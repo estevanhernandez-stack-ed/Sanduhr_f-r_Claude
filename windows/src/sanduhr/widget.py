@@ -11,8 +11,8 @@ import webbrowser
 from datetime import datetime
 from typing import Dict, Optional
 
-from PySide6.QtCore import QPoint, Qt, QThread, QTimer, Slot
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtCore import QEvent, QPoint, Qt, QThread, QTimer, Slot
+from PySide6.QtGui import QColor, QGuiApplication
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -146,11 +146,13 @@ class SanduhrWidget(QWidget):
 
         # Accent gradient strip at top
         self._accent_strip = QWidget()
+        self._accent_strip.setObjectName("AccentStrip")
         self._accent_strip.setFixedHeight(2)
         outer.addWidget(self._accent_strip)
 
         # Title bar
         self._title_bar = QWidget()
+        self._title_bar.setObjectName("TitleBar")
         self._title_bar.setFixedHeight(34)
         tb = QHBoxLayout(self._title_bar)
         tb.setContentsMargins(10, 0, 0, 0)
@@ -176,6 +178,7 @@ class SanduhrWidget(QWidget):
 
         # Theme strip
         self._theme_strip = QWidget()
+        self._theme_strip.setObjectName("ThemeStrip")
         self._theme_strip.setFixedHeight(26)
         ts = QHBoxLayout(self._theme_strip)
         ts.setContentsMargins(10, 0, 10, 0)
@@ -208,6 +211,7 @@ class SanduhrWidget(QWidget):
 
         # Footer
         self._footer = QWidget()
+        self._footer.setObjectName("Footer")
         self._footer.setFixedHeight(24)
         ft = QHBoxLayout(self._footer)
         ft.setContentsMargins(10, 0, 10, 0)
@@ -226,19 +230,64 @@ class SanduhrWidget(QWidget):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
 
+        # Install drag event filter on every non-interactive descendant so the
+        # user can drag from anywhere (cards, labels, bars, empty strip space),
+        # not just the 1-px gaps between child widgets.
+        self._install_drag_filter(self)
+
+    def _install_drag_filter(self, root: QWidget) -> None:
+        """Recursively install drag filter on descendants except QPushButton/QLineEdit."""
+        for child in root.findChildren(QWidget):
+            if isinstance(child, (QPushButton, QLineEdit)):
+                continue
+            child.installEventFilter(self)
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt API)
+        et = event.type()
+        if et == QEvent.MouseButtonPress:
+            if event.button() == Qt.LeftButton:
+                self._drag_origin = (
+                    event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                )
+                return True
+        elif et == QEvent.MouseMove:
+            if self._drag_origin and (event.buttons() & Qt.LeftButton):
+                self.move(event.globalPosition().toPoint() - self._drag_origin)
+                return True
+        elif et == QEvent.MouseButtonRelease:
+            if self._drag_origin is not None:
+                self._drag_origin = None
+                self._save_window_geometry()
+                return True
+        elif et == QEvent.MouseButtonDblClick:
+            if event.button() == Qt.LeftButton:
+                self._toggle_compact()
+                return True
+        return super().eventFilter(obj, event)
+
     # -- theme -----------------------------------------------------
 
     def apply_theme(self, key: str) -> None:
         self._theme_key = key
         self._theme = themes.THEMES[key]
 
+        t = self._theme
         # Themes that opt out of Mica need a solid background on the root widget
         # so the window renders opaque (and captures mouse events across its whole area,
         # so drag works on "empty" regions too).
-        if self._theme.get("opts_out_of_mica"):
-            root_bg = f"background-color: {self._theme['bg']};"
+        opts_out = t.get("opts_out_of_mica", False)
+        if opts_out:
+            root_bg = f"background-color: {t['bg']};"
         else:
             root_bg = ""
+
+        # Chrome strips (title bar, theme strip, footer) need denser glass than
+        # the cards — otherwise their light text disappears against Mica bleeding
+        # through from a light desktop wallpaper. Use a slightly denser alpha than
+        # cards so the chrome feels more solid than the content area.
+        c = QColor(t.get("glass_on_mica", t["glass"]))
+        chrome_alpha = 1.0 if opts_out else 0.92
+        chrome_bg = f"rgba({c.red()},{c.green()},{c.blue()},{chrome_alpha:.3f})"
 
         self.setStyleSheet(
             f"""
@@ -246,9 +295,21 @@ class SanduhrWidget(QWidget):
                 {root_bg}
             }}
             QWidget {{
-                color: {self._theme['text']};
+                color: {t['text']};
                 font-family: "Segoe UI Variable Display", "Segoe UI", sans-serif;
                 font-size: 10pt;
+            }}
+            QWidget#TitleBar, QWidget#ThemeStrip, QWidget#Footer {{
+                background-color: {chrome_bg};
+            }}
+            QPushButton {{
+                color: {t['text']};
+                background: transparent;
+                border: none;
+                padding: 0 8px;
+            }}
+            QPushButton:hover {{
+                background-color: rgba({c.red()},{c.green()},{c.blue()},0.45);
             }}
             """
         )
@@ -470,6 +531,8 @@ class SanduhrWidget(QWidget):
                 self._tier_cards[key] = card
                 self._cards_layout.addWidget(card)
                 self._apply_monospace_if_needed(card)
+                # New card + its descendants need the drag filter too
+                self._install_drag_filter(card)
             card.update_state(
                 util=util,
                 resets_at=resets_at,
