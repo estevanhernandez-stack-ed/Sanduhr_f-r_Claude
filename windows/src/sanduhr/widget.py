@@ -196,9 +196,10 @@ class SanduhrWidget(QWidget):
 
         # Content
         self._content = QWidget()
+        self._content.setObjectName("Content")
         self._content_layout = QVBoxLayout(self._content)
-        self._content_layout.setContentsMargins(14, 10, 14, 10)
-        self._content_layout.setSpacing(8)
+        self._content_layout.setContentsMargins(8, 8, 8, 8)
+        self._content_layout.setSpacing(6)
         self._status_lbl = QLabel("Connecting...")
         self._content_layout.addWidget(self._status_lbl)
         self._cards_container = QWidget()
@@ -300,6 +301,9 @@ class SanduhrWidget(QWidget):
                 font-size: 10pt;
             }}
             QWidget#TitleBar, QWidget#ThemeStrip, QWidget#Footer {{
+                background-color: {chrome_bg};
+            }}
+            QWidget#Content {{
                 background-color: {chrome_bg};
             }}
             QPushButton {{
