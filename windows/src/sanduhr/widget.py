@@ -232,8 +232,19 @@ class SanduhrWidget(QWidget):
         self._theme_key = key
         self._theme = themes.THEMES[key]
 
+        # Themes that opt out of Mica need a solid background on the root widget
+        # so the window renders opaque (and captures mouse events across its whole area,
+        # so drag works on "empty" regions too).
+        if self._theme.get("opts_out_of_mica"):
+            root_bg = f"background-color: {self._theme['bg']};"
+        else:
+            root_bg = ""
+
         self.setStyleSheet(
             f"""
+            SanduhrWidget {{
+                {root_bg}
+            }}
             QWidget {{
                 color: {self._theme['text']};
                 font-family: "Segoe UI Variable Display", "Segoe UI", sans-serif;
