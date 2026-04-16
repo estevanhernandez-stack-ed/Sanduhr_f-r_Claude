@@ -14,8 +14,6 @@ from typing import Dict, Optional
 from PySide6.QtCore import QEvent, QPoint, Qt, QThread, QTimer, Slot
 from PySide6.QtGui import QColor, QGuiApplication
 from PySide6.QtWidgets import (
-    QDialog,
-    QDialogButtonBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -28,6 +26,7 @@ from PySide6.QtWidgets import (
 
 from sanduhr import credentials, history, mica, paths, themes
 from sanduhr.fetcher import UsageFetcher
+from sanduhr.settings_dialog import SettingsDialog
 from sanduhr.tiers import TierCard
 
 _log = logging.getLogger(__name__)
@@ -45,50 +44,6 @@ _TIER_LABELS = {
     "seven_day_oauth_apps": "Weekly - OAuth Apps",
     "iguana_necktie":       "Weekly - Special",
 }
-
-
-class CredentialsDialog(QDialog):
-    def __init__(
-        self,
-        parent=None,
-        session_key: str = "",
-        cf_clearance: str = "",
-        focus_cf: bool = False,
-    ):
-        super().__init__(parent)
-        self.setWindowTitle("Credentials")
-        self.setModal(True)
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(
-            QLabel(
-                "Paste your claude.ai cookies.\n"
-                "F12 -> Application -> Cookies -> claude.ai"
-            )
-        )
-
-        layout.addWidget(QLabel("sessionKey"))
-        self._sk = QLineEdit(session_key)
-        self._sk.setEchoMode(QLineEdit.Password)
-        layout.addWidget(self._sk)
-
-        layout.addWidget(QLabel("cf_clearance (optional)"))
-        self._cf = QLineEdit(cf_clearance)
-        self._cf.setEchoMode(QLineEdit.Password)
-        layout.addWidget(self._cf)
-
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        btns.accepted.connect(self.accept)
-        btns.rejected.connect(self.reject)
-        layout.addWidget(btns)
-
-        (self._cf if focus_cf else self._sk).setFocus()
-
-    def values(self) -> Dict[str, str]:
-        return {
-            "session_key": self._sk.text().strip(),
-            "cf_clearance": self._cf.text().strip(),
-        }
 
 
 class SanduhrWidget(QWidget):
@@ -160,19 +115,19 @@ class SanduhrWidget(QWidget):
         self._title_lbl = QLabel("Sanduhr für Claude")
         tb.addWidget(self._title_lbl)
         tb.addStretch()
-        self._btn_key = QPushButton("Key")
+        self._btn_settings = QPushButton("\u2699 Settings")
         self._btn_refresh = QPushButton("Refresh")
         self._btn_close = QPushButton("x")
         self._btn_pin = QPushButton("Pin")
-        for b in (self._btn_key, self._btn_refresh, self._btn_close, self._btn_pin):
+        for b in (self._btn_settings, self._btn_refresh, self._btn_close, self._btn_pin):
             b.setFlat(True)
             b.setCursor(Qt.PointingHandCursor)
             b.setFixedHeight(34)
-        self._btn_key.clicked.connect(lambda: self._open_credentials_dialog())
+        self._btn_settings.clicked.connect(lambda: self._open_settings_dialog())
         self._btn_refresh.clicked.connect(self._request_refresh)
         self._btn_close.clicked.connect(self.close)
         self._btn_pin.clicked.connect(self._toggle_pin)
-        for b in (self._btn_key, self._btn_refresh, self._btn_close, self._btn_pin):
+        for b in (self._btn_settings, self._btn_refresh, self._btn_close, self._btn_pin):
             tb.addWidget(b)
         outer.addWidget(self._title_bar)
 
@@ -405,7 +360,7 @@ class SanduhrWidget(QWidget):
             "Compact mode" if not self._compact else "Expand",
             self._toggle_compact,
         )
-        menu.addAction("Credentials...", lambda: self._open_credentials_dialog())
+        menu.addAction("Settings...", lambda: self._open_settings_dialog())
         menu.addSeparator()
         menu.addAction("Quit", self.close)
         menu.popup(self.mapToGlobal(pos))
@@ -426,25 +381,22 @@ class SanduhrWidget(QWidget):
         self._compact = not self._compact
         self._render_cards(self._last or {})
 
-    def _open_credentials_dialog(self, focus_cf: bool = False) -> None:
+    def _open_settings_dialog(self, focus_cf: bool = False, initial_tab: int = 0) -> None:
         creds = credentials.load()
-        dlg = CredentialsDialog(
+        dlg = SettingsDialog(
             self,
             session_key=creds.get("session_key") or "",
             cf_clearance=creds.get("cf_clearance") or "",
             focus_cf=focus_cf,
+            initial_tab=initial_tab,
         )
-        if dlg.exec_() == QDialog.Accepted:
-            vals = dlg.values()
-            if vals["session_key"]:
-                credentials.save(
-                    session_key=vals["session_key"],
-                    cf_clearance=vals["cf_clearance"] or None,
-                )
-                self._start_or_update_fetcher(
-                    vals["session_key"], vals["cf_clearance"] or None
-                )
-                self._request_refresh()
+        dlg.credentialsSaved.connect(self._on_credentials_saved)
+        dlg.themesChanged.connect(self._rebuild_theme_strip)
+        dlg.exec_()
+
+    def _on_credentials_saved(self, session_key: str, cf_clearance) -> None:
+        self._start_or_update_fetcher(session_key, cf_clearance)
+        self._request_refresh()
 
     def _prompt_first_run(self) -> None:
         QMessageBox.information(
@@ -456,7 +408,32 @@ class SanduhrWidget(QWidget):
             "3. Copy the sessionKey cookie value.\n\n"
             "Paste it in the next dialog.",
         )
-        self._open_credentials_dialog()
+        self._open_settings_dialog()
+
+    def _rebuild_theme_strip(self) -> None:
+        """Tear down and rebuild the theme strip so newly-added user themes
+        (saved via the Settings dialog) show up immediately without restart."""
+        ts_layout = self._theme_strip.layout()
+        while ts_layout.count():
+            item = ts_layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
+        self._theme_buttons = {}
+        for key, theme in themes.THEMES.items():
+            btn = QPushButton(theme["name"])
+            btn.setFlat(True)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(lambda _=False, k=key: self.apply_theme(k))
+            self._theme_buttons[key] = btn
+            ts_layout.addWidget(btn)
+        ts_layout.addStretch()
+        # Re-apply current theme to refresh active/muted button colors
+        self.apply_theme(self._theme_key)
+        # New buttons need the drag filter too (though buttons are excluded,
+        # this also picks up any new child widgets).
+        self._install_drag_filter(self._theme_strip)
 
     # -- fetcher ---------------------------------------------------
 
