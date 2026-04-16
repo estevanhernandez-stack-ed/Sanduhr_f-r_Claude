@@ -1,0 +1,21 @@
+# Secrets & config (stored in ~/.claude-usage-widget/, not here)
+config.json
+history.json
+*.key
+*.secret
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# VC planning docs (not part of the distributed tool)
+docs/
+process-notes.md
+push.bat
