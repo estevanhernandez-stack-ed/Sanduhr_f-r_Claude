@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# PyInstaller
+build/
+dist/
+*.spec.bak
+
+# Inno Setup output
+/build/
+installer/Output/
+
+# Editors
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+desktop.ini
