@@ -8,6 +8,18 @@ A glassmorphism-styled desktop widget that shows your Claude.ai subscription usa
 
 ---
 
+## Platforms
+
+| Platform | Source | Install |
+|---|---|---|
+| **Windows** (v2, native) | `windows/` | Download installer from [Releases](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases) |
+| **macOS** (native SwiftUI) | `mac/` | Download `.dmg` from [Releases](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases) |
+| **Windows/Mac/Linux** (v1, Python) | `sanduhr.py` | `python sanduhr.py` |
+
+Each platform release is tagged: `v2.0.0-windows`, `v1.0.0-mac`, etc.
+
+---
+
 ## Features
 
 - **Real-time usage bars** — Session (5hr), Weekly All Models, Sonnet, Opus, Cowork, Routines
