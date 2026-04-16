@@ -5,9 +5,10 @@ import pytest
 from sanduhr import themes
 
 
-def test_all_themes_defined():
-    expected = {"obsidian", "aurora", "ember", "mint", "matrix"}
-    assert set(themes.THEMES) == expected
+def test_all_builtin_themes_defined():
+    # Built-ins must always be present. User themes may add more keys at runtime.
+    builtin = {"obsidian", "aurora", "ember", "mint", "matrix"}
+    assert builtin.issubset(set(themes.THEMES))
 
 
 @pytest.mark.parametrize("key", ["obsidian", "aurora", "ember", "mint", "matrix"])

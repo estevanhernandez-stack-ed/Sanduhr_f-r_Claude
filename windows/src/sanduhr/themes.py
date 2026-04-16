@@ -3,7 +3,32 @@
 Each theme is a dict of colors + glass rendering parameters. Non-Matrix
 themes get the full glass-stacking pass (see spec section 4c); Matrix
 explicitly opts out to preserve its phosphor-on-black aesthetic.
+
+Users can drop additional theme JSON files into %APPDATA%\\Sanduhr\\themes\\;
+call `load_user_themes()` at app bootstrap to merge them into THEMES.
 """
+
+import json
+import logging
+
+from sanduhr import paths
+
+_log = logging.getLogger(__name__)
+
+_REQUIRED_COLOR_FIELDS = (
+    "name", "bg", "glass", "glass_on_mica", "title_bg", "border",
+    "text", "text_secondary", "text_dim", "text_muted",
+    "accent", "bar_bg", "footer_bg", "pace_marker", "sparkline",
+)
+
+_DEFAULT_GLASS_TUNING = {
+    "glass_alpha": 0.80,
+    "border_alpha": 0.40,
+    "border_tint": None,
+    "accent_bloom": {"blur": 4, "alpha": 0.45},
+    "inner_highlight": None,
+}
+
 
 THEMES = {
     "obsidian": {
@@ -132,3 +157,45 @@ def usage_color(pct: int) -> str:
     if pct < 90:
         return "#fb923c"
     return "#f87171"
+
+
+def _validate_theme(key: str, data: dict) -> dict | None:
+    """Return a normalized theme dict, or None if invalid (logged)."""
+    missing = [f for f in _REQUIRED_COLOR_FIELDS if f not in data]
+    if missing:
+        _log.warning("User theme '%s' missing required fields: %s", key, missing)
+        return None
+    merged = dict(_DEFAULT_GLASS_TUNING)
+    merged.update(data)
+    return merged
+
+
+def load_user_themes() -> dict:
+    """Scan %APPDATA%\\Sanduhr\\themes\\ for *.json theme files and merge into THEMES.
+
+    File stem becomes the theme key (sunset.json -> "sunset"). Invalid JSON
+    or missing required fields -> logged warning, file skipped. Safe to call
+    repeatedly; later files for the same key replace earlier ones.
+
+    Returns a dict of {key: theme} for only the user themes loaded (for tests).
+    """
+    themes_dir = paths.app_data_dir() / "themes"
+    themes_dir.mkdir(parents=True, exist_ok=True)
+
+    loaded = {}
+    for path in sorted(themes_dir.glob("*.json")):
+        key = path.stem.lower()
+        if not key or key in loaded:
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            _log.warning("Could not read user theme %s: %s", path.name, e)
+            continue
+        theme = _validate_theme(key, data)
+        if theme is None:
+            continue
+        THEMES[key] = theme
+        loaded[key] = theme
+        _log.info("Loaded user theme '%s' from %s", key, path.name)
+    return loaded

@@ -8,7 +8,7 @@ import sys
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
-from sanduhr import paths
+from sanduhr import paths, themes
 from sanduhr.widget import SanduhrWidget
 
 
@@ -57,6 +57,10 @@ def _locate_icon() -> str:
 def main() -> int:
     _configure_logging()
     _set_app_user_model_id()
+
+    # Merge user-dropped themes from %APPDATA%\Sanduhr\themes\*.json into THEMES
+    # before widget construction so the theme strip picks them up automatically.
+    themes.load_user_themes()
 
     app = QApplication(sys.argv)
     app.setApplicationName("Sanduhr für Claude")
