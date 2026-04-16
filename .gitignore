@@ -15,7 +15,11 @@ __pycache__/
 Thumbs.db
 desktop.ini
 
-# VC planning docs (not part of the distributed tool)
-docs/
+# Internal writeups (not part of the distributed tool)
 process-notes.md
+devpost.md
 push.bat
+commit.bat
+
+# Personal profile (contains PII)
+docs/builder-profile.md
