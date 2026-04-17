@@ -86,6 +86,7 @@ class SettingsDialog(QDialog):
 
         self._build_credentials_tab(session_key, cf_clearance, focus_cf)
         self._build_themes_tab()
+        self._build_help_tab()
 
         btns = QDialogButtonBox(QDialogButtonBox.Close)
         btns.rejected.connect(self.reject)
@@ -195,6 +196,73 @@ class SettingsDialog(QDialog):
 
         self._refresh_list()
         self._tabs.addTab(page, "Themes")
+
+    # ── Help tab ─────────────────────────────────────────────────
+
+    def _build_help_tab(self) -> None:
+        from PySide6.QtCore import Qt
+        page = QWidget()
+        v = QVBoxLayout(page)
+
+        help_text = QLabel()
+        help_text.setTextFormat(Qt.RichText)
+        help_text.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        help_text.setOpenExternalLinks(True)
+        help_text.setWordWrap(True)
+        help_text.setText("""
+<h3 style="margin-top:0">Keyboard shortcuts</h3>
+<table cellpadding="4">
+  <tr><td><b>Ctrl + R</b></td><td>Refresh usage now</td></tr>
+  <tr><td><b>Ctrl + ,</b></td><td>Open Settings (this dialog)</td></tr>
+  <tr><td><b>Ctrl + D</b></td><td>Toggle compact mode (highest-usage tier only)</td></tr>
+  <tr><td><b>Ctrl + H</b></td><td>Open Help (this tab)</td></tr>
+  <tr><td><b>Alt + F4</b></td><td>Close Sanduhr</td></tr>
+</table>
+
+<h3>Widget interactions</h3>
+<ul>
+  <li><b>Drag anywhere</b> on the widget to move it. Position persists across sessions.</li>
+  <li><b>Double-click the title bar</b> to toggle compact mode (same as Ctrl+D).</li>
+  <li><b>Right-click anywhere</b> for a quick menu: Refresh / Compact / Settings / Quit.</li>
+  <li><b>Click a theme name</b> in the strip below the title to switch themes instantly.</li>
+  <li><b>Pin button</b> toggles always-on-top.</li>
+  <li><b>× (Close)</b> quits the widget.</li>
+</ul>
+
+<h3>What each tier card shows</h3>
+<ul>
+  <li><b>Percentage bar</b> — how much of that tier you've used this period.</li>
+  <li><b>Bright colored tick</b> on the bar — the "on pace" marker (where you <i>should</i> be right now based on time elapsed).</li>
+  <li><b>Inline sparkline</b> — your utilization trend over the last 2 hours.</li>
+  <li><b>"Resets in Xd Xh"</b> — time until this tier's quota resets.</li>
+  <li><b>"On pace" / "X% ahead" / "X% under"</b> — linear pace analysis.</li>
+  <li><b>"At current pace, expires in X"</b> — burn-rate projection (only shown when you'd hit 100% before the reset).</li>
+</ul>
+
+<h3>Credentials tab</h3>
+<p>On first run, paste your <code>sessionKey</code> cookie from <code>claude.ai</code>
+(F12 → Application → Cookies → claude.ai). Stored in Windows Credential Manager,
+service <code>com.626labs.sanduhr</code>. Update anytime here. If an account
+requires Cloudflare clearance, also paste <code>cf_clearance</code>.</p>
+
+<h3>Themes tab</h3>
+<p>Five themes ship built-in. Author your own by dropping a JSON palette into
+<code>%APPDATA%\\Sanduhr\\themes\\</code>, or paste one directly in the Themes
+tab. The <b>Copy agent prompt</b> button copies a ready-to-use prompt you can
+hand any chat agent (Claude, ChatGPT, etc.) along with a reference image or
+vibe description to get back a drop-in theme JSON.</p>
+
+<h3>More</h3>
+<p>Source + issues: <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude">github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude</a><br/>
+Privacy policy: <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/blob/main/docs/PRIVACY.md">docs/PRIVACY.md</a></p>
+""")
+        from PySide6.QtWidgets import QScrollArea
+        scroll = QScrollArea()
+        scroll.setWidget(help_text)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        v.addWidget(scroll)
+        self._tabs.addTab(page, "Help")
 
     def _autofill_filename(self) -> None:
         """Try to pull name from JSON in the paste buffer; fill filename if empty."""

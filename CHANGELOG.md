@@ -1,5 +1,48 @@
 # Changelog
 
+## v2.0.2-windows — 2026-04-17
+
+**Platform:** Windows
+**Patch release — Microsoft Store resubmission (navigation + content policy).**
+
+### Added
+
+- **Windows-native close button.** Replaced the plain lowercase `x` with the
+  proper heavy-multiplication glyph (×), widened to 46px to match Explorer /
+  Settings title bars, and styled with the standard Win11 red hover
+  (`#c42b1c`) + darker pressed state. Button order rearranged so close sits
+  rightmost, matching every other Windows title bar.
+- **Keyboard shortcuts.** `Ctrl+R` refresh, `Ctrl+,` open Settings,
+  `Ctrl+D` toggle compact mode, `Ctrl+H` jump straight to the Help tab,
+  `Alt+F4` close (stock). Surfaced in tooltips and the Help tab.
+- **Settings dialog → Help tab.** Full keybinding list, widget interaction
+  reference (drag anywhere, double-click title, right-click menu, theme
+  strip, tier-card elements), and quick links to the source repo + privacy
+  policy. Scrollable, rich-text, with real `<a>` hyperlinks.
+- **First-run tip banner.** Dismissible one-liner below the theme strip on
+  first launch: *"💡 Drag anywhere to move · double-click title for compact
+  · right-click for menu."* Dismissal persists to
+  `%APPDATA%\Sanduhr\settings.json`.
+- **Tooltips on chrome buttons.** Settings / Refresh / Pin / × / title bar
+  each get a short hover tooltip including the relevant keyboard shortcut.
+  Deliberately kept off internal elements — no tooltip spam.
+- **Accessible names** on every chrome button so screen readers and Store
+  review tooling can identify controls.
+
+### Fixed
+
+- N/A (all additions).
+
+### Why
+
+Microsoft Store review rejected v2.0.1 under policy **10.1.4.4** with three
+specific concerns: (a) "Content" / trademark disclosure, (b) "unique lasting
+value," (c) "navigation is poor." This release targets (c) directly with
+real affordance work: explicit Help surface, keyboard shortcuts, native
+close-button styling, and a discoverable first-run tip. (a) and (b) are
+addressed in parallel via an updated Store listing description — no code
+changes needed for those. Ships alongside the Store resubmission.
+
 ## v2.0.1-windows — 2026-04-16
 
 **Platform:** Windows

@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Dict, Optional
 
 from PySide6.QtCore import QEvent, QPoint, Qt, QThread, QTimer, Slot
-from PySide6.QtGui import QColor, QGuiApplication
+from PySide6.QtGui import QColor, QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -76,6 +76,10 @@ class SanduhrWidget(QWidget):
 
         creds = credentials.load()
         if not creds["session_key"]:
+            # Preview mode: show what a real tier card looks like so the
+            # empty pre-setup state demonstrates the feature instead of
+            # looking like a broken app.
+            QTimer.singleShot(0, self._render_preview)
             QTimer.singleShot(100, self._prompt_first_run)
         else:
             self._start_fetcher(creds["session_key"], creds["cf_clearance"])
@@ -117,17 +121,41 @@ class SanduhrWidget(QWidget):
         tb.addStretch()
         self._btn_settings = QPushButton("\u2699 Settings")
         self._btn_refresh = QPushButton("Refresh")
-        self._btn_close = QPushButton("x")
         self._btn_pin = QPushButton("Pin")
-        for b in (self._btn_settings, self._btn_refresh, self._btn_close, self._btn_pin):
+        # Windows-native-style close button: wider, red hover via stylesheet,
+        # uses the Unicode heavy multiplication sign that Windows Explorer
+        # itself draws in title bars (rather than a plain lowercase x).
+        self._btn_close = QPushButton("\u2715")
+        self._btn_close.setObjectName("CloseButton")
+        for b in (self._btn_settings, self._btn_refresh, self._btn_pin):
             b.setFlat(True)
             b.setCursor(Qt.PointingHandCursor)
             b.setFixedHeight(34)
+        self._btn_close.setFlat(True)
+        self._btn_close.setCursor(Qt.PointingHandCursor)
+        self._btn_close.setFixedHeight(34)
+        self._btn_close.setFixedWidth(46)  # matches Explorer/Settings close-button width
+
+        # Tooltips — selective, for the controls whose purpose isn't obvious.
+        self._btn_settings.setToolTip("Settings — credentials, themes, help (Ctrl+,)")
+        self._btn_refresh.setToolTip("Refresh usage now (Ctrl+R)")
+        self._btn_pin.setToolTip("Toggle always-on-top")
+        self._btn_close.setToolTip("Close (Alt+F4)")
+        self._title_lbl.setToolTip("Drag to move · double-click to toggle compact · right-click for menu")
+
+        # Accessible names — screen readers + MS Store review tooling look at these.
+        self._btn_settings.setAccessibleName("Settings")
+        self._btn_refresh.setAccessibleName("Refresh usage")
+        self._btn_pin.setAccessibleName("Toggle always-on-top")
+        self._btn_close.setAccessibleName("Close")
+
         self._btn_settings.clicked.connect(lambda: self._open_settings_dialog())
         self._btn_refresh.clicked.connect(self._request_refresh)
         self._btn_close.clicked.connect(self.close)
         self._btn_pin.clicked.connect(self._toggle_pin)
-        for b in (self._btn_settings, self._btn_refresh, self._btn_close, self._btn_pin):
+        # Order matters — close must be the rightmost button, matching every
+        # other Windows title bar the user has ever seen.
+        for b in (self._btn_settings, self._btn_refresh, self._btn_pin, self._btn_close):
             tb.addWidget(b)
         outer.addWidget(self._title_bar)
 
@@ -155,6 +183,17 @@ class SanduhrWidget(QWidget):
         self._content_layout = QVBoxLayout(self._content)
         self._content_layout.setContentsMargins(8, 8, 8, 8)
         self._content_layout.setSpacing(6)
+
+        # First-run tip banner — reveals the non-obvious affordances the
+        # MS Store reviewer (and regular users) would otherwise miss:
+        # drag-anywhere, double-click compact, right-click menu. Persists
+        # the dismissal in settings.json so returning users don't see it.
+        if not self._settings.get("tip_dismissed"):
+            self._tip_banner = self._build_tip_banner()
+            self._content_layout.addWidget(self._tip_banner)
+        else:
+            self._tip_banner = None
+
         self._status_lbl = QLabel("Connecting...")
         self._content_layout.addWidget(self._status_lbl)
         self._cards_container = QWidget()
@@ -186,10 +225,107 @@ class SanduhrWidget(QWidget):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
 
+        # Keyboard shortcuts — surfaced in tooltips + the Help tab.
+        for seq, slot in (
+            ("Ctrl+R", self._request_refresh),
+            ("Ctrl+,", lambda: self._open_settings_dialog()),
+            ("Ctrl+D", self._toggle_compact),
+            ("Ctrl+H", lambda: self._open_settings_dialog(initial_tab=2)),
+        ):
+            sc = QShortcut(QKeySequence(seq), self)
+            sc.activated.connect(slot)
+
         # Install drag event filter on every non-interactive descendant so the
         # user can drag from anywhere (cards, labels, bars, empty strip space),
         # not just the 1-px gaps between child widgets.
         self._install_drag_filter(self)
+
+    # ── preview (no-credentials onboarding) ────────────────────────
+
+    def _render_preview(self) -> None:
+        """Render a demo tier card with mock data so users see what the
+        widget will look like once they paste their sessionKey."""
+        from datetime import datetime, timedelta, timezone
+
+        self._preview_hint = QLabel(
+            "\U0001F441 <b>Preview.</b> Click <b>\u2699 Settings</b> "
+            "and paste your <code>sessionKey</code> cookie from claude.ai "
+            "to see your real usage."
+        )
+        self._preview_hint.setTextFormat(Qt.RichText)
+        self._preview_hint.setWordWrap(True)
+        self._preview_hint.setStyleSheet(
+            f"color: {self._theme['accent']}; font-size: 9pt; "
+            f"padding: 8px 4px;"
+        )
+        self._content_layout.insertWidget(
+            max(0, self._content_layout.indexOf(self._status_lbl)),
+            self._preview_hint,
+        )
+
+        demo = TierCard(
+            tier_key="five_hour",
+            label="Session (5hr) \u00B7 preview",
+            theme=self._theme,
+        )
+        self._preview_card = demo
+        # Mock history: ramp up over 2 hours to ~68%, current util 68%.
+        mock_history = [28, 32, 35, 40, 43, 47, 51, 54, 58, 61, 64, 68]
+        mock_reset = (
+            datetime.now(timezone.utc) + timedelta(hours=2, minutes=27)
+        ).isoformat().replace("+00:00", "Z")
+        demo.update_state(util=68, resets_at=mock_reset, history_values=mock_history)
+        self._cards_layout.addWidget(demo)
+        self._install_drag_filter(demo)
+
+    def _clear_preview(self) -> None:
+        """Tear down preview state — called once real data (or credentials)
+        arrives."""
+        card = getattr(self, "_preview_card", None)
+        if card is not None:
+            self._cards_layout.removeWidget(card)
+            card.setParent(None)
+            card.deleteLater()
+            self._preview_card = None
+        hint = getattr(self, "_preview_hint", None)
+        if hint is not None:
+            self._content_layout.removeWidget(hint)
+            hint.setParent(None)
+            hint.deleteLater()
+            self._preview_hint = None
+
+    def _build_tip_banner(self) -> QWidget:
+        """One-time tip row surfaced on first launch; dismiss → persisted."""
+        banner = QWidget()
+        banner.setObjectName("TipBanner")
+        lay = QHBoxLayout(banner)
+        lay.setContentsMargins(10, 6, 6, 6)
+        lay.setSpacing(8)
+        msg = QLabel(
+            "\U0001F4A1  Drag anywhere to move  \u00B7  double-click title "
+            "for compact  \u00B7  right-click for menu"
+        )
+        msg.setWordWrap(True)
+        lay.addWidget(msg, stretch=1)
+        dismiss = QPushButton("\u00D7")
+        dismiss.setFlat(True)
+        dismiss.setCursor(Qt.PointingHandCursor)
+        dismiss.setFixedSize(22, 22)
+        dismiss.setToolTip("Dismiss")
+        dismiss.setAccessibleName("Dismiss tip")
+        dismiss.clicked.connect(self._dismiss_tip_banner)
+        lay.addWidget(dismiss)
+        return banner
+
+    def _dismiss_tip_banner(self) -> None:
+        if self._tip_banner is None:
+            return
+        self._tip_banner.hide()
+        self._content_layout.removeWidget(self._tip_banner)
+        self._tip_banner.deleteLater()
+        self._tip_banner = None
+        self._settings["tip_dismissed"] = True
+        self._save_settings()
 
     def _install_drag_filter(self, root: QWidget) -> None:
         """Recursively install drag filter on descendants except QPushButton/QLineEdit."""
@@ -261,6 +397,15 @@ class SanduhrWidget(QWidget):
             QWidget#Content {{
                 background-color: {chrome_bg};
             }}
+            QWidget#TipBanner {{
+                background-color: rgba({QColor(t['accent']).red()},{QColor(t['accent']).green()},{QColor(t['accent']).blue()},0.14);
+                border: 1px solid rgba({QColor(t['accent']).red()},{QColor(t['accent']).green()},{QColor(t['accent']).blue()},0.35);
+                border-radius: 6px;
+            }}
+            QWidget#TipBanner QLabel {{
+                color: {t['text']};
+                font-size: 9pt;
+            }}
             QPushButton {{
                 color: {t['text']};
                 background: transparent;
@@ -269,6 +414,20 @@ class SanduhrWidget(QWidget):
             }}
             QPushButton:hover {{
                 background-color: rgba({c.red()},{c.green()},{c.blue()},0.45);
+            }}
+            /* Windows-native close button: larger glyph, red hover, red-darker
+               pressed state. Matches Win11 Explorer / Settings title bars. */
+            QPushButton#CloseButton {{
+                font-size: 12pt;
+                font-weight: 400;
+            }}
+            QPushButton#CloseButton:hover {{
+                background-color: #c42b1c;
+                color: #ffffff;
+            }}
+            QPushButton#CloseButton:pressed {{
+                background-color: #b2271a;
+                color: #ffffff;
             }}
             """
         )
@@ -368,14 +527,41 @@ class SanduhrWidget(QWidget):
     # -- actions ---------------------------------------------------
 
     def _toggle_pin(self) -> None:
+        """Toggle always-on-top.
+
+        Qt's setWindowFlags(~WindowStaysOnTopHint) doesn't reliably demote a
+        frameless window from topmost on Windows — the flag is cleared on
+        the Qt side but SetWindowPos(HWND_NOTOPMOST) isn't always issued,
+        so the window appears "stuck pinned." Call the Win32 API directly
+        to guarantee the z-order change, then keep the Qt flag in sync so
+        future QEvent processing matches reality.
+        """
+        import sys as _sys
         self._pinned = not self._pinned
-        flags = self.windowFlags()
-        if self._pinned:
-            flags |= Qt.WindowStaysOnTopHint
-        else:
-            flags &= ~Qt.WindowStaysOnTopHint
-        self.setWindowFlags(flags)
-        self.show()
+
+        if _sys.platform == "win32":
+            import ctypes
+            HWND_TOPMOST, HWND_NOTOPMOST = -1, -2
+            SWP_NOMOVE, SWP_NOSIZE, SWP_NOACTIVATE = 0x0002, 0x0001, 0x0010
+            ctypes.windll.user32.SetWindowPos(
+                int(self.winId()),
+                HWND_TOPMOST if self._pinned else HWND_NOTOPMOST,
+                0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+            )
+
+        # Keep the Qt-side flag in sync so future flag queries are truthful,
+        # but do it via setWindowFlag (no show()) — we already updated the
+        # native z-order and don't want Qt to re-create the HWND here (that
+        # would drop Mica + reset state).
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, self._pinned)
+
+        # Visual feedback on the button itself.
+        self._btn_pin.setText("Pin" if self._pinned else "Unpin")
+        self._btn_pin.setToolTip(
+            "Unpin (currently always on top)" if self._pinned
+            else "Pin always on top"
+        )
 
     def _toggle_compact(self) -> None:
         self._compact = not self._compact
@@ -395,6 +581,7 @@ class SanduhrWidget(QWidget):
         dlg.exec_()
 
     def _on_credentials_saved(self, session_key: str, cf_clearance) -> None:
+        self._clear_preview()
         self._start_or_update_fetcher(session_key, cf_clearance)
         self._request_refresh()
 
@@ -466,6 +653,7 @@ class SanduhrWidget(QWidget):
 
     @Slot(dict)
     def _on_data_ready(self, data: dict) -> None:
+        self._clear_preview()
         self._status_lbl.setText("")
         self._last = data
         self._render_cards(data)
