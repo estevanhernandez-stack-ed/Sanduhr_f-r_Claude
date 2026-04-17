@@ -1,0 +1,74 @@
+name: Windows Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*-windows"
+
+defaults:
+  run:
+    working-directory: windows
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write  # required to upload release assets
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: windows/requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip install -e .
+
+      - name: Ensure Inno Setup 6 is present
+        # windows-latest ships with Inno Setup already — only install if
+        # missing. Pinning a chocolatey version would fail against the
+        # pre-installed newer one, so we don't.
+        shell: pwsh
+        run: |
+          $iscc = Get-ChildItem -Path "${env:ProgramFiles(x86)}", "${env:ProgramFiles}" -Filter "ISCC.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($iscc) {
+            Write-Host "Inno Setup already installed at $($iscc.FullName)"
+          } else {
+            Write-Host "Inno Setup not found -- installing via chocolatey"
+            choco install innosetup -y --no-progress
+          }
+
+      - name: Run pytest (gate)
+        run: pytest
+
+      - name: Build .exe installer
+        shell: pwsh
+        run: ./build.ps1
+
+      - name: Build .msix (unsigned; Store ingestion re-signs)
+        shell: pwsh
+        run: ./msix/make-msix.ps1
+
+      - name: Extract version
+        id: ver
+        shell: pwsh
+        run: |
+          $t = "${{ github.ref_name }}"
+          $v = $t -replace "^v", "" -replace "-windows$", ""
+          echo "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Upload release artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            windows/build/Sanduhr-Setup-v${{ steps.ver.outputs.version }}.exe
+            windows/build/Sanduhr-v${{ steps.ver.outputs.version }}.0.msix
+          body_path: windows/RELEASE_NOTES.md
+          fail_on_unmatched_files: true
+          prerelease: false

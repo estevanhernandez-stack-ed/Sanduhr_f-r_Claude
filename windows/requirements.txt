@@ -1,0 +1,4 @@
+PySide6==6.8.0.2
+cloudscraper==1.2.71
+keyring==25.5.0
+requests==2.32.3

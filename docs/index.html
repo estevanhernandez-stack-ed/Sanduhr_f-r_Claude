@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sanduhr für Claude — usage widget for Claude.ai power users</title>
+  <meta name="description" content="Native Windows 11 glass widget that turns your Claude.ai subscription usage into something you can actually pace yourself by. Burn-rate projections, pace markers, sparklines, five glass themes, user-authorable palettes." />
+  <meta name="theme-color" content="#0f182b" />
+  <meta name="color-scheme" content="dark" />
+
+  <!-- OpenGraph / social -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Sanduhr für Claude" />
+  <meta property="og:description" content="Native desktop widget for Claude.ai subscription pacing — burn rate, pace markers, glass themes, user-authorable JSON palettes." />
+  <meta property="og:image" content="https://estevanhernandez-stack-ed.github.io/Sanduhr_f-r_Claude/store-assets/logo-square-1080x1080.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="icon" type="image/png" href="store-assets/app-tile-150x150.png" />
+
+  <style>
+    /* ── palette ──────────────────────────────────────────────────
+       Navy sampled from 626Labs.png; cyan + magenta from the Mac
+       icon generator in /mac/icon/generate.swift so the site, the
+       installer, the icon, and the in-app chrome all share one
+       palette. */
+    :root {
+      --navy-deep: #0f182b;
+      --navy-mid:  #162033;
+      --navy-hi:   #1a2540;
+      --navy-line: #2a3a5c;
+      --cyan:      #3bb4d9;
+      --cyan-pale: #7ae0f5;
+      --magenta:   #e13aa0;
+      --text:      #e8f2ff;
+      --text-sec:  #a8c2d9;
+      --text-dim:  #6a849e;
+      --text-mute: #4a5f7a;
+      --ok:        #4ade80;
+      --warn:      #fb923c;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--navy-deep);
+      color: var(--text);
+      font-family: "Segoe UI Variable Display", "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      line-height: 1.55;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      min-height: 100vh;
+      /* Subtle radial glow — echoes the Mac icon's background gradient */
+      background:
+        radial-gradient(1200px 800px at 50% -200px, rgba(59, 180, 217, 0.12), transparent 70%),
+        radial-gradient(900px 600px at 80% 600px, rgba(225, 58, 160, 0.08), transparent 70%),
+        var(--navy-deep);
+    }
+
+    a { color: var(--cyan); text-decoration: none; }
+    a:hover { color: var(--cyan-pale); text-decoration: underline; }
+
+    code, pre {
+      font-family: "Cascadia Code", "Consolas", monospace;
+      background: rgba(10, 20, 41, 0.7);
+      border: 1px solid var(--navy-line);
+      border-radius: 4px;
+    }
+    code { padding: 1px 6px; font-size: 0.9em; }
+
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ── top nav ──────────────────────────────────────── */
+    nav.topbar {
+      border-bottom: 1px solid var(--navy-line);
+      padding: 18px 0;
+      position: sticky;
+      top: 0;
+      background: rgba(15, 24, 43, 0.82);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 50;
+    }
+    nav.topbar .inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    nav.topbar .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    nav.topbar .brand img { width: 32px; height: 32px; border-radius: 6px; }
+    nav.topbar .links { display: flex; gap: 18px; font-size: 14px; }
+    nav.topbar .links a { color: var(--text-sec); }
+    nav.topbar .links a:hover { color: var(--cyan-pale); text-decoration: none; }
+
+    /* ── hero ────────────────────────────────────────── */
+    section.hero {
+      padding: 96px 0 64px;
+      text-align: center;
+    }
+    section.hero h1 {
+      font-size: clamp(36px, 6vw, 60px);
+      line-height: 1.08;
+      margin: 0 0 18px;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, var(--cyan-pale) 0%, var(--cyan) 50%, var(--magenta) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+    section.hero .tagline {
+      font-size: clamp(18px, 2.2vw, 22px);
+      color: var(--text-sec);
+      max-width: 660px;
+      margin: 0 auto 12px;
+    }
+    section.hero .sub {
+      font-size: 14px;
+      color: var(--text-dim);
+      max-width: 640px;
+      margin: 0 auto 38px;
+    }
+    section.hero .ctas {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 22px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 15px;
+      transition: transform .12s ease, background .15s ease, border-color .15s ease;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .btn.primary {
+      background: linear-gradient(135deg, var(--cyan) 0%, var(--magenta) 100%);
+      color: #0a121f;
+    }
+    .btn.primary:hover {
+      transform: translateY(-1px);
+      text-decoration: none;
+      color: #0a121f;
+    }
+    .btn.ghost {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--navy-line);
+    }
+    .btn.ghost:hover {
+      background: rgba(59, 180, 217, 0.08);
+      border-color: var(--cyan);
+      text-decoration: none;
+    }
+
+    /* ── platforms ──────────────────────────────────── */
+    section.platforms {
+      padding: 48px 0;
+    }
+    section.platforms h2,
+    section.features h2,
+    section.themes h2,
+    section.docs h2 {
+      font-size: 28px;
+      margin: 0 0 8px;
+      letter-spacing: -0.01em;
+    }
+    section.platforms p.lead,
+    section.features p.lead,
+    section.themes p.lead,
+    section.docs p.lead {
+      color: var(--text-dim);
+      margin: 0 0 28px;
+      font-size: 15px;
+    }
+    .platform-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .platform-card {
+      background: rgba(26, 37, 64, 0.6);
+      border: 1px solid var(--navy-line);
+      border-radius: 12px;
+      padding: 22px;
+      transition: border-color .15s ease, transform .12s ease;
+    }
+    .platform-card:hover {
+      border-color: var(--cyan);
+      transform: translateY(-2px);
+    }
+    .platform-card h3 {
+      font-size: 18px;
+      margin: 0 0 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .platform-card .badge {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--cyan);
+      background: rgba(59, 180, 217, 0.14);
+      border: 1px solid rgba(59, 180, 217, 0.35);
+      padding: 2px 8px;
+      border-radius: 999px;
+      letter-spacing: 0.02em;
+    }
+    .platform-card .badge.pending {
+      color: var(--warn);
+      background: rgba(251, 146, 60, 0.12);
+      border-color: rgba(251, 146, 60, 0.4);
+    }
+    .platform-card .badge.legacy {
+      color: var(--text-dim);
+      background: rgba(106, 132, 158, 0.12);
+      border-color: rgba(106, 132, 158, 0.3);
+    }
+    .platform-card .meta {
+      color: var(--text-dim);
+      font-size: 13px;
+      margin: 0 0 14px;
+    }
+    .platform-card .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .platform-card .actions a {
+      font-size: 13px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--navy-line);
+      color: var(--text);
+    }
+    .platform-card .actions a:hover {
+      background: rgba(59, 180, 217, 0.1);
+      border-color: var(--cyan);
+      text-decoration: none;
+    }
+    .platform-card .actions a.primary {
+      background: rgba(59, 180, 217, 0.14);
+      border-color: var(--cyan);
+      color: var(--cyan-pale);
+    }
+
+    /* ── features ──────────────────────────────────── */
+    section.features { padding: 48px 0; }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    .feature {
+      background: rgba(26, 37, 64, 0.45);
+      border: 1px solid rgba(59, 180, 217, 0.18);
+      border-radius: 10px;
+      padding: 18px;
+    }
+    .feature h4 {
+      font-size: 15px;
+      margin: 0 0 6px;
+      color: var(--cyan-pale);
+    }
+    .feature p {
+      font-size: 13.5px;
+      color: var(--text-sec);
+      margin: 0;
+    }
+
+    /* ── themes gallery ────────────────────────────── */
+    section.themes { padding: 48px 0; }
+    .themes-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+    }
+    .theme-card {
+      background: rgba(26, 37, 64, 0.55);
+      border: 1px solid var(--navy-line);
+      border-radius: 10px;
+      overflow: hidden;
+      transition: transform .15s ease, border-color .15s ease;
+    }
+    .theme-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--cyan);
+    }
+    .theme-card img {
+      width: 100%;
+      display: block;
+      aspect-ratio: 520 / 606;
+      object-fit: cover;
+    }
+    .theme-card .cap {
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--text-sec);
+      border-top: 1px solid var(--navy-line);
+      display: flex;
+      justify-content: space-between;
+    }
+    .theme-card .cap small { color: var(--text-dim); }
+
+    /* ── docs ──────────────────────────────────────── */
+    section.docs { padding: 48px 0; }
+    .docs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+    }
+    .doc-link {
+      display: block;
+      padding: 14px 16px;
+      background: transparent;
+      border: 1px solid var(--navy-line);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      transition: border-color .15s ease, background .15s ease;
+    }
+    .doc-link:hover {
+      border-color: var(--cyan);
+      background: rgba(59, 180, 217, 0.05);
+      text-decoration: none;
+    }
+    .doc-link .kind {
+      display: block;
+      color: var(--text-dim);
+      font-size: 11px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    /* ── footer ────────────────────────────────────── */
+    footer {
+      margin-top: 64px;
+      border-top: 1px solid var(--navy-line);
+      padding: 28px 0 48px;
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+    footer .inner {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    footer a { color: var(--text-sec); }
+    footer .legal { max-width: 680px; font-size: 12px; }
+
+    /* ── publisher mark ─────────────────────────────── */
+    section.publisher {
+      padding: 56px 0 8px;
+      text-align: center;
+    }
+    section.publisher .mark {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 26px 32px;
+      background: rgba(26, 37, 64, 0.45);
+      border: 1px solid rgba(59, 180, 217, 0.2);
+      border-radius: 16px;
+      transition: border-color .15s ease, transform .15s ease;
+    }
+    section.publisher .mark:hover {
+      border-color: var(--cyan);
+      transform: translateY(-2px);
+      text-decoration: none;
+    }
+    section.publisher img {
+      width: 140px;
+      height: auto;
+      border-radius: 12px;
+      display: block;
+    }
+    section.publisher .by {
+      font-size: 12px;
+      color: var(--text-dim);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* ── responsive ─────────────────────────────────── */
+    @media (max-width: 600px) {
+      section.hero { padding: 56px 0 36px; }
+      nav.topbar .links { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="topbar">
+    <div class="container inner">
+      <div class="brand">
+        <img src="store-assets/app-tile-150x150.png" alt="Sanduhr icon" />
+        <span>Sanduhr&nbsp;für&nbsp;Claude</span>
+      </div>
+      <div class="links">
+        <a href="#download">Download</a>
+        <a href="#features">Features</a>
+        <a href="#themes">Themes</a>
+        <a href="#docs">Docs</a>
+        <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="container">
+      <h1>Pace yourself on claude.ai.</h1>
+      <p class="tagline">A native desktop widget for Windows 11 and macOS that turns your Claude subscription usage into something you can actually pace yourself by — burn rate, pace markers, sparkline trends, and five hand-tuned glass themes on both platforms.</p>
+      <p class="sub">Independent third-party tool. Not affiliated with Anthropic. Requires an active Claude Pro, Team, or Enterprise subscription.</p>
+      <div class="ctas">
+        <a class="btn primary" href="#download">Download ↓</a>
+        <a class="btn ghost" href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude">View source</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="platforms" id="download">
+    <div class="container">
+      <h2>Pick your platform</h2>
+      <p class="lead">Ships for Windows 11 and macOS. A legacy Python script covers everything else.</p>
+      <div class="platform-grid">
+
+        <div class="platform-card">
+          <h3>Windows <span class="badge">v2.0.2 · native</span></h3>
+          <p class="meta">Win11 (Mica glass) &middot; Win10 solid-color fallback &middot; PySide6 / Qt 6 &middot; PyInstaller one-folder + Inno Setup installer.</p>
+          <div class="actions">
+            <a class="primary" href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/latest">Download .exe</a>
+            <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/latest">.msix (Store)</a>
+            <a href="windows/README.md">Build from source</a>
+          </div>
+        </div>
+
+        <div class="platform-card">
+          <h3>macOS <span class="badge">native SwiftUI</span></h3>
+          <p class="meta">NSVisualEffectView vibrancy &middot; Keychain-backed credentials &middot; Developer ID signed + notarized &middot; Sparkle auto-updates &middot; drag-install DMG.</p>
+          <div class="actions">
+            <a class="primary" href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases">Latest .dmg</a>
+            <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/tree/mac-native/mac">Source</a>
+          </div>
+        </div>
+
+        <div class="platform-card">
+          <h3>Cross-platform <span class="badge legacy">v1 · python</span></h3>
+          <p class="meta">Original Python / tkinter version. Works on Windows, Mac, and Linux. Run <code>python sanduhr.py</code>.</p>
+          <div class="actions">
+            <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/blob/main/sanduhr.py">sanduhr.py</a>
+            <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/blob/main/INSTALL.md">Install guide</a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <section class="features" id="features">
+    <div class="container">
+      <h2>Not just a mirror of the numbers.</h2>
+      <p class="lead">Claude.ai&rsquo;s own usage page tells you what you&rsquo;ve used. Sanduhr tells you whether that&rsquo;s a problem yet &mdash; and does it natively on Windows 11 and macOS.</p>
+      <div class="feature-grid">
+        <div class="feature">
+          <h4>Burn rate projection</h4>
+          <p>&ldquo;You&rsquo;ll hit your weekly cap in ~4h 22m at current pace.&rdquo; Know before you run dry.</p>
+        </div>
+        <div class="feature">
+          <h4>Pace markers</h4>
+          <p>Bright ticks on every bar show where &ldquo;on pace&rdquo; is <em>right now</em> &mdash; pace by eye, no math.</p>
+        </div>
+        <div class="feature">
+          <h4>Sparkline history</h4>
+          <p>2-hour utilization trend inline on every tier card, updated every 5 minutes.</p>
+        </div>
+        <div class="feature">
+          <h4>User-authorable themes</h4>
+          <p>Drop a JSON palette into <code>%APPDATA%\Sanduhr\themes\</code> or paste one into Settings.</p>
+        </div>
+        <div class="feature">
+          <h4>AI-agent theme prompt</h4>
+          <p>Hand any LLM a reference image or vibe description and get back a drop-in theme file.</p>
+        </div>
+        <div class="feature">
+          <h4>Native glass, both platforms</h4>
+          <p>Win11 Mica via DWM on Windows (solid-color fallback on Win10); NSVisualEffectView vibrancy on macOS. No Electron, no webview.</p>
+        </div>
+        <div class="feature">
+          <h4>OS-native credential storage</h4>
+          <p>Session key lives in Windows Credential Manager (service <code>com.626labs.sanduhr</code>) or macOS Keychain &mdash; same service name on both, cleared on uninstall, never plaintext.</p>
+        </div>
+        <div class="feature">
+          <h4>Auto-updates on Mac</h4>
+          <p>Mac build ships Developer ID signed + notarized with Sparkle auto-update. No manual re-downloads. Windows Store release is in review.</p>
+        </div>
+        <div class="feature">
+          <h4>No telemetry, ever</h4>
+          <p>No analytics, no crash reporting, no ads, no SDK-phones-home. One outbound destination: claude.ai, using your own cookie.</p>
+        </div>
+        <div class="feature">
+          <h4>Drag anywhere</h4>
+          <p>Drag the widget from any point, not just the title bar. Double-click title to compact. Right-click for menu.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="themes" id="themes">
+    <div class="container">
+      <h2>Five hand-tuned themes &mdash; plus anything you make.</h2>
+      <p class="lead">Each theme has its own glass-stacking recipe: Obsidian is densest, Mint is airiest, Matrix opts out of Mica for a pure phosphor-on-black terminal look with Cascadia Code numerics.</p>
+      <div class="themes-row">
+        <div class="theme-card">
+          <img src="screenshots/windows/obsidian.png" alt="Obsidian theme screenshot" />
+          <div class="cap"><span>Obsidian</span><small>purple / restrained</small></div>
+        </div>
+        <div class="theme-card">
+          <img src="screenshots/windows/aurora.png" alt="Aurora theme screenshot" />
+          <div class="cap"><span>Aurora</span><small>cyan / ice-glass</small></div>
+        </div>
+        <div class="theme-card">
+          <img src="screenshots/windows/ember.png" alt="Ember theme screenshot" />
+          <div class="cap"><span>Ember</span><small>orange / cozy</small></div>
+        </div>
+        <div class="theme-card">
+          <img src="screenshots/windows/mint.png" alt="Mint theme screenshot" />
+          <div class="cap"><span>Mint</span><small>teal / airy</small></div>
+        </div>
+        <div class="theme-card">
+          <img src="screenshots/windows/matrix.png" alt="Matrix theme screenshot" />
+          <div class="cap"><span>Matrix</span><small>phosphor / terminal</small></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="docs" id="docs">
+    <div class="container">
+      <h2>Under the hood</h2>
+      <p class="lead">The whole project is public. Here are the load-bearing documents.</p>
+      <div class="docs-grid">
+        <a class="doc-link" href="PRIVACY.md">
+          <span class="kind">Policy</span>
+          Privacy policy &mdash; what data touches what
+        </a>
+        <a class="doc-link" href="generated/runbook.md">
+          <span class="kind">Ops</span>
+          Runbook &mdash; release, hotfix, rollback
+        </a>
+        <a class="doc-link" href="generated/adr.md">
+          <span class="kind">Decisions</span>
+          ADRs &mdash; why PySide6, why Mica, why no signing
+        </a>
+        <a class="doc-link" href="generated/threat-model.md">
+          <span class="kind">Security</span>
+          Threat model &mdash; assets, controls, ratings
+        </a>
+        <a class="doc-link" href="generated/deployment-procedure.md">
+          <span class="kind">Ops</span>
+          Deployment procedure
+        </a>
+        <a class="doc-link" href="themes/AGENT_PROMPT.md">
+          <span class="kind">Themes</span>
+          AI-agent theme authoring prompt
+        </a>
+        <a class="doc-link" href="themes/template.json">
+          <span class="kind">Themes</span>
+          Theme JSON template
+        </a>
+        <a class="doc-link" href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/blob/main/CHANGELOG.md">
+          <span class="kind">Releases</span>
+          Changelog
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="publisher">
+    <div class="container">
+      <a class="mark" href="https://github.com/626labs" aria-label="626 Labs LLC — publisher">
+        <img src="store-assets/logo-square-1080x1080.png" alt="626 Labs LLC logo" />
+        <span class="by">Built by</span>
+      </a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container inner">
+      <div>
+        <strong>Sanduhr&nbsp;für&nbsp;Claude</strong> &middot;
+        built by <a href="https://github.com/626labs">626&nbsp;Labs&nbsp;LLC</a> with Claude &middot;
+        MIT license &middot;
+        <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude">source on GitHub</a>
+      </div>
+      <div class="legal">
+        Sanduhr&nbsp;für&nbsp;Claude is an independent third-party tool and is not affiliated with, endorsed by, or associated with Anthropic PBC. &ldquo;Claude&rdquo; and &ldquo;claude.ai&rdquo; are trademarks of Anthropic PBC, used nominatively to describe integration.
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

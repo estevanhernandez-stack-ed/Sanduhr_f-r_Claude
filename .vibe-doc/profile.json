@@ -1,0 +1,31 @@
+{
+  "projectName": "Sanduhr für Claude",
+  "projectDescription": "Native Windows desktop widget that tracks Claude.ai subscription usage with burn-rate projections, pace markers, and sparklines. Also ships a native macOS SwiftUI version and a legacy cross-platform Python/tkinter v1.",
+  "mainPurpose": "Desktop application — always-on-top frameless widget rendering usage telemetry from claude.ai",
+  "primaryUsers": "Individual Claude Pro/Team/Enterprise subscribers (solo devs, power users). Not an internal tool, not a customer-facing SaaS.",
+  "coreFeatures": [
+    "Real-time usage bars per subscription tier (session, weekly, per-model)",
+    "Pace markers and burn-rate projections",
+    "2-hour sparkline history",
+    "5 built-in themes plus user-droppable theme JSONs",
+    "Win11 Mica glass backdrop with Win10 solid fallback",
+    "Windows Credential Manager storage via keyring",
+    "cf_clearance fallback for Cloudflare-blocked accounts",
+    "Silent v1->v2 migration",
+    "Inno Setup installer shipped from GitHub Releases"
+  ],
+  "technologies": [
+    "Python 3.11",
+    "PySide6 / Qt 6",
+    "cloudscraper",
+    "keyring (Windows Credential Manager)",
+    "ctypes (DWM API for Mica)",
+    "PyInstaller (one-folder build)",
+    "Inno Setup 6 (installer)",
+    "pytest + pytest-qt",
+    "GitHub Actions (Windows CI + tag-triggered release)",
+    "Swift / SwiftUI (mac companion, separate branch)"
+  ],
+  "deploymentModel": "End-user desktop install. Downloaded as a signed-ready .exe installer from GitHub Releases and run locally on the user's Windows machine. No server, no SaaS. Credentials stored in Windows Credential Manager.",
+  "architectureStyle": "Native desktop application — single frameless Qt widget, threaded QObject for async HTTP to claude.ai, local JSON + keyring for persistence. No backend service. Client-of-API, not a server."
+}
