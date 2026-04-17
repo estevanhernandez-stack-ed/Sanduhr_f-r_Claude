@@ -432,6 +432,109 @@ class SanduhrWidget(QWidget):
                 background-color: #b2271a;
                 color: #ffffff;
             }}
+            /* Dialog chrome. MS Store review caught these rendering as light
+               theme text on Windows' default light background when the host
+               system was set to light mode — because the root stylesheet
+               scoped its background to `SanduhrWidget` only, dialogs fell
+               through to the system palette. Explicit dialog backgrounds
+               here bind the active theme to every QDialog / QMessageBox
+               regardless of what the system is doing. Mica doesn't apply
+               to dialogs (they're separate top-level windows), so always
+               use solid `t['bg']`. */
+            QDialog, QMessageBox {{
+                background-color: {t['bg']};
+                color: {t['text']};
+            }}
+            QMessageBox QLabel, QDialog QLabel {{
+                background-color: transparent;
+                color: {t['text']};
+            }}
+            QTabWidget::pane {{
+                background-color: {t['glass']};
+                border: 1px solid {t['border']};
+                border-radius: 4px;
+                top: -1px;
+            }}
+            QTabWidget {{
+                background-color: {t['bg']};
+            }}
+            QTabBar::tab {{
+                background-color: {t['bg']};
+                color: {t['text_secondary']};
+                border: 1px solid {t['border']};
+                padding: 6px 14px;
+                margin-right: 2px;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+            }}
+            QTabBar::tab:selected {{
+                background-color: {t['glass']};
+                color: {t['text']};
+                border-bottom-color: {t['glass']};
+            }}
+            QTabBar::tab:hover:!selected {{
+                color: {t['text']};
+            }}
+            QLineEdit, QTextEdit, QPlainTextEdit {{
+                background-color: {t['bg']};
+                color: {t['text']};
+                border: 1px solid {t['border']};
+                padding: 4px 6px;
+                border-radius: 4px;
+                selection-background-color: {t['accent']};
+                selection-color: {t['bg']};
+            }}
+            QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{
+                border-color: {t['accent']};
+            }}
+            QListWidget, QListView {{
+                background-color: {t['bg']};
+                color: {t['text']};
+                border: 1px solid {t['border']};
+                border-radius: 4px;
+            }}
+            QListWidget::item:selected, QListView::item:selected {{
+                background-color: {t['accent']};
+                color: {t['bg']};
+            }}
+            QDialogButtonBox QPushButton {{
+                color: {t['text']};
+                background-color: {t['glass']};
+                border: 1px solid {t['border']};
+                border-radius: 4px;
+                padding: 6px 14px;
+                min-width: 72px;
+            }}
+            QDialogButtonBox QPushButton:hover {{
+                border-color: {t['accent']};
+                background-color: {chrome_bg};
+            }}
+            QDialogButtonBox QPushButton:default {{
+                border-color: {t['accent']};
+            }}
+            QScrollArea {{
+                background-color: transparent;
+                border: none;
+            }}
+            QScrollBar:vertical {{
+                background-color: {t['bg']};
+                width: 10px;
+                border: none;
+            }}
+            QScrollBar::handle:vertical {{
+                background-color: {t['border']};
+                min-height: 20px;
+                border-radius: 5px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background-color: {t['text_muted']};
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+                background: transparent;
+                border: none;
+                height: 0;
+            }}
             """
         )
 
@@ -586,6 +689,7 @@ class SanduhrWidget(QWidget):
         )
         dlg.credentialsSaved.connect(self._on_credentials_saved)
         dlg.themesChanged.connect(self._rebuild_theme_strip)
+        dlg.setStyleSheet(self.styleSheet())
         dlg.exec_()
 
     def _on_credentials_saved(self, session_key: str, cf_clearance) -> None:

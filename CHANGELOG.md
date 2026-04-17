@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.0.3-windows — 2026-04-17
+
+**Platform:** Windows
+**Patch release — Microsoft Store resubmission (light-mode dialog legibility).**
+
+### Fixed
+
+- **Dialogs unreadable on light-mode Windows.** Microsoft Store review (device: HP 17-bs011dx) caught the first-run welcome dialog and Settings dialog rendering as dark theme text on Windows' default *light* background — because the root stylesheet scoped its background to `SanduhrWidget` only, while cascading a light text color through `QWidget { color: ... }` to every widget including dialogs. On a light-mode host, the system filled the dialog background in white, producing light-on-white invisible text. Fix: explicit `QDialog`, `QMessageBox`, `QTabWidget`, `QTabBar`, `QLineEdit`, `QTextEdit`, `QListWidget`, `QDialogButtonBox`, and `QScrollBar` rules in the main stylesheet, all bound to the active theme's `bg` / `glass` / `text` / `border` / `accent` tokens. `_open_settings_dialog` now explicitly applies the root stylesheet to the dialog before `exec_()` — QDialog is a separate top-level window so it doesn't inherit QSS from its parent automatically. The `cf_clearance` help label in the Credentials tab no longer hardcodes its grey color (was invisible on Matrix theme and on light-mode Windows).
+
+This was the root cause of the **10.1.4.4 App Quality / "Navigation of the product is poor"** finding in the last Store rejection. First-run setup is now legible regardless of the host system theme.
+
+---
+
 ## v2.0.2-windows — 2026-04-17
 
 **Platform:** Windows
