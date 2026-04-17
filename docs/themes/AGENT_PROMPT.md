@@ -2,24 +2,28 @@
 
 Paste this prompt into Claude, ChatGPT, or any chat agent along with a
 **vibe description** or **a reference image**, and the agent will return
-a ready-to-drop theme JSON.
+a ready-to-drop theme JSON that works on both the macOS and Windows
+builds of Sanduhr.
 
 ## How to use
 
 1. Copy the entire prompt below.
 2. Attach a reference image (album cover, screenshot, painting, color
    palette — anything) and/or describe the vibe in one sentence.
-3. Paste the returned JSON into `%APPDATA%\Sanduhr\themes\<yourname>.json`.
+3. Paste the returned JSON into your platform's themes folder:
+   - **macOS:** `~/Library/Application Support/Sanduhr/themes/<yourname>.json`
+   - **Windows:** `%APPDATA%\Sanduhr\themes\<yourname>.json`
 4. Restart Sanduhr — the new theme appears in the theme strip automatically.
 
 ---
 
 ## The prompt
 
-You are designing a color theme for the Sanduhr für Claude Windows desktop
-widget — a small always-on-top Qt window with Win11 Mica glass backdrop that
-shows Claude.ai usage bars. Themes are JSON dicts with hex colors and a few
-glass-rendering dials.
+You are designing a color theme for Sanduhr für Claude — a small
+always-on-top desktop widget that shows Claude.ai usage bars. The widget
+runs on macOS (SwiftUI with NSVisualEffectView vibrancy) and Windows
+(Qt with Win11 Mica glass). Themes are JSON dicts with hex colors and a
+few glass-rendering dials that work identically on both platforms.
 
 Given the reference image or vibe description I'm providing, return **only**
 a valid JSON object matching this schema. No markdown, no preamble, no
@@ -31,8 +35,8 @@ commentary — just the raw JSON.
 | ----------------- | ---------------------------------------------------------------------------- |
 | `name`            | Display name shown in the theme strip (1–12 chars, Title Case)               |
 | `bg`              | Window background solid fallback (darkest shade of the palette)              |
-| `glass`           | Card background for Win10 non-Mica fallback (slightly lighter than `bg`)     |
-| `glass_on_mica`   | Card background tuned for α-blending over Mica (usually near `bg`, a touch darker) |
+| `glass`           | Solid-fallback card background (Win10 non-Mica, macOS theme strip)           |
+| `glass_on_mica`   | Card background tuned for α-blending over vibrancy (usually near `bg`, a touch darker) |
 | `title_bg`        | Title bar solid fallback                                                     |
 | `border`          | Neutral card border color                                                    |
 | `footer_bg`       | Footer solid fallback                                                        |
@@ -49,7 +53,7 @@ commentary — just the raw JSON.
 
 | Field             | Range                 | What it does                                                    |
 | ----------------- | --------------------- | --------------------------------------------------------------- |
-| `glass_alpha`     | `0.70 – 0.90`         | Card density over Mica. Lower = airier, higher = more solid     |
+| `glass_alpha`     | `0.70 – 0.90`         | Card density over vibrancy. Lower = airier, higher = more solid |
 | `border_alpha`    | `0.20 – 0.60`         | Card border visibility                                          |
 | `border_tint`     | hex or `null`         | Border color override; `null` uses `border`                     |
 | `accent_bloom`    | `{"blur": 3–8, "alpha": 0.25–0.65}` | Glow around percentage numbers                      |
@@ -57,12 +61,12 @@ commentary — just the raw JSON.
 
 **Matrix-style overrides** (optional — use only for opaque / terminal themes):
 
-| Field                | Value                   | What it does                                          |
-| -------------------- | ----------------------- | ----------------------------------------------------- |
-| `opts_out_of_mica`   | `true`                  | Disables Mica; window renders solid                   |
-| `monospace_font`     | `"Cascadia Code"` etc.  | Swaps percentage / countdown fonts to a monospace     |
-| `monospace_fallback` | `"Consolas"` etc.       | Fallback if primary monospace isn't installed         |
-| `card_corner_radius` | `2`                     | Sharper corners for a terminal/CRT feel               |
+| Field                | Value                   | What it does                                                    |
+| -------------------- | ----------------------- | --------------------------------------------------------------- |
+| `opts_out_of_mica`   | `true`                  | Disables translucency; panel renders solid                      |
+| `monospace_font`     | `"Cascadia Code"` etc.  | macOS: presence alone switches digits to SF Mono. Windows: exact font name used, with `monospace_fallback` as backup. |
+| `monospace_fallback` | `"Consolas"` etc.       | Windows-only; fallback if primary monospace isn't installed     |
+| `card_corner_radius` | `2`                     | Sharper corners for a terminal/CRT feel                         |
 
 **If you opt out of Mica, set `glass_alpha: 1.0` so cards stay opaque.**
 
@@ -71,7 +75,7 @@ commentary — just the raw JSON.
 1. **Contrast first.** `text` must be legible on `glass_on_mica`. Simulate α-blending over a medium-gray desktop wallpaper — if text is hard to read, pick a brighter `text` or a darker `glass_on_mica`.
 2. **Cohesion.** Pull colors from the reference image / vibe. Don't mix unrelated accents.
 3. **One accent.** `accent`, `sparkline`, and typically `border_tint` + `inner_highlight.color` should all be the same hue. `pace_marker` can be complementary (e.g., red marker on a green accent).
-4. **Dark base.** `bg`, `glass`, `glass_on_mica` should be in the dark half of the spectrum (value < 50%). Light themes don't work with Mica glass layering.
+4. **Dark base.** `bg`, `glass`, `glass_on_mica` should be in the dark half of the spectrum (value < 50%). Light themes don't work with translucent glass layering.
 5. **Typography is monochrome across the lights.** `text` → `text_secondary` → `text_dim` → `text_muted` should be the same hue at decreasing luminance.
 
 ### Example (for reference, do not copy)
@@ -105,8 +109,18 @@ commentary — just the raw JSON.
 
 ## Installing a theme
 
-1. Save the JSON as `<lowercase-kebab-name>.json` (e.g. `sunset.json`, `midnight-metro.json`). The filename (minus `.json`) becomes the theme's internal key.
-2. Drop it into `%APPDATA%\Sanduhr\themes\`. (Paste `%APPDATA%\Sanduhr\themes` into File Explorer's address bar — the folder is created on first run.)
-3. Restart Sanduhr. Your theme appears in the theme strip next to the built-ins. Click to apply.
+1. Save the JSON as `<lowercase-kebab-name>.json` (e.g. `sunset.json`,
+   `midnight-metro.json`). The filename (minus `.json`) becomes the
+   theme's internal id, so keep it lowercase and URL-safe.
+2. Drop it into your platform's themes folder:
+   - **macOS:** `~/Library/Application Support/Sanduhr/themes/`. Open
+     Finder, press ⇧⌘G, and paste that path. The folder is created on
+     first run.
+   - **Windows:** `%APPDATA%\Sanduhr\themes\`. Paste that into File
+     Explorer's address bar.
+3. Restart Sanduhr. Your theme appears in the theme strip next to the
+   built-ins. Click to apply.
 
-If the widget doesn't pick it up, check `%APPDATA%\Sanduhr\sanduhr.log` for a warning — missing required fields or invalid JSON are logged there.
+If the widget doesn't pick it up, check Console.app (macOS) or
+`%APPDATA%\Sanduhr\sanduhr.log` (Windows) for a warning — missing
+required fields or invalid JSON are logged there.

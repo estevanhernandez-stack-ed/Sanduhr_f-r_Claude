@@ -24,5 +24,16 @@ commit.bat
 # Personal profile (contains PII)
 docs/builder-profile.md
 
+# macOS (Swift) build artifacts
+mac/.build/
+mac/Sanduhr.app/
+mac/Sanduhr.dmg
+mac/dmg-stage/
+mac/dmg-rw.dmg
+mac/icon/Sanduhr.icns
+mac/icon/Sanduhr.iconset/
+mac/icon/master-1024.png
+releases/
+
 # Vibe Doc local scan state (has machine-absolute paths, regenerated on each scan)
 .vibe-doc/state.json

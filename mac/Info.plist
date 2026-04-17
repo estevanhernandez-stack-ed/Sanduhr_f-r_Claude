@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>Sanduhr</string>
+    <key>CFBundleIconFile</key>
+    <string>Sanduhr</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.626labs.sanduhr</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>Sanduhr</string>
+    <key>CFBundleDisplayName</key>
+    <string>Sanduhr für Claude</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSSupportsAutomaticTermination</key>
+    <false/>
+    <key>NSSupportsSuddenTermination</key>
+    <false/>
+    <key>NSHumanReadableCopyright</key>
+    <string>MIT License. 626Labs.</string>
+    <key>SUFeedURL</key>
+    <string>https://estevanhernandez-stack-ed.github.io/Sanduhr_f-r_Claude/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>b5hOsbZVS61d3/wAN8hxf70HvfH3SOpuNVZES3QvhpI=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
+</dict>
+</plist>
