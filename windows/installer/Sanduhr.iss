@@ -34,6 +34,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 CloseApplications=yes
 RestartApplications=no
 WizardImageFile=banner.bmp
+WizardSmallImageFile=banner-small.bmp
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
