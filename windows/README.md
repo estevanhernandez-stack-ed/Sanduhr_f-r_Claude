@@ -42,4 +42,4 @@ Produces `build/Sanduhr-Setup-v2.0.0.exe`.
 2. Paste your `sessionKey` from `claude.ai` DevTools → Application → Cookies.
 3. Credentials land in Windows Credential Manager (service `com.626labs.sanduhr`).
 
-See `../docs/superpowers/specs/2026-04-16-windows-v2-diamond-design.md` for the full design.
+For the polished design reference, see [`docs/generated/adr.md`](../docs/generated/adr.md) and [`docs/generated/runbook.md`](../docs/generated/runbook.md). The original pre-build spec lives in [`docs/_archive/superpowers/specs/`](../docs/_archive/superpowers/specs/).
