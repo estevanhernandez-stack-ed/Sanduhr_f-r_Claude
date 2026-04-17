@@ -1,0 +1,26 @@
+{
+  "name": "Your Theme Name",
+
+  "bg": "#0d0d0d",
+  "glass": "#1c1c1c",
+  "glass_on_mica": "#1a1a1c",
+  "title_bg": "#161616",
+  "border": "#333333",
+  "footer_bg": "#111111",
+  "bar_bg": "#2a2a2a",
+
+  "text": "#e8e4dc",
+  "text_secondary": "#b8b4ac",
+  "text_dim": "#777777",
+  "text_muted": "#555555",
+
+  "accent": "#6c63ff",
+  "pace_marker": "#ff6b6b",
+  "sparkline": "#6c63ff",
+
+  "glass_alpha": 0.82,
+  "border_alpha": 0.40,
+  "border_tint": null,
+  "accent_bloom": {"blur": 5, "alpha": 0.45},
+  "inner_highlight": null
+}

@@ -23,3 +23,6 @@ commit.bat
 
 # Personal profile (contains PII)
 docs/builder-profile.md
+
+# Vibe Doc local scan state (has machine-absolute paths, regenerated on each scan)
+.vibe-doc/state.json

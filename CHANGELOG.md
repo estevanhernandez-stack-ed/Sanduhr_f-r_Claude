@@ -1,5 +1,30 @@
 # Changelog
 
+## v2.0.0-windows — 2026-04-16
+
+**Platform:** Windows
+**Breaking change:** Full rewrite. v1 `sanduhr.py` still works on `main` for users who prefer running from source.
+
+### Added
+
+- PySide6 rewrite -- native Qt 6 widget, proper DPI awareness, Segoe UI Variable throughout
+- Win11 Mica backdrop -- real translucent system material, with Win10 solid-color fallback
+- Glass-stacking visuals -- per-theme glass tuning (Obsidian densest, Mint airiest, Matrix opaque with phosphor glow)
+- Windows Credential Manager storage via `keyring` (service `com.626labs.sanduhr`, matching Mac Keychain)
+- `cf_clearance` fallback field in credentials dialog
+- Right-click context menu: Refresh / Compact / Credentials / Quit
+- Drag anywhere to move (not just the title bar)
+- Window position persistence in `%APPDATA%\Sanduhr\settings.json`
+- Inno Setup installer -- `Sanduhr-Setup-v2.0.0.exe` from GitHub Releases
+- Matrix theme: Cascadia Code monospace, phosphor glow, Mica opt-out
+- Silent v1 migration: session key, theme, history carry over on first v2 run
+- GitHub Actions: pytest on every push, release workflow on `v*.*.*-windows` tags
+
+### Removed
+
+- `--break-system-packages` pip shim (replaced by pinned dependencies in the installer)
+- Hardcoded initial window position (replaced by last-known-position / centered default)
+
 ## v1.1 — 2026-04-15
 
 ### Added

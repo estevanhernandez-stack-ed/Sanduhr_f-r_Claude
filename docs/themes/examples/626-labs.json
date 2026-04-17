@@ -1,0 +1,26 @@
+{
+  "name": "626 Labs",
+
+  "bg": "#0f182b",
+  "glass": "#1a2540",
+  "glass_on_mica": "#131d31",
+  "title_bg": "#131a2a",
+  "border": "#2a3a5c",
+  "footer_bg": "#0a121f",
+  "bar_bg": "#1a2540",
+
+  "text": "#e8f2ff",
+  "text_secondary": "#a8c2d9",
+  "text_dim": "#6a849e",
+  "text_muted": "#4a5f7a",
+
+  "accent": "#3bb4d9",
+  "pace_marker": "#e13aa0",
+  "sparkline": "#3bb4d9",
+
+  "glass_alpha": 0.84,
+  "border_alpha": 0.50,
+  "border_tint": "#3bb4d9",
+  "accent_bloom": {"blur": 6, "alpha": 0.60},
+  "inner_highlight": {"color": "#7ae0f5", "alpha": 0.22}
+}
