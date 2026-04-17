@@ -100,10 +100,13 @@ hdiutil convert "$TMP_DMG" \
     -imagekey zlib-level=9 \
     -o "$DMG_NAME" >/dev/null
 
-# NOTE: do NOT codesign the DMG itself — ad-hoc signatures on DMGs aren't
-# trusted by Gatekeeper and in recent macOS can cause a "file cannot be read"
-# error when double-clicking. The app inside is already ad-hoc signed by
-# build.sh; that's sufficient for local use.
+# Sign the DMG with Developer ID so it can be notarized as its own artifact.
+# (The app inside is signed separately by build.sh.) Skip if SIGN_IDENTITY=-.
+SIGN_IDENTITY="${SIGN_IDENTITY:-Developer ID Application: Estevan Hernandez (82BSR56X5J)}"
+if [[ "$SIGN_IDENTITY" != "-" ]]; then
+    echo "→ Signing DMG: $SIGN_IDENTITY"
+    codesign --force --sign "$SIGN_IDENTITY" --timestamp "$DMG_NAME"
+fi
 
 echo "→ Cleaning up..."
 rm -rf "$STAGE" "$TMP_DMG"

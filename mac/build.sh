@@ -60,8 +60,61 @@ if [[ ! -f icon/Sanduhr.icns ]]; then
 fi
 cp icon/Sanduhr.icns "$APP/Contents/Resources/Sanduhr.icns"
 
-# Ad-hoc code signature so launchd accepts the bundle without Gatekeeper issues.
-codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+# Embed Sparkle.framework so the app can self-update.
+SPARKLE_FRAMEWORK=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+if [[ ! -d "$SPARKLE_FRAMEWORK" ]]; then
+    echo "✗ Sparkle.framework not found — run 'swift package resolve' first" >&2
+    exit 1
+fi
+echo "→ Embedding Sparkle.framework..."
+mkdir -p "$APP/Contents/Frameworks"
+rm -rf "$APP/Contents/Frameworks/Sparkle.framework"
+cp -R "$SPARKLE_FRAMEWORK" "$APP/Contents/Frameworks/"
+
+# Release builds get a Developer ID signature + hardened runtime so they can
+# be notarized and run anywhere. Debug builds get an ad-hoc signature for
+# local iteration only. Override with SIGN_IDENTITY=<id> or SIGN_IDENTITY=-
+# (ad-hoc).
+if [[ "$CONFIG" == "debug" ]]; then
+    SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+else
+    SIGN_IDENTITY="${SIGN_IDENTITY:-Developer ID Application: Estevan Hernandez (82BSR56X5J)}"
+fi
+
+if [[ "$SIGN_IDENTITY" == "-" ]]; then
+    echo "→ Ad-hoc signing (dev build — not distributable)..."
+    codesign --force --deep --sign - "$APP" >/dev/null
+else
+    # Sparkle embeds helpers (Autoupdate, Updater.app, XPC services) that each
+    # need their own hardened-runtime signature. --deep gets the order wrong
+    # for notarization — sign inside-out explicitly.
+    echo "→ Signing Sparkle internals..."
+    SP="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+    for helper in \
+        "$SP/XPCServices/Downloader.xpc" \
+        "$SP/XPCServices/Installer.xpc" \
+        "$SP/Autoupdate" \
+        "$SP/Updater.app"; do
+        [[ -e "$helper" ]] && codesign --force \
+            --sign "$SIGN_IDENTITY" \
+            --options runtime \
+            --timestamp \
+            "$helper"
+    done
+    codesign --force \
+        --sign "$SIGN_IDENTITY" \
+        --options runtime \
+        --timestamp \
+        "$APP/Contents/Frameworks/Sparkle.framework"
+
+    echo "→ Signing main app: $SIGN_IDENTITY"
+    codesign --force \
+        --sign "$SIGN_IDENTITY" \
+        --options runtime \
+        --timestamp \
+        "$APP"
+fi
+codesign --verify --strict --verbose=2 "$APP"
 
 echo "✓ Built $APP"
 echo "  Run:      open $APP"
