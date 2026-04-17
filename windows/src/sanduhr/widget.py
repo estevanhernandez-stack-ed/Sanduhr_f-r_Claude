@@ -122,7 +122,9 @@ class SanduhrWidget(QWidget):
         tb.addStretch()
         self._btn_settings = QPushButton("\u2699 Settings")
         self._btn_refresh = QPushButton("Refresh")
-        self._btn_pin = QPushButton("Pin")
+        # Initial state is pinned (WindowStaysOnTopHint set on __init__),
+        # so the button's first label must be the ACTION, i.e. "Unpin".
+        self._btn_pin = QPushButton("Unpin")
         # Windows-native-style close button: wider, red hover via stylesheet,
         # uses the Unicode heavy multiplication sign that Windows Explorer
         # itself draws in title bars (rather than a plain lowercase x).
@@ -140,7 +142,7 @@ class SanduhrWidget(QWidget):
         # Tooltips — selective, for the controls whose purpose isn't obvious.
         self._btn_settings.setToolTip("Settings — credentials, themes, help (Ctrl+,)")
         self._btn_refresh.setToolTip("Refresh usage now (Ctrl+R)")
-        self._btn_pin.setToolTip("Toggle always-on-top")
+        self._btn_pin.setToolTip("Unpin (currently always on top)")
         self._btn_close.setToolTip("Close (Alt+F4)")
         self._title_lbl.setToolTip("Drag to move · double-click to toggle compact · right-click for menu")
 
@@ -530,30 +532,40 @@ class SanduhrWidget(QWidget):
     def _toggle_pin(self) -> None:
         """Toggle always-on-top.
 
-        Qt's setWindowFlag(WindowStaysOnTopHint, False) on a frameless
-        window (a) doesn't reliably issue SetWindowPos(HWND_NOTOPMOST) on
-        Windows, and (b) hides the widget as a side effect of recreating
-        the native handle. Instead, call user32!SetWindowPos directly via
-        ctypes to demote or promote the z-order. Don't touch Qt's flags —
-        the native change is what the user sees, and leaving the flag
-        alone preserves the HWND (which means Mica stays intact).
+        Every ctypes-only approach fails because Qt re-enforces the
+        WindowStaysOnTopHint flag on focus/paint events — it remembers
+        its own flag state and re-applies WS_EX_TOPMOST. The only
+        reliable path is to actually change Qt's flag (setWindowFlag)
+        and then call show() to re-show the widget (setWindowFlag hides
+        as a side effect of recreating the native handle).
+
+        Cost: HWND gets recreated, which drops Mica + taskbar extended
+        style. We re-apply both right after show().
         """
-        import sys as _sys
         self._pinned = not self._pinned
 
-        if _sys.platform == "win32":
-            import ctypes
-            HWND_TOPMOST, HWND_NOTOPMOST = -1, -2
-            SWP_NOMOVE, SWP_NOSIZE, SWP_NOACTIVATE = 0x0002, 0x0001, 0x0010
-            ctypes.windll.user32.SetWindowPos(
-                int(self.winId()),
-                HWND_TOPMOST if self._pinned else HWND_NOTOPMOST,
-                0, 0, 0, 0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-            )
+        # Preserve geometry — setWindowFlag can reset it on some platforms.
+        geom = self.geometry()
 
-        # Visual feedback on the button itself.
-        self._btn_pin.setText("Pin" if self._pinned else "Unpin")
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, self._pinned)
+        self.setGeometry(geom)
+        self.show()
+
+        # HWND was recreated — re-apply native-layer attributes.
+        if sys.platform == "win32":
+            self._taskbar_forced = False
+            self._force_taskbar_button()
+            self._taskbar_forced = True
+        if self._theme.get("opts_out_of_mica"):
+            mica.disable_mica(self)
+        else:
+            mica.apply_mica(self, enabled=True)
+
+        # Button label shows the action a click will take (standard
+        # Windows convention), not the current state:
+        #   currently pinned  -> "Unpin" (click to unpin)
+        #   currently unpinned -> "Pin"  (click to pin)
+        self._btn_pin.setText("Unpin" if self._pinned else "Pin")
         self._btn_pin.setToolTip(
             "Unpin (currently always on top)" if self._pinned
             else "Pin always on top"
