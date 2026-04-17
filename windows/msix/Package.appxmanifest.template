@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <!-- Identity block: Partner Center-reserved. Do not modify Name or Publisher
+       without updating the Partner Center reservation, or Store ingestion will
+       reject the submission. Version is injected by make-msix.ps1 from
+       pyproject.toml so this stays in sync with the .exe installer. -->
+  <Identity
+    Name="626LabsLLC.SanduhrfrClaude"
+    Publisher="CN=177BCE59-0966-4975-9962-10E36652141F"
+    Version="{{VERSION}}"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Sanduhr für Claude</DisplayName>
+    <PublisherDisplayName>626Labs LLC</PublisherDisplayName>
+    <Logo>Images\StoreLogo.png</Logo>
+    <Description>Native Windows desktop widget that tracks Claude.ai subscription usage with burn-rate projections, pace markers, sparklines, and Win11 Mica glass backdrop.</Description>
+  </Properties>
+
+  <Dependencies>
+    <!-- Windows 10 1809 (build 17763) = Mica/Windows 11 fallback-compatible
+         floor. Mica itself requires Win11 22H2+ but the app gracefully falls
+         back to solid colors on older builds. -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-US" />
+  </Resources>
+
+  <Applications>
+    <Application Id="Sanduhr"
+                 Executable="Sanduhr.exe"
+                 EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Sanduhr für Claude"
+        Description="Claude.ai usage tracker widget"
+        BackgroundColor="#0f182b"
+        Square150x150Logo="Images\Square150x150Logo.png"
+        Square44x44Logo="Images\Square44x44Logo.png">
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- runFullTrust keeps the app outside the MSIX sandbox, which matters
+         for us because:
+           * we read/write %APPDATA%\Sanduhr\ directly (settings, history,
+             logs, user theme drop-ins) and want those at the real user path,
+             not a per-package virtualized copy
+           * we call the DWM ctypes API for Mica, which sandboxed MSIX
+             processes can't touch
+         runFullTrust is a rescap capability and needs a justification field
+         on Store submission. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

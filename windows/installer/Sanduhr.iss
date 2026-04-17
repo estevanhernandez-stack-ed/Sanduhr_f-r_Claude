@@ -3,7 +3,13 @@
 
 #define MyAppName "Sanduhr für Claude"
 #define MyAppShortName "Sanduhr"
-#define MyAppVersion "2.0.0"
+; Fallback when ISCC is invoked without /DMyAppVersion=X.Y.Z.
+; build.ps1 always passes /D so this is only used for manual direct
+; ISCC invocations. A later #define would override /D, but #ifndef
+; makes /D win.
+#ifndef MyAppVersion
+  #define MyAppVersion "2.0.0"
+#endif
 #define MyAppPublisher "626Labs"
 #define MyAppURL "https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude"
 #define MyAppExeName "Sanduhr.exe"
