@@ -31,7 +31,7 @@ pytest
 ```powershell
 ./build.ps1                   # full pipeline: PyInstaller → Inno Setup
 ./build.ps1 -SkipInstaller    # PyInstaller only, for iteration
-./build.ps1 -Debug            # keeps console window for tracebacks
+./build.ps1 -DebugBuild       # keeps console window for tracebacks
 ```
 
 Produces `build/Sanduhr-Setup-v2.0.0.exe`.

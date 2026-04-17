@@ -48,19 +48,37 @@ def clear() -> None:
 def migrate_from_v1() -> dict:
     """Migrate v1's plaintext config + history into v2 storage.
 
-    Returns {"migrated": bool, "session_key": bool, "theme": bool, "history": bool}.
+    Returns a status dict:
+        {
+            "migrated":       bool — whether any migration happened at all
+            "session_key":    bool — whether the session key was copied to keyring
+            "theme":          bool — whether the theme preference was copied
+            "history":        bool — whether history.json was copied
+            "legacy_cleaned": bool — whether the plaintext v1 config was deleted.
+                                     FALSE means the v1 plaintext credential file
+                                     is still on disk — the caller (and the user)
+                                     should be told so they can clean it up.
+        }
     """
+    base = {
+        "migrated": False,
+        "session_key": False,
+        "theme": False,
+        "history": False,
+        "legacy_cleaned": False,
+    }
+
     legacy = paths.legacy_config_file()
     if not legacy.exists():
-        return {"migrated": False, "session_key": False, "theme": False, "history": False}
-
-    result = {"migrated": True, "session_key": False, "theme": False, "history": False}
+        return base
 
     try:
         cfg = json.loads(legacy.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as e:
         _log.warning("v1 config unreadable, skipping migration: %s", e)
-        return {"migrated": False, "session_key": False, "theme": False, "history": False}
+        return base
+
+    result = dict(base, migrated=True)
 
     if cfg.get("session_key"):
         save(session_key=cfg["session_key"])
@@ -90,8 +108,13 @@ def migrate_from_v1() -> dict:
 
     try:
         legacy.unlink()
+        result["legacy_cleaned"] = True
     except OSError as e:
-        _log.warning("Could not delete v1 config: %s", e)
+        _log.warning(
+            "Could not delete v1 config at %s; plaintext credentials remain on disk. "
+            "User should manually delete after confirming v2 works: %s",
+            legacy, e,
+        )
 
     _log.info("v1 -> v2 migration complete: %s", result)
     return result
