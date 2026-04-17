@@ -688,6 +688,7 @@ class SanduhrWidget(QWidget):
             initial_tab=initial_tab,
         )
         dlg.credentialsSaved.connect(self._on_credentials_saved)
+        dlg.credentialsCleared.connect(self._on_credentials_cleared)
         dlg.themesChanged.connect(self._rebuild_theme_strip)
         dlg.setStyleSheet(self.styleSheet())
         dlg.exec_()
@@ -696,6 +697,22 @@ class SanduhrWidget(QWidget):
         self._clear_preview()
         self._start_or_update_fetcher(session_key, cf_clearance)
         self._request_refresh()
+
+    def _on_credentials_cleared(self) -> None:
+        """User signed out via blank-sessionKey save in the Settings dialog.
+        Point the fetcher at empty credentials (it'll 401 on next poll,
+        harmless), tear down any tier cards so stale data doesn't linger,
+        and tell the user how to resume."""
+        if self._fetcher is not None:
+            self._fetcher.update_credentials("", None)
+        for tier_key in list(self._tier_cards.keys()):
+            card = self._tier_cards.pop(tier_key)
+            self._cards_layout.removeWidget(card)
+            card.setParent(None)
+            card.deleteLater()
+        self._status_lbl.setText(
+            "Signed out — paste sessionKey in Settings to resume."
+        )
 
     def _prompt_first_run(self) -> None:
         # Build the welcome dialog with our stylesheet pre-applied so it

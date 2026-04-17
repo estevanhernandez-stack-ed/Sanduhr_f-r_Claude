@@ -88,6 +88,7 @@ def _agent_prompt_path() -> Path:
 
 class SettingsDialog(QDialog):
     credentialsSaved = Signal(str, object)  # (session_key, cf_clearance | None)
+    credentialsCleared = Signal()
     themesChanged = Signal()
 
     def __init__(
@@ -133,6 +134,14 @@ class SettingsDialog(QDialog):
         self._sk = QLineEdit(sk)
         self._sk.setEchoMode(QLineEdit.Password)
         v.addWidget(self._sk)
+        sk_hint = QLabel(
+            "Tip: save this field empty to sign out and clear your stored "
+            "credentials from Windows Credential Manager."
+        )
+        sk_hint.setWordWrap(True)
+        sk_hint.setObjectName("HelpText")
+        sk_hint.setStyleSheet("font-size: 8pt;")
+        v.addWidget(sk_hint)
 
         v.addWidget(QLabel("cf_clearance (optional)"))
         cf_help = QLabel(
@@ -167,9 +176,31 @@ class SettingsDialog(QDialog):
         sk = self._sk.text().strip()
         cf = self._cf.text().strip() or None
         if not sk:
+            # Blank sessionKey on save = explicit intent to sign out.
+            # We previously rejected this with a "sessionKey is required"
+            # error, but that left users with no way to revoke credentials
+            # short of opening Windows Credential Manager by hand — which
+            # none of them do. Treat blank-save as "clear my credentials",
+            # gated behind a confirmation so it can't happen by accident.
+            confirm = _styled_msgbox(
+                self, QMessageBox.Warning, "Sign out of Sanduhr?",
+                "The sessionKey field is empty.\n\n"
+                "Saving this will clear your stored credentials from "
+                "Windows Credential Manager and stop the widget from "
+                "fetching your usage. You'll need to paste a fresh "
+                "sessionKey to resume.\n\n"
+                "Continue?",
+                buttons=QMessageBox.Yes | QMessageBox.No,
+            )
+            confirm.setDefaultButton(QMessageBox.No)
+            if confirm.exec_() != QMessageBox.Yes:
+                return
+            credentials.clear()
+            self.credentialsCleared.emit()
             _styled_msgbox(
-                self, QMessageBox.Warning, "Settings",
-                "sessionKey is required.",
+                self, QMessageBox.Information, "Signed out",
+                "Credentials cleared. Paste a fresh sessionKey above "
+                "when you're ready to resume.",
             ).exec_()
             return
         credentials.save(session_key=sk, cf_clearance=cf)
