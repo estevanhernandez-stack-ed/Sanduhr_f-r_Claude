@@ -582,15 +582,20 @@ class SanduhrWidget(QWidget):
         self._request_refresh()
 
     def _prompt_first_run(self) -> None:
-        QMessageBox.information(
-            self,
-            "Sanduhr für Claude",
+        # Build the welcome dialog with our stylesheet pre-applied so it
+        # doesn't flash white before Qt's style cascade lands.
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Information)
+        box.setWindowTitle("Sanduhr für Claude")
+        box.setText(
             "Welcome!\n\n"
             "1. Open claude.ai and log in.\n"
             "2. Press F12 -> Application -> Cookies -> claude.ai.\n"
             "3. Copy the sessionKey cookie value.\n\n"
-            "Paste it in the next dialog.",
+            "Paste it in the next dialog."
         )
+        box.setStyleSheet(self.styleSheet())
+        box.exec_()
         self._open_settings_dialog()
 
     def _rebuild_theme_strip(self) -> None:

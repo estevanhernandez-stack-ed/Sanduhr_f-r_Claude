@@ -49,6 +49,29 @@ def _themes_dir() -> Path:
     return d
 
 
+def _styled_msgbox(
+    parent,
+    icon,
+    title: str,
+    text: str,
+    buttons=None,
+):
+    """Create a QMessageBox with the parent's stylesheet already applied,
+    so it doesn't flash white before Qt's style cascade catches up."""
+    box = QMessageBox(parent)
+    box.setIcon(icon)
+    box.setWindowTitle(title)
+    box.setText(text)
+    if buttons is not None:
+        box.setStandardButtons(buttons)
+    # Inherit the root widget's stylesheet so the dark theme applies
+    # from the first paint, not the second.
+    root = parent.window() if parent is not None else None
+    if root is not None:
+        box.setStyleSheet(root.styleSheet())
+    return box
+
+
 def _agent_prompt_path() -> Path:
     """Find docs/themes/AGENT_PROMPT.md relative to the package.
 
@@ -112,6 +135,17 @@ class SettingsDialog(QDialog):
         v.addWidget(self._sk)
 
         v.addWidget(QLabel("cf_clearance (optional)"))
+        cf_help = QLabel(
+            "Only needed if Sanduhr shows <b>\u201cCloudflare blocked\u201d</b> "
+            "after you save. Some accounts sit behind a Cloudflare challenge; "
+            "if yours does, copy the <code>cf_clearance</code> cookie from the "
+            "same DevTools panel you copied <code>sessionKey</code> from, and "
+            "paste it here. Leave blank otherwise."
+        )
+        cf_help.setTextFormat(Qt.RichText)
+        cf_help.setWordWrap(True)
+        cf_help.setStyleSheet("font-size: 8pt; color: #9c9c9c;")
+        v.addWidget(cf_help)
         self._cf = QLineEdit(cf)
         self._cf.setEchoMode(QLineEdit.Password)
         v.addWidget(self._cf)
@@ -132,11 +166,18 @@ class SettingsDialog(QDialog):
         sk = self._sk.text().strip()
         cf = self._cf.text().strip() or None
         if not sk:
-            QMessageBox.warning(self, "Settings", "sessionKey is required.")
+            _styled_msgbox(
+                self, QMessageBox.Warning, "Settings",
+                "sessionKey is required.",
+            ).exec_()
             return
         credentials.save(session_key=sk, cf_clearance=cf)
         self.credentialsSaved.emit(sk, cf)
-        QMessageBox.information(self, "Settings", "Credentials saved.")
+        _styled_msgbox(
+            self, QMessageBox.Information, "Settings",
+            "Credentials saved. Your widget is now fetching your usage — "
+            "close this dialog to see it.",
+        ).exec_()
 
     # ── Themes tab ───────────────────────────────────────────────
 
