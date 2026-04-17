@@ -1,0 +1,11 @@
+<?xml version="1.0" standalone="yes"?>
+<rss version="2.0"
+     xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>Sanduhr für Claude</title>
+        <link>https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude</link>
+        <description>Updates for Sanduhr für Claude</description>
+        <language>en</language>
+    </channel>
+</rss>
