@@ -30,8 +30,19 @@ jobs:
           pip install -r requirements-dev.txt
           pip install -e .
 
-      - name: Install Inno Setup 6
-        run: choco install innosetup --version=6.2.2 -y
+      - name: Ensure Inno Setup 6 is present
+        # windows-latest ships with Inno Setup already — only install if
+        # missing. Pinning a chocolatey version would fail against the
+        # pre-installed newer one, so we don't.
+        shell: pwsh
+        run: |
+          $iscc = Get-ChildItem -Path "${env:ProgramFiles(x86)}", "${env:ProgramFiles}" -Filter "ISCC.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($iscc) {
+            Write-Host "Inno Setup already installed at $($iscc.FullName)"
+          } else {
+            Write-Host "Inno Setup not found -- installing via chocolatey"
+            choco install innosetup -y --no-progress
+          }
 
       - name: Run pytest (gate)
         run: pytest
