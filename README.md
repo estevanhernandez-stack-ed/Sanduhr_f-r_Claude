@@ -135,6 +135,7 @@ Full keybindings documented in the in-app **Settings → Help** tab.
 - [Deployment procedure](docs/generated/deployment-procedure.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md) — how to report vulnerabilities, and why no data ever comes back to us
 
 ---
 
