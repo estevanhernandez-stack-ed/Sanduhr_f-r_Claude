@@ -34,5 +34,13 @@
     <false/>
     <key>NSHumanReadableCopyright</key>
     <string>MIT License. 626Labs.</string>
+    <key>SUFeedURL</key>
+    <string>https://estevanhernandez-stack-ed.github.io/Sanduhr_f-r_Claude/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>b5hOsbZVS61d3/wAN8hxf70HvfH3SOpuNVZES3QvhpI=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
 </dict>
 </plist>

@@ -1,4 +1,5 @@
 import AppKit
+import Sparkle
 import SwiftUI
 
 /// Creates the borderless floating panel + menu bar status item.
@@ -9,6 +10,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let viewModel = UsageViewModel()
     private var panel: FloatingPanel?
     private var statusItem: NSStatusItem?
+    private let updaterController = SPUStandardUpdaterController(
+        startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
 
     // MARK: Lifecycle
 
@@ -111,6 +114,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(item("Refresh Now", action: #selector(refreshNow), key: "r"))
         menu.addItem(.separator())
         menu.addItem(item("Credentials…", action: #selector(openCredentials)))
+        menu.addItem(.separator())
+        let updatesItem = NSMenuItem(
+            title: "Check for Updates…",
+            action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
+            keyEquivalent: "")
+        updatesItem.target = updaterController
+        menu.addItem(updatesItem)
         menu.addItem(.separator())
         menu.addItem(item("Quit Sanduhr", action: #selector(NSApplication.terminate(_:)),
                           key: "q", target: NSApp))
