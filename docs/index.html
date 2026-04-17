@@ -174,6 +174,31 @@
       gap: 12px;
       justify-content: center;
     }
+    section.hero .secondary-ctas {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 16px;
+    }
+    section.hero .secondary-ctas a {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--navy-line);
+      background: rgba(26, 37, 64, 0.45);
+      color: var(--text-sec);
+      font-size: 13px;
+      transition: border-color .15s ease, color .15s ease, background .15s ease;
+    }
+    section.hero .secondary-ctas a:hover {
+      color: var(--cyan-pale);
+      border-color: var(--cyan);
+      background: rgba(59, 180, 217, 0.1);
+      text-decoration: none;
+    }
 
     .btn {
       display: inline-flex;
@@ -517,6 +542,14 @@
       <div class="ctas">
         <a class="btn primary" href="#download">Download ↓</a>
         <a class="btn ghost" href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude">View source</a>
+      </div>
+      <div class="secondary-ctas">
+        <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude" aria-label="Star on GitHub">
+          <span>⭐</span><span>Star on GitHub</span>
+        </a>
+        <a href="https://github.com/sponsors/estevanhernandez-stack-ed" aria-label="Sponsor the project">
+          <span>💛</span><span>Sponsor the project</span>
+        </a>
       </div>
     </div>
   </section>
