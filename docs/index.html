@@ -372,6 +372,41 @@
     footer a { color: var(--text-sec); }
     footer .legal { max-width: 680px; font-size: 12px; }
 
+    /* ── publisher mark ─────────────────────────────── */
+    section.publisher {
+      padding: 56px 0 8px;
+      text-align: center;
+    }
+    section.publisher .mark {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 26px 32px;
+      background: rgba(26, 37, 64, 0.45);
+      border: 1px solid rgba(59, 180, 217, 0.2);
+      border-radius: 16px;
+      transition: border-color .15s ease, transform .15s ease;
+    }
+    section.publisher .mark:hover {
+      border-color: var(--cyan);
+      transform: translateY(-2px);
+      text-decoration: none;
+    }
+    section.publisher img {
+      width: 140px;
+      height: auto;
+      border-radius: 12px;
+      display: block;
+    }
+    section.publisher .by {
+      font-size: 12px;
+      color: var(--text-dim);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
     /* ── responsive ─────────────────────────────────── */
     @media (max-width: 600px) {
       section.hero { padding: 56px 0 36px; }
@@ -400,10 +435,10 @@
   <section class="hero">
     <div class="container">
       <h1>Pace yourself on claude.ai.</h1>
-      <p class="tagline">A native Windows 11 glass widget that turns your Claude subscription usage into something you can actually pace yourself by — burn rate, pace markers, sparkline trends, and five hand-tuned glass themes.</p>
+      <p class="tagline">A native desktop widget for Windows 11 and macOS that turns your Claude subscription usage into something you can actually pace yourself by — burn rate, pace markers, sparkline trends, and five hand-tuned glass themes on both platforms.</p>
       <p class="sub">Independent third-party tool. Not affiliated with Anthropic. Requires an active Claude Pro, Team, or Enterprise subscription.</p>
       <div class="ctas">
-        <a class="btn primary" href="#download">Get it for Windows ↓</a>
+        <a class="btn primary" href="#download">Download ↓</a>
         <a class="btn ghost" href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude">View source</a>
       </div>
     </div>
@@ -427,7 +462,7 @@
 
         <div class="platform-card">
           <h3>macOS <span class="badge">native SwiftUI</span></h3>
-          <p class="meta">NSVisualEffectView vibrancy &middot; Keychain-backed credentials &middot; drag-install DMG.</p>
+          <p class="meta">NSVisualEffectView vibrancy &middot; Keychain-backed credentials &middot; Developer ID signed + notarized &middot; Sparkle auto-updates &middot; drag-install DMG.</p>
           <div class="actions">
             <a class="primary" href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases">Latest .dmg</a>
             <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/tree/mac-native/mac">Source</a>
@@ -450,7 +485,7 @@
   <section class="features" id="features">
     <div class="container">
       <h2>Not just a mirror of the numbers.</h2>
-      <p class="lead">Claude.ai&rsquo;s own usage page tells you what you&rsquo;ve used. Sanduhr tells you whether that&rsquo;s a problem yet.</p>
+      <p class="lead">Claude.ai&rsquo;s own usage page tells you what you&rsquo;ve used. Sanduhr tells you whether that&rsquo;s a problem yet &mdash; and does it natively on Windows 11 and macOS.</p>
       <div class="feature-grid">
         <div class="feature">
           <h4>Burn rate projection</h4>
@@ -473,12 +508,16 @@
           <p>Hand any LLM a reference image or vibe description and get back a drop-in theme file.</p>
         </div>
         <div class="feature">
-          <h4>Win11 Mica glass</h4>
-          <p>Real translucent material via DWM, with a clean solid-color fallback on Windows 10.</p>
+          <h4>Native glass, both platforms</h4>
+          <p>Win11 Mica via DWM on Windows (solid-color fallback on Win10); NSVisualEffectView vibrancy on macOS. No Electron, no webview.</p>
         </div>
         <div class="feature">
-          <h4>Credential Manager storage</h4>
-          <p>Session key lives under service <code>com.626labs.sanduhr</code>. Cleared on uninstall. Never written to disk in plaintext.</p>
+          <h4>OS-native credential storage</h4>
+          <p>Session key lives in Windows Credential Manager (service <code>com.626labs.sanduhr</code>) or macOS Keychain &mdash; same service name on both, cleared on uninstall, never plaintext.</p>
+        </div>
+        <div class="feature">
+          <h4>Auto-updates on Mac</h4>
+          <p>Mac build ships Developer ID signed + notarized with Sparkle auto-update. No manual re-downloads. Windows Store release is in review.</p>
         </div>
         <div class="feature">
           <h4>No telemetry, ever</h4>
@@ -559,6 +598,15 @@
           Changelog
         </a>
       </div>
+    </div>
+  </section>
+
+  <section class="publisher">
+    <div class="container">
+      <a class="mark" href="https://github.com/626labs" aria-label="626 Labs LLC — publisher">
+        <img src="store-assets/logo-square-1080x1080.png" alt="626 Labs LLC logo" />
+        <span class="by">Built by</span>
+      </a>
     </div>
   </section>
 
