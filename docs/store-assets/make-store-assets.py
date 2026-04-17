@@ -1,17 +1,19 @@
-"""Generate Microsoft Store / social listing assets from the 626Labs logo.
+"""Generate Microsoft Store / social listing assets.
 
-Takes the source 626Labs.png (hex-brain + wordmark), scales it onto a
-navy canvas matching the brand palette, saves both:
+Two brand marks are used in Partner Center:
 
-  logo-square-1080x1080.png   — 1:1, full-bleed-ish, social post
-  logo-portrait-720x1080.png  — 2:3, tall, Store banner / IG Story
+  1. "Store logo" / publisher identity → the **626Labs company logo**
+     (hex-brain + "626Labs LLC / Imagine Something Else" wordmark).
+     Source: ~/OneDrive/Pictures/626Labs.png (1:1 and 2:3 canvases).
 
-The logo already has "626Labs LLC / Imagine Something Else" baked in,
-so no extra text layout needed — just center on navy with breathing
-room.
+  2. "App tile" / product identity → the **Sanduhr app icon** (hourglass)
+     Source: windows/icon/source.png (71×71, 150×150, 300×300 canvases).
+
+Store logos carry the publisher; app tiles carry this specific product.
+Don't mix them.
 
 Run:
-    python make-store-assets.py  [--source path/to/626Labs.png]
+    python make-store-assets.py  [--company path] [--app path]
 """
 
 import argparse
@@ -19,11 +21,14 @@ import pathlib
 from PIL import Image
 
 HERE = pathlib.Path(__file__).resolve().parent
-DEFAULT_SOURCE = pathlib.Path.home() / "OneDrive" / "Pictures" / "626Labs.png"
+REPO = HERE.parent.parent
+DEFAULT_COMPANY = pathlib.Path.home() / "OneDrive" / "Pictures" / "626Labs.png"
+DEFAULT_APP = REPO / "windows" / "icon" / "source.png"
 
-# Navy sampled directly from the 626Labs.png source so the logo's own
-# rounded-rect background blends seamlessly into the canvas (rather than
-# sitting as a visible rectangle on a different navy).
+# Navy sampled directly from the 626Labs.png source so the company logo's
+# rounded-rect background blends seamlessly into the canvas. The Sanduhr
+# app icon's own navy is slightly different but close enough; either uses
+# this canvas color.
 NAVY = (25, 46, 69, 255)
 
 
@@ -45,34 +50,38 @@ def center_on_navy(src: Image.Image, w: int, h: int, scale: float) -> Image.Imag
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--source", type=pathlib.Path, default=DEFAULT_SOURCE,
-                    help=f"Path to the 626Labs logo PNG (default: {DEFAULT_SOURCE})")
+    ap.add_argument("--company", type=pathlib.Path, default=DEFAULT_COMPANY,
+                    help=f"Path to the 626Labs company logo (default: {DEFAULT_COMPANY})")
+    ap.add_argument("--app", type=pathlib.Path, default=DEFAULT_APP,
+                    help=f"Path to the Sanduhr app icon (default: {DEFAULT_APP})")
     args = ap.parse_args()
 
-    if not args.source.exists():
-        raise SystemExit(f"Source not found: {args.source}")
+    for p, label in [(args.company, "company"), (args.app, "app")]:
+        if not p.exists():
+            raise SystemExit(f"{label} source not found: {p}")
 
-    src = Image.open(args.source).convert("RGBA")
-    print(f"source: {args.source.name} ({src.size[0]}x{src.size[1]})")
+    # -- Store logos: 626Labs company identity -----------------------------
+    company = Image.open(args.company).convert("RGBA")
+    print(f"company: {args.company.name} ({company.size[0]}x{company.size[1]})")
 
-    # 1:1 square — the logo is already balanced, fill it comfortably
-    square = center_on_navy(src, 1080, 1080, scale=0.78)
-    square_out = HERE / "logo-square-1080x1080.png"
-    square.save(square_out, "PNG")
-    print(f"wrote {square_out.name} (1080x1080)")
+    square = center_on_navy(company, 1080, 1080, scale=0.78)
+    (HERE / "logo-square-1080x1080.png").parent.mkdir(exist_ok=True)
+    square.save(HERE / "logo-square-1080x1080.png", "PNG")
+    print("wrote logo-square-1080x1080.png (1080x1080)")
 
-    # 2:3 portrait — tall canvas, logo centered with navy space top/bottom
-    portrait = center_on_navy(src, 720, 1080, scale=0.62)
-    portrait_out = HERE / "logo-portrait-720x1080.png"
-    portrait.save(portrait_out, "PNG")
-    print(f"wrote {portrait_out.name} (720x1080)")
+    portrait = center_on_navy(company, 720, 1080, scale=0.62)
+    portrait.save(HERE / "logo-portrait-720x1080.png", "PNG")
+    print("wrote logo-portrait-720x1080.png (720x1080)")
 
-    # App tile variants for Partner Center "Store logos" grid slots.
-    # Smaller canvases need a bigger relative logo so it reads well at
-    # small sizes, especially 71x71 where the wordmark becomes unreadable
-    # if we pad too much.
-    for size, scale in [(300, 0.90), (150, 0.92), (71, 0.96)]:
-        tile = center_on_navy(src, size, size, scale=scale)
+    # -- App tiles: Sanduhr hourglass icon ---------------------------------
+    app = Image.open(args.app).convert("RGBA")
+    print(f"app: {args.app.name} ({app.size[0]}x{app.size[1]})")
+
+    # Bigger scales than the company logo — the hourglass icon has its
+    # own internal padding (Big Sur icon template) and reads best when it
+    # fills the tile almost edge to edge.
+    for size, scale in [(300, 0.96), (150, 0.98), (71, 1.0)]:
+        tile = center_on_navy(app, size, size, scale=scale)
         out = HERE / f"app-tile-{size}x{size}.png"
         tile.save(out, "PNG")
         print(f"wrote {out.name} ({size}x{size})")
