@@ -244,7 +244,8 @@
     section.platforms h2,
     section.features h2,
     section.themes h2,
-    section.docs h2 {
+    section.docs h2,
+    section.ecosystem h2 {
       font-size: 28px;
       margin: 0 0 8px;
       letter-spacing: -0.01em;
@@ -252,7 +253,8 @@
     section.platforms p.lead,
     section.features p.lead,
     section.themes p.lead,
-    section.docs p.lead {
+    section.docs p.lead,
+    section.ecosystem p.lead {
       color: var(--text-dim);
       margin: 0 0 28px;
       font-size: 15px;
@@ -451,6 +453,77 @@
       text-transform: uppercase;
       margin-bottom: 4px;
     }
+
+    /* ── ecosystem (more from 626 Labs) ───────────── */
+    section.ecosystem { padding: 48px 0; }
+    .ecosystem-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+    }
+    .plugin-card {
+      display: flex;
+      flex-direction: column;
+      padding: 18px 20px;
+      background: rgba(26, 37, 64, 0.35);
+      border: 1px solid var(--navy-line);
+      border-radius: 12px;
+      color: var(--text);
+      transition: border-color .15s ease, background .15s ease, transform .15s ease;
+    }
+    .plugin-card:hover {
+      border-color: var(--cyan);
+      background: rgba(59, 180, 217, 0.06);
+      transform: translateY(-2px);
+      text-decoration: none;
+    }
+    .plugin-card h3 {
+      margin: 0 0 4px;
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.005em;
+    }
+    .plugin-card .tagline {
+      margin: 0 0 10px;
+      color: var(--cyan-pale);
+      font-size: 13px;
+      font-style: italic;
+    }
+    .plugin-card p.desc {
+      margin: 0 0 14px;
+      color: var(--text-sec);
+      font-size: 13.5px;
+      line-height: 1.5;
+      flex: 1;
+    }
+    .plugin-card .badges {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin: 0 0 12px;
+    }
+    .plugin-card .badges img { height: 18px; }
+    .plugin-card .plinks {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+    .plugin-card .plinks a { color: var(--cyan); }
+    .plugin-card .plinks a:hover { color: var(--cyan-pale); }
+    .plugin-card .status {
+      display: inline-block;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: rgba(59, 180, 217, 0.12);
+      color: var(--cyan-pale);
+      border: 1px solid rgba(59, 180, 217, 0.3);
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-left: 8px;
+      vertical-align: middle;
+      font-weight: 500;
+    }
+    .plugin-card.coming-soon { opacity: 0.78; }
 
     /* ── footer ────────────────────────────────────── */
     footer {
@@ -719,6 +792,64 @@
           <span class="kind">Releases</span>
           Changelog
         </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="ecosystem" id="ecosystem">
+    <div class="container">
+      <h2>More from 626 Labs</h2>
+      <p class="lead">Open-source plugins for shipping with AI.</p>
+      <div class="ecosystem-grid">
+
+        <article class="plugin-card">
+          <h3>🗺️ Vibe Cartographer</h3>
+          <p class="tagline">Plot your course from idea to shipped app.</p>
+          <p class="desc">A Claude Code plugin for vibe coding with purpose and direction &mdash; 11 slash commands walk you from onboarding through reflection, with self-evolving memory built in.</p>
+          <div class="badges">
+            <img src="https://img.shields.io/npm/v/@esthernandez/vibe-cartographer?color=3bb4d9&labelColor=0f182b&style=flat-square" alt="npm version">
+            <img src="https://img.shields.io/npm/dw/@esthernandez/vibe-cartographer?color=3bb4d9&labelColor=0f182b&style=flat-square" alt="weekly downloads">
+            <img src="https://img.shields.io/npm/l/@esthernandez/vibe-cartographer?color=4ade80&labelColor=0f182b&style=flat-square" alt="MIT license">
+          </div>
+          <div class="plinks">
+            <a href="https://github.com/estevanhernandez-stack-ed/vibe-cartographer">GitHub</a> &middot;
+            <a href="https://www.npmjs.com/package/@esthernandez/vibe-cartographer">npm</a>
+          </div>
+        </article>
+
+        <article class="plugin-card">
+          <h3>📖 Vibe Doc</h3>
+          <p class="tagline">Close the documentation vacuum.</p>
+          <p class="desc">AI-powered documentation gap analyzer. Scans your codebase, classifies what you&rsquo;ve built, and generates the ADRs, runbooks, threat models, and specs you&rsquo;re missing.</p>
+          <div class="badges">
+            <img src="https://img.shields.io/npm/v/@esthernandez/vibe-doc?color=3bb4d9&labelColor=0f182b&style=flat-square" alt="npm version">
+            <img src="https://img.shields.io/npm/dw/@esthernandez/vibe-doc?color=3bb4d9&labelColor=0f182b&style=flat-square" alt="weekly downloads">
+            <img src="https://img.shields.io/npm/l/@esthernandez/vibe-doc?color=4ade80&labelColor=0f182b&style=flat-square" alt="MIT license">
+          </div>
+          <div class="plinks">
+            <a href="https://github.com/estevanhernandez-stack-ed/Vibe-Doc">GitHub</a> &middot;
+            <a href="https://www.npmjs.com/package/@esthernandez/vibe-doc">npm</a>
+          </div>
+        </article>
+
+        <article class="plugin-card coming-soon">
+          <h3>🧪 Vibe Test <span class="status">coming soon</span></h3>
+          <p class="tagline">Tests that match what your app actually does.</p>
+          <p class="desc">Reads a vibe-coded app, classifies its maturity tier, and generates the tests it genuinely needs &mdash; smoke, behavioral, edge, integration, performance &mdash; proportional to deployment risk.</p>
+          <div class="plinks">
+            <a href="https://github.com/estevanhernandez-stack-ed/vibe-plugins/tree/main/packages/vibe-test">Framework doc</a>
+          </div>
+        </article>
+
+        <article class="plugin-card coming-soon">
+          <h3>🛡️ Vibe Sec <span class="status">coming soon</span></h3>
+          <p class="tagline">Fix the AI-prototyped security gaps.</p>
+          <p class="desc">Security scanner for vibe-coded apps. Detects the predictable gaps AI prototyping leaves behind &mdash; secrets, auth, input validation, dependencies &mdash; and generates fixes proportional to your app&rsquo;s deployment context.</p>
+          <div class="plinks">
+            <a href="https://github.com/estevanhernandez-stack-ed/vibe-plugins/tree/main/packages/vibe-sec">Framework doc</a>
+          </div>
+        </article>
+
       </div>
     </div>
   </section>
