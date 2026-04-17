@@ -9,7 +9,7 @@ subscription usage with burn-rate projections, pace markers, and sparklines.
 Setup: python sanduhr.py
        Paste your sessionKey on first run (F12 > Application > Cookies > claude.ai)
 
-Author: 626Labs | github.com/626labs
+Author: 626 Labs LLC | 626labs.dev | github.com/626Labs-LLC
 License: MIT
 """
 
