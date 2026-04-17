@@ -7,6 +7,7 @@ persistence, credentials dialog, and refresh scheduling.
 
 import json
 import logging
+import sys
 import webbrowser
 from datetime import datetime
 from typing import Dict, Optional
@@ -529,12 +530,13 @@ class SanduhrWidget(QWidget):
     def _toggle_pin(self) -> None:
         """Toggle always-on-top.
 
-        Qt's setWindowFlags(~WindowStaysOnTopHint) doesn't reliably demote a
-        frameless window from topmost on Windows — the flag is cleared on
-        the Qt side but SetWindowPos(HWND_NOTOPMOST) isn't always issued,
-        so the window appears "stuck pinned." Call the Win32 API directly
-        to guarantee the z-order change, then keep the Qt flag in sync so
-        future QEvent processing matches reality.
+        Qt's setWindowFlag(WindowStaysOnTopHint, False) on a frameless
+        window (a) doesn't reliably issue SetWindowPos(HWND_NOTOPMOST) on
+        Windows, and (b) hides the widget as a side effect of recreating
+        the native handle. Instead, call user32!SetWindowPos directly via
+        ctypes to demote or promote the z-order. Don't touch Qt's flags —
+        the native change is what the user sees, and leaving the flag
+        alone preserves the HWND (which means Mica stays intact).
         """
         import sys as _sys
         self._pinned = not self._pinned
@@ -549,12 +551,6 @@ class SanduhrWidget(QWidget):
                 0, 0, 0, 0,
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
             )
-
-        # Keep the Qt-side flag in sync so future flag queries are truthful,
-        # but do it via setWindowFlag (no show()) — we already updated the
-        # native z-order and don't want Qt to re-create the HWND here (that
-        # would drop Mica + reset state).
-        self.setWindowFlag(Qt.WindowStaysOnTopHint, self._pinned)
 
         # Visual feedback on the button itself.
         self._btn_pin.setText("Pin" if self._pinned else "Unpin")
@@ -744,6 +740,39 @@ class SanduhrWidget(QWidget):
             "h": self.height(),
         }
         self._save_settings()
+
+    def showEvent(self, event) -> None:  # noqa: N802
+        super().showEvent(event)
+        # Force a taskbar button once the native HWND exists. Qt's
+        # FramelessWindowHint + WindowStaysOnTopHint combo on Win11 can
+        # omit WS_EX_APPWINDOW from the extended style, which means no
+        # taskbar icon — if the user minimizes there's nowhere to click
+        # to restore. Forcing the flag here guarantees a taskbar button.
+        if sys.platform == "win32" and not getattr(self, "_taskbar_forced", False):
+            self._force_taskbar_button()
+            self._taskbar_forced = True
+
+    def _force_taskbar_button(self) -> None:
+        """Set WS_EX_APPWINDOW on the native window so Windows shows a
+        taskbar button for this frameless widget."""
+        import ctypes
+        GWL_EXSTYLE = -20
+        WS_EX_APPWINDOW = 0x00040000
+        WS_EX_TOOLWINDOW = 0x00000080
+        SWP_NOMOVE = 0x0002
+        SWP_NOSIZE = 0x0001
+        SWP_NOZORDER = 0x0004
+        SWP_FRAMECHANGED = 0x0020
+        hwnd = int(self.winId())
+        user32 = ctypes.windll.user32
+        current = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+        new = (current | WS_EX_APPWINDOW) & ~WS_EX_TOOLWINDOW
+        if new != current:
+            user32.SetWindowLongW(hwnd, GWL_EXSTYLE, new)
+            user32.SetWindowPos(
+                hwnd, 0, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+            )
 
     def closeEvent(self, event) -> None:  # noqa: N802
         self._save_window_geometry()
