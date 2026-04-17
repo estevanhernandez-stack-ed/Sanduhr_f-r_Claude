@@ -103,9 +103,36 @@
       color: var(--text);
     }
     nav.topbar .brand img { width: 32px; height: 32px; border-radius: 6px; }
-    nav.topbar .links { display: flex; gap: 18px; font-size: 14px; }
+    nav.topbar .links { display: flex; gap: 18px; font-size: 14px; align-items: center; }
     nav.topbar .links a { color: var(--text-sec); }
     nav.topbar .links a:hover { color: var(--cyan-pale); text-decoration: none; }
+
+    /* Small 626 Labs publisher chip on the right side of the top nav —
+       subordinate to the product brand on the left but always visible. */
+    nav.topbar .pub-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 12px 4px 4px;
+      border-radius: 999px;
+      border: 1px solid var(--navy-line);
+      background: rgba(26, 37, 64, 0.55);
+      font-size: 12px;
+      color: var(--text-dim);
+      letter-spacing: 0.04em;
+      transition: border-color .15s ease, color .15s ease;
+    }
+    nav.topbar .pub-chip:hover {
+      border-color: var(--cyan);
+      color: var(--cyan-pale);
+      text-decoration: none;
+    }
+    nav.topbar .pub-chip img {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: block;
+    }
 
     /* ── hero ────────────────────────────────────────── */
     section.hero {
@@ -114,10 +141,16 @@
     }
     section.hero h1 {
       font-size: clamp(36px, 6vw, 60px);
-      line-height: 1.08;
+      /* 1.08 was tight enough that the background-clip:text rectangle
+         cropped descenders (visible on the "y" in "yourself"). 1.18 +
+         a small padding-bottom keeps glyph descent fully visible. */
+      line-height: 1.18;
+      padding-bottom: 0.08em;
       margin: 0 0 18px;
       letter-spacing: -0.02em;
+      /* Same oklch smoothing as the primary button */
       background: linear-gradient(135deg, var(--cyan-pale) 0%, var(--cyan) 50%, var(--magenta) 100%);
+      background: linear-gradient(in oklch 135deg, var(--cyan-pale) 0%, var(--cyan) 50%, var(--magenta) 100%);
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -155,7 +188,12 @@
       border: 1px solid transparent;
     }
     .btn.primary {
-      background: linear-gradient(135deg, var(--cyan) 0%, var(--magenta) 100%);
+      /* oklch color interpolation gives a perceptually-smooth cyan→magenta
+         sweep without the sRGB 8-bit banding visible under zoom. The
+         first declaration is a plain sRGB fallback for older browsers;
+         the second overrides on Chrome 111+, Safari 16.4+, Firefox 128+. */
+      background: linear-gradient(135deg, var(--cyan), var(--magenta));
+      background: linear-gradient(in oklch 135deg, var(--cyan), var(--magenta));
       color: #0a121f;
     }
     .btn.primary:hover {
@@ -296,6 +334,41 @@
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 14px;
     }
+    .author-row {
+      margin-top: 40px;
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) minmax(280px, 1.4fr);
+      gap: 28px;
+      align-items: center;
+    }
+    .author-row .copy h3 {
+      font-size: 22px;
+      margin: 0 0 10px;
+      color: var(--cyan-pale);
+    }
+    .author-row .copy p {
+      font-size: 14.5px;
+      color: var(--text-sec);
+      margin: 0 0 10px;
+    }
+    .author-row .copy p.tiny {
+      font-size: 12.5px;
+      color: var(--text-dim);
+    }
+    .author-row .shot {
+      background: rgba(26, 37, 64, 0.55);
+      border: 1px solid var(--navy-line);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+    }
+    .author-row .shot img {
+      width: 100%;
+      display: block;
+    }
+    @media (max-width: 720px) {
+      .author-row { grid-template-columns: 1fr; }
+    }
     .theme-card {
       background: rgba(26, 37, 64, 0.55);
       border: 1px solid var(--navy-line);
@@ -404,7 +477,7 @@
       color: var(--text-dim);
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      margin-top: 4px;
+      margin-bottom: 4px;
     }
 
     /* ── responsive ─────────────────────────────────── */
@@ -428,6 +501,10 @@
         <a href="#themes">Themes</a>
         <a href="#docs">Docs</a>
         <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude">GitHub</a>
+        <a class="pub-chip" href="https://github.com/626labs" aria-label="626 Labs — publisher">
+          <img src="store-assets/logo-square-1080x1080.png" alt="" />
+          <span>626&nbsp;Labs</span>
+        </a>
       </div>
     </div>
   </nav>
@@ -557,6 +634,18 @@
           <div class="cap"><span>Matrix</span><small>phosphor / terminal</small></div>
         </div>
       </div>
+
+      <div class="author-row">
+        <div class="copy">
+          <h3>Author your own &mdash; in two clicks.</h3>
+          <p>Settings &rarr; Themes lets you paste any theme JSON and hit <b>Save &amp; Apply</b>. Your new theme appears instantly in the theme strip, no restart.</p>
+          <p><b>Don&rsquo;t have a palette yet?</b> Click <b>Copy agent prompt</b>, paste it into Claude or any chat agent with a reference image or vibe description, and drop the returned JSON back in the box.</p>
+          <p class="tiny">Or drop the file directly into <code>%APPDATA%\Sanduhr\themes\</code> &mdash; the <b>Open themes folder</b> button takes you there.</p>
+        </div>
+        <div class="shot">
+          <img src="screenshots/windows/settings-themes.png" alt="Sanduhr Settings dialog — Themes tab with paste box, filename field, Save & Apply / Copy agent prompt / Open themes folder buttons, and a list of installed user themes" />
+        </div>
+      </div>
     </div>
   </section>
 
@@ -604,8 +693,8 @@
   <section class="publisher">
     <div class="container">
       <a class="mark" href="https://github.com/626labs" aria-label="626 Labs LLC — publisher">
-        <img src="store-assets/logo-square-1080x1080.png" alt="626 Labs LLC logo" />
         <span class="by">Built by</span>
+        <img src="store-assets/logo-square-1080x1080.png" alt="626 Labs LLC logo" />
       </a>
     </div>
   </section>
