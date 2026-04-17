@@ -66,9 +66,16 @@ if ($SkipInstaller) {
     return
 }
 
-$ISCC = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-if (-not (Test-Path $ISCC)) {
-    throw "Inno Setup 6 not found at $ISCC -- install from https://jrsoftware.org/isdl.php"
+# Inno Setup installs system-wide under Program Files when you have admin,
+# or per-user under %LOCALAPPDATA%\Programs when you don't. Probe both.
+$ISCCCandidates = @(
+    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+    "${env:ProgramFiles}\Inno Setup 6\ISCC.exe",
+    "${env:LocalAppData}\Programs\Inno Setup 6\ISCC.exe"
+)
+$ISCC = $ISCCCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $ISCC) {
+    throw "Inno Setup 6 not found in any of:`n$($ISCCCandidates -join "`n")`nInstall from https://jrsoftware.org/isdl.php or: winget install --id JRSoftware.InnoSetup"
 }
 
 Write-Host "-> Running Inno Setup (v$Version)..." -ForegroundColor Cyan
