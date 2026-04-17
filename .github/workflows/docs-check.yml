@@ -8,6 +8,11 @@ on:
 jobs:
   docs:
     runs-on: ubuntu-latest
+    # Informational only until vibe-doc's CI-side classifier + file-matcher
+    # behavior matches local. Known issue: Linux runs produce a different
+    # classification and fail to detect docs/generated/*.md that local runs
+    # find. Report surfaces in Actions logs without blocking the PR.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -17,14 +22,14 @@ jobs:
         with:
           node-version: "20"
 
-      # Scan rebuilds .vibe-doc/state.json fresh from the current tree so the
-      # check never runs against stale local state. The committed profile.json
-      # seeds the classifier with our project context (desktop widget, not a
-      # web app).
+      # Scan rebuilds .vibe-doc/state.json fresh from the current tree. The
+      # committed profile.json seeds the classifier with project context
+      # (desktop widget, not a web app).
       - name: Scan project
         run: npx -y @esthernandez/vibe-doc@0.4.0 scan . --profile .vibe-doc/profile.json
 
-      # Check returns exit 0 when Required docs are present and current, exit 1
-      # otherwise. CI gates on that exit code.
-      - name: Check Required docs
+      # Check returns exit 0 when Required docs are present + current, exit 1
+      # otherwise. Soft gate — surface the report, don't block merges.
+      - name: Check Required docs (informational)
         run: npx -y @esthernandez/vibe-doc@0.4.0 check .
+        continue-on-error: true
