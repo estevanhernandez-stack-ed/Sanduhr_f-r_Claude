@@ -12,6 +12,26 @@ def _isolate_appdata(monkeypatch):
         yield
 
 
+@pytest.fixture(autouse=True)
+def _stub_modal_dialogs(monkeypatch):
+    """In CI / headless mode, any modal dialog (QMessageBox.exec_, etc.)
+    blocks the event loop forever waiting for user input.
+
+    The widget schedules `_prompt_first_run` via QTimer.singleShot(100, ...)
+    when no credentials are present. On slow CI runners the 100ms elapses
+    before the test's event loop teardown, the modal opens, and pytest
+    hangs indefinitely (saw this on GitHub Actions windows-latest — 57min
+    run that never completed).
+
+    Replace the prompt with a no-op so no modal ever opens during tests.
+    Locally this is invisible because tests finish before the timer fires.
+    """
+    from sanduhr import widget as widget_mod
+    monkeypatch.setattr(
+        widget_mod.SanduhrWidget, "_prompt_first_run", lambda self: None
+    )
+
+
 def test_widget_constructs_without_credentials(qtbot, monkeypatch):
     from sanduhr import credentials, widget
 
