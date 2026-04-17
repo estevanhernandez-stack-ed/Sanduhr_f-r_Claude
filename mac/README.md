@@ -70,4 +70,4 @@ Most accounts don't need this.
 
 ## License
 
-MIT. Python original by [626Labs](https://github.com/626labs).
+MIT. Python original by [626 Labs LLC](https://626labs.dev).
