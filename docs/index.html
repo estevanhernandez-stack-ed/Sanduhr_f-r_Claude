@@ -141,7 +141,11 @@
     }
     section.hero h1 {
       font-size: clamp(36px, 6vw, 60px);
-      line-height: 1.08;
+      /* 1.08 was tight enough that the background-clip:text rectangle
+         cropped descenders (visible on the "y" in "yourself"). 1.18 +
+         a small padding-bottom keeps glyph descent fully visible. */
+      line-height: 1.18;
+      padding-bottom: 0.08em;
       margin: 0 0 18px;
       letter-spacing: -0.02em;
       /* Same oklch smoothing as the primary button */
