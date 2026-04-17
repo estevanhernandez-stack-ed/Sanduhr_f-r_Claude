@@ -11,7 +11,7 @@ final class UsageViewModel {
     // MARK: Config (persisted)
 
     var theme: Theme {
-        didSet { UserDefaults.standard.set(theme.rawValue, forKey: "theme") }
+        didSet { UserDefaults.standard.set(theme.id, forKey: "theme") }
     }
 
     var compact: Bool = false              // double-click title to toggle
@@ -90,8 +90,8 @@ final class UsageViewModel {
     // MARK: Init
 
     init() {
-        self.theme = Theme(rawValue:
-            UserDefaults.standard.string(forKey: "theme") ?? "") ?? .obsidian
+        let stored = UserDefaults.standard.string(forKey: "theme") ?? ""
+        self.theme = ThemeRegistry.theme(id: stored) ?? ThemeRegistry.default
     }
 
     /// Called once the app has a window + a session key.

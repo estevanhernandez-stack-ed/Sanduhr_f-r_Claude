@@ -7,6 +7,10 @@ import AppKit
 enum Sanduhr {
     static func main() {
         let app = NSApplication.shared
+        // Populate ThemeRegistry with user-dropped JSON themes before
+        // anything reads it (UsageViewModel.init resolves the saved theme
+        // id on construction).
+        UserThemes.load()
         let delegate = AppDelegate()
         app.delegate = delegate
         app.run()

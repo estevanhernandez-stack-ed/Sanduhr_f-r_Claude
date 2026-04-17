@@ -7,8 +7,8 @@ struct ThemeStripView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(Theme.allCases) { t in
-                let active = t == vm.theme
+            ForEach(ThemeRegistry.themes) { t in
+                let active = t.id == vm.theme.id
                 Button {
                     vm.theme = t
                 } label: {

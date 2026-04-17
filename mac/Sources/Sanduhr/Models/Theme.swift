@@ -1,50 +1,95 @@
 import SwiftUI
 
-/// The five theme palettes from sanduhr.py:54-90. Hex values copied verbatim
-/// so the Mac version matches the Python widget pixel-for-pixel.
-enum Theme: String, CaseIterable, Codable, Identifiable {
-    case obsidian, aurora, ember, mint, matrix
+/// A named palette + rendering dials. Built-ins live in `ThemeRegistry`;
+/// users can add JSON files to ~/Library/Application Support/Sanduhr/themes/
+/// which are merged at app bootstrap.
+struct Theme: Identifiable, Hashable {
+    let id: String           // "obsidian", "626-labs", "my-custom"
+    let displayName: String  // shown in the theme strip
+    let palette: Palette
 
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .obsidian: return "Obsidian"
-        case .aurora:   return "Aurora"
-        case .ember:    return "Ember"
-        case .mint:     return "Mint"
-        case .matrix:   return "Matrix"
-        }
-    }
-
-    struct Palette {
+    struct Palette: Hashable {
+        // Base colors.
         let bg, glass, titleBg, border: Color
         let text, textSecondary, textDim, textMuted: Color
         let accent, barBg, footerBg, paceMarker, sparkline: Color
+        /// Card background tuned for alpha-blending over the window's
+        /// vibrancy layer. Most themes drop it slightly darker than `glass`
+        /// so text contrast holds when the desktop shows through.
+        let glassOnMica: Color
+
+        // Window-level dials (apply once to the whole panel).
         /// How opaque the theme tint is over the window's vibrancy. Most
         /// themes let vibrancy dominate (~0.18); Matrix goes near-opaque so
         /// the desktop can't bleed through and wash the green out.
         let overlayOpacity: Double
-        /// Same idea for the secondary glass tint inside each tier card.
-        let cardTintOpacity: Double
         /// Font design for numeric readouts (percentages, countdowns).
         /// `.rounded` for most themes; `.monospaced` for Matrix so the
         /// digits feel like phosphor terminal output.
         let numericFontDesign: Font.Design
-        /// Extra glow radius on the accent stripe. Matrix gets a halo so
-        /// the green stripe reads as lit phosphor.
-        let accentGlow: CGFloat
+
+        // Per-card dials (ported from windows/src/sanduhr/themes.py).
+        /// Card density over vibrancy. 0.78–0.90 is the readable range;
+        /// Matrix pushes to 1.0 to kill translucency.
+        let glassAlpha: Double
+        /// Border opacity for each card.
+        let borderAlpha: Double
+        /// Optional accent-matched border color; nil falls back to `border`.
+        let borderTint: Color?
+        /// Soft glow around the percentage readout.
+        let accentBloom: AccentBloom
+        /// Optional 1-px top-edge light catch on cards (nil for restrained
+        /// themes like Obsidian and Matrix).
+        let innerHighlight: InnerHighlight?
+        /// Corner radius in points. Default 10; Matrix drops to 2 for a
+        /// sharper CRT/terminal feel.
+        let cardCornerRadius: CGFloat
+
+        struct AccentBloom: Hashable {
+            let blur: CGFloat
+            let alpha: Double
+        }
+
+        struct InnerHighlight: Hashable {
+            let color: Color
+            let alpha: Double
+        }
+    }
+}
+
+/// All themes available in this session — built-ins plus any loaded from
+/// the user's App Support themes directory. Mutable so `load_user_themes()`
+/// (B.3) can append at bootstrap.
+enum ThemeRegistry {
+    private static var registered: [Theme] = builtIn
+
+    static var themes: [Theme] { registered }
+
+    /// Fallback when the user's saved theme id no longer resolves.
+    static var `default`: Theme {
+        registered.first(where: { $0.id == "obsidian" }) ?? registered[0]
     }
 
-    var palette: Palette {
-        // Defaults for the translucent-glass themes.
-        let standardOverlay: Double    = 0.18
-        let standardCardTint: Double   = 0.14
-        let standardDesign: Font.Design = .rounded
+    static func theme(id: String) -> Theme? {
+        registered.first(where: { $0.id == id })
+    }
 
-        switch self {
-        case .obsidian:
-            return .init(
+    /// Add or replace a theme by id. Later calls win (user themes override
+    /// built-ins that share a key).
+    static func register(_ theme: Theme) {
+        if let i = registered.firstIndex(where: { $0.id == theme.id }) {
+            registered[i] = theme
+        } else {
+            registered.append(theme)
+        }
+    }
+
+    // MARK: Built-ins (port of sanduhr.py:54-90 + windows themes.py dials)
+
+    private static let builtIn: [Theme] = [
+        Theme(
+            id: "obsidian", displayName: "Obsidian",
+            palette: .init(
                 bg: .hex("0d0d0d"), glass: .hex("1c1c1c"),
                 titleBg: .hex("161616"), border: .hex("333333"),
                 text: .hex("e8e4dc"), textSecondary: .hex("b8b4ac"),
@@ -52,12 +97,18 @@ enum Theme: String, CaseIterable, Codable, Identifiable {
                 accent: .hex("6c63ff"), barBg: .hex("2a2a2a"),
                 footerBg: .hex("111111"), paceMarker: .hex("ff6b6b"),
                 sparkline: .hex("6c63ff"),
-                overlayOpacity: standardOverlay,
-                cardTintOpacity: standardCardTint,
-                numericFontDesign: standardDesign,
-                accentGlow: 0)
-        case .aurora:
-            return .init(
+                glassOnMica: .hex("1a1a1c"),
+                overlayOpacity: 0.18,
+                numericFontDesign: .rounded,
+                glassAlpha: 0.85,
+                borderAlpha: 0.30,
+                borderTint: nil,
+                accentBloom: .init(blur: 4, alpha: 0.35),
+                innerHighlight: nil,
+                cardCornerRadius: 10)),
+        Theme(
+            id: "aurora", displayName: "Aurora",
+            palette: .init(
                 bg: .hex("0a0f1a"), glass: .hex("161e30"),
                 titleBg: .hex("0f172a"), border: .hex("334155"),
                 text: .hex("e2e8f0"), textSecondary: .hex("94a3b8"),
@@ -65,12 +116,18 @@ enum Theme: String, CaseIterable, Codable, Identifiable {
                 accent: .hex("38bdf8"), barBg: .hex("1e293b"),
                 footerBg: .hex("0c1220"), paceMarker: .hex("f472b6"),
                 sparkline: .hex("38bdf8"),
-                overlayOpacity: standardOverlay,
-                cardTintOpacity: standardCardTint,
-                numericFontDesign: standardDesign,
-                accentGlow: 0)
-        case .ember:
-            return .init(
+                glassOnMica: .hex("141d2e"),
+                overlayOpacity: 0.18,
+                numericFontDesign: .rounded,
+                glassAlpha: 0.80,
+                borderAlpha: 0.50,
+                borderTint: .hex("38bdf8"),
+                accentBloom: .init(blur: 6, alpha: 0.55),
+                innerHighlight: .init(color: .hex("38bdf8"), alpha: 0.20),
+                cardCornerRadius: 10)),
+        Theme(
+            id: "ember", displayName: "Ember",
+            palette: .init(
                 bg: .hex("1a0a0a"), glass: .hex("261414"),
                 titleBg: .hex("1f0e0e"), border: .hex("442222"),
                 text: .hex("f5e6e0"), textSecondary: .hex("d4a89c"),
@@ -78,12 +135,18 @@ enum Theme: String, CaseIterable, Codable, Identifiable {
                 accent: .hex("f97316"), barBg: .hex("2d1a1a"),
                 footerBg: .hex("150808"), paceMarker: .hex("fbbf24"),
                 sparkline: .hex("f97316"),
-                overlayOpacity: standardOverlay,
-                cardTintOpacity: standardCardTint,
-                numericFontDesign: standardDesign,
-                accentGlow: 0)
-        case .mint:
-            return .init(
+                glassOnMica: .hex("211010"),
+                overlayOpacity: 0.18,
+                numericFontDesign: .rounded,
+                glassAlpha: 0.82,
+                borderAlpha: 0.40,
+                borderTint: .hex("f97316"),
+                accentBloom: .init(blur: 6, alpha: 0.55),
+                innerHighlight: .init(color: .hex("f97316"), alpha: 0.18),
+                cardCornerRadius: 10)),
+        Theme(
+            id: "mint", displayName: "Mint",
+            palette: .init(
                 bg: .hex("0a1a14"), glass: .hex("122a1e"),
                 titleBg: .hex("0c1f14"), border: .hex("22543d"),
                 text: .hex("e0f5ec"), textSecondary: .hex("9cd4b8"),
@@ -91,15 +154,42 @@ enum Theme: String, CaseIterable, Codable, Identifiable {
                 accent: .hex("34d399"), barBg: .hex("163020"),
                 footerBg: .hex("081510"), paceMarker: .hex("f472b6"),
                 sparkline: .hex("34d399"),
-                overlayOpacity: standardOverlay,
-                cardTintOpacity: standardCardTint,
-                numericFontDesign: standardDesign,
-                accentGlow: 0)
-        case .matrix:
-            // Matrix is deliberately opaque + phosphor. Still glass — still
-            // a Mac panel with vibrancy behind it — but the tint wins over
-            // the desktop so the blacks read black and the greens punch.
-            return .init(
+                glassOnMica: .hex("0e2419"),
+                overlayOpacity: 0.18,
+                numericFontDesign: .rounded,
+                glassAlpha: 0.78,
+                borderAlpha: 0.45,
+                borderTint: .hex("34d399"),
+                accentBloom: .init(blur: 4, alpha: 0.35),
+                innerHighlight: .init(color: .hex("34d399"), alpha: 0.22),
+                cardCornerRadius: 10)),
+        Theme(
+            id: "626-labs", displayName: "626 Labs",
+            // 626 Labs brand — navy + cyan + magenta. Ported from
+            // docs/themes/examples/626-labs.json on the windows-native branch.
+            palette: .init(
+                bg: .hex("0f182b"), glass: .hex("1a2540"),
+                titleBg: .hex("131a2a"), border: .hex("2a3a5c"),
+                text: .hex("e8f2ff"), textSecondary: .hex("a8c2d9"),
+                textDim: .hex("6a849e"), textMuted: .hex("4a5f7a"),
+                accent: .hex("3bb4d9"), barBg: .hex("1a2540"),
+                footerBg: .hex("0a121f"), paceMarker: .hex("e13aa0"),
+                sparkline: .hex("3bb4d9"),
+                glassOnMica: .hex("131d31"),
+                overlayOpacity: 0.18,
+                numericFontDesign: .rounded,
+                glassAlpha: 0.84,
+                borderAlpha: 0.50,
+                borderTint: .hex("3bb4d9"),
+                accentBloom: .init(blur: 6, alpha: 0.60),
+                innerHighlight: .init(color: .hex("7ae0f5"), alpha: 0.22),
+                cardCornerRadius: 10)),
+        Theme(
+            id: "matrix", displayName: "Matrix",
+            // Matrix opts out of vibrancy — overlayOpacity pushes near 1.0
+            // and cards go fully opaque so the phosphor stays punchy. Sharp
+            // 2-pt corners give the CRT/terminal feel.
+            palette: .init(
                 bg: .hex("020605"), glass: .hex("061a0c"),
                 titleBg: .hex("020a05"), border: .hex("0f3a1a"),
                 text: .hex("39ff7c"), textSecondary: .hex("20e060"),
@@ -107,12 +197,16 @@ enum Theme: String, CaseIterable, Codable, Identifiable {
                 accent: .hex("39ff7c"), barBg: .hex("0a1a0f"),
                 footerBg: .hex("010604"), paceMarker: .hex("ff0a5c"),
                 sparkline: .hex("39ff7c"),
+                glassOnMica: .hex("0a140a"),
                 overlayOpacity: 0.82,
-                cardTintOpacity: 0.55,
                 numericFontDesign: .monospaced,
-                accentGlow: 6)
-        }
-    }
+                glassAlpha: 1.0,
+                borderAlpha: 0.50,
+                borderTint: .hex("39ff7c"),
+                accentBloom: .init(blur: 4, alpha: 0.60),
+                innerHighlight: nil,
+                cardCornerRadius: 2)),
+    ]
 }
 
 extension Color {

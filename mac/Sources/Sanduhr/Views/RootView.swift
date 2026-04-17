@@ -17,8 +17,8 @@ struct RootView: View {
                 colors: [t.accent.opacity(0.35), t.accent, t.accent.opacity(0.35)],
                 startPoint: .leading, endPoint: .trailing)
                 .frame(height: 2)
-                .shadow(color: t.accent.opacity(t.accentGlow > 0 ? 0.6 : 0),
-                        radius: t.accentGlow, x: 0, y: 0)
+                .shadow(color: t.accent.opacity(t.accentBloom.alpha),
+                        radius: t.accentBloom.blur, x: 0, y: 0)
 
             TitleBarView(
                 vm: vm,

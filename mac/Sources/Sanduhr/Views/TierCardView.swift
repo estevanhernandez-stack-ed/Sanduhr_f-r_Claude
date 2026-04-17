@@ -23,35 +23,32 @@ struct TierCardView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        // Layered glass: SwiftUI .thinMaterial provides a second pane of
-        // frost on top of the window's vibrancy, which is the Mac
-        // Control-Center / HUD layering convention. Theme tint opacity is
-        // palette-controlled — Matrix pushes it hard, others whisper.
+        // Layered glass: .thinMaterial is the vibrancy layer underneath,
+        // then a theme-tinted pane uses `glassOnMica` (tuned for contrast
+        // over vibrancy) at the theme's preferred density. An optional
+        // `innerHighlight` adds an accent-colored top-edge light catch.
         .background(
             ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: palette.cardCornerRadius, style: .continuous)
                     .fill(.thinMaterial)
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(palette.glass.opacity(palette.cardTintOpacity))
-                // Top-edge sheen.
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(LinearGradient(
-                        colors: [Color.white.opacity(0.08), Color.clear],
-                        startPoint: .top, endPoint: .center))
-                    .allowsHitTesting(false)
+                RoundedRectangle(cornerRadius: palette.cardCornerRadius, style: .continuous)
+                    .fill(palette.glassOnMica.opacity(palette.glassAlpha))
+                if let hl = palette.innerHighlight {
+                    RoundedRectangle(cornerRadius: palette.cardCornerRadius, style: .continuous)
+                        .fill(LinearGradient(
+                            colors: [hl.color.opacity(hl.alpha), Color.clear],
+                            startPoint: .top, endPoint: .center))
+                        .allowsHitTesting(false)
+                }
             }
         )
         .overlay(
-            // Inner highlight stroke — classic glass-edge look.
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: palette.cardCornerRadius, style: .continuous)
                 .strokeBorder(
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.22),
-                                 Color.white.opacity(0.04)],
-                        startPoint: .top, endPoint: .bottom),
+                    (palette.borderTint ?? palette.border).opacity(palette.borderAlpha),
                     lineWidth: 0.5)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: palette.cardCornerRadius, style: .continuous))
         .shadow(color: .black.opacity(0.18), radius: 4, x: 0, y: 2)
     }
 
@@ -77,6 +74,8 @@ struct TierCardView: View {
                               design: palette.numericFontDesign))
                 .foregroundStyle(usageColor(util))
                 .monospacedDigit()
+                .shadow(color: usageColor(util).opacity(palette.accentBloom.alpha),
+                        radius: palette.accentBloom.blur)
         }
     }
 
@@ -136,16 +135,19 @@ struct ExtraUsageCard: View {
         .padding(.vertical, 7)
         .background(
             ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: palette.cardCornerRadius, style: .continuous)
                     .fill(.thinMaterial)
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(palette.glass.opacity(0.12))
+                // ExtraUsage is secondary info, so sit lighter than tier cards.
+                RoundedRectangle(cornerRadius: palette.cardCornerRadius, style: .continuous)
+                    .fill(palette.glassOnMica.opacity(palette.glassAlpha * 0.5))
             }
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            RoundedRectangle(cornerRadius: palette.cardCornerRadius, style: .continuous)
+                .strokeBorder(
+                    (palette.borderTint ?? palette.border).opacity(palette.borderAlpha * 0.6),
+                    lineWidth: 0.5))
+        .clipShape(RoundedRectangle(cornerRadius: palette.cardCornerRadius, style: .continuous))
     }
 
     private var text: String {
