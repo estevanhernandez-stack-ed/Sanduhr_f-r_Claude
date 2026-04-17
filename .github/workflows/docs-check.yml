@@ -22,9 +22,9 @@ jobs:
       # seeds the classifier with our project context (desktop widget, not a
       # web app).
       - name: Scan project
-        run: npx -y vibe-doc@0.4.0 scan . --profile .vibe-doc/profile.json
+        run: npx -y @esthernandez/vibe-doc@0.4.0 scan . --profile .vibe-doc/profile.json
 
       # Check returns exit 0 when Required docs are present and current, exit 1
       # otherwise. CI gates on that exit code.
       - name: Check Required docs
-        run: npx -y vibe-doc@0.4.0 check .
+        run: npx -y @esthernandez/vibe-doc@0.4.0 check .
