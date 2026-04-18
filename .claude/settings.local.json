@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vibe-doc *)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_tier_card.py -v)",
+      "Bash(powershell.exe -Command 'Start-Process ./dist/Sanduhr/Sanduhr.exe; Start-Sleep 3; $proc = Get-Process Sanduhr -ErrorAction SilentlyContinue; if \\($proc\\) { Write-Output \"RUNNING: PID $\\($proc.Id\\)\"; Stop-Process -Name Sanduhr -ErrorAction SilentlyContinue; Write-Output '\\\\''Killed.'\\\\'' } else { Write-Output '\\\\''NOT RUNNING - process died'\\\\'' }')"
+    ]
+  }
+}

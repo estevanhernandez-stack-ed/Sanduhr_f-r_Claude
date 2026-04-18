@@ -30,6 +30,8 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QVBoxLayout,
     QWidget,
+    QCheckBox,
+    QSpinBox,
 )
 
 from sanduhr import credentials, paths, themes
@@ -89,6 +91,7 @@ def _agent_prompt_path() -> Path:
 class SettingsDialog(QDialog):
     credentialsSaved = Signal(str, object)  # (session_key, cf_clearance | None)
     themesChanged = Signal()
+    settingsSaved = Signal(dict)
 
     def __init__(
         self,
@@ -97,11 +100,14 @@ class SettingsDialog(QDialog):
         cf_clearance: str = "",
         initial_tab: int = 0,
         focus_cf: bool = False,
+        settings: Optional[dict] = None,
     ):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setModal(True)
         self.resize(520, 520)
+        
+        self._settings = settings or {}
 
         layout = QVBoxLayout(self)
         self._tabs = QTabWidget()
@@ -109,6 +115,7 @@ class SettingsDialog(QDialog):
 
         self._build_credentials_tab(session_key, cf_clearance, focus_cf)
         self._build_themes_tab()
+        self._build_pacing_tab()
         self._build_help_tab()
 
         btns = QDialogButtonBox(QDialogButtonBox.Close)
@@ -238,6 +245,60 @@ class SettingsDialog(QDialog):
 
         self._refresh_list()
         self._tabs.addTab(page, "Themes")
+
+    # ── Pacing tab ───────────────────────────────────────────────
+
+    def _build_pacing_tab(self) -> None:
+        page = QWidget()
+        v = QVBoxLayout(page)
+
+        v.addWidget(QLabel("<b>Pacing Tools & Deep Work</b>"))
+        v.addWidget(QLabel(
+            "Configure the advanced pacing and focus tools. These overlays appear "
+            "directly on top of the widget UI when activated."
+        ))
+        
+        v.addSpacing(16)
+        
+        self._chk_pacing_tools = QCheckBox("Enable Pacing Calculators")
+        self._chk_pacing_tools.setChecked(self._settings.get("pacing_tools_enabled", True))
+        v.addWidget(self._chk_pacing_tools)
+
+        self._chk_auto_game = QCheckBox("Auto-trigger Wait-State Snake Game (>50% ahead)")
+        self._chk_auto_game.setChecked(self._settings.get("auto_trigger_game", False))
+        v.addWidget(self._chk_auto_game)
+
+        v.addSpacing(12)
+        
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Focus Mode duration (minutes):"))
+        self._spin_focus = QSpinBox()
+        self._spin_focus.setRange(1, 120)
+        self._spin_focus.setValue(self._settings.get("focus_mode_duration", 25))
+        row.addWidget(self._spin_focus)
+        row.addStretch()
+        v.addLayout(row)
+
+        v.addStretch()
+
+        act_row = QHBoxLayout()
+        act_row.addStretch()
+        save_btn = QPushButton("Save Pacing Config")
+        save_btn.clicked.connect(self._save_pacing_settings)
+        act_row.addWidget(save_btn)
+        v.addLayout(act_row)
+
+        self._tabs.addTab(page, "Pacing")
+
+    def _save_pacing_settings(self) -> None:
+        self._settings["pacing_tools_enabled"] = self._chk_pacing_tools.isChecked()
+        self._settings["auto_trigger_game"] = self._chk_auto_game.isChecked()
+        self._settings["focus_mode_duration"] = self._spin_focus.value()
+        self.settingsSaved.emit(self._settings)
+        _styled_msgbox(
+            self, QMessageBox.Information, "Settings",
+            "Pacing configuration saved."
+        ).exec_()
 
     # ── Help tab ─────────────────────────────────────────────────
 

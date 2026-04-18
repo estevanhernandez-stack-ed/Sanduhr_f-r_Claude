@@ -71,6 +71,40 @@ def pace_info(util, resets_at, tier_key):
     return (f"{round(abs(diff))}% under", "#60a5fa")
 
 
+def calculate_cooldown(util, resets_at, tier_key):
+    """Return '45m' if ahead of pace, else None."""
+    frac = pace_frac(resets_at, tier_key)
+    if frac is None or util is None:
+        return None
+    wait_frac = (util / 100.0) - frac
+    if wait_frac <= 0:
+        return None
+    total = _tier_total_secs(tier_key)
+    secs = int(wait_frac * total)
+    d, r = divmod(secs, 86400)
+    h, r = divmod(r, 3600)
+    m = r // 60
+    parts = []
+    if d:
+        parts.append(f"{d}d")
+    if h:
+        parts.append(f"{h}h")
+    if m or not parts:
+        parts.append(f"{m}m")
+    return " ".join(parts)
+
+
+def calculate_surplus(util, resets_at, tier_key):
+    """Return surplus integer percentage if under pace, else None."""
+    frac = pace_frac(resets_at, tier_key)
+    if frac is None or util is None:
+        return None
+    surplus = (frac * 100.0) - util
+    if surplus <= 0:
+        return None
+    return int(surplus)
+
+
 def burn_projection(util, resets_at, tier_key):
     """Return (message, color) when current pace will hit 100% before reset, else None."""
     frac = pace_frac(resets_at, tier_key)

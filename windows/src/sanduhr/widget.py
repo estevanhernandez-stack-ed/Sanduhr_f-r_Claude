@@ -21,11 +21,16 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QShortcut,
+    QSizePolicy,
+    QStackedLayout,
     QVBoxLayout,
     QWidget,
 )
 
 from sanduhr import credentials, history, mica, paths, themes
+from sanduhr.focus import FocusTimerWidget
+from sanduhr.game import SnakeOverlay
 from sanduhr.fetcher import UsageFetcher
 from sanduhr.settings_dialog import SettingsDialog
 from sanduhr.tiers import TierCard
@@ -183,7 +188,10 @@ class SanduhrWidget(QWidget):
         # Content
         self._content = QWidget()
         self._content.setObjectName("Content")
-        self._content_layout = QVBoxLayout(self._content)
+        self._main_stack = QStackedLayout(self._content)
+        
+        self._cards_page = QWidget()
+        self._content_layout = QVBoxLayout(self._cards_page)
         self._content_layout.setContentsMargins(8, 8, 8, 8)
         self._content_layout.setSpacing(6)
 
@@ -205,7 +213,21 @@ class SanduhrWidget(QWidget):
         self._cards_layout.setSpacing(8)
         self._content_layout.addWidget(self._cards_container)
         self._content_layout.addStretch()
+        
+        self._main_stack.addWidget(self._cards_page)
+        
+        # Focus Page
+        theme = themes.THEMES.get(self._settings.get("theme", "sunset-neon"), {})
+        self._focus_widget = FocusTimerWidget(theme)
+        self._focus_widget.finished.connect(self._exit_focus_mode)
+        self._main_stack.addWidget(self._focus_widget)
+
         outer.addWidget(self._content, stretch=1)
+        
+        hi = self._settings.get("snake_high_score", 0)
+        self._game_overlay = SnakeOverlay(theme, hi, self)
+        self._game_overlay.finished.connect(lambda: self.setFocus())
+        self._game_overlay.highScoreReached.connect(self._save_snake_highscore)
 
         # Footer
         self._footer = QWidget()
@@ -233,6 +255,7 @@ class SanduhrWidget(QWidget):
             ("Ctrl+R", self._request_refresh),
             ("Ctrl+,", lambda: self._open_settings_dialog()),
             ("Ctrl+D", self._toggle_compact),
+            ("Ctrl+P", self._toggle_focus_mode),
             ("Ctrl+H", lambda: self._open_settings_dialog(initial_tab=2)),
         ):
             sc = QShortcut(QKeySequence(seq), self)
@@ -547,6 +570,12 @@ class SanduhrWidget(QWidget):
         for card in self._tier_cards.values():
             card.apply_theme(self._theme)
             self._apply_monospace_if_needed(card)
+            
+        if hasattr(self, '_focus_widget'):
+            self._focus_widget.apply_theme(self._theme)
+            
+        if hasattr(self, '_game_overlay'):
+            self._game_overlay.apply_theme(self._theme)
 
         if self._theme.get("opts_out_of_mica"):
             mica.disable_mica(self)
@@ -618,16 +647,24 @@ class SanduhrWidget(QWidget):
 
     # -- context menu ----------------------------------------------
 
+    def _save_snake_highscore(self, score: int) -> None:
+        self._settings["snake_high_score"] = score
+        self._save_settings()
+
     def _show_context_menu(self, pos: QPoint) -> None:
         menu = QMenu(self)
-        menu.addAction("Refresh", self._request_refresh)
-        menu.addAction(
-            "Compact mode" if not self._compact else "Expand",
-            self._toggle_compact,
-        )
-        menu.addAction("Settings...", lambda: self._open_settings_dialog())
-        menu.addSeparator()
-        menu.addAction("Quit", self.close)
+        for k, a in [
+            ("Refresh", self._request_refresh),
+            (
+                "Expand" if self._compact else "Compact Mode",
+                self._toggle_compact,
+            ),
+            ("Deep Work Mode (Ctrl+P)", self._toggle_focus_mode),
+            ("Play Cooldown Snake", self._game_overlay.start_game),
+            ("Settings…", self._open_settings_dialog),
+            ("Quit Sanduhr", QGuiApplication.quit),
+        ]:
+            menu.addAction(k, a)
         menu.popup(self.mapToGlobal(pos))
 
     # -- actions ---------------------------------------------------
@@ -678,6 +715,23 @@ class SanduhrWidget(QWidget):
         self._compact = not self._compact
         self._render_cards(self._last or {})
 
+    def _toggle_focus_mode(self) -> None:
+        if self._main_stack.currentIndex() == 1:
+            self._exit_focus_mode()
+        else:
+            dur = self._settings.get("focus_mode_duration", 25)
+            self._main_stack.setCurrentIndex(1)
+            self._focus_widget.start(dur)
+
+    def _exit_focus_mode(self) -> None:
+        self._focus_widget.stop()
+        self._main_stack.setCurrentIndex(0)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if hasattr(self, '_game_overlay'):
+            self._game_overlay.setGeometry(self.rect())
+
     def _open_settings_dialog(self, focus_cf: bool = False, initial_tab: int = 0) -> None:
         creds = credentials.load()
         dlg = SettingsDialog(
@@ -686,9 +740,11 @@ class SanduhrWidget(QWidget):
             cf_clearance=creds.get("cf_clearance") or "",
             focus_cf=focus_cf,
             initial_tab=initial_tab,
+            settings=self._settings,
         )
         dlg.credentialsSaved.connect(self._on_credentials_saved)
         dlg.themesChanged.connect(self._rebuild_theme_strip)
+        dlg.settingsSaved.connect(self._on_settings_saved)
         dlg.setStyleSheet(self.styleSheet())
         dlg.exec_()
 
@@ -696,6 +752,10 @@ class SanduhrWidget(QWidget):
         self._clear_preview()
         self._start_or_update_fetcher(session_key, cf_clearance)
         self._request_refresh()
+
+    def _on_settings_saved(self, new_settings: dict) -> None:
+        self._settings.update(new_settings)
+        self._save_settings()
 
     def _prompt_first_run(self) -> None:
         # Build the welcome dialog with our stylesheet pre-applied so it

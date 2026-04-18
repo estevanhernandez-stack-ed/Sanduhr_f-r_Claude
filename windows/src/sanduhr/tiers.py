@@ -40,6 +40,7 @@ class TierCard(QFrame):
         self._theme = theme
         self._resets_at: Optional[str] = None
         self._util: int = 0
+        self._show_deep_math = False
 
         self._build()
         self.apply_theme(theme)
@@ -65,11 +66,7 @@ class TierCard(QFrame):
         )
         self._reset_dt_lbl.setText(pacing.reset_datetime_str(resets_at))
 
-        pace = pacing.pace_info(util, resets_at, self._tier_key)
-        self._pace_lbl.setText(pace[0] if pace else "")
-        self._pace_lbl.setStyleSheet(
-            f"color: {pace[1]};" if pace else f"color: {self._theme['text_dim']};"
-        )
+        self._update_pace_lbl()
 
         burn = pacing.burn_projection(util, resets_at, self._tier_key)
         self._burn_lbl.setText(burn[0] if burn else "")
@@ -152,6 +149,8 @@ class TierCard(QFrame):
         row3.addStretch()
         self._pace_lbl = QLabel("")
         self._pace_lbl.setAttribute(Qt.WA_TranslucentBackground, True)
+        self._pace_lbl.setCursor(Qt.PointingHandCursor)
+        self._pace_lbl.mousePressEvent = self._toggle_deep_math
         row3.addWidget(self._pace_lbl)
         outer.addLayout(row3)
 
@@ -164,6 +163,30 @@ class TierCard(QFrame):
         self._burn_lbl.setAttribute(Qt.WA_TranslucentBackground, True)
         row4.addWidget(self._burn_lbl)
         outer.addLayout(row4)
+
+    def _toggle_deep_math(self, event) -> None:
+        if event.button() == Qt.LeftButton:
+            self._show_deep_math = not self._show_deep_math
+            self._update_pace_lbl()
+
+    def _update_pace_lbl(self) -> None:
+        if self._show_deep_math:
+            cooldown = pacing.calculate_cooldown(self._util, self._resets_at, self._tier_key)
+            if cooldown:
+                self._pace_lbl.setText(f"Cool down: {cooldown}")
+                self._pace_lbl.setStyleSheet(f"color: {self._theme['text_dim']};")
+                return
+            surplus = pacing.calculate_surplus(self._util, self._resets_at, self._tier_key)
+            if surplus:
+                self._pace_lbl.setText(f"Surplus: {surplus}%")
+                self._pace_lbl.setStyleSheet(f"color: {self._theme['text_dim']};")
+                return
+                
+        pace = pacing.pace_info(self._util, self._resets_at, self._tier_key)
+        self._pace_lbl.setText(pace[0] if pace else "")
+        self._pace_lbl.setStyleSheet(
+            f"color: {pace[1]};" if pace else f"color: {self._theme['text_dim']};"
+        )
 
     def _card_qss(self) -> str:
         t = self._theme

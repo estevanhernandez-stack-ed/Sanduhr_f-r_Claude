@@ -85,6 +85,28 @@ func paceInfo(util: Double?, iso: String?, tier: Tier, now: Date = Date()) -> Pa
     return                          PaceInfo(text: "\(Int(abs(diff)))% under",   colorHex: "60a5fa")
 }
 
+/// Returns formatted wait time (e.g. "45m") if ahead of pace, else nil.
+func calculateCooldown(util: Double?, iso: String?, tier: Tier, now: Date = Date()) -> String? {
+    guard let u = util, let f = paceFrac(iso, tier: tier, now: now) else { return nil }
+    let waitFrac = (u / 100.0) - f
+    if waitFrac <= 0 { return nil }
+    let s = Int(waitFrac * tier.totalSeconds)
+    let d = s / 86400, h = (s % 86400) / 3600, m = (s % 3600) / 60
+    var parts: [String] = []
+    if d > 0 { parts.append("\(d)d") }
+    if h > 0 { parts.append("\(h)h") }
+    if m > 0 || parts.isEmpty { parts.append("\(m)m") }
+    return parts.joined(separator: " ")
+}
+
+/// Returns integer surplus quota percentage if under pace, else nil.
+func calculateSurplus(util: Double?, iso: String?, tier: Tier, now: Date = Date()) -> Int? {
+    guard let u = util, let f = paceFrac(iso, tier: tier, now: now) else { return nil }
+    let surplus = (f * 100.0) - u
+    if surplus <= 0 { return nil }
+    return Int(surplus)
+}
+
 struct BurnInfo {
     let text: String
     let colorHex: String
