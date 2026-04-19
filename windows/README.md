@@ -34,7 +34,7 @@ pytest
 ./build.ps1 -DebugBuild       # keeps console window for tracebacks
 ```
 
-Produces `build/Sanduhr-Setup-v2.0.0.exe`.
+Produces `build/Sanduhr-Setup-vX.Y.Z.exe` using the version in `pyproject.toml` (currently `2.0.4`).
 
 ## First run
 

@@ -63,15 +63,32 @@ Single-file tkinter app with auto-installing `cloudscraper` dep. Works on macOS,
 
 ## Features
 
-- **Burn-rate projection** — "Hits 100% in ~4h 22m at current pace" warns before you run dry.
-- **Pace markers on every bar** — colored ticks show where "on pace" is right now, pace by eye not by math.
-- **2-hour sparkline history** per subscription tier.
+### Pacing
+
+- **Burn-rate projection** — "At current pace, expires in 3d 21h" warns before you run dry.
+- **Always-on pace ghost** — a vertical tick on every bar showing where pace says usage should be right now. Real fill sits to the left (under pace), at (on pace), or to the right (ahead). No math required.
+- **Advanced pacing metrics** — hover any tier card to reveal **Cooldown required** (how long at zero usage to get back on pace) and **Surplus** (burn-rate delta when under pace).
+- **Horizon sparkline** — classic Heer/Tufte 4-band horizon over the last 2 hours. Peaks stack into dense dark regions, lulls wash soft. More information per pixel than a line chart, toggle via the 📊 button.
+- **Breathing glass** — bars pulse softly toward each theme's accent color. Subliminal, not flickery.
+
+### Focus
+
+- **Deep-work focus timer** — swap the tier cards for a digitised 31×31 pixel hourglass that drains in real time. Inline minute picker, zero external deps.
+- **Cooldown snake game** — pure-Qt/pure-SwiftUI snake for when you've burned through your budget and need to kill a few minutes. Persistent high score.
+
+### Chrome & themes
+
 - **Five hand-tuned themes** — Obsidian, Aurora, Ember, Mint, Matrix — plus unlimited **user-authored JSON themes** via Settings → Themes or by dropping a `.json` into your platform's themes folder.
 - **AI-agent theme prompt** ([`docs/themes/AGENT_PROMPT.md`](docs/themes/AGENT_PROMPT.md)) — hand any chat agent a reference image or vibe description and get back a drop-in theme JSON.
 - **Win11 Mica glass / macOS NSVisualEffectView** — real native vibrancy, no Electron, no WebView.
-- **OS-native credential storage** — Credential Manager on Windows, Keychain on macOS. Cleared on uninstall. Never plaintext.
+- **Edge-drag resize** — hover any edge or corner, cursor changes, click-drag. Minimum bounds track your font metrics so text never clips. New geometry persists across launches.
+
+### Privacy & control
+
+- **OS-native credential storage** — Windows Credential Manager / macOS Keychain. Cleared on uninstall. Never plaintext.
+- **One-click sign-out** — Settings → Credentials → save with an empty sessionKey. Confirmation dialog, then credentials are wiped from the OS store.
 - **Drag-anywhere, pin/unpin, compact mode, full keyboard shortcuts** (`Ctrl+R`, `Ctrl+,`, `Ctrl+D`, `Ctrl+H`).
-- **No telemetry, no analytics, no ads.** One network destination: `claude.ai`, using your own session cookie.
+- **No telemetry, no analytics, no ads.** One network destination: `claude.ai`, using your own session cookie. See [SECURITY.md](SECURITY.md) for why no data ever comes back to us.
 
 ---
 
@@ -112,12 +129,17 @@ Sanduhr hits two `claude.ai` endpoints — the same ones the settings page uses 
 
 | Action | Effect |
 |--------|--------|
-| Click a theme name | Switch to that theme |
-| ⚙ Settings | Credentials · Themes · Help tabs |
+| 🎨 Theme | Open theme picker menu |
+| ⚙ Settings | Credentials · Themes · Pacing · Help tabs |
+| 📊 Graph | Cycle sparkline: Classic / Horizon |
+| ↕ Compact | Toggle compact mode (`Ctrl+D`) |
+| ⏳ Focus | Swap tier cards for the deep-work hourglass |
+| 🐍 Snake | Play the cooldown snake game |
 | Refresh | Force a data refresh (`Ctrl+R`) |
 | Pin / Unpin | Toggle always-on-top |
 | Drag anywhere | Reposition the widget |
-| Double-click title | Toggle compact mode (`Ctrl+D`) |
+| Drag any edge or corner | Resize the widget |
+| Double-click anywhere | Toggle compact mode |
 | Right-click | Refresh / Compact / Settings / Quit |
 | × | Close Sanduhr |
 
@@ -140,6 +162,19 @@ Full keybindings documented in the in-app **Settings → Help** tab.
 ---
 
 ## Roadmap
+
+### Shipped in v2.0.4
+
+- [x] Pace ghost (always-on pace position tick on every bar)
+- [x] Horizon sparkline (replaces pulse histogram)
+- [x] Breathing glass (subliminal accent pulse)
+- [x] Edge-drag resize with dynamic minimum bounds
+- [x] Deep-work focus timer with digitised hourglass
+- [x] Cooldown snake game
+- [x] Advanced pacing metrics (Cooldown required, Surplus)
+- [x] One-click sign-out from Settings
+
+### Up next
 
 - [ ] Microsoft Store listing live (in review)
 - [ ] Homebrew cask submission (pending first tagged Mac release)
