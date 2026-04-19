@@ -392,23 +392,60 @@ class SanduhrWidget(QWidget):
             child.installEventFilter(self)
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt API)
+        # Skip while a focus / snake overlay owns the window
+        if hasattr(self, "_main_stack") and self._main_stack.currentIndex() != 0:
+            return super().eventFilter(obj, event)
+
         et = event.type()
-        if et == QEvent.MouseButtonPress:
-            if event.button() == Qt.LeftButton:
-                self._drag_origin = (
-                    event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-                )
+        if et == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+            # Convert child-local position to root-widget-local coords
+            # for resize-zone detection. event.globalPosition() is the
+            # screen position; mapFromGlobal gives us the root-local.
+            local_pos = self.mapFromGlobal(event.globalPosition().toPoint())
+            zone = self._resize_zone(local_pos)
+            if zone:
+                self._resize_active = zone
+                self._resize_start_geom = self.geometry()
+                self._resize_start_pos = event.globalPosition().toPoint()
+                return True  # consume — don't start a drag
+            # Otherwise fall through to drag-origin capture
+            self._drag_origin = (
+                event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            )
+            return True
+        if et == QEvent.MouseMove:
+            if self._resize_active is not None:
+                self._apply_resize_drag(event.globalPosition().toPoint())
                 return True
-        elif et == QEvent.MouseMove:
             if self._drag_origin and (event.buttons() & Qt.LeftButton):
                 self.move(event.globalPosition().toPoint() - self._drag_origin)
                 return True
-        elif et == QEvent.MouseButtonRelease:
+            # Update cursor for resize zones while hovering (no button held)
+            local_pos = self.mapFromGlobal(event.globalPosition().toPoint())
+            zone = self._resize_zone(local_pos)
+            if zone:
+                from PySide6.QtGui import QCursor
+                cursor_map = {
+                    "left": Qt.SizeHorCursor, "right": Qt.SizeHorCursor,
+                    "top": Qt.SizeVerCursor, "bottom": Qt.SizeVerCursor,
+                    "top-left": Qt.SizeFDiagCursor, "bottom-right": Qt.SizeFDiagCursor,
+                    "top-right": Qt.SizeBDiagCursor, "bottom-left": Qt.SizeBDiagCursor,
+                }
+                self.setCursor(QCursor(cursor_map[zone]))
+            else:
+                self.unsetCursor()
+        if et == QEvent.MouseButtonRelease:
+            if self._resize_active is not None:
+                self._resize_active = None
+                self._resize_start_geom = None
+                self._resize_start_pos = None
+                self._save_settings()
+                return True
             if self._drag_origin is not None:
                 self._drag_origin = None
-                self._save_window_geometry()
+                self._save_settings()
                 return True
-        elif et == QEvent.MouseButtonDblClick:
+        if et == QEvent.MouseButtonDblClick:
             if event.button() == Qt.LeftButton:
                 self._toggle_compact()
                 return True
@@ -765,7 +802,7 @@ class SanduhrWidget(QWidget):
             self._save_settings()
             return
         self._drag_origin = None
-        self._save_window_geometry()
+        self._save_settings()
 
     def _apply_resize_drag(self, global_pos) -> None:
         dx = global_pos.x() - self._resize_start_pos.x()
@@ -1128,7 +1165,7 @@ class SanduhrWidget(QWidget):
     # -- geometry persistence --------------------------------------
 
     def _restore_geometry(self) -> None:
-        geom = self._settings.get("window")
+        geom = self._settings.get("geom") or self._settings.get("window")
         if geom and all(k in geom for k in ("x", "y", "w", "h")):
             self.move(geom["x"], geom["y"])
             self.resize(geom["w"], geom["h"])
@@ -1138,15 +1175,6 @@ class SanduhrWidget(QWidget):
                 screen.right() - self.width() - 24,
                 screen.bottom() - self.height() - 24,
             )
-
-    def _save_window_geometry(self) -> None:
-        self._settings["window"] = {
-            "x": self.x(),
-            "y": self.y(),
-            "w": self.width(),
-            "h": self.height(),
-        }
-        self._save_settings()
 
     def showEvent(self, event) -> None:  # noqa: N802
         super().showEvent(event)
@@ -1182,7 +1210,7 @@ class SanduhrWidget(QWidget):
             )
 
     def closeEvent(self, event) -> None:  # noqa: N802
-        self._save_window_geometry()
+        self._save_settings()
         if self._thread is not None:
             self._thread.quit()
             self._thread.wait(2000)
