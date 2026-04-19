@@ -20,6 +20,14 @@ process-notes.md
 devpost.md
 push.bat
 commit.bat
+discord-post.md
+PR_SUMMARY.md
+pr_description.md
+
+# Local IDE / tool settings (machine-specific, never commit)
+.claude/
+.vscode/
+.idea/
 
 # Personal profile (contains PII)
 docs/builder-profile.md

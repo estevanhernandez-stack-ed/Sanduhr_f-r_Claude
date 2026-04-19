@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Dict, Optional
 
 from PySide6.QtCore import QEvent, QPoint, Qt, QThread, QTimer, Slot
-from PySide6.QtGui import QColor, QGuiApplication, QKeySequence, QShortcut
+from PySide6.QtGui import QColor, QCursor, QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -21,14 +21,18 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
+    QStackedLayout,
     QVBoxLayout,
     QWidget,
 )
 
 from sanduhr import credentials, history, mica, paths, themes
+from sanduhr.focus import FocusTimerWidget
+from sanduhr.game import SnakeOverlay
 from sanduhr.fetcher import UsageFetcher
 from sanduhr.settings_dialog import SettingsDialog
-from sanduhr.tiers import TierCard
+from sanduhr.tiers import TierCard, cycle_graph_mode
 
 _log = logging.getLogger(__name__)
 
@@ -48,6 +52,8 @@ _TIER_LABELS = {
 
 
 class SanduhrWidget(QWidget):
+    _RESIZE_EDGE_PX = 6
+
     def __init__(self):
         super().__init__()
         self._settings = self._load_settings()
@@ -60,12 +66,17 @@ class SanduhrWidget(QWidget):
         self._thread: Optional[QThread] = None
         self._fetcher: Optional[UsageFetcher] = None
         self._last: Optional[dict] = None
+        self._resize_active: Optional[str] = None
+        self._resize_start_geom = None
+        self._resize_start_pos = None
 
         self.setWindowTitle("Sanduhr für Claude")
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.resize(420, 540)
+        self.setMouseTracking(True)
         self._restore_geometry()
+        self._compute_and_apply_minimum_size()
 
         self._build()
         self.apply_theme(self._theme_key)
@@ -120,7 +131,6 @@ class SanduhrWidget(QWidget):
         self._title_lbl = QLabel("Sanduhr für Claude")
         tb.addWidget(self._title_lbl)
         tb.addStretch()
-        self._btn_settings = QPushButton("\u2699 Settings")
         self._btn_refresh = QPushButton("Refresh")
         # Initial state is pinned (WindowStaysOnTopHint set on __init__),
         # so the button's first label must be the ACTION, i.e. "Unpin".
@@ -130,7 +140,7 @@ class SanduhrWidget(QWidget):
         # itself draws in title bars (rather than a plain lowercase x).
         self._btn_close = QPushButton("\u2715")
         self._btn_close.setObjectName("CloseButton")
-        for b in (self._btn_settings, self._btn_refresh, self._btn_pin):
+        for b in (self._btn_refresh, self._btn_pin):
             b.setFlat(True)
             b.setCursor(Qt.PointingHandCursor)
             b.setFixedHeight(34)
@@ -140,50 +150,34 @@ class SanduhrWidget(QWidget):
         self._btn_close.setFixedWidth(46)  # matches Explorer/Settings close-button width
 
         # Tooltips — selective, for the controls whose purpose isn't obvious.
-        self._btn_settings.setToolTip("Settings — credentials, themes, help (Ctrl+,)")
         self._btn_refresh.setToolTip("Refresh usage now (Ctrl+R)")
         self._btn_pin.setToolTip("Unpin (currently always on top)")
         self._btn_close.setToolTip("Close (Alt+F4)")
-        self._title_lbl.setToolTip("Drag to move · double-click to toggle compact · right-click for menu")
+        self._title_lbl.setToolTip("Drag to move")
 
         # Accessible names — screen readers + MS Store review tooling look at these.
-        self._btn_settings.setAccessibleName("Settings")
         self._btn_refresh.setAccessibleName("Refresh usage")
         self._btn_pin.setAccessibleName("Toggle always-on-top")
         self._btn_close.setAccessibleName("Close")
 
-        self._btn_settings.clicked.connect(lambda: self._open_settings_dialog())
         self._btn_refresh.clicked.connect(self._request_refresh)
         self._btn_close.clicked.connect(self.close)
         self._btn_pin.clicked.connect(self._toggle_pin)
         # Order matters — close must be the rightmost button, matching every
         # other Windows title bar the user has ever seen.
-        for b in (self._btn_settings, self._btn_refresh, self._btn_pin, self._btn_close):
+        for b in (self._btn_refresh, self._btn_pin, self._btn_close):
             tb.addWidget(b)
         outer.addWidget(self._title_bar)
 
-        # Theme strip
-        self._theme_strip = QWidget()
-        self._theme_strip.setObjectName("ThemeStrip")
-        self._theme_strip.setFixedHeight(26)
-        ts = QHBoxLayout(self._theme_strip)
-        ts.setContentsMargins(10, 0, 10, 0)
-        ts.setSpacing(0)
-        self._theme_buttons: Dict[str, QPushButton] = {}
-        for key, theme in themes.THEMES.items():
-            btn = QPushButton(theme["name"])
-            btn.setFlat(True)
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.clicked.connect(lambda _=False, k=key: self.apply_theme(k))
-            self._theme_buttons[key] = btn
-            ts.addWidget(btn)
-        ts.addStretch()
-        outer.addWidget(self._theme_strip)
+        # Theme strip moved to popup menu
 
         # Content
         self._content = QWidget()
         self._content.setObjectName("Content")
-        self._content_layout = QVBoxLayout(self._content)
+        self._main_stack = QStackedLayout(self._content)
+        
+        self._cards_page = QWidget()
+        self._content_layout = QVBoxLayout(self._cards_page)
         self._content_layout.setContentsMargins(8, 8, 8, 8)
         self._content_layout.setSpacing(6)
 
@@ -205,7 +199,65 @@ class SanduhrWidget(QWidget):
         self._cards_layout.setSpacing(8)
         self._content_layout.addWidget(self._cards_container)
         self._content_layout.addStretch()
+        
+        self._main_stack.addWidget(self._cards_page)
+        
+        # Focus Page
+        theme = themes.THEMES.get(self._settings.get("theme", "sunset-neon"), {})
+        self._focus_widget = FocusTimerWidget(theme)
+        self._focus_widget.finished.connect(self._exit_focus_mode)
+        self._main_stack.addWidget(self._focus_widget)
+
         outer.addWidget(self._content, stretch=1)
+        
+        hi = self._settings.get("snake_high_score", 0)
+        self._game_overlay = SnakeOverlay(theme, hi, self)
+        self._game_overlay.finished.connect(lambda: self.setFocus())
+        self._game_overlay.highScoreReached.connect(self._save_snake_highscore)
+
+        # Tool strip — between cards and footer
+        self._tool_strip = QWidget()
+        self._tool_strip.setObjectName("ToolStrip")
+        self._tool_strip.setFixedHeight(28)
+        tstrip = QHBoxLayout(self._tool_strip)
+        tstrip.setContentsMargins(10, 0, 10, 0)
+        tstrip.setSpacing(4)
+        tstrip.addStretch()
+        self._btn_theme = QPushButton("\ud83c\udfa8")
+        self._btn_settings = QPushButton("⚙")
+        self._btn_graph = QPushButton("\ud83d\udcca")
+        self._btn_compact = QPushButton("↕")
+        self._btn_focus = QPushButton("⏳")
+        self._btn_snake = QPushButton("\ud83d\udc0d")
+        for b in (self._btn_theme, self._btn_settings, self._btn_graph, self._btn_compact, self._btn_focus, self._btn_snake):
+            b.setFlat(True)
+            b.setCursor(Qt.PointingHandCursor)
+            b.setFixedHeight(24)
+            tstrip.addWidget(b)
+        tstrip.addStretch()
+        self._btn_theme.setToolTip("Themes")
+        self._btn_settings.setToolTip("Settings")
+        self._btn_graph.setToolTip("Cycle graph view: Classic / Horizon")
+        self._btn_compact.setToolTip("Compact Mode")
+        self._btn_focus.setToolTip("Cooldown Timer")
+        self._btn_snake.setToolTip("Play Cooldown Snake")
+        # Accessible names — screen readers and MS Store review tooling look at
+        # these. The emoji glyphs on their own read as "picture" or literal
+        # unicode code points, which is what MS Store graded as "poor
+        # navigation" in the v2.0.1 rejection. Same lesson applies here.
+        self._btn_theme.setAccessibleName("Themes")
+        self._btn_settings.setAccessibleName("Settings")
+        self._btn_graph.setAccessibleName("Cycle graph view")
+        self._btn_compact.setAccessibleName("Toggle compact mode")
+        self._btn_focus.setAccessibleName("Cooldown timer")
+        self._btn_snake.setAccessibleName("Play cooldown snake game")
+        self._btn_theme.clicked.connect(self._show_theme_menu)
+        self._btn_settings.clicked.connect(self._open_settings_dialog)
+        self._btn_graph.clicked.connect(self._cycle_graph_view)
+        self._btn_compact.clicked.connect(self._toggle_compact)
+        self._btn_focus.clicked.connect(self._toggle_focus_mode)
+        self._btn_snake.clicked.connect(self._game_overlay.start_game)
+        outer.addWidget(self._tool_strip)
 
         # Footer
         self._footer = QWidget()
@@ -213,9 +265,11 @@ class SanduhrWidget(QWidget):
         self._footer.setFixedHeight(24)
         ft = QHBoxLayout(self._footer)
         ft.setContentsMargins(10, 0, 10, 0)
+        
         self._footer_lbl = QLabel("")
         ft.addWidget(self._footer_lbl)
         ft.addStretch()
+        
         sonnet = QPushButton("Use Sonnet")
         sonnet.setFlat(True)
         sonnet.setCursor(Qt.PointingHandCursor)
@@ -233,6 +287,7 @@ class SanduhrWidget(QWidget):
             ("Ctrl+R", self._request_refresh),
             ("Ctrl+,", lambda: self._open_settings_dialog()),
             ("Ctrl+D", self._toggle_compact),
+            ("Ctrl+P", self._toggle_focus_mode),
             ("Ctrl+H", lambda: self._open_settings_dialog(initial_tab=2)),
         ):
             sc = QShortcut(QKeySequence(seq), self)
@@ -331,30 +386,77 @@ class SanduhrWidget(QWidget):
         self._save_settings()
 
     def _install_drag_filter(self, root: QWidget) -> None:
-        """Recursively install drag filter on descendants except QPushButton/QLineEdit."""
+        """Recursively install drag filter on descendants except QPushButton/QLineEdit.
+        Also enable mouse tracking so MouseMove events fire on hover (not
+        just during drag) — required for resize-zone cursor feedback to
+        reach the event filter when the cursor is over a child widget."""
+        root.setMouseTracking(True)
         for child in root.findChildren(QWidget):
             if isinstance(child, (QPushButton, QLineEdit)):
                 continue
+            child.setMouseTracking(True)
             child.installEventFilter(self)
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt API)
+        # Skip while a focus / snake overlay owns the window
+        if hasattr(self, "_main_stack") and self._main_stack.currentIndex() != 0:
+            return super().eventFilter(obj, event)
+
         et = event.type()
-        if et == QEvent.MouseButtonPress:
-            if event.button() == Qt.LeftButton:
-                self._drag_origin = (
-                    event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-                )
-                return True
-        elif et == QEvent.MouseMove:
+        if et == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+            # Convert child-local position to root-widget-local coords
+            # for resize-zone detection. event.globalPosition() is the
+            # screen position; mapFromGlobal gives us the root-local.
+            local_pos = self.mapFromGlobal(event.globalPosition().toPoint())
+            zone = self._resize_zone(local_pos)
+            if zone:
+                self._resize_active = zone
+                self._resize_start_geom = self.geometry()
+                self._resize_start_pos = event.globalPosition().toPoint()
+                return True  # consume — don't start a drag
+            # Otherwise fall through to drag-origin capture
+            self._drag_origin = (
+                event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            )
+            return True
+        if et == QEvent.MouseMove:
+            if self._resize_active is not None:
+                if event.buttons() & Qt.LeftButton:
+                    self._apply_resize_drag(event.globalPosition().toPoint())
+                    return True
+                # Button dropped (focus-change race) — abandon resize
+                self._resize_active = None
+                self.unsetCursor()
             if self._drag_origin and (event.buttons() & Qt.LeftButton):
                 self.move(event.globalPosition().toPoint() - self._drag_origin)
                 return True
-        elif et == QEvent.MouseButtonRelease:
+            # Update cursor for resize zones while hovering (no button held)
+            local_pos = self.mapFromGlobal(event.globalPosition().toPoint())
+            zone = self._resize_zone(local_pos)
+            if zone:
+                cursor_map = {
+                    "left": Qt.SizeHorCursor, "right": Qt.SizeHorCursor,
+                    "top": Qt.SizeVerCursor, "bottom": Qt.SizeVerCursor,
+                    "top-left": Qt.SizeFDiagCursor, "bottom-right": Qt.SizeFDiagCursor,
+                    "top-right": Qt.SizeBDiagCursor, "bottom-left": Qt.SizeBDiagCursor,
+                }
+                self.setCursor(QCursor(cursor_map[zone]))
+            else:
+                self.unsetCursor()
+            # Fall through — cursor update is a side-effect, not a consumption.
+        if et == QEvent.MouseButtonRelease:
+            if self._resize_active is not None:
+                self._resize_active = None
+                self.unsetCursor()
+                self._resize_start_geom = None
+                self._resize_start_pos = None
+                self._save_settings()
+                return True
             if self._drag_origin is not None:
                 self._drag_origin = None
-                self._save_window_geometry()
+                self._save_settings()
                 return True
-        elif et == QEvent.MouseButtonDblClick:
+        if et == QEvent.MouseButtonDblClick:
             if event.button() == Qt.LeftButton:
                 self._toggle_compact()
                 return True
@@ -394,7 +496,7 @@ class SanduhrWidget(QWidget):
                 font-family: "Segoe UI Variable Display", "Segoe UI", sans-serif;
                 font-size: 10pt;
             }}
-            QWidget#TitleBar, QWidget#ThemeStrip, QWidget#Footer {{
+            QWidget#TitleBar, QWidget#Footer, QWidget#ToolStrip {{
                 background-color: {chrome_bg};
             }}
             QWidget#Content {{
@@ -547,6 +649,12 @@ class SanduhrWidget(QWidget):
         for card in self._tier_cards.values():
             card.apply_theme(self._theme)
             self._apply_monospace_if_needed(card)
+            
+        if hasattr(self, '_focus_widget'):
+            self._focus_widget.apply_theme(self._theme)
+            
+        if hasattr(self, '_game_overlay'):
+            self._game_overlay.apply_theme(self._theme)
 
         if self._theme.get("opts_out_of_mica"):
             mica.disable_mica(self)
@@ -556,13 +664,11 @@ class SanduhrWidget(QWidget):
         self._settings["theme"] = key
         self._save_settings()
 
-        for k, btn in self._theme_buttons.items():
-            if k == key:
-                btn.setStyleSheet(
-                    f"color: {self._theme['accent']}; font-weight: 600;"
-                )
-            else:
-                btn.setStyleSheet(f"color: {self._theme['text_muted']};")
+        # Theme fonts differ (Matrix → Cascadia Code) — recompute minimum
+        # size so the resize floor tracks the new font metrics.
+        self._compute_and_apply_minimum_size()
+
+        # (Theme buttons highlighting logic removed since they are now in a QMenu)
 
     def _apply_monospace_if_needed(self, card: TierCard) -> None:
         """Matrix-only: swap percentage / countdown fonts to Cascadia Code."""
@@ -593,21 +699,162 @@ class SanduhrWidget(QWidget):
             card._pct.setFont(default)
             card._pct.setGraphicsEffect(None)
 
-    # -- drag ------------------------------------------------------
+    # -- drag + edge-resize ---------------------------------------
+
+    def _compute_and_apply_minimum_size(self) -> None:
+        """Set minimumSize based on QFontMetrics of the longest user-
+        facing strings so no text ever clips below the resize floor.
+
+        Note: `self.font()` reflects Qt's inherited font, not stylesheet
+        font-family rules or the Matrix theme's monospace_font swap
+        (which only replaces tier-card percentage-label fonts). The
+        probes here all land on the status label, which stays Segoe UI
+        across every theme, so this measurement is stable. The theme-
+        change re-invocation is defensive only."""
+        from PySide6.QtGui import QFontMetrics
+        fm = QFontMetrics(self.font())
+        # Strings that have historically pushed the width out. Keep this
+        # list in sync with user-facing copy — if a new long message
+        # lands, add it here.
+        probes = [
+            "Signed out — paste sessionKey in Settings to resume.",
+            "At current pace, expires in 7d 23h 59m",
+            "Cloudflare — add cf_clearance (click Key).",
+            "Weekly — OAuth Apps",
+        ]
+        text_w = max(fm.horizontalAdvance(s) for s in probes)
+        # +24 horizontal padding (12px on each side of the content area),
+        # +32 for the sparkline area we want to preserve.
+        min_w = max(380, text_w + 24 + 32)
+        # Vertical floor: needs room for 4 tier cards + chrome. 520px
+        # matches the initial resize(420, 540) default minus the
+        # decoration — at that height every card gets enough room for
+        # its 4 internal rows without squishing.
+        min_h = 520
+        self.setMinimumSize(min_w, min_h)
+
+    def _resize_zone(self, pos) -> Optional[str]:
+        """Return which edge/corner `pos` (local coords) is within
+        `_RESIZE_EDGE_PX` of, or None if it's interior."""
+        left = pos.x() <= self._RESIZE_EDGE_PX
+        right = pos.x() >= self.width() - self._RESIZE_EDGE_PX
+        top = pos.y() <= self._RESIZE_EDGE_PX
+        bottom = pos.y() >= self.height() - self._RESIZE_EDGE_PX
+        if top and left:
+            return "top-left"
+        if top and right:
+            return "top-right"
+        if bottom and left:
+            return "bottom-left"
+        if bottom and right:
+            return "bottom-right"
+        if left:
+            return "left"
+        if right:
+            return "right"
+        if top:
+            return "top"
+        if bottom:
+            return "bottom"
+        return None
 
     def mousePressEvent(self, event) -> None:  # noqa: N802
+        # Resize has priority over drag when the click lands in an edge zone,
+        # but only when no overlay (focus / snake) owns the window.
+        overlay_active = (
+            hasattr(self, "_main_stack") and self._main_stack.currentIndex() != 0
+        )
+        zone = self._resize_zone(event.position().toPoint()) if not overlay_active else None
+        if zone and event.button() == Qt.LeftButton:
+            self._resize_active = zone
+            self._resize_start_geom = self.geometry()
+            self._resize_start_pos = event.globalPosition().toPoint()
+            return
         if event.button() == Qt.LeftButton:
             self._drag_origin = (
                 event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             )
 
     def mouseMoveEvent(self, event) -> None:  # noqa: N802
+        # While an overlay owns the window, skip both resize and cursor work.
+        overlay_active = (
+            hasattr(self, "_main_stack") and self._main_stack.currentIndex() != 0
+        )
+        if overlay_active:
+            if self._drag_origin and event.buttons() & Qt.LeftButton:
+                self.move(event.globalPosition().toPoint() - self._drag_origin)
+            return
+
+        # Active resize drag takes precedence over everything.
+        if self._resize_active is not None:
+            self._apply_resize_drag(event.globalPosition().toPoint())
+            return
+
+        # Update cursor based on whether pointer sits in an edge zone.
+        zone = self._resize_zone(event.position().toPoint())
+        cursor_map = {
+            "left": Qt.SizeHorCursor,
+            "right": Qt.SizeHorCursor,
+            "top": Qt.SizeVerCursor,
+            "bottom": Qt.SizeVerCursor,
+            "top-left": Qt.SizeFDiagCursor,
+            "bottom-right": Qt.SizeFDiagCursor,
+            "top-right": Qt.SizeBDiagCursor,
+            "bottom-left": Qt.SizeBDiagCursor,
+        }
+        if zone and not (self._drag_origin and event.buttons() & Qt.LeftButton):
+            self.setCursor(QCursor(cursor_map[zone]))
+        else:
+            self.unsetCursor()
+
+        # Fall back to drag-to-move when no resize is underway.
         if self._drag_origin and event.buttons() & Qt.LeftButton:
             self.move(event.globalPosition().toPoint() - self._drag_origin)
 
     def mouseReleaseEvent(self, event) -> None:  # noqa: N802
+        if self._resize_active is not None:
+            self._resize_active = None
+            self.unsetCursor()
+            self._resize_start_geom = None
+            self._resize_start_pos = None
+            self._save_settings()
+            return
         self._drag_origin = None
-        self._save_window_geometry()
+        self._save_settings()
+
+    def _apply_resize_drag(self, global_pos) -> None:
+        dx = global_pos.x() - self._resize_start_pos.x()
+        dy = global_pos.y() - self._resize_start_pos.y()
+        geom = self._resize_start_geom
+        new_x, new_y = geom.x(), geom.y()
+        new_w, new_h = geom.width(), geom.height()
+
+        zone = self._resize_active
+        if "left" in zone:
+            new_x = geom.x() + dx
+            new_w = geom.width() - dx
+        if "right" in zone:
+            new_w = geom.width() + dx
+        if "top" in zone:
+            new_y = geom.y() + dy
+            new_h = geom.height() - dy
+        if "bottom" in zone:
+            new_h = geom.height() + dy
+
+        # Clamp to minimum. If clamping the width would have moved the
+        # left edge, stop the edge from moving further.
+        min_w = self.minimumSize().width()
+        min_h = self.minimumSize().height()
+        if new_w < min_w:
+            if "left" in zone:
+                new_x = geom.x() + (geom.width() - min_w)
+            new_w = min_w
+        if new_h < min_h:
+            if "top" in zone:
+                new_y = geom.y() + (geom.height() - min_h)
+            new_h = min_h
+
+        self.setGeometry(new_x, new_y, new_w, new_h)
 
     def mouseDoubleClickEvent(self, event) -> None:  # noqa: N802
         if (
@@ -618,16 +865,24 @@ class SanduhrWidget(QWidget):
 
     # -- context menu ----------------------------------------------
 
+    def _save_snake_highscore(self, score: int) -> None:
+        self._settings["snake_high_score"] = score
+        self._save_settings()
+
     def _show_context_menu(self, pos: QPoint) -> None:
         menu = QMenu(self)
-        menu.addAction("Refresh", self._request_refresh)
-        menu.addAction(
-            "Compact mode" if not self._compact else "Expand",
-            self._toggle_compact,
-        )
-        menu.addAction("Settings...", lambda: self._open_settings_dialog())
-        menu.addSeparator()
-        menu.addAction("Quit", self.close)
+        for k, a in [
+            ("Refresh", self._request_refresh),
+            (
+                "Expand" if self._compact else "Compact Mode",
+                self._toggle_compact,
+            ),
+            ("Deep Work Mode (Ctrl+P)", self._toggle_focus_mode),
+            ("Play Cooldown Snake", self._game_overlay.start_game),
+            ("Settings…", self._open_settings_dialog),
+            ("Quit Sanduhr", QGuiApplication.quit),
+        ]:
+            menu.addAction(k, a)
         menu.popup(self.mapToGlobal(pos))
 
     # -- actions ---------------------------------------------------
@@ -678,6 +933,78 @@ class SanduhrWidget(QWidget):
         self._compact = not self._compact
         self._render_cards(self._last or {})
 
+        # Hide/show non-essential strips in compact mode
+        self._tool_strip.setVisible(not self._compact)
+
+        if self._compact:
+            # Let the layout determine the minimum size needed for the
+            # single card at its original dimensions, then lock to that.
+            self.setMaximumHeight(16777215)
+            self.setMinimumHeight(0)
+            QTimer.singleShot(0, lambda: (
+                self.adjustSize(),
+                self.setFixedHeight(self.sizeHint().height()),
+            ))
+        else:
+            # Unlock height so the layout can expand naturally
+            self.setMaximumHeight(16777215)
+            self.setMinimumHeight(0)
+            QTimer.singleShot(0, lambda: self.adjustSize())
+
+    def _cycle_graph_view(self) -> None:
+        new_mode = cycle_graph_mode()
+        labels = {'classic': '📊', 'horizon': '📈'}
+        self._btn_graph.setText(labels.get(new_mode, '📊'))
+        tips = {
+            'classic': 'Classic sparkline (click to switch to Horizon chart)',
+            'horizon': 'Horizon chart (click to switch to Classic sparkline)',
+        }
+        self._btn_graph.setToolTip(tips.get(new_mode, ''))
+        if self._last:
+            self._render_cards(self._last)
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        if not self._theme.get('bg_grid'):
+            return
+        from PySide6.QtGui import QPainter, QColor
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, False)
+        grid_c = QColor(self._theme.get('border', '#333333'))
+        grid_c.setAlphaF(0.12)
+        w, h = self.width(), self.height()
+        step = 20
+        painter.setPen(grid_c)
+        for x in range(0, w, step):
+            painter.drawLine(x, 0, x, h)
+        for y in range(0, h, step):
+            painter.drawLine(0, y, w, y)
+        major_c = QColor(self._theme.get('border', '#333333'))
+        major_c.setAlphaF(0.22)
+        painter.setPen(major_c)
+        for x in range(0, w, step * 4):
+            painter.drawLine(x, 0, x, h)
+        for y in range(0, h, step * 4):
+            painter.drawLine(0, y, w, y)
+        painter.end()
+
+    def _toggle_focus_mode(self) -> None:
+        if self._main_stack.currentIndex() == 1:
+            self._exit_focus_mode()
+        else:
+            dur = self._settings.get("focus_mode_duration", 25)
+            self._main_stack.setCurrentIndex(1)
+            self._focus_widget.start(dur)
+
+    def _exit_focus_mode(self) -> None:
+        self._focus_widget.stop()
+        self._main_stack.setCurrentIndex(0)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if hasattr(self, '_game_overlay'):
+            self._game_overlay.setGeometry(self.rect())
+
     def _open_settings_dialog(self, focus_cf: bool = False, initial_tab: int = 0) -> None:
         creds = credentials.load()
         dlg = SettingsDialog(
@@ -686,9 +1013,12 @@ class SanduhrWidget(QWidget):
             cf_clearance=creds.get("cf_clearance") or "",
             focus_cf=focus_cf,
             initial_tab=initial_tab,
+            settings=self._settings,
         )
         dlg.credentialsSaved.connect(self._on_credentials_saved)
+        dlg.credentialsCleared.connect(self._on_credentials_cleared)
         dlg.themesChanged.connect(self._rebuild_theme_strip)
+        dlg.settingsSaved.connect(self._on_settings_saved)
         dlg.setStyleSheet(self.styleSheet())
         dlg.exec_()
 
@@ -696,6 +1026,26 @@ class SanduhrWidget(QWidget):
         self._clear_preview()
         self._start_or_update_fetcher(session_key, cf_clearance)
         self._request_refresh()
+
+    def _on_credentials_cleared(self) -> None:
+        """User signed out via blank-sessionKey save in the Settings dialog.
+        Point the fetcher at empty credentials (it'll 401 on next poll,
+        harmless), tear down any tier cards so stale data doesn't linger,
+        and tell the user how to resume."""
+        if self._fetcher is not None:
+            self._fetcher.update_credentials("", None)
+        for tier_key in list(self._tier_cards.keys()):
+            card = self._tier_cards.pop(tier_key)
+            self._cards_layout.removeWidget(card)
+            card.setParent(None)
+            card.deleteLater()
+        self._status_lbl.setText(
+            "Signed out — paste sessionKey in Settings to resume."
+        )
+
+    def _on_settings_saved(self, new_settings: dict) -> None:
+        self._settings.update(new_settings)
+        self._save_settings()
 
     def _prompt_first_run(self) -> None:
         # Build the welcome dialog with our stylesheet pre-applied so it
@@ -715,29 +1065,20 @@ class SanduhrWidget(QWidget):
         self._open_settings_dialog()
 
     def _rebuild_theme_strip(self) -> None:
-        """Tear down and rebuild the theme strip so newly-added user themes
-        (saved via the Settings dialog) show up immediately without restart."""
-        ts_layout = self._theme_strip.layout()
-        while ts_layout.count():
-            item = ts_layout.takeAt(0)
-            w = item.widget()
-            if w is not None:
-                w.setParent(None)
-                w.deleteLater()
-        self._theme_buttons = {}
-        for key, theme in themes.THEMES.items():
-            btn = QPushButton(theme["name"])
-            btn.setFlat(True)
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.clicked.connect(lambda _=False, k=key: self.apply_theme(k))
-            self._theme_buttons[key] = btn
-            ts_layout.addWidget(btn)
-        ts_layout.addStretch()
-        # Re-apply current theme to refresh active/muted button colors
+        """Themes change handles dynamically via QMenu now, so just re-apply current."""
         self.apply_theme(self._theme_key)
-        # New buttons need the drag filter too (though buttons are excluded,
-        # this also picks up any new child widgets).
-        self._install_drag_filter(self._theme_strip)
+
+    def _show_theme_menu(self) -> None:
+        from PySide6.QtWidgets import QMenu
+        menu = QMenu(self)
+        menu.setStyleSheet(self.styleSheet())
+        for key, theme in themes.THEMES.items():
+            action = menu.addAction(theme["name"])
+            if key == self._theme_key:
+                action.setCheckable(True)
+                action.setChecked(True)
+            action.triggered.connect(lambda _=False, k=key: self.apply_theme(k))
+        menu.exec_(self._btn_theme.mapToGlobal(self._btn_theme.rect().bottomLeft()))
 
     # -- fetcher ---------------------------------------------------
 
@@ -842,7 +1183,7 @@ class SanduhrWidget(QWidget):
     # -- geometry persistence --------------------------------------
 
     def _restore_geometry(self) -> None:
-        geom = self._settings.get("window")
+        geom = self._settings.get("geom") or self._settings.get("window")
         if geom and all(k in geom for k in ("x", "y", "w", "h")):
             self.move(geom["x"], geom["y"])
             self.resize(geom["w"], geom["h"])
@@ -852,15 +1193,6 @@ class SanduhrWidget(QWidget):
                 screen.right() - self.width() - 24,
                 screen.bottom() - self.height() - 24,
             )
-
-    def _save_window_geometry(self) -> None:
-        self._settings["window"] = {
-            "x": self.x(),
-            "y": self.y(),
-            "w": self.width(),
-            "h": self.height(),
-        }
-        self._save_settings()
 
     def showEvent(self, event) -> None:  # noqa: N802
         super().showEvent(event)
@@ -896,7 +1228,7 @@ class SanduhrWidget(QWidget):
             )
 
     def closeEvent(self, event) -> None:  # noqa: N802
-        self._save_window_geometry()
+        self._save_settings()
         if self._thread is not None:
             self._thread.quit()
             self._thread.wait(2000)
@@ -914,6 +1246,13 @@ class SanduhrWidget(QWidget):
             return {}
 
     def _save_settings(self) -> None:
+        self._settings["geom"] = {
+            "x": self.x(),
+            "y": self.y(),
+            "w": self.width(),
+            "h": self.height(),
+        }
+        self._settings.pop("window", None)  # migrate away from legacy key
         try:
             paths.settings_file().write_text(
                 json.dumps(self._settings), encoding="utf-8"

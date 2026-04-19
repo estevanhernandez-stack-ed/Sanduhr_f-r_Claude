@@ -25,5 +25,10 @@ let package = Package(
                               "-Xlinker", "@executable_path/../Frameworks"]),
             ]
         ),
+        .testTarget(
+            name: "SanduhrTests",
+            dependencies: ["Sanduhr"],
+            path: "Tests/SanduhrTests"
+        ),
     ]
 )

@@ -30,6 +30,8 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QVBoxLayout,
     QWidget,
+    QCheckBox,
+    QSpinBox,
 )
 
 from sanduhr import credentials, paths, themes
@@ -88,7 +90,9 @@ def _agent_prompt_path() -> Path:
 
 class SettingsDialog(QDialog):
     credentialsSaved = Signal(str, object)  # (session_key, cf_clearance | None)
+    credentialsCleared = Signal()
     themesChanged = Signal()
+    settingsSaved = Signal(dict)
 
     def __init__(
         self,
@@ -97,19 +101,23 @@ class SettingsDialog(QDialog):
         cf_clearance: str = "",
         initial_tab: int = 0,
         focus_cf: bool = False,
+        settings: Optional[dict] = None,
     ):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setModal(True)
         self.resize(520, 520)
+        
+        self._settings = settings or {}
 
         layout = QVBoxLayout(self)
         self._tabs = QTabWidget()
         layout.addWidget(self._tabs)
 
-        self._build_credentials_tab(session_key, cf_clearance, focus_cf)
         self._build_themes_tab()
+        self._build_pacing_tab()
         self._build_help_tab()
+        self._build_credentials_tab(session_key, cf_clearance, focus_cf)
 
         btns = QDialogButtonBox(QDialogButtonBox.Close)
         btns.rejected.connect(self.reject)
@@ -133,6 +141,14 @@ class SettingsDialog(QDialog):
         self._sk = QLineEdit(sk)
         self._sk.setEchoMode(QLineEdit.Password)
         v.addWidget(self._sk)
+        sk_hint = QLabel(
+            "Tip: save this field empty to sign out and clear your stored "
+            "credentials from Windows Credential Manager."
+        )
+        sk_hint.setWordWrap(True)
+        sk_hint.setObjectName("HelpText")
+        sk_hint.setStyleSheet("font-size: 8pt;")
+        v.addWidget(sk_hint)
 
         v.addWidget(QLabel("cf_clearance (optional)"))
         cf_help = QLabel(
@@ -167,9 +183,31 @@ class SettingsDialog(QDialog):
         sk = self._sk.text().strip()
         cf = self._cf.text().strip() or None
         if not sk:
+            # Blank sessionKey on save = explicit intent to sign out.
+            # We previously rejected this with a "sessionKey is required"
+            # error, but that left users with no way to revoke credentials
+            # short of opening Windows Credential Manager by hand — which
+            # none of them do. Treat blank-save as "clear my credentials",
+            # gated behind a confirmation so it can't happen by accident.
+            confirm = _styled_msgbox(
+                self, QMessageBox.Warning, "Sign out of Sanduhr?",
+                "The sessionKey field is empty.\n\n"
+                "Saving this will clear your stored credentials from "
+                "Windows Credential Manager and stop the widget from "
+                "fetching your usage. You'll need to paste a fresh "
+                "sessionKey to resume.\n\n"
+                "Continue?",
+                buttons=QMessageBox.Yes | QMessageBox.No,
+            )
+            confirm.setDefaultButton(QMessageBox.No)
+            if confirm.exec_() != QMessageBox.Yes:
+                return
+            credentials.clear()
+            self.credentialsCleared.emit()
             _styled_msgbox(
-                self, QMessageBox.Warning, "Settings",
-                "sessionKey is required.",
+                self, QMessageBox.Information, "Signed out",
+                "Credentials cleared. Paste a fresh sessionKey above "
+                "when you're ready to resume.",
             ).exec_()
             return
         credentials.save(session_key=sk, cf_clearance=cf)
@@ -238,6 +276,48 @@ class SettingsDialog(QDialog):
 
         self._refresh_list()
         self._tabs.addTab(page, "Themes")
+
+    # ── Pacing tab ───────────────────────────────────────────────
+
+    def _build_pacing_tab(self) -> None:
+        page = QWidget()
+        v = QVBoxLayout(page)
+
+        v.addWidget(QLabel("<b>Pacing Tools & Deep Work</b>"))
+        v.addWidget(QLabel(
+            "Configure the advanced pacing and focus tools. These overlays appear "
+            "directly on top of the widget UI when activated."
+        ))
+        
+        v.addSpacing(16)
+        
+        self._chk_pacing_tools = QCheckBox("Enable Pacing Calculators")
+        self._chk_pacing_tools.setChecked(self._settings.get("pacing_tools_enabled", True))
+        v.addWidget(self._chk_pacing_tools)
+
+        self._chk_remind = QCheckBox("Show reminder at 100% of session")
+        self._chk_remind.setChecked(self._settings.get("remind_session_end", False))
+        v.addWidget(self._chk_remind)
+
+        v.addStretch()
+
+        act_row = QHBoxLayout()
+        act_row.addStretch()
+        save_btn = QPushButton("Save Pacing Config")
+        save_btn.clicked.connect(self._save_pacing_settings)
+        act_row.addWidget(save_btn)
+        v.addLayout(act_row)
+
+        self._tabs.addTab(page, "Pacing")
+
+    def _save_pacing_settings(self) -> None:
+        self._settings["pacing_tools_enabled"] = self._chk_pacing_tools.isChecked()
+        self._settings["remind_session_end"] = self._chk_remind.isChecked()
+        self.settingsSaved.emit(self._settings)
+        _styled_msgbox(
+            self, QMessageBox.Information, "Settings",
+            "Pacing configuration saved."
+        ).exec_()
 
     # ── Help tab ─────────────────────────────────────────────────
 

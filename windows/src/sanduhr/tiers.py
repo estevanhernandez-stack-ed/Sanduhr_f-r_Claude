@@ -1,14 +1,16 @@
 """TierCard -- one rendered usage tier, updates in place.
 
-Handles label, sparkline, percentage number, progress bar with pace
-marker, reset countdown, pacing label, burn projection. Receives a
-theme dict and draws its card chrome (glass fill, border, shadow,
-inner highlight) based on the theme's glass-tuning dials.
+Handles label, sparkline, percentage number, progress bar with
+always-on pace ghost overlay, reset countdown, pacing label, burn
+projection. Receives a theme dict and draws its card chrome (glass
+fill, border, shadow, inner highlight) based on the theme's
+glass-tuning dials.
 """
 
+import math
 from typing import List, Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QEvent, QTimer, QElapsedTimer
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame,
@@ -16,12 +18,32 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QProgressBar,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
 
 from sanduhr import pacing, themes
 from sanduhr.sparkline import Sparkline
+
+
+# Graph view modes — shared across all cards.
+_GRAPH_MODES = ["classic", "horizon"]
+_current_graph_mode = "classic"
+
+_BREATH_TIMER_INTERVAL_MS = 66  # ~15fps, trivial CPU
+
+
+def cycle_graph_mode() -> str:
+    """Advance the shared graph mode and return the new mode name."""
+    global _current_graph_mode
+    idx = _GRAPH_MODES.index(_current_graph_mode)
+    _current_graph_mode = _GRAPH_MODES[(idx + 1) % len(_GRAPH_MODES)]
+    return _current_graph_mode
+
+
+def current_graph_mode() -> str:
+    return _current_graph_mode
 
 
 def _rgba(hex_color: str, alpha: float) -> str:
@@ -40,6 +62,19 @@ class TierCard(QFrame):
         self._theme = theme
         self._resets_at: Optional[str] = None
         self._util: int = 0
+        self._show_deep_math = False
+        self._ghost_frac: Optional[float] = None
+        self._ghost_alpha: float = 0.35
+
+        self._breath_phase: float = 0.0
+        self._breath_period_ms: int = 2800
+        self._breath_elapsed = QElapsedTimer()
+        self._breath_elapsed.start()
+
+        self._breath_timer = QTimer(self)
+        self._breath_timer.setInterval(_BREATH_TIMER_INTERVAL_MS)
+        self._breath_timer.timeout.connect(self._tick_breath)
+        self._breath_timer.start()
 
         self._build()
         self.apply_theme(theme)
@@ -60,16 +95,15 @@ class TierCard(QFrame):
         self._bar.setValue(util)
         self._bar.setStyleSheet(self._bar_qss(color))
 
+        self._ghost_frac = pacing.pace_frac(resets_at, self._tier_key)
+        self._update_pace_tick()
+
         self._reset_lbl.setText(
             "" if not resets_at else f"Resets in {pacing.time_until(resets_at)}"
         )
         self._reset_dt_lbl.setText(pacing.reset_datetime_str(resets_at))
 
-        pace = pacing.pace_info(util, resets_at, self._tier_key)
-        self._pace_lbl.setText(pace[0] if pace else "")
-        self._pace_lbl.setStyleSheet(
-            f"color: {pace[1]};" if pace else f"color: {self._theme['text_dim']};"
-        )
+        self._update_pace_lbl()
 
         burn = pacing.burn_projection(util, resets_at, self._tier_key)
         self._burn_lbl.setText(burn[0] if burn else "")
@@ -80,7 +114,9 @@ class TierCard(QFrame):
         self._spark.set_values(history_values)
         self._spark.set_color(self._theme["sparkline"])
 
-        self._update_pace_marker()
+        # Sync sparkline display mode
+        mode = current_graph_mode()
+        self._spark.set_mode("horizon" if mode == "horizon" else "line")
 
     def apply_theme(self, theme: dict) -> None:
         self._theme = theme
@@ -92,6 +128,9 @@ class TierCard(QFrame):
         self._spark.set_color(theme["sparkline"])
         self._apply_shadow()
         self._bar.setStyleSheet(self._bar_qss(themes.usage_color(self._util)))
+        self._ghost_alpha = float(theme.get("ghost_alpha", 0.35))
+        self._breath_period_ms = int(theme.get("breath_period_ms", 2800))
+        self._update_pace_tick()
 
     # -- for tests -------------------------------------------------
 
@@ -111,6 +150,9 @@ class TierCard(QFrame):
 
     def _build(self) -> None:
         self.setObjectName("TierCard")
+        # Preferred (not Expanding) — cards take natural height instead
+        # of fighting each other for vertical space when the window grows.
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(14, 12, 14, 12)
         outer.setSpacing(6)
@@ -122,7 +164,7 @@ class TierCard(QFrame):
         row1.addWidget(self._lbl)
         row1.addStretch()
         self._spark = Sparkline()
-        self._spark.setFixedSize(50, 16)
+        self._spark.setFixedSize(100, 16)
         row1.addWidget(self._spark)
         self._pct = QLabel("0%")
         self._pct.setAttribute(Qt.WA_TranslucentBackground, True)
@@ -130,19 +172,28 @@ class TierCard(QFrame):
         outer.addLayout(row1)
 
         self._bar_container = QWidget()
-        self._bar_container.setFixedHeight(16)
+        self._bar_container.setMinimumHeight(16)
+        self._bar_container.setMaximumHeight(28)
         bar_layout = QHBoxLayout(self._bar_container)
         bar_layout.setContentsMargins(0, 0, 0, 0)
         self._bar = QProgressBar()
         self._bar.setRange(0, 100)
         self._bar.setValue(0)
         self._bar.setTextVisible(False)
-        self._bar.setFixedHeight(16)
+        self._bar.setMinimumHeight(16)
+        self._bar.setMaximumHeight(28)
         bar_layout.addWidget(self._bar)
-        self._pace_marker = QWidget(self._bar_container)
-        self._pace_marker.setFixedWidth(3)
-        self._pace_marker.setFixedHeight(16)
-        self._pace_marker.hide()
+
+        # Pace-ghost tick as an actual child widget, not a painter call in
+        # the card's paintEvent. QProgressBar is a child widget and paints
+        # itself AFTER the parent's paintEvent, so anything we draw on the
+        # card gets overdrawn by the bar fill. A sibling QWidget inside
+        # _bar_container with raise_() renders on top of the bar.
+        self._pace_tick = QWidget(self._bar_container)
+        self._pace_tick.setFixedWidth(2)
+        self._pace_tick.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self._pace_tick.hide()
+
         outer.addWidget(self._bar_container)
 
         row3 = QHBoxLayout()
@@ -152,6 +203,8 @@ class TierCard(QFrame):
         row3.addStretch()
         self._pace_lbl = QLabel("")
         self._pace_lbl.setAttribute(Qt.WA_TranslucentBackground, True)
+        self._pace_lbl.setCursor(Qt.PointingHandCursor)
+        self._pace_lbl.installEventFilter(self)
         row3.addWidget(self._pace_lbl)
         outer.addLayout(row3)
 
@@ -164,6 +217,43 @@ class TierCard(QFrame):
         self._burn_lbl.setAttribute(Qt.WA_TranslucentBackground, True)
         row4.addWidget(self._burn_lbl)
         outer.addLayout(row4)
+
+    def eventFilter(self, obj, event) -> bool:
+        if obj == self._pace_lbl:
+            if event.type() == QEvent.Enter:
+                self._show_deep_math = True
+                self._update_pace_lbl()
+                return True
+            elif event.type() == QEvent.Leave:
+                self._show_deep_math = False
+                self._update_pace_lbl()
+                return True
+        return super().eventFilter(obj, event)
+
+    def _tick_breath(self) -> None:
+        """Advance the sin-wave phase driving the bar's alpha modulation."""
+        t_ms = self._breath_elapsed.elapsed() % self._breath_period_ms
+        self._breath_phase = (t_ms / self._breath_period_ms) * 2.0 * math.pi
+        self.update()
+
+    def _update_pace_lbl(self) -> None:
+        if self._show_deep_math:
+            cooldown = pacing.calculate_cooldown(self._util, self._resets_at, self._tier_key)
+            if cooldown:
+                self._pace_lbl.setText(f"Cool down: {cooldown}")
+                self._pace_lbl.setStyleSheet(f"color: {self._theme['text_dim']};")
+                return
+            surplus = pacing.calculate_surplus(self._util, self._resets_at, self._tier_key)
+            if surplus:
+                self._pace_lbl.setText(f"Surplus: {surplus}%")
+                self._pace_lbl.setStyleSheet(f"color: {self._theme['text_dim']};")
+                return
+                
+        pace = pacing.pace_info(self._util, self._resets_at, self._tier_key)
+        self._pace_lbl.setText(pace[0] if pace else "")
+        self._pace_lbl.setStyleSheet(
+            f"color: {pace[1]};" if pace else f"color: {self._theme['text_dim']};"
+        )
 
     def _card_qss(self) -> str:
         t = self._theme
@@ -202,34 +292,79 @@ class TierCard(QFrame):
         effect.setColor(QColor(0, 0, 0, 64))
         self.setGraphicsEffect(effect)
 
-    def _update_pace_marker(self) -> None:
-        f = pacing.pace_frac(self._resets_at, self._tier_key)
-        if f is None:
-            self._pace_marker.hide()
+    def _update_pace_tick(self) -> None:
+        """Position + color + visibility the pace-ghost child widget.
+
+        The tick is a 2px-wide QWidget sibling of the QProgressBar inside
+        _bar_container. Because it's a child widget (not a painter call
+        in the card's paintEvent), it renders ON TOP of the bar fill,
+        which is exactly what the user wants — the tick must always be
+        the top layer.
+        """
+        frac = self._ghost_frac
+        if frac is None or self._bar_container.width() == 0:
+            self._pace_tick.hide()
             return
-        w = self._bar_container.width()
-        if w <= 0:
-            self._pace_marker.hide()
-            return
-        self._pace_marker.setStyleSheet(
-            f"background-color: {self._theme['pace_marker']};"
-        )
-        self._pace_marker.move(int(f * w), 0)
-        self._pace_marker.show()
+        color = self._theme.get("pace_marker", self._theme["text"])
+        self._pace_tick.setStyleSheet(f"background-color: {color};")
+        # Match the bar's actual rendered height, not the container's
+        # max-height, so the tick doesn't over/undershoot when the bar
+        # is sized between min 16 and max 28.
+        h = self._bar.height() if self._bar.height() > 0 else self._bar_container.height()
+        self._pace_tick.setFixedHeight(h)
+        bar_w = self._bar_container.width()
+        tick_x = max(0, min(bar_w - 2, int(frac * bar_w)))
+        self._pace_tick.move(tick_x, 0)
+        self._pace_tick.show()
+        self._pace_tick.raise_()
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        # Reposition the pace tick — bar width changes with the card.
+        self._update_pace_tick()
 
     def paintEvent(self, event) -> None:  # noqa: N802
         super().paintEvent(event)
         hl = self._theme.get("inner_highlight")
-        if not hl:
-            return
+        
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, True)
-        color = QColor(hl["color"])
-        color.setAlphaF(hl["alpha"])
-        pen = QPen(color)
-        pen.setWidthF(1.0)
-        painter.setPen(pen)
-        r = self.rect()
-        radius = self._theme.get("card_corner_radius", 10)
-        painter.drawLine(r.left() + radius, r.top() + 1, r.right() - radius, r.top() + 1)
+        
+        if hl:
+            color = QColor(hl["color"])
+            color.setAlpha(int(hl.get("alpha", 0.05) * 255))
+            pen = QPen(color)
+            pen.setWidth(1)
+            painter.setPen(pen)
+            r = self.rect()
+            r.adjust(1, 1, -1, -1)
+            radius = self._theme.get("card_corner_radius", 10) - 1
+            painter.drawRoundedRect(r, radius, radius)
+
+        # Breathing-glass overlay — a slow sine alpha wash on top of the bar
+        # fill. Amplitude 0.08 keeps it visible but subliminal; anything
+        # higher reads as flicker. Drawn before the ghost so the ghost tick
+        # always composites on top (it's the higher-priority signal).
+        if self._bar_container.width() > 0 and self._util > 0:
+            amp = 0.08
+            # sin returns [-1,1] → scale to [0, 2*amp] and center on amp so
+            # brightness pulses above and below the resting bar.
+            breath_alpha = amp + amp * math.sin(self._breath_phase)
+            overlay = QColor(self._theme.get("accent", self._theme["text"]))
+            overlay.setAlphaF(breath_alpha)
+            util_frac = min(1.0, max(0.0, self._util / 100.0))
+            painter.fillRect(
+                self._bar_container.x(),
+                self._bar_container.y(),
+                int(self._bar_container.width() * util_frac),
+                self._bar_container.height(),
+                overlay,
+            )
+
+        # Pace-ghost tick rendering lives on self._pace_tick (a child
+        # widget of _bar_container raised above the QProgressBar).
+        # Painting it here in the card's paintEvent doesn't work —
+        # the QProgressBar child paints AFTER this method returns
+        # and would overdraw whatever we draw here.
+
         painter.end()

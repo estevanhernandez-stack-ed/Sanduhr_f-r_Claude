@@ -10,6 +10,8 @@ struct TierCardView: View {
     let palette: Theme.Palette
     let tick: Int
 
+    @State private var showDeepMath = false
+
     private var util: Double { usage.utilization ?? 0 }
 
     var body: some View {
@@ -88,11 +90,29 @@ struct TierCardView: View {
 
             Spacer()
 
-            if let pace = paceInfo(util: util, iso: usage.resetsAt, tier: tier) {
+            if showDeepMath {
+                if let cooldown = calculateCooldown(util: util, iso: usage.resetsAt, tier: tier) {
+                    Text("Cool down: \(cooldown)")
+                        .font(.system(size: 9, weight: .semibold, design: palette.numericFontDesign))
+                        .foregroundStyle(palette.textDim)
+                } else if let surplus = calculateSurplus(util: util, iso: usage.resetsAt, tier: tier) {
+                    Text("Surplus: \(surplus)%")
+                        .font(.system(size: 9, weight: .semibold, design: palette.numericFontDesign))
+                        .foregroundStyle(palette.textDim)
+                } else if let pace = paceInfo(util: util, iso: usage.resetsAt, tier: tier) {
+                    Text(pace.text)
+                        .font(.system(size: 9, weight: .semibold, design: palette.numericFontDesign))
+                        .foregroundStyle(Color.hex(pace.colorHex))
+                }
+            } else if let pace = paceInfo(util: util, iso: usage.resetsAt, tier: tier) {
                 Text(pace.text)
-                    .font(.system(size: 9, weight: .semibold,
-                                  design: palette.numericFontDesign))
+                    .font(.system(size: 9, weight: .semibold, design: palette.numericFontDesign))
                     .foregroundStyle(Color.hex(pace.colorHex))
+            }
+        }
+        .onHover { hovering in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                showDeepMath = hovering
             }
         }
     }

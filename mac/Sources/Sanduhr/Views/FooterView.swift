@@ -21,8 +21,9 @@ struct FooterView: View {
                 .font(.system(size: 9, weight: .semibold, design: .rounded))
                 .foregroundStyle(t.accent)
                 .padding(.trailing, 10)
+                .padding(.leading, 4)
         }
-        .frame(height: 20)
+        .frame(height: 24)
         .background(
             LinearGradient(
                 colors: [t.footerBg.opacity(0.95), t.footerBg],

@@ -7,6 +7,8 @@ import AppKit
 struct TitleBarView: View {
     @Bindable var vm: UsageViewModel
     var onShowSettings: () -> Void
+    var onToggleFocus: () -> Void
+    var onToggleSnake: () -> Void
     var onRefresh: () -> Void
     var onClose: () -> Void
 
@@ -23,9 +25,12 @@ struct TitleBarView: View {
                 .fill(Color.clear)
                 .contentShape(Rectangle())
                 .onTapGesture(count: 2) { vm.compact.toggle() }
-
-            tbButton("Key",     color: t.textDim, action: onShowSettings)
-            tbButton("↻",       color: t.textDim, action: onRefresh)
+            
+            tbButton("⚙", color: t.textDim, action: onShowSettings)
+            tbButton("↕", color: t.textDim) { vm.compact.toggle() }
+            tbButton("⏳", color: t.textDim, action: onToggleFocus)
+            tbButton("🐍", color: t.textDim, action: onToggleSnake)
+            tbButton("↻", color: t.textDim, action: onRefresh)
             // Different labels so the pin state is readable at a glance.
             tbButton(vm.pinned ? "Pinned" : "Pin",
                      color: vm.pinned ? t.accent : t.textMuted,

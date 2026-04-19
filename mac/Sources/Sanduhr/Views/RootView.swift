@@ -8,7 +8,9 @@ struct RootView: View {
 
     @State private var showSettings = false
     @State private var showOnboarding = false
-
+    @State private var isFocusMode = false
+    @State private var isSnakeGameActive = false
+    
     var body: some View {
         let t = vm.theme.palette
         VStack(spacing: 0) {
@@ -23,6 +25,8 @@ struct RootView: View {
             TitleBarView(
                 vm: vm,
                 onShowSettings: { showSettings = true },
+                onToggleFocus: { isFocusMode.toggle() },
+                onToggleSnake: { isSnakeGameActive.toggle() },
                 onRefresh:      { Task { await vm.refresh() } },
                 // × now HIDES (status item click brings it back). Actual
                 // quit lives in the menu bar's right-click menu and the
@@ -36,28 +40,45 @@ struct RootView: View {
             Rectangle().fill(Color.white.opacity(0.07)).frame(height: 0.5)
 
             // Main content
-            VStack(alignment: .leading, spacing: 6) {
-                if vm.status != .idle && !vm.visibleTiers().isEmpty {
-                    statusLine
-                } else if vm.status != .idle {
-                    statusLine.padding(.bottom, 2)
-                }
+            ZStack(alignment: .topLeading) {
+                if isFocusMode {
+                    FocusView(vm: vm) {
+                        withAnimation(.easeInOut(duration: 0.3)) { isFocusMode = false }
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                } else if isSnakeGameActive {
+                    SnakeGameOverlay(vm: vm) {
+                        withAnimation(.easeInOut(duration: 0.3)) { isSnakeGameActive = false }
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        if vm.status != .idle && !vm.visibleTiers().isEmpty {
+                            statusLine
+                        } else if vm.status != .idle {
+                            statusLine.padding(.bottom, 2)
+                        }
 
-                if !vm.visibleTiers().isEmpty {
-                    ForEach(vm.visibleTiers(), id: \.tier) { row in
-                        TierCardView(
-                            tier: row.tier,
-                            usage: row.usage,
-                            history: vm.history[row.tier.rawValue]?.map(\.v) ?? [],
-                            palette: t,
-                            tick: vm.countdownTick
-                        )
+                        if !vm.visibleTiers().isEmpty {
+                            ForEach(vm.visibleTiers(), id: \.tier) { row in
+                                TierCardView(
+                                    tier: row.tier,
+                                    usage: row.usage,
+                                    history: vm.history[row.tier.rawValue]?.map(\.v) ?? [],
+                                    palette: t,
+                                    tick: vm.countdownTick
+                                )
+                            }
+                            if let extra = vm.usage?.extraUsage, extra.isEnabled, !vm.compact {
+                                ExtraUsageCard(extra: extra, palette: t)
+                            }
+                        }
                     }
-                    if let extra = vm.usage?.extraUsage, extra.isEnabled, !vm.compact {
-                        ExtraUsageCard(extra: extra, palette: t)
-                    }
+                    .transition(.opacity.combined(with: .scale(scale: 1.05)))
                 }
             }
+            .animation(.easeInOut(duration: 0.3), value: isFocusMode)
+            .animation(.easeInOut(duration: 0.3), value: isSnakeGameActive)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -108,10 +129,16 @@ struct RootView: View {
         )
         // Soft drop shadow for the floating-panel feel.
         .shadow(color: .black.opacity(0.45), radius: 24, x: 0, y: 10)
-        // Right-click menu — Mac idiom.
         .contextMenu {
             Button("Refresh") { Task { await vm.refresh() } }
             Button(vm.compact ? "Expand" : "Compact Mode") { vm.compact.toggle() }
+            Button(isFocusMode ? "Exit Deep Work" : "Enter Deep Work") { 
+                withAnimation { isFocusMode.toggle() } 
+            }
+            .keyboardShortcut("p", modifiers: .command)
+            Button("Play Cooldown Snake") { 
+                withAnimation { isSnakeGameActive.toggle() } 
+            }
             Button("Credentials…") { showSettings = true }
             Divider()
             Button("Quit Sanduhr") { NSApp.terminate(nil) }
