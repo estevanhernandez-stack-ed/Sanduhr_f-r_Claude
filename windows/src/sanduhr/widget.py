@@ -52,6 +52,8 @@ _TIER_LABELS = {
 
 
 class SanduhrWidget(QWidget):
+    _RESIZE_EDGE_PX = 6
+
     def __init__(self):
         super().__init__()
         self._settings = self._load_settings()
@@ -64,12 +66,16 @@ class SanduhrWidget(QWidget):
         self._thread: Optional[QThread] = None
         self._fetcher: Optional[UsageFetcher] = None
         self._last: Optional[dict] = None
+        self._resize_active: Optional[str] = None
+        self._resize_start_geom = None
+        self._resize_start_pos = None
 
         self.setWindowTitle("Sanduhr für Claude")
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.resize(420, 540)
         self._restore_geometry()
+        self._compute_and_apply_minimum_size()
 
         self._build()
         self.apply_theme(self._theme_key)
@@ -610,6 +616,10 @@ class SanduhrWidget(QWidget):
         self._settings["theme"] = key
         self._save_settings()
 
+        # Theme fonts differ (Matrix → Cascadia Code) — recompute minimum
+        # size so the resize floor tracks the new font metrics.
+        self._compute_and_apply_minimum_size()
+
         # (Theme buttons highlighting logic removed since they are now in a QMenu)
 
     def _apply_monospace_if_needed(self, card: TierCard) -> None:
@@ -641,21 +651,155 @@ class SanduhrWidget(QWidget):
             card._pct.setFont(default)
             card._pct.setGraphicsEffect(None)
 
-    # -- drag ------------------------------------------------------
+    # -- drag + edge-resize ---------------------------------------
+
+    def _compute_and_apply_minimum_size(self) -> None:
+        """Set minimumSize based on QFontMetrics of known long strings so
+        no text ever clips below the resize floor. Re-run on theme swap
+        in case the theme's font differs (Matrix uses Cascadia Code)."""
+        from PySide6.QtGui import QFontMetrics
+        fm = QFontMetrics(self.font())
+        # Strings that have historically pushed the width out. Keep this
+        # list in sync with user-facing copy — if a new long message
+        # lands, add it here.
+        probes = [
+            "Signed out — paste sessionKey in Settings to resume.",
+            "At current pace, expires in 7d 23h 59m",
+            "Cloudflare — add cf_clearance (click Key).",
+            "Weekly — OAuth Apps",
+        ]
+        text_w = max(fm.horizontalAdvance(s) for s in probes)
+        # +24 horizontal padding (12px on each side of the content area),
+        # +32 for the sparkline area we want to preserve.
+        min_w = max(320, text_w + 24 + 32)
+        # Chrome: title bar 34 + theme strip 26 + tool strip 28 + footer 24
+        # = 112. Plus 1 compact tier card (~60). Plus content margins.
+        min_h = 180
+        self.setMinimumSize(min_w, min_h)
+
+    def _resize_zone(self, pos) -> Optional[str]:
+        """Return which edge/corner `pos` (local coords) is within
+        `_RESIZE_EDGE_PX` of, or None if it's interior."""
+        left = pos.x() <= self._RESIZE_EDGE_PX
+        right = pos.x() >= self.width() - self._RESIZE_EDGE_PX
+        top = pos.y() <= self._RESIZE_EDGE_PX
+        bottom = pos.y() >= self.height() - self._RESIZE_EDGE_PX
+        if top and left:
+            return "top-left"
+        if top and right:
+            return "top-right"
+        if bottom and left:
+            return "bottom-left"
+        if bottom and right:
+            return "bottom-right"
+        if left:
+            return "left"
+        if right:
+            return "right"
+        if top:
+            return "top"
+        if bottom:
+            return "bottom"
+        return None
 
     def mousePressEvent(self, event) -> None:  # noqa: N802
+        # Resize has priority over drag when the click lands in an edge zone,
+        # but only when no overlay (focus / snake) owns the window.
+        overlay_active = (
+            hasattr(self, "_main_stack") and self._main_stack.currentIndex() != 0
+        )
+        zone = self._resize_zone(event.position().toPoint()) if not overlay_active else None
+        if zone and event.button() == Qt.LeftButton:
+            self._resize_active = zone
+            self._resize_start_geom = self.geometry()
+            self._resize_start_pos = event.globalPosition().toPoint()
+            return
         if event.button() == Qt.LeftButton:
             self._drag_origin = (
                 event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             )
 
     def mouseMoveEvent(self, event) -> None:  # noqa: N802
+        from PySide6.QtGui import QCursor
+
+        # While an overlay owns the window, skip both resize and cursor work.
+        overlay_active = (
+            hasattr(self, "_main_stack") and self._main_stack.currentIndex() != 0
+        )
+        if overlay_active:
+            if self._drag_origin and event.buttons() & Qt.LeftButton:
+                self.move(event.globalPosition().toPoint() - self._drag_origin)
+            return
+
+        # Active resize drag takes precedence over everything.
+        if self._resize_active is not None:
+            self._apply_resize_drag(event.globalPosition().toPoint())
+            return
+
+        # Update cursor based on whether pointer sits in an edge zone.
+        zone = self._resize_zone(event.position().toPoint())
+        cursor_map = {
+            "left": Qt.SizeHorCursor,
+            "right": Qt.SizeHorCursor,
+            "top": Qt.SizeVerCursor,
+            "bottom": Qt.SizeVerCursor,
+            "top-left": Qt.SizeFDiagCursor,
+            "bottom-right": Qt.SizeFDiagCursor,
+            "top-right": Qt.SizeBDiagCursor,
+            "bottom-left": Qt.SizeBDiagCursor,
+        }
+        if zone and not (self._drag_origin and event.buttons() & Qt.LeftButton):
+            self.setCursor(QCursor(cursor_map[zone]))
+        else:
+            self.unsetCursor()
+
+        # Fall back to drag-to-move when no resize is underway.
         if self._drag_origin and event.buttons() & Qt.LeftButton:
             self.move(event.globalPosition().toPoint() - self._drag_origin)
 
     def mouseReleaseEvent(self, event) -> None:  # noqa: N802
+        if self._resize_active is not None:
+            self._resize_active = None
+            self._resize_start_geom = None
+            self._resize_start_pos = None
+            self._save_settings()
+            return
         self._drag_origin = None
         self._save_window_geometry()
+
+    def _apply_resize_drag(self, global_pos) -> None:
+        dx = global_pos.x() - self._resize_start_pos.x()
+        dy = global_pos.y() - self._resize_start_pos.y()
+        geom = self._resize_start_geom
+        new_x, new_y = geom.x(), geom.y()
+        new_w, new_h = geom.width(), geom.height()
+
+        zone = self._resize_active
+        if "left" in zone:
+            new_x = geom.x() + dx
+            new_w = geom.width() - dx
+        if "right" in zone:
+            new_w = geom.width() + dx
+        if "top" in zone:
+            new_y = geom.y() + dy
+            new_h = geom.height() - dy
+        if "bottom" in zone:
+            new_h = geom.height() + dy
+
+        # Clamp to minimum. If clamping the width would have moved the
+        # left edge, stop the edge from moving further.
+        min_w = self.minimumSize().width()
+        min_h = self.minimumSize().height()
+        if new_w < min_w:
+            if "left" in zone:
+                new_x = geom.x() + (geom.width() - min_w)
+            new_w = min_w
+        if new_h < min_h:
+            if "top" in zone:
+                new_y = geom.y() + (geom.height() - min_h)
+            new_h = min_h
+
+        self.setGeometry(new_x, new_y, new_w, new_h)
 
     def mouseDoubleClickEvent(self, event) -> None:  # noqa: N802
         if (
@@ -1056,6 +1200,12 @@ class SanduhrWidget(QWidget):
             return {}
 
     def _save_settings(self) -> None:
+        self._settings["geom"] = {
+            "x": self.x(),
+            "y": self.y(),
+            "w": self.width(),
+            "h": self.height(),
+        }
         try:
             paths.settings_file().write_text(
                 json.dumps(self._settings), encoding="utf-8"
