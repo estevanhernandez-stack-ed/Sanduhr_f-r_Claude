@@ -2,52 +2,149 @@ import SwiftUI
 
 /// Minimalist Pomodoro-style timer overlay containing a glowing circular
 /// progress ring and the time remaining.
+class HourglassEngine: ObservableObject {
+    let gw = 31
+    let gh = 31
+    var cx: Int { gw / 2 }
+    var cy: Int { gh / 2 }
+    
+    var mask: [[Bool]] = []
+    var grid: [[Bool]] = []
+    var totalSand = 0
+    var sandPassed = 0
+    var durationSecs = 0
+    
+    var lastUpdate: Date?
+    
+    init() {}
+    
+    func reset(duration: Int) {
+        self.durationSecs = duration
+        self.totalSand = 0
+        self.sandPassed = 0
+        self.lastUpdate = nil
+        
+        self.mask = Array(repeating: Array(repeating: false, count: gw), count: gh)
+        self.grid = Array(repeating: Array(repeating: false, count: gw), count: gh)
+        
+        for y in 0..<gh {
+            for x in 0..<gw {
+                let dy = abs(y - cy)
+                let dx = abs(x - cx)
+                if dx <= dy + 1 {
+                    mask[y][x] = true
+                    if y < cy {
+                        grid[y][x] = true
+                        totalSand += 1
+                    }
+                }
+            }
+        }
+    }
+    
+    func tickPhysics(remaining: Int) {
+        if durationSecs == 0 { return }
+        let expectedPassed = Int((Double(durationSecs - remaining) / Double(durationSecs)) * Double(totalSand))
+        
+        for y in stride(from: gh - 2, through: 0, by: -1) {
+            for x in 0..<gw {
+                if !grid[y][x] { continue }
+                
+                if y == cy - 1 && x == cx {
+                    if sandPassed >= expectedPassed {
+                        continue
+                    }
+                }
+                
+                if mask[y+1][x] && !grid[y+1][x] {
+                    grid[y][x] = false
+                    grid[y+1][x] = true
+                    if y == cy - 1 && x == cx { sandPassed += 1 }
+                } else {
+                    let dirs = Bool.random() ? [-1, 1] : [1, -1]
+                    for dx in dirs {
+                        let nx = x + dx
+                        if nx >= 0 && nx < gw && mask[y+1][nx] && !grid[y+1][nx] {
+                            grid[y][x] = false
+                            grid[y+1][nx] = true
+                            if y == cy - 1 && x == cx { sandPassed += 1 }
+                            break
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    func draw(context: inout GraphicsContext, size: CGSize, palette: Theme.Palette) {
+        let cw = size.width / CGFloat(gw)
+        let ch = size.height / CGFloat(gh)
+        
+        var bgPath = Path()
+        var fgPath = Path()
+        
+        for y in 0..<gh {
+            for x in 0..<gw {
+                if !mask[y][x] { continue }
+                let rect = CGRect(x: CGFloat(x)*cw, y: CGFloat(y)*ch, width: cw - 0.5, height: ch - 0.5)
+                
+                if grid[y][x] {
+                    fgPath.addRect(rect)
+                } else if x != cx || y != cy {
+                    bgPath.addRect(rect)
+                }
+            }
+        }
+        
+        context.fill(bgPath, with: .color(palette.barBg.opacity(0.4)))
+        context.fill(fgPath, with: .color(palette.accent))
+    }
+}
+
 struct FocusView: View {
-    let focusMinutes: Int
     @Bindable var vm: UsageViewModel
     let onComplete: () -> Void
 
-    @State private var remainingSeconds: Int
-    private let timer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
-
-    init(focusMinutes: Int, vm: UsageViewModel, onComplete: @escaping () -> Void) {
-        self.focusMinutes = focusMinutes
-        self.vm = vm
-        self.onComplete = onComplete
-        self._remainingSeconds = State(initialValue: focusMinutes * 60)
-    }
+    @State private var remainingSeconds: Int = 0
+    @State private var isRunning = false
+    @State private var focusMinutes: Int = 25
+    @StateObject private var engine = HourglassEngine()
+    
+    let timer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         let t = vm.theme.palette
-        let durationSeconds = max(1, focusMinutes * 60)
-        let progress = CGFloat(remainingSeconds) / CGFloat(durationSeconds)
 
-        VStack {
+        VStack(spacing: 8) {
             Spacer()
+            
             ZStack {
-                // Background Track
-                Circle()
-                    .stroke(t.barBg, lineWidth: 6)
+                if isRunning {
+                    TimelineView(.animation) { timeline in
+                        Canvas { context, size in
+                            engine.draw(context: &context, size: size, palette: t)
+                        }
+                        .onChange(of: timeline.date) { _, newDate in
+                            let throttle: TimeInterval = 1.0 / 30.0
+                            if let last = engine.lastUpdate, newDate.timeIntervalSince(last) < throttle {
+                                return
+                            }
+                            engine.lastUpdate = newDate
+                            engine.tickPhysics(remaining: remainingSeconds)
+                        }
+                    }
                     .frame(width: 140, height: 140)
+                    .transition(.opacity)
+                } else {
+                    Circle()
+                        .stroke(t.barBg.opacity(0.3), lineWidth: 2)
+                        .frame(width: 140, height: 140)
+                }
 
-                // Neon Progress Arc
-                Circle()
-                    .trim(from: 0.0, to: progress)
-                    .stroke(
-                        t.accent,
-                        style: StrokeStyle(lineWidth: 6, lineCap: .round)
-                    )
-                    .frame(width: 140, height: 140)
-                    .rotationEffect(.degrees(-90))
-                    // Soft Neon Glow
-                    .shadow(color: t.accent.opacity(t.accentBloom.alpha),
-                            radius: t.accentBloom.blur)
-
-                VStack(spacing: 4) {
+                VStack(spacing: 6) {
                     Text(timeString)
-                        .font(.system(size: 28, weight: .bold, design: t.numericFontDesign))
+                        .font(.system(size: 32, weight: .bold, design: t.numericFontDesign))
                         .foregroundStyle(t.text)
-                        // Explicit mono spacing so numbers don't jitter
                         .monospacedDigit()
                     
                     Text("Deep Work")
@@ -55,20 +152,58 @@ struct FocusView: View {
                         .foregroundStyle(t.textDim)
                 }
             }
+            .frame(height: 150)
+            
+            if !isRunning {
+                HStack {
+                    Spacer()
+                    Text("Minutes:")
+                        .font(.system(size: 11))
+                        .foregroundStyle(t.text)
+                    TextField("", value: $focusMinutes, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 50)
+                    Button("Start Cooldown") {
+                        start()
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(t.glass)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .foregroundStyle(t.text)
+                    Spacer()
+                }
+                .padding(.top, 10)
+                .transition(.opacity)
+            }
+            
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.vertical, 20)
+        .padding(.vertical, 10)
         .onReceive(timer) { _ in
-            if remainingSeconds > 0 {
-                remainingSeconds -= 1
-            } else {
-                onComplete()
+            if isRunning {
+                if remainingSeconds > 0 {
+                    remainingSeconds -= 1
+                } else {
+                    isRunning = false
+                    onComplete()
+                }
             }
+        }
+    }
+    
+    private func start() {
+        remainingSeconds = max(1, focusMinutes * 60)
+        engine.reset(duration: remainingSeconds)
+        withAnimation(.easeInOut(duration: 0.3)) {
+            isRunning = true
         }
     }
 
     private var timeString: String {
+        if !isRunning { return String(format: "%02d:00", focusMinutes) }
         let m = remainingSeconds / 60
         let s = remainingSeconds % 60
         return String(format: "%02d:%02d", m, s)

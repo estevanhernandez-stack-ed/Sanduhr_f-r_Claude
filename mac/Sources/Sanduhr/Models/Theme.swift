@@ -206,6 +206,25 @@ enum ThemeRegistry {
                 accentBloom: .init(blur: 4, alpha: 0.60),
                 innerHighlight: nil,
                 cardCornerRadius: 2)),
+        Theme(
+            id: "blueprint", displayName: "Blueprint",
+            palette: .init(
+                bg: .hex("1a1625"), glass: .hex("2a2438"),
+                titleBg: .hex("15121e"), border: .hex("3a324d"),
+                text: .hex("e0e2f5"), textSecondary: .hex("a2a6cc"),
+                textDim: .hex("6a6e99"), textMuted: .hex("484b70"),
+                accent: .hex("4dffc4"), barBg: .hex("1f1a2e"),
+                footerBg: .hex("100d16"), paceMarker: .hex("ff4d88"),
+                sparkline: .hex("4dffc4"),
+                glassOnMica: .hex("241f30"),
+                overlayOpacity: 0.18,
+                numericFontDesign: .rounded,
+                glassAlpha: 0.85,
+                borderAlpha: 0.70,
+                borderTint: .hex("4dffc4"),
+                accentBloom: .init(blur: 8, alpha: 0.65),
+                innerHighlight: .init(color: .hex("4dffc4"), alpha: 0.15),
+                cardCornerRadius: 10)),
     ]
 }
 

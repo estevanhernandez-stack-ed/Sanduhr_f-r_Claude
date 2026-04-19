@@ -141,6 +141,19 @@ def burn_projection(util, resets_at, tier_key):
     return (f"At current pace, expires in {' '.join(parts)}", "#f87171")
 
 
+def velocity_projection(util, resets_at, tier_key):
+    """Project final utilization at reset if current momentum continues.
+
+    Returns a float in [0, 200] (capped at 200 to avoid absurd bars),
+    or None when the data is insufficient.
+    """
+    frac = pace_frac(resets_at, tier_key)
+    if frac is None or util is None or util <= 0 or frac <= 0.01:
+        return None
+    projected = util / frac  # simple linear extrapolation
+    return min(200.0, projected)
+
+
 def reset_datetime_str(iso_str):
     """Friendly 'Today 1:00 AM' / 'Tomorrow 1:00 AM' / 'Sun 1:00 AM' / 'Wed Apr 22 1:00 AM'."""
     if not iso_str:

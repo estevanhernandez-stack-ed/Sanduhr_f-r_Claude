@@ -11,8 +11,6 @@ struct RootView: View {
     @State private var isFocusMode = false
     @State private var isSnakeGameActive = false
     
-    @AppStorage("focusModeDuration") private var focusModeDuration = 25
-
     var body: some View {
         let t = vm.theme.palette
         VStack(spacing: 0) {
@@ -27,6 +25,8 @@ struct RootView: View {
             TitleBarView(
                 vm: vm,
                 onShowSettings: { showSettings = true },
+                onToggleFocus: { isFocusMode.toggle() },
+                onToggleSnake: { isSnakeGameActive.toggle() },
                 onRefresh:      { Task { await vm.refresh() } },
                 // × now HIDES (status item click brings it back). Actual
                 // quit lives in the menu bar's right-click menu and the
@@ -42,7 +42,7 @@ struct RootView: View {
             // Main content
             ZStack(alignment: .topLeading) {
                 if isFocusMode {
-                    FocusView(focusMinutes: focusModeDuration, vm: vm) {
+                    FocusView(vm: vm) {
                         withAnimation(.easeInOut(duration: 0.3)) { isFocusMode = false }
                     }
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))

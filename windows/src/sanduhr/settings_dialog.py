@@ -113,10 +113,10 @@ class SettingsDialog(QDialog):
         self._tabs = QTabWidget()
         layout.addWidget(self._tabs)
 
-        self._build_credentials_tab(session_key, cf_clearance, focus_cf)
         self._build_themes_tab()
         self._build_pacing_tab()
         self._build_help_tab()
+        self._build_credentials_tab(session_key, cf_clearance, focus_cf)
 
         btns = QDialogButtonBox(QDialogButtonBox.Close)
         btns.rejected.connect(self.reject)
@@ -264,20 +264,9 @@ class SettingsDialog(QDialog):
         self._chk_pacing_tools.setChecked(self._settings.get("pacing_tools_enabled", True))
         v.addWidget(self._chk_pacing_tools)
 
-        self._chk_auto_game = QCheckBox("Auto-trigger Wait-State Snake Game (>50% ahead)")
-        self._chk_auto_game.setChecked(self._settings.get("auto_trigger_game", False))
-        v.addWidget(self._chk_auto_game)
-
-        v.addSpacing(12)
-        
-        row = QHBoxLayout()
-        row.addWidget(QLabel("Focus Mode duration (minutes):"))
-        self._spin_focus = QSpinBox()
-        self._spin_focus.setRange(1, 120)
-        self._spin_focus.setValue(self._settings.get("focus_mode_duration", 25))
-        row.addWidget(self._spin_focus)
-        row.addStretch()
-        v.addLayout(row)
+        self._chk_remind = QCheckBox("Show reminder at 100% of session")
+        self._chk_remind.setChecked(self._settings.get("remind_session_end", False))
+        v.addWidget(self._chk_remind)
 
         v.addStretch()
 
@@ -292,8 +281,7 @@ class SettingsDialog(QDialog):
 
     def _save_pacing_settings(self) -> None:
         self._settings["pacing_tools_enabled"] = self._chk_pacing_tools.isChecked()
-        self._settings["auto_trigger_game"] = self._chk_auto_game.isChecked()
-        self._settings["focus_mode_duration"] = self._spin_focus.value()
+        self._settings["remind_session_end"] = self._chk_remind.isChecked()
         self.settingsSaved.emit(self._settings)
         _styled_msgbox(
             self, QMessageBox.Information, "Settings",

@@ -16,18 +16,17 @@ struct SettingsSheet: View {
     }
 
     @AppStorage("pacingToolsEnabled") private var pacingToolsEnabled = true
-    @AppStorage("autoTriggerGame") private var autoTriggerGame = false
-    @AppStorage("focusModeDuration") private var focusModeDuration = 25
+    @AppStorage("remindSessionEnd") private var remindSessionEnd = false
 
     var body: some View {
         let t = vm.theme.palette
         VStack(spacing: 0) {
             TabView {
-                credentialsTab(t: t)
-                    .tabItem { Text("Credentials") }
-                
                 pacingTab(t: t)
                     .tabItem { Text("Pacing & Focus") }
+                
+                credentialsTab(t: t)
+                    .tabItem { Text("Credentials") }
             }
             .padding(.bottom, 16)
 
@@ -107,16 +106,7 @@ struct SettingsSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             Toggle("Enable Pacing Calculators", isOn: $pacingToolsEnabled)
-            Toggle("Auto-trigger Wait-State Snake Game (>50% ahead)", isOn: $autoTriggerGame)
-
-            HStack {
-                Text("Focus Mode duration (minutes):")
-                Spacer()
-                TextField("Minutes", value: $focusModeDuration, format: .number)
-                    .modifier(NumericOnly())
-                    .frame(width: 50)
-                    .textFieldStyle(.roundedBorder)
-            }
+            Toggle("Show reminder at 100% of session", isOn: $remindSessionEnd)
             Spacer()
         }
         .padding(.top, 12)

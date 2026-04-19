@@ -5,6 +5,7 @@ from typing import List, Tuple
 
 from PySide6.QtCore import Qt, QTimer, Signal, QRectF
 from PySide6.QtGui import QPainter, QColor, QPen, QBrush
+from PySide6.QtWidgets import QWidget
 
 class SnakeOverlay(QWidget):
     finished = Signal()

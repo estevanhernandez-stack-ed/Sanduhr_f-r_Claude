@@ -28,18 +28,21 @@ struct ProgressBarView: View {
                             .frame(width: w, height: 1)
                             .frame(maxHeight: .infinity, alignment: .top)
                     )
-
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .overlay(alignment: .leading) {
                 // Pace marker — thin bright tick with a subtle glow.
+                // Redrawn absolutely outside the clipping frame to allow
+                // a 24px vertical extension down the length of the track.
                 if let f = paceFraction {
                     palette.paceMarker
-                        .frame(width: 2)
+                        .frame(width: 3, height: 24)
                         .shadow(color: palette.paceMarker.opacity(0.6),
                                 radius: 2, x: 0, y: 0)
-                        .offset(x: f * g.size.width - 1)
+                        .offset(x: f * g.size.width - 1.5)
                 }
             }
         }
         .frame(height: 10)
-        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
     }
 }

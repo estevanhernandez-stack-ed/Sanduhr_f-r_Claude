@@ -8,7 +8,7 @@ inner highlight) based on the theme's glass-tuning dials.
 
 from typing import List, Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QEvent
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame,
@@ -22,6 +22,23 @@ from PySide6.QtWidgets import (
 
 from sanduhr import pacing, themes
 from sanduhr.sparkline import Sparkline
+
+
+# Graph view modes — shared across all cards.
+_GRAPH_MODES = ["classic", "projection", "pulse"]
+_current_graph_mode = "classic"
+
+
+def cycle_graph_mode() -> str:
+    """Advance the shared graph mode and return the new mode name."""
+    global _current_graph_mode
+    idx = _GRAPH_MODES.index(_current_graph_mode)
+    _current_graph_mode = _GRAPH_MODES[(idx + 1) % len(_GRAPH_MODES)]
+    return _current_graph_mode
+
+
+def current_graph_mode() -> str:
+    return _current_graph_mode
 
 
 def _rgba(hex_color: str, alpha: float) -> str:
@@ -41,6 +58,7 @@ class TierCard(QFrame):
         self._resets_at: Optional[str] = None
         self._util: int = 0
         self._show_deep_math = False
+        self._projected: Optional[float] = None
 
         self._build()
         self.apply_theme(theme)
@@ -61,6 +79,9 @@ class TierCard(QFrame):
         self._bar.setValue(util)
         self._bar.setStyleSheet(self._bar_qss(color))
 
+        # Cache projection for velocity shadow drawing
+        self._projected = pacing.velocity_projection(util, resets_at, self._tier_key)
+
         self._reset_lbl.setText(
             "" if not resets_at else f"Resets in {pacing.time_until(resets_at)}"
         )
@@ -76,6 +97,10 @@ class TierCard(QFrame):
 
         self._spark.set_values(history_values)
         self._spark.set_color(self._theme["sparkline"])
+
+        # Sync sparkline display mode
+        mode = current_graph_mode()
+        self._spark.set_mode("pulse" if mode == "pulse" else "line")
 
         self._update_pace_marker()
 
@@ -119,7 +144,7 @@ class TierCard(QFrame):
         row1.addWidget(self._lbl)
         row1.addStretch()
         self._spark = Sparkline()
-        self._spark.setFixedSize(50, 16)
+        self._spark.setFixedSize(100, 16)
         row1.addWidget(self._spark)
         self._pct = QLabel("0%")
         self._pct.setAttribute(Qt.WA_TranslucentBackground, True)
@@ -136,10 +161,12 @@ class TierCard(QFrame):
         self._bar.setTextVisible(False)
         self._bar.setFixedHeight(16)
         bar_layout.addWidget(self._bar)
-        self._pace_marker = QWidget(self._bar_container)
-        self._pace_marker.setFixedWidth(3)
-        self._pace_marker.setFixedHeight(16)
-        self._pace_marker.hide()
+
+        self._pace_tick = QWidget(self._bar_container)
+        self._pace_tick.setFixedHeight(16)
+        self._pace_tick.setFixedWidth(3)
+        self._pace_tick.hide()
+
         outer.addWidget(self._bar_container)
 
         row3 = QHBoxLayout()
@@ -150,7 +177,7 @@ class TierCard(QFrame):
         self._pace_lbl = QLabel("")
         self._pace_lbl.setAttribute(Qt.WA_TranslucentBackground, True)
         self._pace_lbl.setCursor(Qt.PointingHandCursor)
-        self._pace_lbl.mousePressEvent = self._toggle_deep_math
+        self._pace_lbl.installEventFilter(self)
         row3.addWidget(self._pace_lbl)
         outer.addLayout(row3)
 
@@ -164,10 +191,17 @@ class TierCard(QFrame):
         row4.addWidget(self._burn_lbl)
         outer.addLayout(row4)
 
-    def _toggle_deep_math(self, event) -> None:
-        if event.button() == Qt.LeftButton:
-            self._show_deep_math = not self._show_deep_math
-            self._update_pace_lbl()
+    def eventFilter(self, obj, event) -> bool:
+        if obj == self._pace_lbl:
+            if event.type() == QEvent.Enter:
+                self._show_deep_math = True
+                self._update_pace_lbl()
+                return True
+            elif event.type() == QEvent.Leave:
+                self._show_deep_math = False
+                self._update_pace_lbl()
+                return True
+        return super().eventFilter(obj, event)
 
     def _update_pace_lbl(self) -> None:
         if self._show_deep_math:
@@ -227,32 +261,54 @@ class TierCard(QFrame):
 
     def _update_pace_marker(self) -> None:
         f = pacing.pace_frac(self._resets_at, self._tier_key)
-        if f is None:
-            self._pace_marker.hide()
-            return
-        w = self._bar_container.width()
-        if w <= 0:
-            self._pace_marker.hide()
-            return
-        self._pace_marker.setStyleSheet(
-            f"background-color: {self._theme['pace_marker']};"
-        )
-        self._pace_marker.move(int(f * w), 0)
-        self._pace_marker.show()
+        if f is not None and self._bar_container.width() > 0:
+            w = self._bar_container.width()
+            rx = int(f * w)
+            self._pace_tick.setStyleSheet(f"background-color: {self._theme['pace_marker']};")
+            self._pace_tick.move(rx, 0)
+            self._pace_tick.show()
+            self._pace_tick.raise_()
+        else:
+            self._pace_tick.hide()
+
+        # Just queue a repaint for the absolute geometry drawing
+        self.update()
 
     def paintEvent(self, event) -> None:  # noqa: N802
         super().paintEvent(event)
         hl = self._theme.get("inner_highlight")
-        if not hl:
-            return
+        
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, True)
-        color = QColor(hl["color"])
-        color.setAlphaF(hl["alpha"])
-        pen = QPen(color)
-        pen.setWidthF(1.0)
-        painter.setPen(pen)
-        r = self.rect()
-        radius = self._theme.get("card_corner_radius", 10)
-        painter.drawLine(r.left() + radius, r.top() + 1, r.right() - radius, r.top() + 1)
+        
+        if hl:
+            color = QColor(hl["color"])
+            color.setAlpha(int(hl.get("alpha", 0.05) * 255))
+            pen = QPen(color)
+            pen.setWidth(1)
+            painter.setPen(pen)
+            r = self.rect()
+            r.adjust(1, 1, -1, -1)
+            radius = self._theme.get("card_corner_radius", 10) - 1
+            painter.drawRoundedRect(r, radius, radius)
+
+        # Draw velocity shadow (projection bar) when in projection mode
+        mode = current_graph_mode()
+        if mode == "projection" and self._projected is not None and self._bar_container.width() > 0:
+            bar_w = self._bar_container.width()
+            bar_x = self._bar_container.x()
+            bar_y = self._bar_container.y()
+            bar_h = self._bar_container.height()
+            actual_end = bar_x + int((self._util / 100.0) * bar_w)
+            proj_end = bar_x + int(min(self._projected, 100.0) / 100.0 * bar_w)
+            if proj_end > actual_end:
+                shadow_c = QColor(themes.usage_color(self._util))
+                shadow_c.setAlphaF(0.25)
+                painter.fillRect(actual_end, bar_y, proj_end - actual_end, bar_h, shadow_c)
+                # Thin bright leading edge
+                edge_c = QColor(themes.usage_color(self._util))
+                edge_c.setAlphaF(0.6)
+                painter.fillRect(proj_end - 1, bar_y, 2, bar_h, edge_c)
+
+        # Pace tick is now drawn via an absolute positioned widget (_pace_tick)
         painter.end()

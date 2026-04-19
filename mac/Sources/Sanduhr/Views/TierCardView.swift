@@ -110,9 +110,9 @@ struct TierCardView: View {
                     .foregroundStyle(Color.hex(pace.colorHex))
             }
         }
-        .onTapGesture {
+        .onHover { hovering in
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                showDeepMath.toggle()
+                showDeepMath = hovering
             }
         }
     }

@@ -21,7 +21,6 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
-    QShortcut,
     QSizePolicy,
     QStackedLayout,
     QVBoxLayout,
@@ -33,7 +32,7 @@ from sanduhr.focus import FocusTimerWidget
 from sanduhr.game import SnakeOverlay
 from sanduhr.fetcher import UsageFetcher
 from sanduhr.settings_dialog import SettingsDialog
-from sanduhr.tiers import TierCard
+from sanduhr.tiers import TierCard, cycle_graph_mode
 
 _log = logging.getLogger(__name__)
 
@@ -125,7 +124,6 @@ class SanduhrWidget(QWidget):
         self._title_lbl = QLabel("Sanduhr für Claude")
         tb.addWidget(self._title_lbl)
         tb.addStretch()
-        self._btn_settings = QPushButton("\u2699 Settings")
         self._btn_refresh = QPushButton("Refresh")
         # Initial state is pinned (WindowStaysOnTopHint set on __init__),
         # so the button's first label must be the ACTION, i.e. "Unpin".
@@ -135,7 +133,7 @@ class SanduhrWidget(QWidget):
         # itself draws in title bars (rather than a plain lowercase x).
         self._btn_close = QPushButton("\u2715")
         self._btn_close.setObjectName("CloseButton")
-        for b in (self._btn_settings, self._btn_refresh, self._btn_pin):
+        for b in (self._btn_refresh, self._btn_pin):
             b.setFlat(True)
             b.setCursor(Qt.PointingHandCursor)
             b.setFixedHeight(34)
@@ -145,45 +143,26 @@ class SanduhrWidget(QWidget):
         self._btn_close.setFixedWidth(46)  # matches Explorer/Settings close-button width
 
         # Tooltips — selective, for the controls whose purpose isn't obvious.
-        self._btn_settings.setToolTip("Settings — credentials, themes, help (Ctrl+,)")
         self._btn_refresh.setToolTip("Refresh usage now (Ctrl+R)")
         self._btn_pin.setToolTip("Unpin (currently always on top)")
         self._btn_close.setToolTip("Close (Alt+F4)")
-        self._title_lbl.setToolTip("Drag to move · double-click to toggle compact · right-click for menu")
+        self._title_lbl.setToolTip("Drag to move")
 
         # Accessible names — screen readers + MS Store review tooling look at these.
-        self._btn_settings.setAccessibleName("Settings")
         self._btn_refresh.setAccessibleName("Refresh usage")
         self._btn_pin.setAccessibleName("Toggle always-on-top")
         self._btn_close.setAccessibleName("Close")
 
-        self._btn_settings.clicked.connect(lambda: self._open_settings_dialog())
         self._btn_refresh.clicked.connect(self._request_refresh)
         self._btn_close.clicked.connect(self.close)
         self._btn_pin.clicked.connect(self._toggle_pin)
         # Order matters — close must be the rightmost button, matching every
         # other Windows title bar the user has ever seen.
-        for b in (self._btn_settings, self._btn_refresh, self._btn_pin, self._btn_close):
+        for b in (self._btn_refresh, self._btn_pin, self._btn_close):
             tb.addWidget(b)
         outer.addWidget(self._title_bar)
 
-        # Theme strip
-        self._theme_strip = QWidget()
-        self._theme_strip.setObjectName("ThemeStrip")
-        self._theme_strip.setFixedHeight(26)
-        ts = QHBoxLayout(self._theme_strip)
-        ts.setContentsMargins(10, 0, 10, 0)
-        ts.setSpacing(0)
-        self._theme_buttons: Dict[str, QPushButton] = {}
-        for key, theme in themes.THEMES.items():
-            btn = QPushButton(theme["name"])
-            btn.setFlat(True)
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.clicked.connect(lambda _=False, k=key: self.apply_theme(k))
-            self._theme_buttons[key] = btn
-            ts.addWidget(btn)
-        ts.addStretch()
-        outer.addWidget(self._theme_strip)
+        # Theme strip moved to popup menu
 
         # Content
         self._content = QWidget()
@@ -229,15 +208,51 @@ class SanduhrWidget(QWidget):
         self._game_overlay.finished.connect(lambda: self.setFocus())
         self._game_overlay.highScoreReached.connect(self._save_snake_highscore)
 
+        # Tool strip — between cards and footer
+        self._tool_strip = QWidget()
+        self._tool_strip.setObjectName("ToolStrip")
+        self._tool_strip.setFixedHeight(28)
+        tstrip = QHBoxLayout(self._tool_strip)
+        tstrip.setContentsMargins(10, 0, 10, 0)
+        tstrip.setSpacing(4)
+        tstrip.addStretch()
+        self._btn_theme = QPushButton("\ud83c\udfa8")
+        self._btn_settings = QPushButton("⚙")
+        self._btn_graph = QPushButton("\ud83d\udcca")
+        self._btn_compact = QPushButton("↕")
+        self._btn_focus = QPushButton("⏳")
+        self._btn_snake = QPushButton("\ud83d\udc0d")
+        for b in (self._btn_theme, self._btn_settings, self._btn_graph, self._btn_compact, self._btn_focus, self._btn_snake):
+            b.setFlat(True)
+            b.setCursor(Qt.PointingHandCursor)
+            b.setFixedHeight(24)
+            tstrip.addWidget(b)
+        tstrip.addStretch()
+        self._btn_theme.setToolTip("Themes")
+        self._btn_settings.setToolTip("Settings")
+        self._btn_graph.setToolTip("Cycle graph view: Classic / Projection / Pulse")
+        self._btn_compact.setToolTip("Compact Mode")
+        self._btn_focus.setToolTip("Cooldown Timer")
+        self._btn_snake.setToolTip("Play Cooldown Snake")
+        self._btn_theme.clicked.connect(self._show_theme_menu)
+        self._btn_settings.clicked.connect(self._open_settings_dialog)
+        self._btn_graph.clicked.connect(self._cycle_graph_view)
+        self._btn_compact.clicked.connect(self._toggle_compact)
+        self._btn_focus.clicked.connect(self._toggle_focus_mode)
+        self._btn_snake.clicked.connect(self._game_overlay.start_game)
+        outer.addWidget(self._tool_strip)
+
         # Footer
         self._footer = QWidget()
         self._footer.setObjectName("Footer")
         self._footer.setFixedHeight(24)
         ft = QHBoxLayout(self._footer)
         ft.setContentsMargins(10, 0, 10, 0)
+        
         self._footer_lbl = QLabel("")
         ft.addWidget(self._footer_lbl)
         ft.addStretch()
+        
         sonnet = QPushButton("Use Sonnet")
         sonnet.setFlat(True)
         sonnet.setCursor(Qt.PointingHandCursor)
@@ -417,7 +432,7 @@ class SanduhrWidget(QWidget):
                 font-family: "Segoe UI Variable Display", "Segoe UI", sans-serif;
                 font-size: 10pt;
             }}
-            QWidget#TitleBar, QWidget#ThemeStrip, QWidget#Footer {{
+            QWidget#TitleBar, QWidget#Footer, QWidget#ToolStrip {{
                 background-color: {chrome_bg};
             }}
             QWidget#Content {{
@@ -585,13 +600,7 @@ class SanduhrWidget(QWidget):
         self._settings["theme"] = key
         self._save_settings()
 
-        for k, btn in self._theme_buttons.items():
-            if k == key:
-                btn.setStyleSheet(
-                    f"color: {self._theme['accent']}; font-weight: 600;"
-                )
-            else:
-                btn.setStyleSheet(f"color: {self._theme['text_muted']};")
+        # (Theme buttons highlighting logic removed since they are now in a QMenu)
 
     def _apply_monospace_if_needed(self, card: TierCard) -> None:
         """Matrix-only: swap percentage / countdown fonts to Cascadia Code."""
@@ -715,6 +724,62 @@ class SanduhrWidget(QWidget):
         self._compact = not self._compact
         self._render_cards(self._last or {})
 
+        # Hide/show non-essential strips in compact mode
+        self._tool_strip.setVisible(not self._compact)
+
+        if self._compact:
+            # Let the layout determine the minimum size needed for the
+            # single card at its original dimensions, then lock to that.
+            self.setMaximumHeight(16777215)
+            self.setMinimumHeight(0)
+            QTimer.singleShot(0, lambda: (
+                self.adjustSize(),
+                self.setFixedHeight(self.sizeHint().height()),
+            ))
+        else:
+            # Unlock height so the layout can expand naturally
+            self.setMaximumHeight(16777215)
+            self.setMinimumHeight(0)
+            QTimer.singleShot(0, lambda: self.adjustSize())
+
+    def _cycle_graph_view(self) -> None:
+        new_mode = cycle_graph_mode()
+        labels = {'classic': '📊', 'projection': '📈', 'pulse': '📶'}
+        self._btn_graph.setText(labels.get(new_mode, '📊'))
+        tips = {
+            'classic': 'Classic view (click to switch to Projection)',
+            'projection': 'Projection view (click to switch to Pulse)',
+            'pulse': 'Pulse view (click to switch to Classic)',
+        }
+        self._btn_graph.setToolTip(tips.get(new_mode, ''))
+        if self._last:
+            self._render_cards(self._last)
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        if not self._theme.get('bg_grid'):
+            return
+        from PySide6.QtGui import QPainter, QColor
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, False)
+        grid_c = QColor(self._theme.get('border', '#333333'))
+        grid_c.setAlphaF(0.12)
+        w, h = self.width(), self.height()
+        step = 20
+        painter.setPen(grid_c)
+        for x in range(0, w, step):
+            painter.drawLine(x, 0, x, h)
+        for y in range(0, h, step):
+            painter.drawLine(0, y, w, y)
+        major_c = QColor(self._theme.get('border', '#333333'))
+        major_c.setAlphaF(0.22)
+        painter.setPen(major_c)
+        for x in range(0, w, step * 4):
+            painter.drawLine(x, 0, x, h)
+        for y in range(0, h, step * 4):
+            painter.drawLine(0, y, w, y)
+        painter.end()
+
     def _toggle_focus_mode(self) -> None:
         if self._main_stack.currentIndex() == 1:
             self._exit_focus_mode()
@@ -775,29 +840,20 @@ class SanduhrWidget(QWidget):
         self._open_settings_dialog()
 
     def _rebuild_theme_strip(self) -> None:
-        """Tear down and rebuild the theme strip so newly-added user themes
-        (saved via the Settings dialog) show up immediately without restart."""
-        ts_layout = self._theme_strip.layout()
-        while ts_layout.count():
-            item = ts_layout.takeAt(0)
-            w = item.widget()
-            if w is not None:
-                w.setParent(None)
-                w.deleteLater()
-        self._theme_buttons = {}
-        for key, theme in themes.THEMES.items():
-            btn = QPushButton(theme["name"])
-            btn.setFlat(True)
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.clicked.connect(lambda _=False, k=key: self.apply_theme(k))
-            self._theme_buttons[key] = btn
-            ts_layout.addWidget(btn)
-        ts_layout.addStretch()
-        # Re-apply current theme to refresh active/muted button colors
+        """Themes change handles dynamically via QMenu now, so just re-apply current."""
         self.apply_theme(self._theme_key)
-        # New buttons need the drag filter too (though buttons are excluded,
-        # this also picks up any new child widgets).
-        self._install_drag_filter(self._theme_strip)
+
+    def _show_theme_menu(self) -> None:
+        from PySide6.QtWidgets import QMenu
+        menu = QMenu(self)
+        menu.setStyleSheet(self.styleSheet())
+        for key, theme in themes.THEMES.items():
+            action = menu.addAction(theme["name"])
+            if key == self._theme_key:
+                action.setCheckable(True)
+                action.setChecked(True)
+            action.triggered.connect(lambda _=False, k=key: self.apply_theme(k))
+        menu.exec_(self._btn_theme.mapToGlobal(self._btn_theme.rect().bottomLeft()))
 
     # -- fetcher ---------------------------------------------------
 
