@@ -25,7 +25,7 @@ from sanduhr.sparkline import Sparkline
 
 
 # Graph view modes — shared across all cards.
-_GRAPH_MODES = ["classic", "projection", "pulse"]
+_GRAPH_MODES = ["classic", "horizon"]
 _current_graph_mode = "classic"
 
 
@@ -59,6 +59,8 @@ class TierCard(QFrame):
         self._util: int = 0
         self._show_deep_math = False
         self._projected: Optional[float] = None
+        self._ghost_frac: Optional[float] = None
+        self._ghost_alpha: float = 0.35
 
         self._build()
         self.apply_theme(theme)
@@ -81,6 +83,7 @@ class TierCard(QFrame):
 
         # Cache projection for velocity shadow drawing
         self._projected = pacing.velocity_projection(util, resets_at, self._tier_key)
+        self._ghost_frac = pacing.pace_frac(resets_at, self._tier_key)
 
         self._reset_lbl.setText(
             "" if not resets_at else f"Resets in {pacing.time_until(resets_at)}"
@@ -100,7 +103,7 @@ class TierCard(QFrame):
 
         # Sync sparkline display mode
         mode = current_graph_mode()
-        self._spark.set_mode("pulse" if mode == "pulse" else "line")
+        self._spark.set_mode("horizon" if mode == "horizon" else "line")
 
         self._update_pace_marker()
 
@@ -114,6 +117,7 @@ class TierCard(QFrame):
         self._spark.set_color(theme["sparkline"])
         self._apply_shadow()
         self._bar.setStyleSheet(self._bar_qss(themes.usage_color(self._util)))
+        self._ghost_alpha = float(theme.get("ghost_alpha", 0.35))
 
     # -- for tests -------------------------------------------------
 
@@ -292,23 +296,28 @@ class TierCard(QFrame):
             radius = self._theme.get("card_corner_radius", 10) - 1
             painter.drawRoundedRect(r, radius, radius)
 
-        # Draw velocity shadow (projection bar) when in projection mode
-        mode = current_graph_mode()
-        if mode == "projection" and self._projected is not None and self._bar_container.width() > 0:
-            bar_w = self._bar_container.width()
+        # Always-on pace ghost — a thin outlined rectangle at x=ghost_frac*bar_w.
+        # Reads as: "where pace says you should be right now." Real fill sits
+        # to the left (under pace), at (on pace), or to the right (ahead).
+        if self._ghost_frac is not None and self._bar_container.width() > 0:
             bar_x = self._bar_container.x()
             bar_y = self._bar_container.y()
+            bar_w = self._bar_container.width()
             bar_h = self._bar_container.height()
-            actual_end = bar_x + int((self._util / 100.0) * bar_w)
-            proj_end = bar_x + int(min(self._projected, 100.0) / 100.0 * bar_w)
-            if proj_end > actual_end:
-                shadow_c = QColor(themes.usage_color(self._util))
-                shadow_c.setAlphaF(0.25)
-                painter.fillRect(actual_end, bar_y, proj_end - actual_end, bar_h, shadow_c)
-                # Thin bright leading edge
-                edge_c = QColor(themes.usage_color(self._util))
-                edge_c.setAlphaF(0.6)
-                painter.fillRect(proj_end - 1, bar_y, 2, bar_h, edge_c)
+
+            ghost_x = bar_x + int(self._ghost_frac * bar_w)
+            # 2px wide tick that spans the full bar height plus a small
+            # protrusion top and bottom — like a race-ghost time marker.
+            protrude = 2
+            ghost_color = QColor(self._theme["text"])
+            ghost_color.setAlphaF(self._ghost_alpha)
+            pen = QPen(ghost_color)
+            pen.setWidth(2)
+            painter.setPen(pen)
+            painter.drawLine(
+                ghost_x, bar_y - protrude,
+                ghost_x, bar_y + bar_h + protrude,
+            )
 
         # Pace tick is now drawn via an absolute positioned widget (_pace_tick)
         painter.end()
