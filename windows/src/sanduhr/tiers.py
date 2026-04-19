@@ -329,9 +329,12 @@ class TierCard(QFrame):
 
             ghost_x = bar_x + int(self._ghost_frac * bar_w)
             # Tick sits exactly on the bar — same top and bottom edges,
-            # no protrusion. Overlay onto the bar, not around it.
-            ghost_color = QColor(self._theme["text"])
-            ghost_color.setAlphaF(self._ghost_alpha)
+            # no protrusion. Uses the theme's pace_marker color (the alert
+            # accent designed for exactly this: visible against both the
+            # filled and unfilled portions of the bar) at full opacity.
+            # Earlier iterations used text-color at 0.35 alpha; too subtle
+            # to read at a glance.
+            ghost_color = QColor(self._theme.get("pace_marker", self._theme["text"]))
             pen = QPen(ghost_color)
             pen.setWidth(2)
             painter.setPen(pen)
