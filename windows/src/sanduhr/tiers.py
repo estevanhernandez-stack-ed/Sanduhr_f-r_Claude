@@ -96,6 +96,7 @@ class TierCard(QFrame):
         self._bar.setStyleSheet(self._bar_qss(color))
 
         self._ghost_frac = pacing.pace_frac(resets_at, self._tier_key)
+        self._update_pace_tick()
 
         self._reset_lbl.setText(
             "" if not resets_at else f"Resets in {pacing.time_until(resets_at)}"
@@ -129,6 +130,7 @@ class TierCard(QFrame):
         self._bar.setStyleSheet(self._bar_qss(themes.usage_color(self._util)))
         self._ghost_alpha = float(theme.get("ghost_alpha", 0.35))
         self._breath_period_ms = int(theme.get("breath_period_ms", 2800))
+        self._update_pace_tick()
 
     # -- for tests -------------------------------------------------
 
@@ -181,6 +183,16 @@ class TierCard(QFrame):
         self._bar.setMinimumHeight(16)
         self._bar.setMaximumHeight(28)
         bar_layout.addWidget(self._bar)
+
+        # Pace-ghost tick as an actual child widget, not a painter call in
+        # the card's paintEvent. QProgressBar is a child widget and paints
+        # itself AFTER the parent's paintEvent, so anything we draw on the
+        # card gets overdrawn by the bar fill. A sibling QWidget inside
+        # _bar_container with raise_() renders on top of the bar.
+        self._pace_tick = QWidget(self._bar_container)
+        self._pace_tick.setFixedWidth(2)
+        self._pace_tick.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self._pace_tick.hide()
 
         outer.addWidget(self._bar_container)
 
@@ -280,6 +292,37 @@ class TierCard(QFrame):
         effect.setColor(QColor(0, 0, 0, 64))
         self.setGraphicsEffect(effect)
 
+    def _update_pace_tick(self) -> None:
+        """Position + color + visibility the pace-ghost child widget.
+
+        The tick is a 2px-wide QWidget sibling of the QProgressBar inside
+        _bar_container. Because it's a child widget (not a painter call
+        in the card's paintEvent), it renders ON TOP of the bar fill,
+        which is exactly what the user wants — the tick must always be
+        the top layer.
+        """
+        frac = self._ghost_frac
+        if frac is None or self._bar_container.width() == 0:
+            self._pace_tick.hide()
+            return
+        color = self._theme.get("pace_marker", self._theme["text"])
+        self._pace_tick.setStyleSheet(f"background-color: {color};")
+        # Match the bar's actual rendered height, not the container's
+        # max-height, so the tick doesn't over/undershoot when the bar
+        # is sized between min 16 and max 28.
+        h = self._bar.height() if self._bar.height() > 0 else self._bar_container.height()
+        self._pace_tick.setFixedHeight(h)
+        bar_w = self._bar_container.width()
+        tick_x = max(0, min(bar_w - 2, int(frac * bar_w)))
+        self._pace_tick.move(tick_x, 0)
+        self._pace_tick.show()
+        self._pace_tick.raise_()
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        # Reposition the pace tick — bar width changes with the card.
+        self._update_pace_tick()
+
     def paintEvent(self, event) -> None:  # noqa: N802
         super().paintEvent(event)
         hl = self._theme.get("inner_highlight")
@@ -318,29 +361,10 @@ class TierCard(QFrame):
                 overlay,
             )
 
-        # Always-on pace ghost — a thin outlined rectangle at x=ghost_frac*bar_w.
-        # Reads as: "where pace says you should be right now." Real fill sits
-        # to the left (under pace), at (on pace), or to the right (ahead).
-        if self._ghost_frac is not None and self._bar_container.width() > 0:
-            bar_x = self._bar_container.x()
-            bar_y = self._bar_container.y()
-            bar_w = self._bar_container.width()
-            bar_h = self._bar_container.height()
-
-            ghost_x = bar_x + int(self._ghost_frac * bar_w)
-            # Tick sits exactly on the bar — same top and bottom edges,
-            # no protrusion. Uses the theme's pace_marker color (the alert
-            # accent designed for exactly this: visible against both the
-            # filled and unfilled portions of the bar) at full opacity.
-            # Earlier iterations used text-color at 0.35 alpha; too subtle
-            # to read at a glance.
-            ghost_color = QColor(self._theme.get("pace_marker", self._theme["text"]))
-            pen = QPen(ghost_color)
-            pen.setWidth(2)
-            painter.setPen(pen)
-            painter.drawLine(
-                ghost_x, bar_y,
-                ghost_x, bar_y + bar_h,
-            )
+        # Pace-ghost tick rendering lives on self._pace_tick (a child
+        # widget of _bar_container raised above the QProgressBar).
+        # Painting it here in the card's paintEvent doesn't work —
+        # the QProgressBar child paints AFTER this method returns
+        # and would overdraw whatever we draw here.
 
         painter.end()
