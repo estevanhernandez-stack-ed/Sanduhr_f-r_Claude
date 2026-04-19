@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QProgressBar,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -147,6 +148,9 @@ class TierCard(QFrame):
 
     def _build(self) -> None:
         self.setObjectName("TierCard")
+        # Preferred (not Expanding) — cards take natural height instead
+        # of fighting each other for vertical space when the window grows.
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(14, 12, 14, 12)
         outer.setSpacing(6)
@@ -166,14 +170,16 @@ class TierCard(QFrame):
         outer.addLayout(row1)
 
         self._bar_container = QWidget()
-        self._bar_container.setFixedHeight(16)
+        self._bar_container.setMinimumHeight(16)
+        self._bar_container.setMaximumHeight(28)
         bar_layout = QHBoxLayout(self._bar_container)
         bar_layout.setContentsMargins(0, 0, 0, 0)
         self._bar = QProgressBar()
         self._bar.setRange(0, 100)
         self._bar.setValue(0)
         self._bar.setTextVisible(False)
-        self._bar.setFixedHeight(16)
+        self._bar.setMinimumHeight(16)
+        self._bar.setMaximumHeight(28)
         bar_layout.addWidget(self._bar)
 
         outer.addWidget(self._bar_container)
@@ -322,17 +328,16 @@ class TierCard(QFrame):
             bar_h = self._bar_container.height()
 
             ghost_x = bar_x + int(self._ghost_frac * bar_w)
-            # 2px wide tick that spans the full bar height plus a small
-            # protrusion top and bottom — like a race-ghost time marker.
-            protrude = 2
+            # Tick sits exactly on the bar — same top and bottom edges,
+            # no protrusion. Overlay onto the bar, not around it.
             ghost_color = QColor(self._theme["text"])
             ghost_color.setAlphaF(self._ghost_alpha)
             pen = QPen(ghost_color)
             pen.setWidth(2)
             painter.setPen(pen)
             painter.drawLine(
-                ghost_x, bar_y - protrude,
-                ghost_x, bar_y + bar_h + protrude,
+                ghost_x, bar_y,
+                ghost_x, bar_y + bar_h,
             )
 
         painter.end()

@@ -74,6 +74,7 @@ class SanduhrWidget(QWidget):
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.resize(420, 540)
+        self.setMouseTracking(True)
         self._restore_geometry()
         self._compute_and_apply_minimum_size()
 
@@ -385,10 +386,15 @@ class SanduhrWidget(QWidget):
         self._save_settings()
 
     def _install_drag_filter(self, root: QWidget) -> None:
-        """Recursively install drag filter on descendants except QPushButton/QLineEdit."""
+        """Recursively install drag filter on descendants except QPushButton/QLineEdit.
+        Also enable mouse tracking so MouseMove events fire on hover (not
+        just during drag) — required for resize-zone cursor feedback to
+        reach the event filter when the cursor is over a child widget."""
+        root.setMouseTracking(True)
         for child in root.findChildren(QWidget):
             if isinstance(child, (QPushButton, QLineEdit)):
                 continue
+            child.setMouseTracking(True)
             child.installEventFilter(self)
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt API)
@@ -719,10 +725,14 @@ class SanduhrWidget(QWidget):
         text_w = max(fm.horizontalAdvance(s) for s in probes)
         # +24 horizontal padding (12px on each side of the content area),
         # +32 for the sparkline area we want to preserve.
-        min_w = max(320, text_w + 24 + 32)
-        # Chrome: title bar 34 + theme strip 26 + tool strip 28 + footer 24
-        # = 112. Plus 1 compact tier card (~60). Plus content margins.
-        min_h = 180
+        # Horizontal floor: the initial window is 420px and looks right.
+        # Allow some shrink toward 380px but not below, otherwise tier
+        # labels and burn-projection text crowd into each other.
+        min_w = max(380, text_w + 24 + 32)
+        # Vertical floor: needs room for 4 tier cards + chrome. 420px gives
+        # ~75px per card which is the minimum for bar + ghost + sparkline +
+        # pacing-label readability.
+        min_h = 420
         self.setMinimumSize(min_w, min_h)
 
     def _resize_zone(self, pos) -> Optional[str]:

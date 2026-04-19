@@ -50,7 +50,7 @@ def test_minimum_size_is_dynamic(qtbot, monkeypatch):
 def test_resize_zone_detection_left_edge(qtbot, monkeypatch):
     """Cursor within 6px of the left edge is a resize zone."""
     w = _build_widget(qtbot, monkeypatch)
-    w.resize(500, 400)
+    w.resize(500, 500)
     from PySide6.QtCore import QPoint
     zone = w._resize_zone(QPoint(3, 200))
     assert zone == "left"
@@ -59,18 +59,18 @@ def test_resize_zone_detection_left_edge(qtbot, monkeypatch):
 def test_resize_zone_detection_bottom_right_corner(qtbot, monkeypatch):
     """Corner zone takes priority over edge."""
     w = _build_widget(qtbot, monkeypatch)
-    w.resize(500, 400)
+    w.resize(500, 500)
     from PySide6.QtCore import QPoint
-    zone = w._resize_zone(QPoint(498, 398))
+    zone = w._resize_zone(QPoint(498, 498))
     assert zone == "bottom-right"
 
 
 def test_resize_zone_detection_interior(qtbot, monkeypatch):
     """Interior returns None (not a resize zone)."""
     w = _build_widget(qtbot, monkeypatch)
-    w.resize(500, 400)
+    w.resize(500, 500)
     from PySide6.QtCore import QPoint
-    zone = w._resize_zone(QPoint(250, 200))
+    zone = w._resize_zone(QPoint(250, 250))
     assert zone is None
 
 
