@@ -722,13 +722,23 @@ class SanduhrWidget(QWidget):
             "Cloudflare — add cf_clearance (click Key).",
             "Weekly — OAuth Apps",
         ]
-        text_w = max(fm.horizontalAdvance(s) for s in probes)
-        # +24 horizontal padding (12px on each side of the content area),
-        # +32 for the sparkline area we want to preserve.
-        # Horizontal floor: the initial window is 420px and looks right.
-        # Allow some shrink toward 380px but not below, otherwise tier
-        # labels and burn-projection text crowd into each other.
-        min_w = max(380, text_w + 24 + 32)
+        # Row-3/4 on a tier card holds reset text on the left and burn
+        # text on the right with a stretch between them. The card can't
+        # shrink below the sum of those two widths plus the card's
+        # internal horizontal padding — otherwise the two columns start
+        # overlapping visually even before Qt clips.
+        row_pair_w = fm.horizontalAdvance(
+            "Resets in 4d 1h 59m" "  " "At current pace, expires in 7d 23h 59m"
+        )
+        text_w = max(
+            max(fm.horizontalAdvance(s) for s in probes),
+            row_pair_w,
+        )
+        # Card internal padding: 14px left + 14px right (see _build).
+        # Widget outer margins: ~8px + ~8px = 16.
+        # Total horizontal chrome to add: 14+14+16 = 44.
+        # Extra breathing room so nothing touches: +12.
+        min_w = max(460, text_w + 44 + 12)
         # Vertical floor: needs room for 4 tier cards + chrome. 420px gives
         # ~75px per card which is the minimum for bar + ghost + sparkline +
         # pacing-label readability.
