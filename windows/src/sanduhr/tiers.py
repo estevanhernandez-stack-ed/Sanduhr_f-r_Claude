@@ -105,8 +105,6 @@ class TierCard(QFrame):
         mode = current_graph_mode()
         self._spark.set_mode("horizon" if mode == "horizon" else "line")
 
-        self._update_pace_marker()
-
     def apply_theme(self, theme: dict) -> None:
         self._theme = theme
         self.setStyleSheet(self._card_qss())
@@ -165,11 +163,6 @@ class TierCard(QFrame):
         self._bar.setTextVisible(False)
         self._bar.setFixedHeight(16)
         bar_layout.addWidget(self._bar)
-
-        self._pace_tick = QWidget(self._bar_container)
-        self._pace_tick.setFixedHeight(16)
-        self._pace_tick.setFixedWidth(3)
-        self._pace_tick.hide()
 
         outer.addWidget(self._bar_container)
 
@@ -263,21 +256,6 @@ class TierCard(QFrame):
         effect.setColor(QColor(0, 0, 0, 64))
         self.setGraphicsEffect(effect)
 
-    def _update_pace_marker(self) -> None:
-        f = pacing.pace_frac(self._resets_at, self._tier_key)
-        if f is not None and self._bar_container.width() > 0:
-            w = self._bar_container.width()
-            rx = int(f * w)
-            self._pace_tick.setStyleSheet(f"background-color: {self._theme['pace_marker']};")
-            self._pace_tick.move(rx, 0)
-            self._pace_tick.show()
-            self._pace_tick.raise_()
-        else:
-            self._pace_tick.hide()
-
-        # Just queue a repaint for the absolute geometry drawing
-        self.update()
-
     def paintEvent(self, event) -> None:  # noqa: N802
         super().paintEvent(event)
         hl = self._theme.get("inner_highlight")
@@ -319,5 +297,4 @@ class TierCard(QFrame):
                 ghost_x, bar_y + bar_h + protrude,
             )
 
-        # Pace tick is now drawn via an absolute positioned widget (_pace_tick)
         painter.end()
