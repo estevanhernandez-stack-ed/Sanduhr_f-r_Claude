@@ -1,9 +1,10 @@
 """TierCard -- one rendered usage tier, updates in place.
 
-Handles label, sparkline, percentage number, progress bar with pace
-marker, reset countdown, pacing label, burn projection. Receives a
-theme dict and draws its card chrome (glass fill, border, shadow,
-inner highlight) based on the theme's glass-tuning dials.
+Handles label, sparkline, percentage number, progress bar with
+always-on pace ghost overlay, reset countdown, pacing label, burn
+projection. Receives a theme dict and draws its card chrome (glass
+fill, border, shadow, inner highlight) based on the theme's
+glass-tuning dials.
 """
 
 from typing import List, Optional
@@ -58,7 +59,6 @@ class TierCard(QFrame):
         self._resets_at: Optional[str] = None
         self._util: int = 0
         self._show_deep_math = False
-        self._projected: Optional[float] = None
         self._ghost_frac: Optional[float] = None
         self._ghost_alpha: float = 0.35
 
@@ -81,8 +81,6 @@ class TierCard(QFrame):
         self._bar.setValue(util)
         self._bar.setStyleSheet(self._bar_qss(color))
 
-        # Cache projection for velocity shadow drawing
-        self._projected = pacing.velocity_projection(util, resets_at, self._tier_key)
         self._ghost_frac = pacing.pace_frac(resets_at, self._tier_key)
 
         self._reset_lbl.setText(

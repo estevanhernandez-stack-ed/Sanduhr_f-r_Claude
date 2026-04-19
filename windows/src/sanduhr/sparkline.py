@@ -37,7 +37,7 @@ class Sparkline(QWidget):
         self.update()
 
     def set_mode(self, mode: str) -> None:
-        """Switch between 'line' (classic sparkline) and 'pulse' (histogram)."""
+        """Switch between 'line' (classic sparkline), 'pulse' (histogram), and 'horizon' (stacked horizon chart — implementation lands in Task 2)."""
         self._mode = mode
         self.update()
 

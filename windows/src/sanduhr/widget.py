@@ -754,12 +754,11 @@ class SanduhrWidget(QWidget):
 
     def _cycle_graph_view(self) -> None:
         new_mode = cycle_graph_mode()
-        labels = {'classic': '📊', 'projection': '📈', 'pulse': '📶'}
+        labels = {'classic': '📊', 'horizon': '📈'}
         self._btn_graph.setText(labels.get(new_mode, '📊'))
         tips = {
-            'classic': 'Classic view (click to switch to Projection)',
-            'projection': 'Projection view (click to switch to Pulse)',
-            'pulse': 'Pulse view (click to switch to Classic)',
+            'classic': 'Classic sparkline (click to switch to Horizon chart)',
+            'horizon': 'Horizon chart (click to switch to Classic sparkline)',
         }
         self._btn_graph.setToolTip(tips.get(new_mode, ''))
         if self._last:
