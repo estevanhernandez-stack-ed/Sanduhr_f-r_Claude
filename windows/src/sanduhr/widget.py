@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Dict, Optional
 
 from PySide6.QtCore import QEvent, QPoint, Qt, QThread, QTimer, Slot
-from PySide6.QtGui import QColor, QGuiApplication, QKeySequence, QShortcut
+from PySide6.QtGui import QColor, QCursor, QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -415,8 +415,12 @@ class SanduhrWidget(QWidget):
             return True
         if et == QEvent.MouseMove:
             if self._resize_active is not None:
-                self._apply_resize_drag(event.globalPosition().toPoint())
-                return True
+                if event.buttons() & Qt.LeftButton:
+                    self._apply_resize_drag(event.globalPosition().toPoint())
+                    return True
+                # Button dropped (focus-change race) — abandon resize
+                self._resize_active = None
+                self.unsetCursor()
             if self._drag_origin and (event.buttons() & Qt.LeftButton):
                 self.move(event.globalPosition().toPoint() - self._drag_origin)
                 return True
@@ -424,7 +428,6 @@ class SanduhrWidget(QWidget):
             local_pos = self.mapFromGlobal(event.globalPosition().toPoint())
             zone = self._resize_zone(local_pos)
             if zone:
-                from PySide6.QtGui import QCursor
                 cursor_map = {
                     "left": Qt.SizeHorCursor, "right": Qt.SizeHorCursor,
                     "top": Qt.SizeVerCursor, "bottom": Qt.SizeVerCursor,
@@ -434,9 +437,11 @@ class SanduhrWidget(QWidget):
                 self.setCursor(QCursor(cursor_map[zone]))
             else:
                 self.unsetCursor()
+            # Fall through — cursor update is a side-effect, not a consumption.
         if et == QEvent.MouseButtonRelease:
             if self._resize_active is not None:
                 self._resize_active = None
+                self.unsetCursor()
                 self._resize_start_geom = None
                 self._resize_start_pos = None
                 self._save_settings()
@@ -691,9 +696,15 @@ class SanduhrWidget(QWidget):
     # -- drag + edge-resize ---------------------------------------
 
     def _compute_and_apply_minimum_size(self) -> None:
-        """Set minimumSize based on QFontMetrics of known long strings so
-        no text ever clips below the resize floor. Re-run on theme swap
-        in case the theme's font differs (Matrix uses Cascadia Code)."""
+        """Set minimumSize based on QFontMetrics of the longest user-
+        facing strings so no text ever clips below the resize floor.
+
+        Note: `self.font()` reflects Qt's inherited font, not stylesheet
+        font-family rules or the Matrix theme's monospace_font swap
+        (which only replaces tier-card percentage-label fonts). The
+        probes here all land on the status label, which stays Segoe UI
+        across every theme, so this measurement is stable. The theme-
+        change re-invocation is defensive only."""
         from PySide6.QtGui import QFontMetrics
         fm = QFontMetrics(self.font())
         # Strings that have historically pushed the width out. Keep this
@@ -757,8 +768,6 @@ class SanduhrWidget(QWidget):
             )
 
     def mouseMoveEvent(self, event) -> None:  # noqa: N802
-        from PySide6.QtGui import QCursor
-
         # While an overlay owns the window, skip both resize and cursor work.
         overlay_active = (
             hasattr(self, "_main_stack") and self._main_stack.currentIndex() != 0
@@ -797,6 +806,7 @@ class SanduhrWidget(QWidget):
     def mouseReleaseEvent(self, event) -> None:  # noqa: N802
         if self._resize_active is not None:
             self._resize_active = None
+            self.unsetCursor()
             self._resize_start_geom = None
             self._resize_start_pos = None
             self._save_settings()
@@ -1234,6 +1244,7 @@ class SanduhrWidget(QWidget):
             "w": self.width(),
             "h": self.height(),
         }
+        self._settings.pop("window", None)  # migrate away from legacy key
         try:
             paths.settings_file().write_text(
                 json.dumps(self._settings), encoding="utf-8"
