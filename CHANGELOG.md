@@ -33,8 +33,12 @@
 
 - **+8 `test_focus_physics.py`** — construction, start/stop lifecycle, float-vs-int regression guard for `expected_passed`, zero-duration edge case, pre-start tick, snake construction, snake wall/self-collision.
 - **+4 `test_clear_credentials.py`** (restored from stranded commit `0a3b3d6`) — happy path, cancellation, non-blank regression, hint-label visibility.
+- **+4 `test_pace_ghost.py`** — ghost position tracks `pace_frac`, ghost absent without reset data, theme `ghost_alpha` override, sane default alpha.
+- **+5 `test_horizon_sparkline.py`** — horizon mode recognized, renders without crash, short-history no-op, line mode regression guard, peaks-render-darker-than-lulls pixel test.
+- **+5 `test_breathing_glass.py`** — timer runs on construct, phase advances on tick, theme `breath_period_ms` override, sane default period, paint-doesn't-crash smoke test.
+- **+6 `test_edge_resize.py`** — dynamic minimum size, zone detection (left / bottom-right corner / interior), minimum clamp, geometry persistence.
 - **+11 Swift `UsageMathTests`** — new `mac/Tests/SanduhrTests/` target in `Package.swift` with baseline coverage for `parseISO`, `timeUntil`, `paceFrac`, `paceInfo`. Was zero Mac test coverage before — this is the scaffold to build on.
-- Full Windows suite: **173 passed**, up from 161 on the pre-v2.0.4 state.
+- Full Windows suite: **193 passed**, up from 161 on the pre-v2.0.4 state.
 
 ### Errata for v2.0.3
 
