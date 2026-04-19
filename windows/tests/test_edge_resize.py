@@ -59,18 +59,18 @@ def test_resize_zone_detection_left_edge(qtbot, monkeypatch):
 def test_resize_zone_detection_bottom_right_corner(qtbot, monkeypatch):
     """Corner zone takes priority over edge."""
     w = _build_widget(qtbot, monkeypatch)
-    w.resize(500, 500)
+    w.resize(600, 600)
     from PySide6.QtCore import QPoint
-    zone = w._resize_zone(QPoint(498, 498))
+    zone = w._resize_zone(QPoint(598, 598))
     assert zone == "bottom-right"
 
 
 def test_resize_zone_detection_interior(qtbot, monkeypatch):
     """Interior returns None (not a resize zone)."""
     w = _build_widget(qtbot, monkeypatch)
-    w.resize(500, 500)
+    w.resize(600, 600)
     from PySide6.QtCore import QPoint
-    zone = w._resize_zone(QPoint(250, 250))
+    zone = w._resize_zone(QPoint(300, 300))
     assert zone is None
 
 
@@ -88,8 +88,8 @@ def test_resize_persists_to_settings(qtbot, monkeypatch):
     """After a resize + save, the geometry is in settings.json."""
     from sanduhr import paths
     w = _build_widget(qtbot, monkeypatch)
-    w.resize(500, 450)
+    w.resize(520, 580)
     w._save_settings()
     data = json.loads(paths.settings_file().read_text(encoding="utf-8"))
-    assert data.get("geom", {}).get("w") == 500
-    assert data.get("geom", {}).get("h") == 450
+    assert data.get("geom", {}).get("w") == 520
+    assert data.get("geom", {}).get("h") == 580

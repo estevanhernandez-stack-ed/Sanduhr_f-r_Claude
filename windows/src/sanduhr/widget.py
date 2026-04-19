@@ -722,27 +722,15 @@ class SanduhrWidget(QWidget):
             "Cloudflare — add cf_clearance (click Key).",
             "Weekly — OAuth Apps",
         ]
-        # Row-3/4 on a tier card holds reset text on the left and burn
-        # text on the right with a stretch between them. The card can't
-        # shrink below the sum of those two widths plus the card's
-        # internal horizontal padding — otherwise the two columns start
-        # overlapping visually even before Qt clips.
-        row_pair_w = fm.horizontalAdvance(
-            "Resets in 4d 1h 59m" "  " "At current pace, expires in 7d 23h 59m"
-        )
-        text_w = max(
-            max(fm.horizontalAdvance(s) for s in probes),
-            row_pair_w,
-        )
-        # Card internal padding: 14px left + 14px right (see _build).
-        # Widget outer margins: ~8px + ~8px = 16.
-        # Total horizontal chrome to add: 14+14+16 = 44.
-        # Extra breathing room so nothing touches: +12.
-        min_w = max(460, text_w + 44 + 12)
-        # Vertical floor: needs room for 4 tier cards + chrome. 420px gives
-        # ~75px per card which is the minimum for bar + ghost + sparkline +
-        # pacing-label readability.
-        min_h = 420
+        text_w = max(fm.horizontalAdvance(s) for s in probes)
+        # +24 horizontal padding (12px on each side of the content area),
+        # +32 for the sparkline area we want to preserve.
+        min_w = max(380, text_w + 24 + 32)
+        # Vertical floor: needs room for 4 tier cards + chrome. 520px
+        # matches the initial resize(420, 540) default minus the
+        # decoration — at that height every card gets enough room for
+        # its 4 internal rows without squishing.
+        min_h = 520
         self.setMinimumSize(min_w, min_h)
 
     def _resize_zone(self, pos) -> Optional[str]:
