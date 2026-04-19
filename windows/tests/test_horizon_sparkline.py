@@ -6,13 +6,14 @@ soft backgrounds. More information per pixel than a line chart,
 without the visual noise of a histogram.
 """
 
-import pytest
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 
 
-def test_horizon_mode_is_recognized():
+def test_horizon_mode_is_recognized(qtbot):
     from sanduhr.sparkline import Sparkline
     s = Sparkline()
+    qtbot.addWidget(s)
     s.set_mode("horizon")
     assert s._mode == "horizon"
 
@@ -55,3 +56,49 @@ def test_line_mode_still_works(qtbot):
     s.set_mode("line")
     pm = QPixmap(s.size())
     s.render(pm)
+
+
+def test_horizon_peaks_render_darker_than_lulls(qtbot):
+    """The core visual claim of the horizon chart is that peaks accumulate
+    alpha (multiple bands overlap) while lulls render single-band-soft.
+    Sample a peak column vs a lull column and confirm the peak column
+    contains more ink.
+
+    Note: QWidget.render() flattens to opaque so we can't measure alpha
+    directly. Instead we paint white ink over the black-flattened
+    transparent background and measure accumulated RGB brightness —
+    more overlaps = more white = higher sum."""
+    from sanduhr.sparkline import Sparkline
+    from PySide6.QtGui import QPixmap, QColor
+
+    s = Sparkline()
+    qtbot.addWidget(s)
+    s.resize(200, 40)
+    s.set_color("#ffffff")
+    # Peak in the middle, lulls at the edges
+    s.set_values([5, 5, 5, 5, 100, 100, 100, 100, 5, 5, 5, 5])
+    s.set_mode("horizon")
+
+    pm = QPixmap(s.size())
+    pm.fill(Qt.transparent)
+    s.render(pm)
+    img = pm.toImage()
+
+    mid_x = s.width() // 2
+    edge_x = 10
+
+    def column_brightness(x: int) -> int:
+        total = 0
+        for y in range(s.height()):
+            c = QColor(img.pixel(x, y))
+            total += c.red() + c.green() + c.blue()
+        return total
+
+    peak_brightness = column_brightness(mid_x)
+    lull_brightness = column_brightness(edge_x)
+
+    assert peak_brightness > lull_brightness * 1.5, (
+        f"Peak column should be substantially brighter than lull column "
+        f"(more accumulated white ink). Got peak={peak_brightness}, "
+        f"lull={lull_brightness}."
+    )
