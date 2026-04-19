@@ -1,5 +1,43 @@
 # Changelog
 
+## v2.0.4-windows — 2026-04-19
+
+**Platform:** Windows + macOS
+**Feature release — advanced pacing, deep-work focus timer, cooldown snake game, hourglass physics tightening, and sign-out flow restoration.**
+
+### Added
+
+- **Advanced pacing tools.** Cards now surface **Cooldown required** (how long at zero usage to get back on pace) and **Surplus** (burn-rate delta when under pace) as deep-math metrics. Hover-to-reveal, not click, so you can glance and move on without stacking extra clicks.
+- **Deep-work focus timer** (`⏳` in the tool strip). Replaces the tier cards with a 31×31 digitised hourglass overlay that drains in proportion to the remaining block. Inline minute-picker inside the overlay — no digging through Settings. Mac port renders via SwiftUI `Canvas` + `TimelineView`; Windows via `QPainter` + `QTimer`. Zero external dependencies on either platform.
+- **Cooldown snake game** (`🐍` in the tool strip). A pure-Qt / pure-SwiftUI snake game for the wait state when you've blown through your budget and need to kill a few minutes. High score persists to `%APPDATA%\Sanduhr\settings.json` / macOS `UserDefaults`.
+- **Graph-mode cycling** (`📊`). Cycles the tier-card graph between Classic / Projection / Pulse. `pacing.velocity_projection()` does the linear extrapolation for the Projection mode.
+- **Tool strip** between content and footer. Consolidates Themes, Settings, Graph-mode, Compact, Focus, and Snake into persistent tooltip-bearing buttons with explicit `setAccessibleName` so screen readers — and MS Store review tooling — can identify every control by name, not by emoji glyph.
+- **Sign out / clear credentials from the Credentials tab.** (Originally intended for v2.0.3 — see errata below.) Saving the Credentials form with an empty sessionKey triggers a confirmation dialog; confirming calls `credentials.clear()`, wipes `sessionKey` and `cf_clearance` from Windows Credential Manager, stops the fetcher, tears down tier cards, and sets the status to *"Signed out — paste sessionKey in Settings to resume."* Hint label under the sessionKey field advertises the behaviour so users discover it.
+
+### Fixed
+
+- **Hourglass sand-fall was drifting out of sync with wall-clock.** Two bugs in `focus._physics_tick`: (1) `elapsed` was derived from the integer-second `_remaining` counter, so the 30Hz physics tick had no sub-second resolution → sand stalled between 1Hz timer ticks and then dropped in clumps; (2) the bottleneck throttle only guarded the centre cell `(cy-1, cx)`, so diagonal falls from `(cy-1, cx±1)` into the bottom half bypassed the rate limit and the bottom half would outpace the timer over long focus blocks. Now uses `QElapsedTimer` for millisecond-resolution elapsed and throttles the entire `y == cy-1` row. Sand visibly drips in proportion to the fraction of the timer that's elapsed at all times.
+- **Compact mode now actually shrinks the window.** Previously it only hid child widgets; the frame stayed the original size, wasting desktop space. Windows: `setFixedHeight(sizeHint.height())` after `adjustSize()`. Mac: SwiftUI `fixedSize` bounding.
+- **Heartbeat pace marker is no longer clipped by the progress-bar container.** Moved from an inside-the-bar overlay to an absolute draw that protrudes a pixel above and below the bar, so it's visible at a glance regardless of fill level.
+
+### Changed
+
+- **Settings dialog tab order.** Themes first (quick win, low-stakes onboarding), Pacing + Help in the middle, Credentials last (the "spooky" one). Also dropped the `focus_minutes` option — the Focus overlay has its own inline minute-picker now — and replaced the *Auto-trigger snake* checkbox with a *Session 100% reminder* preference.
+- **Title bar chrome simplified.** Settings and Key buttons removed from the top bar, now accessible from the tool strip. Cleaner native title-bar look.
+
+### Tests
+
+- **+8 `test_focus_physics.py`** — construction, start/stop lifecycle, float-vs-int regression guard for `expected_passed`, zero-duration edge case, pre-start tick, snake construction, snake wall/self-collision.
+- **+4 `test_clear_credentials.py`** (restored from stranded commit `0a3b3d6`) — happy path, cancellation, non-blank regression, hint-label visibility.
+- **+11 Swift `UsageMathTests`** — new `mac/Tests/SanduhrTests/` target in `Package.swift` with baseline coverage for `parseISO`, `timeUntil`, `paceFrac`, `paceInfo`. Was zero Mac test coverage before — this is the scaffold to build on.
+- Full Windows suite: **173 passed**, up from 161 on the pre-v2.0.4 state.
+
+### Errata for v2.0.3
+
+The v2.0.3 CHANGELOG and Notes-to-Publisher referred to a **sign out / clear credentials** feature. That commit (`0a3b3d6`) was pushed to the `fix/dialog-light-mode-readability` branch **44 minutes after PR #14 squash-merged**, so the feature was never in the main branch and never in the `v2.0.3-windows` tag or the MSIX that was uploaded to Microsoft Partner Center. The v2.0.3 shipped artifact contains only the light-mode dialog fix. The sign-out feature lands properly in this release (v2.0.4).
+
+---
+
 ## v2.0.3-windows — 2026-04-17
 
 **Platform:** Windows
@@ -10,6 +48,8 @@
 - **Dialogs unreadable on light-mode Windows.** Microsoft Store review (device: HP 17-bs011dx) caught the first-run welcome dialog and Settings dialog rendering as dark theme text on Windows' default *light* background — because the root stylesheet scoped its background to `SanduhrWidget` only, while cascading a light text color through `QWidget { color: ... }` to every widget including dialogs. On a light-mode host, the system filled the dialog background in white, producing light-on-white invisible text. Fix: explicit `QDialog`, `QMessageBox`, `QTabWidget`, `QTabBar`, `QLineEdit`, `QTextEdit`, `QListWidget`, `QDialogButtonBox`, and `QScrollBar` rules in the main stylesheet, all bound to the active theme's `bg` / `glass` / `text` / `border` / `accent` tokens. `_open_settings_dialog` now explicitly applies the root stylesheet to the dialog before `exec_()` — QDialog is a separate top-level window so it doesn't inherit QSS from its parent automatically. The `cf_clearance` help label in the Credentials tab no longer hardcodes its grey color (was invisible on Matrix theme and on light-mode Windows).
 
 This was the root cause of the **10.1.4.4 App Quality / "Navigation of the product is poor"** finding in the last Store rejection. First-run setup is now legible regardless of the host system theme.
+
+> **Errata:** the original v2.0.3 CHANGELOG also claimed a *Sign out / clear credentials* feature in an `### Added` section. That feature's commit was stranded on the branch after squash-merge and never shipped in the v2.0.3 MSIX. It lands in v2.0.4. See the v2.0.4 errata note for the full story.
 
 ---
 
