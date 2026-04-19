@@ -230,7 +230,7 @@ class SanduhrWidget(QWidget):
         tstrip.addStretch()
         self._btn_theme.setToolTip("Themes")
         self._btn_settings.setToolTip("Settings")
-        self._btn_graph.setToolTip("Cycle graph view: Classic / Projection / Pulse")
+        self._btn_graph.setToolTip("Cycle graph view: Classic / Horizon")
         self._btn_compact.setToolTip("Compact Mode")
         self._btn_focus.setToolTip("Cooldown Timer")
         self._btn_snake.setToolTip("Play Cooldown Snake")

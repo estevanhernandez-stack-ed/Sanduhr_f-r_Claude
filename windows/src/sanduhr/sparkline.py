@@ -1,8 +1,8 @@
-"""Anti-aliased sparkline / pulse histogram widget drawn with QPainter.
+"""Anti-aliased sparkline / horizon-chart widget drawn with QPainter.
 
 Supports two visual modes:
-  - "line"  : the classic smooth sparkline curve (default)
-  - "pulse" : dense vertical bar histogram (Pulse mode)
+  - "line"    : the classic smooth sparkline curve (default)
+  - "horizon" : 4-band stacked horizon chart (dense, low noise)
 
 Paints transparently over its parent's background so it sits cleanly
 on card glass.
@@ -21,7 +21,7 @@ class Sparkline(QWidget):
         self._values: List[int] = []
         self._color = QColor("#ffffff")
         self._stroke_width = 1.5
-        self._mode = "line"  # "line" or "pulse"
+        self._mode = "line"  # "line" or "horizon"
         self.setAttribute(Qt.WA_TranslucentBackground, True)
 
     def set_values(self, values: List[int]) -> None:
@@ -37,7 +37,8 @@ class Sparkline(QWidget):
         self.update()
 
     def set_mode(self, mode: str) -> None:
-        """Switch between 'line' (classic sparkline), 'pulse' (histogram), and 'horizon' (stacked horizon chart — implementation lands in Task 2)."""
+        """Switch between 'line' (classic sparkline) and 'horizon'
+        (stacked horizon chart — dense info, low noise)."""
         self._mode = mode
         self.update()
 
@@ -50,8 +51,8 @@ class Sparkline(QWidget):
         if w < 10 or h < 4:
             return
 
-        if self._mode == "pulse":
-            self._paint_pulse(w, h)
+        if self._mode == "horizon":
+            self._paint_horizon(w, h)
         else:
             self._paint_line(w, h)
 
@@ -80,28 +81,43 @@ class Sparkline(QWidget):
         painter.drawPath(path)
         painter.end()
 
-    def _paint_pulse(self, w: int, h: int) -> None:
-        """Draw a dense bar histogram — each value becomes a vertical bar."""
-        mn = min(self._values)
-        mx = max(self._values)
-        rng = (mx - mn) if mx != mn else 1
+    def _paint_horizon(self, w: int, h: int) -> None:
+        """Horizon chart — stack 4 alpha-bands of the history.
+
+        Each value is quantized into 4 bands at 25% intervals. Bands are
+        drawn in order dark → light with increasing alpha, so peaks in
+        the history pile up multiple overlapping bands and read as
+        dense dark regions, while quiet stretches render as a single
+        soft band."""
+        mn = 0  # horizon bands are absolute percentage, not normalized
+        mx = 100
+        rng = mx - mn
 
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, False)
 
         n = len(self._values)
-        gap = 1  # 1px gap between bars
-        bar_w = max(1, (w - (n - 1) * gap) / n)
-
-        for i, v in enumerate(self._values):
-            norm = (v - mn) / rng  # 0..1
-            bar_h = max(1, int(norm * (h - 2)))
-            x = int(i * (bar_w + gap))
-            y = h - bar_h
-
-            # Subtle alpha gradient from bottom (strong) to top (vivid)
+        col_w = max(1, w / n)
+        bands = 4
+        for band in range(bands):
+            band_floor = mn + (rng * band / bands)
+            band_ceil = mn + (rng * (band + 1) / bands)
+            # Alpha rises with band index: lowest band is softest.
+            alpha = 0.18 + 0.20 * band  # 0.18, 0.38, 0.58, 0.78
             c = QColor(self._color)
-            c.setAlphaF(0.4 + 0.6 * norm)
-            painter.fillRect(int(x), int(y), max(1, int(bar_w)), bar_h, c)
+            c.setAlphaF(alpha)
+
+            for i, v in enumerate(self._values):
+                if v <= band_floor:
+                    continue
+                # How much of this band does v fill?
+                fill = min(v, band_ceil) - band_floor
+                fill_ratio = fill / (band_ceil - band_floor)
+                bar_h = max(1, int(fill_ratio * (h / bands)))
+                x = int(i * col_w)
+                # Band is anchored to bottom of widget, stacked upward
+                band_bottom = h - (band * (h / bands))
+                y = int(band_bottom - bar_h)
+                painter.fillRect(x, y, max(1, int(col_w)), bar_h, c)
 
         painter.end()
