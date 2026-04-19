@@ -234,6 +234,16 @@ class SanduhrWidget(QWidget):
         self._btn_compact.setToolTip("Compact Mode")
         self._btn_focus.setToolTip("Cooldown Timer")
         self._btn_snake.setToolTip("Play Cooldown Snake")
+        # Accessible names — screen readers and MS Store review tooling look at
+        # these. The emoji glyphs on their own read as "picture" or literal
+        # unicode code points, which is what MS Store graded as "poor
+        # navigation" in the v2.0.1 rejection. Same lesson applies here.
+        self._btn_theme.setAccessibleName("Themes")
+        self._btn_settings.setAccessibleName("Settings")
+        self._btn_graph.setAccessibleName("Cycle graph view")
+        self._btn_compact.setAccessibleName("Toggle compact mode")
+        self._btn_focus.setAccessibleName("Cooldown timer")
+        self._btn_snake.setAccessibleName("Play cooldown snake game")
         self._btn_theme.clicked.connect(self._show_theme_menu)
         self._btn_settings.clicked.connect(self._open_settings_dialog)
         self._btn_graph.clicked.connect(self._cycle_graph_view)
@@ -808,6 +818,7 @@ class SanduhrWidget(QWidget):
             settings=self._settings,
         )
         dlg.credentialsSaved.connect(self._on_credentials_saved)
+        dlg.credentialsCleared.connect(self._on_credentials_cleared)
         dlg.themesChanged.connect(self._rebuild_theme_strip)
         dlg.settingsSaved.connect(self._on_settings_saved)
         dlg.setStyleSheet(self.styleSheet())
@@ -817,6 +828,22 @@ class SanduhrWidget(QWidget):
         self._clear_preview()
         self._start_or_update_fetcher(session_key, cf_clearance)
         self._request_refresh()
+
+    def _on_credentials_cleared(self) -> None:
+        """User signed out via blank-sessionKey save in the Settings dialog.
+        Point the fetcher at empty credentials (it'll 401 on next poll,
+        harmless), tear down any tier cards so stale data doesn't linger,
+        and tell the user how to resume."""
+        if self._fetcher is not None:
+            self._fetcher.update_credentials("", None)
+        for tier_key in list(self._tier_cards.keys()):
+            card = self._tier_cards.pop(tier_key)
+            self._cards_layout.removeWidget(card)
+            card.setParent(None)
+            card.deleteLater()
+        self._status_lbl.setText(
+            "Signed out — paste sessionKey in Settings to resume."
+        )
 
     def _on_settings_saved(self, new_settings: dict) -> None:
         self._settings.update(new_settings)
