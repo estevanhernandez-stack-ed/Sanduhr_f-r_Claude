@@ -59,3 +59,29 @@ def test_breath_default_period(qtbot):
     qtbot.addWidget(card)
     # 2800ms default feels alive but calm
     assert card._breath_period_ms == 2800
+
+
+def test_breath_renders_without_crash(qtbot):
+    """Smoke test — the breath overlay must not raise when painted at
+    typical sizes and utilizations. Matches the shape of Task 2's
+    `test_horizon_renders_without_crash`."""
+    from sanduhr.tiers import TierCard
+    from PySide6.QtGui import QPixmap
+
+    card = TierCard(tier_key="five_hour", label="Session", theme=_obsidian())
+    qtbot.addWidget(card)
+    card.resize(300, 80)
+
+    # Simulate a typical mid-session state so the breath overlay has
+    # something to paint (guard requires _util > 0).
+    from datetime import datetime, timezone, timedelta
+    future = datetime.now(timezone.utc) + timedelta(hours=2.5)
+    card.update_state(
+        util=50,
+        resets_at=future.isoformat().replace("+00:00", "Z"),
+        history_values=[],
+    )
+
+    pm = QPixmap(card.size())
+    card.render(pm)
+    assert not pm.isNull()

@@ -30,6 +30,8 @@ from sanduhr.sparkline import Sparkline
 _GRAPH_MODES = ["classic", "horizon"]
 _current_graph_mode = "classic"
 
+_BREATH_TIMER_INTERVAL_MS = 66  # ~15fps, trivial CPU
+
 
 def cycle_graph_mode() -> str:
     """Advance the shared graph mode and return the new mode name."""
@@ -69,7 +71,7 @@ class TierCard(QFrame):
         self._breath_elapsed.start()
 
         self._breath_timer = QTimer(self)
-        self._breath_timer.setInterval(66)  # ~15fps — enough for smooth breath, trivial CPU
+        self._breath_timer.setInterval(_BREATH_TIMER_INTERVAL_MS)
         self._breath_timer.timeout.connect(self._tick_breath)
         self._breath_timer.start()
 
@@ -290,6 +292,26 @@ class TierCard(QFrame):
             radius = self._theme.get("card_corner_radius", 10) - 1
             painter.drawRoundedRect(r, radius, radius)
 
+        # Breathing-glass overlay — a slow sine alpha wash on top of the bar
+        # fill. Amplitude 0.08 keeps it visible but subliminal; anything
+        # higher reads as flicker. Drawn before the ghost so the ghost tick
+        # always composites on top (it's the higher-priority signal).
+        if self._bar_container.width() > 0 and self._util > 0:
+            amp = 0.08
+            # sin returns [-1,1] → scale to [0, 2*amp] and center on amp so
+            # brightness pulses above and below the resting bar.
+            breath_alpha = amp + amp * math.sin(self._breath_phase)
+            overlay = QColor(self._theme.get("accent", self._theme["text"]))
+            overlay.setAlphaF(breath_alpha)
+            util_frac = min(1.0, max(0.0, self._util / 100.0))
+            painter.fillRect(
+                self._bar_container.x(),
+                self._bar_container.y(),
+                int(self._bar_container.width() * util_frac),
+                self._bar_container.height(),
+                overlay,
+            )
+
         # Always-on pace ghost — a thin outlined rectangle at x=ghost_frac*bar_w.
         # Reads as: "where pace says you should be right now." Real fill sits
         # to the left (under pace), at (on pace), or to the right (ahead).
@@ -311,24 +333,6 @@ class TierCard(QFrame):
             painter.drawLine(
                 ghost_x, bar_y - protrude,
                 ghost_x, bar_y + bar_h + protrude,
-            )
-
-        # Breathing-glass overlay — a slow sine alpha wash on top of the bar
-        # fill. Amplitude 0.08 keeps it visible but subliminal; anything
-        # higher reads as flicker.
-        if self._bar_container.width() > 0 and self._util > 0:
-            amp = 0.08
-            # sin returns [-1,1] → scale to [0, 2*amp] and center on amp so
-            # brightness pulses above and below the resting bar.
-            breath_alpha = amp + amp * math.sin(self._breath_phase)
-            overlay = QColor(self._theme["text"])
-            overlay.setAlphaF(breath_alpha)
-            painter.fillRect(
-                self._bar_container.x(),
-                self._bar_container.y(),
-                int(self._bar_container.width() * (self._util / 100.0)),
-                self._bar_container.height(),
-                overlay,
             )
 
         painter.end()

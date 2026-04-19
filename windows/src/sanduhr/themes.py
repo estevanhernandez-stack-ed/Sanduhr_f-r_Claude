@@ -144,6 +144,7 @@ THEMES = {
         "monospace_font": "Cascadia Code",
         "monospace_fallback": "Consolas",
         "card_corner_radius": 2,
+        "breath_period_ms": 1800,
     },
     "blueprint": {
         "name": "Blueprint",
