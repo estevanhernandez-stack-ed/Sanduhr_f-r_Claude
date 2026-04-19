@@ -4,7 +4,7 @@ Replaces the tier cards with a single glowing circle tracking a distraction-free
 work block.
 """
 
-from PySide6.QtCore import Qt, QTimer, Signal, QRectF
+from PySide6.QtCore import Qt, QTimer, QElapsedTimer, Signal, QRectF
 from PySide6.QtGui import QPainter, QPen, QColor, QFont, QBrush
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QSpinBox, QHBoxLayout, QPushButton
 import random
@@ -16,16 +16,24 @@ class FocusTimerWidget(QWidget):
         super().__init__(parent)
         self._theme = theme
         self._duration_secs = 25 * 60
+        self._duration_ms = self._duration_secs * 1000
         self._remaining = self._duration_secs
-        
+
+        # Wall-clock elapsed timer — drives the sand-fall rate with
+        # millisecond resolution. The 1Hz `_tick` only owns the visible
+        # label countdown; physics computes its own elapsed to avoid the
+        # visible stutter that happens when expected_passed is quantized
+        # to integer seconds.
+        self._elapsed = QElapsedTimer()
+
         self.setMinimumHeight(240)
         self._setup_ui()
         self._init_physics()
-        
+
         self._timer = QTimer(self)
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self._tick)
-        
+
         self._physics_timer = QTimer(self)
         self._physics_timer.setInterval(33)  # ~30fps physics update
         self._physics_timer.timeout.connect(self._physics_tick)
@@ -112,10 +120,12 @@ class FocusTimerWidget(QWidget):
 
     def start(self, minutes: int) -> None:
         self._duration_secs = minutes * 60
+        self._duration_ms = self._duration_secs * 1000
         self._remaining = self._duration_secs
         self._setup_row.hide()
         self._init_physics()
         self._update_label()
+        self._elapsed.start()
         self._timer.start()
         self._physics_timer.start()
         self.update()
@@ -123,6 +133,7 @@ class FocusTimerWidget(QWidget):
     def stop(self) -> None:
         self._timer.stop()
         self._physics_timer.stop()
+        self._elapsed.invalidate()
         self._setup_row.show()
         self._remaining = 0
         self.update()
@@ -144,11 +155,16 @@ class FocusTimerWidget(QWidget):
         self._lbl_time.setText(f"{m:02d}:{s:02d}")
 
     def _physics_tick(self) -> None:
-        if self._remaining <= 0:
+        if self._remaining <= 0 or not self._elapsed.isValid() or self._duration_ms <= 0:
             return
 
-        elapsed = self._duration_secs - self._remaining
-        expected_passed = int((elapsed / self._duration_secs) * self._total_sand)
+        # Wall-clock elapsed (milliseconds). Float ratio, no truncation —
+        # the bottleneck throttle can now decide grain-by-grain whether
+        # the next fall-through is "on schedule," not just once per
+        # integer second. Visibly: sand drips in proportion to the
+        # fraction of the timer that's elapsed at all times.
+        elapsed_ms = self._elapsed.elapsed()
+        expected_passed = (elapsed_ms / self._duration_ms) * self._total_sand
 
         moved_any = False
         # Sweep bottom up so particles at the bottom fall first making room
@@ -157,17 +173,23 @@ class FocusTimerWidget(QWidget):
                 if not self._grid[y][x]:
                     continue
 
-                # Throttle the bottleneck
-                if y == self._cy - 1 and x == self._cx:
-                    if self._sand_passed >= expected_passed:
-                        continue
-                    
+                # Any grain at y == cy-1 is about to cross into the
+                # bottom half of the hourglass. That's the bottleneck
+                # — throttle every such move (center column AND the two
+                # diagonal neighbours), not just the center cell. The
+                # old version only checked (cy-1, cx), so diagonal
+                # entries from (cy-1, cx-1) / (cy-1, cx+1) bypassed the
+                # rate limit and the sand could outpace wall-clock.
+                entering_bottom_half = (y == self._cy - 1)
+                if entering_bottom_half and self._sand_passed >= expected_passed:
+                    continue
+
                 # 1. Try directly below
                 if self._mask[y+1][x] and not self._grid[y+1][x]:
                     self._grid[y][x] = False
                     self._grid[y+1][x] = True
                     moved_any = True
-                    if y == self._cy - 1 and x == self._cx:
+                    if entering_bottom_half:
                         self._sand_passed += 1
                 else:
                     # 2. Try falling down-diagonal
@@ -178,7 +200,7 @@ class FocusTimerWidget(QWidget):
                             self._grid[y][x] = False
                             self._grid[y+1][nx] = True
                             moved_any = True
-                            if y == self._cy - 1 and x == self._cx:
+                            if entering_bottom_half:
                                 self._sand_passed += 1
                             break
 
