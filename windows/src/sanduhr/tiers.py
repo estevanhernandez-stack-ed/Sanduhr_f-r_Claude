@@ -7,9 +7,10 @@ fill, border, shadow, inner highlight) based on the theme's
 glass-tuning dials.
 """
 
+import math
 from typing import List, Optional
 
-from PySide6.QtCore import Qt, QEvent
+from PySide6.QtCore import Qt, QEvent, QTimer, QElapsedTimer
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame,
@@ -61,6 +62,16 @@ class TierCard(QFrame):
         self._show_deep_math = False
         self._ghost_frac: Optional[float] = None
         self._ghost_alpha: float = 0.35
+
+        self._breath_phase: float = 0.0
+        self._breath_period_ms: int = 2800
+        self._breath_elapsed = QElapsedTimer()
+        self._breath_elapsed.start()
+
+        self._breath_timer = QTimer(self)
+        self._breath_timer.setInterval(66)  # ~15fps — enough for smooth breath, trivial CPU
+        self._breath_timer.timeout.connect(self._tick_breath)
+        self._breath_timer.start()
 
         self._build()
         self.apply_theme(theme)
@@ -114,6 +125,7 @@ class TierCard(QFrame):
         self._apply_shadow()
         self._bar.setStyleSheet(self._bar_qss(themes.usage_color(self._util)))
         self._ghost_alpha = float(theme.get("ghost_alpha", 0.35))
+        self._breath_period_ms = int(theme.get("breath_period_ms", 2800))
 
     # -- for tests -------------------------------------------------
 
@@ -197,6 +209,12 @@ class TierCard(QFrame):
                 self._update_pace_lbl()
                 return True
         return super().eventFilter(obj, event)
+
+    def _tick_breath(self) -> None:
+        """Advance the sin-wave phase driving the bar's alpha modulation."""
+        t_ms = self._breath_elapsed.elapsed() % self._breath_period_ms
+        self._breath_phase = (t_ms / self._breath_period_ms) * 2.0 * math.pi
+        self.update()
 
     def _update_pace_lbl(self) -> None:
         if self._show_deep_math:
@@ -293,6 +311,24 @@ class TierCard(QFrame):
             painter.drawLine(
                 ghost_x, bar_y - protrude,
                 ghost_x, bar_y + bar_h + protrude,
+            )
+
+        # Breathing-glass overlay — a slow sine alpha wash on top of the bar
+        # fill. Amplitude 0.08 keeps it visible but subliminal; anything
+        # higher reads as flicker.
+        if self._bar_container.width() > 0 and self._util > 0:
+            amp = 0.08
+            # sin returns [-1,1] → scale to [0, 2*amp] and center on amp so
+            # brightness pulses above and below the resting bar.
+            breath_alpha = amp + amp * math.sin(self._breath_phase)
+            overlay = QColor(self._theme["text"])
+            overlay.setAlphaF(breath_alpha)
+            painter.fillRect(
+                self._bar_container.x(),
+                self._bar_container.y(),
+                int(self._bar_container.width() * (self._util / 100.0)),
+                self._bar_container.height(),
+                overlay,
             )
 
         painter.end()
