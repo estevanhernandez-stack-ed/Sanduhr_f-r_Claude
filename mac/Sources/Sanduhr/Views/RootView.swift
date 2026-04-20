@@ -86,8 +86,13 @@ struct RootView: View {
             Spacer(minLength: 0)
             FooterView(vm: vm)
         }
-        .frame(width: 340)
-        .fixedSize(horizontal: true, vertical: true)
+        // Edge-drag resize: allow the VStack to fill whatever window size
+        // the user drags to, down to a usable floor (matches NSPanel.minSize
+        // in AppDelegate). Previously pinned to 340×intrinsic via
+        // `.fixedSize`; that made edge-drag resize a no-op on the SwiftUI
+        // side even after the NSPanel accepted it.
+        .frame(minWidth: 340, maxWidth: .infinity,
+               minHeight: 480, maxHeight: .infinity, alignment: .top)
         // The full macOS glass stack: NSVisualEffectView behind the window
         // blurs whatever's underneath; a very faint theme tint adds mood
         // without killing the transparency; a hairline white inner stroke
