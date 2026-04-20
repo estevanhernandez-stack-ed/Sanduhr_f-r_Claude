@@ -42,9 +42,13 @@ class HourglassEngine: ObservableObject {
         }
     }
     
-    func tickPhysics(remaining: Int) {
+    /// Progress sand one frame. `elapsedSecs` is wall-clock elapsed time
+    /// since `start()` — a Double, not the integer-second countdown —
+    /// so the grain flow advances sub-second instead of stuttering once
+    /// per second. Parity fix with Windows commit 455e58d.
+    func tickPhysics(elapsedSecs: Double) {
         if durationSecs == 0 { return }
-        let expectedPassed = Int((Double(durationSecs - remaining) / Double(durationSecs)) * Double(totalSand))
+        let expectedPassed = Int((elapsedSecs / Double(durationSecs)) * Double(totalSand))
         
         for y in stride(from: gh - 2, through: 0, by: -1) {
             for x in 0..<gw {
@@ -108,6 +112,7 @@ struct FocusView: View {
     @State private var remainingSeconds: Int = 0
     @State private var isRunning = false
     @State private var focusMinutes: Int = 25
+    @State private var startDate: Date?
     @StateObject private var engine = HourglassEngine()
     
     let timer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
@@ -125,12 +130,14 @@ struct FocusView: View {
                             engine.draw(context: &context, size: size, palette: t)
                         }
                         .onChange(of: timeline.date) { _, newDate in
+                            guard let start = startDate else { return }
                             let throttle: TimeInterval = 1.0 / 30.0
-                            if let last = engine.lastUpdate, newDate.timeIntervalSince(last) < throttle {
+                            if let last = engine.lastUpdate,
+                               newDate.timeIntervalSince(last) < throttle {
                                 return
                             }
                             engine.lastUpdate = newDate
-                            engine.tickPhysics(remaining: remainingSeconds)
+                            engine.tickPhysics(elapsedSecs: newDate.timeIntervalSince(start))
                         }
                     }
                     .frame(width: 140, height: 140)
@@ -197,6 +204,7 @@ struct FocusView: View {
     private func start() {
         remainingSeconds = max(1, focusMinutes * 60)
         engine.reset(duration: remainingSeconds)
+        startDate = Date()
         withAnimation(.easeInOut(duration: 0.3)) {
             isRunning = true
         }
