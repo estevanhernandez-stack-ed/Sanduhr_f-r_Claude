@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sanduhr für Claude — usage widget for Claude.ai power users</title>
-  <meta name="description" content="Native Windows 11 glass widget that turns your Claude.ai subscription usage into something you can actually pace yourself by. Burn-rate projections, pace markers, sparklines, five glass themes, user-authorable palettes." />
+  <meta name="description" content="Native Windows 11 and macOS glass widget that turns your Claude.ai subscription usage into something you can actually pace yourself by. Burn-rate projections, pace ghost, horizon sparklines, deep-work focus timer, cooldown snake game, five glass themes, user-authorable palettes." />
   <meta name="theme-color" content="#0f182b" />
   <meta name="color-scheme" content="dark" />
 
@@ -610,7 +610,7 @@
   <section class="hero">
     <div class="container">
       <h1>Pace yourself on claude.ai.</h1>
-      <p class="tagline">A native desktop widget for Windows 11 and macOS that turns your Claude subscription usage into something you can actually pace yourself by — burn rate, pace markers, sparkline trends, and five hand-tuned glass themes on both platforms.</p>
+      <p class="tagline">A native desktop widget for Windows 11 and macOS that turns your Claude subscription usage into something you can actually pace yourself by — burn rate, pace ghost, horizon sparklines, a deep-work hourglass timer, a cooldown snake game, and five hand-tuned glass themes on both platforms.</p>
       <p class="sub">Independent third-party tool. Not affiliated with Anthropic. Requires an active Claude Pro, Team, or Enterprise subscription.</p>
       <div class="ctas">
         <a class="btn primary" href="#download">Download ↓</a>
@@ -634,7 +634,7 @@
       <div class="platform-grid">
 
         <div class="platform-card">
-          <h3>Windows <span class="badge">v2.0.2 · native</span></h3>
+          <h3>Windows <span class="badge">v2.0.4 · native</span></h3>
           <p class="meta">Win11 (Mica glass) &middot; Win10 solid-color fallback &middot; PySide6 / Qt 6 &middot; PyInstaller one-folder + Inno Setup installer.</p>
           <div class="actions">
             <a class="primary" href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/latest">Download .exe</a>
@@ -675,12 +675,28 @@
           <p>&ldquo;You&rsquo;ll hit your weekly cap in ~4h 22m at current pace.&rdquo; Know before you run dry.</p>
         </div>
         <div class="feature">
-          <h4>Pace markers</h4>
-          <p>Bright ticks on every bar show where &ldquo;on pace&rdquo; is <em>right now</em> &mdash; pace by eye, no math.</p>
+          <h4>Pace ghost</h4>
+          <p>A thin tick on every bar shows where pace says usage <em>should</em> be right now. Real fill sits to the left (under pace) or right (ahead) &mdash; pace by eye, no math.</p>
         </div>
         <div class="feature">
-          <h4>Sparkline history</h4>
-          <p>2-hour utilization trend inline on every tier card, updated every 5 minutes.</p>
+          <h4>Horizon sparkline</h4>
+          <p>Heer/Tufte 4-band stacked horizon of your last 2 hours. Peaks accumulate into dense dark regions, lulls wash soft. Denser information than a line chart, same pixel budget.</p>
+        </div>
+        <div class="feature">
+          <h4>Deep-work focus timer</h4>
+          <p>Swap the tier cards for a digitised 31&times;31 pixel hourglass that drains in real time. Inline minute picker, zero external dependencies.</p>
+        </div>
+        <div class="feature">
+          <h4>Cooldown snake game</h4>
+          <p>Pure-Qt/pure-SwiftUI snake for when you&rsquo;ve blown through your budget and need to kill a few minutes. Persistent high score.</p>
+        </div>
+        <div class="feature">
+          <h4>Breathing glass</h4>
+          <p>Bars pulse subliminally toward each theme&rsquo;s accent color. The widget feels alive at rest; the effect is deliberately below the threshold of flicker.</p>
+        </div>
+        <div class="feature">
+          <h4>Edge-drag resize</h4>
+          <p>Hover any edge or corner, cursor changes, click-drag. Minimum bounds track your font metrics so text never clips. New geometry persists across launches.</p>
         </div>
         <div class="feature">
           <h4>User-authorable themes</h4>

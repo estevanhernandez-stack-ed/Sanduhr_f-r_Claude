@@ -57,16 +57,21 @@ Most accounts don't need this.
 
 ## Controls
 
-| Gesture                     | Action                       |
-| --------------------------- | ---------------------------- |
-| Drag anywhere               | Move the widget              |
-| Double-click title          | Toggle compact mode          |
-| Click theme name            | Switch theme                 |
-| **Pin** button              | Toggle always-on-top         |
-| **Refresh** button          | Fetch usage now              |
-| **Key** button              | Open credentials sheet       |
-| Right-click widget          | Refresh / Compact / Quit menu|
-| **×**                       | Quit                         |
+| Gesture                     | Action                              |
+| --------------------------- | ----------------------------------- |
+| Drag anywhere               | Move the widget                     |
+| Drag any edge or corner     | Resize the widget                   |
+| Double-click title          | Toggle compact mode                 |
+| Click theme name            | Switch theme                        |
+| **Focus** button            | Swap tier cards for hourglass timer |
+| **Snake** button            | Play the cooldown snake game        |
+| **Graph** button            | Cycle sparkline: Classic / Horizon  |
+| **Pin** button              | Toggle always-on-top                |
+| **Refresh** button          | Fetch usage now                     |
+| **Key** button              | Open credentials sheet              |
+| Hover a tier card           | Reveal cooldown / surplus metrics   |
+| Right-click widget          | Refresh / Compact / Quit menu       |
+| **×**                       | Quit                                |
 
 ## License
 
