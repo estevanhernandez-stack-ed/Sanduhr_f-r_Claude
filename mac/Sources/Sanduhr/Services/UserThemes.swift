@@ -77,6 +77,10 @@ private struct ThemeDTO: Decodable {
     let optsOutOfMica: Bool?
     let monospaceFont: String?
 
+    // Optional v2.0.4 dials.
+    let ghostAlpha: Double?
+    let breathPeriodMs: Int?
+
     struct AccentBloomDTO: Decodable {
         let blur: Double
         let alpha: Double
@@ -110,6 +114,8 @@ private struct ThemeDTO: Decodable {
                 innerHighlight: innerHighlight.map {
                     .init(color: .hex($0.color), alpha: $0.alpha)
                 },
-                cardCornerRadius: cardCornerRadius.map { CGFloat($0) } ?? 10))
+                cardCornerRadius: cardCornerRadius.map { CGFloat($0) } ?? 10,
+                ghostAlpha: ghostAlpha ?? 1.0,
+                breathPeriodMs: breathPeriodMs ?? 2800))
     }
 }
