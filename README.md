@@ -34,13 +34,27 @@ markers, sparkline trends, and five hand-tuned glass themes.
 
 ### macOS — native SwiftUI
 
-Download the latest **`Sanduhr.dmg`** from [Releases](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases) and drag to Applications.
+**Via Homebrew** (recommended):
+
+```sh
+brew tap estevanhernandez-stack-ed/tap
+brew install --cask sanduhr
+```
+
+**Via DMG**: download the latest **`Sanduhr.dmg`** from [Releases][releases]
+and drag to Applications.
 
 - Developer ID signed + Apple-notarized → no Gatekeeper warnings.
 - NSVisualEffectView vibrancy, Keychain-backed credentials.
-- Auto-updates via [Sparkle](https://sparkle-project.org) (24h check interval).
-- Homebrew cask manifest at [`docs/distribution/sanduhr.rb`](docs/distribution/sanduhr.rb); submission to `homebrew-cask` pending a tagged Mac release.
-- Requires **macOS 11 (Big Sur)** or newer.
+- Auto-updates via [Sparkle](https://sparkle-project.org) (24h check
+  interval); `brew upgrade --cask sanduhr` also works.
+- Cask lives in [the personal tap][tap]. Submission to core
+  `Homebrew/homebrew-cask` is pending the project's notability bar
+  (90 forks / 90 watchers / 225 stars).
+- Requires **macOS 14 (Sonoma)** or newer.
+
+[releases]: https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases
+[tap]: https://github.com/estevanhernandez-stack-ed/homebrew-tap
 
 ### Windows 11 — native PySide6
 
@@ -177,7 +191,8 @@ Full keybindings documented in the in-app **Settings → Help** tab.
 ### Up next
 
 - [ ] Microsoft Store listing live (in review)
-- [ ] Homebrew cask submission (pending first tagged Mac release)
+- [x] Homebrew install available via `estevanhernandez-stack-ed/tap` ([repo](https://github.com/estevanhernandez-stack-ed/homebrew-tap))
+- [ ] Homebrew cask submission to core `Homebrew/homebrew-cask` (pending notability bar)
 - [ ] winget manifest (pending MS Store cert)
 - [ ] Historical usage dashboard with CSV export
 - [ ] Auto-start on boot (native builds)
