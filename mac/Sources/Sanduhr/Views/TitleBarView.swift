@@ -1,74 +1,67 @@
 import SwiftUI
 import AppKit
 
-/// Title bar with app name + Key / Refresh / Pin / Close buttons.
-/// Dragging the title bar moves the window; double-click toggles compact mode.
-/// Mirrors sanduhr.py:300-322.
+/// Mac-style header: traffic-light red close button on the left, app name
+/// next to it, and a large draggable area filling the rest. Double-click
+/// anywhere on the drag area toggles compact mode. Keyboard/mouse chrome
+/// lives in `ActionIconRow` below the tier cards now — this bar is just
+/// close + label + drag.
 struct TitleBarView: View {
     @Bindable var vm: UsageViewModel
-    var onShowSettings: () -> Void
-    var onToggleFocus: () -> Void
-    var onToggleSnake: () -> Void
-    var onRefresh: () -> Void
     var onClose: () -> Void
 
     var body: some View {
         let t = vm.theme.palette
-        HStack(spacing: 0) {
+        HStack(spacing: 8) {
+            TrafficLightCloseButton(action: onClose)
+                .padding(.leading, 10)
+
             Text("Sanduhr")
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(t.text)
-                .padding(.leading, 10)
 
-            // Draggable spacer — grabs the window by anywhere here.
+            // Draggable spacer — claims the rest of the row so the user can
+            // grab the widget anywhere to move it.
             Rectangle()
                 .fill(Color.clear)
                 .contentShape(Rectangle())
                 .onTapGesture(count: 2) { vm.compact.toggle() }
-            
-            tbButton("⚙", color: t.textDim, action: onShowSettings)
-            tbButton("↕", color: t.textDim) { vm.compact.toggle() }
-            tbButton("⏳", color: t.textDim, action: onToggleFocus)
-            tbButton("🐍", color: t.textDim, action: onToggleSnake)
-            tbButton("↻", color: t.textDim, action: onRefresh)
-            // Different labels so the pin state is readable at a glance.
-            tbButton(vm.pinned ? "Pinned" : "Pin",
-                     color: vm.pinned ? t.accent : t.textMuted,
-                     bold: vm.pinned) {
-                vm.pinned.toggle()
-                DispatchQueue.main.async { applyPinnedState() }
-            }
-            tbButton("×", color: .hex("f87171"), action: onClose)
-                .padding(.trailing, 2)
         }
         .frame(height: 28)
         .background(
-            // Subtle gradient in the title bar for depth.
             LinearGradient(
                 colors: [t.titleBg, t.titleBg.opacity(0.88)],
                 startPoint: .top, endPoint: .bottom))
     }
+}
 
-    @ViewBuilder
-    private func tbButton(_ label: String, color: Color, bold: Bool = false,
-                          action: @escaping () -> Void) -> some View {
+/// Apple-style red close button — 12×12 gradient disc with a subtle stroke,
+/// showing a small `×` glyph on hover. Click hides the panel via `onClose`.
+private struct TrafficLightCloseButton: View {
+    var action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
         Button(action: action) {
-            Text(label)
-                .font(.system(size: 9, weight: bold ? .bold : .regular))
-                .foregroundStyle(color)
-                .padding(.horizontal, 6)
-                .frame(maxHeight: .infinity)
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(
+                        colors: [Color(red: 1.00, green: 0.37, blue: 0.37),
+                                 Color(red: 0.92, green: 0.28, blue: 0.28)],
+                        startPoint: .top, endPoint: .bottom))
+                    .frame(width: 12, height: 12)
+                    .overlay(
+                        Circle().strokeBorder(Color.black.opacity(0.18),
+                                              lineWidth: 0.5))
+                if hovering {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(.black.opacity(0.55))
+                }
+            }
         }
         .buttonStyle(.plain)
-    }
-
-    /// Toggles both `level` AND `isFloatingPanel` — the latter forces always-
-    /// on-top behavior on NSPanel regardless of level, so we have to flip it
-    /// alongside. Without this, "unpin" had no visible effect.
-    private func applyPinnedState() {
-        guard let panel = NSApp.windows.compactMap({ $0 as? FloatingPanel }).first
-        else { return }
-        panel.isFloatingPanel = vm.pinned
-        panel.level = vm.pinned ? .floating : .normal
+        .onHover { hovering = $0 }
+        .help("Close")
     }
 }

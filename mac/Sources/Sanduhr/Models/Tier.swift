@@ -20,7 +20,7 @@ enum Tier: String, CaseIterable, Codable, Hashable {
         case .sevenDaySonnet:    return "Weekly — Sonnet"
         case .sevenDayOpus:      return "Weekly — Opus"
         case .sevenDayCowork:    return "Weekly — Cowork"
-        case .sevenDayOmelette:  return "Weekly — Routines"
+        case .sevenDayOmelette:  return "Weekly — Design"
         case .sevenDayOauthApps: return "Weekly — OAuth Apps"
         case .iguanaNecktie:     return "Weekly — Special"
         }

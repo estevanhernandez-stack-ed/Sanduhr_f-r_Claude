@@ -48,6 +48,93 @@ enum UserThemes {
                                              in: .userDomainMask).first!
         return base.appendingPathComponent("Sanduhr/themes", isDirectory: true)
     }
+
+    /// Clear all user-installed themes from `ThemeRegistry`, then re-read
+    /// the themes folder. Settings' **Reload** button calls this after an
+    /// install, delete, or filesystem drop-in.
+    static func reload() {
+        ThemeRegistry.clearUserThemes()
+        load()
+    }
+
+    /// List installed user theme files, sorted by filename.
+    static func listFiles() -> [URL] {
+        let dir = appSupportThemesDir()
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: nil)
+        else { return [] }
+        return files
+            .filter { $0.pathExtension.lowercased() == "json" }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+
+    /// Validate the given JSON, write it to `<filename>.json` in the themes
+    /// folder, and reload. Throws if the JSON isn't valid or doesn't match
+    /// the theme schema.
+    @discardableResult
+    static func writeTheme(json: String, filename: String) throws -> URL {
+        guard let data = json.data(using: .utf8) else {
+            throw UserThemeError.invalidText
+        }
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        _ = try decoder.decode(ThemeDTO.self, from: data) // throws on invalid
+
+        let sanitized = slugify(filename)
+        let final = sanitized.hasSuffix(".json") ? sanitized : "\(sanitized).json"
+        let dir = appSupportThemesDir()
+        try FileManager.default.createDirectory(at: dir,
+                                                 withIntermediateDirectories: true)
+        let target = dir.appendingPathComponent(final)
+
+        // Pretty-print on write so the file is human-editable later.
+        let pretty: Data
+        if let obj = try? JSONSerialization.jsonObject(with: data),
+           let out = try? JSONSerialization.data(
+                withJSONObject: obj,
+                options: [.prettyPrinted, .sortedKeys]) {
+            pretty = out
+        } else {
+            pretty = data
+        }
+        try pretty.write(to: target, options: .atomic)
+        reload()
+        return target
+    }
+
+    /// Delete a user theme file by basename (e.g. "sunset.json"), then
+    /// reload the registry.
+    static func deleteTheme(filename: String) throws {
+        let path = appSupportThemesDir().appendingPathComponent(filename)
+        try FileManager.default.removeItem(at: path)
+        reload()
+    }
+
+    /// "Sunset Neon" → "sunset-neon". Matches Windows `_slugify`.
+    static func slugify(_ name: String) -> String {
+        let lowered = name.lowercased()
+        var out = ""
+        var lastWasDash = false
+        for ch in lowered {
+            if ch.isLetter || ch.isNumber {
+                out.append(ch)
+                lastWasDash = false
+            } else if !lastWasDash {
+                out.append("-")
+                lastWasDash = true
+            }
+        }
+        return out.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+    }
+}
+
+enum UserThemeError: LocalizedError {
+    case invalidText
+    var errorDescription: String? {
+        switch self {
+        case .invalidText: return "Theme paste is empty or not UTF-8."
+        }
+    }
 }
 
 // MARK: - JSON DTO

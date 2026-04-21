@@ -189,6 +189,23 @@ struct FocusView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.vertical, 10)
+        .overlay(alignment: .topTrailing) {
+            // Always-visible exit button. Deep Work had no way out without
+            // Escape; broken Touch Bar Macs got stranded. Click to dismiss
+            // whether the timer's running or paused.
+            Button {
+                if isRunning { isRunning = false }
+                onComplete()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(t.textDim, t.glass.opacity(0.6))
+                    .font(.system(size: 18))
+            }
+            .buttonStyle(.plain)
+            .padding(8)
+            .help("Exit Deep Work")
+        }
         .onReceive(timer) { _ in
             if isRunning {
                 if remainingSeconds > 0 {

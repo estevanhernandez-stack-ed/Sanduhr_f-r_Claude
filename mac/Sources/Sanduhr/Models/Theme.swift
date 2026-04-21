@@ -94,6 +94,14 @@ enum ThemeRegistry {
         }
     }
 
+    /// Drop any theme whose id isn't one of the compiled-in built-ins.
+    /// Used before `UserThemes.load()` to ensure a deleted file's theme
+    /// actually disappears from the picker instead of sticking around.
+    static func clearUserThemes() {
+        let builtInIds = Set(builtIn.map(\.id))
+        registered.removeAll { !builtInIds.contains($0.id) }
+    }
+
     // MARK: Built-ins (port of sanduhr.py:54-90 + windows themes.py dials)
 
     private static let builtIn: [Theme] = [
