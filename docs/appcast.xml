@@ -1,11 +1,17 @@
 <?xml version="1.0" standalone="yes"?>
-<rss version="2.0"
-     xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
-     xmlns:dc="http://purl.org/dc/elements/1.1/">
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
     <channel>
         <title>Sanduhr für Claude</title>
         <link>https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude</link>
         <description>Updates for Sanduhr für Claude</description>
         <language>en</language>
+        <item>
+            <title>2.0.4</title>
+            <pubDate>Mon, 20 Apr 2026 21:02:03 -0500</pubDate>
+            <sparkle:version>2</sparkle:version>
+            <sparkle:shortVersionString>2.0.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/download/v2.0.4-mac/Sanduhr-2.0.4.dmg" length="2389192" type="application/octet-stream" sparkle:edSignature="yU8xX1POmLGWBzhCfYOrLmeSIvlrDlIsJuU6tRsDb9nEUR3TUAl5dTq9TBvfHkss/11pFLwydWYGcKhnSnFnCA=="/>
+        </item>
     </channel>
 </rss>

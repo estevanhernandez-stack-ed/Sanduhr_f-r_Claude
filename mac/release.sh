@@ -70,9 +70,12 @@ fi
 
 mkdir -p "$APPCAST_DIR"
 echo "→ Generating appcast..."
+# Sparkle's generate_appcast takes the archives dir positionally and uses
+# `-o <file>` for an explicit output path (not --output-dir, which it
+# doesn't support).
 "$GENERATE_APPCAST" "$RELEASES_DIR" \
     --download-url-prefix "$DOWNLOAD_URL_PREFIX" \
-    --output-dir "$APPCAST_DIR"
+    -o "$APPCAST_DIR/appcast.xml"
 
 cat <<DONE
 
