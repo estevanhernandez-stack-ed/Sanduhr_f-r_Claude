@@ -1,6 +1,6 @@
 cask "sanduhr" do
-  version "2.0.0"
-  sha256 "REPLACE_WITH_SHA256_OF_DMG"
+  version "2.0.4"
+  sha256 "82506e0b0ce3b05b41538ce9740d9e88ecbc459bf78553df43b2cf6db3a80522"
 
   url "https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/download/v#{version}-mac/Sanduhr-#{version}.dmg",
       verified: "github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/"
