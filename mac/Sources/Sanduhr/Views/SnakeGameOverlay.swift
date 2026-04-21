@@ -85,11 +85,11 @@ struct SnakeGameOverlay: View {
     
     var body: some View {
         let t = vm.theme.palette
-        ZStack {
+        ZStack(alignment: .topTrailing) {
             // Dim background
             t.bg.opacity(0.9)
                 .edgesIgnoringSafeArea(.all)
-                
+
             // Canvas drawing
             Canvas { context, size in
                 let boxSize = min(size.width, size.height) - 40
@@ -131,13 +131,26 @@ struct SnakeGameOverlay: View {
                 }
                 
                 if engine.isGameOver {
-                    let text = Text("GAME OVER\nPress Space to Restart\nEsc to Exit")
+                    let text = Text("GAME OVER\nPress Space to Restart\nEsc or × to Exit")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(t.textDim)
-                    
+
                     context.draw(text, at: CGPoint(x: size.width / 2, y: size.height / 2))
                 }
             }
+
+            // Exit button — touch-bar-less Macs can't reach Escape, so
+            // render a visible × in the top-right that always exits the
+            // game back to the widget.
+            Button(action: onExit) {
+                Image(systemName: "xmark.circle.fill")
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(t.textDim, t.glass.opacity(0.6))
+                    .font(.system(size: 18))
+            }
+            .buttonStyle(.plain)
+            .padding(8)
+            .help("Exit Snake")
         }
         // Local Keyboard Focus capture
         .focusable(true)

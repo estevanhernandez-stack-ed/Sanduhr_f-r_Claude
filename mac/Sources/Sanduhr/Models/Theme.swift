@@ -45,6 +45,16 @@ struct Theme: Identifiable, Hashable {
         /// sharper CRT/terminal feel.
         let cardCornerRadius: CGFloat
 
+        // v2.0.4 dials (ported from windows/src/sanduhr/themes.py).
+        /// Opacity of the always-on pace ghost tick. Windows settled on 1.0
+        /// (full opacity, paceMarker color) after a round of UX tuning; set
+        /// lower via user JSON for a more subliminal variant.
+        let ghostAlpha: Double
+        /// Breathing-glass shimmer period on the bar fill, in milliseconds.
+        /// 2800 feels like a calm inhale/exhale; Matrix runs at 1800 so the
+        /// CRT phosphor pulse feels more alive.
+        let breathPeriodMs: Int
+
         struct AccentBloom: Hashable {
             let blur: CGFloat
             let alpha: Double
@@ -84,6 +94,14 @@ enum ThemeRegistry {
         }
     }
 
+    /// Drop any theme whose id isn't one of the compiled-in built-ins.
+    /// Used before `UserThemes.load()` to ensure a deleted file's theme
+    /// actually disappears from the picker instead of sticking around.
+    static func clearUserThemes() {
+        let builtInIds = Set(builtIn.map(\.id))
+        registered.removeAll { !builtInIds.contains($0.id) }
+    }
+
     // MARK: Built-ins (port of sanduhr.py:54-90 + windows themes.py dials)
 
     private static let builtIn: [Theme] = [
@@ -105,7 +123,8 @@ enum ThemeRegistry {
                 borderTint: nil,
                 accentBloom: .init(blur: 4, alpha: 0.35),
                 innerHighlight: nil,
-                cardCornerRadius: 10)),
+                cardCornerRadius: 10,
+                ghostAlpha: 1.0, breathPeriodMs: 2800)),
         Theme(
             id: "aurora", displayName: "Aurora",
             palette: .init(
@@ -124,7 +143,8 @@ enum ThemeRegistry {
                 borderTint: .hex("38bdf8"),
                 accentBloom: .init(blur: 6, alpha: 0.55),
                 innerHighlight: .init(color: .hex("38bdf8"), alpha: 0.20),
-                cardCornerRadius: 10)),
+                cardCornerRadius: 10,
+                ghostAlpha: 1.0, breathPeriodMs: 2800)),
         Theme(
             id: "ember", displayName: "Ember",
             palette: .init(
@@ -143,7 +163,8 @@ enum ThemeRegistry {
                 borderTint: .hex("f97316"),
                 accentBloom: .init(blur: 6, alpha: 0.55),
                 innerHighlight: .init(color: .hex("f97316"), alpha: 0.18),
-                cardCornerRadius: 10)),
+                cardCornerRadius: 10,
+                ghostAlpha: 1.0, breathPeriodMs: 2800)),
         Theme(
             id: "mint", displayName: "Mint",
             palette: .init(
@@ -162,7 +183,8 @@ enum ThemeRegistry {
                 borderTint: .hex("34d399"),
                 accentBloom: .init(blur: 4, alpha: 0.35),
                 innerHighlight: .init(color: .hex("34d399"), alpha: 0.22),
-                cardCornerRadius: 10)),
+                cardCornerRadius: 10,
+                ghostAlpha: 1.0, breathPeriodMs: 2800)),
         Theme(
             id: "626-labs", displayName: "626 Labs",
             // 626 Labs brand — navy + cyan + magenta. Ported from
@@ -183,7 +205,8 @@ enum ThemeRegistry {
                 borderTint: .hex("3bb4d9"),
                 accentBloom: .init(blur: 6, alpha: 0.60),
                 innerHighlight: .init(color: .hex("7ae0f5"), alpha: 0.22),
-                cardCornerRadius: 10)),
+                cardCornerRadius: 10,
+                ghostAlpha: 1.0, breathPeriodMs: 2800)),
         Theme(
             id: "matrix", displayName: "Matrix",
             // Matrix opts out of vibrancy — overlayOpacity pushes near 1.0
@@ -205,7 +228,8 @@ enum ThemeRegistry {
                 borderTint: .hex("39ff7c"),
                 accentBloom: .init(blur: 4, alpha: 0.60),
                 innerHighlight: nil,
-                cardCornerRadius: 2)),
+                cardCornerRadius: 2,
+                ghostAlpha: 1.0, breathPeriodMs: 1800)),
         Theme(
             id: "blueprint", displayName: "Blueprint",
             palette: .init(
@@ -224,7 +248,8 @@ enum ThemeRegistry {
                 borderTint: .hex("4dffc4"),
                 accentBloom: .init(blur: 8, alpha: 0.65),
                 innerHighlight: .init(color: .hex("4dffc4"), alpha: 0.15),
-                cardCornerRadius: 10)),
+                cardCornerRadius: 10,
+                ghostAlpha: 1.0, breathPeriodMs: 2800)),
     ]
 }
 

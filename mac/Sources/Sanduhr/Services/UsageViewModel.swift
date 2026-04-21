@@ -3,6 +3,13 @@ import SwiftUI
 import Combine
 import LocalAuthentication
 
+extension Notification.Name {
+    /// Posted by `UsageViewModel` whenever `compact` flips. AppDelegate
+    /// listens so it can shrink/grow the NSPanel to match the new content
+    /// height — SwiftUI alone can't drive the underlying window size.
+    static let sanduhrCompactDidChange = Notification.Name("sanduhr.compactDidChange")
+}
+
 /// Central state for the widget. Owns the API client, refresh/countdown
 /// timers, theme + compact/pin preferences, and the last-fetched `UsageResponse`.
 @Observable
@@ -14,7 +21,14 @@ final class UsageViewModel {
         didSet { UserDefaults.standard.set(theme.id, forKey: "theme") }
     }
 
-    var compact: Bool = false              // double-click title to toggle
+    var compact: Bool = false {            // double-click title to toggle
+        didSet {
+            if oldValue != compact {
+                NotificationCenter.default.post(
+                    name: .sanduhrCompactDidChange, object: nil)
+            }
+        }
+    }
     var pinned: Bool = true                // floats on top when true
 
     // MARK: Runtime state
@@ -25,6 +39,10 @@ final class UsageViewModel {
     var history: HistoryStore.History = HistoryStore.load()
     /// Bumped every 30s so countdown labels re-render without refetching.
     var countdownTick: Int = 0
+    /// Bumped whenever the user installs/reloads/deletes a theme so the
+    /// theme dropdown re-reads `ThemeRegistry.themes`. SwiftUI can't
+    /// observe a static registry otherwise.
+    var userThemesTick: Int = 0
     /// Set to `true` externally (e.g. from the menu bar) to pop the
     /// credentials sheet on the main widget. RootView flips it back to
     /// false once it consumes the signal.

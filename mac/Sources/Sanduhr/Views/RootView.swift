@@ -24,17 +24,12 @@ struct RootView: View {
 
             TitleBarView(
                 vm: vm,
-                onShowSettings: { showSettings = true },
-                onToggleFocus: { isFocusMode.toggle() },
-                onToggleSnake: { isSnakeGameActive.toggle() },
-                onRefresh:      { Task { await vm.refresh() } },
-                // × now HIDES (status item click brings it back). Actual
-                // quit lives in the menu bar's right-click menu and the
-                // widget's own right-click context menu below.
-                onClose:        { (NSApp.delegate as? AppDelegate)?.hidePanel() }
+                // × HIDES the widget (status item click brings it back).
+                // Quit still lives in the menu-bar right-click menu and the
+                // right-click context menu below.
+                onClose: { (NSApp.delegate as? AppDelegate)?.hidePanel() }
             )
 
-            ThemeStripView(vm: vm)
             // Hairline separator — 0.5pt white at low opacity is the Mac
             // convention instead of a solid border line.
             Rectangle().fill(Color.white.opacity(0.07)).frame(height: 0.5)
@@ -83,11 +78,27 @@ struct RootView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
 
-            Spacer(minLength: 0)
+            // Bottom chrome sits directly below the last tier card. No
+            // Spacer anywhere — the window itself now auto-sizes to content
+            // height via FloatingPanel.windowWillResize + fitPanelToContent
+            // in AppDelegate, so "excess space between anything" is no
+            // longer physically possible. Horizontal drag-resize still
+            // works.
+            Rectangle().fill(Color.white.opacity(0.07)).frame(height: 0.5)
+            ThemeStripView(vm: vm)
+            ActionIconRow(
+                vm: vm,
+                onShowSettings: { showSettings = true },
+                onToggleFocus:  { isFocusMode.toggle() },
+                onToggleSnake:  { isSnakeGameActive.toggle() },
+                onRefresh:      { Task { await vm.refresh() } }
+            )
             FooterView(vm: vm)
         }
-        .frame(width: 340)
-        .fixedSize(horizontal: true, vertical: true)
+        // Width stays flexible for horizontal drag-resize; vertical goes
+        // fixed to content so there's never empty space anywhere.
+        .frame(minWidth: 340, maxWidth: .infinity, alignment: .top)
+        .fixedSize(horizontal: false, vertical: true)
         // The full macOS glass stack: NSVisualEffectView behind the window
         // blurs whatever's underneath; a very faint theme tint adds mood
         // without killing the transparency; a hairline white inner stroke

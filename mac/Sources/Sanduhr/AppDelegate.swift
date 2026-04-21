@@ -26,8 +26,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let panel = FloatingPanel(hosting: hosting)
         self.panel = panel
+        // Self-delegate so `windowWillResize` can clamp the height to
+        // content — user horizontal drag works, vertical drag snaps back
+        // so the window never gains empty space.
+        panel.delegate = panel
         panel.makeKeyAndOrderFront(nil)
         placeInTopRightCorner(panel)
+        fitPanelToContent()
 
         // Build menu bar status item.
         setupStatusItem()
@@ -35,10 +40,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Wire up status-item updates.
         viewModel.onUsageUpdate = { [weak self] in
             self?.renderStatusItem()
+            self?.fitPanelToContent()
         }
+
+        // When the user toggles compact mode, resize the panel to fit the
+        // (now much smaller) content instead of leaving an empty window.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(applyCompactState),
+            name: .sanduhrCompactDidChange, object: nil)
 
         viewModel.bootstrap()
         renderStatusItem()
+    }
+
+    /// Shrink or grow the panel so its height equals the SwiftUI
+    /// content's fitting size. Called after the model signals a change
+    /// (`onUsageUpdate`), when the user toggles compact, and at startup.
+    @objc func applyCompactState() { fitPanelToContent() }
+
+    /// Single source of truth for panel height: whatever SwiftUI's
+    /// `.fixedSize(vertical: true)` reports as the hosting-view's
+    /// fittingSize. Keeps the top edge pinned so the widget doesn't appear
+    /// to jump when its height changes.
+    func fitPanelToContent() {
+        guard let panel else { return }
+        DispatchQueue.main.async {
+            guard let content = panel.contentView else { return }
+            let fit = content.fittingSize.height
+            guard fit > 0 else { return }
+            // Allow the window to match content exactly; user horizontal
+            // drags are preserved (width stays whatever it is).
+            panel.minSize = NSSize(width: 340, height: fit)
+            if abs(panel.frame.height - fit) < 0.5 { return }
+            var frame = panel.frame
+            let delta = frame.size.height - fit
+            frame.origin.y += delta          // pin the top edge
+            frame.size.height = fit
+            panel.setFrame(frame, display: true, animate: true)
+        }
     }
 
     // LSUIElement apps never get this called, but set it false anyway.
@@ -141,10 +180,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func togglePanel() {
         guard let panel else { return }
-        if panel.isVisible {
+        // Status-item left-click UX:
+        //   • Hidden  → show + bring to front.
+        //   • Visible and active → hide.
+        //   • Visible but behind other windows → bring to front (don't hide).
+        //
+        // NSApp.activate is required because the panel is a `.nonactivating`
+        // NSPanel in an `.accessory` app — makeKeyAndOrderFront on its own
+        // won't raise the window above other apps' windows if Sanduhr isn't
+        // the frontmost process.
+        if panel.isVisible && panel.isKeyWindow {
             panel.orderOut(nil)
         } else {
+            NSApp.activate(ignoringOtherApps: true)
             panel.makeKeyAndOrderFront(nil)
+            panel.orderFrontRegardless()
         }
     }
 
@@ -164,11 +214,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: Panel placement
 
     private func placeInTopRightCorner(_ win: NSWindow) {
+        // Restore both position AND size if a valid frame was persisted
+        // last session. Users who resize the widget expect that to stick.
         if let s = UserDefaults.standard.string(forKey: "windowFrame") {
             let r = NSRectFromString(s)
-            if r.size.width >= 400 && r.size.height >= 240,
+            if r.size.width >= 340 && r.size.height >= 480,
                NSScreen.screens.contains(where: { $0.frame.intersects(r) }) {
-                win.setFrameOrigin(r.origin)
+                win.setFrame(r, display: true)
                 return
             }
         }
@@ -183,13 +235,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 // MARK: - Floating Panel
 
-/// Borderless, always-on-top, non-activating panel.
-final class FloatingPanel: NSPanel {
+/// Borderless, always-on-top, non-activating panel. Self-delegates so it
+/// can clamp vertical drag-resize to the SwiftUI content's fitting size,
+/// eliminating the dead-space-below-footer problem while keeping
+/// horizontal drag-resize working.
+final class FloatingPanel: NSPanel, NSWindowDelegate {
+    func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
+        let fit = self.contentView?.fittingSize.height ?? frameSize.height
+        return NSSize(width: frameSize.width, height: fit)
+    }
     init(hosting: NSHostingController<RootView>) {
         // NOTE: deliberately no `.utilityWindow` here — that mask forces
         // always-on-top regardless of `level` / `isFloatingPanel`, which
-        // makes the Pin toggle ineffective.
-        let styleMask: NSWindow.StyleMask = [.borderless, .nonactivatingPanel]
+        // makes the Pin toggle ineffective. `.resizable` enables edge-drag
+        // resize so users can make the widget larger or taller.
+        let styleMask: NSWindow.StyleMask = [.borderless, .nonactivatingPanel, .resizable]
         let initial = NSRect(x: 0, y: 0, width: 340, height: 520)
         super.init(contentRect: initial,
                    styleMask: styleMask,
@@ -205,7 +265,11 @@ final class FloatingPanel: NSPanel {
         self.titlebarAppearsTransparent = true
         self.titleVisibility = .hidden
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        self.minSize = NSSize(width: 340, height: 240)
+        // Minimum size matches Windows v2.0.4's 380×520 spec, adjusted down
+        // 40 pts wide for Mac's tighter intrinsic card layout (340-wide
+        // cards already fit the content; we just want enough vertical room
+        // for 4-5 tier cards + footer without overflow).
+        self.minSize = NSSize(width: 340, height: 480)
         self.standardWindowButton(.closeButton)?.isHidden = true
         self.standardWindowButton(.miniaturizeButton)?.isHidden = true
         self.standardWindowButton(.zoomButton)?.isHidden = true
@@ -214,13 +278,16 @@ final class FloatingPanel: NSPanel {
         root.autoresizingMask = [.width, .height]
         self.contentView = root
 
-        NotificationCenter.default.addObserver(
-            self, selector: #selector(persistFrame),
-            name: NSWindow.didMoveNotification, object: self)
+        // Persist both moves and resizes so the frame survives a quit.
+        let center = NotificationCenter.default
+        center.addObserver(self, selector: #selector(persistFrame),
+                           name: NSWindow.didMoveNotification, object: self)
+        center.addObserver(self, selector: #selector(persistFrame),
+                           name: NSWindow.didResizeNotification, object: self)
     }
 
     @objc private func persistFrame() {
-        guard frame.size.width >= 400, frame.size.height >= 240 else { return }
+        guard frame.size.width >= 340, frame.size.height >= 480 else { return }
         UserDefaults.standard.set(NSStringFromRect(frame), forKey: "windowFrame")
     }
 
