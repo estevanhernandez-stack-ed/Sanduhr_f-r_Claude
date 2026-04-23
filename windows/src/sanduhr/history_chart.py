@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QWidget
 
-from sanduhr import history, themes
+from sanduhr import history
 
 
 _TIER_LABELS = {
@@ -59,9 +59,12 @@ class HistoryChart(QWidget):
         painter.setRenderHint(QPainter.Antialiasing, True)
         t = self._theme
 
+        fm = painter.fontMetrics()
+        label_w = max(fm.horizontalAdvance(lbl) for lbl in _TIER_LABELS.values()) + 12
+
         w = self.width()
         h = self.height()
-        if w < 40 or h < 40:
+        if w < 180 or h < 40:
             painter.end()
             return
 
@@ -77,7 +80,6 @@ class HistoryChart(QWidget):
 
         n_tiers = len(self._data)
         row_h = h / n_tiers
-        label_w = 140
         chart_x = label_w + 8
         chart_w = w - chart_x - 8
 
@@ -94,6 +96,10 @@ class HistoryChart(QWidget):
             )
 
             # Line chart — map util_pct 0..100 -> y_bottom..y_top
+            # Note: at theoretical max (30 days × 288 ticks × 8 tiers = 69k
+            # points) paint can stutter. Realistic series are far sparser
+            # (machine sleep, fetch gaps, sign-outs). If this ever shows
+            # up in a profiler, decimate points to ~chart_w pixels here.
             if len(points) < 2:
                 continue
             path = QPainterPath()

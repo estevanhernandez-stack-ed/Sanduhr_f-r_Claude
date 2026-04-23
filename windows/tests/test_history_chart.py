@@ -70,3 +70,18 @@ def test_chart_handles_empty_history(qtbot):
     pm = QPixmap(chart.size())
     chart.render(pm)
     assert not pm.isNull()
+
+
+def test_chart_apply_theme_does_not_raise(qtbot):
+    """Swapping themes at runtime must not raise and must still paint.
+    Catches 'theme dict shape drifted' bugs that would otherwise only
+    surface in manual QA."""
+    from sanduhr.history_chart import HistoryChart
+    from sanduhr import themes
+    chart = HistoryChart(theme=themes.THEMES["obsidian"])
+    qtbot.addWidget(chart)
+    chart.apply_theme(themes.THEMES["aurora"])
+    chart.resize(400, 300)
+    pm = QPixmap(chart.size())
+    chart.render(pm)
+    assert not pm.isNull()
