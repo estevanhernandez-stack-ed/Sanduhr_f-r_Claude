@@ -76,3 +76,22 @@ def test_export_rows_are_chronological(tmp_path):
         rows = list(csv.DictReader(f))
     timestamps = [r["timestamp"] for r in rows]
     assert timestamps == sorted(timestamps)
+
+
+def test_export_escapes_special_characters(tmp_path):
+    """Tier keys or values with commas/quotes are CSV-escaped, not smashed.
+
+    Current tier keys are all ASCII identifiers, so this path isn't
+    exercised in production today — this test locks in correct quoting
+    against future refactors (e.g. user-authored tier aliases)."""
+    from sanduhr import history, csv_export
+    history.save_history({
+        'tricky,key"': [
+            {"t": "2026-04-21T10:00:00+00:00", "v": 42},
+        ],
+    })
+    dest = tmp_path / "escaped.csv"
+    csv_export.export_to_csv(dest)
+    with open(dest, newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    assert rows[0]["tier"] == 'tricky,key"'

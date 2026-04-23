@@ -26,6 +26,9 @@ def export_to_csv(dest_path: str | Path) -> int:
                 "tier": tier_key,
                 "util_pct": str(p.get("v", "")),
             })
+    # Lexicographic sort on the ISO-8601 timestamp strings is chronological
+    # because history.append() writes a fixed `+00:00` UTC offset every time.
+    # If a future writer ever introduces mixed timezones, parse before sorting.
     rows.sort(key=lambda r: r["timestamp"])
 
     with open(dest_path, "w", newline="", encoding="utf-8") as f:
