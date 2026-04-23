@@ -20,7 +20,7 @@ _TIER_LABELS = {
     "seven_day_sonnet":     "Weekly — Sonnet",
     "seven_day_opus":       "Weekly — Opus",
     "seven_day_cowork":     "Weekly — Cowork",
-    "seven_day_omelette":   "Weekly — Routines",
+    "seven_day_omelette":   "Weekly — Design",
     "seven_day_oauth_apps": "Weekly — OAuth Apps",
     "iguana_necktie":       "Weekly — Special",
 }
