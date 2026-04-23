@@ -9,7 +9,11 @@ from datetime import datetime, timedelta, timezone
 
 from sanduhr import paths
 
-MAX_HISTORY = 8640  # 30 days × 288 five-minute ticks per day
+MAX_HISTORY = 8640  # 30 days × 288 five-minute ticks per day.
+# Sizing assumes the 5-min fetch cadence from fetcher._tick. Across 8
+# tiers that's ~3.5 MB per history.json — fine on modern disks. If the
+# fetch cadence ever tightens (e.g. a burst-mode 60s cadence), revisit
+# this cap or switch storage format to something more compact than JSON.
 
 
 def _read_raw():
@@ -32,7 +36,12 @@ def load_history() -> dict:
 
 
 def save_history(data: dict) -> None:
-    """Overwrite the history file with `data`."""
+    """Overwrite the history file with `data`.
+
+    Internal/test helper — external callers should prefer `append()`.
+    Does NOT validate the schema: pass a malformed dict and `load_window`
+    / `load` will happily return garbage (or drop points silently).
+    """
     _write_raw(data)
 
 
@@ -64,7 +73,7 @@ def load_window(tier_key: str, days: int) -> list[dict]:
     for p in all_points:
         try:
             t = datetime.fromisoformat(p["t"].replace("Z", "+00:00"))
-        except (ValueError, KeyError):
+        except (ValueError, KeyError, TypeError, AttributeError):
             continue
         if t >= cutoff:
             out.append(p)

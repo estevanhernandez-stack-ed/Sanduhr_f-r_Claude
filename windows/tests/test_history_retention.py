@@ -67,3 +67,14 @@ def test_clear_all_wipes_file():
     history.save_history({"five_hour": [{"t": "2026-04-21T00:00:00+00:00", "v": 50}]})
     history.clear_all()
     assert history.load_history() == {}
+
+
+def test_clear_all_preserves_file():
+    """clear_all writes {} rather than unlinking — preserves the file-
+    existence invariant that downstream readers (load, load_window) depend
+    on. Locks this behavior in against a future 'simplification' that
+    swaps to Path.unlink(missing_ok=True)."""
+    from sanduhr import history, paths
+    history.save_history({"five_hour": [{"t": "2026-04-21T00:00:00+00:00", "v": 50}]})
+    history.clear_all()
+    assert paths.history_file().exists()
