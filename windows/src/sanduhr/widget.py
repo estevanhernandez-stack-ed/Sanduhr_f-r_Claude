@@ -1014,6 +1014,7 @@ class SanduhrWidget(QWidget):
             focus_cf=focus_cf,
             initial_tab=initial_tab,
             settings=self._settings,
+            theme=self._theme,
         )
         dlg.credentialsSaved.connect(self._on_credentials_saved)
         dlg.credentialsCleared.connect(self._on_credentials_cleared)

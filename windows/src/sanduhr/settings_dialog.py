@@ -102,13 +102,15 @@ class SettingsDialog(QDialog):
         initial_tab: int = 0,
         focus_cf: bool = False,
         settings: Optional[dict] = None,
+        theme: Optional[dict] = None,
     ):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setModal(True)
         self.resize(520, 520)
-        
+
         self._settings = settings or {}
+        self._theme = theme or themes.THEMES.get("obsidian")
 
         layout = QVBoxLayout(self)
         self._tabs = QTabWidget()
@@ -324,7 +326,6 @@ class SettingsDialog(QDialog):
 
     def _build_history_tab(self) -> None:
         from sanduhr.history_chart import HistoryChart
-        from sanduhr import csv_export, history, themes
 
         page = QWidget()
         v = QVBoxLayout(page)
@@ -348,7 +349,7 @@ class SettingsDialog(QDialog):
         v.addLayout(mode_row)
 
         # Chart
-        self._hist_chart = HistoryChart(theme=themes.THEMES.get("obsidian"))
+        self._hist_chart = HistoryChart(theme=self._theme)
         self._hist_chart.refresh()
         v.addWidget(self._hist_chart, stretch=1)
 
@@ -415,7 +416,14 @@ class SettingsDialog(QDialog):
         confirm.setDefaultButton(QMessageBox.No)
         if confirm.exec_() != QMessageBox.Yes:
             return
-        history.clear_all()
+        try:
+            history.clear_all()
+        except OSError as e:
+            _styled_msgbox(
+                self, QMessageBox.Critical, "Clear failed",
+                f"Could not clear history file:\n{e}",
+            ).exec_()
+            return
         self._hist_chart.refresh()
         _styled_msgbox(
             self, QMessageBox.Information, "History cleared",
