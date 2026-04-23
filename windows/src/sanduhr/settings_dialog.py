@@ -195,10 +195,11 @@ class SettingsDialog(QDialog):
             confirm = _styled_msgbox(
                 self, QMessageBox.Warning, "Sign out of Sanduhr?",
                 "The sessionKey field is empty.\n\n"
-                "Saving this will clear your stored credentials from "
-                "Windows Credential Manager and stop the widget from "
-                "fetching your usage. You'll need to paste a fresh "
-                "sessionKey to resume.\n\n"
+                "Saving this will:\n"
+                "  • Clear your stored credentials from Windows Credential Manager\n"
+                "  • Delete the local 30-day usage history file\n"
+                "  • Stop the widget from fetching your usage\n\n"
+                "You'll need to paste a fresh sessionKey to resume.\n\n"
                 "Continue?",
                 buttons=QMessageBox.Yes | QMessageBox.No,
             )
@@ -206,6 +207,8 @@ class SettingsDialog(QDialog):
             if confirm.exec_() != QMessageBox.Yes:
                 return
             credentials.clear()
+            from sanduhr import history
+            history.clear_all()
             self.credentialsCleared.emit()
             _styled_msgbox(
                 self, QMessageBox.Information, "Signed out",
