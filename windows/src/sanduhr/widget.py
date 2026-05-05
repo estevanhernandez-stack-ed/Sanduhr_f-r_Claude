@@ -305,7 +305,8 @@ class SanduhrWidget(QWidget):
             ("Ctrl+,", lambda: self._open_settings_dialog()),
             ("Ctrl+D", self._toggle_compact),
             ("Ctrl+P", self._toggle_focus_mode),
-            ("Ctrl+H", lambda: self._open_settings_dialog(initial_tab=2)),
+            ("Ctrl+H", lambda: self._open_settings_dialog(
+                initial_tab=SettingsDialog.TAB_HISTORY)),
         ):
             sc = QShortcut(QKeySequence(seq), self)
             sc.activated.connect(slot)
@@ -1022,16 +1023,15 @@ class SanduhrWidget(QWidget):
         if hasattr(self, '_game_overlay'):
             self._game_overlay.setGeometry(self.rect())
 
-    def _open_settings_dialog(self, focus_cf: bool = False, initial_tab: int = 0) -> None:
-        creds = credentials.load()
+    def _open_settings_dialog(
+        self, initial_tab: int = 0, trigger_add_account: bool = False
+    ) -> None:
         dlg = SettingsDialog(
             self,
-            session_key=creds.get("session_key") or "",
-            cf_clearance=creds.get("cf_clearance") or "",
-            focus_cf=focus_cf,
             initial_tab=initial_tab,
             settings=self._settings,
             theme=self._theme,
+            trigger_add_account=trigger_add_account,
         )
         dlg.credentialsSaved.connect(self._on_credentials_saved)
         dlg.credentialsCleared.connect(self._on_credentials_cleared)
@@ -1134,11 +1134,16 @@ class SanduhrWidget(QWidget):
             "1. Open claude.ai and log in.\n"
             "2. Press F12 -> Application -> Cookies -> claude.ai.\n"
             "3. Copy the sessionKey cookie value.\n\n"
-            "Paste it in the next dialog."
+            "Paste it into the Add Account dialog that opens next."
         )
         box.setStyleSheet(self.styleSheet())
         box.exec_()
-        self._open_settings_dialog()
+        # Open Accounts tab and pre-trigger Add… so the user lands directly
+        # on the modal that takes their first sessionKey.
+        self._open_settings_dialog(
+            initial_tab=SettingsDialog.TAB_ACCOUNTS,
+            trigger_add_account=True,
+        )
 
     def _rebuild_theme_strip(self) -> None:
         """Themes change handles dynamically via QMenu now, so just re-apply current."""

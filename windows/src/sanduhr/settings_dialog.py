@@ -1,13 +1,19 @@
 """SettingsDialog — consolidated user-facing settings.
 
-Two tabs:
-  - Credentials: sessionKey + cf_clearance (keyring-backed)
-  - Themes: paste JSON, open themes folder, copy agent prompt, reload
+Five tabs:
+  - Themes:   paste JSON, open themes folder, copy agent prompt, reload
+  - Pacing:   pacing tools toggle, session-end reminder
+  - Accounts: multi-account registry — add / rename / set-active / remove.
+              Replaces the old single-credentials tab; the same Add… modal
+              collects sessionKey + cf_clearance.
+  - History:  30-day usage chart with per-account / All-accounts toggle,
+              Export CSV, Clear history.
+  - Help:     getting started + DevTools cookie copy instructions.
 
-Replaces the older standalone CredentialsDialog. The owning widget wires
-it up via `open(parent, current_creds)` and reacts to `credentialsSaved`
-and `themesChanged` signals.
-"""
+The owning widget wires it up via `open(parent, ...)` and reacts to the
+`credentialsSaved`, `credentialsCleared`, `themesChanged`, `settingsSaved`,
+and `accountsChanged` signals. Tab indices are exposed as TAB_* class
+constants so callers don't hardcode integers."""
 
 import json
 import logging
@@ -15,7 +21,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import QUrl, Qt, Signal
+from PySide6.QtCore import QTimer, QUrl, Qt, Signal
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import (
     QComboBox,
@@ -35,7 +41,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
 )
 
-from sanduhr import credentials, paths, themes
+from sanduhr import paths, themes
 from sanduhr.accounts_dialog import AccountsTab
 
 _log = logging.getLogger(__name__)
@@ -91,6 +97,14 @@ def _agent_prompt_path() -> Path:
 
 
 class SettingsDialog(QDialog):
+    # Tab indices — public so callers can pass them via initial_tab without
+    # hardcoding integers that drift when the build order changes.
+    TAB_THEMES = 0
+    TAB_PACING = 1
+    TAB_ACCOUNTS = 2
+    TAB_HISTORY = 3
+    TAB_HELP = 4
+
     credentialsSaved = Signal(str, object)  # (session_key, cf_clearance | None)
     credentialsCleared = Signal()
     themesChanged = Signal()
@@ -100,12 +114,10 @@ class SettingsDialog(QDialog):
     def __init__(
         self,
         parent: Optional[QWidget] = None,
-        session_key: str = "",
-        cf_clearance: str = "",
         initial_tab: int = 0,
-        focus_cf: bool = False,
         settings: Optional[dict] = None,
         theme: Optional[dict] = None,
+        trigger_add_account: bool = False,
     ):
         super().__init__(parent)
         self.setWindowTitle("Settings")
@@ -124,7 +136,6 @@ class SettingsDialog(QDialog):
         self._build_accounts_tab()
         self._build_history_tab()
         self._build_help_tab()
-        self._build_credentials_tab(session_key, cf_clearance, focus_cf)
 
         btns = QDialogButtonBox(QDialogButtonBox.Close)
         btns.rejected.connect(self.reject)
@@ -133,103 +144,12 @@ class SettingsDialog(QDialog):
 
         self._tabs.setCurrentIndex(initial_tab)
 
-    # ── Credentials tab ──────────────────────────────────────────
-
-    def _build_credentials_tab(self, sk: str, cf: str, focus_cf: bool) -> None:
-        page = QWidget()
-        v = QVBoxLayout(page)
-
-        v.addWidget(QLabel(
-            "Paste your claude.ai cookies.\n"
-            "F12 → Application → Cookies → claude.ai"
-        ))
-
-        v.addWidget(QLabel("sessionKey"))
-        self._sk = QLineEdit(sk)
-        self._sk.setEchoMode(QLineEdit.Password)
-        v.addWidget(self._sk)
-        sk_hint = QLabel(
-            "Tip: save this field empty to sign out and clear your stored "
-            "credentials from Windows Credential Manager."
-        )
-        sk_hint.setWordWrap(True)
-        sk_hint.setObjectName("HelpText")
-        sk_hint.setStyleSheet("font-size: 8pt;")
-        v.addWidget(sk_hint)
-
-        v.addWidget(QLabel("cf_clearance (optional)"))
-        cf_help = QLabel(
-            "Only needed if Sanduhr shows <b>\u201cCloudflare blocked\u201d</b> "
-            "after you save. Some accounts sit behind a Cloudflare challenge; "
-            "if yours does, copy the <code>cf_clearance</code> cookie from the "
-            "same DevTools panel you copied <code>sessionKey</code> from, and "
-            "paste it here. Leave blank otherwise."
-        )
-        cf_help.setTextFormat(Qt.RichText)
-        cf_help.setWordWrap(True)
-        cf_help.setObjectName("HelpText")
-        cf_help.setStyleSheet("font-size: 8pt;")
-        v.addWidget(cf_help)
-        self._cf = QLineEdit(cf)
-        self._cf.setEchoMode(QLineEdit.Password)
-        v.addWidget(self._cf)
-
-        row = QHBoxLayout()
-        row.addStretch()
-        save = QPushButton("Save")
-        save.setDefault(True)
-        save.clicked.connect(self._save_credentials)
-        row.addWidget(save)
-        v.addLayout(row)
-
-        v.addStretch()
-        (self._cf if focus_cf else self._sk).setFocus()
-        self._tabs.addTab(page, "Credentials")
-
-    def _save_credentials(self) -> None:
-        sk = self._sk.text().strip()
-        cf = self._cf.text().strip() or None
-        if not sk:
-            # Blank sessionKey on save = explicit intent to sign out.
-            # We previously rejected this with a "sessionKey is required"
-            # error, but that left users with no way to revoke credentials
-            # short of opening Windows Credential Manager by hand — which
-            # none of them do. Treat blank-save as "clear my credentials",
-            # gated behind a confirmation so it can't happen by accident.
-            confirm = _styled_msgbox(
-                self, QMessageBox.Warning, "Sign out of Sanduhr?",
-                "The sessionKey field is empty.\n\n"
-                "Saving this will:\n"
-                "  • Clear your stored credentials from Windows Credential Manager\n"
-                "  • Delete the local 30-day usage history file\n"
-                "  • Stop the widget from fetching your usage\n\n"
-                "You'll need to paste a fresh sessionKey to resume.\n\n"
-                "Continue?",
-                buttons=QMessageBox.Yes | QMessageBox.No,
-            )
-            confirm.setDefaultButton(QMessageBox.No)
-            if confirm.exec_() != QMessageBox.Yes:
-                return
-            # Wipe history BEFORE removing the account — credentials.clear()
-            # advances the active-account pointer, so clearing afterwards
-            # would target the WRONG account in a multi-account install.
-            from sanduhr import history
-            history.clear_all()
-            credentials.clear()
-            self.credentialsCleared.emit()
-            _styled_msgbox(
-                self, QMessageBox.Information, "Signed out",
-                "Credentials cleared. Paste a fresh sessionKey above "
-                "when you're ready to resume.",
-            ).exec_()
-            return
-        credentials.save(session_key=sk, cf_clearance=cf)
-        self.credentialsSaved.emit(sk, cf)
-        _styled_msgbox(
-            self, QMessageBox.Information, "Settings",
-            "Credentials saved. Your widget is now fetching your usage — "
-            "close this dialog to see it.",
-        ).exec_()
+        # First-run UX: when the welcome dialog has just told the user to
+        # paste their sessionKey, drop them straight into the Add Account
+        # modal. QTimer hop ensures the parent dialog is fully laid out
+        # first so the modal renders on top correctly.
+        if trigger_add_account:
+            QTimer.singleShot(0, self._accounts_tab._on_add)
 
     # ── Themes tab ───────────────────────────────────────────────
 
