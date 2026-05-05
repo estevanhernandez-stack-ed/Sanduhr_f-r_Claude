@@ -15,7 +15,14 @@ def app_data_dir() -> Path:
 
 
 def history_file() -> Path:
+    """Legacy single-account history path. Read during migration only —
+    new writes go to history_file_for(account)."""
     return app_data_dir() / "history.json"
+
+
+def history_file_for(account: str) -> Path:
+    """Per-account history file: history.{account}.json."""
+    return app_data_dir() / f"history.{account}.json"
 
 
 def settings_file() -> Path:

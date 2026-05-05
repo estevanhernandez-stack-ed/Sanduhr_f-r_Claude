@@ -18,6 +18,16 @@ def _isolate_appdata(monkeypatch):
         yield
 
 
+@pytest.fixture(autouse=True)
+def _default_active_account(_fake_keyring):
+    """Default active account so history routing has somewhere to land.
+    Multi-account export semantics (account column, all-accounts mode)
+    are tested separately in test_aggregated_chart.py."""
+    from sanduhr import accounts
+    accounts.add_account("Personal", session_key="sk-test")
+    yield
+
+
 def test_export_writes_header_and_rows(tmp_path):
     from sanduhr import history, csv_export
     history.save_history({
