@@ -18,6 +18,7 @@ from typing import Optional
 from PySide6.QtCore import QUrl, Qt, Signal
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import (
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
@@ -363,7 +364,7 @@ class SettingsDialog(QDialog):
             "never uploaded. Export as CSV to analyze with any agent."
         ))
 
-        # Mode toggle
+        # Mode + account selector row
         mode_row = QHBoxLayout()
         mode_row.addWidget(QLabel("Window:"))
         self._hist_week_btn = QPushButton("Week")
@@ -373,12 +374,22 @@ class SettingsDialog(QDialog):
         self._hist_month_btn.setCheckable(True)
         mode_row.addWidget(self._hist_week_btn)
         mode_row.addWidget(self._hist_month_btn)
+        mode_row.addSpacing(12)
+        mode_row.addWidget(QLabel("Account:"))
+        self._hist_account = QComboBox()
+        self._hist_account.currentIndexChanged.connect(self._on_history_account_changed)
+        mode_row.addWidget(self._hist_account)
         mode_row.addStretch()
         v.addLayout(mode_row)
 
+        # Legend strip — only visible when 'All accounts' is selected.
+        self._hist_legend = QWidget()
+        self._hist_legend_layout = QHBoxLayout(self._hist_legend)
+        self._hist_legend_layout.setContentsMargins(0, 0, 0, 0)
+        v.addWidget(self._hist_legend)
+
         # Chart
         self._hist_chart = HistoryChart(theme=self._theme)
-        self._hist_chart.refresh()
         v.addWidget(self._hist_chart, stretch=1)
 
         def _set_week():
@@ -406,21 +417,90 @@ class SettingsDialog(QDialog):
         action_row.addStretch()
         v.addLayout(action_row)
 
+        self._refresh_history_account_selector()
+        # Re-populate the selector whenever the registry changes (Add /
+        # Remove / Rename / Set Active in the Accounts tab).
+        self.accountsChanged.connect(self._refresh_history_account_selector)
+
         self._tabs.addTab(page, "History")
+
+    def _refresh_history_account_selector(self) -> None:
+        """Rebuild the History tab's account combo from the registry."""
+        from sanduhr import accounts as accounts_mod
+        # Block signals while we rebuild so the currentIndexChanged
+        # handler doesn't fire repeatedly during clear()/addItem().
+        self._hist_account.blockSignals(True)
+        prev = self._hist_account.currentData()
+        self._hist_account.clear()
+        self._hist_account.addItem("All accounts", None)
+        for label in accounts_mod.list_accounts():
+            self._hist_account.addItem(label, label)
+        # Restore previous selection if it still exists, else default to
+        # All accounts.
+        idx = self._hist_account.findData(prev) if prev is not None else 0
+        if idx < 0:
+            idx = 0
+        self._hist_account.setCurrentIndex(idx)
+        self._hist_account.blockSignals(False)
+        # Trigger the chart + legend update under the (possibly new)
+        # selection.
+        self._on_history_account_changed()
+
+    def _on_history_account_changed(self) -> None:
+        selected = self._hist_account.currentData()  # None = All accounts
+        self._hist_chart.set_account(selected)
+        self._refresh_history_legend(aggregate=(selected is None))
+
+    def _refresh_history_legend(self, aggregate: bool) -> None:
+        """Show one colored swatch per account when in All-accounts mode;
+        hide the legend strip entirely in single-account mode."""
+        # Clear existing entries
+        while self._hist_legend_layout.count():
+            item = self._hist_legend_layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
+        if not aggregate:
+            self._hist_legend.setVisible(False)
+            return
+        from sanduhr import accounts as accounts_mod
+        from sanduhr.history_chart import color_for_account
+        labels = accounts_mod.list_accounts()
+        if not labels:
+            self._hist_legend.setVisible(False)
+            return
+        for label in labels:
+            color = color_for_account(label)
+            swatch = QLabel(
+                f"<span style='color:{color}; font-size:14pt;'>●</span> "
+                f"<span style='font-size:9pt;'>{label}</span>"
+            )
+            swatch.setTextFormat(Qt.RichText)
+            self._hist_legend_layout.addWidget(swatch)
+        self._hist_legend_layout.addStretch()
+        self._hist_legend.setVisible(True)
 
     def _export_history_csv(self) -> None:
         from PySide6.QtWidgets import QFileDialog
         from sanduhr import csv_export
         from datetime import date
 
-        default_name = f"Sanduhr-usage-{date.today().isoformat()}.csv"
+        # Honor the History tab's current account selection — None
+        # exports all accounts (with account column), specific exports
+        # just that account.
+        selected_account = self._hist_account.currentData()
+        scope_tag = (
+            "all-accounts" if selected_account is None
+            else selected_account.lower().replace(" ", "-")
+        )
+        default_name = f"Sanduhr-usage-{scope_tag}-{date.today().isoformat()}.csv"
         path, _ = QFileDialog.getSaveFileName(
             self, "Export usage history", default_name, "CSV files (*.csv)"
         )
         if not path:
             return
         try:
-            count = csv_export.export_to_csv(path)
+            count = csv_export.export_to_csv(path, account=selected_account)
         except OSError as e:
             _styled_msgbox(
                 self, QMessageBox.Critical, "Export failed",
