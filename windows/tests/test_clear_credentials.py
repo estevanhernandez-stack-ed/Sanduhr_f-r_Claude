@@ -164,3 +164,30 @@ def test_sessionkey_hint_label_exists(qtbot):
     assert ("sign out" in hint_text) or ("clear" in hint_text), (
         "Hint must mention the sign-out/clear semantics"
     )
+
+
+def test_blank_save_confirmed_also_clears_history(qtbot, monkeypatch):
+    """Sign-out flow also wipes the local usage history file.
+
+    The Credentials confirmation dialog explicitly says 'this also
+    clears local usage history' — so users aren't surprised, and the
+    privacy posture is kept clean: signing out = no trace of prior
+    usage on disk."""
+    from sanduhr import credentials, history
+    from sanduhr.settings_dialog import SettingsDialog
+    from PySide6.QtWidgets import QMessageBox
+
+    credentials.save(session_key="abc123")
+    history.save_history({"five_hour": [{"t": "2026-04-21T10:00:00+00:00", "v": 50}]})
+    assert history.load_history() != {}  # sanity
+
+    dlg = SettingsDialog(None, session_key="abc123", cf_clearance="")
+    qtbot.addWidget(dlg)
+    dlg._sk.setText("")  # clear the input
+
+    # Auto-accept the confirmation
+    monkeypatch.setattr(QMessageBox, "exec_", lambda self: QMessageBox.Yes)
+
+    dlg._save_credentials()
+
+    assert history.load_history() == {}

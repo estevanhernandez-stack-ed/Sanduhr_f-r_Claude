@@ -102,13 +102,15 @@ class SettingsDialog(QDialog):
         initial_tab: int = 0,
         focus_cf: bool = False,
         settings: Optional[dict] = None,
+        theme: Optional[dict] = None,
     ):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setModal(True)
         self.resize(520, 520)
-        
+
         self._settings = settings or {}
+        self._theme = theme or themes.THEMES.get("obsidian")
 
         layout = QVBoxLayout(self)
         self._tabs = QTabWidget()
@@ -116,6 +118,7 @@ class SettingsDialog(QDialog):
 
         self._build_themes_tab()
         self._build_pacing_tab()
+        self._build_history_tab()
         self._build_help_tab()
         self._build_credentials_tab(session_key, cf_clearance, focus_cf)
 
@@ -192,10 +195,11 @@ class SettingsDialog(QDialog):
             confirm = _styled_msgbox(
                 self, QMessageBox.Warning, "Sign out of Sanduhr?",
                 "The sessionKey field is empty.\n\n"
-                "Saving this will clear your stored credentials from "
-                "Windows Credential Manager and stop the widget from "
-                "fetching your usage. You'll need to paste a fresh "
-                "sessionKey to resume.\n\n"
+                "Saving this will:\n"
+                "  • Clear your stored credentials from Windows Credential Manager\n"
+                "  • Delete the local 30-day usage history file\n"
+                "  • Stop the widget from fetching your usage\n\n"
+                "You'll need to paste a fresh sessionKey to resume.\n\n"
                 "Continue?",
                 buttons=QMessageBox.Yes | QMessageBox.No,
             )
@@ -203,6 +207,8 @@ class SettingsDialog(QDialog):
             if confirm.exec_() != QMessageBox.Yes:
                 return
             credentials.clear()
+            from sanduhr import history
+            history.clear_all()
             self.credentialsCleared.emit()
             _styled_msgbox(
                 self, QMessageBox.Information, "Signed out",
@@ -317,6 +323,114 @@ class SettingsDialog(QDialog):
         _styled_msgbox(
             self, QMessageBox.Information, "Settings",
             "Pacing configuration saved."
+        ).exec_()
+
+    # ── History tab ──────────────────────────────────────────────
+
+    def _build_history_tab(self) -> None:
+        from sanduhr.history_chart import HistoryChart
+
+        page = QWidget()
+        v = QVBoxLayout(page)
+
+        v.addWidget(QLabel(
+            "Rolling 30-day usage history. Stored locally only — "
+            "never uploaded. Export as CSV to analyze with any agent."
+        ))
+
+        # Mode toggle
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("Window:"))
+        self._hist_week_btn = QPushButton("Week")
+        self._hist_week_btn.setCheckable(True)
+        self._hist_week_btn.setChecked(True)
+        self._hist_month_btn = QPushButton("Month")
+        self._hist_month_btn.setCheckable(True)
+        mode_row.addWidget(self._hist_week_btn)
+        mode_row.addWidget(self._hist_month_btn)
+        mode_row.addStretch()
+        v.addLayout(mode_row)
+
+        # Chart
+        self._hist_chart = HistoryChart(theme=self._theme)
+        self._hist_chart.refresh()
+        v.addWidget(self._hist_chart, stretch=1)
+
+        def _set_week():
+            self._hist_week_btn.setChecked(True)
+            self._hist_month_btn.setChecked(False)
+            self._hist_chart.set_mode("week")
+
+        def _set_month():
+            self._hist_week_btn.setChecked(False)
+            self._hist_month_btn.setChecked(True)
+            self._hist_chart.set_mode("month")
+
+        self._hist_week_btn.clicked.connect(_set_week)
+        self._hist_month_btn.clicked.connect(_set_month)
+
+        # Action row
+        action_row = QHBoxLayout()
+        export_btn = QPushButton("Export CSV…")
+        export_btn.clicked.connect(self._export_history_csv)
+        action_row.addWidget(export_btn)
+
+        clear_btn = QPushButton("Clear history")
+        clear_btn.clicked.connect(self._clear_history)
+        action_row.addWidget(clear_btn)
+        action_row.addStretch()
+        v.addLayout(action_row)
+
+        self._tabs.addTab(page, "History")
+
+    def _export_history_csv(self) -> None:
+        from PySide6.QtWidgets import QFileDialog
+        from sanduhr import csv_export
+        from datetime import date
+
+        default_name = f"Sanduhr-usage-{date.today().isoformat()}.csv"
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export usage history", default_name, "CSV files (*.csv)"
+        )
+        if not path:
+            return
+        try:
+            count = csv_export.export_to_csv(path)
+        except OSError as e:
+            _styled_msgbox(
+                self, QMessageBox.Critical, "Export failed",
+                f"Could not write {path}:\n{e}",
+            ).exec_()
+            return
+        _styled_msgbox(
+            self, QMessageBox.Information, "Exported",
+            f"Wrote {count} rows to:\n{path}",
+        ).exec_()
+
+    def _clear_history(self) -> None:
+        from sanduhr import history
+        confirm = _styled_msgbox(
+            self, QMessageBox.Warning, "Clear history?",
+            "This permanently removes the local 30-day usage history "
+            "file. Sparkline and history chart will be empty until new "
+            "data accumulates.\n\nCredentials are not affected.",
+            buttons=QMessageBox.Yes | QMessageBox.No,
+        )
+        confirm.setDefaultButton(QMessageBox.No)
+        if confirm.exec_() != QMessageBox.Yes:
+            return
+        try:
+            history.clear_all()
+        except OSError as e:
+            _styled_msgbox(
+                self, QMessageBox.Critical, "Clear failed",
+                f"Could not clear history file:\n{e}",
+            ).exec_()
+            return
+        self._hist_chart.refresh()
+        _styled_msgbox(
+            self, QMessageBox.Information, "History cleared",
+            "Local usage history file removed.",
         ).exec_()
 
     # ── Help tab ─────────────────────────────────────────────────

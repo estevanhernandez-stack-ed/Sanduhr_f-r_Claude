@@ -1,6 +1,7 @@
 """Tests for sanduhr.history."""
 
 import json
+from datetime import datetime, timedelta, timezone
 
 from sanduhr import history, paths
 
@@ -38,11 +39,17 @@ def test_load_missing_file_returns_empty_list(tmp_appdata):
 
 
 def test_append_rolls_over_at_max(tmp_appdata):
-    for i in range(history.MAX_POINTS + 5):
+    # Seed the file at MAX_HISTORY then append a few more — avoids doing
+    # 8645 individual read-modify-write cycles just to exercise pruning.
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    seed = {"five_hour": [{"t": (base + timedelta(minutes=5 * i)).isoformat(), "v": i}
+                          for i in range(history.MAX_HISTORY)]}
+    history.save_history(seed)
+    for i in range(history.MAX_HISTORY, history.MAX_HISTORY + 5):
         history.append("five_hour", i)
     values = history.load("five_hour")
-    assert len(values) == history.MAX_POINTS
-    assert values[-1] == history.MAX_POINTS + 4
+    assert len(values) == history.MAX_HISTORY
+    assert values[-1] == history.MAX_HISTORY + 4
 
 
 def test_corrupt_file_does_not_crash(tmp_appdata):
