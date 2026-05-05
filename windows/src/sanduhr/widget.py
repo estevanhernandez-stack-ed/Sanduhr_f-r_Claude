@@ -193,6 +193,23 @@ class SanduhrWidget(QWidget):
 
         self._status_lbl = QLabel("Connecting...")
         self._content_layout.addWidget(self._status_lbl)
+
+        # Active-account label — clickable to cycle through registered
+        # accounts when more than one is configured. Hidden entirely
+        # when no accounts exist (signed-out / first-run).
+        self._account_btn = QPushButton("")
+        self._account_btn.setFlat(True)
+        self._account_btn.setObjectName("AccountLabel")
+        self._account_btn.setCursor(Qt.PointingHandCursor)
+        self._account_btn.setStyleSheet("padding: 2px; font-size: 9pt;")
+        self._account_btn.setToolTip(
+            "Active Claude account. Click to switch when multiple are "
+            "configured (Settings → Accounts to add or remove)."
+        )
+        self._account_btn.clicked.connect(self._cycle_active_account)
+        self._content_layout.addWidget(self._account_btn)
+        self._refresh_account_label()
+
         self._cards_container = QWidget()
         self._cards_layout = QVBoxLayout(self._cards_container)
         self._cards_layout.setContentsMargins(0, 0, 0, 0)
@@ -1020,12 +1037,49 @@ class SanduhrWidget(QWidget):
         dlg.credentialsCleared.connect(self._on_credentials_cleared)
         dlg.themesChanged.connect(self._rebuild_theme_strip)
         dlg.settingsSaved.connect(self._on_settings_saved)
+        dlg.accountsChanged.connect(self._refresh_account_label)
         dlg.setStyleSheet(self.styleSheet())
         dlg.exec_()
 
     def _on_credentials_saved(self, session_key: str, cf_clearance) -> None:
         self._clear_preview()
         self._start_or_update_fetcher(session_key, cf_clearance)
+        self._refresh_account_label()
+        self._request_refresh()
+
+    def _active_account_text(self) -> str:
+        """Render text for the active-account label. Empty when no
+        active account; bare label when only one; ⇆-prefixed when
+        cycling-by-click is meaningful (multiple accounts)."""
+        active = accounts.get_active()
+        if active is None:
+            return ""
+        if len(accounts.list_accounts()) <= 1:
+            return active
+        return f"⇆ {active}"
+
+    def _refresh_account_label(self) -> None:
+        text = self._active_account_text()
+        self._account_btn.setText(text)
+        self._account_btn.setVisible(bool(text))
+
+    def _cycle_active_account(self) -> None:
+        """Advance the active-account pointer to the next registered
+        account (round-robin). No-op when fewer than two accounts."""
+        labels = accounts.list_accounts()
+        if len(labels) < 2:
+            return
+        active = accounts.get_active()
+        if active is None:
+            return
+        idx = labels.index(active)
+        new_active = labels[(idx + 1) % len(labels)]
+        accounts.set_active(new_active)
+        creds = credentials.load()
+        self._refresh_account_label()
+        self._start_or_update_fetcher(
+            creds.get("session_key") or "", creds.get("cf_clearance")
+        )
         self._request_refresh()
 
     def _on_credentials_cleared(self) -> None:
@@ -1052,6 +1106,7 @@ class SanduhrWidget(QWidget):
             sk = creds.get("session_key") or ""
             cf = creds.get("cf_clearance")
             self._start_or_update_fetcher(sk, cf)
+            self._refresh_account_label()
             self._request_refresh()
             self._status_lbl.setText(f"Switched to {new_active}.")
             return
@@ -1059,6 +1114,7 @@ class SanduhrWidget(QWidget):
         # No accounts remain — full signed-out state.
         if self._fetcher is not None:
             self._fetcher.update_credentials("", None)
+        self._refresh_account_label()
         self._status_lbl.setText(
             "Signed out — paste sessionKey in Settings to resume."
         )
