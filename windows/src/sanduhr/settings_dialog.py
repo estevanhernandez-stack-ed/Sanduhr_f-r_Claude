@@ -206,9 +206,12 @@ class SettingsDialog(QDialog):
             confirm.setDefaultButton(QMessageBox.No)
             if confirm.exec_() != QMessageBox.Yes:
                 return
-            credentials.clear()
+            # Wipe history BEFORE removing the account — credentials.clear()
+            # advances the active-account pointer, so clearing afterwards
+            # would target the WRONG account in a multi-account install.
             from sanduhr import history
             history.clear_all()
+            credentials.clear()
             self.credentialsCleared.emit()
             _styled_msgbox(
                 self, QMessageBox.Information, "Signed out",

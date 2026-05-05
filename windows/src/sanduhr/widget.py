@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from sanduhr import credentials, history, mica, paths, themes
+from sanduhr import accounts, credentials, history, mica, paths, themes
 from sanduhr.focus import FocusTimerWidget
 from sanduhr.game import SnakeOverlay
 from sanduhr.fetcher import UsageFetcher
@@ -1029,17 +1029,36 @@ class SanduhrWidget(QWidget):
         self._request_refresh()
 
     def _on_credentials_cleared(self) -> None:
-        """User signed out via blank-sessionKey save in the Settings dialog.
-        Point the fetcher at empty credentials (it'll 401 on next poll,
-        harmless), tear down any tier cards so stale data doesn't linger,
-        and tell the user how to resume."""
-        if self._fetcher is not None:
-            self._fetcher.update_credentials("", None)
+        """User signed out the active account via blank-sessionKey save.
+
+        In a multi-account install, sign-out only removes the active
+        account; if other accounts remain, the registry has already
+        advanced the active pointer to the next one. Switch the fetcher
+        to that account's credentials and refresh, rather than dropping
+        the user into a signed-out state they didn't ask for.
+
+        Last account → full signed-out flow (existing behavior)."""
+        # Tear down tier cards in either branch — stale data from the
+        # signed-out account shouldn't linger.
         for tier_key in list(self._tier_cards.keys()):
             card = self._tier_cards.pop(tier_key)
             self._cards_layout.removeWidget(card)
             card.setParent(None)
             card.deleteLater()
+
+        new_active = accounts.get_active()
+        if new_active is not None:
+            creds = credentials.load()
+            sk = creds.get("session_key") or ""
+            cf = creds.get("cf_clearance")
+            self._start_or_update_fetcher(sk, cf)
+            self._request_refresh()
+            self._status_lbl.setText(f"Switched to {new_active}.")
+            return
+
+        # No accounts remain — full signed-out state.
+        if self._fetcher is not None:
+            self._fetcher.update_credentials("", None)
         self._status_lbl.setText(
             "Signed out — paste sessionKey in Settings to resume."
         )

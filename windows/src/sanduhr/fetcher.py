@@ -24,6 +24,7 @@ _HISTORY_TIERS = (
     "seven_day_omelette",
     "seven_day_oauth_apps",
     "iguana_necktie",
+    "extra_usage",
 )
 
 

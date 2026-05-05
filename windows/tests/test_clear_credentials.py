@@ -166,6 +166,37 @@ def test_sessionkey_hint_label_exists(qtbot):
     )
 
 
+def test_sign_out_only_clears_active_accounts_history(
+    qtbot, monkeypatch, _fake_keyring, tmp_appdata
+):
+    """In a multi-account install, signing out clears ONLY the active
+    account's history file. Other accounts' history is preserved, and
+    the active pointer advances to the next account."""
+    from sanduhr import accounts, history, paths
+    from sanduhr.settings_dialog import SettingsDialog
+
+    accounts.add_account("Personal", session_key="sk-p")
+    accounts.add_account("Work", session_key="sk-w")
+    accounts.set_active("Personal")
+
+    history.append("five_hour", 30, account="Personal")
+    history.append("five_hour", 70, account="Work")
+    assert paths.history_file_for("Personal").exists()
+    assert paths.history_file_for("Work").exists()
+
+    monkeypatch.setattr(QMessageBox, "exec_", lambda self: QMessageBox.Yes)
+    dlg = SettingsDialog(None, session_key="sk-p", cf_clearance="")
+    qtbot.addWidget(dlg)
+    dlg._sk.setText("")
+    dlg._save_credentials()
+
+    # Personal is gone from the registry; Work is now active and intact.
+    assert "Personal" not in accounts.list_accounts()
+    assert accounts.get_active() == "Work"
+    # Work's history file is untouched.
+    assert history.load("five_hour", account="Work") == [70]
+
+
 def test_blank_save_confirmed_also_clears_history(qtbot, monkeypatch):
     """Sign-out flow also wipes the local usage history file.
 
