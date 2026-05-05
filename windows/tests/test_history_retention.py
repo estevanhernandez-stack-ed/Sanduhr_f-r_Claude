@@ -25,7 +25,7 @@ def _default_active_account(_fake_keyring):
     routing requires one. _fake_keyring (from conftest) is composed in so
     the registry doesn't write to the real OS keychain."""
     from sanduhr import accounts
-    accounts.add_account("Personal", session_key="sk-test")
+    accounts.add_account("Personal", session_key="placeholder-default")
     yield
 
 

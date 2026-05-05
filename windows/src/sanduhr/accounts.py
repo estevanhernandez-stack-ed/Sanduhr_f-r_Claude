@@ -21,8 +21,12 @@ import keyring.errors
 SERVICE = "com.626labs.sanduhr"
 _LIST_SLOT = "accounts:list"
 _ACTIVE_SLOT = "accounts:active"
-_LEGACY_SESSION_SLOT = "sessionKey"
-_LEGACY_CF_SLOT = "cf_clearance"
+# These two are KEYRING SLOT NAMES (storage identifiers), not credential
+# values. They must match exactly what v2.0.x / v2.1.x wrote so that
+# migrate_legacy() can read pre-v2.2.0 credentials from those slots. Do
+# not rename or treat as secrets.
+_LEGACY_SESSION_SLOT = "sessionKey"  # pragma: allowlist secret
+_LEGACY_CF_SLOT = "cf_clearance"  # pragma: allowlist secret
 _LABEL_RE = re.compile(r"^[A-Za-z0-9 _-]{1,32}$")
 
 

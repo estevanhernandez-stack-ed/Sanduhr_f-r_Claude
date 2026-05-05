@@ -8,8 +8,8 @@ import pytest
 def _registered_accounts(_fake_keyring):
     """Register two accounts: Personal (active) and Work."""
     from sanduhr import accounts
-    accounts.add_account("Personal", session_key="sk-p")
-    accounts.add_account("Work", session_key="sk-w")
+    accounts.add_account("Personal", session_key="placeholder-personal")
+    accounts.add_account("Work", session_key="placeholder-work")
     yield
 
 

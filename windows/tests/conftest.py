@@ -1,4 +1,12 @@
-"""Shared pytest fixtures."""
+"""Shared pytest fixtures.
+
+Note for secret scanners: any string in this directory that looks like a
+credential ('placeholder-*', etc.) is a fake fixture for the in-memory
+keyring shim — never persisted, never transmitted, never resembles a
+real session key. The `_fake_keyring` fixture below intercepts every
+keyring call so even if a test forgot to use it, no real credential
+store would be touched.
+"""
 
 import tempfile
 from pathlib import Path

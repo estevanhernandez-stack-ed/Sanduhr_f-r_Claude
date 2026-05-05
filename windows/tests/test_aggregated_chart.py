@@ -19,8 +19,8 @@ def _isolate_appdata(monkeypatch):
 @pytest.fixture
 def _two_accounts_with_data(_fake_keyring):
     from sanduhr import accounts, history
-    accounts.add_account("Personal", session_key="sk-p")
-    accounts.add_account("Work", session_key="sk-w")
+    accounts.add_account("Personal", session_key="placeholder-personal")
+    accounts.add_account("Work", session_key="placeholder-work")
     history.append("five_hour", 30, account="Personal")
     history.append("five_hour", 70, account="Work")
     history.append("seven_day", 50, account="Personal")
@@ -33,8 +33,8 @@ def test_color_for_account_is_stable_per_label(_fake_keyring):
     from sanduhr import accounts
     from sanduhr.history_chart import color_for_account, ACCOUNT_COLORS
 
-    accounts.add_account("Personal", session_key="sk-p")
-    accounts.add_account("Work", session_key="sk-w")
+    accounts.add_account("Personal", session_key="placeholder-personal")
+    accounts.add_account("Work", session_key="placeholder-work")
 
     c_p1 = color_for_account("Personal")
     c_p2 = color_for_account("Personal")

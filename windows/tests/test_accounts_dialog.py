@@ -33,7 +33,7 @@ def _stub_message_box(monkeypatch):
 def _stub_add_dialog(monkeypatch):
     """Stub the _AddAccountDialog modal — pass `set_values` to choose
     what the next .exec_() returns."""
-    state = {"values": ("New", "sk-new", ""), "result": QDialog.Accepted}
+    state = {"values": ("New", "placeholder-new", ""), "result": QDialog.Accepted}
 
     class _Stub:
         def __init__(self, *args, **kwargs):
@@ -90,7 +90,7 @@ def test_add_first_account_emits_active_changed(
 
     tab = AccountsTab()
     qtbot.addWidget(tab)
-    _stub_add_dialog["values"] = ("Personal", "sk-1", "")
+    _stub_add_dialog["values"] = ("Personal", "placeholder-1", "")
 
     active_changed = MagicMock()
     accounts_changed = MagicMock()
@@ -102,7 +102,7 @@ def test_add_first_account_emits_active_changed(
     assert accounts.list_accounts() == ["Personal"]
     assert accounts.get_active() == "Personal"
     accounts_changed.assert_called_once()
-    active_changed.assert_called_once_with("sk-1", None)
+    active_changed.assert_called_once_with("placeholder-1", None)
 
 
 def test_add_second_account_does_not_change_active(
@@ -111,11 +111,11 @@ def test_add_second_account_does_not_change_active(
     from sanduhr import accounts
     from sanduhr.accounts_dialog import AccountsTab
 
-    accounts.add_account("Personal", session_key="sk-p")
+    accounts.add_account("Personal", session_key="placeholder-personal")
 
     tab = AccountsTab()
     qtbot.addWidget(tab)
-    _stub_add_dialog["values"] = ("Work", "sk-w", "")
+    _stub_add_dialog["values"] = ("Work", "placeholder-work", "")
 
     active_changed = MagicMock()
     tab.activeAccountChanged.connect(active_changed)
@@ -136,7 +136,7 @@ def test_add_with_invalid_name_shows_error(
 
     tab = AccountsTab()
     qtbot.addWidget(tab)
-    _stub_add_dialog["values"] = ("bad/name", "sk", "")
+    _stub_add_dialog["values"] = ("bad/name", "x", "")
 
     tab._on_add()
 
@@ -148,8 +148,8 @@ def test_set_active_emits_signal_with_credentials(qtbot, _fake_keyring):
     from sanduhr import accounts
     from sanduhr.accounts_dialog import AccountsTab
 
-    accounts.add_account("Personal", session_key="sk-p")
-    accounts.add_account("Work", session_key="sk-w", cf_clearance="cf-w")
+    accounts.add_account("Personal", session_key="placeholder-personal")
+    accounts.add_account("Work", session_key="placeholder-work", cf_clearance="cf-placeholder-work")
 
     tab = AccountsTab()
     qtbot.addWidget(tab)
@@ -166,14 +166,14 @@ def test_set_active_emits_signal_with_credentials(qtbot, _fake_keyring):
     tab._on_set_active()
 
     assert accounts.get_active() == "Work"
-    active_changed.assert_called_once_with("sk-w", "cf-w")
+    active_changed.assert_called_once_with("placeholder-work", "cf-placeholder-work")
 
 
 def test_rename_updates_registry(qtbot, _fake_keyring, _stub_rename_dialog):
     from sanduhr import accounts
     from sanduhr.accounts_dialog import AccountsTab
 
-    accounts.add_account("Personal", session_key="sk-p")
+    accounts.add_account("Personal", session_key="placeholder-personal")
     tab = AccountsTab()
     qtbot.addWidget(tab)
     tab._list.setCurrentRow(0)
@@ -191,8 +191,8 @@ def test_remove_active_account_advances_active_pointer(
     from sanduhr import accounts, history, paths
     from sanduhr.accounts_dialog import AccountsTab
 
-    accounts.add_account("Personal", session_key="sk-p")
-    accounts.add_account("Work", session_key="sk-w")
+    accounts.add_account("Personal", session_key="placeholder-personal")
+    accounts.add_account("Work", session_key="placeholder-work")
     history.append("five_hour", 30, account="Personal")
     history.append("five_hour", 70, account="Work")
 
@@ -213,7 +213,7 @@ def test_remove_active_account_advances_active_pointer(
     # Work's history is intact.
     assert history.load("five_hour", account="Work") == [70]
     # New-active credentials emitted so the widget re-points the fetcher.
-    active_changed.assert_called_once_with("sk-w", None)
+    active_changed.assert_called_once_with("placeholder-work", None)
 
 
 def test_remove_last_account_emits_empty_credentials(
@@ -222,7 +222,7 @@ def test_remove_last_account_emits_empty_credentials(
     from sanduhr import accounts
     from sanduhr.accounts_dialog import AccountsTab
 
-    accounts.add_account("Solo", session_key="sk-solo")
+    accounts.add_account("Solo", session_key="placeholder-solo")
     tab = AccountsTab()
     qtbot.addWidget(tab)
     tab._list.setCurrentRow(0)

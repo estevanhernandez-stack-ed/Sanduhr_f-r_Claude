@@ -24,7 +24,7 @@ def _default_active_account(_fake_keyring):
     Multi-account export semantics (account column, all-accounts mode)
     are tested separately in test_aggregated_chart.py."""
     from sanduhr import accounts
-    accounts.add_account("Personal", session_key="sk-test")
+    accounts.add_account("Personal", session_key="placeholder-default")
     yield
 
 
@@ -72,7 +72,7 @@ def test_export_all_accounts_includes_account_column(tmp_path):
     """Default mode (account=None) exports every registered account
     with an extra 'account' column for downstream filtering."""
     from sanduhr import accounts, history, csv_export
-    accounts.add_account("Work", session_key="sk-w")
+    accounts.add_account("Work", session_key="placeholder-work")
 
     history.save_history(
         {"five_hour": [{"t": "2026-04-21T10:00:00+00:00", "v": 25}]},

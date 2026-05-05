@@ -175,8 +175,8 @@ def test_sign_out_only_clears_active_accounts_history(
     from sanduhr import accounts, history, paths
     from sanduhr.settings_dialog import SettingsDialog
 
-    accounts.add_account("Personal", session_key="sk-p")
-    accounts.add_account("Work", session_key="sk-w")
+    accounts.add_account("Personal", session_key="placeholder-personal")
+    accounts.add_account("Work", session_key="placeholder-work")
     accounts.set_active("Personal")
 
     history.append("five_hour", 30, account="Personal")
@@ -185,7 +185,7 @@ def test_sign_out_only_clears_active_accounts_history(
     assert paths.history_file_for("Work").exists()
 
     monkeypatch.setattr(QMessageBox, "exec_", lambda self: QMessageBox.Yes)
-    dlg = SettingsDialog(None, session_key="sk-p", cf_clearance="")
+    dlg = SettingsDialog(None, session_key="placeholder-personal", cf_clearance="")
     qtbot.addWidget(dlg)
     dlg._sk.setText("")
     dlg._save_credentials()

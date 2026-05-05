@@ -15,7 +15,7 @@ def _default_active_account(_fake_keyring):
     the legacy single-file tests still expect operations to work without
     explicit account setup, so we default it here at module scope."""
     from sanduhr import accounts
-    accounts.add_account("Personal", session_key="sk-test")
+    accounts.add_account("Personal", session_key="placeholder-default")
     yield
 
 
