@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
 )
 
 from sanduhr import credentials, paths, themes
+from sanduhr.accounts_dialog import AccountsTab
 
 _log = logging.getLogger(__name__)
 
@@ -93,6 +94,7 @@ class SettingsDialog(QDialog):
     credentialsCleared = Signal()
     themesChanged = Signal()
     settingsSaved = Signal(dict)
+    accountsChanged = Signal()  # any registry mutation — widget re-reads label
 
     def __init__(
         self,
@@ -118,6 +120,7 @@ class SettingsDialog(QDialog):
 
         self._build_themes_tab()
         self._build_pacing_tab()
+        self._build_accounts_tab()
         self._build_history_tab()
         self._build_help_tab()
         self._build_credentials_tab(session_key, cf_clearance, focus_cf)
@@ -327,6 +330,25 @@ class SettingsDialog(QDialog):
             self, QMessageBox.Information, "Settings",
             "Pacing configuration saved."
         ).exec_()
+
+    # ── Accounts tab ─────────────────────────────────────────────
+
+    def _build_accounts_tab(self) -> None:
+        self._accounts_tab = AccountsTab()
+        self._accounts_tab.activeAccountChanged.connect(self._on_active_account_changed)
+        # Registry mutations re-emit so the widget can refresh its
+        # active-account label.
+        self._accounts_tab.accountsChanged.connect(self.accountsChanged.emit)
+        self._tabs.addTab(self._accounts_tab, "Accounts")
+
+    def _on_active_account_changed(self, session_key: str, cf_clearance) -> None:
+        """Translate AccountsTab signal into the existing widget-facing
+        signals. Empty session_key means last account removed → signed-out
+        flow; otherwise it's a switch to a different active account."""
+        if not session_key:
+            self.credentialsCleared.emit()
+        else:
+            self.credentialsSaved.emit(session_key, cf_clearance)
 
     # ── History tab ──────────────────────────────────────────────
 
