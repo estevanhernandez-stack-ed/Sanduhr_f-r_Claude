@@ -1,5 +1,41 @@
 # Changelog
 
+## v2.2.0-windows — 2026-05-05
+
+**Platform:** Windows
+**Feature release — multi-account support, per-account history, aggregated overlay views, plus the API Credits (`extra_usage`) tier and a sign-out flow that keeps your other accounts intact.**
+
+### Added
+
+- **Multi-account registry.** Track multiple Claude accounts in one Sanduhr install (e.g. Personal + Work). Per-account credentials in Windows Credential Manager under named slots (`sessionKey:{label}`, `cf_clearance:{label}`); a registry slot tracks the active account. Subscription usage, history, and CSV exports follow whichever account is active.
+- **Settings → Accounts tab** between Pacing and History. List view of registered accounts with the active one marked. Buttons for `Add…` (name + sessionKey + cf_clearance), `Rename…`, `Set Active`, and `Remove…` (with confirmation). Empty-state hint walks first-time users through their first add.
+- **Active-account label in the widget**, just below the status text. Renders the bare account name when only one is configured; renders `⇆ Name` when multiple are configured to indicate that clicking cycles through them. Hidden entirely when signed-out.
+- **History tab — per-account / All-accounts toggle.** New combo box selects either a single account (theme-accent line per tier, identical to the existing single-account view) or "All accounts" (one colored line per account per tier, overlaid). Legend strip shows colored swatches when in All-accounts mode. CSV export honors the selection — per-account exports keep the original 3-column shape (`timestamp, tier, util_pct`); All-accounts exports add a 4th `account` column.
+- **`extra_usage` (API Credits) tier.** The claude.ai usage endpoint returns API credit-spend tracking with `is_enabled / monthly_limit / used_credits / utilization / currency` — Sanduhr now records and renders the `utilization` value alongside the other tiers, with the label "API Credits".
+- **Account-scoped sign-out.** Saving a blank sessionKey now removes only the active account (not your entire registry) and wipes only its history file. If other accounts remain, the widget switches to the next one and refreshes ("Switched to {Account}"). If the signed-out account was the last one, the existing signed-out flow runs.
+
+### Changed
+
+- **`history.json` is per-account.** Files now live at `%APPDATA%\Sanduhr\history.{Account}.json` so per-account wipes are atomic and aggregation happens at chart-render time. **Migration is automatic on first v2.2.0 launch:** any existing single-slot keyring credentials become a "Personal" account, and the legacy `history.json` is renamed to `history.Personal.json`. No data loss, no user prompt.
+- **Settings tab order.** Themes · Pacing · **Accounts (NEW)** · History · Help · Credentials. The Credentials tab still operates on the active account, so single-account users see no UX change.
+
+### Tests
+
+- **+18 `test_accounts.py`** — registry CRUD (add, remove, rename, set-active), validation (label rules, duplicates), legacy migration (promote single-slot creds to "Personal"), edge cases (empty registry, unknown account, last-account removal).
+- **+9 `test_history_per_account.py`** — per-account routing, isolation, explicit-account override, legacy `history.json` migration with idempotency, aggregate window, no-active-account no-op.
+- **+8 `test_accounts_dialog.py`** — UI tests via pytest-qt: empty state, add-first-account becomes active, add-second doesn't change active, invalid name surfaces error, set-active emits credentials, rename, remove of active advances pointer, remove of last emits empty creds.
+- **+5 `test_aggregated_chart.py`** — color stability (same label → same color), unknown-label fallback, aggregate `_data` shape, single-account filter, account round-trip.
+- **+2 `test_csv_export.py`** — all-accounts CSV includes `account` column.
+- **+1 `test_clear_credentials.py`** — multi-account sign-out leaves other accounts intact.
+- **Updated** `test_credentials.py` keyring fixture (now patches the `keyring` module globally instead of the `credentials` module attribute, since `credentials.py` delegates to `accounts.py`).
+
+**Total: 251 / 251 tests pass.**
+
+### Known limitations
+
+- The `/usage` endpoint Sanduhr fetches lags actual consumption by minutes — known property of the upstream API. Community tool [`ccusage`](https://www.npmjs.com/package/ccusage) reads local Claude Code logs for a more real-time view; a hybrid local-logs data source is a candidate for a future PR.
+- Routines (Claude Code's cloud-hosted scheduled / API / GitHub-triggered runs, shipped 2026-04-14) have a daily quota that surfaces on `claude.ai/settings/usage` as `0/15` (Max plan) but is **not** returned by the `/usage` endpoint. Routines tracking is parked for v2.3.0 — different shape (count-based) and lives at a different (undiscovered) endpoint.
+
 ## v2.0.4-windows — 2026-04-19
 
 **Platform:** Windows + macOS
