@@ -17,7 +17,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QWidget
 
-from sanduhr import accounts, history
+from sanduhr import accounts, history, pacing
 
 
 _TIER_LABELS = {
@@ -109,10 +109,11 @@ class HistoryChart(QWidget):
 
         fm = painter.fontMetrics()
         label_w = max(fm.horizontalAdvance(lbl) for lbl in _TIER_LABELS.values()) + 12
-        # Reserve a column on the right for current-value labels (only
-        # rendered in single-account mode where one value per row is
-        # unambiguous; aggregate mode skips it to avoid clutter).
-        value_w = fm.horizontalAdvance("100%") + 8
+        # Reserve a column on the right for current-state labels —
+        # rendered in single-account mode only ('53% left · 3d 12h'
+        # when resets_at is known, '47%' otherwise). Aggregate mode
+        # skips this column to avoid stacking conflicting values.
+        value_w = fm.horizontalAdvance("99% left · 30d 23h") + 8
 
         w = self.width()
         h = self.height()
@@ -219,17 +220,27 @@ class HistoryChart(QWidget):
                 painter.drawPath(path)
 
                 if self._account is not None and points:
-                    most_recent = (color, points[-1].get("v", 0))
+                    most_recent = (color, points[-1])
 
-            # Right-edge value label (single-account mode only).
+            # Right-edge state label (single-account mode only) — turns
+            # the chart from 'historical scribble' into 'how much budget
+            # do I have left and when does it reset'. Falls back to bare
+            # '%' when resets_at is missing (older history points or
+            # tiers like seven_day_omelette where the API returns null).
             if most_recent is not None:
-                value_color, util = most_recent
+                value_color, last_point = most_recent
+                util = max(0, min(100, int(last_point.get("v", 0))))
+                resets_at = last_point.get("resets_at")
+                if resets_at:
+                    label_text = f"{100 - util}% left · {pacing.time_until(resets_at)}"
+                else:
+                    label_text = f"{util}%"
                 painter.setPen(value_color)
                 painter.drawText(
                     int(chart_x + chart_w + 4), int(y_top),
                     int(value_w - 4), int(row_h - 4),
                     Qt.AlignRight | Qt.AlignVCenter,
-                    f"{int(util)}%",
+                    label_text,
                 )
 
         # Time-axis tick marks along the bottom (shared x-scale).

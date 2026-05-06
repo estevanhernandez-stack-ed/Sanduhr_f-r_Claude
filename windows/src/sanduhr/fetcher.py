@@ -69,7 +69,11 @@ class UsageFetcher(QObject):
             tier = data.get(tier_key)
             if tier and tier.get("utilization") is not None:
                 try:
-                    history.append(tier_key, int(tier["utilization"]))
+                    history.append(
+                        tier_key,
+                        int(tier["utilization"]),
+                        resets_at=tier.get("resets_at"),
+                    )
                 except Exception:
                     _log.exception("Failed to append history for %s", tier_key)
 

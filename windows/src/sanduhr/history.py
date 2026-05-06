@@ -76,17 +76,27 @@ def save_history(data: dict, account: Optional[str] = None) -> None:
     _write_account_file(active, data)
 
 
-def append(tier_key: str, util: int, account: Optional[str] = None) -> list[int]:
+def append(
+    tier_key: str,
+    util: int,
+    account: Optional[str] = None,
+    resets_at: Optional[str] = None,
+) -> list[int]:
     """Record a new utilization data point for the given (or active)
-    account. Returns the current series. No-op (returns []) when no
-    active account is configured."""
+    account. `resets_at` (ISO-8601 string from the API response) is
+    stored when present so the chart can render 'X% left · resets in
+    Yd Zh' on the latest point. Returns the current series of values.
+    No-op (returns []) when no active account is configured."""
     active = _resolve_account(account)
     if active is None:
         return []
     _migrate_legacy_if_needed(active)
     data = _read_account_file(active)
     series = data.get(tier_key, [])
-    series.append({"t": datetime.now(timezone.utc).isoformat(), "v": int(util)})
+    point: dict = {"t": datetime.now(timezone.utc).isoformat(), "v": int(util)}
+    if resets_at:
+        point["resets_at"] = resets_at
+    series.append(point)
     series = series[-MAX_HISTORY:]
     data[tier_key] = series
     _write_account_file(active, data)
