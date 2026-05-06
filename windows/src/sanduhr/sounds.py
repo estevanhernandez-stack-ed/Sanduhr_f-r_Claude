@@ -78,6 +78,9 @@ _NOTES_INFO = [
     (659.25, 0.08),  # E5
     (659.25, 0.12),  # E5 (same pitch, two-beat tap — neutral 'note')
 ]
+_NOTES_TOGGLE = [
+    (880.00, 0.04),  # A5 — single brief tap, ~50 ms total with envelope
+]
 
 # Cached lazy builds — pay the math cost once per tone shape.
 _WAV_CACHE: dict[str, bytes] = {}
@@ -91,13 +94,19 @@ def _wav_for(notes: list[tuple[float, float]], cache_key: str) -> bytes:
 
 def _play(wav: bytes) -> None:
     """Soft-fail async play. Sound failures must never propagate —
-    a bad sound card shouldn't crash the widget over a save dialog."""
+    a bad sound card shouldn't crash the widget over a save dialog.
+
+    Flags: SND_MEMORY tells PlaySound to read the bytes directly
+    (no temp file); SND_ASYNC returns immediately so the UI doesn't
+    block. SND_NODEFAULT was previously included to suppress the OS
+    default sound on failure, but it interacts badly with SND_MEMORY
+    on some Windows configs — silently drops the playback. Removed."""
     if winsound is None:
         return
     try:
         winsound.PlaySound(
             wav,
-            winsound.SND_MEMORY | winsound.SND_ASYNC | winsound.SND_NODEFAULT,
+            winsound.SND_MEMORY | winsound.SND_ASYNC,
         )
     except Exception:
         _log.debug("Sound playback failed", exc_info=True)
@@ -119,3 +128,10 @@ def play_info() -> None:
     Lighter than the success chime — used when the dialog is just
     surfacing info, not confirming a write."""
     _play(_wav_for(_NOTES_INFO, "info"))
+
+
+def play_toggle() -> None:
+    """Async brief A5 tap for checkbox / toggle interactions. Much
+    softer than the save/error chimes — meant to be felt rather than
+    heard, like a mechanical click."""
+    _play(_wav_for(_NOTES_TOGGLE, "toggle"))

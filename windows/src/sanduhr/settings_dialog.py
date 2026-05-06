@@ -302,13 +302,15 @@ class SettingsDialog(QDialog):
     def _auto_save_pacing(self) -> None:
         """Auto-save handler — wired to every Pacing-tab toggle. No
         explicit Save button, no confirmation msgbox; the visible
-        change on the widget IS the confirmation."""
+        change on the widget IS the confirmation. Subtle click tone
+        gives auditory feedback that the toggle registered."""
         self._settings["pacing_tools_enabled"] = self._chk_pacing_tools.isChecked()
         self._settings["remind_session_end"] = self._chk_remind.isChecked()
         self._settings["hidden_tiers"] = [
             key for key, chk in self._tier_checkboxes.items()
             if not chk.isChecked()
         ]
+        sounds.play_toggle()
         self.settingsSaved.emit(self._settings)
 
     # ── Accounts tab ─────────────────────────────────────────────
@@ -716,6 +718,17 @@ Privacy policy: <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-
             return
         self.themeApplied.emit(key)
         sounds.play_save_confirmation()
+        # Push the fresh stylesheet to ourselves AFTER the parent has
+        # applied the new theme. The parent's apply_theme runs in
+        # response to the same themeApplied signal; the QTimer hop
+        # puts our refresh after the current event-loop tick so the
+        # parent's stylesheet is up-to-date when we copy it.
+        QTimer.singleShot(0, self._refresh_styling_from_parent)
+
+    def _refresh_styling_from_parent(self) -> None:
+        parent = self.parent()
+        if parent is not None:
+            self.setStyleSheet(parent.styleSheet())
 
     def _reload_themes(self) -> None:
         themes.load_user_themes()
