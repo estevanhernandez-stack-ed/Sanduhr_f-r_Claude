@@ -109,6 +109,10 @@ class HistoryChart(QWidget):
 
         fm = painter.fontMetrics()
         label_w = max(fm.horizontalAdvance(lbl) for lbl in _TIER_LABELS.values()) + 12
+        # Reserve a column on the right for current-value labels (only
+        # rendered in single-account mode where one value per row is
+        # unambiguous; aggregate mode skips it to avoid clutter).
+        value_w = fm.horizontalAdvance("100%") + 8
 
         w = self.width()
         h = self.height()
@@ -125,15 +129,27 @@ class HistoryChart(QWidget):
             painter.end()
             return
 
+        # Reserve a thin strip at the bottom for time-axis tick marks +
+        # 'older' / 'now' anchors. This is shared by all tier rows since
+        # they all use the same x-scale.
+        axis_h = 16
+        rows_h = h - axis_h
         n_tiers = len(self._data)
-        row_h = h / n_tiers
+        row_h = rows_h / n_tiers
         chart_x = label_w + 8
-        chart_w = w - chart_x - 8
+        chart_w = w - chart_x - value_w - 8
+
+        # Light reference gridlines at 25 / 50 / 75 / 100 %. Locks the
+        # eye onto a scale instead of letting the lines float.
+        grid_color = QColor(t["text_dim"])
+        grid_color.setAlpha(60)
+        grid_pcts = (25, 50, 75, 100)
 
         for idx, (tier_key, per_account) in enumerate(self._data.items()):
             y_top = idx * row_h
             y_bottom = (idx + 1) * row_h - 4
 
+            # Tier label (left column).
             painter.setPen(QColor(t["text_secondary"]))
             painter.drawText(
                 int(8), int(y_top), int(label_w), int(row_h - 4),
@@ -141,33 +157,106 @@ class HistoryChart(QWidget):
                 _TIER_LABELS.get(tier_key, tier_key),
             )
 
-            # Line per account per tier — one in aggregate (could be many),
-            # exactly one in single-account mode.
+            # Gridlines — drawn behind fills/lines.
+            grid_pen = QPen(grid_color)
+            grid_pen.setWidthF(1.0)
+            grid_pen.setStyle(Qt.DotLine)
+            painter.setPen(grid_pen)
+            for pct in grid_pcts:
+                gy = y_bottom - (pct / 100.0) * (row_h - 8)
+                painter.drawLine(
+                    int(chart_x), int(gy),
+                    int(chart_x + chart_w), int(gy),
+                )
+
+            # Line + area-fill per account per tier — one in aggregate
+            # (could be many), exactly one in single-account mode.
+            most_recent = None
             for label, points in per_account.items():
                 if len(points) < 2:
                     continue
+                # Choose color: theme accent for single-account view
+                # (preserves existing visual); per-account palette for
+                # aggregate overlay.
+                if self._account is not None:
+                    color = QColor(t["accent"])
+                else:
+                    color = QColor(color_for_account(label))
+
+                # Build the line path.
                 path = QPainterPath()
                 denom = len(points) - 1
+                first_x = last_x = chart_x
                 for i, p in enumerate(points):
                     x = chart_x + (i / denom) * chart_w
                     util = max(0, min(100, p.get("v", 0)))
                     y = y_bottom - (util / 100.0) * (row_h - 8)
                     if i == 0:
                         path.moveTo(x, y)
+                        first_x = x
                     else:
                         path.lineTo(x, y)
-                # Single-account view uses the theme accent so existing
-                # users don't see a color change. Aggregate view uses the
-                # per-account palette.
-                if self._account is not None:
-                    color = QColor(t["accent"])
-                else:
-                    color = QColor(color_for_account(label))
+                    last_x = x
+
+                # Area fill under the line — adds visual mass so the
+                # rows don't feel empty when values are small.
+                fill_path = QPainterPath(path)
+                fill_path.lineTo(last_x, y_bottom)
+                fill_path.lineTo(first_x, y_bottom)
+                fill_path.closeSubpath()
+                fill_color = QColor(color)
+                fill_color.setAlpha(40)
+                painter.fillPath(fill_path, fill_color)
+
+                # Stroke the line on top of the fill.
                 pen = QPen(color)
-                pen.setWidthF(1.5)
+                pen.setWidthF(2.0)
                 pen.setCapStyle(Qt.RoundCap)
                 pen.setJoinStyle(Qt.RoundJoin)
                 painter.setPen(pen)
                 painter.drawPath(path)
+
+                if self._account is not None and points:
+                    most_recent = (color, points[-1].get("v", 0))
+
+            # Right-edge value label (single-account mode only).
+            if most_recent is not None:
+                value_color, util = most_recent
+                painter.setPen(value_color)
+                painter.drawText(
+                    int(chart_x + chart_w + 4), int(y_top),
+                    int(value_w - 4), int(row_h - 4),
+                    Qt.AlignRight | Qt.AlignVCenter,
+                    f"{int(util)}%",
+                )
+
+        # Time-axis tick marks along the bottom (shared x-scale).
+        tick_count = 7 if self._mode == "week" else 4
+        tick_y = rows_h - 1
+        axis_pen = QColor(t["text_dim"])
+        axis_pen_dim = QColor(t["text_dim"])
+        axis_pen_dim.setAlpha(140)
+        painter.setPen(axis_pen_dim)
+        for i in range(tick_count + 1):
+            x = chart_x + (i / tick_count) * chart_w
+            painter.drawLine(int(x), int(tick_y), int(x), int(tick_y + 4))
+
+        # 'older' / 'now' anchor labels.
+        painter.setPen(axis_pen_dim)
+        anchor_text_y = tick_y + 5
+        anchor_h = axis_h - 5
+        older_label = "7 days ago" if self._mode == "week" else "30 days ago"
+        painter.drawText(
+            int(chart_x), int(anchor_text_y),
+            int(chart_w // 2), int(anchor_h),
+            Qt.AlignLeft | Qt.AlignTop,
+            older_label,
+        )
+        painter.drawText(
+            int(chart_x + chart_w // 2), int(anchor_text_y),
+            int(chart_w // 2), int(anchor_h),
+            Qt.AlignRight | Qt.AlignTop,
+            "now",
+        )
 
         painter.end()
