@@ -12,7 +12,7 @@ comes from sanduhr.cc_logs — no network, no writes."""
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -32,6 +32,30 @@ from sanduhr.tiers import _format_tokens_compact
 
 _LOOKBACK_DAYS = 30
 _REFRESH_MS = 30_000  # match the widget's tick cadence
+
+
+class _CCAggregateThread(QThread):
+    """Off-main-thread worker for cc_logs.aggregate_for_local_cc_tab.
+
+    First-time loads on heavy CC users walk hundreds of session JSONLs
+    — even with mtime filtering and a 30 s in-process cache, the
+    initial read can stall the UI for a noticeable beat. Running the
+    aggregation on a QThread keeps the dialog responsive; subsequent
+    refreshes hit the warm cache and return in microseconds, but the
+    same path is still used for consistency."""
+
+    done = Signal(dict)
+
+    def __init__(self, days_back: int, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self._days_back = days_back
+
+    def run(self) -> None:  # noqa: N802 (Qt API)
+        try:
+            agg = cc_logs.aggregate_for_local_cc_tab(days_back=self._days_back)
+        except Exception:
+            agg = {"by_day": {}, "by_project": {}, "by_skill": {}}
+        self.done.emit(agg)
 
 
 class _DailyBarStrip(QWidget):
@@ -121,6 +145,13 @@ class LocalCCTab(QWidget):
     ):
         super().__init__(parent)
         self._theme = theme or {}
+        # In-flight aggregation worker. Only one runs at a time —
+        # showEvent + the 30 s timer can't queue up multiple disk
+        # walks if the first hasn't returned yet.
+        self._agg_thread: Optional[_CCAggregateThread] = None
+        # Set true after the first worker completes, so we can
+        # distinguish 'genuinely no activity' from 'still loading'.
+        self._loaded_once = False
 
         v = QVBoxLayout(self)
 
@@ -146,7 +177,11 @@ class LocalCCTab(QWidget):
         self._today_caption = QLabel("Today")
         self._today_caption.setStyleSheet("font-size: 9pt;")
         today_box.addWidget(self._today_caption)
-        self._today_lbl = QLabel("—")
+        # 'Loading…' is the initial placeholder so the user sees the
+        # tab is alive while the background aggregation runs. Worker
+        # done-handler swaps to either a real number or
+        # 'No activity yet'.
+        self._today_lbl = QLabel("Loading…")
         self._today_lbl.setStyleSheet("font-size: 22pt; font-weight: bold;")
         today_box.addWidget(self._today_lbl)
         totals_row.addLayout(today_box)
@@ -155,7 +190,7 @@ class LocalCCTab(QWidget):
         self._month_caption = QLabel(f"Last {_LOOKBACK_DAYS} days")
         self._month_caption.setStyleSheet("font-size: 9pt;")
         month_box.addWidget(self._month_caption)
-        self._month_lbl = QLabel("—")
+        self._month_lbl = QLabel("Loading…")
         self._month_lbl.setStyleSheet("font-size: 22pt; font-weight: bold;")
         month_box.addWidget(self._month_lbl)
         totals_row.addLayout(month_box)
@@ -249,14 +284,23 @@ class LocalCCTab(QWidget):
         self._refresh_timer.stop()
 
     def refresh(self) -> None:
-        """Re-read the session logs and update all three widgets.
-        Single-pass aggregation via cc_logs.aggregate_for_local_cc_tab
-        with a 30 s cache — fast enough that the 30 s timer doesn't
-        burn disk I/O even on heavy CC users."""
-        try:
-            agg = cc_logs.aggregate_for_local_cc_tab(days_back=_LOOKBACK_DAYS)
-        except Exception:
-            agg = {"by_day": {}, "by_project": {}, "by_skill": {}}
+        """Kick off a background aggregation if none is in flight.
+        Real work happens in `_CCAggregateThread.run`; the UI update
+        happens in `_on_agg_done` when the thread emits its result.
+        Subsequent calls within the cc_logs cache TTL are essentially
+        free because the worker hits the warm cache."""
+        if self._agg_thread is not None and self._agg_thread.isRunning():
+            return  # already loading; let it finish
+        self._agg_thread = _CCAggregateThread(days_back=_LOOKBACK_DAYS, parent=self)
+        self._agg_thread.done.connect(self._on_agg_done)
+        # Auto-cleanup so we don't leak QThread instances on each tick.
+        self._agg_thread.finished.connect(self._agg_thread.deleteLater)
+        self._agg_thread.start()
+
+    def _on_agg_done(self, agg: dict) -> None:
+        """Apply aggregation results to the UI. Runs on the main
+        thread (Qt marshals the signal across)."""
+        self._loaded_once = True
         by_day = agg["by_day"]
         by_proj = agg["by_project"]
         by_skill = agg["by_skill"]

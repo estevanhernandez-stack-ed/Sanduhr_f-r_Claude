@@ -116,31 +116,31 @@ def test_empty_registry_returns_no_accounts():
 
 def test_add_account_persists_and_sets_active_when_first():
     from sanduhr import accounts
-    accounts.add_account("Personal", session_key="sk-1", cf_clearance=None)
+    accounts.add_account("Personal", session_key="placeholder-1", cf_clearance=None)
     assert accounts.list_accounts() == ["Personal"]
     assert accounts.get_active() == "Personal"
 
 
 def test_add_second_account_does_not_change_active():
     from sanduhr import accounts
-    accounts.add_account("Personal", session_key="sk-1")
-    accounts.add_account("Work", session_key="sk-2")
+    accounts.add_account("Personal", session_key="placeholder-1")
+    accounts.add_account("Work", session_key="placeholder-2")
     assert accounts.list_accounts() == ["Personal", "Work"]
     assert accounts.get_active() == "Personal"
 
 
 def test_set_active_changes_pointer():
     from sanduhr import accounts
-    accounts.add_account("Personal", session_key="sk-1")
-    accounts.add_account("Work", session_key="sk-2")
+    accounts.add_account("Personal", session_key="placeholder-1")
+    accounts.add_account("Work", session_key="placeholder-2")
     accounts.set_active("Work")
     assert accounts.get_active() == "Work"
 
 
 def test_remove_account_clears_creds_and_advances_active_if_needed():
     from sanduhr import accounts
-    accounts.add_account("Personal", session_key="sk-1")
-    accounts.add_account("Work", session_key="sk-2")
+    accounts.add_account("Personal", session_key="placeholder-1")
+    accounts.add_account("Work", session_key="placeholder-2")
     accounts.remove_account("Personal")
     assert accounts.list_accounts() == ["Work"]
     assert accounts.get_active() == "Work"
@@ -150,7 +150,7 @@ def test_remove_account_clears_creds_and_advances_active_if_needed():
 
 def test_remove_last_account_leaves_no_active():
     from sanduhr import accounts
-    accounts.add_account("Solo", session_key="sk-1")
+    accounts.add_account("Solo", session_key="placeholder-1")
     accounts.remove_account("Solo")
     assert accounts.list_accounts() == []
     assert accounts.get_active() is None
@@ -158,11 +158,11 @@ def test_remove_last_account_leaves_no_active():
 
 def test_rename_account_updates_list_active_and_keys():
     from sanduhr import accounts
-    accounts.add_account("Personal", session_key="sk-1", cf_clearance="cf-1")
+    accounts.add_account("Personal", session_key="placeholder-1", cf_clearance="cf-1")
     accounts.rename_account("Personal", "Home")
     assert accounts.list_accounts() == ["Home"]
     assert accounts.get_active() == "Home"
-    assert accounts.load_credentials("Home") == {"session_key": "sk-1", "cf_clearance": "cf-1"}
+    assert accounts.load_credentials("Home") == {"session_key": "placeholder-1", "cf_clearance": "cf-1"}
 
 
 def test_invalid_label_rejected():
@@ -177,29 +177,29 @@ def test_invalid_label_rejected():
 
 def test_duplicate_label_rejected():
     from sanduhr import accounts
-    accounts.add_account("Personal", session_key="sk-1")
+    accounts.add_account("Personal", session_key="placeholder-1")
     with pytest.raises(ValueError):
-        accounts.add_account("Personal", session_key="sk-2")
+        accounts.add_account("Personal", session_key="placeholder-2")
 
 
 def test_migrate_legacy_promotes_existing_creds_to_personal():
     """Legacy sessionKey slot becomes the 'Personal' account; legacy slots cleaned up."""
     import keyring
     from sanduhr import accounts
-    keyring.set_password("com.626labs.sanduhr", "sessionKey", "sk-legacy")
+    keyring.set_password("com.626labs.sanduhr", "sessionKey", "placeholder-legacy")
     keyring.set_password("com.626labs.sanduhr", "cf_clearance", "cf-legacy")
     migrated = accounts.migrate_legacy()
     assert migrated is True
     assert accounts.list_accounts() == ["Personal"]
     assert accounts.get_active() == "Personal"
-    assert accounts.load_credentials("Personal") == {"session_key": "sk-legacy", "cf_clearance": "cf-legacy"}
+    assert accounts.load_credentials("Personal") == {"session_key": "placeholder-legacy", "cf_clearance": "cf-legacy"}
     assert keyring.get_password("com.626labs.sanduhr", "sessionKey") is None
     assert keyring.get_password("com.626labs.sanduhr", "cf_clearance") is None
 
 
 def test_migrate_legacy_noop_when_already_migrated():
     from sanduhr import accounts
-    accounts.add_account("Personal", session_key="sk-1")
+    accounts.add_account("Personal", session_key="placeholder-1")
     assert accounts.migrate_legacy() is False
 
 
@@ -484,8 +484,8 @@ def _isolate_appdata(monkeypatch, tmp_path):
 def _registered_accounts(_fake_keyring):
     """Fixture from test_accounts.py — set up two accounts."""
     from sanduhr import accounts
-    accounts.add_account("Personal", session_key="sk-p")
-    accounts.add_account("Work", session_key="sk-w")
+    accounts.add_account("Personal", session_key="placeholder-p")
+    accounts.add_account("Work", session_key="placeholder-w")
     yield
 
 

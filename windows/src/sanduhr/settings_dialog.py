@@ -24,6 +24,7 @@ from typing import Optional
 from PySide6.QtCore import QTimer, QUrl, Qt, Signal
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -31,6 +32,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -43,7 +45,7 @@ from PySide6.QtWidgets import (
 
 from sanduhr import paths, sounds, themes
 from sanduhr.accounts_dialog import AccountsTab
-from sanduhr.history_chart import _TIER_LABELS
+from sanduhr.history_chart import _TIER_LABELS, SPECULATIVE_TIERS
 from sanduhr.local_cc_dialog import LocalCCTab
 
 _log = logging.getLogger(__name__)
@@ -130,6 +132,8 @@ class SettingsDialog(QDialog):
     # Tab indices — public so callers can pass them via initial_tab without
     # hardcoding integers that drift when the build order changes.
     TAB_THEMES = 0
+    TAB_CARDS = 1
+    # Backwards-compat alias — prior name pre-2026-05-06 was TAB_PACING.
     TAB_PACING = 1
     TAB_ACCOUNTS = 2
     TAB_HISTORY = 3
@@ -164,7 +168,7 @@ class SettingsDialog(QDialog):
         layout.addWidget(self._tabs)
 
         self._build_themes_tab()
-        self._build_pacing_tab()
+        self._build_cards_tab()
         self._build_accounts_tab()
         self._build_history_tab()
         self._build_local_cc_tab()
@@ -252,64 +256,131 @@ class SettingsDialog(QDialog):
         self._refresh_list()
         self._tabs.addTab(page, "Themes")
 
-    # ── Pacing tab ───────────────────────────────────────────────
+    # ── Cards tab ────────────────────────────────────────────────
 
-    def _build_pacing_tab(self) -> None:
+    def _build_cards_tab(self) -> None:
         page = QWidget()
         v = QVBoxLayout(page)
 
-        v.addWidget(QLabel("<b>Pacing Tools & Deep Work</b>"))
+        v.addWidget(QLabel("<b>Pacing tools</b>"))
         v.addWidget(QLabel(
-            "Changes save automatically — no need for a Save button. "
-            "Toggle and the widget reflects it immediately."
+            "Changes save automatically. Toggle and the widget "
+            "reflects it immediately."
         ))
-
-        v.addSpacing(16)
 
         self._chk_pacing_tools = QCheckBox("Enable Pacing Calculators")
         self._chk_pacing_tools.setChecked(self._settings.get("pacing_tools_enabled", True))
-        self._chk_pacing_tools.toggled.connect(self._auto_save_pacing)
+        self._chk_pacing_tools.toggled.connect(self._auto_save_cards)
         v.addWidget(self._chk_pacing_tools)
 
         self._chk_remind = QCheckBox("Show reminder at 100% of session")
         self._chk_remind.setChecked(self._settings.get("remind_session_end", False))
-        self._chk_remind.toggled.connect(self._auto_save_pacing)
+        self._chk_remind.toggled.connect(self._auto_save_cards)
         v.addWidget(self._chk_remind)
 
         v.addSpacing(16)
         v.addWidget(QLabel("<b>Visible tier cards</b>"))
         v.addWidget(QLabel(
-            "Pick which tiers render on the widget. Hide ones you don't track "
-            "to keep the surface lean."
+            "Drag to reorder. Uncheck to hide. Order and visibility "
+            "save automatically."
         ))
-        # Per-tier visibility checkboxes. Saved as `hidden_tiers` (a list
-        # of tier_keys) so the default 'visible' state survives schema
-        # additions — new tiers we add later show up unless the user
-        # explicitly hides them.
+
+        # Drag-and-drop reorderable list with checkable items. Replaces
+        # the prior per-tier QCheckBox column — same visibility control
+        # plus user-defined ordering. Persisted as two settings keys:
+        #   `hidden_tiers` — list of unchecked tier_keys (matches the
+        #     prior schema so old settings still resolve cleanly)
+        #   `tier_order`  — list of tier_keys in user-chosen order;
+        #     keys not in the saved order render after, in the default
+        #     order, so newly-added tiers show up without surprise.
+        self._tier_list = QListWidget()
+        self._tier_list.setDragDropMode(QAbstractItemView.InternalMove)
+        self._tier_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        self._tier_list.setMinimumHeight(220)
+
+        # All tiers default to checked. Speculative ones won't pollute
+        # the widget surface anyway (the render filter drops tiers with
+        # null utilization) — leaving them checked means they auto-
+        # appear if Anthropic ever ships data for your account, which
+        # is a free discovery affordance. Users who don't want them in
+        # the Cards list can uncheck explicitly.
         hidden_tiers = set(self._settings.get("hidden_tiers", []))
-        self._tier_checkboxes: dict[str, QCheckBox] = {}
-        for tier_key, label in _TIER_LABELS.items():
-            chk = QCheckBox(label)
-            chk.setChecked(tier_key not in hidden_tiers)
-            chk.toggled.connect(self._auto_save_pacing)
-            self._tier_checkboxes[tier_key] = chk
-            v.addWidget(chk)
+        saved_order = self._settings.get("tier_order", []) or []
+        # Resolve final order: saved positions first, then any tiers
+        # the saved order didn't know about (new release added tiers).
+        seen: set[str] = set()
+        ordered_keys: list[str] = []
+        for key in saved_order:
+            if key in _TIER_LABELS and key not in seen:
+                ordered_keys.append(key)
+                seen.add(key)
+        for key in _TIER_LABELS:
+            if key not in seen:
+                ordered_keys.append(key)
+                seen.add(key)
+
+        for key in ordered_keys:
+            label = _TIER_LABELS[key]
+            # Soft tag on speculative tiers so the user understands why
+            # they default to hidden — these rows correspond to API
+            # fields most consumer accounts return null for. Tooltip
+            # carries the longer explanation; the inline tag keeps the
+            # row scannable.
+            if key in SPECULATIVE_TIERS:
+                label = f"{label}  ·  future use"
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, key)
+            item.setFlags(
+                item.flags()
+                | Qt.ItemIsUserCheckable
+                | Qt.ItemIsDragEnabled
+            )
+            if key in SPECULATIVE_TIERS:
+                item.setToolTip(
+                    "Future-use tier — the upstream API references "
+                    "this name but most consumer accounts return null "
+                    "for it. The widget only renders a card when real "
+                    "data arrives, so leaving this checked is a free "
+                    "discovery cue if Anthropic ever ships data here. "
+                    "Uncheck to hide it from this list entirely."
+                )
+            item.setCheckState(
+                Qt.Unchecked if key in hidden_tiers else Qt.Checked
+            )
+            self._tier_list.addItem(item)
+
+        # itemChanged fires on check-state toggle. rowsMoved on the
+        # underlying model fires on drag-drop reorder. Both routed to
+        # the same auto-save handler.
+        self._tier_list.itemChanged.connect(lambda _i: self._auto_save_cards())
+        self._tier_list.model().rowsMoved.connect(
+            lambda *_a: self._auto_save_cards()
+        )
+        v.addWidget(self._tier_list)
 
         v.addStretch()
 
-        self._tabs.addTab(page, "Pacing")
+        self._tabs.addTab(page, "Cards")
 
-    def _auto_save_pacing(self) -> None:
-        """Auto-save handler — wired to every Pacing-tab toggle. No
-        explicit Save button, no confirmation msgbox; the visible
-        change on the widget IS the confirmation. Subtle click tone
-        gives auditory feedback that the toggle registered."""
+    def _auto_save_cards(self) -> None:
+        """Auto-save handler — wired to every Cards-tab change.
+        No explicit Save button; the visible change on the widget IS
+        the confirmation. Subtle click tone confirms the toggle/move
+        registered."""
         self._settings["pacing_tools_enabled"] = self._chk_pacing_tools.isChecked()
         self._settings["remind_session_end"] = self._chk_remind.isChecked()
-        self._settings["hidden_tiers"] = [
-            key for key, chk in self._tier_checkboxes.items()
-            if not chk.isChecked()
-        ]
+
+        order: list[str] = []
+        hidden: list[str] = []
+        for i in range(self._tier_list.count()):
+            item = self._tier_list.item(i)
+            key = item.data(Qt.UserRole)
+            order.append(key)
+            if item.checkState() == Qt.Unchecked:
+                hidden.append(key)
+        self._settings["tier_order"] = order
+        self._settings["hidden_tiers"] = hidden
+
         sounds.play_toggle()
         self.settingsSaved.emit(self._settings)
 

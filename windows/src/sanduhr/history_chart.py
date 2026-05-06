@@ -34,6 +34,21 @@ _TIER_LABELS = {
 }
 
 
+# Tier keys the upstream API references but for which most consumer
+# accounts return null. Codenames (iguana_necktie, omelette) and
+# entitlement-gated rows (cowork, oauth_apps) — useful to acknowledge
+# for forward compatibility, but pollute the widget surface for users
+# whose accounts never see real numbers there. Default-hidden in the
+# Cards tab on fresh installs; the labels also get a 'future use' tag
+# so the user understands why they ship un-checked.
+SPECULATIVE_TIERS = frozenset({
+    "seven_day_cowork",
+    "seven_day_omelette",
+    "seven_day_oauth_apps",
+    "iguana_necktie",
+})
+
+
 # Stable per-account color palette for aggregate-view overlay. Picked
 # for readability against both light and dark themes; cycles after the
 # 5th registered account (most users have ≤2 — Personal + Work).

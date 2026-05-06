@@ -4,7 +4,20 @@ Single source of truth for where the app reads and writes on Windows.
 """
 
 import os
+import sys
 from pathlib import Path
+
+
+def bundled_icon_path() -> str:
+    """Resolve the path to the shipped Sanduhr.ico — works both when
+    running from source (`windows/icon/Sanduhr.ico`) and from a
+    PyInstaller bundle (`_MEIPASS/icon/Sanduhr.ico`). Caller is
+    responsible for `os.path.exists` check before passing to QIcon."""
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        return os.path.join(meipass, "icon", "Sanduhr.ico")
+    here = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(here, "..", "..", "icon", "Sanduhr.ico")
 
 
 def app_data_dir() -> Path:

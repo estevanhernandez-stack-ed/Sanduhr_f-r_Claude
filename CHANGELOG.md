@@ -1,5 +1,55 @@
 # Changelog
 
+## v2.3.0-windows — 2026-05-06
+
+**Platform:** Windows
+**Feature release — Routines daily-quota tier, Local CC tab reading session JSONLs for live token-burn deltas, drag-reorder tier cards, custom dialog sound chimes, theme apply across all open dialogs, and a Win11 taskbar-icon binding fix.**
+
+### Added
+
+- **Routines (Daily Routines) tier.** Wires the `/v1/code/routines/run-budget` endpoint discovered via Cowork DevTools — needs `x-organization-uuid` + `anthropic-version` headers. Renders as a count card (e.g. `3/15`) instead of a percentage since it's a daily run-quota, not subscription utilization. Was parked at v2.2.0 with "different shape, undiscovered endpoint" — both unblocked.
+- **Local CC settings tab.** Read-only view of token consumption from local Claude Code session JSONLs in `~/.claude*/projects/`. Side-by-side prominent numbers for Today vs Last 30 Days, a 30-day daily-bar strip, and per-project / per-skill breakdown tables (top 10 each). Show/hide breakdown toggle persists. Anthropic's `/usage` endpoint lags actual consumption by minutes — this is the canonical local view of what's actually being burned.
+- **Local CC token-burn delta on tier cards + footer.** Each tier card overlays a live "+1.2k since fetch" badge and the footer shows " · CC +X" — both source from the local session logs and reset to zero on every successful API fetch (~5 min). Hover tooltips explain the semantics.
+- **Cards tab — drag-and-drop tier reorder.** Settings → Cards (renamed from Pacing) uses a checkable `QListWidget` with internal-move drag-drop. Reorder by dragging; uncheck to hide. Saves `tier_order` alongside `hidden_tiers`. Tiers added in future releases fall in at the end automatically.
+- **Speculative-tier "future use" tag.** Codename / null-returning tiers (`seven_day_cowork`, `seven_day_omelette`, `seven_day_oauth_apps`, `iguana_necktie`) carry an inline `· future use` label and a tooltip explaining they'll auto-render when Anthropic surfaces data. Leaving them checked is a free discovery cue.
+- **Custom sound chimes.** Replaced every Windows system beep on dialog confirmations with four short PCM-WAV tones — success: C4-E4-G4 ascending; error: D4-B3-G3 descending; info: E4 two-beat; toggle: A4 single tap. Files lazy-built to `%APPDATA%\Sanduhr\sounds\*.wav` on first use, played via `winsound.PlaySound` with `SND_FILENAME | SND_ASYNC`. Disabled via `SANDUHR_SILENT_SOUNDS=1` for tests.
+- **Apply Selected button on Themes tab.** Pick any installed theme + click Apply Selected → live theme switch without restart. Double-click on the list item also applies.
+- **History tab visual polish.** Gridlines at 25/50/75/100%, area fills under each line, time-axis ticks, right-edge stacked label showing "X% left" + "resets in Yd Zh". Per-tier line is the theme accent in single-account mode; one colored line per account in All-accounts mode.
+- **Auto-save on Pacing / Cards toggles.** Save button removed — toggles persist instantly with a click chime for confirmation.
+
+### Changed
+
+- **Settings tab: Pacing → Cards.** New name better reflects the tab's contents (visible tier cards + drag-reorder + pacing-tools toggle). Old `TAB_PACING` constant kept as an alias for backwards compat.
+- **`extra_usage` tier label: "API Credits" → "Capped Extra Usage".** Clearer labeling for what the tier actually tracks.
+- **Tier-card label collision on narrow widgets.** Width-responsive: secondary rows hide when the card width drops below 360 px so labels don't overlap.
+
+### Fixed
+
+- **Themes apply across child dialogs.** Qt stylesheets don't cross window boundaries by default; `apply_theme` now iterates `findChildren(QDialog)` and pushes the stylesheet at the source. Previously, applying a theme via Settings → Themes → Apply Selected updated the widget but left the open settings dialog stale until reopened.
+- **Win11 taskbar icon binds at startup on frameless + topmost windows.** The `FramelessWindowHint + WindowStaysOnTopHint` combo on Win11 dropped the small-icon variant for the taskbar button at first show — neither Qt's `setWindowIcon` nor a direct `WM_SETICON` was enough; only an actual HWND recreation via `setWindowFlag` bound it. Widget now starts unpinned (clean HWND), forces a one-time recreation 150 ms after init, and replays the user's saved pin preference. Cosmetic side effects batched at the end so launch doesn't visibly flicker. Pin choice now persists across launches via a new `pinned` settings key.
+- **Pin / Float footer label updates immediately on pin toggle** instead of waiting up to 30 s for the next tick.
+- **Local CC tab no longer freezes on first open.** Aggregation moved to a `QThread` worker; tab shows "Loading…" placeholder until the disk walk returns. Subsequent ticks hit the warm 30 s cache and stay instant.
+- **Local CC table no longer shows duplicate project rows** when the same project is accessed via different `cwd` paths (e.g. via symlink + directly). Tokens are summed under the display basename before the table renders.
+- **Local CC totals split: Today + Last 30 days side-by-side.** Earlier single "Today's local CC" headline got read as the 30-day total because the bar strip's "Last 30 days" caption sat right next to it.
+- **Error chime now audible.** Earlier `SND_NODEFAULT` flag interfered with `SND_MEMORY` payloads; switched to file-based playback for reliable audio across Windows configs.
+- **Settings dialog re-styles on Apply.** Apply-theme on a paste no longer leaves the dialog stale; theme propagates to all open dialog windows.
+- **History chart axis labels no longer clipped** by parent layout — `axis_h=22` reservation.
+
+### Performance
+
+- **Local CC mtime filter + single-pass aggregation + 30 s in-process cache.** Heavy CC users with hundreds of session JSONL files: sub-100 ms refresh after the first fetch (was multi-second freeze).
+
+### Tests
+
+- **Total: 273 / 273 tests pass** (up from 251 in v2.2.0).
+- **+20 `test_cc_logs.py`** — discovery, parsing, mtime filter, model→tier mapping, by-day / by-project / by-skill aggregations, cache TTL, project_display_name normalization.
+- **+6 `test_sounds.py`** — file-based playback, env-var silence, lazy WAV build, tone palette stability, soft-fail on platform without `winsound`.
+
+### Known limitations
+
+- The `/usage` endpoint Sanduhr fetches still lags actual consumption by minutes — same upstream property as before. The Local CC tab + per-tier delta badges are the live-burn workaround. Future PR may cross-reference Anthropic's `ccusage` data shape for sharper attribution.
+- Mac parity for the new features (Routines, Local CC, drag reorder, custom sounds, taskbar icon fix) is deferred to a separate Mac-side release.
+
 ## v2.2.0-windows — 2026-05-05
 
 **Platform:** Windows

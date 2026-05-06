@@ -7,13 +7,14 @@ persistence, credentials dialog, and refresh scheduling.
 
 import json
 import logging
+import os
 import sys
 import webbrowser
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
 from PySide6.QtCore import QEvent, QPoint, Qt, QThread, QTimer, Slot
-from PySide6.QtGui import QColor, QCursor, QGuiApplication, QKeySequence, QShortcut
+from PySide6.QtGui import QColor, QCursor, QGuiApplication, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -63,7 +64,18 @@ class SanduhrWidget(QWidget):
         self._theme_key = self._settings.get("theme", "obsidian")
         self._theme = themes.THEMES.get(self._theme_key, themes.THEMES["obsidian"])
         self._compact = False
-        self._pinned = True
+        # Always construct unpinned. Win11 + FramelessWindowHint +
+        # WindowStaysOnTopHint at initial show drops the small-icon
+        # variant for the taskbar button — neither Qt's setWindowIcon
+        # nor a direct WM_SETICON fixes it. The reliable workaround is
+        # to start without the topmost flag (so the taskbar slot binds
+        # the icon cleanly), then re-pin AFTER the widget shows if the
+        # user previously had it pinned. The re-pin recreates the
+        # HWND via setWindowFlag → show() and _force_taskbar_button
+        # re-pushes the icon, so the glyph survives the transition.
+        self._pinned = False
+        # User's saved pin preference (replayed after init if True).
+        self._restore_pinned = bool(self._settings.get("pinned", False))
         self._drag_origin: Optional[QPoint] = None
         self._tier_cards: Dict[str, TierCard] = {}
         self._thread: Optional[QThread] = None
@@ -78,8 +90,24 @@ class SanduhrWidget(QWidget):
         self._resize_start_pos = None
 
         self.setWindowTitle("Sanduhr für Claude")
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        # Initial flags exclude WindowStaysOnTopHint so the taskbar
+        # icon binds at first show; pin preference (if any) is
+        # replayed via _toggle_pin further down.
+        self.setWindowFlags(Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
+        # Per-widget window icon. QApplication.setWindowIcon (set in
+        # app.py at startup) doesn't always propagate to a frameless +
+        # always-on-top HWND on Windows 11 — the taskbar slot exists
+        # (we force WS_EX_APPWINDOW separately) but renders without an
+        # icon glyph until the HWND gets recreated. Setting the icon
+        # on the widget itself fixes the initial paint, and we re-apply
+        # in `_toggle_pin` for the same reason after each recreation.
+        icon_path = paths.bundled_icon_path()
+        if os.path.exists(icon_path):
+            self._window_icon = QIcon(icon_path)
+            self.setWindowIcon(self._window_icon)
+        else:
+            self._window_icon = None
         self.resize(420, 540)
         self.setMouseTracking(True)
         self._restore_geometry()
@@ -106,6 +134,23 @@ class SanduhrWidget(QWidget):
         self._countdown = QTimer(self)
         self._countdown.timeout.connect(self._tick)
         self._countdown.start(_TICK_MS)
+
+        # Bind the taskbar icon. On Win11, neither Qt's setWindowIcon
+        # nor a direct WM_SETICON at initial show is enough — only an
+        # actual HWND recreation via setWindowFlag binds the small-
+        # icon variant the taskbar button uses. So we force a
+        # recreation at startup, ending in whatever pin state the
+        # user had last:
+        #   restore_pinned True  → one toggle (unpinned → pinned)
+        #   restore_pinned False → two toggles (unpinned → pinned →
+        #                          unpinned), giving us the icon-
+        #                          binding HWND recreation without
+        #                          changing the visible pin state
+        # The 150 ms delay lets the initial show + paint complete
+        # before the HWND gets recreated; without it, the user
+        # sees a brief blank-window frame.
+        if sys.platform == "win32":
+            QTimer.singleShot(150, self._bind_taskbar_icon)
 
     # -- for tests -------------------------------------------------
 
@@ -139,9 +184,12 @@ class SanduhrWidget(QWidget):
         tb.addWidget(self._title_lbl)
         tb.addStretch()
         self._btn_refresh = QPushButton("Refresh")
-        # Initial state is pinned (WindowStaysOnTopHint set on __init__),
-        # so the button's first label must be the ACTION, i.e. "Unpin".
-        self._btn_pin = QPushButton("Unpin")
+        # Initial state is unpinned (WindowStaysOnTopHint omitted on
+        # __init__ for the taskbar-icon workaround). Button text is
+        # the ACTION a click takes — so "Pin" while unpinned. The
+        # post-init replay below may flip this to "Unpin" before
+        # the user ever sees the title bar.
+        self._btn_pin = QPushButton("Pin")
         # Windows-native-style close button: wider, red hover via stylesheet,
         # uses the Unicode heavy multiplication sign that Windows Explorer
         # itself draws in title bars (rather than a plain lowercase x).
@@ -158,7 +206,7 @@ class SanduhrWidget(QWidget):
 
         # Tooltips — selective, for the controls whose purpose isn't obvious.
         self._btn_refresh.setToolTip("Refresh usage now (Ctrl+R)")
-        self._btn_pin.setToolTip("Unpin (currently always on top)")
+        self._btn_pin.setToolTip("Pin always on top")
         self._btn_close.setToolTip("Close (Alt+F4)")
         self._title_lbl.setToolTip("Drag to move")
 
@@ -962,6 +1010,12 @@ class SanduhrWidget(QWidget):
             self._taskbar_forced = False
             self._force_taskbar_button()
             self._taskbar_forced = True
+        # Re-set the window icon on the recreated HWND. Qt usually
+        # propagates the stored windowIcon automatically, but the
+        # WindowStaysOnTopHint + FramelessWindowHint combo on Win11
+        # has shipped with a stale-icon race after recreation.
+        if self._window_icon is not None:
+            self.setWindowIcon(self._window_icon)
         if self._theme.get("opts_out_of_mica"):
             mica.disable_mica(self)
         else:
@@ -976,6 +1030,58 @@ class SanduhrWidget(QWidget):
             "Unpin (currently always on top)" if self._pinned
             else "Pin always on top"
         )
+
+        # Persist the pin choice so we replay it on next launch via
+        # the post-init QTimer in __init__.
+        self._settings["pinned"] = self._pinned
+        self._save_settings()
+
+        # Footer's mode label ("Pinned" / "Float") otherwise wouldn't
+        # update until the next 30 s tick — refresh now so the change
+        # is immediate.
+        self._update_footer()
+
+    def _bind_taskbar_icon(self) -> None:
+        """Workaround for the Win11 frameless-window taskbar-icon
+        binding bug. Forces an HWND recreation so the icon binds —
+        once if the user wants pinned (we start unpinned, so one
+        flip lands at pinned), twice otherwise (unpinned → pinned →
+        unpinned, returning to chosen state). Each flip calls
+        _force_taskbar_button which is what actually binds the icon.
+        Cosmetic side effects (button label, mica reapply, persist,
+        footer) are batched at the end so the user doesn't see the
+        button label or mica style flicker during the coerce."""
+        if sys.platform != "win32":
+            return
+        flips = 1 if self._restore_pinned else 2
+        for _ in range(flips):
+            self._silent_pin_flip()
+        # Sync cosmetic state once, with the final pin value.
+        self._btn_pin.setText("Unpin" if self._pinned else "Pin")
+        self._btn_pin.setToolTip(
+            "Unpin (currently always on top)" if self._pinned
+            else "Pin always on top"
+        )
+        self._settings["pinned"] = self._pinned
+        self._save_settings()
+        self._update_footer()
+
+    def _silent_pin_flip(self) -> None:
+        """HWND recreation core of _toggle_pin, minus the cosmetic
+        updates. Used by _bind_taskbar_icon to flip pin state without
+        visibly flickering button labels or status bars."""
+        self._pinned = not self._pinned
+        geom = self.geometry()
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, self._pinned)
+        self.setGeometry(geom)
+        self.show()
+        self._taskbar_forced = False
+        self._force_taskbar_button()
+        self._taskbar_forced = True
+        if self._theme.get("opts_out_of_mica"):
+            mica.disable_mica(self)
+        else:
+            mica.apply_mica(self, enabled=True)
 
     def _toggle_compact(self) -> None:
         self._compact = not self._compact
@@ -1253,16 +1359,36 @@ class SanduhrWidget(QWidget):
         self._status_lbl.setStyleSheet("color: #f87171;")
 
     def _render_cards(self, data: dict) -> None:
-        # Per-tier visibility filter — Settings → Pacing → 'Visible
-        # tier cards' lets the user hide tiers they don't track.
-        # Stored as the inverse (list of hidden keys) so newly-added
-        # tiers default to visible.
+        # Per-tier visibility + ordering — Settings → Cards lets the
+        # user hide tiers and drag-reorder them. Stored as:
+        #   hidden_tiers — list of unchecked keys (default: none).
+        #     Speculative codename tiers stay checked by default — the
+        #     null-utilization filter below already prevents them from
+        #     rendering on the widget when there's no data, so the
+        #     visible-by-default state acts as a free discovery cue
+        #     if Anthropic ever ships data for those tiers.
+        #   tier_order   — list of keys in user-chosen order; tiers
+        #     missing from the saved order fall back to default order
+        #     after the saved ones, so new releases that add tiers
+        #     show up without manual config.
         hidden_tiers = set(self._settings.get("hidden_tiers", []))
+        saved_order = self._settings.get("tier_order", []) or []
+        seen: set[str] = set()
+        ordered_keys: list[str] = []
+        for key in saved_order:
+            if key in _TIER_LABELS and key not in seen:
+                ordered_keys.append(key)
+                seen.add(key)
+        for key in _TIER_LABELS:
+            if key not in seen:
+                ordered_keys.append(key)
+                seen.add(key)
 
         active = []
-        for key, label in _TIER_LABELS.items():
+        for key in ordered_keys:
             if key in hidden_tiers:
                 continue
+            label = _TIER_LABELS[key]
             tier = data.get(key)
             if tier and tier.get("utilization") is not None:
                 active.append(
@@ -1279,13 +1405,22 @@ class SanduhrWidget(QWidget):
             card.setParent(None)
             card.deleteLater()
 
-        for key, label, util, resets_at in active:
+        for desired_index, (key, label, util, resets_at) in enumerate(active):
             if key in self._tier_cards:
                 card = self._tier_cards[key]
+                # User reordered or hid a sibling — reposition this
+                # card to its desired slot if Qt's layout has it
+                # somewhere else. removeWidget preserves the widget
+                # itself; insertWidget places it at the requested
+                # position.
+                current_index = self._cards_layout.indexOf(card)
+                if current_index != desired_index:
+                    self._cards_layout.removeWidget(card)
+                    self._cards_layout.insertWidget(desired_index, card)
             else:
                 card = TierCard(tier_key=key, label=label, theme=self._theme)
                 self._tier_cards[key] = card
-                self._cards_layout.addWidget(card)
+                self._cards_layout.insertWidget(desired_index, card)
                 self._apply_monospace_if_needed(card)
                 # New card + its descendants need the drag filter too
                 self._install_drag_filter(card)
@@ -1390,7 +1525,13 @@ class SanduhrWidget(QWidget):
 
     def _force_taskbar_button(self) -> None:
         """Set WS_EX_APPWINDOW on the native window so Windows shows a
-        taskbar button for this frameless widget."""
+        taskbar button for this frameless widget. Also push the icon
+        directly via WM_SETICON — Qt's setWindowIcon is unreliable for
+        the small (16×16) taskbar-button variant on frameless +
+        topmost windows on Win11; the alt-tab / hover-preview icon
+        works fine, but the actual button slot stays blank until
+        WM_SETICON is sent. LoadImageW reads the .ico file directly
+        and Windows picks the right variant per ICON_SMALL / ICON_BIG."""
         import ctypes
         GWL_EXSTYLE = -20
         WS_EX_APPWINDOW = 0x00040000
@@ -1409,6 +1550,37 @@ class SanduhrWidget(QWidget):
                 hwnd, 0, 0, 0, 0, 0,
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
             )
+
+        # Push the .ico to both icon slots via WM_SETICON. Done after
+        # the EXSTYLE pass so the taskbar button exists before we
+        # populate its glyph.
+        icon_path = paths.bundled_icon_path()
+        if not os.path.exists(icon_path):
+            return
+        IMAGE_ICON = 1
+        LR_LOADFROMFILE = 0x00000010
+        LR_DEFAULTSIZE = 0x00000040
+        WM_SETICON = 0x0080
+        ICON_SMALL = 0
+        ICON_BIG = 1
+        # LoadImageW returns an HICON. We deliberately leak it (no
+        # DestroyIcon) — the icon lives for the lifetime of the
+        # window and Windows reclaims it on process exit. Re-loading
+        # on every _toggle_pin would otherwise leak per click.
+        # SetLastError reset keeps debugging cleaner if a load fails.
+        user32.LoadImageW.restype = ctypes.c_void_p
+        small = user32.LoadImageW(
+            None, ctypes.c_wchar_p(icon_path), IMAGE_ICON,
+            16, 16, LR_LOADFROMFILE,
+        )
+        big = user32.LoadImageW(
+            None, ctypes.c_wchar_p(icon_path), IMAGE_ICON,
+            32, 32, LR_LOADFROMFILE,
+        )
+        if small:
+            user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, ctypes.c_void_p(small))
+        if big:
+            user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, ctypes.c_void_p(big))
 
     def closeEvent(self, event) -> None:  # noqa: N802
         self._save_settings()
