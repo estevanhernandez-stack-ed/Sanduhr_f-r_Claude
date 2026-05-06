@@ -1056,6 +1056,7 @@ class SanduhrWidget(QWidget):
         dlg.credentialsSaved.connect(self._on_credentials_saved)
         dlg.credentialsCleared.connect(self._on_credentials_cleared)
         dlg.themesChanged.connect(self._rebuild_theme_strip)
+        dlg.themeApplied.connect(self.apply_theme)
         dlg.settingsSaved.connect(self._on_settings_saved)
         dlg.accountsChanged.connect(self._refresh_account_label)
         dlg.setStyleSheet(self.styleSheet())

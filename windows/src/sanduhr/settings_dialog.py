@@ -68,19 +68,47 @@ def _styled_msgbox(
     text: str,
     buttons=None,
 ):
-    """Create a QMessageBox with the parent's stylesheet already applied,
-    so it doesn't flash white before Qt's style cascade catches up."""
+    """Create a themed QMessageBox AND play our matching chime in
+    place of the OS system sound. We suppress the OS sound by
+    setting QMessageBox.NoIcon (the OS only beeps on Critical /
+    Warning / Information icon-styled boxes); the icon argument is
+    used to pick which of our tones to play (and to colour the
+    title-text accent so the user still reads severity at a glance)."""
     box = QMessageBox(parent)
-    box.setIcon(icon)
+    # NoIcon suppresses the platform's automatic icon-style system
+    # beep. Our chime fires below.
+    box.setIcon(QMessageBox.NoIcon)
     box.setWindowTitle(title)
-    box.setText(text)
+
+    # Severity-colored accent line in the title — replaces the
+    # system icon as the visual hint that this is an
+    # error / warning / info dialog.
+    if icon == QMessageBox.Critical:
+        marker = "⛔"
+    elif icon == QMessageBox.Warning:
+        marker = "⚠"
+    elif icon == QMessageBox.Question:
+        marker = "?"
+    else:
+        marker = ""
+    box.setText(f"{marker} {text}" if marker else text)
+
     if buttons is not None:
         box.setStandardButtons(buttons)
+
     # Inherit the root widget's stylesheet so the dark theme applies
     # from the first paint, not the second.
     root = parent.window() if parent is not None else None
     if root is not None:
         box.setStyleSheet(root.styleSheet())
+
+    # Play our chime instead of the OS beep.
+    if icon == QMessageBox.Critical or icon == QMessageBox.Warning:
+        sounds.play_error()
+    elif icon == QMessageBox.Information:
+        sounds.play_info()
+    # Question dialogs are silent — they're prompts, not events.
+
     return box
 
 
@@ -111,6 +139,7 @@ class SettingsDialog(QDialog):
     credentialsSaved = Signal(str, object)  # (session_key, cf_clearance | None)
     credentialsCleared = Signal()
     themesChanged = Signal()
+    themeApplied = Signal(str)  # user clicked Apply on an installed theme
     settingsSaved = Signal(dict)
     accountsChanged = Signal()  # any registry mutation — widget re-reads label
 
@@ -202,6 +231,9 @@ class SettingsDialog(QDialog):
         v.addWidget(self._list)
 
         list_row = QHBoxLayout()
+        apply_btn = QPushButton("Apply Selected")
+        apply_btn.clicked.connect(self._apply_selected_theme)
+        list_row.addWidget(apply_btn)
         reload_btn = QPushButton("Reload themes")
         reload_btn.clicked.connect(self._reload_themes)
         list_row.addWidget(reload_btn)
@@ -210,6 +242,12 @@ class SettingsDialog(QDialog):
         list_row.addWidget(del_btn)
         list_row.addStretch()
         v.addLayout(list_row)
+
+        # Double-click on a list item also applies — same gesture
+        # the user expects on a 'pickable list'.
+        self._list.itemDoubleClicked.connect(
+            lambda _: self._apply_selected_theme()
+        )
 
         self._refresh_list()
         self._tabs.addTab(page, "Themes")
@@ -581,12 +619,18 @@ Privacy policy: <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-
     def _save_and_apply_theme(self) -> None:
         raw = self._paste.toPlainText().strip()
         if not raw:
-            QMessageBox.warning(self, "Settings", "Paste a theme JSON first.")
+            _styled_msgbox(
+                self, QMessageBox.Warning, "Settings",
+                "Paste a theme JSON first.",
+            ).exec_()
             return
         try:
             data = json.loads(raw)
         except json.JSONDecodeError as e:
-            QMessageBox.critical(self, "Settings", f"Invalid JSON: {e}")
+            _styled_msgbox(
+                self, QMessageBox.Critical, "Settings",
+                f"Invalid JSON: {e}",
+            ).exec_()
             return
 
         filename = self._filename.text().strip()
@@ -595,7 +639,10 @@ Privacy policy: <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-
             if isinstance(name, str):
                 filename = _slugify(name)
         if not filename:
-            QMessageBox.warning(self, "Settings", "Filename is required.")
+            _styled_msgbox(
+                self, QMessageBox.Warning, "Settings",
+                "Filename is required.",
+            ).exec_()
             return
         if not filename.endswith(".json"):
             filename = f"{filename}.json"
@@ -604,15 +651,20 @@ Privacy policy: <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-
         try:
             target.write_text(json.dumps(data, indent=2), encoding="utf-8")
         except OSError as e:
-            QMessageBox.critical(self, "Settings", f"Could not write theme: {e}")
+            _styled_msgbox(
+                self, QMessageBox.Critical, "Settings",
+                f"Could not write theme: {e}",
+            ).exec_()
             return
 
         themes.load_user_themes()
         self._refresh_list()
         self.themesChanged.emit()
-        QMessageBox.information(
-            self, "Settings", f"Saved and applied: {target.name}"
-        )
+        sounds.play_save_confirmation()
+        _styled_msgbox(
+            self, QMessageBox.Information, "Settings",
+            f"Saved and applied: {target.name}",
+        ).exec_()
         self._paste.clear()
         self._filename.clear()
 
@@ -623,13 +675,12 @@ Privacy policy: <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-
         except OSError:
             text = self._fallback_prompt()
         QGuiApplication.clipboard().setText(text)
-        QMessageBox.information(
-            self,
-            "Settings",
+        _styled_msgbox(
+            self, QMessageBox.Information, "Settings",
             "Agent prompt copied to clipboard.\n\n"
             "Paste it into any chat agent with a reference image or vibe "
             "description. Drop the returned JSON into the paste box above.",
-        )
+        ).exec_()
 
     def _fallback_prompt(self) -> str:
         return (
@@ -644,6 +695,27 @@ Privacy policy: <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-
 
     def _open_themes_folder(self) -> None:
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(_themes_dir())))
+
+    def _apply_selected_theme(self) -> None:
+        """Apply the user theme currently selected in the installed-list.
+        File names look like 'my-theme.json'; the THEMES dict key is
+        the stem lowercased (matches what themes.load_user_themes does)."""
+        item = self._list.currentItem()
+        if item is None:
+            _styled_msgbox(
+                self, QMessageBox.Warning, "Settings",
+                "Pick a theme from the list first.",
+            ).exec_()
+            return
+        key = Path(item.text()).stem.lower()
+        if key not in themes.THEMES:
+            _styled_msgbox(
+                self, QMessageBox.Critical, "Settings",
+                f"Theme '{key}' isn't loaded — try Reload themes first.",
+            ).exec_()
+            return
+        self.themeApplied.emit(key)
+        sounds.play_save_confirmation()
 
     def _reload_themes(self) -> None:
         themes.load_user_themes()
@@ -660,15 +732,20 @@ Privacy policy: <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-
         if not item:
             return
         name = item.text()
-        confirm = QMessageBox.question(
-            self, "Settings", f"Delete {name}?"
+        confirm = _styled_msgbox(
+            self, QMessageBox.Question, "Settings",
+            f"Delete {name}?",
+            buttons=QMessageBox.Yes | QMessageBox.No,
         )
-        if confirm != QMessageBox.Yes:
+        if confirm.exec_() != QMessageBox.Yes:
             return
         try:
             (_themes_dir() / name).unlink()
         except OSError as e:
-            QMessageBox.critical(self, "Settings", f"Could not delete: {e}")
+            _styled_msgbox(
+                self, QMessageBox.Critical, "Settings",
+                f"Could not delete: {e}",
+            ).exec_()
             return
         # Also drop from in-memory THEMES dict so the strip gets rebuilt cleanly
         key = Path(name).stem.lower()

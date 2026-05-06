@@ -30,14 +30,24 @@ def test_build_wav_data_size_matches_header():
     assert declared_data == actual_data
 
 
-def test_save_confirm_wav_caches():
+def test_wav_cache_returns_same_object_on_second_call():
     from sanduhr import sounds
 
     # Reset the cache to ensure first call builds.
-    sounds._SAVE_CONFIRM_WAV = None
-    a = sounds._save_confirm_wav()
-    b = sounds._save_confirm_wav()
+    sounds._WAV_CACHE.clear()
+    a = sounds._wav_for(sounds._NOTES_SUCCESS, "success")
+    b = sounds._wav_for(sounds._NOTES_SUCCESS, "success")
     assert a is b  # exact same object on second call (cached)
+
+
+def test_play_error_and_play_info_do_not_raise(monkeypatch):
+    """The expanded tone palette (error / info) shares the same
+    soft-fail wrapper as play_save_confirmation — verify both new
+    helpers stay quiet when winsound is absent."""
+    from sanduhr import sounds
+    monkeypatch.setattr(sounds, "winsound", None)
+    sounds.play_error()
+    sounds.play_info()
 
 
 def test_play_save_confirmation_does_not_raise(monkeypatch):

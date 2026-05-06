@@ -60,37 +60,62 @@ def _build_wav(notes: list[tuple[float, float]], sample_rate: int = 44100) -> by
     return bytes(header) + bytes(samples)
 
 
-# C5 → E5 → G5 ascending arpeggio. Bright, short, doesn't outstay
-# its welcome — about 350 ms total.
-_SAVE_CONFIRM_NOTES = [
+# Tone palette. All ascending shapes for success / info, descending
+# for error so the user can recognize severity by ear without seeing
+# the dialog. Both deliberately short (~300 ms) and softer than the
+# OS defaults — pleasant rather than punishing.
+_NOTES_SUCCESS = [
     (523.25, 0.10),  # C5
     (659.25, 0.10),  # E5
-    (783.99, 0.16),  # G5 (held a hair longer for the landing)
+    (783.99, 0.16),  # G5 (slightly longer landing)
 ]
-_SAVE_CONFIRM_WAV: Optional[bytes] = None
+_NOTES_ERROR = [
+    (587.33, 0.10),  # D5
+    (493.88, 0.10),  # B4
+    (392.00, 0.18),  # G4 (lower landing, signals 'something didn't land')
+]
+_NOTES_INFO = [
+    (659.25, 0.08),  # E5
+    (659.25, 0.12),  # E5 (same pitch, two-beat tap — neutral 'note')
+]
+
+# Cached lazy builds — pay the math cost once per tone shape.
+_WAV_CACHE: dict[str, bytes] = {}
 
 
-def _save_confirm_wav() -> bytes:
-    """Cached lazy-build of the save chime so the cost is paid once,
-    not on every call (and not at module import which would fire even
-    on a fresh import of the package for tests that don't play
-    anything)."""
-    global _SAVE_CONFIRM_WAV
-    if _SAVE_CONFIRM_WAV is None:
-        _SAVE_CONFIRM_WAV = _build_wav(_SAVE_CONFIRM_NOTES)
-    return _SAVE_CONFIRM_WAV
+def _wav_for(notes: list[tuple[float, float]], cache_key: str) -> bytes:
+    if cache_key not in _WAV_CACHE:
+        _WAV_CACHE[cache_key] = _build_wav(notes)
+    return _WAV_CACHE[cache_key]
 
 
-def play_save_confirmation() -> None:
-    """Async playback of the save chime. No-op on platforms without
-    winsound, and silently swallows any audio-subsystem failure —
-    a successful save shouldn't be undone by a sound-card hiccup."""
+def _play(wav: bytes) -> None:
+    """Soft-fail async play. Sound failures must never propagate —
+    a bad sound card shouldn't crash the widget over a save dialog."""
     if winsound is None:
         return
     try:
         winsound.PlaySound(
-            _save_confirm_wav(),
+            wav,
             winsound.SND_MEMORY | winsound.SND_ASYNC | winsound.SND_NODEFAULT,
         )
     except Exception:
-        _log.debug("Save-confirmation sound failed", exc_info=True)
+        _log.debug("Sound playback failed", exc_info=True)
+
+
+def play_save_confirmation() -> None:
+    """Async ascending C-E-G arpeggio for save / action success."""
+    _play(_wav_for(_NOTES_SUCCESS, "success"))
+
+
+def play_error() -> None:
+    """Async descending D-B-G arpeggio for failures / invalid input.
+    Replaces the Windows system error beep on validation dialogs."""
+    _play(_wav_for(_NOTES_ERROR, "error"))
+
+
+def play_info() -> None:
+    """Async two-beat E5 tap for neutral / informational dialogs.
+    Lighter than the success chime — used when the dialog is just
+    surfacing info, not confirming a write."""
+    _play(_wav_for(_NOTES_INFO, "info"))
