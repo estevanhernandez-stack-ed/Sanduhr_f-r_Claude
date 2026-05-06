@@ -22,6 +22,7 @@ Conventions:
 """
 
 import json
+import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, NamedTuple, Optional
@@ -134,6 +135,20 @@ def _human_tokens(usage: dict) -> int:
     )
 
 
+def _file_mtime_after(path: Path, cutoff_epoch: float) -> bool:
+    """Cheap stat-check: does this file's mtime fall after the cutoff?
+    Used to skip parsing entirely on session files that haven't been
+    touched since the time window we care about. Heavy users with
+    months of CC history accumulate hundreds of session files —
+    skipping them at the stat() level instead of parsing every line
+    is the difference between an instant refresh and a multi-second
+    freeze."""
+    try:
+        return path.stat().st_mtime >= cutoff_epoch
+    except OSError:
+        return False
+
+
 def tokens_since(cutoff: datetime) -> dict[str, int]:
     """Return `{model_name: total_tokens}` summed across ALL session
     files in ALL discovered roots, considering only events with
@@ -142,7 +157,10 @@ def tokens_since(cutoff: datetime) -> dict[str, int]:
     totals: dict[str, int] = {}
     if cutoff.tzinfo is None:
         cutoff = cutoff.replace(tzinfo=timezone.utc)
+    cutoff_epoch = cutoff.timestamp()
     for path in discover_log_files():
+        if not _file_mtime_after(path, cutoff_epoch):
+            continue
         for event in iter_usage_events(path):
             if event.timestamp is None or event.model is None:
                 continue
@@ -165,8 +183,11 @@ def tokens_by_day(days_back: int = 30) -> dict[date, int]:
     which matches what they'd recognize as 'today's usage' /
     'yesterday's usage'."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
+    cutoff_epoch = cutoff.timestamp()
     by_day: dict[date, int] = {}
     for path in discover_log_files():
+        if not _file_mtime_after(path, cutoff_epoch):
+            continue
         for event in iter_usage_events(path):
             if event.timestamp is None:
                 continue
@@ -189,8 +210,11 @@ def tokens_by_project(since: datetime) -> dict[str, int]:
     skipped so we don't have a None bucket."""
     if since.tzinfo is None:
         since = since.replace(tzinfo=timezone.utc)
+    cutoff_epoch = since.timestamp()
     by_project: dict[str, int] = {}
     for path in discover_log_files():
+        if not _file_mtime_after(path, cutoff_epoch):
+            continue
         for event in iter_usage_events(path):
             if event.timestamp is None or event.cwd is None:
                 continue
@@ -213,8 +237,11 @@ def tokens_by_skill(since: datetime) -> dict[str, int]:
     for skill-attributed work."""
     if since.tzinfo is None:
         since = since.replace(tzinfo=timezone.utc)
+    cutoff_epoch = since.timestamp()
     by_skill: dict[str, int] = {}
     for path in discover_log_files():
+        if not _file_mtime_after(path, cutoff_epoch):
+            continue
         for event in iter_usage_events(path):
             if event.timestamp is None or not event.attribution_skill:
                 continue
@@ -230,6 +257,79 @@ def tokens_by_skill(since: datetime) -> dict[str, int]:
                 by_skill.get(event.attribution_skill, 0) + tokens
             )
     return by_skill
+
+
+# In-memory cache for the LocalCCTab combined aggregation. Tab
+# refreshes hit the cache after the first compute; the data is
+# acceptable to be ~30 s stale (the underlying sessions log faster
+# than that, but not by much).
+_AGG_CACHE: dict = {
+    "computed_at": 0.0,
+    "days_back": None,
+    "result": None,
+}
+_AGG_CACHE_TTL_SEC = 30
+
+
+def aggregate_for_local_cc_tab(days_back: int = 30) -> dict:
+    """Single-pass aggregation for the Local CC tab — replaces three
+    separate iterations (tokens_by_day + tokens_by_project +
+    tokens_by_skill) with one walk through the session files.
+
+    Combined with mtime filtering and a 30 s cache, this turns a
+    multi-second freeze into a sub-100ms refresh on heavy CC users
+    with hundreds of session files.
+
+    Returns `{'by_day': ..., 'by_project': ..., 'by_skill': ...}`."""
+    now = time.time()
+    if (
+        _AGG_CACHE["result"] is not None
+        and _AGG_CACHE["days_back"] == days_back
+        and (now - _AGG_CACHE["computed_at"]) < _AGG_CACHE_TTL_SEC
+    ):
+        return _AGG_CACHE["result"]
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
+    cutoff_epoch = cutoff.timestamp()
+    by_day: dict[date, int] = {}
+    by_project: dict[str, int] = {}
+    by_skill: dict[str, int] = {}
+
+    for path in discover_log_files():
+        if not _file_mtime_after(path, cutoff_epoch):
+            continue
+        for event in iter_usage_events(path):
+            if event.timestamp is None:
+                continue
+            ts = event.timestamp
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            if ts < cutoff:
+                continue
+            tokens = _human_tokens(event.usage)
+            if tokens <= 0:
+                continue
+
+            by_day[ts.astimezone().date()] = (
+                by_day.get(ts.astimezone().date(), 0) + tokens
+            )
+            if event.cwd:
+                by_project[event.cwd] = by_project.get(event.cwd, 0) + tokens
+            if event.attribution_skill:
+                by_skill[event.attribution_skill] = (
+                    by_skill.get(event.attribution_skill, 0) + tokens
+                )
+
+    result = {"by_day": by_day, "by_project": by_project, "by_skill": by_skill}
+    _AGG_CACHE.update(computed_at=now, days_back=days_back, result=result)
+    return result
+
+
+def invalidate_cache() -> None:
+    """Force the next aggregate_for_local_cc_tab call to recompute.
+    Tests use this to verify cache behavior without time travel."""
+    _AGG_CACHE["computed_at"] = 0.0
+    _AGG_CACHE["result"] = None
 
 
 def project_display_name(cwd: str) -> str:

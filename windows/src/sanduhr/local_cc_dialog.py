@@ -231,18 +231,16 @@ class LocalCCTab(QWidget):
 
     def refresh(self) -> None:
         """Re-read the session logs and update all three widgets.
-        Cheap enough to call on each 30s tick — file I/O bounded by
-        actual log volume, parser is line-streaming."""
+        Single-pass aggregation via cc_logs.aggregate_for_local_cc_tab
+        with a 30 s cache — fast enough that the 30 s timer doesn't
+        burn disk I/O even on heavy CC users."""
         try:
-            by_day = cc_logs.tokens_by_day(days_back=_LOOKBACK_DAYS)
+            agg = cc_logs.aggregate_for_local_cc_tab(days_back=_LOOKBACK_DAYS)
         except Exception:
-            by_day = {}
-        try:
-            since = datetime.now(timezone.utc) - timedelta(days=_LOOKBACK_DAYS)
-            by_proj = cc_logs.tokens_by_project(since)
-            by_skill = cc_logs.tokens_by_skill(since)
-        except Exception:
-            by_proj, by_skill = {}, {}
+            agg = {"by_day": {}, "by_project": {}, "by_skill": {}}
+        by_day = agg["by_day"]
+        by_proj = agg["by_project"]
+        by_skill = agg["by_skill"]
 
         # Today's total — local date
         today = datetime.now(timezone.utc).astimezone().date()

@@ -293,3 +293,55 @@ def test_project_display_name_extracts_basename():
     assert cc_logs.project_display_name("/home/dev/work/foo") == "foo"
     assert cc_logs.project_display_name("/home/dev/work/foo/") == "foo"
     assert cc_logs.project_display_name("") == ""
+
+
+def test_aggregate_for_local_cc_tab_combines_three_views(_fake_home):
+    from sanduhr import cc_logs
+    cc_logs.invalidate_cache()
+    base = datetime.now(timezone.utc) - timedelta(days=1)
+    _write_session(_fake_home, ".claude", "P", "s", [
+        _assistant_event(
+            base.isoformat(), "claude-opus-4-7", 100, 200,
+            cwd="C:/proj/Sanduhr", attribution_skill="superpowers:debugging",
+        ),
+        _assistant_event(
+            (base + timedelta(minutes=5)).isoformat(), "claude-opus-4-7", 50, 50,
+            cwd="C:/proj/Sanduhr", attribution_skill="superpowers:debugging",
+        ),
+        _assistant_event(
+            (base + timedelta(minutes=10)).isoformat(), "claude-opus-4-7", 30, 70,
+            cwd="C:/proj/Other",  # no attribution_skill on this one
+        ),
+    ])
+    agg = cc_logs.aggregate_for_local_cc_tab(days_back=30)
+    assert sum(agg["by_day"].values()) == 500
+    assert agg["by_project"] == {"C:/proj/Sanduhr": 400, "C:/proj/Other": 100}
+    assert agg["by_skill"] == {"superpowers:debugging": 400}
+
+
+def test_aggregate_for_local_cc_tab_caches_within_ttl(_fake_home, monkeypatch):
+    """Second call within the TTL window should NOT re-read files —
+    verify by changing the underlying data after the first call and
+    confirming the cached return doesn't reflect it."""
+    from sanduhr import cc_logs
+    cc_logs.invalidate_cache()
+    base = datetime.now(timezone.utc) - timedelta(hours=1)
+    f = _write_session(_fake_home, ".claude", "P", "s", [
+        _assistant_event(base.isoformat(), "claude-opus-4-7", 100, 100),
+    ])
+    first = cc_logs.aggregate_for_local_cc_tab(days_back=30)
+    assert sum(first["by_day"].values()) == 200
+
+    # Append a new event; cache should still return the first result.
+    with open(f, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(_assistant_event(
+            (base + timedelta(minutes=10)).isoformat(),
+            "claude-opus-4-7", 999, 999,
+        )) + "\n")
+    second = cc_logs.aggregate_for_local_cc_tab(days_back=30)
+    assert sum(second["by_day"].values()) == 200  # unchanged — cache hit
+
+    # After invalidation the new event lands.
+    cc_logs.invalidate_cache()
+    third = cc_logs.aggregate_for_local_cc_tab(days_back=30)
+    assert sum(third["by_day"].values()) == 200 + 1998
