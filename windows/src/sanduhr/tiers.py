@@ -52,6 +52,18 @@ def _rgba(hex_color: str, alpha: float) -> str:
     return f"rgba({c.red()},{c.green()},{c.blue()},{alpha:.3f})"
 
 
+def _format_tokens_compact(n: int) -> str:
+    """Compact human-readable token count for badge labels.
+    1499 -> '1.5k', 12345 -> '12k', 1_234_567 -> '1.2M'."""
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 10_000:
+        return f"{n // 1_000}k"
+    if n >= 1_000:
+        return f"{n / 1_000:.1f}k"
+    return str(n)
+
+
 class TierCard(QFrame):
     def __init__(
         self, tier_key: str, label: str, theme: dict, parent: Optional[QWidget] = None
@@ -82,14 +94,24 @@ class TierCard(QFrame):
     # -- public API -----------------------------------------------
 
     def update_state(
-        self, util: int, resets_at: Optional[str], history_values: List[int]
+        self,
+        util: int,
+        resets_at: Optional[str],
+        history_values: List[int],
+        *,
+        value_label: Optional[str] = None,
     ) -> None:
-        """Mutate labels and bar in place -- no rebuild."""
+        """Mutate labels and bar in place -- no rebuild.
+
+        `value_label` overrides the default 'NN%' label in the card
+        header — e.g., count-based tiers like Daily Routines pass
+        '0/15' so the user reads the actual quota count rather than
+        the derived percentage."""
         self._util = util
         self._resets_at = resets_at
 
         color = themes.usage_color(util)
-        self._pct.setText(f"{util}%")
+        self._pct.setText(value_label if value_label is not None else f"{util}%")
         self._pct.setStyleSheet(f"color: {color};")
 
         self._bar.setValue(util)
@@ -118,11 +140,25 @@ class TierCard(QFrame):
         mode = current_graph_mode()
         self._spark.set_mode("horizon" if mode == "horizon" else "line")
 
+    def set_local_delta(self, tokens: int) -> None:
+        """Update the small 'tokens burned since last fetch' badge in
+        the card header. Hidden when zero (nothing happening locally
+        in this tier since the API caught up) so cards stay quiet."""
+        if tokens <= 0:
+            self._local_delta_lbl.hide()
+            self._local_delta_lbl.setText("")
+            return
+        self._local_delta_lbl.setText(f"+{_format_tokens_compact(tokens)}")
+        self._local_delta_lbl.show()
+
     def apply_theme(self, theme: dict) -> None:
         self._theme = theme
         self.setStyleSheet(self._card_qss())
         self._lbl.setStyleSheet(f"color: {theme['text_secondary']};")
         self._pct.setStyleSheet(f"color: {theme['text']};")
+        self._local_delta_lbl.setStyleSheet(
+            f"color: {theme['text_dim']}; font-size: 8pt;"
+        )
         self._reset_lbl.setStyleSheet(f"color: {theme['text_dim']};")
         self._reset_dt_lbl.setStyleSheet(f"color: {theme['text_muted']};")
         self._spark.set_color(theme["sparkline"])
@@ -166,6 +202,24 @@ class TierCard(QFrame):
         self._spark = Sparkline()
         self._spark.setFixedSize(100, 16)
         row1.addWidget(self._spark)
+        # Local CC token delta — small badge showing tokens burned in
+        # this tier since the last API fetch landed. Hidden when zero
+        # so cards stay clean during inactivity. Sits between sparkline
+        # and percentage so it reads as "what's happening right now"
+        # while % is the canonical state from the fetch.
+        self._local_delta_lbl = QLabel("")
+        self._local_delta_lbl.setAttribute(Qt.WA_TranslucentBackground, True)
+        self._local_delta_lbl.setObjectName("LocalDeltaBadge")
+        self._local_delta_lbl.setStyleSheet("font-size: 8pt;")
+        self._local_delta_lbl.setToolTip(
+            "Tokens consumed in this tier from local Claude Code "
+            "sessions since the last API fetch landed.\n\n"
+            "The /usage endpoint lags actual consumption by minutes "
+            "— this is the live delta. Resets to zero each time a "
+            "fresh fetch arrives (every ~5 min)."
+        )
+        self._local_delta_lbl.hide()
+        row1.addWidget(self._local_delta_lbl)
         self._pct = QLabel("0%")
         self._pct.setAttribute(Qt.WA_TranslucentBackground, True)
         row1.addWidget(self._pct)
@@ -217,6 +271,25 @@ class TierCard(QFrame):
         self._burn_lbl.setAttribute(Qt.WA_TranslucentBackground, True)
         row4.addWidget(self._burn_lbl)
         outer.addLayout(row4)
+
+    # Width below which the secondary rows (reset countdown, pace
+    # label, reset datetime, burn projection) get hidden — at narrow
+    # widget widths the labels start colliding with each other and
+    # the bar chrome. Empirical pick; tweak if users complain.
+    _NARROW_HIDE_PX = 360
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        narrow = self.width() < self._NARROW_HIDE_PX
+        # Hide the entire row3 + row4 set when narrow — primary info
+        # (label, %, sparkline, bar) stays visible regardless.
+        for lbl in (
+            self._reset_lbl,
+            self._pace_lbl,
+            self._reset_dt_lbl,
+            self._burn_lbl,
+        ):
+            lbl.setVisible(not narrow)
 
     def eventFilter(self, obj, event) -> bool:
         if obj == self._pace_lbl:

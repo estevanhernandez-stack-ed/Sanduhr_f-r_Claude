@@ -24,6 +24,8 @@ _HISTORY_TIERS = (
     "seven_day_omelette",
     "seven_day_oauth_apps",
     "iguana_necktie",
+    "extra_usage",
+    "routines",  # synthesized from /v1/code/routines/run-budget below
 )
 
 
@@ -64,11 +66,36 @@ class UsageFetcher(QObject):
             self.fetchFailed.emit("unknown", str(e))
             return
 
+        # Routines is a separate endpoint (different base path, requires
+        # Anthropic-version headers). Synthesize its result into the
+        # main `data` dict under the 'routines' key so it flows through
+        # the same tier rendering path. Endpoint 404s on accounts
+        # without code access — that's a None return, not a fetch
+        # failure.
+        try:
+            budget = self._client.get_routine_budget()
+        except Exception:
+            _log.exception("Routines budget fetch failed (non-fatal)")
+            budget = None
+        if budget and budget.get("limit", 0) > 0:
+            used = int(budget["used"])
+            limit = int(budget["limit"])
+            data["routines"] = {
+                "utilization": (used / limit) * 100,
+                "resets_at": None,  # daily quota, no specific reset time exposed
+                "used": used,
+                "limit": limit,
+            }
+
         for tier_key in _HISTORY_TIERS:
             tier = data.get(tier_key)
             if tier and tier.get("utilization") is not None:
                 try:
-                    history.append(tier_key, int(tier["utilization"]))
+                    history.append(
+                        tier_key,
+                        int(tier["utilization"]),
+                        resets_at=tier.get("resets_at"),
+                    )
                 except Exception:
                     _log.exception("Failed to append history for %s", tier_key)
 

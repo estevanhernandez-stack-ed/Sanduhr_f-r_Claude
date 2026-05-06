@@ -1,5 +1,91 @@
 # Changelog
 
+## v2.3.0-windows — 2026-05-06
+
+**Platform:** Windows
+**Feature release — Routines daily-quota tier, Local CC tab reading session JSONLs for live token-burn deltas, drag-reorder tier cards, custom dialog sound chimes, theme apply across all open dialogs, and a Win11 taskbar-icon binding fix.**
+
+### Added
+
+- **Routines (Daily Routines) tier.** Wires the `/v1/code/routines/run-budget` endpoint discovered via Cowork DevTools — needs `x-organization-uuid` + `anthropic-version` headers. Renders as a count card (e.g. `3/15`) instead of a percentage since it's a daily run-quota, not subscription utilization. Was parked at v2.2.0 with "different shape, undiscovered endpoint" — both unblocked.
+- **Local CC settings tab.** Read-only view of token consumption from local Claude Code session JSONLs in `~/.claude*/projects/`. Side-by-side prominent numbers for Today vs Last 30 Days, a 30-day daily-bar strip, and per-project / per-skill breakdown tables (top 10 each). Show/hide breakdown toggle persists. Anthropic's `/usage` endpoint lags actual consumption by minutes — this is the canonical local view of what's actually being burned.
+- **Local CC token-burn delta on tier cards + footer.** Each tier card overlays a live "+1.2k since fetch" badge and the footer shows " · CC +X" — both source from the local session logs and reset to zero on every successful API fetch (~5 min). Hover tooltips explain the semantics.
+- **Cards tab — drag-and-drop tier reorder.** Settings → Cards (renamed from Pacing) uses a checkable `QListWidget` with internal-move drag-drop. Reorder by dragging; uncheck to hide. Saves `tier_order` alongside `hidden_tiers`. Tiers added in future releases fall in at the end automatically.
+- **Speculative-tier "future use" tag.** Codename / null-returning tiers (`seven_day_cowork`, `seven_day_omelette`, `seven_day_oauth_apps`, `iguana_necktie`) carry an inline `· future use` label and a tooltip explaining they'll auto-render when Anthropic surfaces data. Leaving them checked is a free discovery cue.
+- **Custom sound chimes.** Replaced every Windows system beep on dialog confirmations with four short PCM-WAV tones — success: C4-E4-G4 ascending; error: D4-B3-G3 descending; info: E4 two-beat; toggle: A4 single tap. Files lazy-built to `%APPDATA%\Sanduhr\sounds\*.wav` on first use, played via `winsound.PlaySound` with `SND_FILENAME | SND_ASYNC`. Disabled via `SANDUHR_SILENT_SOUNDS=1` for tests.
+- **Apply Selected button on Themes tab.** Pick any installed theme + click Apply Selected → live theme switch without restart. Double-click on the list item also applies.
+- **History tab visual polish.** Gridlines at 25/50/75/100%, area fills under each line, time-axis ticks, right-edge stacked label showing "X% left" + "resets in Yd Zh". Per-tier line is the theme accent in single-account mode; one colored line per account in All-accounts mode.
+- **Auto-save on Pacing / Cards toggles.** Save button removed — toggles persist instantly with a click chime for confirmation.
+
+### Changed
+
+- **Settings tab: Pacing → Cards.** New name better reflects the tab's contents (visible tier cards + drag-reorder + pacing-tools toggle). Old `TAB_PACING` constant kept as an alias for backwards compat.
+- **`extra_usage` tier label: "API Credits" → "Capped Extra Usage".** Clearer labeling for what the tier actually tracks.
+- **Tier-card label collision on narrow widgets.** Width-responsive: secondary rows hide when the card width drops below 360 px so labels don't overlap.
+
+### Fixed
+
+- **Themes apply across child dialogs.** Qt stylesheets don't cross window boundaries by default; `apply_theme` now iterates `findChildren(QDialog)` and pushes the stylesheet at the source. Previously, applying a theme via Settings → Themes → Apply Selected updated the widget but left the open settings dialog stale until reopened.
+- **Win11 taskbar icon binds at startup on frameless + topmost windows.** The `FramelessWindowHint + WindowStaysOnTopHint` combo on Win11 dropped the small-icon variant for the taskbar button at first show — neither Qt's `setWindowIcon` nor a direct `WM_SETICON` was enough; only an actual HWND recreation via `setWindowFlag` bound it. Widget now starts unpinned (clean HWND), forces a one-time recreation 150 ms after init, and replays the user's saved pin preference. Cosmetic side effects batched at the end so launch doesn't visibly flicker. Pin choice now persists across launches via a new `pinned` settings key.
+- **Pin / Float footer label updates immediately on pin toggle** instead of waiting up to 30 s for the next tick.
+- **Local CC tab no longer freezes on first open.** Aggregation moved to a `QThread` worker; tab shows "Loading…" placeholder until the disk walk returns. Subsequent ticks hit the warm 30 s cache and stay instant.
+- **Local CC table no longer shows duplicate project rows** when the same project is accessed via different `cwd` paths (e.g. via symlink + directly). Tokens are summed under the display basename before the table renders.
+- **Local CC totals split: Today + Last 30 days side-by-side.** Earlier single "Today's local CC" headline got read as the 30-day total because the bar strip's "Last 30 days" caption sat right next to it.
+- **Error chime now audible.** Earlier `SND_NODEFAULT` flag interfered with `SND_MEMORY` payloads; switched to file-based playback for reliable audio across Windows configs.
+- **Settings dialog re-styles on Apply.** Apply-theme on a paste no longer leaves the dialog stale; theme propagates to all open dialog windows.
+- **History chart axis labels no longer clipped** by parent layout — `axis_h=22` reservation.
+
+### Performance
+
+- **Local CC mtime filter + single-pass aggregation + 30 s in-process cache.** Heavy CC users with hundreds of session JSONL files: sub-100 ms refresh after the first fetch (was multi-second freeze).
+
+### Tests
+
+- **Total: 273 / 273 tests pass** (up from 251 in v2.2.0).
+- **+20 `test_cc_logs.py`** — discovery, parsing, mtime filter, model→tier mapping, by-day / by-project / by-skill aggregations, cache TTL, project_display_name normalization.
+- **+6 `test_sounds.py`** — file-based playback, env-var silence, lazy WAV build, tone palette stability, soft-fail on platform without `winsound`.
+
+### Known limitations
+
+- The `/usage` endpoint Sanduhr fetches still lags actual consumption by minutes — same upstream property as before. The Local CC tab + per-tier delta badges are the live-burn workaround. Future PR may cross-reference Anthropic's `ccusage` data shape for sharper attribution.
+- Mac parity for the new features (Routines, Local CC, drag reorder, custom sounds, taskbar icon fix) is deferred to a separate Mac-side release.
+
+## v2.2.0-windows — 2026-05-05
+
+**Platform:** Windows
+**Feature release — multi-account support, per-account history, aggregated overlay views, plus the API Credits (`extra_usage`) tier and a sign-out flow that keeps your other accounts intact.**
+
+### Added
+
+- **Multi-account registry.** Track multiple Claude accounts in one Sanduhr install (e.g. Personal + Work). Per-account credentials in Windows Credential Manager under named slots (`sessionKey:{label}`, `cf_clearance:{label}`); a registry slot tracks the active account. Subscription usage, history, and CSV exports follow whichever account is active.
+- **Settings → Accounts tab** between Pacing and History. List view of registered accounts with the active one marked. Buttons for `Add…` (name + sessionKey + cf_clearance), `Rename…`, `Set Active`, and `Remove…` (with confirmation). Empty-state hint walks first-time users through their first add.
+- **Active-account label in the widget**, just below the status text. Renders the bare account name when only one is configured; renders `⇆ Name` when multiple are configured to indicate that clicking cycles through them. Hidden entirely when signed-out.
+- **History tab — per-account / All-accounts toggle.** New combo box selects either a single account (theme-accent line per tier, identical to the existing single-account view) or "All accounts" (one colored line per account per tier, overlaid). Legend strip shows colored swatches when in All-accounts mode. CSV export honors the selection — per-account exports keep the original 3-column shape (`timestamp, tier, util_pct`); All-accounts exports add a 4th `account` column.
+- **`extra_usage` (API Credits) tier.** The claude.ai usage endpoint returns API credit-spend tracking with `is_enabled / monthly_limit / used_credits / utilization / currency` — Sanduhr now records and renders the `utilization` value alongside the other tiers, with the label "API Credits".
+- **Account-scoped sign-out.** Saving a blank sessionKey now removes only the active account (not your entire registry) and wipes only its history file. If other accounts remain, the widget switches to the next one and refreshes ("Switched to {Account}"). If the signed-out account was the last one, the existing signed-out flow runs.
+
+### Changed
+
+- **`history.json` is per-account.** Files now live at `%APPDATA%\Sanduhr\history.{Account}.json` so per-account wipes are atomic and aggregation happens at chart-render time. **Migration is automatic on first v2.2.0 launch:** any existing single-slot keyring credentials become a "Personal" account, and the legacy `history.json` is renamed to `history.Personal.json`. No data loss, no user prompt.
+- **Settings tab order.** Themes · Pacing · **Accounts (NEW)** · History · Help · Credentials. The Credentials tab still operates on the active account, so single-account users see no UX change.
+
+### Tests
+
+- **+18 `test_accounts.py`** — registry CRUD (add, remove, rename, set-active), validation (label rules, duplicates), legacy migration (promote single-slot creds to "Personal"), edge cases (empty registry, unknown account, last-account removal).
+- **+9 `test_history_per_account.py`** — per-account routing, isolation, explicit-account override, legacy `history.json` migration with idempotency, aggregate window, no-active-account no-op.
+- **+8 `test_accounts_dialog.py`** — UI tests via pytest-qt: empty state, add-first-account becomes active, add-second doesn't change active, invalid name surfaces error, set-active emits credentials, rename, remove of active advances pointer, remove of last emits empty creds.
+- **+5 `test_aggregated_chart.py`** — color stability (same label → same color), unknown-label fallback, aggregate `_data` shape, single-account filter, account round-trip.
+- **+2 `test_csv_export.py`** — all-accounts CSV includes `account` column.
+- **+1 `test_clear_credentials.py`** — multi-account sign-out leaves other accounts intact.
+- **Updated** `test_credentials.py` keyring fixture (now patches the `keyring` module globally instead of the `credentials` module attribute, since `credentials.py` delegates to `accounts.py`).
+
+**Total: 251 / 251 tests pass.**
+
+### Known limitations
+
+- The `/usage` endpoint Sanduhr fetches lags actual consumption by minutes — known property of the upstream API. Community tool [`ccusage`](https://www.npmjs.com/package/ccusage) reads local Claude Code logs for a more real-time view; a hybrid local-logs data source is a candidate for a future PR.
+- Routines (Claude Code's cloud-hosted scheduled / API / GitHub-triggered runs, shipped 2026-04-14) have a daily quota that surfaces on `claude.ai/settings/usage` as `0/15` (Max plan) but is **not** returned by the `/usage` endpoint. Routines tracking is parked for v2.3.0 — different shape (count-based) and lives at a different (undiscovered) endpoint.
+
 ## v2.0.4-windows — 2026-04-19
 
 **Platform:** Windows + macOS

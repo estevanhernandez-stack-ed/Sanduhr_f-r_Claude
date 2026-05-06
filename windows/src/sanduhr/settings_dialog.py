@@ -1,13 +1,19 @@
 """SettingsDialog — consolidated user-facing settings.
 
-Two tabs:
-  - Credentials: sessionKey + cf_clearance (keyring-backed)
-  - Themes: paste JSON, open themes folder, copy agent prompt, reload
+Five tabs:
+  - Themes:   paste JSON, open themes folder, copy agent prompt, reload
+  - Pacing:   pacing tools toggle, session-end reminder
+  - Accounts: multi-account registry — add / rename / set-active / remove.
+              Replaces the old single-credentials tab; the same Add… modal
+              collects sessionKey + cf_clearance.
+  - History:  30-day usage chart with per-account / All-accounts toggle,
+              Export CSV, Clear history.
+  - Help:     getting started + DevTools cookie copy instructions.
 
-Replaces the older standalone CredentialsDialog. The owning widget wires
-it up via `open(parent, current_creds)` and reacts to `credentialsSaved`
-and `themesChanged` signals.
-"""
+The owning widget wires it up via `open(parent, ...)` and reacts to the
+`credentialsSaved`, `credentialsCleared`, `themesChanged`, `settingsSaved`,
+and `accountsChanged` signals. Tab indices are exposed as TAB_* class
+constants so callers don't hardcode integers."""
 
 import json
 import logging
@@ -15,15 +21,18 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import QUrl, Qt, Signal
+from PySide6.QtCore import QTimer, QUrl, Qt, Signal
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -34,7 +43,10 @@ from PySide6.QtWidgets import (
     QSpinBox,
 )
 
-from sanduhr import credentials, paths, themes
+from sanduhr import paths, sounds, themes
+from sanduhr.accounts_dialog import AccountsTab
+from sanduhr.history_chart import _TIER_LABELS, SPECULATIVE_TIERS
+from sanduhr.local_cc_dialog import LocalCCTab
 
 _log = logging.getLogger(__name__)
 
@@ -58,19 +70,47 @@ def _styled_msgbox(
     text: str,
     buttons=None,
 ):
-    """Create a QMessageBox with the parent's stylesheet already applied,
-    so it doesn't flash white before Qt's style cascade catches up."""
+    """Create a themed QMessageBox AND play our matching chime in
+    place of the OS system sound. We suppress the OS sound by
+    setting QMessageBox.NoIcon (the OS only beeps on Critical /
+    Warning / Information icon-styled boxes); the icon argument is
+    used to pick which of our tones to play (and to colour the
+    title-text accent so the user still reads severity at a glance)."""
     box = QMessageBox(parent)
-    box.setIcon(icon)
+    # NoIcon suppresses the platform's automatic icon-style system
+    # beep. Our chime fires below.
+    box.setIcon(QMessageBox.NoIcon)
     box.setWindowTitle(title)
-    box.setText(text)
+
+    # Severity-colored accent line in the title — replaces the
+    # system icon as the visual hint that this is an
+    # error / warning / info dialog.
+    if icon == QMessageBox.Critical:
+        marker = "⛔"
+    elif icon == QMessageBox.Warning:
+        marker = "⚠"
+    elif icon == QMessageBox.Question:
+        marker = "?"
+    else:
+        marker = ""
+    box.setText(f"{marker} {text}" if marker else text)
+
     if buttons is not None:
         box.setStandardButtons(buttons)
+
     # Inherit the root widget's stylesheet so the dark theme applies
     # from the first paint, not the second.
     root = parent.window() if parent is not None else None
     if root is not None:
         box.setStyleSheet(root.styleSheet())
+
+    # Play our chime instead of the OS beep.
+    if icon == QMessageBox.Critical or icon == QMessageBox.Warning:
+        sounds.play_error()
+    elif icon == QMessageBox.Information:
+        sounds.play_info()
+    # Question dialogs are silent — they're prompts, not events.
+
     return box
 
 
@@ -89,20 +129,31 @@ def _agent_prompt_path() -> Path:
 
 
 class SettingsDialog(QDialog):
+    # Tab indices — public so callers can pass them via initial_tab without
+    # hardcoding integers that drift when the build order changes.
+    TAB_THEMES = 0
+    TAB_CARDS = 1
+    # Backwards-compat alias — prior name pre-2026-05-06 was TAB_PACING.
+    TAB_PACING = 1
+    TAB_ACCOUNTS = 2
+    TAB_HISTORY = 3
+    TAB_LOCAL_CC = 4
+    TAB_HELP = 5
+
     credentialsSaved = Signal(str, object)  # (session_key, cf_clearance | None)
     credentialsCleared = Signal()
     themesChanged = Signal()
+    themeApplied = Signal(str)  # user clicked Apply on an installed theme
     settingsSaved = Signal(dict)
+    accountsChanged = Signal()  # any registry mutation — widget re-reads label
 
     def __init__(
         self,
         parent: Optional[QWidget] = None,
-        session_key: str = "",
-        cf_clearance: str = "",
         initial_tab: int = 0,
-        focus_cf: bool = False,
         settings: Optional[dict] = None,
         theme: Optional[dict] = None,
+        trigger_add_account: bool = False,
     ):
         super().__init__(parent)
         self.setWindowTitle("Settings")
@@ -117,10 +168,11 @@ class SettingsDialog(QDialog):
         layout.addWidget(self._tabs)
 
         self._build_themes_tab()
-        self._build_pacing_tab()
+        self._build_cards_tab()
+        self._build_accounts_tab()
         self._build_history_tab()
+        self._build_local_cc_tab()
         self._build_help_tab()
-        self._build_credentials_tab(session_key, cf_clearance, focus_cf)
 
         btns = QDialogButtonBox(QDialogButtonBox.Close)
         btns.rejected.connect(self.reject)
@@ -129,100 +181,12 @@ class SettingsDialog(QDialog):
 
         self._tabs.setCurrentIndex(initial_tab)
 
-    # ── Credentials tab ──────────────────────────────────────────
-
-    def _build_credentials_tab(self, sk: str, cf: str, focus_cf: bool) -> None:
-        page = QWidget()
-        v = QVBoxLayout(page)
-
-        v.addWidget(QLabel(
-            "Paste your claude.ai cookies.\n"
-            "F12 → Application → Cookies → claude.ai"
-        ))
-
-        v.addWidget(QLabel("sessionKey"))
-        self._sk = QLineEdit(sk)
-        self._sk.setEchoMode(QLineEdit.Password)
-        v.addWidget(self._sk)
-        sk_hint = QLabel(
-            "Tip: save this field empty to sign out and clear your stored "
-            "credentials from Windows Credential Manager."
-        )
-        sk_hint.setWordWrap(True)
-        sk_hint.setObjectName("HelpText")
-        sk_hint.setStyleSheet("font-size: 8pt;")
-        v.addWidget(sk_hint)
-
-        v.addWidget(QLabel("cf_clearance (optional)"))
-        cf_help = QLabel(
-            "Only needed if Sanduhr shows <b>\u201cCloudflare blocked\u201d</b> "
-            "after you save. Some accounts sit behind a Cloudflare challenge; "
-            "if yours does, copy the <code>cf_clearance</code> cookie from the "
-            "same DevTools panel you copied <code>sessionKey</code> from, and "
-            "paste it here. Leave blank otherwise."
-        )
-        cf_help.setTextFormat(Qt.RichText)
-        cf_help.setWordWrap(True)
-        cf_help.setObjectName("HelpText")
-        cf_help.setStyleSheet("font-size: 8pt;")
-        v.addWidget(cf_help)
-        self._cf = QLineEdit(cf)
-        self._cf.setEchoMode(QLineEdit.Password)
-        v.addWidget(self._cf)
-
-        row = QHBoxLayout()
-        row.addStretch()
-        save = QPushButton("Save")
-        save.setDefault(True)
-        save.clicked.connect(self._save_credentials)
-        row.addWidget(save)
-        v.addLayout(row)
-
-        v.addStretch()
-        (self._cf if focus_cf else self._sk).setFocus()
-        self._tabs.addTab(page, "Credentials")
-
-    def _save_credentials(self) -> None:
-        sk = self._sk.text().strip()
-        cf = self._cf.text().strip() or None
-        if not sk:
-            # Blank sessionKey on save = explicit intent to sign out.
-            # We previously rejected this with a "sessionKey is required"
-            # error, but that left users with no way to revoke credentials
-            # short of opening Windows Credential Manager by hand — which
-            # none of them do. Treat blank-save as "clear my credentials",
-            # gated behind a confirmation so it can't happen by accident.
-            confirm = _styled_msgbox(
-                self, QMessageBox.Warning, "Sign out of Sanduhr?",
-                "The sessionKey field is empty.\n\n"
-                "Saving this will:\n"
-                "  • Clear your stored credentials from Windows Credential Manager\n"
-                "  • Delete the local 30-day usage history file\n"
-                "  • Stop the widget from fetching your usage\n\n"
-                "You'll need to paste a fresh sessionKey to resume.\n\n"
-                "Continue?",
-                buttons=QMessageBox.Yes | QMessageBox.No,
-            )
-            confirm.setDefaultButton(QMessageBox.No)
-            if confirm.exec_() != QMessageBox.Yes:
-                return
-            credentials.clear()
-            from sanduhr import history
-            history.clear_all()
-            self.credentialsCleared.emit()
-            _styled_msgbox(
-                self, QMessageBox.Information, "Signed out",
-                "Credentials cleared. Paste a fresh sessionKey above "
-                "when you're ready to resume.",
-            ).exec_()
-            return
-        credentials.save(session_key=sk, cf_clearance=cf)
-        self.credentialsSaved.emit(sk, cf)
-        _styled_msgbox(
-            self, QMessageBox.Information, "Settings",
-            "Credentials saved. Your widget is now fetching your usage — "
-            "close this dialog to see it.",
-        ).exec_()
+        # First-run UX: when the welcome dialog has just told the user to
+        # paste their sessionKey, drop them straight into the Add Account
+        # modal. QTimer hop ensures the parent dialog is fully laid out
+        # first so the modal renders on top correctly.
+        if trigger_add_account:
+            QTimer.singleShot(0, self._accounts_tab._on_add)
 
     # ── Themes tab ───────────────────────────────────────────────
 
@@ -271,6 +235,9 @@ class SettingsDialog(QDialog):
         v.addWidget(self._list)
 
         list_row = QHBoxLayout()
+        apply_btn = QPushButton("Apply Selected")
+        apply_btn.clicked.connect(self._apply_selected_theme)
+        list_row.addWidget(apply_btn)
         reload_btn = QPushButton("Reload themes")
         reload_btn.clicked.connect(self._reload_themes)
         list_row.addWidget(reload_btn)
@@ -280,50 +247,161 @@ class SettingsDialog(QDialog):
         list_row.addStretch()
         v.addLayout(list_row)
 
+        # Double-click on a list item also applies — same gesture
+        # the user expects on a 'pickable list'.
+        self._list.itemDoubleClicked.connect(
+            lambda _: self._apply_selected_theme()
+        )
+
         self._refresh_list()
         self._tabs.addTab(page, "Themes")
 
-    # ── Pacing tab ───────────────────────────────────────────────
+    # ── Cards tab ────────────────────────────────────────────────
 
-    def _build_pacing_tab(self) -> None:
+    def _build_cards_tab(self) -> None:
         page = QWidget()
         v = QVBoxLayout(page)
 
-        v.addWidget(QLabel("<b>Pacing Tools & Deep Work</b>"))
+        v.addWidget(QLabel("<b>Pacing tools</b>"))
         v.addWidget(QLabel(
-            "Configure the advanced pacing and focus tools. These overlays appear "
-            "directly on top of the widget UI when activated."
+            "Changes save automatically. Toggle and the widget "
+            "reflects it immediately."
         ))
-        
-        v.addSpacing(16)
-        
+
         self._chk_pacing_tools = QCheckBox("Enable Pacing Calculators")
         self._chk_pacing_tools.setChecked(self._settings.get("pacing_tools_enabled", True))
+        self._chk_pacing_tools.toggled.connect(self._auto_save_cards)
         v.addWidget(self._chk_pacing_tools)
 
         self._chk_remind = QCheckBox("Show reminder at 100% of session")
         self._chk_remind.setChecked(self._settings.get("remind_session_end", False))
+        self._chk_remind.toggled.connect(self._auto_save_cards)
         v.addWidget(self._chk_remind)
+
+        v.addSpacing(16)
+        v.addWidget(QLabel("<b>Visible tier cards</b>"))
+        v.addWidget(QLabel(
+            "Drag to reorder. Uncheck to hide. Order and visibility "
+            "save automatically."
+        ))
+
+        # Drag-and-drop reorderable list with checkable items. Replaces
+        # the prior per-tier QCheckBox column — same visibility control
+        # plus user-defined ordering. Persisted as two settings keys:
+        #   `hidden_tiers` — list of unchecked tier_keys (matches the
+        #     prior schema so old settings still resolve cleanly)
+        #   `tier_order`  — list of tier_keys in user-chosen order;
+        #     keys not in the saved order render after, in the default
+        #     order, so newly-added tiers show up without surprise.
+        self._tier_list = QListWidget()
+        self._tier_list.setDragDropMode(QAbstractItemView.InternalMove)
+        self._tier_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        self._tier_list.setMinimumHeight(220)
+
+        # All tiers default to checked. Speculative ones won't pollute
+        # the widget surface anyway (the render filter drops tiers with
+        # null utilization) — leaving them checked means they auto-
+        # appear if Anthropic ever ships data for your account, which
+        # is a free discovery affordance. Users who don't want them in
+        # the Cards list can uncheck explicitly.
+        hidden_tiers = set(self._settings.get("hidden_tiers", []))
+        saved_order = self._settings.get("tier_order", []) or []
+        # Resolve final order: saved positions first, then any tiers
+        # the saved order didn't know about (new release added tiers).
+        seen: set[str] = set()
+        ordered_keys: list[str] = []
+        for key in saved_order:
+            if key in _TIER_LABELS and key not in seen:
+                ordered_keys.append(key)
+                seen.add(key)
+        for key in _TIER_LABELS:
+            if key not in seen:
+                ordered_keys.append(key)
+                seen.add(key)
+
+        for key in ordered_keys:
+            label = _TIER_LABELS[key]
+            # Soft tag on speculative tiers so the user understands why
+            # they default to hidden — these rows correspond to API
+            # fields most consumer accounts return null for. Tooltip
+            # carries the longer explanation; the inline tag keeps the
+            # row scannable.
+            if key in SPECULATIVE_TIERS:
+                label = f"{label}  ·  future use"
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, key)
+            item.setFlags(
+                item.flags()
+                | Qt.ItemIsUserCheckable
+                | Qt.ItemIsDragEnabled
+            )
+            if key in SPECULATIVE_TIERS:
+                item.setToolTip(
+                    "Future-use tier — the upstream API references "
+                    "this name but most consumer accounts return null "
+                    "for it. The widget only renders a card when real "
+                    "data arrives, so leaving this checked is a free "
+                    "discovery cue if Anthropic ever ships data here. "
+                    "Uncheck to hide it from this list entirely."
+                )
+            item.setCheckState(
+                Qt.Unchecked if key in hidden_tiers else Qt.Checked
+            )
+            self._tier_list.addItem(item)
+
+        # itemChanged fires on check-state toggle. rowsMoved on the
+        # underlying model fires on drag-drop reorder. Both routed to
+        # the same auto-save handler.
+        self._tier_list.itemChanged.connect(lambda _i: self._auto_save_cards())
+        self._tier_list.model().rowsMoved.connect(
+            lambda *_a: self._auto_save_cards()
+        )
+        v.addWidget(self._tier_list)
 
         v.addStretch()
 
-        act_row = QHBoxLayout()
-        act_row.addStretch()
-        save_btn = QPushButton("Save Pacing Config")
-        save_btn.clicked.connect(self._save_pacing_settings)
-        act_row.addWidget(save_btn)
-        v.addLayout(act_row)
+        self._tabs.addTab(page, "Cards")
 
-        self._tabs.addTab(page, "Pacing")
-
-    def _save_pacing_settings(self) -> None:
+    def _auto_save_cards(self) -> None:
+        """Auto-save handler — wired to every Cards-tab change.
+        No explicit Save button; the visible change on the widget IS
+        the confirmation. Subtle click tone confirms the toggle/move
+        registered."""
         self._settings["pacing_tools_enabled"] = self._chk_pacing_tools.isChecked()
         self._settings["remind_session_end"] = self._chk_remind.isChecked()
+
+        order: list[str] = []
+        hidden: list[str] = []
+        for i in range(self._tier_list.count()):
+            item = self._tier_list.item(i)
+            key = item.data(Qt.UserRole)
+            order.append(key)
+            if item.checkState() == Qt.Unchecked:
+                hidden.append(key)
+        self._settings["tier_order"] = order
+        self._settings["hidden_tiers"] = hidden
+
+        sounds.play_toggle()
         self.settingsSaved.emit(self._settings)
-        _styled_msgbox(
-            self, QMessageBox.Information, "Settings",
-            "Pacing configuration saved."
-        ).exec_()
+
+    # ── Accounts tab ─────────────────────────────────────────────
+
+    def _build_accounts_tab(self) -> None:
+        self._accounts_tab = AccountsTab()
+        self._accounts_tab.activeAccountChanged.connect(self._on_active_account_changed)
+        # Registry mutations re-emit so the widget can refresh its
+        # active-account label.
+        self._accounts_tab.accountsChanged.connect(self.accountsChanged.emit)
+        self._tabs.addTab(self._accounts_tab, "Accounts")
+
+    def _on_active_account_changed(self, session_key: str, cf_clearance) -> None:
+        """Translate AccountsTab signal into the existing widget-facing
+        signals. Empty session_key means last account removed → signed-out
+        flow; otherwise it's a switch to a different active account."""
+        if not session_key:
+            self.credentialsCleared.emit()
+        else:
+            self.credentialsSaved.emit(session_key, cf_clearance)
 
     # ── History tab ──────────────────────────────────────────────
 
@@ -338,7 +416,7 @@ class SettingsDialog(QDialog):
             "never uploaded. Export as CSV to analyze with any agent."
         ))
 
-        # Mode toggle
+        # Mode + account selector row
         mode_row = QHBoxLayout()
         mode_row.addWidget(QLabel("Window:"))
         self._hist_week_btn = QPushButton("Week")
@@ -348,12 +426,22 @@ class SettingsDialog(QDialog):
         self._hist_month_btn.setCheckable(True)
         mode_row.addWidget(self._hist_week_btn)
         mode_row.addWidget(self._hist_month_btn)
+        mode_row.addSpacing(12)
+        mode_row.addWidget(QLabel("Account:"))
+        self._hist_account = QComboBox()
+        self._hist_account.currentIndexChanged.connect(self._on_history_account_changed)
+        mode_row.addWidget(self._hist_account)
         mode_row.addStretch()
         v.addLayout(mode_row)
 
+        # Legend strip — only visible when 'All accounts' is selected.
+        self._hist_legend = QWidget()
+        self._hist_legend_layout = QHBoxLayout(self._hist_legend)
+        self._hist_legend_layout.setContentsMargins(0, 0, 0, 0)
+        v.addWidget(self._hist_legend)
+
         # Chart
         self._hist_chart = HistoryChart(theme=self._theme)
-        self._hist_chart.refresh()
         v.addWidget(self._hist_chart, stretch=1)
 
         def _set_week():
@@ -381,27 +469,97 @@ class SettingsDialog(QDialog):
         action_row.addStretch()
         v.addLayout(action_row)
 
+        self._refresh_history_account_selector()
+        # Re-populate the selector whenever the registry changes (Add /
+        # Remove / Rename / Set Active in the Accounts tab).
+        self.accountsChanged.connect(self._refresh_history_account_selector)
+
         self._tabs.addTab(page, "History")
+
+    def _refresh_history_account_selector(self) -> None:
+        """Rebuild the History tab's account combo from the registry."""
+        from sanduhr import accounts as accounts_mod
+        # Block signals while we rebuild so the currentIndexChanged
+        # handler doesn't fire repeatedly during clear()/addItem().
+        self._hist_account.blockSignals(True)
+        prev = self._hist_account.currentData()
+        self._hist_account.clear()
+        self._hist_account.addItem("All accounts", None)
+        for label in accounts_mod.list_accounts():
+            self._hist_account.addItem(label, label)
+        # Restore previous selection if it still exists, else default to
+        # All accounts.
+        idx = self._hist_account.findData(prev) if prev is not None else 0
+        if idx < 0:
+            idx = 0
+        self._hist_account.setCurrentIndex(idx)
+        self._hist_account.blockSignals(False)
+        # Trigger the chart + legend update under the (possibly new)
+        # selection.
+        self._on_history_account_changed()
+
+    def _on_history_account_changed(self) -> None:
+        selected = self._hist_account.currentData()  # None = All accounts
+        self._hist_chart.set_account(selected)
+        self._refresh_history_legend(aggregate=(selected is None))
+
+    def _refresh_history_legend(self, aggregate: bool) -> None:
+        """Show one colored swatch per account when in All-accounts mode;
+        hide the legend strip entirely in single-account mode."""
+        # Clear existing entries
+        while self._hist_legend_layout.count():
+            item = self._hist_legend_layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
+        if not aggregate:
+            self._hist_legend.setVisible(False)
+            return
+        from sanduhr import accounts as accounts_mod
+        from sanduhr.history_chart import color_for_account
+        labels = accounts_mod.list_accounts()
+        if not labels:
+            self._hist_legend.setVisible(False)
+            return
+        for label in labels:
+            color = color_for_account(label)
+            swatch = QLabel(
+                f"<span style='color:{color}; font-size:14pt;'>●</span> "
+                f"<span style='font-size:9pt;'>{label}</span>"
+            )
+            swatch.setTextFormat(Qt.RichText)
+            self._hist_legend_layout.addWidget(swatch)
+        self._hist_legend_layout.addStretch()
+        self._hist_legend.setVisible(True)
 
     def _export_history_csv(self) -> None:
         from PySide6.QtWidgets import QFileDialog
         from sanduhr import csv_export
         from datetime import date
 
-        default_name = f"Sanduhr-usage-{date.today().isoformat()}.csv"
+        # Honor the History tab's current account selection — None
+        # exports all accounts (with account column), specific exports
+        # just that account.
+        selected_account = self._hist_account.currentData()
+        scope_tag = (
+            "all-accounts" if selected_account is None
+            else selected_account.lower().replace(" ", "-")
+        )
+        default_name = f"Sanduhr-usage-{scope_tag}-{date.today().isoformat()}.csv"
         path, _ = QFileDialog.getSaveFileName(
             self, "Export usage history", default_name, "CSV files (*.csv)"
         )
         if not path:
             return
         try:
-            count = csv_export.export_to_csv(path)
+            count = csv_export.export_to_csv(path, account=selected_account)
         except OSError as e:
             _styled_msgbox(
                 self, QMessageBox.Critical, "Export failed",
                 f"Could not write {path}:\n{e}",
             ).exec_()
             return
+        sounds.play_save_confirmation()
         _styled_msgbox(
             self, QMessageBox.Information, "Exported",
             f"Wrote {count} rows to:\n{path}",
@@ -432,6 +590,25 @@ class SettingsDialog(QDialog):
             self, QMessageBox.Information, "History cleared",
             "Local usage history file removed.",
         ).exec_()
+
+    # ── Local CC tab ─────────────────────────────────────────────
+
+    def _build_local_cc_tab(self) -> None:
+        show_breakdowns = bool(
+            self._settings.get("local_cc_show_breakdowns", True)
+        )
+        self._local_cc_tab = LocalCCTab(
+            theme=self._theme,
+            show_breakdowns=show_breakdowns,
+        )
+        self._local_cc_tab.showBreakdownsChanged.connect(
+            self._on_local_cc_breakdowns_toggled
+        )
+        self._tabs.addTab(self._local_cc_tab, "Local CC")
+
+    def _on_local_cc_breakdowns_toggled(self, show: bool) -> None:
+        self._settings["local_cc_show_breakdowns"] = show
+        self.settingsSaved.emit(self._settings)
 
     # ── Help tab ─────────────────────────────────────────────────
 
@@ -515,12 +692,18 @@ Privacy policy: <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-
     def _save_and_apply_theme(self) -> None:
         raw = self._paste.toPlainText().strip()
         if not raw:
-            QMessageBox.warning(self, "Settings", "Paste a theme JSON first.")
+            _styled_msgbox(
+                self, QMessageBox.Warning, "Settings",
+                "Paste a theme JSON first.",
+            ).exec_()
             return
         try:
             data = json.loads(raw)
         except json.JSONDecodeError as e:
-            QMessageBox.critical(self, "Settings", f"Invalid JSON: {e}")
+            _styled_msgbox(
+                self, QMessageBox.Critical, "Settings",
+                f"Invalid JSON: {e}",
+            ).exec_()
             return
 
         filename = self._filename.text().strip()
@@ -529,7 +712,10 @@ Privacy policy: <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-
             if isinstance(name, str):
                 filename = _slugify(name)
         if not filename:
-            QMessageBox.warning(self, "Settings", "Filename is required.")
+            _styled_msgbox(
+                self, QMessageBox.Warning, "Settings",
+                "Filename is required.",
+            ).exec_()
             return
         if not filename.endswith(".json"):
             filename = f"{filename}.json"
@@ -538,15 +724,20 @@ Privacy policy: <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-
         try:
             target.write_text(json.dumps(data, indent=2), encoding="utf-8")
         except OSError as e:
-            QMessageBox.critical(self, "Settings", f"Could not write theme: {e}")
+            _styled_msgbox(
+                self, QMessageBox.Critical, "Settings",
+                f"Could not write theme: {e}",
+            ).exec_()
             return
 
         themes.load_user_themes()
         self._refresh_list()
         self.themesChanged.emit()
-        QMessageBox.information(
-            self, "Settings", f"Saved and applied: {target.name}"
-        )
+        sounds.play_save_confirmation()
+        _styled_msgbox(
+            self, QMessageBox.Information, "Settings",
+            f"Saved and applied: {target.name}",
+        ).exec_()
         self._paste.clear()
         self._filename.clear()
 
@@ -557,13 +748,12 @@ Privacy policy: <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-
         except OSError:
             text = self._fallback_prompt()
         QGuiApplication.clipboard().setText(text)
-        QMessageBox.information(
-            self,
-            "Settings",
+        _styled_msgbox(
+            self, QMessageBox.Information, "Settings",
             "Agent prompt copied to clipboard.\n\n"
             "Paste it into any chat agent with a reference image or vibe "
             "description. Drop the returned JSON into the paste box above.",
-        )
+        ).exec_()
 
     def _fallback_prompt(self) -> str:
         return (
@@ -578,6 +768,29 @@ Privacy policy: <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-
 
     def _open_themes_folder(self) -> None:
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(_themes_dir())))
+
+    def _apply_selected_theme(self) -> None:
+        """Apply the user theme currently selected in the installed-list.
+        File names look like 'my-theme.json'; the THEMES dict key is
+        the stem lowercased (matches what themes.load_user_themes does)."""
+        item = self._list.currentItem()
+        if item is None:
+            _styled_msgbox(
+                self, QMessageBox.Warning, "Settings",
+                "Pick a theme from the list first.",
+            ).exec_()
+            return
+        key = Path(item.text()).stem.lower()
+        if key not in themes.THEMES:
+            _styled_msgbox(
+                self, QMessageBox.Critical, "Settings",
+                f"Theme '{key}' isn't loaded — try Reload themes first.",
+            ).exec_()
+            return
+        self.themeApplied.emit(key)
+        sounds.play_save_confirmation()
+        # The widget's apply_theme handler pushes the fresh stylesheet
+        # to us as part of its work — no manual refresh needed here.
 
     def _reload_themes(self) -> None:
         themes.load_user_themes()
@@ -594,15 +807,20 @@ Privacy policy: <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-
         if not item:
             return
         name = item.text()
-        confirm = QMessageBox.question(
-            self, "Settings", f"Delete {name}?"
+        confirm = _styled_msgbox(
+            self, QMessageBox.Question, "Settings",
+            f"Delete {name}?",
+            buttons=QMessageBox.Yes | QMessageBox.No,
         )
-        if confirm != QMessageBox.Yes:
+        if confirm.exec_() != QMessageBox.Yes:
             return
         try:
             (_themes_dir() / name).unlink()
         except OSError as e:
-            QMessageBox.critical(self, "Settings", f"Could not delete: {e}")
+            _styled_msgbox(
+                self, QMessageBox.Critical, "Settings",
+                f"Could not delete: {e}",
+            ).exec_()
             return
         # Also drop from in-memory THEMES dict so the strip gets rebuilt cleanly
         key = Path(name).stem.lower()

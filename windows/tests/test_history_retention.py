@@ -19,6 +19,16 @@ def _isolate_appdata(monkeypatch):
         yield
 
 
+@pytest.fixture(autouse=True)
+def _default_active_account(_fake_keyring):
+    """Default active account for retention tests — multi-account history
+    routing requires one. _fake_keyring (from conftest) is composed in so
+    the registry doesn't write to the real OS keychain."""
+    from sanduhr import accounts
+    accounts.add_account("Personal", session_key="placeholder-default")
+    yield
+
+
 def test_retention_keeps_8640_points():
     """MAX_HISTORY must be 8640 — 30 days of 5-min ticks (30 * 288)."""
     from sanduhr import history
@@ -73,8 +83,9 @@ def test_clear_all_preserves_file():
     """clear_all writes {} rather than unlinking — preserves the file-
     existence invariant that downstream readers (load, load_window) depend
     on. Locks this behavior in against a future 'simplification' that
-    swaps to Path.unlink(missing_ok=True)."""
+    swaps to Path.unlink(missing_ok=True). After multi-account refactor,
+    the file is per-account: history.{label}.json."""
     from sanduhr import history, paths
     history.save_history({"five_hour": [{"t": "2026-04-21T00:00:00+00:00", "v": 50}]})
     history.clear_all()
-    assert paths.history_file().exists()
+    assert paths.history_file_for("Personal").exists()

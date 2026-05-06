@@ -16,6 +16,13 @@ store (Windows Credential Manager or macOS Keychain). It never touches a
 plaintext file on disk, never goes over the network to anyone except
 `claude.ai`, and is wiped when you uninstall.
 
+Multi-account installs (v2.2.0+) store one session cookie per named account
+using slot names like `sessionKey:Personal` and `sessionKey:Work` under the
+same `com.626labs.sanduhr` service. The same protections apply to every
+slot: only applications running as your user account can read them, and
+each account's local history file (`history.{Account}.json`) is wiped
+when that specific account is signed out.
+
 ## Reporting a vulnerability
 
 If you find a security issue, please **do not** open a public GitHub issue.

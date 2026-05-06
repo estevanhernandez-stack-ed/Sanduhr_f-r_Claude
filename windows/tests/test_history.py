@@ -3,12 +3,25 @@
 import json
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from sanduhr import history, paths
+
+
+@pytest.fixture(autouse=True)
+def _default_active_account(_fake_keyring):
+    """Register a 'Personal' account as the active account for these tests.
+    Per-account history routing requires an active account to write to;
+    the legacy single-file tests still expect operations to work without
+    explicit account setup, so we default it here at module scope."""
+    from sanduhr import accounts
+    accounts.add_account("Personal", session_key="placeholder-default")
+    yield
 
 
 def test_append_creates_file(tmp_appdata):
     history.append("five_hour", 42)
-    assert paths.history_file().exists()
+    assert paths.history_file_for("Personal").exists()
 
 
 def test_append_adds_entry(tmp_appdata):
@@ -58,7 +71,7 @@ def test_corrupt_file_does_not_crash(tmp_appdata):
 
 
 def test_corrupt_file_repaired_on_append(tmp_appdata):
-    paths.history_file().write_text("garbage")
+    paths.history_file_for("Personal").write_text("garbage")
     history.append("five_hour", 50)
-    data = json.loads(paths.history_file().read_text())
+    data = json.loads(paths.history_file_for("Personal").read_text())
     assert data["five_hour"][-1]["v"] == 50

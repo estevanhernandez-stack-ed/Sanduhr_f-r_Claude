@@ -7,13 +7,14 @@ persistence, credentials dialog, and refresh scheduling.
 
 import json
 import logging
+import os
 import sys
 import webbrowser
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Optional
 
 from PySide6.QtCore import QEvent, QPoint, Qt, QThread, QTimer, Slot
-from PySide6.QtGui import QColor, QCursor, QGuiApplication, QKeySequence, QShortcut
+from PySide6.QtGui import QColor, QCursor, QGuiApplication, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -27,7 +28,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from sanduhr import credentials, history, mica, paths, themes
+from sanduhr import accounts, cc_logs, credentials, history, mica, paths, themes
+from sanduhr.tiers import _format_tokens_compact
 from sanduhr.focus import FocusTimerWidget
 from sanduhr.game import SnakeOverlay
 from sanduhr.fetcher import UsageFetcher
@@ -48,6 +50,8 @@ _TIER_LABELS = {
     "seven_day_omelette":   "Weekly - Design",
     "seven_day_oauth_apps": "Weekly - OAuth Apps",
     "iguana_necktie":       "Weekly - Special",
+    "extra_usage":          "Capped Extra Usage",
+    "routines":             "Daily Routines",
 }
 
 
@@ -60,19 +64,50 @@ class SanduhrWidget(QWidget):
         self._theme_key = self._settings.get("theme", "obsidian")
         self._theme = themes.THEMES.get(self._theme_key, themes.THEMES["obsidian"])
         self._compact = False
-        self._pinned = True
+        # Always construct unpinned. Win11 + FramelessWindowHint +
+        # WindowStaysOnTopHint at initial show drops the small-icon
+        # variant for the taskbar button — neither Qt's setWindowIcon
+        # nor a direct WM_SETICON fixes it. The reliable workaround is
+        # to start without the topmost flag (so the taskbar slot binds
+        # the icon cleanly), then re-pin AFTER the widget shows if the
+        # user previously had it pinned. The re-pin recreates the
+        # HWND via setWindowFlag → show() and _force_taskbar_button
+        # re-pushes the icon, so the glyph survives the transition.
+        self._pinned = False
+        # User's saved pin preference (replayed after init if True).
+        self._restore_pinned = bool(self._settings.get("pinned", False))
         self._drag_origin: Optional[QPoint] = None
         self._tier_cards: Dict[str, TierCard] = {}
         self._thread: Optional[QThread] = None
         self._fetcher: Optional[UsageFetcher] = None
         self._last: Optional[dict] = None
+        # Anchor for the local-CC token-burn delta. Set on every
+        # successful fetch; the delta = tokens consumed in CC sessions
+        # since this timestamp. None = no fetch landed yet.
+        self._last_fetch_at: Optional[datetime] = None
         self._resize_active: Optional[str] = None
         self._resize_start_geom = None
         self._resize_start_pos = None
 
         self.setWindowTitle("Sanduhr für Claude")
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        # Initial flags exclude WindowStaysOnTopHint so the taskbar
+        # icon binds at first show; pin preference (if any) is
+        # replayed via _toggle_pin further down.
+        self.setWindowFlags(Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
+        # Per-widget window icon. QApplication.setWindowIcon (set in
+        # app.py at startup) doesn't always propagate to a frameless +
+        # always-on-top HWND on Windows 11 — the taskbar slot exists
+        # (we force WS_EX_APPWINDOW separately) but renders without an
+        # icon glyph until the HWND gets recreated. Setting the icon
+        # on the widget itself fixes the initial paint, and we re-apply
+        # in `_toggle_pin` for the same reason after each recreation.
+        icon_path = paths.bundled_icon_path()
+        if os.path.exists(icon_path):
+            self._window_icon = QIcon(icon_path)
+            self.setWindowIcon(self._window_icon)
+        else:
+            self._window_icon = None
         self.resize(420, 540)
         self.setMouseTracking(True)
         self._restore_geometry()
@@ -99,6 +134,23 @@ class SanduhrWidget(QWidget):
         self._countdown = QTimer(self)
         self._countdown.timeout.connect(self._tick)
         self._countdown.start(_TICK_MS)
+
+        # Bind the taskbar icon. On Win11, neither Qt's setWindowIcon
+        # nor a direct WM_SETICON at initial show is enough — only an
+        # actual HWND recreation via setWindowFlag binds the small-
+        # icon variant the taskbar button uses. So we force a
+        # recreation at startup, ending in whatever pin state the
+        # user had last:
+        #   restore_pinned True  → one toggle (unpinned → pinned)
+        #   restore_pinned False → two toggles (unpinned → pinned →
+        #                          unpinned), giving us the icon-
+        #                          binding HWND recreation without
+        #                          changing the visible pin state
+        # The 150 ms delay lets the initial show + paint complete
+        # before the HWND gets recreated; without it, the user
+        # sees a brief blank-window frame.
+        if sys.platform == "win32":
+            QTimer.singleShot(150, self._bind_taskbar_icon)
 
     # -- for tests -------------------------------------------------
 
@@ -132,9 +184,12 @@ class SanduhrWidget(QWidget):
         tb.addWidget(self._title_lbl)
         tb.addStretch()
         self._btn_refresh = QPushButton("Refresh")
-        # Initial state is pinned (WindowStaysOnTopHint set on __init__),
-        # so the button's first label must be the ACTION, i.e. "Unpin".
-        self._btn_pin = QPushButton("Unpin")
+        # Initial state is unpinned (WindowStaysOnTopHint omitted on
+        # __init__ for the taskbar-icon workaround). Button text is
+        # the ACTION a click takes — so "Pin" while unpinned. The
+        # post-init replay below may flip this to "Unpin" before
+        # the user ever sees the title bar.
+        self._btn_pin = QPushButton("Pin")
         # Windows-native-style close button: wider, red hover via stylesheet,
         # uses the Unicode heavy multiplication sign that Windows Explorer
         # itself draws in title bars (rather than a plain lowercase x).
@@ -151,7 +206,7 @@ class SanduhrWidget(QWidget):
 
         # Tooltips — selective, for the controls whose purpose isn't obvious.
         self._btn_refresh.setToolTip("Refresh usage now (Ctrl+R)")
-        self._btn_pin.setToolTip("Unpin (currently always on top)")
+        self._btn_pin.setToolTip("Pin always on top")
         self._btn_close.setToolTip("Close (Alt+F4)")
         self._title_lbl.setToolTip("Drag to move")
 
@@ -193,6 +248,23 @@ class SanduhrWidget(QWidget):
 
         self._status_lbl = QLabel("Connecting...")
         self._content_layout.addWidget(self._status_lbl)
+
+        # Active-account label — clickable to cycle through registered
+        # accounts when more than one is configured. Hidden entirely
+        # when no accounts exist (signed-out / first-run).
+        self._account_btn = QPushButton("")
+        self._account_btn.setFlat(True)
+        self._account_btn.setObjectName("AccountLabel")
+        self._account_btn.setCursor(Qt.PointingHandCursor)
+        self._account_btn.setStyleSheet("padding: 2px; font-size: 9pt;")
+        self._account_btn.setToolTip(
+            "Active Claude account. Click to switch when multiple are "
+            "configured (Settings → Accounts to add or remove)."
+        )
+        self._account_btn.clicked.connect(self._cycle_active_account)
+        self._content_layout.addWidget(self._account_btn)
+        self._refresh_account_label()
+
         self._cards_container = QWidget()
         self._cards_layout = QVBoxLayout(self._cards_container)
         self._cards_layout.setContentsMargins(0, 0, 0, 0)
@@ -268,6 +340,19 @@ class SanduhrWidget(QWidget):
         
         self._footer_lbl = QLabel("")
         ft.addWidget(self._footer_lbl)
+        # Local-CC token-burn segment, separated from the base footer so
+        # we can attach a hover tooltip explaining what it is. Empty
+        # text when there's been no CC activity since the last fetch.
+        self._cc_delta_lbl = QLabel("")
+        self._cc_delta_lbl.setToolTip(
+            "Tokens consumed in local Claude Code sessions since the "
+            "last API fetch landed.\n\n"
+            "Anthropic's /usage endpoint lags actual consumption by "
+            "minutes — this is the live delta you'd otherwise wait "
+            "for the next fetch to see. Resets to zero each time a "
+            "fresh fetch arrives (every ~5 min)."
+        )
+        ft.addWidget(self._cc_delta_lbl)
         ft.addStretch()
         
         sonnet = QPushButton("Use Sonnet")
@@ -288,7 +373,8 @@ class SanduhrWidget(QWidget):
             ("Ctrl+,", lambda: self._open_settings_dialog()),
             ("Ctrl+D", self._toggle_compact),
             ("Ctrl+P", self._toggle_focus_mode),
-            ("Ctrl+H", lambda: self._open_settings_dialog(initial_tab=2)),
+            ("Ctrl+H", lambda: self._open_settings_dialog(
+                initial_tab=SettingsDialog.TAB_HISTORY)),
         ):
             sc = QShortcut(QKeySequence(seq), self)
             sc.activated.connect(slot)
@@ -668,6 +754,16 @@ class SanduhrWidget(QWidget):
         # size so the resize floor tracks the new font metrics.
         self._compute_and_apply_minimum_size()
 
+        # Push the fresh stylesheet to any open child dialogs. Qt
+        # stylesheet inheritance doesn't cross window boundaries, so
+        # a child QDialog (Settings, etc.) keeps the stylesheet it
+        # was constructed with unless we explicitly re-push. Without
+        # this, applying a theme via Settings → Themes → Apply
+        # Selected updated the widget but left the open dialog stale.
+        from PySide6.QtWidgets import QDialog
+        for child_dialog in self.findChildren(QDialog):
+            child_dialog.setStyleSheet(self.styleSheet())
+
         # (Theme buttons highlighting logic removed since they are now in a QMenu)
 
     def _apply_monospace_if_needed(self, card: TierCard) -> None:
@@ -914,6 +1010,12 @@ class SanduhrWidget(QWidget):
             self._taskbar_forced = False
             self._force_taskbar_button()
             self._taskbar_forced = True
+        # Re-set the window icon on the recreated HWND. Qt usually
+        # propagates the stored windowIcon automatically, but the
+        # WindowStaysOnTopHint + FramelessWindowHint combo on Win11
+        # has shipped with a stale-icon race after recreation.
+        if self._window_icon is not None:
+            self.setWindowIcon(self._window_icon)
         if self._theme.get("opts_out_of_mica"):
             mica.disable_mica(self)
         else:
@@ -928,6 +1030,58 @@ class SanduhrWidget(QWidget):
             "Unpin (currently always on top)" if self._pinned
             else "Pin always on top"
         )
+
+        # Persist the pin choice so we replay it on next launch via
+        # the post-init QTimer in __init__.
+        self._settings["pinned"] = self._pinned
+        self._save_settings()
+
+        # Footer's mode label ("Pinned" / "Float") otherwise wouldn't
+        # update until the next 30 s tick — refresh now so the change
+        # is immediate.
+        self._update_footer()
+
+    def _bind_taskbar_icon(self) -> None:
+        """Workaround for the Win11 frameless-window taskbar-icon
+        binding bug. Forces an HWND recreation so the icon binds —
+        once if the user wants pinned (we start unpinned, so one
+        flip lands at pinned), twice otherwise (unpinned → pinned →
+        unpinned, returning to chosen state). Each flip calls
+        _force_taskbar_button which is what actually binds the icon.
+        Cosmetic side effects (button label, mica reapply, persist,
+        footer) are batched at the end so the user doesn't see the
+        button label or mica style flicker during the coerce."""
+        if sys.platform != "win32":
+            return
+        flips = 1 if self._restore_pinned else 2
+        for _ in range(flips):
+            self._silent_pin_flip()
+        # Sync cosmetic state once, with the final pin value.
+        self._btn_pin.setText("Unpin" if self._pinned else "Pin")
+        self._btn_pin.setToolTip(
+            "Unpin (currently always on top)" if self._pinned
+            else "Pin always on top"
+        )
+        self._settings["pinned"] = self._pinned
+        self._save_settings()
+        self._update_footer()
+
+    def _silent_pin_flip(self) -> None:
+        """HWND recreation core of _toggle_pin, minus the cosmetic
+        updates. Used by _bind_taskbar_icon to flip pin state without
+        visibly flickering button labels or status bars."""
+        self._pinned = not self._pinned
+        geom = self.geometry()
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, self._pinned)
+        self.setGeometry(geom)
+        self.show()
+        self._taskbar_forced = False
+        self._force_taskbar_button()
+        self._taskbar_forced = True
+        if self._theme.get("opts_out_of_mica"):
+            mica.disable_mica(self)
+        else:
+            mica.apply_mica(self, enabled=True)
 
     def _toggle_compact(self) -> None:
         self._compact = not self._compact
@@ -1005,41 +1159,99 @@ class SanduhrWidget(QWidget):
         if hasattr(self, '_game_overlay'):
             self._game_overlay.setGeometry(self.rect())
 
-    def _open_settings_dialog(self, focus_cf: bool = False, initial_tab: int = 0) -> None:
-        creds = credentials.load()
+    def _open_settings_dialog(
+        self, initial_tab: int = 0, trigger_add_account: bool = False
+    ) -> None:
         dlg = SettingsDialog(
             self,
-            session_key=creds.get("session_key") or "",
-            cf_clearance=creds.get("cf_clearance") or "",
-            focus_cf=focus_cf,
             initial_tab=initial_tab,
             settings=self._settings,
             theme=self._theme,
+            trigger_add_account=trigger_add_account,
         )
         dlg.credentialsSaved.connect(self._on_credentials_saved)
         dlg.credentialsCleared.connect(self._on_credentials_cleared)
         dlg.themesChanged.connect(self._rebuild_theme_strip)
+        dlg.themeApplied.connect(self.apply_theme)
         dlg.settingsSaved.connect(self._on_settings_saved)
+        dlg.accountsChanged.connect(self._refresh_account_label)
         dlg.setStyleSheet(self.styleSheet())
         dlg.exec_()
 
     def _on_credentials_saved(self, session_key: str, cf_clearance) -> None:
         self._clear_preview()
         self._start_or_update_fetcher(session_key, cf_clearance)
+        self._refresh_account_label()
+        self._request_refresh()
+
+    def _active_account_text(self) -> str:
+        """Render text for the active-account label. Empty when no
+        active account; bare label when only one; ⇆-prefixed when
+        cycling-by-click is meaningful (multiple accounts)."""
+        active = accounts.get_active()
+        if active is None:
+            return ""
+        if len(accounts.list_accounts()) <= 1:
+            return active
+        return f"⇆ {active}"
+
+    def _refresh_account_label(self) -> None:
+        text = self._active_account_text()
+        self._account_btn.setText(text)
+        self._account_btn.setVisible(bool(text))
+
+    def _cycle_active_account(self) -> None:
+        """Advance the active-account pointer to the next registered
+        account (round-robin). No-op when fewer than two accounts."""
+        labels = accounts.list_accounts()
+        if len(labels) < 2:
+            return
+        active = accounts.get_active()
+        if active is None:
+            return
+        idx = labels.index(active)
+        new_active = labels[(idx + 1) % len(labels)]
+        accounts.set_active(new_active)
+        creds = credentials.load()
+        self._refresh_account_label()
+        self._start_or_update_fetcher(
+            creds.get("session_key") or "", creds.get("cf_clearance")
+        )
         self._request_refresh()
 
     def _on_credentials_cleared(self) -> None:
-        """User signed out via blank-sessionKey save in the Settings dialog.
-        Point the fetcher at empty credentials (it'll 401 on next poll,
-        harmless), tear down any tier cards so stale data doesn't linger,
-        and tell the user how to resume."""
-        if self._fetcher is not None:
-            self._fetcher.update_credentials("", None)
+        """User signed out the active account via blank-sessionKey save.
+
+        In a multi-account install, sign-out only removes the active
+        account; if other accounts remain, the registry has already
+        advanced the active pointer to the next one. Switch the fetcher
+        to that account's credentials and refresh, rather than dropping
+        the user into a signed-out state they didn't ask for.
+
+        Last account → full signed-out flow (existing behavior)."""
+        # Tear down tier cards in either branch — stale data from the
+        # signed-out account shouldn't linger.
         for tier_key in list(self._tier_cards.keys()):
             card = self._tier_cards.pop(tier_key)
             self._cards_layout.removeWidget(card)
             card.setParent(None)
             card.deleteLater()
+
+        new_active = accounts.get_active()
+        if new_active is not None:
+            creds = credentials.load()
+            sk = creds.get("session_key") or ""
+            cf = creds.get("cf_clearance")
+            self._start_or_update_fetcher(sk, cf)
+            self._refresh_account_label()
+            self._request_refresh()
+            self._status_lbl.setText(f"Switched to {new_active}.")
+            return
+
+        # No accounts remain — full signed-out state.
+        if self._fetcher is not None:
+            self._fetcher.update_credentials("", None)
+        self._refresh_account_label()
         self._status_lbl.setText(
             "Signed out — paste sessionKey in Settings to resume."
         )
@@ -1047,6 +1259,11 @@ class SanduhrWidget(QWidget):
     def _on_settings_saved(self, new_settings: dict) -> None:
         self._settings.update(new_settings)
         self._save_settings()
+        # Settings changes can hide / unhide tier cards, so re-render
+        # against the latest data so the user sees the change without
+        # waiting for the next fetch tick.
+        if self._last is not None:
+            self._render_cards(self._last)
 
     def _prompt_first_run(self) -> None:
         # Build the welcome dialog with our stylesheet pre-applied so it
@@ -1059,11 +1276,16 @@ class SanduhrWidget(QWidget):
             "1. Open claude.ai and log in.\n"
             "2. Press F12 -> Application -> Cookies -> claude.ai.\n"
             "3. Copy the sessionKey cookie value.\n\n"
-            "Paste it in the next dialog."
+            "Paste it into the Add Account dialog that opens next."
         )
         box.setStyleSheet(self.styleSheet())
         box.exec_()
-        self._open_settings_dialog()
+        # Open Accounts tab and pre-trigger Add… so the user lands directly
+        # on the modal that takes their first sessionKey.
+        self._open_settings_dialog(
+            initial_tab=SettingsDialog.TAB_ACCOUNTS,
+            trigger_add_account=True,
+        )
 
     def _rebuild_theme_strip(self) -> None:
         """Themes change handles dynamically via QMenu now, so just re-apply current."""
@@ -1115,10 +1337,14 @@ class SanduhrWidget(QWidget):
         self._clear_preview()
         self._status_lbl.setText("")
         self._last = data
+        self._last_fetch_at = datetime.now(timezone.utc)
         self._render_cards(data)
-        ts = datetime.now().strftime("%I:%M %p").lstrip("0")
-        mode = "Compact" if self._compact else ("Pinned" if self._pinned else "Float")
-        self._footer_lbl.setText(f"Updated {ts} | {mode}")
+        # Refresh the local-CC delta now that we have a fresh anchor.
+        # Delta will be 0 immediately after a fetch lands; the 30s
+        # _tick is what makes the badges/footer grow visibly between
+        # fetches as CC events stream in.
+        self._refresh_cc_delta()
+        self._update_footer()
 
     @Slot(str, str)
     def _on_fetch_failed(self, kind: str, message: str) -> None:
@@ -1133,8 +1359,36 @@ class SanduhrWidget(QWidget):
         self._status_lbl.setStyleSheet("color: #f87171;")
 
     def _render_cards(self, data: dict) -> None:
+        # Per-tier visibility + ordering — Settings → Cards lets the
+        # user hide tiers and drag-reorder them. Stored as:
+        #   hidden_tiers — list of unchecked keys (default: none).
+        #     Speculative codename tiers stay checked by default — the
+        #     null-utilization filter below already prevents them from
+        #     rendering on the widget when there's no data, so the
+        #     visible-by-default state acts as a free discovery cue
+        #     if Anthropic ever ships data for those tiers.
+        #   tier_order   — list of keys in user-chosen order; tiers
+        #     missing from the saved order fall back to default order
+        #     after the saved ones, so new releases that add tiers
+        #     show up without manual config.
+        hidden_tiers = set(self._settings.get("hidden_tiers", []))
+        saved_order = self._settings.get("tier_order", []) or []
+        seen: set[str] = set()
+        ordered_keys: list[str] = []
+        for key in saved_order:
+            if key in _TIER_LABELS and key not in seen:
+                ordered_keys.append(key)
+                seen.add(key)
+        for key in _TIER_LABELS:
+            if key not in seen:
+                ordered_keys.append(key)
+                seen.add(key)
+
         active = []
-        for key, label in _TIER_LABELS.items():
+        for key in ordered_keys:
+            if key in hidden_tiers:
+                continue
+            label = _TIER_LABELS[key]
             tier = data.get(key)
             if tier and tier.get("utilization") is not None:
                 active.append(
@@ -1151,24 +1405,49 @@ class SanduhrWidget(QWidget):
             card.setParent(None)
             card.deleteLater()
 
-        for key, label, util, resets_at in active:
+        for desired_index, (key, label, util, resets_at) in enumerate(active):
             if key in self._tier_cards:
                 card = self._tier_cards[key]
+                # User reordered or hid a sibling — reposition this
+                # card to its desired slot if Qt's layout has it
+                # somewhere else. removeWidget preserves the widget
+                # itself; insertWidget places it at the requested
+                # position.
+                current_index = self._cards_layout.indexOf(card)
+                if current_index != desired_index:
+                    self._cards_layout.removeWidget(card)
+                    self._cards_layout.insertWidget(desired_index, card)
             else:
                 card = TierCard(tier_key=key, label=label, theme=self._theme)
                 self._tier_cards[key] = card
-                self._cards_layout.addWidget(card)
+                self._cards_layout.insertWidget(desired_index, card)
                 self._apply_monospace_if_needed(card)
                 # New card + its descendants need the drag filter too
                 self._install_drag_filter(card)
+            # Routines is count-based (used / daily limit), not a
+            # subscription-tier percentage. Render the raw count so the
+            # user reads '3/15' instead of '20%'. Bar fill still tracks
+            # the derived utilization.
+            value_label = None
+            if key == "routines":
+                tier_data = data.get(key, {})
+                used = tier_data.get("used")
+                limit = tier_data.get("limit")
+                if used is not None and limit is not None:
+                    value_label = f"{used}/{limit}"
             card.update_state(
                 util=util,
                 resets_at=resets_at,
                 history_values=history.load(key),
+                value_label=value_label,
             )
 
     def _tick(self) -> None:
-        """30s countdown tick -- refresh reset labels + pace markers only."""
+        """30s countdown tick -- refresh reset labels + pace markers,
+        and recompute the local-CC token-burn delta against the cached
+        last_fetch_at. Cheap (only re-reads files modified since
+        cutoff in practice) and gives the user a live-updating badge
+        between API fetches."""
         data = self._last
         if not data:
             return
@@ -1180,6 +1459,44 @@ class SanduhrWidget(QWidget):
                 card.update_state(
                     util=int(util), resets_at=ra, history_values=history.load(key)
                 )
+        self._refresh_cc_delta()
+        self._update_footer()
+
+    def _refresh_cc_delta(self) -> None:
+        """Recompute the per-tier and aggregate local-CC token deltas
+        since `_last_fetch_at` and push them into the tier-card badges.
+        Footer text is updated separately by `_update_footer` so the
+        compact-mode footer doesn't change shape unnecessarily."""
+        if self._last_fetch_at is None:
+            return
+        try:
+            by_tier = cc_logs.tokens_since_by_tier(self._last_fetch_at)
+        except Exception:
+            # Defensive — log file I/O shouldn't take down the widget.
+            by_tier = {}
+        for tier_key, card in self._tier_cards.items():
+            card.set_local_delta(by_tier.get(tier_key, 0))
+
+    def _update_footer(self) -> None:
+        """Refresh the two-segment footer: 'Updated 4:32 PM | Pinned'
+        in `_footer_lbl`, and an optional ' · CC +1.2k' in the
+        tooltip-bearing `_cc_delta_lbl` when there's been local CC
+        activity since the anchor."""
+        if self._last_fetch_at is None:
+            self._footer_lbl.setText("")
+            self._cc_delta_lbl.setText("")
+            return
+        ts = self._last_fetch_at.astimezone().strftime("%I:%M %p").lstrip("0")
+        mode = "Compact" if self._compact else ("Pinned" if self._pinned else "Float")
+        self._footer_lbl.setText(f"Updated {ts} | {mode}")
+        try:
+            deltas = cc_logs.tokens_since(self._last_fetch_at)
+        except Exception:
+            deltas = {}
+        total = sum(deltas.values())
+        self._cc_delta_lbl.setText(
+            f" · CC +{_format_tokens_compact(total)}" if total > 0 else ""
+        )
 
     # -- geometry persistence --------------------------------------
 
@@ -1208,7 +1525,13 @@ class SanduhrWidget(QWidget):
 
     def _force_taskbar_button(self) -> None:
         """Set WS_EX_APPWINDOW on the native window so Windows shows a
-        taskbar button for this frameless widget."""
+        taskbar button for this frameless widget. Also push the icon
+        directly via WM_SETICON — Qt's setWindowIcon is unreliable for
+        the small (16×16) taskbar-button variant on frameless +
+        topmost windows on Win11; the alt-tab / hover-preview icon
+        works fine, but the actual button slot stays blank until
+        WM_SETICON is sent. LoadImageW reads the .ico file directly
+        and Windows picks the right variant per ICON_SMALL / ICON_BIG."""
         import ctypes
         GWL_EXSTYLE = -20
         WS_EX_APPWINDOW = 0x00040000
@@ -1227,6 +1550,37 @@ class SanduhrWidget(QWidget):
                 hwnd, 0, 0, 0, 0, 0,
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
             )
+
+        # Push the .ico to both icon slots via WM_SETICON. Done after
+        # the EXSTYLE pass so the taskbar button exists before we
+        # populate its glyph.
+        icon_path = paths.bundled_icon_path()
+        if not os.path.exists(icon_path):
+            return
+        IMAGE_ICON = 1
+        LR_LOADFROMFILE = 0x00000010
+        LR_DEFAULTSIZE = 0x00000040
+        WM_SETICON = 0x0080
+        ICON_SMALL = 0
+        ICON_BIG = 1
+        # LoadImageW returns an HICON. We deliberately leak it (no
+        # DestroyIcon) — the icon lives for the lifetime of the
+        # window and Windows reclaims it on process exit. Re-loading
+        # on every _toggle_pin would otherwise leak per click.
+        # SetLastError reset keeps debugging cleaner if a load fails.
+        user32.LoadImageW.restype = ctypes.c_void_p
+        small = user32.LoadImageW(
+            None, ctypes.c_wchar_p(icon_path), IMAGE_ICON,
+            16, 16, LR_LOADFROMFILE,
+        )
+        big = user32.LoadImageW(
+            None, ctypes.c_wchar_p(icon_path), IMAGE_ICON,
+            32, 32, LR_LOADFROMFILE,
+        )
+        if small:
+            user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, ctypes.c_void_p(small))
+        if big:
+            user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, ctypes.c_void_p(big))
 
     def closeEvent(self, event) -> None:  # noqa: N802
         self._save_settings()

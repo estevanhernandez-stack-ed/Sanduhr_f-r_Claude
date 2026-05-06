@@ -17,6 +17,9 @@ build/
 dist/
 *.spec.bak
 
+# MSIX build staging
+msix/_stage/
+
 # Inno Setup output
 /build/
 installer/Output/

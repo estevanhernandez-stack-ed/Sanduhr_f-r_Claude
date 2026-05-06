@@ -10,6 +10,10 @@ from sanduhr import credentials, paths
 
 @pytest.fixture
 def mock_keyring(monkeypatch):
+    """Patch keyring module functions globally so callers in any module
+    (credentials, accounts, etc.) hit the in-memory store instead of the
+    real keychain. Returns a MagicMock for call-arg assertions."""
+    import keyring as kr
     storage = {}
 
     def _set(service, account, value):
@@ -26,7 +30,9 @@ def mock_keyring(monkeypatch):
     mock.get_password = MagicMock(side_effect=_get)
     mock.delete_password = MagicMock(side_effect=_delete)
     mock._storage = storage
-    monkeypatch.setattr(credentials, "keyring", mock)
+    monkeypatch.setattr(kr, "set_password", mock.set_password)
+    monkeypatch.setattr(kr, "get_password", mock.get_password)
+    monkeypatch.setattr(kr, "delete_password", mock.delete_password)
     return mock
 
 

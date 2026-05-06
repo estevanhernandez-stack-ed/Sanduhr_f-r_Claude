@@ -1,6 +1,6 @@
 # Privacy Policy — Sanduhr für Claude
 
-**Last updated:** 2026-04-16
+**Last updated:** 2026-05-05
 **Publisher:** 626Labs LLC
 **Contact:** [GitHub Issues](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/issues)
 
@@ -14,11 +14,12 @@ The only network destination it contacts is `claude.ai` — and only with the cr
 
 | Data | Where it lives | Who can see it | What Sanduhr does with it |
 | --- | --- | --- | --- |
-| `sessionKey` (claude.ai cookie you paste in) | Windows Credential Manager, service `com.626labs.sanduhr` | Only applications running as your Windows user account | Sent only to `claude.ai` when fetching your usage |
-| `cf_clearance` (optional Cloudflare cookie you paste in) | Windows Credential Manager, same service | Same as above | Sent only to `claude.ai` when fetching your usage |
-| Your Claude usage percentages (the numbers the widget displays) | `%APPDATA%\Sanduhr\history.json` on your machine | Only your Windows user account | Stored for up to 2 hours (24 rolling snapshots) so the widget can draw a sparkline. Never transmitted anywhere. |
+| `sessionKey` (claude.ai cookie you paste in) | Windows Credential Manager, service `com.626labs.sanduhr`, slot `sessionKey:{Account}` per registered account | Only applications running as your Windows user account | Sent only to `claude.ai` when fetching that account's usage. Multi-account installs (v2.2.0+) store one slot per named account. |
+| `cf_clearance` (optional Cloudflare cookie you paste in) | Windows Credential Manager, same service, slot `cf_clearance:{Account}` per account | Same as above | Sent only to `claude.ai` when fetching that account's usage |
+| Account registry (the list of named accounts and which one is active) | Windows Credential Manager, slots `accounts:list` (JSON array of labels) and `accounts:active` (label string) | Same as above | Used by Sanduhr to route fetches and history writes to the right account. The labels are the names you choose ("Personal", "Work", etc.) — Sanduhr does nothing else with them. |
+| Your Claude usage percentages (the numbers the widget displays) | `%APPDATA%\Sanduhr\history.{Account}.json` per account on your machine | Only your Windows user account | Stored for up to 30 days (rolling) so the widget can draw a sparkline and the History tab can chart trends. Never transmitted anywhere. |
 | Your theme preference and last window position | `%APPDATA%\Sanduhr\settings.json` | Your Windows user account | Read at startup to restore your setup |
-| Operational logs | `%APPDATA%\Sanduhr\sanduhr.log` (rotating, 1 MB × 3 files) | Your Windows user account | Used for troubleshooting. **Never contains your session key or `cf_clearance` value** — only presence/absence, HTTP status codes, and stack traces. |
+| Operational logs | `%APPDATA%\Sanduhr\sanduhr.log` (rotating, 1 MB × 3 files) | Your Windows user account | Used for troubleshooting. **Never contains your session keys, account labels, or `cf_clearance` values** — only presence/absence, HTTP status codes, and stack traces. |
 
 ## What Sanduhr does NOT do
 

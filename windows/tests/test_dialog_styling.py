@@ -99,7 +99,7 @@ def test_settings_dialog_inherits_widget_stylesheet(qtbot, monkeypatch, theme_ke
     from sanduhr.settings_dialog import SettingsDialog
     w = _build_widget(qtbot, monkeypatch, theme_key)
 
-    dlg = SettingsDialog(w, session_key="", cf_clearance="")
+    dlg = SettingsDialog(w)
     qtbot.addWidget(dlg)
 
     # Simulate what _open_settings_dialog does.

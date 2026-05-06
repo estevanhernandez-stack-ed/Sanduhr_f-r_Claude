@@ -100,7 +100,9 @@ Single-file tkinter app with auto-installing `cloudscraper` dep. Works on macOS,
 ### Privacy & control
 
 - **OS-native credential storage** — Windows Credential Manager / macOS Keychain. Cleared on uninstall. Never plaintext.
-- **One-click sign-out** — Settings → Credentials → save with an empty sessionKey. Confirmation dialog, then credentials are wiped from the OS store.
+- **Multi-account support** *(Windows v2.2.0+)* — track multiple Claude accounts (Personal + Work) in one install. Per-account credentials, per-account history, switch active account from the widget label or Settings → Accounts. Sign-out is account-scoped — the others stay intact.
+- **30-day local history** *(Windows v2.1.0+)* — rolling per-account history file in `%APPDATA%\Sanduhr\history.{Account}.json`. Settings → History shows a stacked per-tier line chart with Week / Month windows + per-account / All-accounts overlay views. Export as CSV to analyze with any agent.
+- **One-click sign-out** — Settings → Credentials → save with an empty sessionKey. Confirmation dialog, then that account's credentials and history are wiped from the OS store. Other accounts left intact.
 - **Drag-anywhere, pin/unpin, compact mode, full keyboard shortcuts** (`Ctrl+R`, `Ctrl+,`, `Ctrl+D`, `Ctrl+H`).
 - **No telemetry, no analytics, no ads.** One network destination: `claude.ai`, using your own session cookie. See [SECURITY.md](SECURITY.md) for why no data ever comes back to us.
 
@@ -177,6 +179,19 @@ Full keybindings documented in the in-app **Settings → Help** tab.
 
 ## Roadmap
 
+### Shipped in v2.2.0 *(Windows)*
+
+- [x] Multi-account support (Personal + Work in one install)
+- [x] Per-account history files + aggregated overlay view in Settings → History
+- [x] Active-account label in the widget (click to cycle)
+- [x] Account-scoped sign-out (other accounts left intact)
+- [x] `extra_usage` tier (API credit spend tracking)
+
+### Shipped in v2.1.0 *(Windows)*
+
+- [x] Historical usage dashboard with CSV export (30-day retention)
+- [x] Settings → History tab with stacked per-tier line charts (Week / Month)
+
 ### Shipped in v2.0.4
 
 - [x] Pace ghost (always-on pace position tick on every bar)
@@ -194,7 +209,9 @@ Full keybindings documented in the in-app **Settings → Help** tab.
 - [x] Homebrew install available via `estevanhernandez-stack-ed/tap` ([repo](https://github.com/estevanhernandez-stack-ed/homebrew-tap))
 - [ ] Homebrew cask submission to core `Homebrew/homebrew-cask` (pending notability bar)
 - [ ] winget manifest (pending MS Store cert)
-- [ ] Historical usage dashboard with CSV export
+- [ ] Routines daily-quota tracking (Claude Code routines — different endpoint, count-based shape)
+- [ ] Real-time mode via local Claude Code log read (alongside the `/usage` endpoint)
+- [ ] Mac parity for v2.1.0 / v2.2.0 features (history, multi-account)
 - [ ] Auto-start on boot (native builds)
 - [ ] Antigravity (Google Gemini IDE) quota tracking
 - [ ] Official Anthropic read-only usage endpoint support (pending Anthropic response)
