@@ -41,7 +41,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
 )
 
-from sanduhr import paths, themes
+from sanduhr import paths, sounds, themes
 from sanduhr.accounts_dialog import AccountsTab
 from sanduhr.history_chart import _TIER_LABELS
 from sanduhr.local_cc_dialog import LocalCCTab
@@ -222,18 +222,20 @@ class SettingsDialog(QDialog):
 
         v.addWidget(QLabel("<b>Pacing Tools & Deep Work</b>"))
         v.addWidget(QLabel(
-            "Configure the advanced pacing and focus tools. These overlays appear "
-            "directly on top of the widget UI when activated."
+            "Changes save automatically — no need for a Save button. "
+            "Toggle and the widget reflects it immediately."
         ))
 
         v.addSpacing(16)
 
         self._chk_pacing_tools = QCheckBox("Enable Pacing Calculators")
         self._chk_pacing_tools.setChecked(self._settings.get("pacing_tools_enabled", True))
+        self._chk_pacing_tools.toggled.connect(self._auto_save_pacing)
         v.addWidget(self._chk_pacing_tools)
 
         self._chk_remind = QCheckBox("Show reminder at 100% of session")
         self._chk_remind.setChecked(self._settings.get("remind_session_end", False))
+        self._chk_remind.toggled.connect(self._auto_save_pacing)
         v.addWidget(self._chk_remind)
 
         v.addSpacing(16)
@@ -251,21 +253,18 @@ class SettingsDialog(QDialog):
         for tier_key, label in _TIER_LABELS.items():
             chk = QCheckBox(label)
             chk.setChecked(tier_key not in hidden_tiers)
+            chk.toggled.connect(self._auto_save_pacing)
             self._tier_checkboxes[tier_key] = chk
             v.addWidget(chk)
 
         v.addStretch()
 
-        act_row = QHBoxLayout()
-        act_row.addStretch()
-        save_btn = QPushButton("Save Pacing Config")
-        save_btn.clicked.connect(self._save_pacing_settings)
-        act_row.addWidget(save_btn)
-        v.addLayout(act_row)
-
         self._tabs.addTab(page, "Pacing")
 
-    def _save_pacing_settings(self) -> None:
+    def _auto_save_pacing(self) -> None:
+        """Auto-save handler — wired to every Pacing-tab toggle. No
+        explicit Save button, no confirmation msgbox; the visible
+        change on the widget IS the confirmation."""
         self._settings["pacing_tools_enabled"] = self._chk_pacing_tools.isChecked()
         self._settings["remind_session_end"] = self._chk_remind.isChecked()
         self._settings["hidden_tiers"] = [
@@ -273,10 +272,6 @@ class SettingsDialog(QDialog):
             if not chk.isChecked()
         ]
         self.settingsSaved.emit(self._settings)
-        _styled_msgbox(
-            self, QMessageBox.Information, "Settings",
-            "Pacing configuration saved."
-        ).exec_()
 
     # ── Accounts tab ─────────────────────────────────────────────
 
@@ -453,6 +448,7 @@ class SettingsDialog(QDialog):
                 f"Could not write {path}:\n{e}",
             ).exec_()
             return
+        sounds.play_save_confirmation()
         _styled_msgbox(
             self, QMessageBox.Information, "Exported",
             f"Wrote {count} rows to:\n{path}",

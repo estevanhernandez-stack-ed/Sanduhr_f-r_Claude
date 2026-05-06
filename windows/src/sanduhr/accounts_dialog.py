@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from sanduhr import accounts
+from sanduhr import accounts, sounds
 
 _log = logging.getLogger(__name__)
 
@@ -206,6 +206,7 @@ class AccountsTab(QWidget):
             self._error(str(e))
             return
         is_first_account = (len(accounts.list_accounts()) == 1)
+        sounds.play_save_confirmation()
         self.refresh()
         self.accountsChanged.emit()
         if is_first_account:
