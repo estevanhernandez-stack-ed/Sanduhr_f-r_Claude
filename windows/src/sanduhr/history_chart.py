@@ -64,7 +64,7 @@ class HistoryChart(QWidget):
         # — uniform whether we're in aggregate or single-account mode, so the
         # paint loop doesn't branch.
         self._data: Dict[str, Dict[str, List[dict]]] = {}
-        self.setMinimumHeight(240)
+        self.setMinimumHeight(280)
 
     def mode(self) -> str:
         return self._mode
@@ -129,10 +129,12 @@ class HistoryChart(QWidget):
             painter.end()
             return
 
-        # Reserve a thin strip at the bottom for time-axis tick marks +
+        # Reserve a strip at the bottom for time-axis tick marks +
         # 'older' / 'now' anchors. This is shared by all tier rows since
-        # they all use the same x-scale.
-        axis_h = 16
+        # they all use the same x-scale. 22 px = a tick-mark band + a
+        # font-line + descender clearance so anchors don't get clipped
+        # by the parent layout.
+        axis_h = 22
         rows_h = h - axis_h
         n_tiers = len(self._data)
         row_h = rows_h / n_tiers
