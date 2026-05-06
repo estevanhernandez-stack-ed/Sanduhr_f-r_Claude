@@ -30,14 +30,18 @@ def test_build_wav_data_size_matches_header():
     assert declared_data == actual_data
 
 
-def test_wav_cache_returns_same_object_on_second_call():
+def test_wav_path_cache_returns_same_path_on_second_call(tmp_path, monkeypatch):
+    """File-based playback writes the WAV once on first call;
+    subsequent calls reuse the same path."""
     from sanduhr import sounds
 
-    # Reset the cache to ensure first call builds.
-    sounds._WAV_CACHE.clear()
-    a = sounds._wav_for(sounds._NOTES_SUCCESS, "success")
-    b = sounds._wav_for(sounds._NOTES_SUCCESS, "success")
-    assert a is b  # exact same object on second call (cached)
+    monkeypatch.setattr(sounds, "_sounds_dir", lambda: tmp_path)
+    sounds._FILE_CACHE.clear()
+    a = sounds._wav_path_for(sounds._NOTES_SUCCESS, "success_test")
+    b = sounds._wav_path_for(sounds._NOTES_SUCCESS, "success_test")
+    assert a == b
+    assert a.exists()
+    assert a.read_bytes()[:4] == b"RIFF"
 
 
 def test_play_error_and_play_info_do_not_raise(monkeypatch):

@@ -8,10 +8,17 @@ keyring call so even if a test forgot to use it, no real credential
 store would be touched.
 """
 
+import os
 import tempfile
 from pathlib import Path
 
 import pytest
+
+# Disable sound playback during the entire test session — async
+# winsound playback holds WAV files open, which breaks
+# TemporaryDirectory cleanup on Windows when the test fixture's
+# tmpdir is the same APPDATA the sound module writes WAVs into.
+os.environ["SANDUHR_SILENT_SOUNDS"] = "1"
 
 
 @pytest.fixture
