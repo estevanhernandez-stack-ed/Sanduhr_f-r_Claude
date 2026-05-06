@@ -43,6 +43,7 @@ from PySide6.QtWidgets import (
 
 from sanduhr import paths, themes
 from sanduhr.accounts_dialog import AccountsTab
+from sanduhr.local_cc_dialog import LocalCCTab
 
 _log = logging.getLogger(__name__)
 
@@ -103,7 +104,8 @@ class SettingsDialog(QDialog):
     TAB_PACING = 1
     TAB_ACCOUNTS = 2
     TAB_HISTORY = 3
-    TAB_HELP = 4
+    TAB_LOCAL_CC = 4
+    TAB_HELP = 5
 
     credentialsSaved = Signal(str, object)  # (session_key, cf_clearance | None)
     credentialsCleared = Signal()
@@ -135,6 +137,7 @@ class SettingsDialog(QDialog):
         self._build_pacing_tab()
         self._build_accounts_tab()
         self._build_history_tab()
+        self._build_local_cc_tab()
         self._build_help_tab()
 
         btns = QDialogButtonBox(QDialogButtonBox.Close)
@@ -457,6 +460,12 @@ class SettingsDialog(QDialog):
             self, QMessageBox.Information, "History cleared",
             "Local usage history file removed.",
         ).exec_()
+
+    # ── Local CC tab ─────────────────────────────────────────────
+
+    def _build_local_cc_tab(self) -> None:
+        self._local_cc_tab = LocalCCTab(theme=self._theme)
+        self._tabs.addTab(self._local_cc_tab, "Local CC")
 
     # ── Help tab ─────────────────────────────────────────────────
 
