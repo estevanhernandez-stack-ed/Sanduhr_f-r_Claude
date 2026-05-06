@@ -135,18 +135,36 @@ class LocalCCTab(QWidget):
         intro.setWordWrap(True)
         v.addWidget(intro)
 
-        # Today's total — large prominent number.
-        self._today_caption = QLabel("Today's local CC")
-        self._today_caption.setStyleSheet("font-size: 9pt;")
-        v.addWidget(self._today_caption)
-        self._today_lbl = QLabel("—")
-        self._today_lbl.setStyleSheet("font-size: 28pt; font-weight: bold;")
-        v.addWidget(self._today_lbl)
+        # Two prominent totals side by side — Today vs Last 30 Days.
+        # Earlier version was a single 'Today's local CC' headline that
+        # got read as the 30-day total because the bar strip's
+        # 'Last 30 days' caption sat right next to it. Showing both
+        # numbers explicitly removes the ambiguity.
+        totals_row = QHBoxLayout()
 
-        # 30-day bar strip
-        self._bars_caption = QLabel(f"Last {_LOOKBACK_DAYS} days")
-        self._bars_caption.setStyleSheet("font-size: 9pt;")
-        v.addWidget(self._bars_caption)
+        today_box = QVBoxLayout()
+        self._today_caption = QLabel("Today")
+        self._today_caption.setStyleSheet("font-size: 9pt;")
+        today_box.addWidget(self._today_caption)
+        self._today_lbl = QLabel("—")
+        self._today_lbl.setStyleSheet("font-size: 22pt; font-weight: bold;")
+        today_box.addWidget(self._today_lbl)
+        totals_row.addLayout(today_box)
+
+        month_box = QVBoxLayout()
+        self._month_caption = QLabel(f"Last {_LOOKBACK_DAYS} days")
+        self._month_caption.setStyleSheet("font-size: 9pt;")
+        month_box.addWidget(self._month_caption)
+        self._month_lbl = QLabel("—")
+        self._month_lbl.setStyleSheet("font-size: 22pt; font-weight: bold;")
+        month_box.addWidget(self._month_lbl)
+        totals_row.addLayout(month_box)
+
+        totals_row.addStretch()
+        v.addLayout(totals_row)
+
+        # 30-day bar strip — caption removed; the 'Last 30 days' number
+        # above already declares scope, no need to repeat.
         self._bars = _DailyBarStrip(self._theme)
         v.addWidget(self._bars)
 
@@ -212,13 +230,14 @@ class LocalCCTab(QWidget):
     def apply_theme(self, theme: dict) -> None:
         self._theme = theme
         self._bars.apply_theme(theme)
-        self._today_caption.setStyleSheet(
-            f"font-size: 9pt; color: {theme.get('text_secondary', '')};"
-        )
-        self._today_lbl.setStyleSheet(
-            f"font-size: 28pt; font-weight: bold; "
-            f"color: {theme.get('text', '')};"
-        )
+        secondary = theme.get("text_secondary", "")
+        primary = theme.get("text", "")
+        for cap in (self._today_caption, self._month_caption):
+            cap.setStyleSheet(f"font-size: 9pt; color: {secondary};")
+        for lbl in (self._today_lbl, self._month_lbl):
+            lbl.setStyleSheet(
+                f"font-size: 22pt; font-weight: bold; color: {primary};"
+            )
 
     def showEvent(self, event) -> None:  # noqa: N802
         super().showEvent(event)
@@ -248,19 +267,31 @@ class LocalCCTab(QWidget):
         self._today_lbl.setText(
             f"{_format_tokens_compact(today_total)} tokens"
             if today_total > 0
-            else "No activity yet today"
+            else "No activity yet"
+        )
+
+        # Last-N-days aggregate — sum of all daily buckets.
+        month_total = sum(by_day.values())
+        self._month_lbl.setText(
+            f"{_format_tokens_compact(month_total)} tokens"
+            if month_total > 0
+            else "No activity"
         )
 
         # 30-day bar strip
         self._bars.set_data(by_day)
 
         # Tables — top 10 each, sorted desc by token count.
+        # For projects: combine entries that share a display basename.
+        # Different absolute cwds (e.g., a project accessed via symlink
+        # AND directly) otherwise show as duplicate rows in the table.
+        proj_by_name: dict[str, int] = {}
+        for cwd, tokens in by_proj.items():
+            name = cc_logs.project_display_name(cwd)
+            proj_by_name[name] = proj_by_name.get(name, 0) + tokens
         self._fill_table(
             self._proj_table,
-            sorted(
-                ((cc_logs.project_display_name(k), v) for k, v in by_proj.items()),
-                key=lambda kv: kv[1], reverse=True,
-            )[:10],
+            sorted(proj_by_name.items(), key=lambda kv: kv[1], reverse=True)[:10],
         )
         self._fill_table(
             self._skill_table,
