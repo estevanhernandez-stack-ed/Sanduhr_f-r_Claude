@@ -109,11 +109,15 @@ class HistoryChart(QWidget):
 
         fm = painter.fontMetrics()
         label_w = max(fm.horizontalAdvance(lbl) for lbl in _TIER_LABELS.values()) + 12
-        # Reserve a column on the right for current-state labels —
-        # rendered in single-account mode only ('53% left · 3d 12h'
-        # when resets_at is known, '47%' otherwise). Aggregate mode
-        # skips this column to avoid stacking conflicting values.
-        value_w = fm.horizontalAdvance("99% left · 30d 23h") + 8
+        # Reserve a column on the right for current-state labels — rendered
+        # only in single-account mode. Two-line stacked when resets_at is
+        # known ('95% left' / '3h 46m'); single-line when it's not ('47%').
+        # Width sized to the wider of '100% left' and a 3-part time string
+        # like '30d 23h 59m', plus a small gutter.
+        value_w = max(
+            fm.horizontalAdvance("100% left"),
+            fm.horizontalAdvance("30d 23h 59m"),
+        ) + 8
 
         w = self.width()
         h = self.height()
@@ -231,17 +235,34 @@ class HistoryChart(QWidget):
                 value_color, last_point = most_recent
                 util = max(0, min(100, int(last_point.get("v", 0))))
                 resets_at = last_point.get("resets_at")
-                if resets_at:
-                    label_text = f"{100 - util}% left · {pacing.time_until(resets_at)}"
-                else:
-                    label_text = f"{util}%"
                 painter.setPen(value_color)
-                painter.drawText(
-                    int(chart_x + chart_w + 4), int(y_top),
-                    int(value_w - 4), int(row_h - 4),
-                    Qt.AlignRight | Qt.AlignVCenter,
-                    label_text,
-                )
+                if resets_at:
+                    # Two-line stacked: '95% left' over '3h 46m'. Splits
+                    # the row's vertical space evenly so each line gets
+                    # half. Aligns the % to bottom of upper half and the
+                    # time to top of lower half so they read as a single
+                    # block centered on the chart row.
+                    h_per_line = (row_h - 4) / 2
+                    painter.drawText(
+                        int(chart_x + chart_w + 4), int(y_top),
+                        int(value_w - 4), int(h_per_line),
+                        Qt.AlignRight | Qt.AlignBottom,
+                        f"{100 - util}% left",
+                    )
+                    painter.drawText(
+                        int(chart_x + chart_w + 4),
+                        int(y_top + h_per_line),
+                        int(value_w - 4), int(h_per_line),
+                        Qt.AlignRight | Qt.AlignTop,
+                        pacing.time_until(resets_at),
+                    )
+                else:
+                    painter.drawText(
+                        int(chart_x + chart_w + 4), int(y_top),
+                        int(value_w - 4), int(row_h - 4),
+                        Qt.AlignRight | Qt.AlignVCenter,
+                        f"{util}%",
+                    )
 
         # Time-axis tick marks along the bottom (shared x-scale).
         tick_count = 7 if self._mode == "week" else 4
