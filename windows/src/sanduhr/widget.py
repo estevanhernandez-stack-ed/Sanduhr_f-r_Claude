@@ -290,6 +290,19 @@ class SanduhrWidget(QWidget):
         
         self._footer_lbl = QLabel("")
         ft.addWidget(self._footer_lbl)
+        # Local-CC token-burn segment, separated from the base footer so
+        # we can attach a hover tooltip explaining what it is. Empty
+        # text when there's been no CC activity since the last fetch.
+        self._cc_delta_lbl = QLabel("")
+        self._cc_delta_lbl.setToolTip(
+            "Tokens consumed in local Claude Code sessions since the "
+            "last API fetch landed.\n\n"
+            "Anthropic's /usage endpoint lags actual consumption by "
+            "minutes — this is the live delta you'd otherwise wait "
+            "for the next fetch to see. Resets to zero each time a "
+            "fresh fetch arrives (every ~5 min)."
+        )
+        ft.addWidget(self._cc_delta_lbl)
         ft.addStretch()
         
         sonnet = QPushButton("Use Sonnet")
@@ -1292,23 +1305,25 @@ class SanduhrWidget(QWidget):
             card.set_local_delta(by_tier.get(tier_key, 0))
 
     def _update_footer(self) -> None:
-        """Compose the footer line: 'Updated 4:32 PM | Pinned' plus
-        an optional ' · CC +1.2k' suffix when local CC activity has
-        accumulated since the last fetch landed."""
+        """Refresh the two-segment footer: 'Updated 4:32 PM | Pinned'
+        in `_footer_lbl`, and an optional ' · CC +1.2k' in the
+        tooltip-bearing `_cc_delta_lbl` when there's been local CC
+        activity since the anchor."""
         if self._last_fetch_at is None:
             self._footer_lbl.setText("")
+            self._cc_delta_lbl.setText("")
             return
         ts = self._last_fetch_at.astimezone().strftime("%I:%M %p").lstrip("0")
         mode = "Compact" if self._compact else ("Pinned" if self._pinned else "Float")
-        base = f"Updated {ts} | {mode}"
+        self._footer_lbl.setText(f"Updated {ts} | {mode}")
         try:
             deltas = cc_logs.tokens_since(self._last_fetch_at)
         except Exception:
             deltas = {}
         total = sum(deltas.values())
-        if total > 0:
-            base = f"{base} · CC +{_format_tokens_compact(total)}"
-        self._footer_lbl.setText(base)
+        self._cc_delta_lbl.setText(
+            f" · CC +{_format_tokens_compact(total)}" if total > 0 else ""
+        )
 
     # -- geometry persistence --------------------------------------
 

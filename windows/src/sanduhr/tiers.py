@@ -201,6 +201,13 @@ class TierCard(QFrame):
         self._local_delta_lbl.setAttribute(Qt.WA_TranslucentBackground, True)
         self._local_delta_lbl.setObjectName("LocalDeltaBadge")
         self._local_delta_lbl.setStyleSheet("font-size: 8pt;")
+        self._local_delta_lbl.setToolTip(
+            "Tokens consumed in this tier from local Claude Code "
+            "sessions since the last API fetch landed.\n\n"
+            "The /usage endpoint lags actual consumption by minutes "
+            "— this is the live delta. Resets to zero each time a "
+            "fresh fetch arrives (every ~5 min)."
+        )
         self._local_delta_lbl.hide()
         row1.addWidget(self._local_delta_lbl)
         self._pct = QLabel("0%")
