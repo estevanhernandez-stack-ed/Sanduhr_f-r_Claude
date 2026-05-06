@@ -22,9 +22,20 @@ Conventions:
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Iterator, NamedTuple, Optional
+
+
+class UsageEvent(NamedTuple):
+    """One assistant-message event extracted from a CC session log.
+    Carries the fields aggregations need: when, which model, the raw
+    usage dict, plus context (project cwd + active skill if any)."""
+    timestamp: Optional[datetime]
+    model: Optional[str]
+    usage: dict
+    cwd: Optional[str]
+    attribution_skill: Optional[str]
 
 
 _LOG_ROOT_NAMES = (".claude", ".claude-personal")
@@ -72,11 +83,9 @@ def _parse_iso(s: Optional[str]) -> Optional[datetime]:
         return None
 
 
-def iter_usage_events(
-    path: Path,
-) -> Iterator[tuple[Optional[datetime], Optional[str], dict]]:
-    """Stream `(timestamp, model, usage_dict)` tuples for every
-    `type=assistant` event in a single session JSONL.
+def iter_usage_events(path: Path) -> Iterator[UsageEvent]:
+    """Stream UsageEvent records for every `type=assistant` event in
+    a single session JSONL.
 
     Streaming (line by line) instead of slurping the whole file —
     active sessions can hit tens of MB and we only want the latest
@@ -103,7 +112,13 @@ def iter_usage_events(
             usage = msg.get("usage")
             if not isinstance(usage, dict):
                 continue
-            yield (_parse_iso(d.get("timestamp")), msg.get("model"), usage)
+            yield UsageEvent(
+                timestamp=_parse_iso(d.get("timestamp")),
+                model=msg.get("model"),
+                usage=usage,
+                cwd=d.get("cwd"),
+                attribution_skill=d.get("attributionSkill"),
+            )
     finally:
         f.close()
 
@@ -128,18 +143,104 @@ def tokens_since(cutoff: datetime) -> dict[str, int]:
     if cutoff.tzinfo is None:
         cutoff = cutoff.replace(tzinfo=timezone.utc)
     for path in discover_log_files():
-        for ts, model, usage in iter_usage_events(path):
-            if ts is None or model is None:
+        for event in iter_usage_events(path):
+            if event.timestamp is None or event.model is None:
                 continue
+            ts = event.timestamp
             if ts.tzinfo is None:
                 ts = ts.replace(tzinfo=timezone.utc)
             if ts < cutoff:
                 continue
-            tokens = _human_tokens(usage)
+            tokens = _human_tokens(event.usage)
             if tokens <= 0:
                 continue
-            totals[model] = totals.get(model, 0) + tokens
+            totals[event.model] = totals.get(event.model, 0) + tokens
     return totals
+
+
+def tokens_by_day(days_back: int = 30) -> dict[date, int]:
+    """Sum tokens grouped by LOCAL calendar date for the trailing
+    `days_back` days. Returns `{date: total_tokens}`. The date is
+    each event's timestamp converted to the user's local timezone,
+    which matches what they'd recognize as 'today's usage' /
+    'yesterday's usage'."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
+    by_day: dict[date, int] = {}
+    for path in discover_log_files():
+        for event in iter_usage_events(path):
+            if event.timestamp is None:
+                continue
+            ts = event.timestamp
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            if ts < cutoff:
+                continue
+            tokens = _human_tokens(event.usage)
+            if tokens <= 0:
+                continue
+            local_date = ts.astimezone().date()
+            by_day[local_date] = by_day.get(local_date, 0) + tokens
+    return by_day
+
+
+def tokens_by_project(since: datetime) -> dict[str, int]:
+    """Sum tokens grouped by working directory (`cwd`) since the
+    cutoff. Returns `{cwd: total_tokens}`. Events without a cwd are
+    skipped so we don't have a None bucket."""
+    if since.tzinfo is None:
+        since = since.replace(tzinfo=timezone.utc)
+    by_project: dict[str, int] = {}
+    for path in discover_log_files():
+        for event in iter_usage_events(path):
+            if event.timestamp is None or event.cwd is None:
+                continue
+            ts = event.timestamp
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            if ts < since:
+                continue
+            tokens = _human_tokens(event.usage)
+            if tokens <= 0:
+                continue
+            by_project[event.cwd] = by_project.get(event.cwd, 0) + tokens
+    return by_project
+
+
+def tokens_by_skill(since: datetime) -> dict[str, int]:
+    """Sum tokens grouped by `attributionSkill` since the cutoff.
+    Returns `{skill_name: total_tokens}`. Events without an
+    attributionSkill are skipped — the caller is asking specifically
+    for skill-attributed work."""
+    if since.tzinfo is None:
+        since = since.replace(tzinfo=timezone.utc)
+    by_skill: dict[str, int] = {}
+    for path in discover_log_files():
+        for event in iter_usage_events(path):
+            if event.timestamp is None or not event.attribution_skill:
+                continue
+            ts = event.timestamp
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            if ts < since:
+                continue
+            tokens = _human_tokens(event.usage)
+            if tokens <= 0:
+                continue
+            by_skill[event.attribution_skill] = (
+                by_skill.get(event.attribution_skill, 0) + tokens
+            )
+    return by_skill
+
+
+def project_display_name(cwd: str) -> str:
+    """Pull a friendly basename out of a cwd path for display in the
+    Local CC tab. `C:\\Users\\estev\\Projects\\Sanduhr` → `Sanduhr`.
+    Handles both forward and backslash separators."""
+    if not cwd:
+        return ""
+    parts = cwd.replace("\\", "/").rstrip("/").split("/")
+    last = parts[-1] if parts else cwd
+    return last or cwd
 
 
 # Mapping from model-name prefix → Sanduhr tier_key. Used by callers
