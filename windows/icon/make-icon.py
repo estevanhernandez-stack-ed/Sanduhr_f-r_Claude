@@ -2,10 +2,13 @@
 Sanduhr Windows icon generator.
 Ports mac/icon/generate.swift (CoreGraphics) to Pillow.
 
-Brand palette:
-  navyDeep  #0f182b   navyLight  #2a3a5c   navyRim  #1b2a4a
-  cyan       #3bb4d9   paleCyan   #7ae0f5   magenta  #e13aa0
-  magPink    #ff5eb6   magDark    #9a2a78
+Brand palette — aligned to the 626Labs design system. Earlier revisions
+used eyeballed hex values close to but not exactly the brand tokens;
+snapping to the official values keeps the Store icon consistent with
+the 626Labs hub site, the dashboard, and sibling product surfaces.
+  navyDeep  #0f1f31   navyLight  #192e44   navyRim  #223a54
+  cyan       #17d4fa   paleCyan   #5ce6ff   magenta  #f22f89
+  magPink    #ff5aa3   magDark    #c21f6c
 
 Canvas: 1024×1024 RGBA
 Outputs: source.png  +  Sanduhr.ico (9 resolutions)
@@ -20,14 +23,14 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter
 # ---------------------------------------------------------------------------
 # Palette
 # ---------------------------------------------------------------------------
-NAVY_DEEP  = (0x0f, 0x18, 0x2b, 255)
-NAVY_LIGHT = (0x2a, 0x3a, 0x5c, 255)
-NAVY_RIM   = (0x1b, 0x2a, 0x4a, 255)
-CYAN       = (0x3b, 0xb4, 0xd9, 255)
-PALE_CYAN  = (0x7a, 0xe0, 0xf5, 255)
-MAGENTA    = (0xe1, 0x3a, 0xa0, 255)
-MAG_PINK   = (0xff, 0x5e, 0xb6, 255)
-MAG_DARK   = (0x9a, 0x2a, 0x78, 255)
+NAVY_DEEP  = (0x0f, 0x1f, 0x31, 255)  # 626Labs --brand-navy-deep
+NAVY_LIGHT = (0x19, 0x2e, 0x44, 255)  # --brand-navy
+NAVY_RIM   = (0x22, 0x3a, 0x54, 255)  # --brand-navy-soft
+CYAN       = (0x17, 0xd4, 0xfa, 255)  # --brand-cyan
+PALE_CYAN  = (0x5c, 0xe6, 0xff, 255)  # --brand-cyan-bright
+MAGENTA    = (0xf2, 0x2f, 0x89, 255)  # --brand-magenta
+MAG_PINK   = (0xff, 0x5a, 0xa3, 255)  # --brand-magenta-bright
+MAG_DARK   = (0xc2, 0x1f, 0x6c, 255)  # --brand-magenta-dim
 
 SIZE = 1024
 
