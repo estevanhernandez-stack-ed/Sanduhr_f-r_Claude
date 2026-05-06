@@ -29,7 +29,7 @@ _TIER_LABELS = {
     "seven_day_omelette":   "Weekly — Design",
     "seven_day_oauth_apps": "Weekly — OAuth Apps",
     "iguana_necktie":       "Weekly — Special",
-    "extra_usage":          "Capped Usage",
+    "extra_usage":          "Capped Extra Usage",
     "routines":             "Daily Routines",
 }
 
