@@ -706,6 +706,16 @@ class SanduhrWidget(QWidget):
         # size so the resize floor tracks the new font metrics.
         self._compute_and_apply_minimum_size()
 
+        # Push the fresh stylesheet to any open child dialogs. Qt
+        # stylesheet inheritance doesn't cross window boundaries, so
+        # a child QDialog (Settings, etc.) keeps the stylesheet it
+        # was constructed with unless we explicitly re-push. Without
+        # this, applying a theme via Settings → Themes → Apply
+        # Selected updated the widget but left the open dialog stale.
+        from PySide6.QtWidgets import QDialog
+        for child_dialog in self.findChildren(QDialog):
+            child_dialog.setStyleSheet(self.styleSheet())
+
         # (Theme buttons highlighting logic removed since they are now in a QMenu)
 
     def _apply_monospace_if_needed(self, card: TierCard) -> None:

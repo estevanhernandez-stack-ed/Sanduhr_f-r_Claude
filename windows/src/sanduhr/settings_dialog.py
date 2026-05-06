@@ -718,17 +718,8 @@ Privacy policy: <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-
             return
         self.themeApplied.emit(key)
         sounds.play_save_confirmation()
-        # Push the fresh stylesheet to ourselves AFTER the parent has
-        # applied the new theme. The parent's apply_theme runs in
-        # response to the same themeApplied signal; the QTimer hop
-        # puts our refresh after the current event-loop tick so the
-        # parent's stylesheet is up-to-date when we copy it.
-        QTimer.singleShot(0, self._refresh_styling_from_parent)
-
-    def _refresh_styling_from_parent(self) -> None:
-        parent = self.parent()
-        if parent is not None:
-            self.setStyleSheet(parent.styleSheet())
+        # The widget's apply_theme handler pushes the fresh stylesheet
+        # to us as part of its work — no manual refresh needed here.
 
     def _reload_themes(self) -> None:
         themes.load_user_themes()
