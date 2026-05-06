@@ -27,6 +27,16 @@ class NetworkError(APIError):
 
 
 _API_BASE = "https://claude.ai/api"
+_ROUTINES_URL = "https://claude.ai/v1/code/routines/run-budget"
+
+# Anthropic client headers required by the /v1/code/* endpoints. The
+# /api/* endpoints accept just the session cookie; /v1/code/* return
+# 404 unless these are present alongside x-organization-uuid.
+_ROUTINES_HEADERS = {
+    "anthropic-client-platform": "web_claude_ai",
+    "anthropic-version": "2023-06-01",
+    "anthropic-beta": "ccr-triggers-2026-01-30",
+}
 
 
 def _looks_like_cloudflare(text: str) -> bool:
@@ -89,3 +99,38 @@ class ClaudeAPI:
             return resp.json()
         except ValueError as e:
             raise NetworkError("Usage endpoint returned non-JSON") from e
+
+    def get_routine_budget(self) -> Optional[dict]:
+        """Fetch daily Claude Code Routines run-budget for the org.
+
+        Returns `{'used': int, 'limit': int}` on success, or None when
+        the account doesn't have Routines enabled (the endpoint 404s
+        on older subscription tiers / individual accounts without code
+        access).
+
+        Note: this hits a DIFFERENT base path (`/v1/code/...`) and
+        requires Anthropic-version headers + the org UUID; the regular
+        cookie-only auth path used by /api/* won't resolve here."""
+        org_id = self._get_org_id()
+        headers = {
+            "Cookie": self._cookie_header(),
+            "x-organization-uuid": org_id,
+            **_ROUTINES_HEADERS,
+        }
+        resp = self._scraper.get(_ROUTINES_URL, headers=headers, timeout=15)
+        if resp.status_code == 404:
+            return None
+        self._check(resp)
+        try:
+            body = resp.json()
+        except ValueError:
+            return None
+        if not isinstance(body, dict):
+            return None
+        try:
+            return {
+                "used": int(body.get("used", 0)),
+                "limit": int(body.get("limit", 0)),
+            }
+        except (ValueError, TypeError):
+            return None

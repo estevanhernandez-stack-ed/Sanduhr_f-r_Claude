@@ -30,6 +30,7 @@ _TIER_LABELS = {
     "seven_day_oauth_apps": "Weekly — OAuth Apps",
     "iguana_necktie":       "Weekly — Special",
     "extra_usage":          "API Credits",
+    "routines":             "Daily Routines",
 }
 
 
