@@ -1142,6 +1142,11 @@ class SanduhrWidget(QWidget):
     def _on_settings_saved(self, new_settings: dict) -> None:
         self._settings.update(new_settings)
         self._save_settings()
+        # Settings changes can hide / unhide tier cards, so re-render
+        # against the latest data so the user sees the change without
+        # waiting for the next fetch tick.
+        if self._last is not None:
+            self._render_cards(self._last)
 
     def _prompt_first_run(self) -> None:
         # Build the welcome dialog with our stylesheet pre-applied so it
@@ -1237,8 +1242,16 @@ class SanduhrWidget(QWidget):
         self._status_lbl.setStyleSheet("color: #f87171;")
 
     def _render_cards(self, data: dict) -> None:
+        # Per-tier visibility filter — Settings → Pacing → 'Visible
+        # tier cards' lets the user hide tiers they don't track.
+        # Stored as the inverse (list of hidden keys) so newly-added
+        # tiers default to visible.
+        hidden_tiers = set(self._settings.get("hidden_tiers", []))
+
         active = []
         for key, label in _TIER_LABELS.items():
+            if key in hidden_tiers:
+                continue
             tier = data.get(key)
             if tier and tier.get("utilization") is not None:
                 active.append(

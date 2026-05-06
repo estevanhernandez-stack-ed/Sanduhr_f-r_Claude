@@ -272,6 +272,25 @@ class TierCard(QFrame):
         row4.addWidget(self._burn_lbl)
         outer.addLayout(row4)
 
+    # Width below which the secondary rows (reset countdown, pace
+    # label, reset datetime, burn projection) get hidden — at narrow
+    # widget widths the labels start colliding with each other and
+    # the bar chrome. Empirical pick; tweak if users complain.
+    _NARROW_HIDE_PX = 360
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        narrow = self.width() < self._NARROW_HIDE_PX
+        # Hide the entire row3 + row4 set when narrow — primary info
+        # (label, %, sparkline, bar) stays visible regardless.
+        for lbl in (
+            self._reset_lbl,
+            self._pace_lbl,
+            self._reset_dt_lbl,
+            self._burn_lbl,
+        ):
+            lbl.setVisible(not narrow)
+
     def eventFilter(self, obj, event) -> bool:
         if obj == self._pace_lbl:
             if event.type() == QEvent.Enter:

@@ -43,6 +43,7 @@ from PySide6.QtWidgets import (
 
 from sanduhr import paths, themes
 from sanduhr.accounts_dialog import AccountsTab
+from sanduhr.history_chart import _TIER_LABELS
 from sanduhr.local_cc_dialog import LocalCCTab
 
 _log = logging.getLogger(__name__)
@@ -224,9 +225,9 @@ class SettingsDialog(QDialog):
             "Configure the advanced pacing and focus tools. These overlays appear "
             "directly on top of the widget UI when activated."
         ))
-        
+
         v.addSpacing(16)
-        
+
         self._chk_pacing_tools = QCheckBox("Enable Pacing Calculators")
         self._chk_pacing_tools.setChecked(self._settings.get("pacing_tools_enabled", True))
         v.addWidget(self._chk_pacing_tools)
@@ -234,6 +235,24 @@ class SettingsDialog(QDialog):
         self._chk_remind = QCheckBox("Show reminder at 100% of session")
         self._chk_remind.setChecked(self._settings.get("remind_session_end", False))
         v.addWidget(self._chk_remind)
+
+        v.addSpacing(16)
+        v.addWidget(QLabel("<b>Visible tier cards</b>"))
+        v.addWidget(QLabel(
+            "Pick which tiers render on the widget. Hide ones you don't track "
+            "to keep the surface lean."
+        ))
+        # Per-tier visibility checkboxes. Saved as `hidden_tiers` (a list
+        # of tier_keys) so the default 'visible' state survives schema
+        # additions — new tiers we add later show up unless the user
+        # explicitly hides them.
+        hidden_tiers = set(self._settings.get("hidden_tiers", []))
+        self._tier_checkboxes: dict[str, QCheckBox] = {}
+        for tier_key, label in _TIER_LABELS.items():
+            chk = QCheckBox(label)
+            chk.setChecked(tier_key not in hidden_tiers)
+            self._tier_checkboxes[tier_key] = chk
+            v.addWidget(chk)
 
         v.addStretch()
 
@@ -249,6 +268,10 @@ class SettingsDialog(QDialog):
     def _save_pacing_settings(self) -> None:
         self._settings["pacing_tools_enabled"] = self._chk_pacing_tools.isChecked()
         self._settings["remind_session_end"] = self._chk_remind.isChecked()
+        self._settings["hidden_tiers"] = [
+            key for key, chk in self._tier_checkboxes.items()
+            if not chk.isChecked()
+        ]
         self.settingsSaved.emit(self._settings)
         _styled_msgbox(
             self, QMessageBox.Information, "Settings",
