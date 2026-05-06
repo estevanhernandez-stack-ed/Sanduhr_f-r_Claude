@@ -52,6 +52,18 @@ def _rgba(hex_color: str, alpha: float) -> str:
     return f"rgba({c.red()},{c.green()},{c.blue()},{alpha:.3f})"
 
 
+def _format_tokens_compact(n: int) -> str:
+    """Compact human-readable token count for badge labels.
+    1499 -> '1.5k', 12345 -> '12k', 1_234_567 -> '1.2M'."""
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 10_000:
+        return f"{n // 1_000}k"
+    if n >= 1_000:
+        return f"{n / 1_000:.1f}k"
+    return str(n)
+
+
 class TierCard(QFrame):
     def __init__(
         self, tier_key: str, label: str, theme: dict, parent: Optional[QWidget] = None
@@ -118,11 +130,25 @@ class TierCard(QFrame):
         mode = current_graph_mode()
         self._spark.set_mode("horizon" if mode == "horizon" else "line")
 
+    def set_local_delta(self, tokens: int) -> None:
+        """Update the small 'tokens burned since last fetch' badge in
+        the card header. Hidden when zero (nothing happening locally
+        in this tier since the API caught up) so cards stay quiet."""
+        if tokens <= 0:
+            self._local_delta_lbl.hide()
+            self._local_delta_lbl.setText("")
+            return
+        self._local_delta_lbl.setText(f"+{_format_tokens_compact(tokens)}")
+        self._local_delta_lbl.show()
+
     def apply_theme(self, theme: dict) -> None:
         self._theme = theme
         self.setStyleSheet(self._card_qss())
         self._lbl.setStyleSheet(f"color: {theme['text_secondary']};")
         self._pct.setStyleSheet(f"color: {theme['text']};")
+        self._local_delta_lbl.setStyleSheet(
+            f"color: {theme['text_dim']}; font-size: 8pt;"
+        )
         self._reset_lbl.setStyleSheet(f"color: {theme['text_dim']};")
         self._reset_dt_lbl.setStyleSheet(f"color: {theme['text_muted']};")
         self._spark.set_color(theme["sparkline"])
@@ -166,6 +192,17 @@ class TierCard(QFrame):
         self._spark = Sparkline()
         self._spark.setFixedSize(100, 16)
         row1.addWidget(self._spark)
+        # Local CC token delta — small badge showing tokens burned in
+        # this tier since the last API fetch landed. Hidden when zero
+        # so cards stay clean during inactivity. Sits between sparkline
+        # and percentage so it reads as "what's happening right now"
+        # while % is the canonical state from the fetch.
+        self._local_delta_lbl = QLabel("")
+        self._local_delta_lbl.setAttribute(Qt.WA_TranslucentBackground, True)
+        self._local_delta_lbl.setObjectName("LocalDeltaBadge")
+        self._local_delta_lbl.setStyleSheet("font-size: 8pt;")
+        self._local_delta_lbl.hide()
+        row1.addWidget(self._local_delta_lbl)
         self._pct = QLabel("0%")
         self._pct.setAttribute(Qt.WA_TranslucentBackground, True)
         row1.addWidget(self._pct)

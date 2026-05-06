@@ -9,7 +9,7 @@ import json
 import logging
 import sys
 import webbrowser
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Optional
 
 from PySide6.QtCore import QEvent, QPoint, Qt, QThread, QTimer, Slot
@@ -27,7 +27,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from sanduhr import accounts, credentials, history, mica, paths, themes
+from sanduhr import accounts, cc_logs, credentials, history, mica, paths, themes
+from sanduhr.tiers import _format_tokens_compact
 from sanduhr.focus import FocusTimerWidget
 from sanduhr.game import SnakeOverlay
 from sanduhr.fetcher import UsageFetcher
@@ -66,6 +67,10 @@ class SanduhrWidget(QWidget):
         self._thread: Optional[QThread] = None
         self._fetcher: Optional[UsageFetcher] = None
         self._last: Optional[dict] = None
+        # Anchor for the local-CC token-burn delta. Set on every
+        # successful fetch; the delta = tokens consumed in CC sessions
+        # since this timestamp. None = no fetch landed yet.
+        self._last_fetch_at: Optional[datetime] = None
         self._resize_active: Optional[str] = None
         self._resize_start_geom = None
         self._resize_start_pos = None
@@ -1195,10 +1200,14 @@ class SanduhrWidget(QWidget):
         self._clear_preview()
         self._status_lbl.setText("")
         self._last = data
+        self._last_fetch_at = datetime.now(timezone.utc)
         self._render_cards(data)
-        ts = datetime.now().strftime("%I:%M %p").lstrip("0")
-        mode = "Compact" if self._compact else ("Pinned" if self._pinned else "Float")
-        self._footer_lbl.setText(f"Updated {ts} | {mode}")
+        # Refresh the local-CC delta now that we have a fresh anchor.
+        # Delta will be 0 immediately after a fetch lands; the 30s
+        # _tick is what makes the badges/footer grow visibly between
+        # fetches as CC events stream in.
+        self._refresh_cc_delta()
+        self._update_footer()
 
     @Slot(str, str)
     def _on_fetch_failed(self, kind: str, message: str) -> None:
@@ -1248,7 +1257,11 @@ class SanduhrWidget(QWidget):
             )
 
     def _tick(self) -> None:
-        """30s countdown tick -- refresh reset labels + pace markers only."""
+        """30s countdown tick -- refresh reset labels + pace markers,
+        and recompute the local-CC token-burn delta against the cached
+        last_fetch_at. Cheap (only re-reads files modified since
+        cutoff in practice) and gives the user a live-updating badge
+        between API fetches."""
         data = self._last
         if not data:
             return
@@ -1260,6 +1273,42 @@ class SanduhrWidget(QWidget):
                 card.update_state(
                     util=int(util), resets_at=ra, history_values=history.load(key)
                 )
+        self._refresh_cc_delta()
+        self._update_footer()
+
+    def _refresh_cc_delta(self) -> None:
+        """Recompute the per-tier and aggregate local-CC token deltas
+        since `_last_fetch_at` and push them into the tier-card badges.
+        Footer text is updated separately by `_update_footer` so the
+        compact-mode footer doesn't change shape unnecessarily."""
+        if self._last_fetch_at is None:
+            return
+        try:
+            by_tier = cc_logs.tokens_since_by_tier(self._last_fetch_at)
+        except Exception:
+            # Defensive — log file I/O shouldn't take down the widget.
+            by_tier = {}
+        for tier_key, card in self._tier_cards.items():
+            card.set_local_delta(by_tier.get(tier_key, 0))
+
+    def _update_footer(self) -> None:
+        """Compose the footer line: 'Updated 4:32 PM | Pinned' plus
+        an optional ' · CC +1.2k' suffix when local CC activity has
+        accumulated since the last fetch landed."""
+        if self._last_fetch_at is None:
+            self._footer_lbl.setText("")
+            return
+        ts = self._last_fetch_at.astimezone().strftime("%I:%M %p").lstrip("0")
+        mode = "Compact" if self._compact else ("Pinned" if self._pinned else "Float")
+        base = f"Updated {ts} | {mode}"
+        try:
+            deltas = cc_logs.tokens_since(self._last_fetch_at)
+        except Exception:
+            deltas = {}
+        total = sum(deltas.values())
+        if total > 0:
+            base = f"{base} · CC +{_format_tokens_compact(total)}"
+        self._footer_lbl.setText(base)
 
     # -- geometry persistence --------------------------------------
 
