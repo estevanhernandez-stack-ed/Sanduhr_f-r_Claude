@@ -94,14 +94,24 @@ class TierCard(QFrame):
     # -- public API -----------------------------------------------
 
     def update_state(
-        self, util: int, resets_at: Optional[str], history_values: List[int]
+        self,
+        util: int,
+        resets_at: Optional[str],
+        history_values: List[int],
+        *,
+        value_label: Optional[str] = None,
     ) -> None:
-        """Mutate labels and bar in place -- no rebuild."""
+        """Mutate labels and bar in place -- no rebuild.
+
+        `value_label` overrides the default 'NN%' label in the card
+        header — e.g., count-based tiers like Daily Routines pass
+        '0/15' so the user reads the actual quota count rather than
+        the derived percentage."""
         self._util = util
         self._resets_at = resets_at
 
         color = themes.usage_color(util)
-        self._pct.setText(f"{util}%")
+        self._pct.setText(value_label if value_label is not None else f"{util}%")
         self._pct.setStyleSheet(f"color: {color};")
 
         self._bar.setValue(util)

@@ -12,9 +12,10 @@ comes from sanduhr.cc_logs — no network, no writes."""
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import (
+    QCheckBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -108,7 +109,16 @@ class _DailyBarStrip(QWidget):
 class LocalCCTab(QWidget):
     """Settings tab body — Local Claude Code usage summary."""
 
-    def __init__(self, theme: Optional[dict] = None, parent: Optional[QWidget] = None):
+    # Emitted when the breakdown-tables visibility checkbox toggles.
+    # Parent SettingsDialog persists this via settingsSaved.
+    showBreakdownsChanged = Signal(bool)
+
+    def __init__(
+        self,
+        theme: Optional[dict] = None,
+        show_breakdowns: bool = True,
+        parent: Optional[QWidget] = None,
+    ):
         super().__init__(parent)
         self._theme = theme or {}
 
@@ -140,8 +150,22 @@ class LocalCCTab(QWidget):
         self._bars = _DailyBarStrip(self._theme)
         v.addWidget(self._bars)
 
-        # Per-project + per-skill tables side by side.
-        tables_row = QHBoxLayout()
+        # Show/hide toggle for the breakdown tables. Some users prefer
+        # the lean today + bars view without scrolling past per-project
+        # detail. Persisted via showBreakdownsChanged signal so the
+        # preference sticks across launches.
+        self._chk_show_breakdowns = QCheckBox("Show project & skill breakdown")
+        self._chk_show_breakdowns.setChecked(show_breakdowns)
+        self._chk_show_breakdowns.toggled.connect(self._on_show_breakdowns_toggled)
+        v.addWidget(self._chk_show_breakdowns)
+
+        # Per-project + per-skill tables side by side. Wrapped in a
+        # container QWidget so the whole row hides cleanly when the
+        # checkbox is off (hiding individual layouts is fiddlier).
+        self._tables_widget = QWidget()
+        tables_row = QHBoxLayout(self._tables_widget)
+        tables_row.setContentsMargins(0, 0, 0, 0)
+
         proj_box = QVBoxLayout()
         proj_caption = QLabel(f"Top projects (last {_LOOKBACK_DAYS} days)")
         proj_caption.setStyleSheet("font-size: 9pt;")
@@ -158,7 +182,8 @@ class LocalCCTab(QWidget):
         skill_box.addWidget(self._skill_table)
         tables_row.addLayout(skill_box)
 
-        v.addLayout(tables_row)
+        v.addWidget(self._tables_widget)
+        self._tables_widget.setVisible(show_breakdowns)
 
         # Refresh timer — runs only while the tab is visible (start in
         # showEvent, stop in hideEvent) so we don't burn disk I/O on a
@@ -166,6 +191,10 @@ class LocalCCTab(QWidget):
         self._refresh_timer = QTimer(self)
         self._refresh_timer.setInterval(_REFRESH_MS)
         self._refresh_timer.timeout.connect(self.refresh)
+
+    def _on_show_breakdowns_toggled(self, checked: bool) -> None:
+        self._tables_widget.setVisible(checked)
+        self.showBreakdownsChanged.emit(checked)
 
     def _make_table(self) -> QTableWidget:
         t = QTableWidget(0, 2)

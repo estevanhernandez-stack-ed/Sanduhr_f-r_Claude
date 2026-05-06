@@ -49,7 +49,7 @@ _TIER_LABELS = {
     "seven_day_omelette":   "Weekly - Design",
     "seven_day_oauth_apps": "Weekly - OAuth Apps",
     "iguana_necktie":       "Weekly - Special",
-    "extra_usage":          "API Credits",
+    "extra_usage":          "Capped Usage",
     "routines":             "Daily Routines",
 }
 
@@ -1265,10 +1265,22 @@ class SanduhrWidget(QWidget):
                 self._apply_monospace_if_needed(card)
                 # New card + its descendants need the drag filter too
                 self._install_drag_filter(card)
+            # Routines is count-based (used / daily limit), not a
+            # subscription-tier percentage. Render the raw count so the
+            # user reads '3/15' instead of '20%'. Bar fill still tracks
+            # the derived utilization.
+            value_label = None
+            if key == "routines":
+                tier_data = data.get(key, {})
+                used = tier_data.get("used")
+                limit = tier_data.get("limit")
+                if used is not None and limit is not None:
+                    value_label = f"{used}/{limit}"
             card.update_state(
                 util=util,
                 resets_at=resets_at,
                 history_values=history.load(key),
+                value_label=value_label,
             )
 
     def _tick(self) -> None:

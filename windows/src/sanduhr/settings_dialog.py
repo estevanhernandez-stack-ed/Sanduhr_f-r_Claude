@@ -464,8 +464,21 @@ class SettingsDialog(QDialog):
     # ── Local CC tab ─────────────────────────────────────────────
 
     def _build_local_cc_tab(self) -> None:
-        self._local_cc_tab = LocalCCTab(theme=self._theme)
+        show_breakdowns = bool(
+            self._settings.get("local_cc_show_breakdowns", True)
+        )
+        self._local_cc_tab = LocalCCTab(
+            theme=self._theme,
+            show_breakdowns=show_breakdowns,
+        )
+        self._local_cc_tab.showBreakdownsChanged.connect(
+            self._on_local_cc_breakdowns_toggled
+        )
         self._tabs.addTab(self._local_cc_tab, "Local CC")
+
+    def _on_local_cc_breakdowns_toggled(self, show: bool) -> None:
+        self._settings["local_cc_show_breakdowns"] = show
+        self.settingsSaved.emit(self._settings)
 
     # ── Help tab ─────────────────────────────────────────────────
 
