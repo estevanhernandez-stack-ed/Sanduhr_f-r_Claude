@@ -19,8 +19,9 @@ SOURCE = HERE.parent / "icon" / "source.png"
 OUT = HERE / "Images"
 OUT.mkdir(parents=True, exist_ok=True)
 
-# Brand-navy bg so the tile reads as a deliberate color on any accent.
-NAVY = (15, 24, 43, 255)
+# 626Labs --brand-navy-deep so the tile reads as a deliberate color on
+# any Start Menu accent and matches the icon's interior background.
+NAVY = (15, 31, 49, 255)
 
 
 def render(name: str, size: int, icon_scale: float = 0.82) -> None:
