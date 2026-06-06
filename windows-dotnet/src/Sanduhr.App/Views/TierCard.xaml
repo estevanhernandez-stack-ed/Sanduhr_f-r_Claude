@@ -1,0 +1,85 @@
+<UserControl x:Class="Sanduhr.App.Views.TierCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Sanduhr.App.Controls"
+             xmlns:conv="clr-namespace:Sanduhr.App.Converters"
+             xmlns:vm="clr-namespace:Sanduhr.App.ViewModels"
+             mc:Ignorable="d"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             d:DataContext="{d:DesignInstance vm:TierCardViewModel}"
+             AllowDrop="True"
+             Cursor="SizeAll">
+    <UserControl.Resources>
+        <conv:StringToVisibilityConverter x:Key="StrVis" />
+        <conv:ColorToBrushConverter x:Key="ColorBrush" />
+    </UserControl.Resources>
+    <UserControl.ContextMenu>
+        <ContextMenu>
+            <MenuItem Header="Hide this tier" Click="OnHideClick" />
+        </ContextMenu>
+    </UserControl.ContextMenu>
+
+    <Border Background="{DynamicResource Sanduhr.Brush.CardGlass}"
+            BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
+            BorderThickness="1" CornerRadius="10"
+            Padding="14,12" Margin="0,0,0,8">
+        <StackPanel>
+            <!-- Row 1: label · sparkline · value -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                           FontSize="13" TextTrimming="CharacterEllipsis" />
+                <controls:SparklineControl Grid.Column="1" Width="100" Height="16"
+                                           Margin="8,0"
+                                           VerticalAlignment="Center"
+                                           Values="{Binding Sparkline}"
+                                           LineColor="{Binding SparklineColor}" />
+                <TextBlock Grid.Column="2" Text="{Binding ValueText}" VerticalAlignment="Center"
+                           FontSize="15" FontWeight="Bold"
+                           Foreground="{Binding BarColor, Converter={StaticResource ColorBrush}}" />
+            </Grid>
+
+            <!-- Row 2: utilization bar + pace ghost -->
+            <controls:UsageBar Height="18" Margin="0,6,0,0"
+                               Value="{Binding Utilization}"
+                               FillColor="{Binding BarColor}"
+                               TrackColor="{DynamicResource Sanduhr.Color.BarBg}"
+                               PaceFraction="{Binding PaceFraction}"
+                               PaceColor="{Binding PaceTickColor}" />
+
+            <!-- Row 3: reset countdown · pace label -->
+            <Grid Margin="0,6,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding ResetCountdown}" FontSize="11"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                           Visibility="{Binding ResetCountdown, Converter={StaticResource StrVis}}" />
+                <TextBlock Grid.Column="1" Text="{Binding PaceLabel}" FontSize="11"
+                           Foreground="{Binding PaceBrush}"
+                           Visibility="{Binding PaceLabel, Converter={StaticResource StrVis}}" />
+            </Grid>
+
+            <!-- Row 4: reset datetime · burn projection -->
+            <Grid Margin="0,2,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding ResetDateTime}" FontSize="11"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextMuted}"
+                           Visibility="{Binding ResetDateTime, Converter={StaticResource StrVis}}" />
+                <TextBlock Grid.Column="1" Text="{Binding BurnText}" FontSize="11"
+                           Foreground="{Binding BurnBrush}"
+                           Visibility="{Binding BurnText, Converter={StaticResource StrVis}}" />
+            </Grid>
+        </StackPanel>
+    </Border>
+</UserControl>

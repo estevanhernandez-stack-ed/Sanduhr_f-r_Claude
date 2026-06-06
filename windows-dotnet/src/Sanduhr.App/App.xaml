@@ -1,9 +1,11 @@
-﻿<Application x:Class="Sanduhr.App.App"
+<Application x:Class="Sanduhr.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:Sanduhr.App"
-             StartupUri="MainWindow.xaml">
+             ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
-         
+        <!-- Theme brushes are injected at startup by ThemePalette.Apply so the
+             palette stays swappable (item 8). DynamicResource lookups resolve
+             against these at render time. -->
     </Application.Resources>
 </Application>

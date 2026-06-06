@@ -1,7 +1,24 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\Sanduhr.Core\Sanduhr.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
+    <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.275">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
+  </ItemGroup>
+
+  <!-- Window + tray glyph share the shipped Sanduhr.ico (parity with the Python
+       build's bundled icon/Sanduhr.ico). Resource = embedded for WPF Window.Icon;
+       ApplicationIcon stamps the .exe. -->
+  <ItemGroup>
+    <Resource Include="Assets\Sanduhr.ico" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -10,6 +27,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>Assets\Sanduhr.ico</ApplicationIcon>
+    <AssemblyName>Sanduhr</AssemblyName>
+    <RootNamespace>Sanduhr.App</RootNamespace>
   </PropertyGroup>
 
 </Project>
