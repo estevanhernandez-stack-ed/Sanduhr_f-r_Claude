@@ -22,4 +22,8 @@
     <ProjectReference Include="..\..\src\Sanduhr.Core\Sanduhr.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

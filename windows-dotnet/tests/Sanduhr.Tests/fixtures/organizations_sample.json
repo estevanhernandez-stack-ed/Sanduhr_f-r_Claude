@@ -1,0 +1,22 @@
+[
+  {
+    "id": 11111111,
+    "uuid": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+    "name": "[redacted]'s Organization",
+    "capabilities": ["claude_max", "chat"],
+    "rate_limit_tier": "default_claude_max_20x",
+    "billing_type": "stripe_subscription",
+    "free_credits_status": "granted_manually",
+    "created_at": "2025-08-17T14:48:36.706089Z"
+  },
+  {
+    "id": 22222222,
+    "uuid": "YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY",
+    "name": "[redacted] Individual Org",
+    "capabilities": ["api", "api_individual"],
+    "rate_limit_tier": "auto_prepaid_tier_0",
+    "billing_type": "prepaid",
+    "free_credits_status": "available",
+    "created_at": "2025-10-28T00:15:49.675797Z"
+  }
+]
