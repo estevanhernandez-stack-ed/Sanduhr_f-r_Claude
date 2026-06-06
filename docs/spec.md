@@ -62,6 +62,23 @@ No browser-store prying (ABE-dead); we own the cookie jar. Login window is its o
 
 WPF borderless `WindowStyle=None`, `AllowsTransparency`, top-most; Mica via WPF-UI `SystemBackdrop` (or CsWin32 `DwmExtendFrameIntoClientArea` + `DWMWA_SYSTEMBACKDROP_TYPE`) with solid-color fallback < Win11 22H2. Pin/float toggle, frame persistence (save on move only — port the Python gotcha), taskbar-icon binding.
 
+## Focus hourglass — view rebuild (item 10)
+
+The focus timer's hourglass (`focus.py → App/Views/FocusTimer`) is **cert-load-bearing** (10.1.4.4 unique value). Decision (checklist deepening round, 2026-06-06): **keep the model, rebuild the view.** The fog was diagnosed as *both* a contrast problem and a missing-vessel problem.
+
+**Model — port 1:1 (do not redesign).** The Python falling-sand cellular automaton is sound and tested; port it verbatim so the physics stays verified:
+- 31×31 grid; hourglass/bowtie mask via `dx <= dy + 1` (dx, dy = distance from center); sand spawns in the top half, `total_sand` counted.
+- Physics at ~30fps off a **millisecond** elapsed clock (not the 1Hz label). Sweep bottom-up; each grain falls straight-down, else random-biased diagonal.
+- **Wall-clock throttle (the load-bearing invariant):** grains crossing the throat (`y == cy-1`) are rate-limited so `sand_passed` chases `expected_passed = (elapsed_ms / duration_ms) * total_sand`, compared as **float, not truncated** (port `test_focus_physics`'s float-not-int regression). Sand drains in exact proportion to elapsed time and can never outpace the clock. Throttle the center column *and* both diagonal entries into the bottom half (the Python fix — diagonals must not bypass the rate limit).
+
+**View — new WPF render (this is the un-fogging).** Drop the Python `alpha-60` backing wash entirely. Render on a WPF `Canvas` / `DrawingContext`:
+- **Vessel:** thin-line vector glass — hairline walls, a subtle top-edge sheen, faint tinted bulbs, a visible thin **neck + falling stream**. Minimal, matches the app's layered-glass language; no skeuomorphic caps.
+- **Grains, per theme:** square pixel grains on retro/Matrix themes (phosphor feel, honest to the CA); soft round anti-aliased grains on the glass themes. Mirrors the Mac build's per-theme `numericFontDesign` split.
+- **Color:** sand follows the **active theme accent**; the glass vessel always carries the **626 cyan→magenta** tint (themed fill, branded vessel).
+- **Contrast:** no alpha-60 haze; grains drawn crisp at full contrast over the vessel. Grain cell size scales with the panel but is floored so grains never mush below legibility.
+
+Net: the model that earns the cert stays byte-for-byte verifiable; the view becomes a recognizable, on-brand, high-contrast hourglass instead of a hazy triangle of squares.
+
 ## Release
 
 Velopack (GitHub `Setup.exe` + delta) + MSIX (Store) from one version. Follow RORORO's freshened `docs/store/release-playbook.md` (4th-version-component `.0`; Partner Center; reviewer letter; draft-release; listing "What's new") merged with Sanduhr's `docs/ms-store-submission-playbook.md`. Likely **v3.0.0** to signal the platform shift. GitNexus indexes the new tree.
