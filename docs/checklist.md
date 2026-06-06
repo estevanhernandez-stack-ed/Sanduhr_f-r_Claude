@@ -25,19 +25,19 @@ Pairs with `docs/scope.md`, `docs/prd.md`, `docs/spec.md`. Parity rewrite of a s
   Acceptance: solution compiles; `PacingTests` green; pacing values match the Python implementation.
   Verify: `dotnet test` → `PacingTests` pass. **(Complete — commit `5bc8798`.)**
 
-- [ ] **2. Port plan + tier models (pure Core)**
+- [x] **2. Port plan + tier models (pure Core)**
   Spec ref: `spec.md > Module map` (`plan.py → Core/PlanLabel.cs`, `tiers.py → Core/TierModel.cs`)
   What to build: `PlanLabel.cs` — `rate_limit_tier` → Pro/Team/Max/Max ×20 mapping with the defensive stripe-subscription-gated parse (port PR #25's logic; API/prepaid orgs render no badge). `TierModel.cs` — represent `five_hour`, `seven_day` + sub-tiers (`sonnet`/`opus`/`cowork`/`omelette`/`oauth_apps`), `extra_usage`, **Routines** daily-quota count, speculative-tier "future use" tags; utilization + reset-countdown calc. Pure Core, zero WPF. Port the matching Python test intents.
   Acceptance (prd): tier model covers every tier type incl. Routines + `extra_usage`; plan badge maps correctly incl. Max ×20 from `default_claude_max_20x`; tests green.
   Verify: `dotnet test` → plan + tier tests pass; assert Max ×20 maps and that a non-stripe org yields no badge.
 
-- [ ] **3. Port API client + fetcher (CF-aware, typed errors)**
+- [x] **3. Port API client + fetcher (CF-aware, typed errors)**
   Spec ref: `spec.md > Module map` (`api.py → Core/ClaudeApiClient.cs`, `fetcher.py → Core/UsageFetcher.cs`) + `spec.md > Stack / packages` (Cloudflare-aware handler)
   What to build: `ClaudeApiClient.cs` — `HttpClient` + Cloudflare-aware handler replacing cloudscraper (Chrome UA + `Sec-Fetch-*` headers, CF-challenge HTML detection → distinct typed error); `/organizations` (capture `rate_limit_tier`/`billing_type`/`capabilities`, cache `orgID`) + `/organizations/{id}/usage`. `UsageFetcher.cs` — async fetch + Routines synth + history append + `_account` injection; typed errors (session-expired / CF-blocked / network). Port api-parsing tests with the JSON fixtures.
   Acceptance (prd): fetch returns typed usage; the three error classes are distinguishable; api-parsing tests green against fixtures.
   Verify: `dotnet test` → api/fetcher parsing tests pass; optional live run against a real `sessionKey` parses the usage JSON.
 
-- [ ] **4. Port persistence layer — history, accounts, credentials, CC logs (Milestone A gate)**
+- [x] **4. Port persistence layer — history, accounts, credentials, CC logs (Milestone A gate)**
   Spec ref: `spec.md > Module map` (`history.py`, `accounts.py`, `credentials.py`, `cc_logs.py`) + `prd.md > Data-compat requirement (load-bearing)`
   What to build: `UsageHistory.cs` (`%APPDATA%\Sanduhr\history.{account}.json`, **same schema**, 30-day retention); `AccountStore.cs` (Windows Credential Manager slots `sessionKey:{label}` / `cf_clearance:{label}`, active-account switch, per-account history); `CredentialStore.cs` (DPAPI / Credential Manager); `CcLogReader.cs` (local Claude Code JSONL token-burn delta). Same files + same slots as Python = zero migration. Port history/accounts/cc-logs test intents.
   Acceptance (prd): reads/writes the **same** `%APPDATA%\Sanduhr\` files + Credential Manager slots as the Python build; an existing user's data + accounts carry over untouched; the ported Core xUnit suite is green — **the parity bar for pure logic is met.**
