@@ -1,0 +1,19 @@
+# .NET build output
+bin/
+obj/
+
+# IDE / user
+.vs/
+*.user
+*.suo
+
+# Test + coverage
+[Tt]est[Rr]esults/
+*.coverage
+*.trx
+
+# Velopack / MSIX build artifacts
+[Rr]eleases/
+*.msix
+*.appx
+AppPackages/
