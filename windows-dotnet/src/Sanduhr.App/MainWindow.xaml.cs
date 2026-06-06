@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -38,6 +40,74 @@ public partial class MainWindow : Window
 
         RestoreFrame();
         LocationChanged += (_, _) => { _saveDebounce.Stop(); _saveDebounce.Start(); };
+
+        // DataContext is assigned by App AFTER construction, so build the right-click
+        // menu once the window is loaded (and the VM is present).
+        Loaded += (_, _) => EnsureWidgetContextMenu();
+    }
+
+    private WidgetViewModel? Vm => DataContext as WidgetViewModel;
+
+    // -- account access from the widget body ----------------------------------
+
+    /// <summary>The widget's right-click menu (currently the gap this item closes):
+    /// Accounts ▸ [switch list] · Settings… · Refresh · Hide. Built once; the
+    /// Accounts submenu repopulates on open so the live registry + active marker
+    /// stay current.</summary>
+    private bool _menuBuilt;
+
+    private void EnsureWidgetContextMenu()
+    {
+        if (_menuBuilt || Vm is null)
+            return;
+        _menuBuilt = true;
+
+        var menu = new ContextMenu
+        {
+            Background = new SolidColorBrush(Color.FromRgb(0x1c, 0x1c, 0x1c)),
+            Foreground = new SolidColorBrush(Color.FromRgb(0xe8, 0xe4, 0xdc)),
+        };
+
+        var accounts = new MenuItem { Header = "Accounts" };
+        // Placeholder so the submenu arrow renders; replaced on open.
+        accounts.Items.Add(new MenuItem { Header = "…", IsEnabled = false });
+        accounts.SubmenuOpened += (_, _) =>
+        {
+            if (Vm is not null)
+                AccountMenuBuilder.PopulateSwitchList(accounts.Items, Vm, includeAdd: true, includeManage: false);
+        };
+        menu.Items.Add(accounts);
+
+        var settings = new MenuItem { Header = "Settings…", Command = Vm.OpenSettingsCommand };
+        menu.Items.Add(settings);
+
+        var refresh = new MenuItem { Header = "Refresh", Command = Vm.RefreshCommand };
+        menu.Items.Add(refresh);
+
+        menu.Items.Add(new Separator());
+
+        var hide = new MenuItem { Header = "Hide" };
+        hide.Click += (_, _) => Hide();
+        menu.Items.Add(hide);
+
+        RootBorder.ContextMenu = menu;
+    }
+
+    /// <summary>Title-bar account chip → drop a flat quick-switch popup (accounts +
+    /// Add account… + Manage accounts…).</summary>
+    private void AccountChip_Click(object sender, RoutedEventArgs e)
+    {
+        if (Vm is null || sender is not UIElement anchor)
+            return;
+        var menu = new ContextMenu
+        {
+            PlacementTarget = anchor,
+            Placement = PlacementMode.Bottom,
+            Background = new SolidColorBrush(Color.FromRgb(0x1c, 0x1c, 0x1c)),
+            Foreground = new SolidColorBrush(Color.FromRgb(0xe8, 0xe4, 0xdc)),
+        };
+        AccountMenuBuilder.PopulateSwitchList(menu.Items, Vm, includeAdd: true, includeManage: true);
+        menu.IsOpen = true;
     }
 
     protected override void OnSourceInitialized(EventArgs e)

@@ -254,6 +254,30 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
 
     private void InjectAuthCookies(CoreWebView2 core)
     {
+        // SESSION-BLEED GUARD (multi-account). The transport profile at
+        // %APPDATA%\Sanduhr\webview2-fetch\ is SHARED across accounts, so its
+        // cookie jar still holds the PREVIOUS account's claude.ai cookies on disk
+        // (sessionKey, __Secure-* auth cookies, lastActiveOrg, __cf_bm, …). A new
+        // WebView2ApiClient is built per account switch (WidgetViewModel.RebuildFetcher),
+        // and each runs InitAsync against this same profile. Injecting the new
+        // sessionKey is NOT enough on its own: a stale auth cookie can out-rank it
+        // and make the in-page fetch return the OLD account's usage. So we wipe the
+        // jar clean here, every (re)build, BEFORE adding the new account's cookies
+        // and BEFORE navigating — guaranteeing the browser presents only the
+        // account we're switching to. This is the same multi-account isolation the
+        // sign-in flow gets from its per-capture user-data folders. cf_clearance is
+        // re-injected below when supplied, and the live browser re-solves Cloudflare
+        // on navigation regardless, so clearing everything is safe.
+        try
+        {
+            core.CookieManager.DeleteAllCookies();
+            Log("init: cleared transport cookie jar (anti-bleed)");
+        }
+        catch (Exception ex)
+        {
+            Log($"init: cookie clear failed: {ex.Message}");
+        }
+
         // Both domain variants: .claude.ai (host-wide) and claude.ai (exact). The
         // browser sends whichever matches the request origin.
         DateTime expires = DateTime.UtcNow.AddDays(30);

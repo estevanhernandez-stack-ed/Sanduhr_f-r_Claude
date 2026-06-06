@@ -75,7 +75,22 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// sessionKey fallback modal.</summary>
     public event Func<Task>? PasteKeyRequested;
 
+    /// <summary>Raised by the "Settings…" command (title-bar chip, widget right-click,
+    /// tray) — App opens the <c>SettingsWindow</c> on the Accounts tab.</summary>
+    public event Func<Task>? SettingsRequested;
+
+    /// <summary>Raised after any account-registry mutation routed through this VM
+    /// (switch / rename / sign-out). Open menus + the Settings accounts list re-read
+    /// the registry so their checkmarks and rows stay in sync.</summary>
+    public event Action? AccountsChanged;
+
     public ThemePalette Palette => _palette;
+
+    /// <summary>Account labels in registry order — drives the quick-switch menus.</summary>
+    public IReadOnlyList<string> ListAccounts() => _accounts.ListAccounts();
+
+    /// <summary>The active account label, or null when signed out.</summary>
+    public string? ActiveAccount => _accounts.GetActive();
 
     public WidgetViewModel()
     {
@@ -139,6 +154,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         RebuildFetcher();
         RefreshAccountLabel();
+        AccountsChanged?.Invoke();
         await RefreshAsync();
     }
 
@@ -154,6 +170,77 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         if (PasteKeyRequested is not null)
             await PasteKeyRequested.Invoke();
+    }
+
+    [RelayCommand]
+    private async Task OpenSettings()
+    {
+        if (SettingsRequested is not null)
+            await SettingsRequested.Invoke();
+    }
+
+    /// <summary>
+    /// Quick-switch the active account (title-bar chip, widget right-click submenu,
+    /// tray submenu, or the Settings "Switch to" button all route here). Sets the
+    /// active pointer, rebuilds the fetcher against the new account — which spins up
+    /// a fresh <see cref="WebView2ApiClient"/> whose <c>InitAsync</c> wipes the shared
+    /// transport cookie jar before injecting the new sessionKey, so the next fetch
+    /// returns the NEW account's usage with no bleed — then refetches. Tier cards are
+    /// cleared first so the old account's numbers never linger during the switch.
+    /// </summary>
+    [RelayCommand]
+    private async Task SwitchAccount(string? label)
+    {
+        if (string.IsNullOrEmpty(label) || label == _accounts.GetActive())
+            return;
+
+        _accounts.SetActive(label);
+        Tiers.Clear();
+        _lastData = null;
+        StatusText = "Switching account…";
+        TrayPercentChanged?.Invoke(-1);
+
+        RebuildFetcher();
+        RefreshAccountLabel();
+        AccountsChanged?.Invoke();
+        await RefreshAsync();
+    }
+
+    /// <summary>Rename an account in place (same secrets, new label). The active
+    /// pointer follows the rename inside <see cref="AccountStore"/>, so the fetcher
+    /// keeps the same session — only the displayed label refreshes.</summary>
+    public void RenameAccount(string oldLabel, string newLabel)
+    {
+        _accounts.RenameAccount(oldLabel, newLabel);
+        RefreshAccountLabel();
+        AccountsChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Sign out (remove) an account: wipe its per-account history file, drop its
+    /// Credential-Manager slots, and — when it was the active one —
+    /// <see cref="AccountStore.RemoveAccount"/> advances the active pointer to the
+    /// first remaining account (or none). When the active account changed we rebuild
+    /// the fetcher (anti-bleed cookie wipe runs again) and refetch; signing out the
+    /// last account drops the widget into its "Sign in to Claude" empty state.
+    /// </summary>
+    public async Task SignOutAccountAsync(string label)
+    {
+        bool wasActive = _accounts.GetActive() == label;
+        // Wipe history BEFORE removal so the file is targeted by an explicit label
+        // (parity with the Python remove flow).
+        _history.ClearAll(label);
+        _accounts.RemoveAccount(label);
+
+        if (wasActive)
+        {
+            Tiers.Clear();
+            _lastData = null;
+            RebuildFetcher();
+            await RefreshAsync();
+        }
+        RefreshAccountLabel();
+        AccountsChanged?.Invoke();
     }
 
     [RelayCommand]
