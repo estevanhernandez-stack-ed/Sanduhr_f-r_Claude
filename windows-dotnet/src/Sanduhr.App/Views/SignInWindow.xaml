@@ -7,7 +7,7 @@
         Height="720" Width="1040"
         WindowStartupLocation="CenterScreen"
         Background="#0d0d0d"
-        Icon="Assets/Sanduhr.ico">
+        Icon="/Assets/Sanduhr.ico">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />

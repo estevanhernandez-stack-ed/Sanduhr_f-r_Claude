@@ -6,4 +6,12 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <!-- Shared internal parsing (ClaudeApiParsing) is consumed by the WebView2
+       transport in the App assembly (AssemblyName=Sanduhr) and unit-tested
+       directly by Sanduhr.Tests. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Sanduhr" />
+    <InternalsVisibleTo Include="Sanduhr.Tests" />
+  </ItemGroup>
+
 </Project>

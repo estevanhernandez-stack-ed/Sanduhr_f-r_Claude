@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace Sanduhr.Core;
@@ -81,11 +80,10 @@ public interface IClaudeApiClient
 /// </summary>
 public sealed class CloudflareAwareHandler : DelegatingHandler
 {
-    // A current, plausible Chrome-on-Windows UA. The exact build matters less
-    // than reading as a desktop Chrome rather than a .NET HttpClient.
-    private const string ChromeUserAgent =
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+    // Shared with the embedded sign-in WebView2 so the cf_clearance issued during
+    // sign-in is valid when replayed here — Cloudflare binds cf_clearance to the
+    // User-Agent that obtained it. Single source of truth in Core.
+    private const string ChromeUserAgent = ClaudeSignIn.BrowserUserAgent;
 
     public CloudflareAwareHandler(HttpMessageHandler innerHandler) : base(innerHandler) { }
 
@@ -235,36 +233,12 @@ public sealed class ClaudeApiClient : IClaudeApiClient, IDisposable
         await CheckAsync(resp, ct).ConfigureAwait(false);
         var body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
 
-        JsonNode? root;
-        try { root = JsonNode.Parse(body); }
-        catch (JsonException e) { throw new NetworkException("Org discovery returned non-JSON", e); }
-
-        if (root is not JsonArray orgs)
-            throw new NetworkException("Org discovery returned non-JSON");
-        if (orgs.Count == 0)
-            throw new NetworkException("No organizations returned for this account");
-        if (orgs[0] is not JsonObject org)
-            throw new NetworkException("Malformed organization entry");
-
-        var uuid = (string?)org["uuid"];
-        if (string.IsNullOrEmpty(uuid))
-            throw new NetworkException("Organization missing uuid");
-        _orgId = uuid;
-
-        // Capture the plan/subscription fields off the same org we track usage
-        // for, so the tier badge can render the subscription tier (PR #25).
-        _accountNode = new JsonObject
-        {
-            ["rate_limit_tier"] = org["rate_limit_tier"]?.DeepClone(),
-            ["billing_type"] = org["billing_type"]?.DeepClone(),
-            ["capabilities"] = org["capabilities"]?.DeepClone(),
-        };
-        Account = new AccountPlan(
-            (string?)org["rate_limit_tier"],
-            (string?)org["billing_type"],
-            org["capabilities"] is JsonArray caps
-                ? caps.Select(e => (string?)e).Where(s => s is not null).Select(s => s!).ToArray()
-                : null);
+        // Shape parsing + plan capture live in ClaudeApiParsing so the WebView2
+        // transport reuses the exact same logic (and the same parity tests).
+        var discovery = ClaudeApiParsing.ParseOrganizations(body);
+        _orgId = discovery.OrgId;
+        _accountNode = discovery.AccountNode;
+        Account = discovery.Account;
 
         return _orgId;
     }
@@ -279,21 +253,9 @@ public sealed class ClaudeApiClient : IClaudeApiClient, IDisposable
         await CheckAsync(resp, cancellationToken).ConfigureAwait(false);
         var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
-        JsonNode? root;
-        try { root = JsonNode.Parse(body); }
-        catch (JsonException e) { throw new NetworkException("Usage endpoint returned non-JSON", e); }
-
-        if (root is not JsonObject data)
-            throw new NetworkException("Usage endpoint returned non-object JSON");
-
-        // Ride the captured plan fields through on the reserved _account key.
-        // The tier renderers iterate known tier keys only, so this stays inert
-        // to them (parity with PR #25). DeepClone so every call hands back an
-        // independent node — a JsonNode can only ever have one parent.
-        if (_accountNode is not null)
-            data["_account"] = _accountNode.DeepClone();
-
-        return data;
+        // Parse + ride the captured plan fields through on the reserved _account
+        // key (shared with the WebView2 transport via ClaudeApiParsing).
+        return ClaudeApiParsing.ParseUsage(body, _accountNode);
     }
 
     /// <inheritdoc />
@@ -312,21 +274,7 @@ public sealed class ClaudeApiClient : IClaudeApiClient, IDisposable
         await CheckAsync(resp, cancellationToken).ConfigureAwait(false);
 
         var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        JsonNode? root;
-        try { root = JsonNode.Parse(body); }
-        catch (JsonException) { return null; }
-        if (root is not JsonObject obj) return null;
-
-        try
-        {
-            int used = obj["used"] is JsonNode u ? (int)u.GetValue<double>() : 0;
-            int limit = obj["limit"] is JsonNode l ? (int)l.GetValue<double>() : 0;
-            return new RoutineBudget(used, limit);
-        }
-        catch
-        {
-            return null; // non-numeric used/limit — matches api.py's (ValueError, TypeError) guard
-        }
+        return ClaudeApiParsing.ParseRoutineBudget(body);
     }
 
     public void Dispose() => _http.Dispose();

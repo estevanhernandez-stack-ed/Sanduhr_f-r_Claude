@@ -39,7 +39,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private readonly DispatcherTimer _riffTimer;
 
     private ThemePalette _palette = ThemePalette.Obsidian;
-    private ClaudeApiClient? _client;
+    private IClaudeApiClient? _client;
     private UsageFetcher? _fetcher;
     private JsonObject? _lastData;
     private DateTimeOffset? _lastFetchAt;
@@ -110,7 +110,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     private void RebuildFetcher()
     {
-        _client?.Dispose();
+        (_client as IDisposable)?.Dispose();
         _client = null;
         _fetcher = null;
 
@@ -125,7 +125,10 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             return;
         }
         ShowSignInPrompt = false;
-        _client = new ClaudeApiClient(creds.SessionKey, creds.CfClearance);
+        // WebView2-backed transport (item 3 pivot): a raw HttpClient can't pass
+        // Cloudflare's fingerprint binding, but a real authenticated browser can.
+        // Same (sessionKey, cfClearance) shape as ClaudeApiClient, same interface.
+        _client = new WebView2ApiClient(creds.SessionKey, creds.CfClearance);
         _fetcher = new UsageFetcher(_client, _history);
     }
 
@@ -380,6 +383,6 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _refreshTimer.Stop();
         _tickTimer.Stop();
         _riffTimer.Stop();
-        _client?.Dispose();
+        (_client as IDisposable)?.Dispose();
     }
 }

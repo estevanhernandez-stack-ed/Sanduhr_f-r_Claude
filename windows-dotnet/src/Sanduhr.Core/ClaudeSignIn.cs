@@ -35,6 +35,19 @@ public static class ClaudeSignIn
     public const string CfClearanceCookie = "cf_clearance";
 
     /// <summary>
+    /// Canonical desktop-Chrome User-Agent used by BOTH the embedded sign-in
+    /// WebView2 and <c>ClaudeApiClient</c>. Two reasons they must match:
+    /// (1) Cloudflare binds <c>cf_clearance</c> to the UA that obtained it — a
+    /// clearance captured in the sign-in window is only valid when the API client
+    /// replays it under an identical UA. (2) WebView2's default UA carries Edge /
+    /// embedded-webview markers that Google's sign-in refuses; a clean desktop-Chrome
+    /// UA is the standard mitigation for OAuth inside a WebView2.
+    /// </summary>
+    public const string BrowserUserAgent =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+    /// <summary>
     /// True when <paramref name="url"/> is an https claude.ai (or *.claude.ai)
     /// page. Gates capture so we never fire on embedded analytics, captcha
     /// iframes, OAuth provider hosts (accounts.google.com), or telemetry.
