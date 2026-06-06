@@ -43,7 +43,7 @@ Pairs with `docs/scope.md`, `docs/prd.md`, `docs/spec.md`. Parity rewrite of a s
   Acceptance (prd): reads/writes the **same** `%APPDATA%\Sanduhr\` files + Credential Manager slots as the Python build; an existing user's data + accounts carry over untouched; the ported Core xUnit suite is green — **the parity bar for pure logic is met.**
   Verify: `dotnet test` → full Core suite green; manually confirm a Python-written `history.json` + a Python-created Credential Manager slot are read correctly by the .NET Core. **Milestone A checkpoint.**
 
-- [ ] **5. Glass/Mica widget shell + tier cards + tier badge (Milestone B gate)**
+- [x] **5. Glass/Mica widget shell + tier cards + tier badge (Milestone B gate)**
   Spec ref: `spec.md > Glass / Mica` + `spec.md > Module map` (`widget.py → App/MainWindow + ViewModels/WidgetViewModel`, `tiers.py` render → `App/Views/TierCard.xaml`, footer badge from `PlanLabel`)
   What to build: `MainWindow.xaml` borderless (`WindowStyle=None`, `AllowsTransparency`, top-most); Mica via WPF-UI `SystemBackdrop` (CsWin32 `DwmExtendFrameIntoClientArea` + `DWMWA_SYSTEMBACKDROP_TYPE`; solid-color fallback < Win11 22H2); pin/float toggle (flip top-most); **frame persistence on MOVE only** (port the Python gotcha — never persist on resize); taskbar-icon binding. `WidgetViewModel` binds to `UsageFetcher`. `TierCard.xaml` renders each tier (utilization bar + reset countdown + sparkline), drag-reorder + hide. Footer tier badge (`PlanLabel` + rotating easter-egg tooltip).
   Acceptance (prd): borderless top-most Mica panel; tier cards show live usage; pin/float works; frame persists across launch; badge shows the plan. US-1 at-a-glance usage holds.
