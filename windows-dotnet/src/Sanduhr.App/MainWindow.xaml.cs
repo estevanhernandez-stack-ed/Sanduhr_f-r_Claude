@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -91,23 +90,6 @@ public partial class MainWindow : Window
         menu.Items.Add(hide);
 
         RootBorder.ContextMenu = menu;
-    }
-
-    /// <summary>Title-bar account chip → drop a flat quick-switch popup (accounts +
-    /// Add account… + Manage accounts…).</summary>
-    private void AccountChip_Click(object sender, RoutedEventArgs e)
-    {
-        if (Vm is null || sender is not UIElement anchor)
-            return;
-        var menu = new ContextMenu
-        {
-            PlacementTarget = anchor,
-            Placement = PlacementMode.Bottom,
-            Background = new SolidColorBrush(Color.FromRgb(0x1c, 0x1c, 0x1c)),
-            Foreground = new SolidColorBrush(Color.FromRgb(0xe8, 0xe4, 0xdc)),
-        };
-        AccountMenuBuilder.PopulateSwitchList(menu.Items, Vm, includeAdd: true, includeManage: true);
-        menu.IsOpen = true;
     }
 
     protected override void OnSourceInitialized(EventArgs e)

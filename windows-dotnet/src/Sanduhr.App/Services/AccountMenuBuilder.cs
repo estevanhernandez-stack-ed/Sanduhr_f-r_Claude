@@ -4,10 +4,11 @@ using Sanduhr.App.ViewModels;
 namespace Sanduhr.App.Services;
 
 /// <summary>
-/// Builds the dynamic "quick switch account" menu items shared by the three widget
-/// entry points: the tray <c>Accounts ▸</c> submenu, the widget right-click
-/// <c>Accounts ▸</c> submenu, and the title-bar account chip popup. Each is rebuilt
-/// on open (the account registry changes at runtime), so this is a stateless filler
+/// Builds the dynamic "quick switch account" menu items shared by the two
+/// pick-from-list widget entry points: the tray <c>Accounts ▸</c> submenu and the
+/// widget right-click <c>Accounts ▸</c> submenu. (The content-area account label is
+/// a separate round-robin cycle-on-click switcher, not a menu.) Each is rebuilt on
+/// open (the account registry changes at runtime), so this is a stateless filler
 /// over an <see cref="ItemCollection"/>. The active account carries a bullet prefix
 /// (matching <c>accounts_dialog.py</c>'s "●  label   (active)" convention); clicking
 /// any account routes to <see cref="WidgetViewModel.SwitchAccountCommand"/> with the

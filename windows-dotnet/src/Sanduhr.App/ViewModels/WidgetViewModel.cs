@@ -54,7 +54,18 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     [ObservableProperty] private string _statusText = "Connecting…";
     [ObservableProperty] private bool _pinned;
-    [ObservableProperty] private string _accountLabel = "";
+
+    /// <summary>Display text for the content-area account switcher (widget.py
+    /// <c>_active_account_text()</c> parity): empty when signed out, the bare label
+    /// with one account, and <c>⇆ {active}</c> with 2+ (the ⇆ prefix signals a click
+    /// cycles to the next account). Drives the switcher's visibility.</summary>
+    [ObservableProperty] private string _accountSwitcherText = "";
+
+    /// <summary>True when 2+ accounts are configured, so a click on the switcher
+    /// actually cycles. Drives the pointing-hand cursor + hover affordance; with
+    /// a single account the switcher is a flat, non-interactive label.</summary>
+    [ObservableProperty] private bool _accountSwitcherClickable;
+
     [ObservableProperty] private string _footerText = "";
     [ObservableProperty] private string _planBadgeName = "";
     [ObservableProperty] private string _planTooltip = "";
@@ -204,6 +215,29 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         RefreshAccountLabel();
         AccountsChanged?.Invoke();
         await RefreshAsync();
+    }
+
+    /// <summary>
+    /// Round-robin the active account to the NEXT registered one (wrap around) and
+    /// re-fetch — the content-area account switcher's click handler. Ports
+    /// <c>widget.py</c>'s <c>_cycle_active_account</c>: a no-op with fewer than two
+    /// accounts. Delegates to <see cref="SwitchAccount"/> so the tier-card clear +
+    /// anti-bleed cookie wipe + refetch all apply identically.
+    /// </summary>
+    [RelayCommand]
+    private async Task CycleAccount()
+    {
+        var labels = _accounts.ListAccounts().ToList();
+        if (labels.Count < 2)
+            return;
+        var active = _accounts.GetActive();
+        if (active is null)
+            return;
+        int idx = labels.IndexOf(active);
+        if (idx < 0)
+            return;
+        var next = labels[(idx + 1) % labels.Count];
+        await SwitchAccount(next);
     }
 
     /// <summary>Rename an account in place (same secrets, new label). The active
@@ -389,8 +423,15 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private void RefreshAccountLabel()
     {
         var active = _accounts.GetActive();
-        if (active is null) { AccountLabel = ""; return; }
-        AccountLabel = _accounts.ListAccounts().Count <= 1 ? active : $"⇆ {active}";
+        if (active is null)
+        {
+            AccountSwitcherText = "";
+            AccountSwitcherClickable = false;
+            return;
+        }
+        bool multiple = _accounts.ListAccounts().Count > 1;
+        AccountSwitcherText = multiple ? $"⇆ {active}" : active;
+        AccountSwitcherClickable = multiple;
     }
 
     private void UpdateFooter()

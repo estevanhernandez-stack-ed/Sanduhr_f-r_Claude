@@ -41,15 +41,19 @@
             <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="10,0" />
-            <Setter Property="Height" Value="34" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Margin" Value="3,0,0,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="bg" Background="{TemplateBinding Background}">
+                        <!-- 6px rounded hover chip so the three chrome buttons read as
+                             distinct, intentional pills against the glass title bar. -->
+                        <Border x:Name="bg" CornerRadius="6" Background="{TemplateBinding Background}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -65,6 +69,10 @@
         <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource ChromeButton}">
             <Setter Property="Width" Value="46" />
             <Setter Property="FontSize" Value="14" />
+            <!-- Close stays as-is: full-height, flush far-right, square red hover. -->
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -111,35 +119,6 @@
                     <TextBlock Text="Sanduhr für Claude" VerticalAlignment="Center" Margin="12,0,0,0"
                                Foreground="{DynamicResource Sanduhr.Brush.Text}" FontSize="12"
                                ToolTip="Drag to move" />
-                    <!-- Active-account chip: the visible chrome affordance. Click to
-                         quick-switch / manage accounts. Hidden when signed out. -->
-                    <Button x:Name="AccountChip" Click="AccountChip_Click"
-                            Margin="10,0,0,0" Padding="8,2" Cursor="Hand"
-                            VerticalAlignment="Center"
-                            Visibility="{Binding AccountLabel, Converter={StaticResource StrVis}}"
-                            ToolTip="Switch or manage accounts"
-                            shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Border x:Name="chipbg" CornerRadius="6" Background="#22FFFFFF"
-                                        Padding="{TemplateBinding Padding}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding AccountLabel}" FontSize="10"
-                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
-                                                   VerticalAlignment="Center" />
-                                        <TextBlock Text="&#x25BE;" FontSize="9" Margin="5,0,0,0"
-                                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                                   VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="chipbg" Property="Background" Value="#33FFFFFF" />
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Style="{StaticResource ChromeButton}" Content="Settings"
@@ -184,12 +163,59 @@
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                           Padding="10,8">
                 <StackPanel>
+                    <!-- Active-account switcher (widget.py _account_btn parity): a flat
+                         clickable label at the top of the content, above status + cards.
+                         Shows the active account; ⇆-prefixed when 2+ accounts are
+                         configured (the prefix signals a click cycles to the next one,
+                         round-robin). Hidden when signed out; a plain non-interactive
+                         label with a single account. Tray "Accounts ▸" and Settings →
+                         Accounts remain the explicit pick-from-list surfaces. -->
+                    <Button x:Name="AccountSwitcher"
+                            Command="{Binding CycleAccountCommand}"
+                            HorizontalAlignment="Left" Margin="2,2,2,6"
+                            Visibility="{Binding AccountSwitcherText, Converter={StaticResource StrVis}}"
+                            ToolTip="Active Claude account. Click to switch when multiple are configured (Settings → Accounts to add or remove).">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="BorderThickness" Value="0" />
+                                <Setter Property="Padding" Value="6,2" />
+                                <Setter Property="FontSize" Value="10" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="bg" CornerRadius="5"
+                                                    Background="{TemplateBinding Background}"
+                                                    Padding="{TemplateBinding Padding}">
+                                                <TextBlock Text="{Binding AccountSwitcherText}"
+                                                           Foreground="{TemplateBinding Foreground}" />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <!-- Subtle hover only when a click actually cycles. -->
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource TemplatedParent}}" Value="True" />
+                                                        <Condition Binding="{Binding AccountSwitcherClickable}" Value="True" />
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter TargetName="bg" Property="Background" Value="#22FFFFFF" />
+                                                </MultiDataTrigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding AccountSwitcherClickable}" Value="True">
+                                        <Setter Property="Cursor" Value="Hand" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                     <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" Margin="2,2,2,6"
                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" FontSize="12"
                                Visibility="{Binding StatusText, Converter={StaticResource StrVis}}" />
-                    <TextBlock Text="{Binding AccountLabel}" Margin="2,0,2,6"
-                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" FontSize="10"
-                               Visibility="{Binding AccountLabel, Converter={StaticResource StrVis}}" />
 
                     <!-- Empty-state: first-run "Sign in to Claude" prompt (item 6).
                          Shown when there's no active account; the headline feature's
