@@ -3,7 +3,8 @@
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap rescap">
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap rescap desktop">
 
   <!-- Identity block: Partner Center-reserved. Do not modify Name or Publisher
        without updating the Partner Center reservation, or Store ingestion will
@@ -44,6 +45,19 @@
         Square150x150Logo="Images\Square150x150Logo.png"
         Square44x44Logo="Images\Square44x44Logo.png">
       </uap:VisualElements>
+      <Extensions>
+        <!-- Run-on-login, OFF by default. The in-app Settings control
+             deep-links here (Settings → Startup apps); a programmatic
+             toggle needs the WinRT StartupTask API (follow-up). Mirrors
+             the unpackaged .exe's optional HKCU Run entry. -->
+        <desktop:Extension Category="windows.startupTask"
+                           Executable="Sanduhr.exe"
+                           EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="SanduhrAutoStart"
+                               Enabled="false"
+                               DisplayName="Sanduhr für Claude" />
+        </desktop:Extension>
+      </Extensions>
     </Application>
   </Applications>
 

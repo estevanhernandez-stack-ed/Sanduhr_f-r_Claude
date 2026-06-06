@@ -43,7 +43,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
 )
 
-from sanduhr import paths, sounds, themes
+from sanduhr import paths, sounds, startup, themes
 from sanduhr.accounts_dialog import AccountsTab
 from sanduhr.history_chart import _TIER_LABELS, SPECULATIVE_TIERS
 from sanduhr.local_cc_dialog import LocalCCTab
@@ -279,6 +279,26 @@ class SettingsDialog(QDialog):
         v.addWidget(self._chk_remind)
 
         v.addSpacing(16)
+        v.addWidget(QLabel("<b>Startup</b>"))
+        if startup.is_packaged():
+            note = QLabel(
+                "Manage whether Sanduhr starts with Windows from "
+                "Windows Settings → Startup apps."
+            )
+            note.setWordWrap(True)
+            note.setObjectName("HelpText")
+            note.setStyleSheet("font-size: 8pt;")
+            v.addWidget(note)
+            btn = QPushButton("Open Windows Startup settings…")
+            btn.clicked.connect(lambda: startup.open_startup_settings())
+            v.addWidget(btn)
+        else:
+            self._chk_autostart = QCheckBox("Start Sanduhr when Windows starts")
+            self._chk_autostart.setChecked(startup.is_enabled())
+            self._chk_autostart.toggled.connect(self._on_autostart_toggled)
+            v.addWidget(self._chk_autostart)
+
+        v.addSpacing(16)
         v.addWidget(QLabel("<b>Visible tier cards</b>"))
         v.addWidget(QLabel(
             "Drag to reorder. Uncheck to hide. Order and visibility "
@@ -361,6 +381,15 @@ class SettingsDialog(QDialog):
         v.addStretch()
 
         self._tabs.addTab(page, "Cards")
+
+    def _on_autostart_toggled(self, checked: bool) -> None:
+        """Persist the run-on-login preference (unpackaged build)."""
+        try:
+            startup.set_enabled(checked)
+        except OSError:
+            _log.exception("Failed to update run-on-login state")
+            return
+        sounds.play_toggle()
 
     def _auto_save_cards(self) -> None:
         """Auto-save handler — wired to every Cards-tab change.

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Auto-start on boot (opt-in).** New "Startup" control in Settings → Cards. On the installer (`.exe`) build it's a live toggle writing/removing the `HKCU\…\Run\Sanduhr` entry — the same one the Inno installer's optional autostart task uses, so install-time and in-app stay in sync. On the MSIX/Store build it's declared as a `windows.startupTask` manifest extension (off by default) and the control deep-links to Windows Settings → Startup apps (programmatic packaged toggle deferred — needs WinRT). Off by default everywhere. New pure, unit-tested `startup.py`.
+
 ## v2.3.0-windows — 2026-05-06
 
 **Platform:** Windows
