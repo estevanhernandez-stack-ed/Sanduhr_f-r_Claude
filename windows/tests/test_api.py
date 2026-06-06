@@ -99,3 +99,41 @@ def test_no_orgs_raises_network_error(mock_scraper, requests_mock):
     requests_mock.get("https://claude.ai/api/organizations", json=[])
     with pytest.raises(api.NetworkError):
         api.ClaudeAPI("abc").get_usage()
+
+
+def test_get_usage_attaches_account_plan_fields(mock_scraper, requests_mock):
+    requests_mock.get(
+        "https://claude.ai/api/organizations",
+        json=[
+            {
+                "uuid": "org-123",
+                "rate_limit_tier": "default_claude_max_20x",
+                "billing_type": "stripe_subscription",
+                "capabilities": ["claude_max", "chat"],
+            }
+        ],
+    )
+    requests_mock.get(
+        "https://claude.ai/api/organizations/org-123/usage",
+        json={"five_hour": {"utilization": 42, "resets_at": None}},
+    )
+    result = api.ClaudeAPI("abc").get_usage()
+    assert result["_account"]["rate_limit_tier"] == "default_claude_max_20x"
+    assert result["_account"]["billing_type"] == "stripe_subscription"
+    assert "claude_max" in result["_account"]["capabilities"]
+    # Usage buckets pass through untouched alongside the reserved key.
+    assert result["five_hour"]["utilization"] == 42
+
+
+def test_get_usage_account_fields_default_none_when_absent(mock_scraper, requests_mock):
+    requests_mock.get(
+        "https://claude.ai/api/organizations", json=[{"uuid": "org-x"}]
+    )
+    requests_mock.get(
+        "https://claude.ai/api/organizations/org-x/usage",
+        json={"seven_day": {"utilization": 5}},
+    )
+    result = api.ClaudeAPI("abc").get_usage()
+    # _account is attached but every field is None -> the badge stays hidden.
+    assert result["_account"]["rate_limit_tier"] is None
+    assert result["seven_day"]["utilization"] == 5

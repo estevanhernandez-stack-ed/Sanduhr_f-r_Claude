@@ -54,6 +54,9 @@ class ClaudeAPI:
         self._scraper = cloudscraper.create_scraper()
         self._scraper.headers["Accept"] = "application/json"
         self._org_id: Optional[str] = None
+        # Plan/subscription fields captured off the selected org during
+        # discovery; surfaced to the UI via get_usage. See plan.plan_label.
+        self._account: Optional[dict] = None
 
     def _cookie_header(self) -> str:
         parts = [f"sessionKey={self.session_key}"]
@@ -88,7 +91,15 @@ class ClaudeAPI:
             raise NetworkError("Org discovery returned non-JSON") from e
         if not orgs:
             raise NetworkError("No organizations returned for this account")
-        self._org_id = orgs[0]["uuid"]
+        org = orgs[0]
+        self._org_id = org["uuid"]
+        # Capture the plan/subscription fields off the same org we track
+        # usage for, so the UI can render the subscription tier.
+        self._account = {
+            "rate_limit_tier": org.get("rate_limit_tier"),
+            "billing_type": org.get("billing_type"),
+            "capabilities": org.get("capabilities"),
+        }
         return self._org_id
 
     def get_usage(self) -> dict:
@@ -96,9 +107,15 @@ class ClaudeAPI:
         resp = self._get(f"{_API_BASE}/organizations/{org_id}/usage")
         self._check(resp)
         try:
-            return resp.json()
+            data = resp.json()
         except ValueError as e:
             raise NetworkError("Usage endpoint returned non-JSON") from e
+        # Ride the captured plan fields through to the UI on a reserved
+        # key. The tier renderers iterate known tier keys only, so this is
+        # inert to them. See widget._update_plan_badge.
+        if isinstance(data, dict) and self._account:
+            data["_account"] = self._account
+        return data
 
     def get_routine_budget(self) -> Optional[dict]:
         """Fetch daily Claude Code Routines run-budget for the org.
