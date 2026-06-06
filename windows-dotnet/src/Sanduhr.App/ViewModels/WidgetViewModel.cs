@@ -60,8 +60,20 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _planTooltip = "";
     [ObservableProperty] private bool _hasPlanBadge;
 
+    /// <summary>True when there's no active account — drives the widget's
+    /// "Sign in to Claude" empty-state prompt (item 6 first-run entry point).</summary>
+    [ObservableProperty] private bool _showSignInPrompt;
+
     /// <summary>Highest active-tier % for the tray glyph; -1 when no data.</summary>
     public event Action<int>? TrayPercentChanged;
+
+    /// <summary>Raised by the "Sign in to Claude" command — App opens the embedded
+    /// WebView2 <c>SignInWindow</c> flow, then calls <see cref="ReloadAfterSignInAsync"/>.</summary>
+    public event Func<Task>? SignInRequested;
+
+    /// <summary>Raised by the "Paste a key instead" command — App opens the manual
+    /// sessionKey fallback modal.</summary>
+    public event Func<Task>? PasteKeyRequested;
 
     public ThemePalette Palette => _palette;
 
@@ -105,11 +117,40 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         var creds = _credentials.Load();
         if (string.IsNullOrEmpty(creds.SessionKey))
         {
-            StatusText = "No account yet — add your sessionKey to start tracking.";
+            // Empty state: the widget shows the "Sign in to Claude" prompt instead
+            // of a status line, so clear StatusText to avoid the redundant message.
+            ShowSignInPrompt = true;
+            StatusText = "";
+            TrayPercentChanged?.Invoke(-1);
             return;
         }
+        ShowSignInPrompt = false;
         _client = new ClaudeApiClient(creds.SessionKey, creds.CfClearance);
         _fetcher = new UsageFetcher(_client, _history);
+    }
+
+    /// <summary>Rebuild the fetcher against the now-active account, refresh the
+    /// account label, and kick an immediate fetch — called after a successful
+    /// embedded or manual sign-in so the widget starts tracking at once.</summary>
+    public async Task ReloadAfterSignInAsync()
+    {
+        RebuildFetcher();
+        RefreshAccountLabel();
+        await RefreshAsync();
+    }
+
+    [RelayCommand]
+    private async Task SignIn()
+    {
+        if (SignInRequested is not null)
+            await SignInRequested.Invoke();
+    }
+
+    [RelayCommand]
+    private async Task PasteKey()
+    {
+        if (PasteKeyRequested is not null)
+            await PasteKeyRequested.Invoke();
     }
 
     [RelayCommand]

@@ -31,6 +31,8 @@ public partial class App : Application
 
         _vm = new WidgetViewModel();
         _vm.TrayPercentChanged += OnTrayPercentChanged;
+        _vm.SignInRequested += () => RunSignInAsync(embedded: true);
+        _vm.PasteKeyRequested += () => RunSignInAsync(embedded: false);
 
         _window = new MainWindow { DataContext = _vm };
         _window.Show();
@@ -59,14 +61,34 @@ public partial class App : Application
         var refresh = new MenuItem { Header = "Refresh" };
         refresh.Click += (_, _) => _vm?.RefreshCommand.Execute(null);
 
+        var addAccount = new MenuItem { Header = "Add account" };
+        addAccount.Click += async (_, _) => await RunSignInAsync(embedded: true);
+
         var quit = new MenuItem { Header = "Quit Sanduhr" };
         quit.Click += (_, _) => QuitApp();
 
         menu.Items.Add(show);
         menu.Items.Add(refresh);
+        menu.Items.Add(addAccount);
         menu.Items.Add(new Separator());
         menu.Items.Add(quit);
         _tray.ContextMenu = menu;
+    }
+
+    /// <summary>
+    /// Run a sign-in (embedded WebView2 or manual paste) and, on success, kick the
+    /// widget to rebuild its fetcher against the new active account and refetch.
+    /// Both tray "Add account" and the widget's empty-state prompt route here.
+    /// </summary>
+    private async Task RunSignInAsync(bool embedded)
+    {
+        var coordinator = new SignInCoordinator();
+        SignInOutcome outcome = embedded
+            ? await coordinator.SignInEmbeddedAsync(_window)
+            : coordinator.SignInManual(_window);
+
+        if (outcome.Added && _vm is not null)
+            await _vm.ReloadAfterSignInAsync();
     }
 
     private void OnTrayPercentChanged(int percent)
