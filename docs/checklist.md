@@ -49,7 +49,7 @@ Pairs with `docs/scope.md`, `docs/prd.md`, `docs/spec.md`. Parity rewrite of a s
   Acceptance (prd): borderless top-most Mica panel; tier cards show live usage; pin/float works; frame persists across launch; badge shows the plan. US-1 at-a-glance usage holds.
   Verify: `dotnet run` → widget floats top-most with Mica; with a credential, cards show live usage; drag a card, hide one, move the window, relaunch — layout persists. **Milestone B checkpoint.**
 
-- [ ] **6. Embedded WebView2 "Sign in to Claude" login + manual fallback (Milestone C gate — the headline)**
+- [x] **6. Embedded WebView2 "Sign in to Claude" login + manual fallback (Milestone C gate — the headline)**
   Spec ref: `spec.md > The new piece — embedded WebView2 login`
   What to build: `App/Views/SignInWindow.xaml(.cs)` hosting a `WebView2` (`CoreWebView2`, app-owned user-data folder `%APPDATA%\Sanduhr\webview2\`, isolated from the user's Chrome/Edge); navigate `https://claude.ai/login`; user signs in normally (Google/email/passkey — all real Anthropic login); on navigation to a signed-in URL call `CoreWebView2.CookieManager.GetCookiesAsync("https://claude.ai")`, pull `sessionKey` (+ `cf_clearance` if present); persist via `CredentialStore`, close, kick a fetch. Manual sessionKey paste retained in the Add-Account modal as the power-user fallback. (RORORO `CookieCaptureWindow` pattern lifted 1:1.) No browser-store prying — we own the cookie jar.
   Acceptance (prd): a non-technical user goes "Sign in to Claude" → logs in → tracking, **zero DevTools**; manual paste still works.
