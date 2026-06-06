@@ -55,7 +55,7 @@ Pairs with `docs/scope.md`, `docs/prd.md`, `docs/spec.md`. Parity rewrite of a s
   Acceptance (prd): a non-technical user goes "Sign in to Claude" → logs in → tracking, **zero DevTools**; manual paste still works.
   Verify: `dotnet run` → click Sign in → real Anthropic login → on success the widget begins tracking with no manual key entry. **Milestone C checkpoint — critical path closed.**
 
-- [ ] **7. Settings + multi-account UI**
+- [x] **7. Settings + multi-account UI**
   Spec ref: `spec.md > Module map` (`settings_dialog.py → App/Views/SettingsWindow + VM`, `accounts.py` UI surface)
   What to build: `SettingsWindow.xaml` + VM (tabbed); multi-account add / switch-active / account-scoped sign-out UI wired to `AccountStore` + `CredentialStore` + `SignInWindow`.
   Acceptance (prd): multi-account switch + per-account history + account-scoped sign-out; settings persist across launch.
