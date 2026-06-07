@@ -157,22 +157,66 @@
                  Settings → Themes, so the active highlight stays in sync. -->
             <Border DockPanel.Dock="Top"
                     Background="{DynamicResource Sanduhr.Brush.TitleBg}"
-                    Padding="6,4,4,6">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                              MaxHeight="96">
-                    <ScrollViewer.Resources>
-                        <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
-                    </ScrollViewer.Resources>
-                    <ItemsControl ItemsSource="{Binding Themes}"
-                                  ItemTemplate="{StaticResource ThemeSwatchTemplate}"
-                                  shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel Orientation="Horizontal" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                    </ItemsControl>
-                </ScrollViewer>
+                    Padding="6,2,4,4">
+                <StackPanel>
+                    <!-- Thin, full-width "Themes" disclosure header. Clicking toggles
+                         the swatch grid below (ToggleThemesCommand → IsThemesExpanded,
+                         persisted to settings.json "themes_expanded"). Subtle by design:
+                         chevron + label in the muted/dim chrome inks, pointing-hand
+                         cursor, faint hover chip. When collapsed it also shows the live
+                         theme name ("Themes · Matrix"); that name hides once expanded. -->
+                    <Button Command="{Binding ToggleThemesCommand}" Cursor="Hand"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                            ToolTip="Show or hide the theme switcher"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="hdr" CornerRadius="5" Background="Transparent" Padding="6,3">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock x:Name="chev" Text="&#x25B8;" FontSize="9"
+                                                   VerticalAlignment="Center" Margin="0,0,6,0"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextMuted}" />
+                                        <TextBlock Text="Themes" FontSize="11" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                        <TextBlock x:Name="activeName" VerticalAlignment="Center"
+                                                   FontSize="11" Margin="6,0,0,0"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextMuted}">
+                                            <Run Text="·&#160;" /><Run Text="{Binding ActiveThemeName, Mode=OneWay}" />
+                                        </TextBlock>
+                                    </StackPanel>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="hdr" Property="Background" Value="#16FFFFFF" />
+                                    </Trigger>
+                                    <!-- Expanded: chevron points down, drop the redundant name. -->
+                                    <DataTrigger Binding="{Binding IsThemesExpanded}" Value="True">
+                                        <Setter TargetName="chev" Property="Text" Value="&#x25BE;" />
+                                        <Setter TargetName="activeName" Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+
+                    <!-- Collapsible swatch grid: visibility bound to IsThemesExpanded. -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                  MaxHeight="96" Margin="0,2,0,2"
+                                  Visibility="{Binding IsThemesExpanded, Converter={StaticResource BoolVis}}">
+                        <ScrollViewer.Resources>
+                            <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                        </ScrollViewer.Resources>
+                        <ItemsControl ItemsSource="{Binding Themes}"
+                                      ItemTemplate="{StaticResource ThemeSwatchTemplate}"
+                                      shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
             </Border>
 
             <!-- Footer -->

@@ -128,6 +128,23 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>The widget's "Themes" header expand/collapse state (settings.json
+    /// "themes_expanded"), defaulting to false (collapsed) so the widget rests with
+    /// the swatch grid tucked under the thin header.</summary>
+    public bool LoadThemesExpanded()
+    {
+        var root = Read();
+        try { return root["themes_expanded"]?.GetValue<bool>() ?? false; }
+        catch { return false; }
+    }
+
+    public void SaveThemesExpanded(bool expanded)
+    {
+        var root = Read();
+        root["themes_expanded"] = expanded;
+        Write(root);
+    }
+
     public IReadOnlyList<string> LoadTierOrder() => LoadStringArray("tier_order");
 
     public void SaveTierOrder(IEnumerable<string> order)

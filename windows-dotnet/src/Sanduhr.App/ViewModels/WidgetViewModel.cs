@@ -66,6 +66,17 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _statusText = "Connecting…";
     [ObservableProperty] private bool _pinned;
 
+    /// <summary>Widget "Themes" header expand/collapse state — false (collapsed) by
+    /// default so the swatch grid is tucked away under the thin header at rest.
+    /// Bound to the grid's Visibility (BooleanToVisibilityConverter) and persisted to
+    /// settings.json ("themes_expanded") so it sticks across launches. Settings →
+    /// Themes is unaffected — that tab stays fully expanded.</summary>
+    [ObservableProperty] private bool _isThemesExpanded;
+
+    /// <summary>Active theme display name (e.g. "Matrix") — shown next to the
+    /// collapsed "Themes" header so the resting state still names the live theme.</summary>
+    [ObservableProperty] private string _activeThemeName = "";
+
     /// <summary>Display text for the content-area account switcher (widget.py
     /// <c>_active_account_text()</c> parity): empty when signed out, the bare label
     /// with one account, and <c>⇆ {active}</c> with 2+ (the ⇆ prefix signals a click
@@ -137,6 +148,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _settings = new SettingsStore(_paths);
 
         _pinned = _settings.LoadPinned();
+        _isThemesExpanded = _settings.LoadThemesExpanded();
         _savedOrder = _settings.LoadTierOrder().ToList();
         _hidden = new HashSet<string>(_settings.LoadHiddenTiers());
 
@@ -159,6 +171,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             def = _themes[savedKey];
         }
         _palette = new ThemePalette(savedKey, def);
+        _activeThemeName = _palette.Name;
         BuildThemeStrip(savedKey);
     }
 
@@ -225,6 +238,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             return;
 
         _palette = new ThemePalette(key, def);
+        ActiveThemeName = _palette.Name;
         ApplyThemeResources();
 
         foreach (var card in Tiers)
@@ -454,6 +468,14 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         Pinned = !Pinned;
         _settings.SavePinned(Pinned);
     }
+
+    /// <summary>Toggle the widget's "Themes" swatch grid open/closed (the thin header
+    /// click). Persistence rides the <see cref="OnIsThemesExpandedChanged"/> hook so the
+    /// state survives relaunch.</summary>
+    [RelayCommand]
+    private void ToggleThemes() => IsThemesExpanded = !IsThemesExpanded;
+
+    partial void OnIsThemesExpandedChanged(bool value) => _settings.SaveThemesExpanded(value);
 
     private void Fail(string message)
     {
