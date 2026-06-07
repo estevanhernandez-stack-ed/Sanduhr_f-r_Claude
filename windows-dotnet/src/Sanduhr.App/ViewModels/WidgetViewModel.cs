@@ -55,9 +55,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<TierCardViewModel> Tiers { get; } = new();
 
-    /// <summary>The theme strip's entries — built-ins (in display order) then any
-    /// loaded user themes, each marked active or not. Bound to the strip below the
-    /// title bar; a click routes to <see cref="StripSelectThemeCommand"/>.</summary>
+    /// <summary>The theme swatch entries — built-ins (in display order) then any
+    /// loaded user themes, each marked active or not. This SAME collection backs
+    /// both the widget's quick-switch swatch grid and Settings → Themes (the
+    /// Settings tab exposes it via <c>ThemesViewModel.Themes</c>), so a switch in
+    /// one immediately reflects the active highlight in the other. Each tile's
+    /// click routes through its own <c>ApplyCommand</c> into <see cref="ApplySwatch"/>.</summary>
     public ObservableCollection<ThemeStripItemViewModel> Themes { get; } = new();
 
     [ObservableProperty] private string _statusText = "Connecting…";
@@ -193,20 +196,22 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _themes = map;
     }
 
-    /// <summary>Rebuild the strip collection: built-ins in display order, then any
-    /// user themes (sorted), with <paramref name="activeKey"/> marked active.</summary>
+    /// <summary>Rebuild the swatch collection: built-ins in display order, then any
+    /// user themes (sorted), with <paramref name="activeKey"/> marked active. Each
+    /// tile gets the theme's own preview colors + an apply callback routed through
+    /// <see cref="ApplySwatch"/>.</summary>
     private void BuildThemeStrip(string activeKey)
     {
         Themes.Clear();
         foreach (var key in ThemeCatalog.BuiltInOrder)
             if (_themes.TryGetValue(key, out var def))
-                Themes.Add(new ThemeStripItemViewModel(key, def.Name, key == activeKey));
+                Themes.Add(new ThemeStripItemViewModel(key, def, key == activeKey, ApplySwatch));
 
         var userKeys = _themes.Keys
             .Where(k => !ThemeCatalog.BuiltIns.ContainsKey(k))
             .OrderBy(k => k, StringComparer.Ordinal);
         foreach (var key in userKeys)
-            Themes.Add(new ThemeStripItemViewModel(key, _themes[key].Name, key == activeKey));
+            Themes.Add(new ThemeStripItemViewModel(key, _themes[key], key == activeKey, ApplySwatch));
     }
 
     /// <summary>Apply a theme by catalog key: re-tint the live resources, recolor
@@ -232,11 +237,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         ThemeChanged?.Invoke(_palette);
     }
 
-    /// <summary>The theme strip's click handler — apply the theme instantly and
-    /// play a soft toggle tick (the visible re-tint is the real confirmation,
-    /// mirroring the Python build's "the change IS the confirmation" pattern).</summary>
-    [RelayCommand]
-    private void StripSelectTheme(string? key)
+    /// <summary>A swatch tile's click handler (widget or Settings) — apply the
+    /// theme instantly and play a soft toggle tick. The visible re-tint is the real
+    /// confirmation, mirroring the Python build's "the change IS the confirmation"
+    /// pattern. Wired into every <see cref="ThemeStripItemViewModel.ApplyCommand"/>
+    /// so both swatch grids route through one path and stay in sync.</summary>
+    private void ApplySwatch(string key)
     {
         if (string.IsNullOrEmpty(key))
             return;

@@ -118,6 +118,9 @@ public sealed class ThemePalette
 
         SetBrush(res, "Sanduhr.Brush.Bg", Bg);
         SetBrush(res, "Sanduhr.Brush.Glass", Glass);
+        // A lifted glass for hover / selected surfaces (Settings buttons, list rows,
+        // tab hover). Solid so it reads the same whether or not Mica is behind it.
+        SetBrush(res, "Sanduhr.Brush.GlassHover", Lighten(Glass, 0.10));
         SetBrush(res, "Sanduhr.Brush.GlassChrome", WithAlpha(GlassOnMica, ChromeAlpha));
         SetBrush(res, "Sanduhr.Brush.CardGlass", WithAlpha(GlassOnMica, CardAlpha));
         SetBrush(res, "Sanduhr.Brush.TitleBg", WithAlpha(TitleBg, ChromeAlpha));
@@ -195,6 +198,18 @@ public sealed class ThemePalette
 
     private static Color WithAlpha(Color c, double alpha)
         => Color.FromArgb((byte)Math.Round(Math.Clamp(alpha, 0, 1) * 255), c.R, c.G, c.B);
+
+    /// <summary>Blend a color toward white by <paramref name="amount"/> (0..1) for a
+    /// subtle lifted surface — used for hover / selected states that need to read a
+    /// notch brighter than the resting glass in every theme.</summary>
+    private static Color Lighten(Color c, double amount)
+    {
+        amount = Math.Clamp(amount, 0, 1);
+        return Color.FromRgb(
+            (byte)Math.Round(c.R + (255 - c.R) * amount),
+            (byte)Math.Round(c.G + (255 - c.G) * amount),
+            (byte)Math.Round(c.B + (255 - c.B) * amount));
+    }
 
     private static Color Hex(string hex) => (Color)ColorConverter.ConvertFromString(hex)!;
 }

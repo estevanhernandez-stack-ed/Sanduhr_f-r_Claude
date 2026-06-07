@@ -86,6 +86,25 @@ public static class MicaHelper
     }
 
     /// <summary>
+    /// Apply just the dark immersive frame + rounded corners to a window, WITHOUT a
+    /// Mica backdrop — for a solid themed window (the Settings window) that paints
+    /// its own background via DynamicResource brushes but still wants the OS frame
+    /// edge / rounded corners to read dark instead of the default light chrome.
+    /// Call from <c>OnSourceInitialized</c>. No-op on pre-Win11.
+    /// </summary>
+    public static void ApplyDarkRoundedChrome(Window window)
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero || !IsWin11)
+            return;
+
+        int useDark = 1;
+        DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDark, sizeof(int));
+        int corner = DWMWCP_ROUND;
+        DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref corner, sizeof(int));
+    }
+
+    /// <summary>
     /// Disable the system backdrop so the window renders solid — the Matrix
     /// theme's phosphor-terminal opt-out (parity with <c>mica.disable_mica</c>).
     /// Sets <c>DWMSBT_NONE</c> and collapses the extended frame so no Mica bleeds

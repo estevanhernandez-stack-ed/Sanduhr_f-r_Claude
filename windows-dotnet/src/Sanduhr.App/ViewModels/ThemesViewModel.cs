@@ -38,6 +38,12 @@ public sealed partial class ThemesViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(DeleteCommand))]
     private string? _selectedTheme;
 
+    /// <summary>The swatch entries (built-ins then user themes) — the SAME
+    /// collection the widget's quick-switch grid binds to, so the Settings swatch
+    /// grid and the widget stay in lockstep: switching in either highlights the
+    /// active tile in both. The widget VM is the single owner of this state.</summary>
+    public ObservableCollection<ThemeStripItemViewModel> Themes => _widget.Themes;
+
     /// <summary>The *.json file names installed in the themes folder.</summary>
     public ObservableCollection<string> InstalledThemes { get; } = new();
 

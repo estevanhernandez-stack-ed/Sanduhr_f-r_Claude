@@ -4,38 +4,40 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:vm="clr-namespace:Sanduhr.App.ViewModels"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
         Title="Sanduhr — Settings"
-        Height="540" Width="520"
-        MinHeight="440" MinWidth="460"
+        Height="620" Width="540"
+        MinHeight="520" MinWidth="480"
         WindowStartupLocation="CenterScreen"
-        Background="#0d0d0d"
+        WindowStyle="None"
+        AllowsTransparency="False"
+        ResizeMode="CanResize"
+        Background="{DynamicResource Sanduhr.Brush.Bg}"
         TextOptions.TextFormattingMode="Display"
         FontFamily="Segoe UI Variable Display, Segoe UI"
+        UseLayoutRounding="True"
         Icon="/Assets/Sanduhr.ico">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome x:Name="Chrome"
+                            CaptionHeight="0"
+                            ResizeBorderThickness="6"
+                            GlassFrameThickness="0"
+                            CornerRadius="0"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolVis" />
 
-        <!-- Obsidian-themed primitives matching the widget. -->
-        <SolidColorBrush x:Key="Bg" Color="#0d0d0d" />
-        <SolidColorBrush x:Key="Panel" Color="#161616" />
-        <SolidColorBrush x:Key="PanelHover" Color="#1f1f1f" />
-        <SolidColorBrush x:Key="Field" Color="#1c1c1c" />
-        <SolidColorBrush x:Key="Border" Color="#333333" />
-        <SolidColorBrush x:Key="Text" Color="#e8e4dc" />
-        <SolidColorBrush x:Key="TextSecondary" Color="#b8b4ac" />
-        <SolidColorBrush x:Key="TextDim" Color="#777777" />
-        <SolidColorBrush x:Key="Accent" Color="#17d4fa" />
-        <SolidColorBrush x:Key="Danger" Color="#f87171" />
-
-        <!-- Flat dark button. -->
+        <!-- Flat themed button (re-tints with the active theme). -->
         <Style x:Key="FlatButton" TargetType="Button">
-            <Setter Property="Foreground" Value="{StaticResource Text}" />
-            <Setter Property="Background" Value="{StaticResource Field}" />
-            <Setter Property="BorderBrush" Value="{StaticResource Border}" />
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Glass}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Border}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="14,7" />
             <Setter Property="Margin" Value="0,0,8,0" />
@@ -53,7 +55,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bg" Property="Background" Value="{StaticResource PanelHover}" />
+                                <Setter TargetName="bg" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.4" />
@@ -64,10 +66,10 @@
             </Setter>
         </Style>
 
-        <!-- Primary accent button. -->
+        <!-- Primary accent button — accent fill, theme-bg ink. -->
         <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource FlatButton}">
-            <Setter Property="Foreground" Value="#0d0d0d" />
-            <Setter Property="Background" Value="{StaticResource Accent}" />
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Template">
@@ -91,30 +93,30 @@
             </Setter>
         </Style>
 
-        <!-- Dark text input (Themes tab paste box + filename). -->
+        <!-- Themed text input (Themes tab paste box + filename). -->
         <Style x:Key="Input" TargetType="TextBox">
-            <Setter Property="Background" Value="{StaticResource Bg}" />
-            <Setter Property="Foreground" Value="{StaticResource Text}" />
-            <Setter Property="CaretBrush" Value="{StaticResource Text}" />
-            <Setter Property="SelectionBrush" Value="{StaticResource Accent}" />
-            <Setter Property="BorderBrush" Value="{StaticResource Border}" />
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="SelectionBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Border}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="6,4" />
             <Setter Property="FontSize" Value="12" />
             <Style.Triggers>
                 <Trigger Property="IsFocused" Value="True">
-                    <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
                 </Trigger>
             </Style.Triggers>
         </Style>
 
-        <!-- Tab strip styled dark. -->
+        <!-- Tab strip, themed. -->
         <Style TargetType="TabControl">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
         </Style>
         <Style TargetType="TabItem">
-            <Setter Property="Foreground" Value="{StaticResource TextSecondary}" />
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.TextSecondary}" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -125,11 +127,39 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="{StaticResource Panel}" />
-                                <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource Sanduhr.Brush.Glass}" />
+                                <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Accent}" />
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="{StaticResource PanelHover}" />
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Title-bar close button — themed text, square red hover (matches the widget). -->
+        <Style x:Key="CloseButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Width" Value="46" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bg" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="#C42B1C" />
+                                <Setter Property="Foreground" Value="White" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -138,250 +168,297 @@
         </Style>
     </Window.Resources>
 
-    <Grid Margin="0">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="2" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+    <!-- Themed root panel + custom chrome (parity with the widget). The window paints
+         its background via DynamicResource Sanduhr.Brush.Bg, so the whole surface —
+         including the title bar — re-tints live when the active theme changes. -->
+    <Border x:Name="RootBorder"
+            CornerRadius="10"
+            Background="{DynamicResource Sanduhr.Brush.Bg}"
+            BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
+            BorderThickness="1">
+        <DockPanel LastChildFill="True">
 
-        <!-- Accent gradient strip (626 cyan -> magenta), mirrors the widget. -->
-        <Border Grid.Row="0">
-            <Border.Background>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                    <GradientStop Offset="0" Color="#17d4fa" />
-                    <GradientStop Offset="1" Color="#f22f89" />
-                </LinearGradientBrush>
-            </Border.Background>
-        </Border>
+            <!-- Accent gradient strip (theme accent -> fade), mirrors the widget. -->
+            <Border DockPanel.Dock="Top" Height="2" CornerRadius="10,10,0,0">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Offset="0" Color="{DynamicResource Sanduhr.Color.Accent}" />
+                        <GradientStop Offset="1" Color="{DynamicResource Sanduhr.Color.AccentFade}" />
+                    </LinearGradientBrush>
+                </Border.Background>
+            </Border>
 
-        <TabControl Grid.Row="1" Margin="16,12,16,16" Background="Transparent">
+            <!-- Custom themed title bar: draggable, themed text, themed close. -->
+            <Grid x:Name="TitleBar" DockPanel.Dock="Top" Height="34"
+                  Background="{DynamicResource Sanduhr.Brush.TitleBg}"
+                  MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <TextBlock Text="Sanduhr — Settings" VerticalAlignment="Center" Margin="14,0,0,0"
+                           HorizontalAlignment="Left"
+                           Foreground="{DynamicResource Sanduhr.Brush.Text}" FontSize="12"
+                           ToolTip="Drag to move" />
+                <Button Style="{StaticResource CloseButton}" Content="&#x2715;"
+                        HorizontalAlignment="Right"
+                        Click="CloseButton_Click" ToolTip="Close settings" />
+            </Grid>
 
-            <!-- Accounts tab — the feature. -->
-            <TabItem Header="Accounts">
-                <Border Background="{StaticResource Panel}" CornerRadius="0,8,8,8" Padding="16">
-                    <Grid DataContext="{Binding Accounts}">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
+            <!-- Tabs -->
+            <TabControl Margin="16,12,16,16" Background="Transparent">
 
-                        <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="11"
-                                   Foreground="{StaticResource TextSecondary}" Margin="0,0,0,12"
-                                   Text="Track multiple Claude accounts in one install. Switch which one is active to send fetches and history to that account. Each account's history is stored in its own file." />
+                <!-- Accounts tab — the feature. -->
+                <TabItem Header="Accounts">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="16">
+                        <Grid DataContext="{Binding Accounts}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
 
-                        <!-- Account list -->
-                        <Border Grid.Row="1" Background="{StaticResource Bg}" CornerRadius="6"
-                                BorderBrush="{StaticResource Border}" BorderThickness="1">
-                            <Grid>
-                                <ListBox x:Name="AccountsList"
-                                         ItemsSource="{Binding Accounts}"
-                                         SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"
-                                         Background="Transparent" BorderThickness="0"
-                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                         HorizontalContentAlignment="Stretch">
-                                    <ListBox.ItemContainerStyle>
-                                        <Style TargetType="ListBoxItem">
-                                            <Setter Property="Padding" Value="10,8" />
-                                            <Setter Property="Foreground" Value="{StaticResource Text}" />
-                                            <Setter Property="Template">
-                                                <Setter.Value>
-                                                    <ControlTemplate TargetType="ListBoxItem">
-                                                        <Border x:Name="row" Background="Transparent"
-                                                                Padding="{TemplateBinding Padding}" CornerRadius="4">
-                                                            <ContentPresenter />
-                                                        </Border>
-                                                        <ControlTemplate.Triggers>
-                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter TargetName="row" Property="Background" Value="{StaticResource PanelHover}" />
-                                                            </Trigger>
-                                                            <Trigger Property="IsSelected" Value="True">
-                                                                <Setter TargetName="row" Property="Background" Value="#2A2A2E" />
-                                                            </Trigger>
-                                                        </ControlTemplate.Triggers>
-                                                    </ControlTemplate>
-                                                </Setter.Value>
-                                            </Setter>
-                                        </Style>
-                                    </ListBox.ItemContainerStyle>
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="18" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" Text="{Binding Marker}"
-                                                           Foreground="{StaticResource Accent}" FontSize="12"
-                                                           VerticalAlignment="Center" />
-                                                <TextBlock Grid.Column="1" Text="{Binding Label}"
-                                                           Foreground="{StaticResource Text}" FontSize="13"
-                                                           VerticalAlignment="Center" />
-                                                <TextBlock Grid.Column="2" Text="active" FontSize="10"
-                                                           Foreground="{StaticResource Accent}"
-                                                           VerticalAlignment="Center"
-                                                           Visibility="{Binding IsActive, Converter={StaticResource BoolVis}}" />
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
+                            <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="11"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12"
+                                       Text="Track multiple Claude accounts in one install. Switch which one is active to send fetches and history to that account. Each account's history is stored in its own file." />
 
-                                <!-- Empty hint -->
-                                <TextBlock Text="No accounts yet. Click &quot;Add account…&quot; to sign in."
-                                           Foreground="{StaticResource TextDim}" FontSize="11"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                                           Visibility="{Binding HasNoAccounts, Converter={StaticResource BoolVis}}" />
-                            </Grid>
-                        </Border>
+                            <!-- Account list -->
+                            <Border Grid.Row="1" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
+                                    BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
+                                <Grid>
+                                    <ListBox x:Name="AccountsList"
+                                             ItemsSource="{Binding Accounts}"
+                                             SelectedItem="{Binding SelectedAccount, Mode=TwoWay}"
+                                             Background="Transparent" BorderThickness="0"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             HorizontalContentAlignment="Stretch">
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="Padding" Value="10,8" />
+                                                <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                            <Border x:Name="row" Background="Transparent"
+                                                                    Padding="{TemplateBinding Padding}" CornerRadius="4">
+                                                                <ContentPresenter />
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="row" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                                                                </Trigger>
+                                                                <Trigger Property="IsSelected" Value="True">
+                                                                    <Setter TargetName="row" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="18" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{Binding Marker}"
+                                                               Foreground="{DynamicResource Sanduhr.Brush.Accent}" FontSize="12"
+                                                               VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding Label}"
+                                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" FontSize="13"
+                                                               VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="2" Text="active" FontSize="10"
+                                                               Foreground="{DynamicResource Sanduhr.Brush.Accent}"
+                                                               VerticalAlignment="Center"
+                                                               Visibility="{Binding IsActive, Converter={StaticResource BoolVis}}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
 
-                        <!-- Per-selection actions -->
-                        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0">
-                            <Button Style="{StaticResource FlatButton}" Content="Switch to"
-                                    Command="{Binding SwitchToCommand}" />
-                            <Button Style="{StaticResource FlatButton}" Content="Rename…"
-                                    Command="{Binding RenameCommand}" />
-                            <Button Style="{StaticResource FlatButton}" Content="Sign out"
-                                    Command="{Binding SignOutCommand}" Foreground="{StaticResource Danger}" />
-                        </StackPanel>
+                                    <!-- Empty hint -->
+                                    <TextBlock Text="No accounts yet. Click &quot;Add account…&quot; to sign in."
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" FontSize="11"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Visibility="{Binding HasNoAccounts, Converter={StaticResource BoolVis}}" />
+                                </Grid>
+                            </Border>
 
-                        <!-- Add -->
-                        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,10,0,0">
-                            <Button Style="{StaticResource AccentButton}" Content="Add account…"
-                                    Command="{Binding AddCommand}" Margin="0" />
-                        </StackPanel>
-                    </Grid>
-                </Border>
-            </TabItem>
+                            <!-- Per-selection actions -->
+                            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0">
+                                <Button Style="{StaticResource FlatButton}" Content="Switch to"
+                                        Command="{Binding SwitchToCommand}" />
+                                <Button Style="{StaticResource FlatButton}" Content="Rename…"
+                                        Command="{Binding RenameCommand}" />
+                                <Button Style="{StaticResource FlatButton}" Content="Sign out"
+                                        Command="{Binding SignOutCommand}" Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" />
+                            </StackPanel>
 
-            <!-- Themes tab (item 8) — agent-assisted theme creation + management. -->
-            <TabItem Header="Themes">
-                <Border Background="{StaticResource Panel}" CornerRadius="0,8,8,8" Padding="16"
-                        DataContext="{Binding Themes}">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="11"
-                                   Foreground="{StaticResource TextSecondary}" Margin="0,0,0,8"
-                                   Text="Paste a theme JSON below (or what an AI agent returned), give it a filename, and Save &amp; apply. Use Copy agent prompt to get a ready-to-paste prompt for any chat agent." />
-
-                        <!-- Paste box with an in-box placeholder hint. -->
-                        <Grid Grid.Row="1" MinHeight="120">
-                            <TextBox x:Name="PasteBox"
-                                     Style="{StaticResource Input}"
-                                     Text="{Binding PasteJson, UpdateSourceTrigger=PropertyChanged}"
-                                     AcceptsReturn="True" TextWrapping="Wrap"
-                                     VerticalScrollBarVisibility="Auto"
-                                     VerticalContentAlignment="Top"
-                                     FontFamily="Cascadia Code, Consolas" />
-                            <TextBlock Text='{}{"name": "Sunset", "bg": "#1a0a1f", ...}'
-                                       Foreground="{StaticResource TextDim}" Margin="8,6"
-                                       IsHitTestVisible="False" FontSize="11"
-                                       FontFamily="Cascadia Code, Consolas">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Text.Length, ElementName=PasteBox}" Value="0">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
+                            <!-- Add -->
+                            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,10,0,0">
+                                <Button Style="{StaticResource AccentButton}" Content="Add account…"
+                                        Command="{Binding AddCommand}" Margin="0" />
+                            </StackPanel>
                         </Grid>
+                    </Border>
+                </TabItem>
 
-                        <!-- Filename row -->
-                        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0">
-                            <TextBlock Text="Filename:" VerticalAlignment="Center" FontSize="12"
-                                       Foreground="{StaticResource TextSecondary}" Margin="0,0,8,0" />
-                            <TextBox Style="{StaticResource Input}" Width="220"
-                                     Text="{Binding FileName, UpdateSourceTrigger=PropertyChanged}" />
-                            <TextBlock Text=".json" VerticalAlignment="Center" FontSize="12"
-                                       Foreground="{StaticResource TextDim}" Margin="6,0,0,0" />
-                        </StackPanel>
+                <!-- Themes tab (item 8) — swatch grid + agent-assisted theme creation. -->
+                <TabItem Header="Themes">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="16"
+                            DataContext="{Binding Themes}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
 
-                        <!-- Action row -->
-                        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,12,0,0">
-                            <Button Style="{StaticResource AccentButton}" Content="Save &amp; apply"
-                                    Command="{Binding SaveAndApplyCommand}" />
-                            <Button Style="{StaticResource FlatButton}" Content="Copy agent prompt"
-                                    Command="{Binding CopyAgentPromptCommand}" />
-                            <Button Style="{StaticResource FlatButton}" Content="Open themes folder"
-                                    Command="{Binding OpenThemesFolderCommand}" Margin="0" />
-                        </StackPanel>
+                            <!-- Swatch grid: the same tiles as the widget, bound to the
+                                 SAME Themes collection so the active highlight stays in
+                                 sync with the widget. Click a tile to switch live. -->
+                            <TextBlock Grid.Row="0" Text="Choose a theme" FontSize="11"
+                                       FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                       Margin="0,0,0,8" />
+                            <Border Grid.Row="1" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
+                                    BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1"
+                                    Padding="3">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled" MaxHeight="172">
+                                    <ItemsControl ItemsSource="{Binding Themes}"
+                                                  ItemTemplate="{StaticResource ThemeSwatchTemplate}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Border>
 
-                        <!-- Installed user themes -->
-                        <TextBlock Grid.Row="4" Text="Installed user themes" FontSize="11"
-                                   FontWeight="SemiBold" Foreground="{StaticResource TextDim}"
-                                   Margin="0,16,0,6" />
+                            <Border Grid.Row="2" Height="1" Background="{DynamicResource Sanduhr.Brush.Border}"
+                                    Margin="0,16,0,12" />
 
-                        <Border Grid.Row="5" Height="110" Background="{StaticResource Bg}" CornerRadius="6"
-                                BorderBrush="{StaticResource Border}" BorderThickness="1">
-                            <Grid>
-                                <ListBox x:Name="ThemesList"
-                                         ItemsSource="{Binding InstalledThemes}"
-                                         SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
-                                         Background="Transparent" BorderThickness="0"
-                                         Foreground="{StaticResource Text}"
-                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
-                                <TextBlock Text="No user themes yet. Paste one above or drop a JSON in the themes folder."
-                                           Foreground="{StaticResource TextDim}" FontSize="11"
-                                           TextWrapping="Wrap" TextAlignment="Center" MaxWidth="280"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                                           Visibility="{Binding HasNoThemes, Converter={StaticResource BoolVis}}" />
+                            <TextBlock Grid.Row="3" TextWrapping="Wrap" FontSize="11"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,8"
+                                       Text="Paste a theme JSON below (or what an AI agent returned), give it a filename, and Save &amp; apply. Use Copy agent prompt to get a ready-to-paste prompt for any chat agent." />
+
+                            <!-- Paste box with an in-box placeholder hint. -->
+                            <Grid Grid.Row="4" MinHeight="90">
+                                <TextBox x:Name="PasteBox"
+                                         Style="{StaticResource Input}"
+                                         Text="{Binding PasteJson, UpdateSourceTrigger=PropertyChanged}"
+                                         AcceptsReturn="True" TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto"
+                                         VerticalContentAlignment="Top"
+                                         FontFamily="Cascadia Code, Consolas" />
+                                <TextBlock Text='{}{"name": "Sunset", "bg": "#1a0a1f", ...}'
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}" Margin="8,6"
+                                           IsHitTestVisible="False" FontSize="11"
+                                           FontFamily="Cascadia Code, Consolas">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Text.Length, ElementName=PasteBox}" Value="0">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                             </Grid>
-                        </Border>
 
-                        <!-- List actions -->
-                        <StackPanel Grid.Row="6" Orientation="Horizontal" Margin="0,10,0,0">
-                            <Button Style="{StaticResource FlatButton}" Content="Apply"
-                                    Command="{Binding ApplySelectedCommand}" />
-                            <Button Style="{StaticResource FlatButton}" Content="Reload"
-                                    Command="{Binding ReloadCommand}" />
-                            <Button Style="{StaticResource FlatButton}" Content="Delete"
-                                    Command="{Binding DeleteCommand}" Foreground="{StaticResource Danger}" Margin="0" />
+                            <!-- Filename row -->
+                            <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="0,10,0,0">
+                                <TextBlock Text="Filename:" VerticalAlignment="Center" FontSize="12"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,8,0" />
+                                <TextBox Style="{StaticResource Input}" Width="220"
+                                         Text="{Binding FileName, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text=".json" VerticalAlignment="Center" FontSize="12"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}" Margin="6,0,0,0" />
+                            </StackPanel>
+
+                            <!-- Action row -->
+                            <StackPanel Grid.Row="6" Orientation="Horizontal" Margin="0,12,0,0">
+                                <Button Style="{StaticResource AccentButton}" Content="Save &amp; apply"
+                                        Command="{Binding SaveAndApplyCommand}" />
+                                <Button Style="{StaticResource FlatButton}" Content="Copy agent prompt"
+                                        Command="{Binding CopyAgentPromptCommand}" />
+                                <Button Style="{StaticResource FlatButton}" Content="Open themes folder"
+                                        Command="{Binding OpenThemesFolderCommand}" Margin="0" />
+                            </StackPanel>
+
+                            <!-- Installed user themes -->
+                            <TextBlock Grid.Row="7" Text="Installed user themes" FontSize="11"
+                                       FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                       Margin="0,16,0,6" />
+
+                            <Border Grid.Row="8" Height="92" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
+                                    BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
+                                <Grid>
+                                    <ListBox x:Name="ThemesList"
+                                             ItemsSource="{Binding InstalledThemes}"
+                                             SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
+                                             Background="Transparent" BorderThickness="0"
+                                             Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+                                    <TextBlock Text="No user themes yet. Paste one above or drop a JSON in the themes folder."
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" FontSize="11"
+                                               TextWrapping="Wrap" TextAlignment="Center" MaxWidth="280"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Visibility="{Binding HasNoThemes, Converter={StaticResource BoolVis}}" />
+                                </Grid>
+                            </Border>
+
+                            <!-- List actions -->
+                            <StackPanel Grid.Row="9" Orientation="Horizontal" Margin="0,10,0,0">
+                                <Button Style="{StaticResource FlatButton}" Content="Apply"
+                                        Command="{Binding ApplySelectedCommand}" />
+                                <Button Style="{StaticResource FlatButton}" Content="Reload"
+                                        Command="{Binding ReloadCommand}" />
+                                <Button Style="{StaticResource FlatButton}" Content="Delete"
+                                        Command="{Binding DeleteCommand}" Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" Margin="0" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </TabItem>
+
+                <!-- General tab — thin; room for items 9/10. -->
+                <TabItem Header="General">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="20">
+                        <StackPanel>
+                            <TextBlock Text="General" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <TextBlock Text="Active account: " FontSize="12" Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                <TextBlock Text="{Binding Accounts.ActiveLabel}" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <TextBlock Text="Version: " FontSize="12" Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                <TextBlock Text="{Binding Version}" FontSize="12" Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                            <TextBlock Text="Coming in later builds" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}" Margin="0,0,0,6" />
+                            <TextBlock FontSize="11" Foreground="{DynamicResource Sanduhr.Brush.TextDim}" TextWrapping="Wrap"
+                                       Text="• History charts + CSV export + local Claude Code reader&#x0a;• Focus timer (hourglass), cooldown game, and auto-start" />
                         </StackPanel>
-                    </Grid>
-                </Border>
-            </TabItem>
-
-            <!-- General tab — thin; room for items 8/9/10. -->
-            <TabItem Header="General">
-                <Border Background="{StaticResource Panel}" CornerRadius="0,8,8,8" Padding="20">
-                    <StackPanel>
-                        <TextBlock Text="General" FontSize="14" FontWeight="SemiBold"
-                                   Foreground="{StaticResource Text}" Margin="0,0,0,8" />
-
-                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                            <TextBlock Text="Active account: " FontSize="12" Foreground="{StaticResource TextSecondary}" />
-                            <TextBlock Text="{Binding Accounts.ActiveLabel}" FontSize="12" FontWeight="SemiBold"
-                                       Foreground="{StaticResource Accent}" />
-                        </StackPanel>
-
-                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                            <TextBlock Text="Version: " FontSize="12" Foreground="{StaticResource TextSecondary}" />
-                            <TextBlock Text="{Binding Version}" FontSize="12" Foreground="{StaticResource Text}" />
-                        </StackPanel>
-
-                        <Border Height="1" Background="{StaticResource Border}" Margin="0,16,0,16" />
-
-                        <TextBlock Text="Coming in later builds" FontSize="11" FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextDim}" Margin="0,0,0,6" />
-                        <TextBlock FontSize="11" Foreground="{StaticResource TextDim}" TextWrapping="Wrap"
-                                   Text="• History charts + CSV export + local Claude Code reader&#x0a;• Focus timer (hourglass), cooldown game, and auto-start" />
-                    </StackPanel>
-                </Border>
-            </TabItem>
-        </TabControl>
-    </Grid>
+                    </Border>
+                </TabItem>
+            </TabControl>
+        </DockPanel>
+    </Border>
 </Window>
