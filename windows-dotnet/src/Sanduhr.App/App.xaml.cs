@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using Hardcodet.Wpf.TaskbarNotification;
 using Sanduhr.App.Services;
 using Sanduhr.App.Theming;
+using Sanduhr.App.Updates;
 using Sanduhr.App.ViewModels;
 using Sanduhr.App.Views;
 
@@ -50,6 +51,10 @@ public partial class App : Application
 
         // Load the active account's stored credential + fetch real usage now.
         _vm.Start();
+
+        // Best-effort GitHub/Velopack update probe — fire-and-forget so a slow or offline
+        // network never delays the first paint. No-ops on the Store/MSIX install and in dev.
+        _ = new UpdateChecker().CheckForUpdatesAsync();
     }
 
     private void SetupTray()

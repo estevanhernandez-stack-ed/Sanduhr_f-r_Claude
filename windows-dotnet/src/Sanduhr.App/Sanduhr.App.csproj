@@ -12,6 +12,10 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <!-- Auto-update for the GitHub/Velopack channel (Setup.exe + delta). VelopackApp.Build().Run()
+         runs FIRST in Program.Main (before WPF) so install/uninstall/restart hooks fire; the
+         in-app probe (Updates/UpdateChecker.cs) checks the GitHub release feed best-effort. -->
+    <PackageReference Include="Velopack" Version="0.0.1298" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
   </ItemGroup>
 
@@ -41,6 +45,16 @@
     <ApplicationIcon>Assets\Sanduhr.ico</ApplicationIcon>
     <AssemblyName>Sanduhr</AssemblyName>
     <RootNamespace>Sanduhr.App</RootNamespace>
+    <!-- Custom entry point so VelopackApp.Build().Run() executes before WPF starts.
+         Setting StartupObject suppresses the WPF-generated Main in App.g.cs (the build
+         uses Program.Main instead). See Program.cs. -->
+    <StartupObject>Sanduhr.App.Program</StartupObject>
+    <!-- v3.0.0 signals the platform shift (Python/PySide6 -> .NET 10/WPF). MSIX requires a
+         4-part version with the 4th component .0 (Partner Center rejects non-zero revisions).
+         Keep these three in lockstep with <Identity Version> in Package.appxmanifest. -->
+    <Version>3.0.0.0</Version>
+    <AssemblyVersion>3.0.0.0</AssemblyVersion>
+    <FileVersion>3.0.0.0</FileVersion>
   </PropertyGroup>
 
 </Project>
