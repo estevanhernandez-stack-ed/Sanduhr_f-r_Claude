@@ -2,6 +2,18 @@
 
 Pairs with `docs/scope.md` + `docs/prd.md`. Architecture mirrors RORORO (`ROROROblox`). SDK present: .NET 10.0.202.
 
+> **Reality note (back-merged 2026-06-06, item 12):** two things shifted during the build.
+> (1) **The live API transport is WebView2, not HttpClient.** The `HttpClient` + Cloudflare-aware
+> handler (`Core/ClaudeApiClient.cs`, described in the Module map below) is retained as the
+> parity-tested reference seam, but a raw `HttpClient` cannot clear claude.ai's Cloudflare
+> (challenge bound to the TLS/JA3 fingerprint + `__cf_bm`). The production fetcher is
+> `App/Services/WebView2ApiClient.cs` — a hidden authenticated WebView2 running in-page `fetch()`,
+> a drop-in for `ClaudeApiClient` (same `IClaudeApiClient` surface, same `ClaudeApiParsing`). See
+> `windows-dotnet/README.md > The WebView2 fetch transport`. (2) **No Serilog.** The "Serilog + sinks"
+> line under Stack/packages was not adopted; diagnostics are lightweight file-append logs
+> (`signin-debug.log`, `fetch-debug.log`) plus `Debug.WriteLine`. The hourglass deepening round is
+> already folded into "Focus hourglass — view rebuild" below.
+
 ## Solution layout (`windows-dotnet/`)
 
 ```
