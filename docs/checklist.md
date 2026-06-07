@@ -67,7 +67,7 @@ Pairs with `docs/scope.md`, `docs/prd.md`, `docs/spec.md`. Parity rewrite of a s
   Acceptance (prd): 5 themes + user JSON drop-ins live; sound chimes play; `SANDUHR_SILENT_SOUNDS` silences them.
   Verify: `dotnet run` → cycle all 5 themes, drop a user theme JSON and see it load, confirm a chime fires and the silent env var mutes it.
 
-- [ ] **9. History charts + CSV export + Local CC reader**
+- [x] **9. History charts + CSV export + Local CC reader**
   Spec ref: `spec.md > Module map` (`history_chart.py → App/Views/HistoryChart`, `cc_logs.py` UI surface)
   What to build: `HistoryChart.xaml(.cs)` WPF drawing — 30-day per-tier charts, per-account / all-accounts overlay; CSV export; Local CC reader surface showing live token-burn delta vs the lagging `/usage` endpoint.
   Acceptance (prd): 30-day charts + overlay + CSV export; Local CC delta updates live.
