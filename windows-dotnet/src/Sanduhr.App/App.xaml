@@ -10,63 +10,106 @@
              palette stays swappable (item 8). DynamicResource lookups resolve
              against these at render time. -->
 
-        <!-- Shared theme swatch tile — used by BOTH the widget's quick-switch grid
+        <!-- Shared theme swatch — used by BOTH the widget's quick-switch grid
              (below the title bar) and Settings → Themes, so the two render
              identically and bind to the SAME Themes collection (switching in one
-             reflects the active highlight in the other). Each tile previews its
-             theme in the theme's OWN colors: a glass fill, an accent stripe + chip,
-             and the name in the theme's text color. The active tile gets an accent
-             ring; hover previews the ring. Click → ApplyCommand (live re-tint +
-             persist + soft chime via the widget VM). -->
+             reflects the active highlight in the other). Discreet by design: the
+             theme NAME itself IS the swatch — rendered in the theme's accent ink and
+             its own typeface (Matrix → monospace; others → the default UI font),
+             with a thin accent underline as the only color cue beyond the text. No
+             glass-fill card, no accent chip. Active: bold + a fuller, fully-opaque
+             underline. Hover: brighter underline + a faint backing chip. Click →
+             ApplyCommand (live re-tint + persist + soft chime via the widget VM). -->
         <DataTemplate x:Key="ThemeSwatchTemplate" DataType="{x:Type vm:ThemeStripItemViewModel}">
             <Button Command="{Binding ApplyCommand}" Cursor="Hand" ToolTip="{Binding Name}"
-                    HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
                     shell:WindowChrome.IsHitTestVisibleInChrome="True">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
-                        <!-- ring: the accent highlight (transparent at rest, accent on
-                             hover + active). -->
-                        <Border x:Name="ring" CornerRadius="9" Margin="3" Padding="2"
-                                BorderThickness="2" BorderBrush="Transparent" Background="Transparent">
-                            <!-- tile: the theme's glass surface in its own colors. -->
-                            <Border x:Name="tile" CornerRadius="6" Width="172" Height="38"
-                                    Background="{Binding GlassBrush}"
-                                    BorderBrush="{Binding PreviewBorder}" BorderThickness="1">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="6" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <!-- accent stripe down the left edge -->
-                                    <Border Grid.Column="0" Background="{Binding AccentBrush}"
-                                            CornerRadius="6,0,0,6" />
-                                    <!-- name in the theme's own text color -->
-                                    <TextBlock Grid.Column="1" Text="{Binding Name}"
-                                               Foreground="{Binding TextBrush}"
-                                               VerticalAlignment="Center" Margin="9,0,6,0"
-                                               FontSize="12" FontWeight="Medium"
-                                               TextTrimming="CharacterEllipsis" />
-                                    <!-- accent chip -->
-                                    <Border Grid.Column="2" Width="11" Height="11" CornerRadius="6"
-                                            Background="{Binding AccentBrush}"
-                                            VerticalAlignment="Center" Margin="0,0,9,0" />
-                                </Grid>
-                            </Border>
+                        <!-- wrap: transparent at rest, faint chip on hover; tight padding. -->
+                        <Border x:Name="wrap" CornerRadius="5" Background="Transparent"
+                                Padding="7,3" Margin="2,1">
+                            <!-- vertical stack: name on top, accent underline sized to
+                                 the name's width (the StackPanel hugs its widest child). -->
+                            <StackPanel>
+                                <TextBlock x:Name="label" Text="{Binding Name}"
+                                           Foreground="{Binding AccentBrush}"
+                                           FontFamily="{Binding NameFont}"
+                                           FontSize="11" FontWeight="Normal"
+                                           TextTrimming="CharacterEllipsis" />
+                                <!-- thin accent underline (the bar that "represents the color"). -->
+                                <Border x:Name="bar" Height="2" CornerRadius="1" Margin="0,2,0,0"
+                                        Background="{Binding AccentBrush}" Opacity="0.4" />
+                            </StackPanel>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ring" Property="BorderBrush" Value="{Binding AccentBrush}" />
+                                <Setter TargetName="wrap" Property="Background" Value="#16FFFFFF" />
+                                <Setter TargetName="bar" Property="Opacity" Value="0.75" />
                             </Trigger>
                             <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                <Setter TargetName="ring" Property="BorderBrush" Value="{Binding AccentBrush}" />
-                                <Setter TargetName="tile" Property="BorderBrush" Value="{Binding AccentBrush}" />
-                                <Setter TargetName="tile" Property="BorderThickness" Value="2" />
+                                <Setter TargetName="label" Property="FontWeight" Value="Bold" />
+                                <Setter TargetName="bar" Property="Height" Value="3" />
+                                <Setter TargetName="bar" Property="Opacity" Value="1" />
                             </DataTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Button.Template>
             </Button>
         </DataTemplate>
+
+        <!-- Slim themed scrollbar for the theme swatch areas only (scoped in via each
+             theme ScrollViewer's local resources — never the app-wide default). A
+             7px-wide bar: transparent track, no arrow buttons, a rounded thumb in the
+             muted text ink that brightens to the accent on hover. Keeps the swatch
+             areas tidy when many user themes push them past their height cap, instead
+             of the vanilla WPF scrollbar chrome. -->
+        <Style x:Key="SlimThemeScrollBar" TargetType="ScrollBar">
+            <Setter Property="Width" Value="7" />
+            <Setter Property="MinWidth" Value="7" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageUpCommand"
+                                                  Opacity="0" Focusable="False" IsTabStop="False" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageDownCommand"
+                                                  Opacity="0" Focusable="False" IsTabStop="False" />
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border x:Name="thumb" Width="5" CornerRadius="3"
+                                                        HorizontalAlignment="Center"
+                                                        Background="{DynamicResource Sanduhr.Brush.TextDim}"
+                                                        Opacity="0.55" />
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="thumb" Property="Background"
+                                                                Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                                                        <Setter TargetName="thumb" Property="Opacity" Value="0.9" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter TargetName="thumb" Property="Background"
+                                                                Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                                                        <Setter TargetName="thumb" Property="Opacity" Value="1" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Application.Resources>
 </Application>

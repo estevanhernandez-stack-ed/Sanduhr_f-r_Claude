@@ -144,20 +144,25 @@
                 </StackPanel>
             </Grid>
 
-            <!-- Theme swatch area: a wrapping grid of theme tiles below the title
-                 bar (the strip became an area). Each tile previews its theme in the
-                 theme's own colors — glass fill, accent stripe + chip, name in the
-                 theme's text color — and the active theme's tile gets an accent ring.
-                 Click a tile to switch instantly (live re-tint + persisted to
-                 settings.json "theme" + soft chime). Built-ins first, then user
-                 drop-ins. Roomy but compact (wraps to ~2 columns; scrolls if many).
-                 Uses the shared ThemeSwatchTemplate + the SAME Themes collection as
+            <!-- Theme swatch area: a wrapping row of discreet name-entries below the
+                 title bar. Each entry IS the theme name, rendered in the theme's accent
+                 ink and its own font, with a thin accent underline as the only extra
+                 color cue (active = bold + fuller underline). Click to switch instantly
+                 (live re-tint + persisted to settings.json "theme" + soft chime).
+                 Built-ins first, then user drop-ins. Compact: at 420px wide the names
+                 wrap to ~2 short rows for the ~10 common themes, so no scrollbar shows.
+                 If many user themes push past the cap, the slim themed scrollbar
+                 (scoped in below) appears instead of the vanilla WPF one. Uses the
+                 shared ThemeSwatchTemplate + the SAME Themes collection as
                  Settings → Themes, so the active highlight stays in sync. -->
             <Border DockPanel.Dock="Top"
                     Background="{DynamicResource Sanduhr.Brush.TitleBg}"
-                    Padding="5,4,5,5">
+                    Padding="6,4,4,6">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                              MaxHeight="124">
+                              MaxHeight="96">
+                    <ScrollViewer.Resources>
+                        <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                    </ScrollViewer.Resources>
                     <ItemsControl ItemsSource="{Binding Themes}"
                                   ItemTemplate="{StaticResource ThemeSwatchTemplate}"
                                   shell:WindowChrome.IsHitTestVisibleInChrome="True">

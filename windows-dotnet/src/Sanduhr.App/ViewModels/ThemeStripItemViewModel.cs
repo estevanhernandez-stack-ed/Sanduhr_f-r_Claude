@@ -6,13 +6,14 @@ using Sanduhr.Core;
 namespace Sanduhr.App.ViewModels;
 
 /// <summary>
-/// One theme tile in the swatch area (the widget's quick-switch grid below the
+/// One theme entry in the swatch area (the widget's quick-switch grid below the
 /// title bar AND Settings → Themes). Carries the catalog key, display name,
-/// whether it is the active theme (drives the accent ring), and the theme's OWN
-/// preview brushes so each tile renders in its theme's colors — a glass fill, an
-/// accent stripe + chip, and the name in the theme's text color. A click routes
-/// through <see cref="ApplyCommand"/> back into the widget VM so both swatch grids
-/// switch in lockstep. Ported from the Python build's per-theme strip rows.
+/// whether it is the active theme (drives the bold + fuller underline), the theme's
+/// accent ink + own font (the name IS the swatch — rendered in the theme's accent
+/// color and typeface, with a thin accent underline as the only extra color cue),
+/// plus the legacy preview brushes kept for compatibility. A click routes through
+/// <see cref="ApplyCommand"/> back into the widget VM so both swatch grids switch
+/// in lockstep. Ported from the Python build's per-theme strip rows.
 /// </summary>
 public sealed partial class ThemeStripItemViewModel : ObservableObject
 {
@@ -39,7 +40,17 @@ public sealed partial class ThemeStripItemViewModel : ObservableObject
     /// <summary>The theme's (tinted) border for the tile's resting edge.</summary>
     public Brush PreviewBorder { get; }
 
+    /// <summary>The theme's own display font: a terminal theme's monospace family
+    /// (e.g. Matrix → "Cascadia Code, Consolas") when it declares one, else the
+    /// default UI font. The discreet name-entry renders in this so each row previews
+    /// the theme's typeface as well as its accent ink. Mirrors
+    /// <c>ThemePalette.ResolveValueFont</c> so the swatch font matches the live
+    /// value-label font a theme would paint.</summary>
+    public FontFamily NameFont { get; }
+
     [ObservableProperty] private bool _isActive;
+
+    private static readonly FontFamily DefaultFont = new("Segoe UI Variable Display, Segoe UI");
 
     public ThemeStripItemViewModel(string key, ThemeDefinition def, bool isActive, Action<string> apply)
     {
@@ -53,6 +64,21 @@ public sealed partial class ThemeStripItemViewModel : ObservableObject
         AccentBrush = Frozen(def.Accent);
         TextBrush = Frozen(def.Text);
         PreviewBorder = Frozen(def.BorderTint ?? def.Border);
+        NameFont = ResolveFont(def);
+    }
+
+    /// <summary>Pick the theme's preview font: its monospace family (with the
+    /// theme's declared fallback, defaulting to Consolas) when set, else the UI
+    /// default. WPF resolves the comma list left-to-right, skipping uninstalled
+    /// families, so no manual probe is needed.</summary>
+    private static FontFamily ResolveFont(ThemeDefinition def)
+    {
+        if (!string.IsNullOrEmpty(def.MonospaceFont))
+        {
+            var fallback = string.IsNullOrEmpty(def.MonospaceFallback) ? "Consolas" : def.MonospaceFallback;
+            return new FontFamily($"{def.MonospaceFont}, {fallback}");
+        }
+        return DefaultFont;
     }
 
     /// <summary>Apply this theme — live re-tint + persist + soft chime, via the

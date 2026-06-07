@@ -329,9 +329,12 @@
                                        Margin="0,0,0,8" />
                             <Border Grid.Row="1" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
                                     BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1"
-                                    Padding="3">
+                                    Padding="5,4">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                              HorizontalScrollBarVisibility="Disabled" MaxHeight="172">
+                                              HorizontalScrollBarVisibility="Disabled" MaxHeight="112">
+                                    <ScrollViewer.Resources>
+                                        <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                                    </ScrollViewer.Resources>
                                     <ItemsControl ItemsSource="{Binding Themes}"
                                                   ItemTemplate="{StaticResource ThemeSwatchTemplate}">
                                         <ItemsControl.ItemsPanel>
