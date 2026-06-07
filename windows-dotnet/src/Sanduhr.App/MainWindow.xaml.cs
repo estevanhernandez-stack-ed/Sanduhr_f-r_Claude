@@ -150,7 +150,10 @@ public partial class MainWindow : Window
     {
         CardsScroller.Visibility = Visibility.Collapsed;
         FocusView.Visibility = Visibility.Visible;
-        FocusView.Start(Vm?.LoadFocusDuration() ?? 25);
+        // Land on the setup state (stepper + Start) seeded with the saved duration —
+        // the user adjusts the minutes and clicks Start. Do NOT auto-start; Start
+        // persists the chosen duration via FocusView.Started → SaveFocusDuration.
+        FocusView.PrepareSetup(Vm?.LoadFocusDuration() ?? 25);
     }
 
     private void ExitFocusMode()

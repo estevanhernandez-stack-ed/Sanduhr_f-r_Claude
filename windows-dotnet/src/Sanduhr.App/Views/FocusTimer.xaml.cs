@@ -70,6 +70,25 @@ public partial class FocusTimer : UserControl
         Hourglass.InvalidateVisual();
     }
 
+    /// <summary>Enter the inactive setup state with the stepper seeded to
+    /// <paramref name="minutes"/> (clamped) — the screen the user lands on when
+    /// focus mode opens. Does NOT start: the user sets minutes, then clicks Start.
+    /// Mirrors <c>focus.py</c>, where the duration row is visible until
+    /// <c>start()</c> hides it. Idempotent — safe to call when already in setup.</summary>
+    public void PrepareSetup(int minutes)
+    {
+        if (IsActive)
+            Stop();
+
+        _minutes = Math.Clamp(minutes, MinMinutes, MaxMinutes);
+        UpdateMinutesText();
+
+        ActiveHeader.Visibility = Visibility.Collapsed;
+        Hourglass.Visibility = Visibility.Collapsed;
+        SetupPanel.Visibility = Visibility.Visible;
+        ActionButton.Content = "Start";
+    }
+
     /// <summary>Start a session of <paramref name="minutes"/> minutes (clamped).
     /// Resets the CA, starts the wall clock + both timers, and shows the hourglass.</summary>
     public void Start(int minutes)

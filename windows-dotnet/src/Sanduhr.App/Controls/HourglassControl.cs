@@ -74,9 +74,11 @@ public sealed class HourglassControl : FrameworkElement
         var sandBrush = new SolidColorBrush(Palette.Accent);
         sandBrush.Freeze();
 
-        // Stream: a thin accent thread through the neck while the glass still drains.
-        if (sim.SandPassed < sim.TotalSand)
-            DrawStream(dc, ox + cx * cell + cell / 2.0, yMid, yBot, cell, Palette.Accent);
+        // No decorative falling-stream line: the drain reads from the REAL grains.
+        // Every grain the CA holds is drawn below (top bulb draining, bottom bulb
+        // filling), so the pile in the lower bulb grows on its own as sand crosses
+        // the throat. The old fixed vertical "stream" bar was a static artifact and
+        // is gone; the only neck cue is the two short hairline ticks in DrawVessel.
 
         // Grains — crisp, full contrast, no backing haze. Square for retro/terminal
         // themes; soft round for glass themes. Floor the drawn size so it never mushes.
@@ -166,13 +168,6 @@ public sealed class HourglassControl : FrameworkElement
         dc.DrawLine(sheenPen,
             new Point(leftX + sheenInset, yTop + cell * 0.9),
             new Point(leftX + sheenInset + cell * 5, yTop + cell * 0.9));
-    }
-
-    private static void DrawStream(DrawingContext dc, double centerX, double yMid, double yBot, double cell, Color accent)
-    {
-        var pen = new Pen(new SolidColorBrush(WithAlpha(accent, 0.55)), Math.Max(cell * 0.5, 1.5));
-        pen.Freeze();
-        dc.DrawLine(pen, new Point(centerX, yMid), new Point(centerX, yMid + (yBot - yMid) * 0.45));
     }
 
     /// <summary>Retro/terminal themes (opt out of Mica or carry a monospace face)

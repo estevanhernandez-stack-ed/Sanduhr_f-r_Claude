@@ -89,8 +89,10 @@
                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <Button x:Name="MinusButton" Style="{StaticResource Stepper}" Content="&#x2212;"
-                        Click="MinusButton_Click" ToolTip="Fewer minutes" />
-                <Border MinWidth="64" Margin="10,0" VerticalAlignment="Center">
+                        Click="MinusButton_Click" ToolTip="Fewer minutes"
+                        AutomationProperties.Name="Decrease focus duration" />
+                <Border MinWidth="64" Margin="10,0" VerticalAlignment="Center"
+                        AutomationProperties.Name="Focus duration in minutes">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <TextBlock x:Name="MinutesText" Text="25" FontSize="22" FontWeight="Bold"
                                    Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
@@ -99,13 +101,15 @@
                     </StackPanel>
                 </Border>
                 <Button x:Name="PlusButton" Style="{StaticResource Stepper}" Content="+"
-                        Click="PlusButton_Click" ToolTip="More minutes" />
+                        Click="PlusButton_Click" ToolTip="More minutes"
+                        AutomationProperties.Name="Increase focus duration" />
             </StackPanel>
         </StackPanel>
 
         <!-- Start / Stop. -->
         <Button Grid.Row="2" x:Name="ActionButton" Style="{StaticResource FocusAction}"
                 Content="Start" HorizontalAlignment="Center" Margin="0,12,0,4"
-                Click="ActionButton_Click" />
+                Click="ActionButton_Click"
+                AutomationProperties.Name="Start or stop focus session" />
     </Grid>
 </UserControl>
