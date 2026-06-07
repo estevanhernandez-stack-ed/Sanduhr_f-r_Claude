@@ -85,7 +85,7 @@ Pairs with `docs/scope.md`, `docs/prd.md`, `docs/spec.md`. Parity rewrite of a s
   Acceptance: single-version dual build (Store MSIX + GitHub/Velopack); manifest valid; version 4th-component `.0`; playbook steps enumerated for the actual submission.
   Verify: build MSIX + Velopack from one version; `makeappx` validates the package; confirm the version format. **Milestone E checkpoint — pre-ship review.**
 
-- [ ] **12. Documentation & security verification**
+- [x] **12. Documentation & security verification**
   Spec ref: `prd.md > Acceptance` + `spec.md` (all sections)
   What to build: `windows-dotnet/README.md` — what the app does, build/run (`dotnet build` / `dotnet run`, .NET 10 SDK), where credentials live (Credential Manager — never in repo or config), tech stack, a screenshot or two. Confirm `docs/` artifacts (scope/prd/spec/checklist) reflect what was actually built (back-merge the hourglass deepening outcome). Secrets scan — verify no `sessionKey`/`cf_clearance`/tokens hardcoded or logged; `.gitignore` covers `bin/`, `obj/`, and the `webview2/` profile path. Dependency audit: `dotnet list package --vulnerable` — address criticals or document with mitigation. Input-validation spot-check proportional to scope — focus on the cookie/credential handling surface and the WebView2 navigation (only persist cookies from the real `claude.ai` origin). Push the branch.
   Acceptance: README clear enough for a fresh clone to build; no secrets in committed code or logs; vulnerable-package audit clean or documented; security spot-check (esp. credential + cookie handling) written down; code pushed.
