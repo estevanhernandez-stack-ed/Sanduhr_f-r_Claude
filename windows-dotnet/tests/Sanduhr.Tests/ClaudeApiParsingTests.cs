@@ -138,8 +138,27 @@ public class ClaudeApiParsingTests
         => Assert.Null(ClaudeApiParsing.ParseRoutineBudget("[1,2,3]"));
 
     [Fact]
-    public void ParseRoutineBudget_non_numeric_returns_null()
-        => Assert.Null(ClaudeApiParsing.ParseRoutineBudget("{\"used\":\"three\",\"limit\":15}"));
+    public void ParseRoutineBudget_numeric_strings_parse()
+    {
+        // The live unified-billing body returns used/limit as numeric STRINGS,
+        // which the old GetValue<double> path threw on (-> the routines-null bug).
+        // Tolerant read handles strings as well as numbers.
+        var b = ClaudeApiParsing.ParseRoutineBudget("{\"used\":\"3\",\"limit\":\"15\"}");
+        Assert.NotNull(b);
+        Assert.Equal(3, b!.Used);
+        Assert.Equal(15, b.Limit);
+    }
+
+    [Fact]
+    public void ParseRoutineBudget_garbage_value_falls_back_to_zero()
+    {
+        // Genuinely non-numeric values degrade to 0 (no throw, no null); a 0 limit
+        // reads as "no routines" downstream rather than dropping the whole budget.
+        var b = ClaudeApiParsing.ParseRoutineBudget("{\"used\":\"three\",\"limit\":15}");
+        Assert.NotNull(b);
+        Assert.Equal(0, b!.Used);
+        Assert.Equal(15, b.Limit);
+    }
 
     // -- ThrowForStatus (the WebView2-path status mapping) --------------------
 

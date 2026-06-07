@@ -102,16 +102,29 @@ internal static class ClaudeApiParsing
         catch (JsonException) { return null; }
         if (root is not JsonObject obj) return null;
 
-        try
-        {
-            int used = obj["used"] is JsonNode u ? (int)u.GetValue<double>() : 0;
-            int limit = obj["limit"] is JsonNode l ? (int)l.GetValue<double>() : 0;
-            return new RoutineBudget(used, limit);
-        }
-        catch
-        {
-            return null; // non-numeric used/limit
-        }
+        // used/limit may arrive as JSON numbers OR numeric strings, and may be
+        // absent/null on unified-billing accounts. Read leniently — never throw,
+        // never return null for a valid object (limit==0 means "no routines",
+        // which the fetcher already treats as nothing to show). The live tell was
+        // a body {used, limit, unified_billing_enabled} that parsed to null because
+        // GetValue<double> threw on a non-number value.
+        int used = ReadIntLenient(obj["used"]);
+        int limit = ReadIntLenient(obj["limit"]);
+        return new RoutineBudget(used, limit);
+    }
+
+    /// <summary>Tolerant int read: JSON number, numeric string, or absent/null → 0. Never throws.</summary>
+    private static int ReadIntLenient(JsonNode? node)
+    {
+        if (node is not JsonValue v) return 0;
+        if (v.TryGetValue<double>(out var d)) return (int)d;
+        if (v.TryGetValue<long>(out var l)) return (int)l;
+        if (v.TryGetValue<int>(out var i)) return i;
+        if (v.TryGetValue<string>(out var s)
+            && double.TryParse(s, System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture, out var ds))
+            return (int)ds;
+        return 0;
     }
 
     /// <summary>
