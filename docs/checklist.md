@@ -61,7 +61,7 @@ Pairs with `docs/scope.md`, `docs/prd.md`, `docs/spec.md`. Parity rewrite of a s
   Acceptance (prd): multi-account switch + per-account history + account-scoped sign-out; settings persist across launch.
   Verify: `dotnet run` → add a 2nd account via Sign in, switch active, sign out one — per-account data + active switch behave correctly.
 
-- [ ] **8. Themes + sound chimes**
+- [x] **8. Themes + sound chimes**
   Spec ref: `spec.md > Module map` (`themes.py → Core/ThemeModel + App/Theming`, `sounds.py → App/Sounds.cs`)
   What to build: `ThemeModel.cs` (5 palettes ported pixel-exact) + `App/Theming/` + user JSON drop-ins (`%APPDATA%\Sanduhr\themes\`); `Sounds.cs` chimes (`SoundPlayer`/NAudio; honor `SANDUHR_SILENT_SOUNDS`).
   Acceptance (prd): 5 themes + user JSON drop-ins live; sound chimes play; `SANDUHR_SILENT_SOUNDS` silences them.
