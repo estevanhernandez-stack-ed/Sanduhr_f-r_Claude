@@ -35,6 +35,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private readonly CredentialStore _credentials;
     private readonly UsageHistory _history;
     private readonly SettingsStore _settings;
+    private readonly CcLogReader _ccReader;
 
     private readonly DispatcherTimer _refreshTimer;
     private readonly DispatcherTimer _tickTimer;
@@ -139,6 +140,26 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// <summary>The active account label, or null when signed out.</summary>
     public string? ActiveAccount => _accounts.GetActive();
 
+    /// <summary>The per-account usage history store — shared with the Settings
+    /// History tab (chart + CSV export) so it reads the same files the live
+    /// widget writes.</summary>
+    public UsageHistory History => _history;
+
+    /// <summary>The multi-account registry — the Settings History tab's account
+    /// selector + CSV export read account labels from here.</summary>
+    public AccountStore AccountStore => _accounts;
+
+    /// <summary>The local Claude Code session-log reader — shared with the
+    /// Settings Local CC tab so it reuses the same 30-second aggregation cache the
+    /// card badges hit.</summary>
+    public CcLogReader CcReader => _ccReader;
+
+    /// <summary>The Local CC tab's "show breakdowns" preference (settings.json).</summary>
+    public bool LoadLocalCcShowBreakdowns() => _settings.LoadLocalCcShowBreakdowns();
+
+    /// <summary>Persist the Local CC tab's "show breakdowns" preference.</summary>
+    public void SaveLocalCcShowBreakdowns(bool show) => _settings.SaveLocalCcShowBreakdowns(show);
+
     public WidgetViewModel()
     {
         _paths = new Paths();
@@ -146,6 +167,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _credentials = new CredentialStore(_accounts, _paths);
         _history = new UsageHistory(_accounts, _paths);
         _settings = new SettingsStore(_paths);
+        _ccReader = new CcLogReader();
 
         _pinned = _settings.LoadPinned();
         _isThemesExpanded = _settings.LoadThemesExpanded();
@@ -432,6 +454,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             _lastData = data;
             _lastFetchAt = DateTimeOffset.Now;
             RenderCards(data, DateTimeOffset.UtcNow);
+            // Fresh fetch re-anchors the Local CC delta window: badges reset to ~0
+            // here, then the 30s tick grows them as CC events stream in between fetches.
+            RefreshCcDelta();
             UpdatePlanBadge();
             StatusText = "";
             UpdateFooter();
@@ -490,7 +515,32 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         var now = DateTimeOffset.UtcNow;
         foreach (var vm in Tiers)
             vm.Tick(now);
+        RefreshCcDelta();
         UpdateFooter();
+    }
+
+    /// <summary>
+    /// Recompute the per-tier Local CC token-burn deltas since <c>_lastFetchAt</c>
+    /// and push them into the card badges. Ports <c>widget._refresh_cc_delta</c>:
+    /// no-op before the first fetch; the CC-log model→tier mapping lives in
+    /// <see cref="CcLogReader.TokensSinceByTier"/>; tiers with no local activity get
+    /// zero (badge hidden). Defensive — log-file IO never takes down the widget.
+    /// </summary>
+    private void RefreshCcDelta()
+    {
+        if (_lastFetchAt is null)
+            return;
+        Dictionary<string, long> byTier;
+        try
+        {
+            byTier = _ccReader.TokensSinceByTier(_lastFetchAt.Value);
+        }
+        catch
+        {
+            byTier = new Dictionary<string, long>();
+        }
+        foreach (var vm in Tiers)
+            vm.SetLocalDelta(byTier.GetValueOrDefault(vm.TierKey));
     }
 
     private void RenderCards(JsonObject data, DateTimeOffset now)
@@ -588,7 +638,20 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         if (_lastFetchAt is null) { FooterText = ""; return; }
         string ts = _lastFetchAt.Value.ToString("h:mm tt", CultureInfo.InvariantCulture);
         string mode = Pinned ? "Pinned" : "Float";
-        FooterText = $"Updated {ts}  ·  {mode}";
+        // Aggregate Local CC burn since the anchor, appended as "· CC +Nk" when
+        // there's been activity — parity with widget._update_footer's _cc_delta_lbl.
+        string cc = "";
+        try
+        {
+            long total = _ccReader.TokensSince(_lastFetchAt.Value).Values.Sum();
+            if (total > 0)
+                cc = $"  ·  CC +{TokenFormat.Compact(total)}";
+        }
+        catch
+        {
+            // Log-file IO must never break the footer.
+        }
+        FooterText = $"Updated {ts}  ·  {mode}{cc}";
     }
 
     partial void OnPinnedChanged(bool value) => UpdateFooter();

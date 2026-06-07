@@ -6,6 +6,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:vm="clr-namespace:Sanduhr.App.ViewModels"
+        xmlns:views="clr-namespace:Sanduhr.App.Views"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
         Title="Sanduhr — Settings"
@@ -139,6 +140,147 @@
             </Setter>
         </Style>
 
+        <!-- Themed dropdown item (History account selector). -->
+        <Style x:Key="ThemedComboItem" TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="ib" Background="Transparent" CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ib" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ib" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Themed combo box (History account selector). Flat glass field, accent
+             focus, themed popup — no white OS chrome. -->
+        <Style x:Key="ThemedComboBox" TargetType="ComboBox">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource ThemedComboItem}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Border x:Name="bd" CornerRadius="6"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="22" />
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter Grid.Column="0" Margin="{TemplateBinding Padding}"
+                                                      VerticalAlignment="Center" HorizontalAlignment="Left"
+                                                      Content="{TemplateBinding SelectionBoxItem}"
+                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" />
+                                    <Path Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Data="M0,0 L8,0 L4,5 Z"
+                                          Fill="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                </Grid>
+                            </Border>
+                            <ToggleButton Focusable="False" Background="Transparent" BorderThickness="0"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="Transparent" />
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True"
+                                   Focusable="False" PopupAnimation="Slide"
+                                   IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}">
+                                <Border Background="{DynamicResource Sanduhr.Brush.Bg}"
+                                        BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1"
+                                        CornerRadius="6" Margin="0,2,0,0"
+                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+                                    <ScrollViewer MaxHeight="220">
+                                        <ItemsPresenter />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Themed check box (Local CC "show breakdowns"). -->
+        <Style x:Key="ThemedCheckBox" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal">
+                            <Border x:Name="box" Width="16" Height="16" CornerRadius="3"
+                                    VerticalAlignment="Center" Margin="0,0,8,0"
+                                    Background="{DynamicResource Sanduhr.Brush.Bg}"
+                                    BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
+                                <Path x:Name="check" Stretch="Uniform" Margin="2"
+                                      Data="M0,5 L4,9 L11,0" Visibility="Collapsed"
+                                      Stroke="{DynamicResource Sanduhr.Brush.Accent}" StrokeThickness="2" />
+                            </Border>
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="check" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="box" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Window-range pill (History Week / Month): FlatButton that fills with
+             accent when active (the bound DataTrigger sets Button.Background, which
+             the FlatButton template surfaces via TemplateBinding). -->
+        <Style x:Key="RangePillWeek" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding WeekMode}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="RangePillMonth" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding WeekMode}" Value="False">
+                    <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- Title-bar close button — themed text, square red hover (matches the widget). -->
         <Style x:Key="CloseButton" TargetType="Button">
             <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
@@ -202,7 +344,8 @@
             </Grid>
 
             <!-- Tabs -->
-            <TabControl Margin="16,12,16,16" Background="Transparent">
+            <TabControl x:Name="Tabs" Margin="16,12,16,16" Background="Transparent"
+                        SelectionChanged="Tabs_SelectionChanged">
 
                 <!-- Accounts tab — the feature. -->
                 <TabItem Header="Accounts">
@@ -434,7 +577,189 @@
                     </Border>
                 </TabItem>
 
-                <!-- General tab — thin; room for items 9/10. -->
+                <!-- History tab (item 9) — 30-day usage chart + CSV export. -->
+                <TabItem Header="History">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="16"
+                            DataContext="{Binding History}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="11"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12"
+                                       Text="Rolling 30-day usage history. Stored locally only — never uploaded. Export as CSV to analyze with any agent." />
+
+                            <!-- Window + account selector row -->
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="Window:" VerticalAlignment="Center" FontSize="12"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,8,0" />
+                                <Button Content="Week" Style="{StaticResource RangePillWeek}"
+                                        Command="{Binding SetWeekCommand}" />
+                                <Button Content="Month" Style="{StaticResource RangePillMonth}"
+                                        Command="{Binding SetMonthCommand}" />
+                                <TextBlock Text="Account:" VerticalAlignment="Center" FontSize="12"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="12,0,8,0" />
+                                <ComboBox Style="{StaticResource ThemedComboBox}" Width="170"
+                                          VerticalAlignment="Center"
+                                          ItemsSource="{Binding AccountOptions}"
+                                          DisplayMemberPath="Display"
+                                          SelectedItem="{Binding SelectedOption, Mode=TwoWay}" />
+                            </StackPanel>
+
+                            <!-- Legend — only when 'All accounts' is selected. -->
+                            <ItemsControl Grid.Row="2" ItemsSource="{Binding Legend}" Margin="0,0,0,4"
+                                          Visibility="{Binding ShowLegend, Converter={StaticResource BoolVis}}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,12,2" VerticalAlignment="Center">
+                                            <Ellipse Width="10" Height="10" VerticalAlignment="Center"
+                                                     Fill="{Binding Swatch}" Margin="0,0,5,0" />
+                                            <TextBlock Text="{Binding Label}" FontSize="11" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- The chart (custom-render control; data pushed from code-behind). -->
+                            <Border Grid.Row="3" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
+                                    BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1"
+                                    Padding="8" Margin="0,4,0,0">
+                                <views:HistoryChart x:Name="Chart" />
+                            </Border>
+
+                            <!-- Action row -->
+                            <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,12,0,0">
+                                <Button Style="{StaticResource AccentButton}" Content="Export CSV…"
+                                        Command="{Binding ExportCsvCommand}" />
+                                <Button Style="{StaticResource FlatButton}" Content="Clear history"
+                                        Command="{Binding ClearHistoryCommand}"
+                                        Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" Margin="0" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </TabItem>
+
+                <!-- Local CC tab (item 9) — local Claude Code token-burn summary. -->
+                <TabItem Header="Local CC">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="16"
+                            DataContext="{Binding LocalCc}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="11"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12"
+                                       Text="Token usage from local Claude Code sessions on this machine. Read directly from the session JSONL files in your ~/.claude folder — no network, no upload. Anthropic's /usage endpoint lags real consumption by minutes; this is the canonical local view of what's actually being burned." />
+
+                            <!-- Two prominent totals: Today vs Last 30 days. -->
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
+                                <StackPanel Margin="0,0,32,0">
+                                    <TextBlock Text="Today" FontSize="9"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <TextBlock Text="{Binding TodayText}" FontSize="22" FontWeight="Bold"
+                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Text="Last 30 days" FontSize="9"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <TextBlock Text="{Binding MonthText}" FontSize="22" FontWeight="Bold"
+                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- 30-day bar strip (custom-render control). -->
+                            <views:LocalCcBarStrip x:Name="BarStrip" Grid.Row="2" Height="60" Margin="0,0,0,8" />
+
+                            <CheckBox Grid.Row="3" Style="{StaticResource ThemedCheckBox}"
+                                      Content="Show project &amp; skill breakdown"
+                                      IsChecked="{Binding ShowBreakdowns, Mode=TwoWay}" Margin="0,0,0,8" />
+
+                            <!-- Per-project + per-skill tables side by side. -->
+                            <Grid Grid.Row="4"
+                                  Visibility="{Binding ShowBreakdowns, Converter={StaticResource BoolVis}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <DockPanel Grid.Column="0">
+                                    <TextBlock DockPanel.Dock="Top" Text="Top projects (last 30 days)" FontSize="9"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,4" />
+                                    <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
+                                            BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                            <ItemsControl ItemsSource="{Binding Projects}" Margin="4">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Margin="4,3">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11"
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding Tokens}" FontSize="11"
+                                                                       Margin="8,0,0,0"
+                                                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </Border>
+                                </DockPanel>
+
+                                <DockPanel Grid.Column="2">
+                                    <TextBlock DockPanel.Dock="Top" Text="Top skills (last 30 days)" FontSize="9"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,4" />
+                                    <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
+                                            BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                            <ItemsControl ItemsSource="{Binding Skills}" Margin="4">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Margin="4,3">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11"
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding Tokens}" FontSize="11"
+                                                                       Margin="8,0,0,0"
+                                                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </Border>
+                                </DockPanel>
+                            </Grid>
+                        </Grid>
+                    </Border>
+                </TabItem>
+
+                <!-- General tab — thin; room for item 10. -->
                 <TabItem Header="General">
                     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="20">
                         <StackPanel>
@@ -457,7 +782,7 @@
                             <TextBlock Text="Coming in later builds" FontSize="11" FontWeight="SemiBold"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextDim}" Margin="0,0,0,6" />
                             <TextBlock FontSize="11" Foreground="{DynamicResource Sanduhr.Brush.TextDim}" TextWrapping="Wrap"
-                                       Text="• History charts + CSV export + local Claude Code reader&#x0a;• Focus timer (hourglass), cooldown game, and auto-start" />
+                                       Text="• Focus timer (hourglass), cooldown game, and auto-start" />
                         </StackPanel>
                     </Border>
                 </TabItem>

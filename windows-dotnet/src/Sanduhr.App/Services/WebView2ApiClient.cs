@@ -150,6 +150,12 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
         ClaudeApiParsing.ThrowForStatus(reply.Status, reply.Body);
         var budget = ClaudeApiParsing.ParseRoutineBudget(reply.Body ?? "");
         Log($"routines: status={reply.Status} budget={(budget is null ? "null" : "ok")}");
+        // Diagnostic for the routines-null-on-200 case: ParseRoutineBudget expects a
+        // top-level {used, limit} object. When a 200 still parses to null, the body's
+        // actual shape differs — log its TOP-LEVEL JSON KEYS ONLY (never values, no
+        // secrets) so the real shape is visible next run without guessing.
+        if (budget is null)
+            Log($"routines: NULL-PARSE top-level keys=[{TopLevelJsonKeys(reply.Body)}]");
         return budget;
     }
 
@@ -424,6 +430,28 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
 
     private static string SafeHost(string? url)
         => Uri.TryCreate(url, UriKind.Absolute, out var u) ? u.Host : "(?)";
+
+    /// <summary>Top-level JSON object keys of a response body, comma-joined — KEYS
+    /// ONLY, never values. Used by the routines-null diagnostic to surface the
+    /// body's real shape without ever logging secret/usage values.</summary>
+    private static string TopLevelJsonKeys(string? body)
+    {
+        if (string.IsNullOrEmpty(body))
+            return "(empty)";
+        try
+        {
+            return JsonNode.Parse(body) switch
+            {
+                JsonObject o => string.Join(",", o.Select(kv => kv.Key)),
+                JsonArray => "(array)",
+                _ => "(non-object)",
+            };
+        }
+        catch
+        {
+            return "(non-json)";
+        }
+    }
 
     private void Log(string message)
     {

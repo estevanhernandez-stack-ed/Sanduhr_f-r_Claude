@@ -145,6 +145,23 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>The Local CC tab's "show project &amp; skill breakdown" preference
+    /// (settings.json "local_cc_show_breakdowns"), defaulting to true — parity with
+    /// <c>local_cc_dialog</c>'s default-on breakdown tables.</summary>
+    public bool LoadLocalCcShowBreakdowns()
+    {
+        var root = Read();
+        try { return root["local_cc_show_breakdowns"]?.GetValue<bool>() ?? true; }
+        catch { return true; }
+    }
+
+    public void SaveLocalCcShowBreakdowns(bool show)
+    {
+        var root = Read();
+        root["local_cc_show_breakdowns"] = show;
+        Write(root);
+    }
+
     public IReadOnlyList<string> LoadTierOrder() => LoadStringArray("tier_order");
 
     public void SaveTierOrder(IEnumerable<string> order)

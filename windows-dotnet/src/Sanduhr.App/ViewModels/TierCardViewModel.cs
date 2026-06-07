@@ -39,6 +39,14 @@ public sealed partial class TierCardViewModel : ObservableObject
     [ObservableProperty] private IReadOnlyList<int> _sparkline = Array.Empty<int>();
     [ObservableProperty] private Color _sparklineColor = Colors.White;
 
+    /// <summary>The "+Nk" Local CC token-burn badge text (e.g. "+1.5k").</summary>
+    [ObservableProperty] private string _localDelta = "";
+
+    /// <summary>True when there's been local CC activity in this tier since the
+    /// last fetch — drives the badge's visibility (hidden at zero, parity with
+    /// <c>tiers.set_local_delta</c>).</summary>
+    [ObservableProperty] private bool _hasLocalDelta;
+
     public TierCardViewModel(string tierKey, ThemePalette palette)
     {
         TierKey = tierKey;
@@ -67,6 +75,25 @@ public sealed partial class TierCardViewModel : ObservableObject
 
     /// <summary>Re-derive only the time-based labels (no refetch).</summary>
     public void Tick(DateTimeOffset now) => RefreshTimeDerived(now);
+
+    /// <summary>
+    /// Update the "+Nk" Local CC token-burn badge: the tokens consumed in this
+    /// tier from local Claude Code sessions since the last API fetch landed.
+    /// Hidden at zero so cards stay quiet during inactivity, then reset to zero
+    /// (and re-hidden) when a fresh fetch re-anchors the window. Ports
+    /// <c>tiers.set_local_delta</c> (compact format + hide-when-zero).
+    /// </summary>
+    public void SetLocalDelta(long tokens)
+    {
+        if (tokens <= 0)
+        {
+            HasLocalDelta = false;
+            LocalDelta = "";
+            return;
+        }
+        LocalDelta = $"+{TokenFormat.Compact(tokens)}";
+        HasLocalDelta = true;
+    }
 
     /// <summary>Recolor against a newly applied theme without a refetch — the
     /// theme-strip live switch path. The bar/value color stays usage-derived

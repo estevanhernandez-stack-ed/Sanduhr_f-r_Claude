@@ -13,6 +13,7 @@
     <UserControl.Resources>
         <conv:StringToVisibilityConverter x:Key="StrVis" />
         <conv:ColorToBrushConverter x:Key="ColorBrush" />
+        <BooleanToVisibilityConverter x:Key="BoolVis" />
     </UserControl.Resources>
     <UserControl.ContextMenu>
         <ContextMenu>
@@ -30,10 +31,11 @@
         <Border Height="1" VerticalAlignment="Top" Margin="2,0"
                 Background="{DynamicResource Sanduhr.Brush.InnerHighlight}" />
         <StackPanel>
-            <!-- Row 1: label · sparkline · value -->
+            <!-- Row 1: label · sparkline · local-CC badge · value -->
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
@@ -45,7 +47,17 @@
                                            VerticalAlignment="Center"
                                            Values="{Binding Sparkline}"
                                            LineColor="{Binding SparklineColor}" />
-                <TextBlock Grid.Column="2" Text="{Binding ValueText}" VerticalAlignment="Center"
+                <!-- Local CC token-burn delta: "+Nk" tokens burned in this tier
+                     since the last API fetch landed. Hidden at zero. Sits between
+                     the sparkline and the % so it reads as "what's happening right
+                     now" while % is the canonical fetched state (parity with
+                     tiers.py row1 order). -->
+                <TextBlock Grid.Column="2" Text="{Binding LocalDelta}" VerticalAlignment="Center"
+                           Margin="0,0,6,0" FontSize="10"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                           Visibility="{Binding HasLocalDelta, Converter={StaticResource BoolVis}}"
+                           ToolTip="Tokens consumed in this tier from local Claude Code sessions since the last API fetch landed.&#x0a;&#x0a;The /usage endpoint lags actual consumption by minutes — this is the live delta. Resets to zero each time a fresh fetch arrives (every ~5 min)." />
+                <TextBlock Grid.Column="3" Text="{Binding ValueText}" VerticalAlignment="Center"
                            FontSize="15" FontWeight="Bold"
                            FontFamily="{DynamicResource Sanduhr.Font.Value}"
                            Effect="{DynamicResource Sanduhr.Effect.ValueBloom}"

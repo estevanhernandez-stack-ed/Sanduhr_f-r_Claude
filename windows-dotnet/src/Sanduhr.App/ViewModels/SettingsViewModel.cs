@@ -19,6 +19,14 @@ public sealed class SettingsViewModel
     /// open folder, installed-themes management.</summary>
     public ThemesViewModel Themes { get; }
 
+    /// <summary>Backs the History tab (item 9): 30-day chart with per-account /
+    /// all-accounts overlay, Week/Month window, CSV export, Clear history.</summary>
+    public HistoryTabViewModel History { get; }
+
+    /// <summary>Backs the Local CC tab (item 9): local Claude Code token-burn
+    /// summary — today / 30-day totals, daily bar strip, project + skill breakdowns.</summary>
+    public LocalCcViewModel LocalCc { get; }
+
     /// <summary>Assembly version for the General tab footer (e.g. "3.0.0").</summary>
     public string Version { get; }
 
@@ -26,6 +34,9 @@ public sealed class SettingsViewModel
     {
         Accounts = new AccountsViewModel(widget, addAccountAsync);
         Themes = new ThemesViewModel(widget);
+        History = new HistoryTabViewModel(widget);
+        LocalCc = new LocalCcViewModel(
+            widget, widget.LoadLocalCcShowBreakdowns(), widget.SaveLocalCcShowBreakdowns);
         var v = Assembly.GetExecutingAssembly().GetName().Version;
         Version = v is null ? "3.0.0" : $"{v.Major}.{v.Minor}.{v.Build}";
     }
