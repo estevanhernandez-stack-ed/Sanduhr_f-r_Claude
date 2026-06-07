@@ -111,5 +111,239 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- ============================================================
+             Themed menus (item 7). The widget right-click ContextMenu, its
+             Accounts ▸ submenu, and the tray ContextMenu are all WPF menus —
+             without these, WPF's default MenuItem template paints a grey left
+             icon-gutter column and the popup rides the system background, which
+             reads broken next to the themed widget. These implicit styles
+             (TargetType, no x:Key) re-skin EVERY ContextMenu / MenuItem /
+             Separator in the app from the active palette, via DynamicResource
+             so they re-tint live on a theme switch (Matrix → green-on-black).
+             The grey gutter is gone: the templates below have no fixed icon
+             column. Menus built in code (AccountMenuBuilder / MainWindow /
+             App tray) pick these up implicitly — no per-item styling needed.
+             ============================================================ -->
+
+        <!-- Leaf menu item (and top-level leaf): header + optional gesture text,
+             no icon gutter. Themed text, GlassHover highlight, TextMuted when
+             disabled (the active account is intentionally disabled → reads dim). -->
+        <ControlTemplate x:Key="Sanduhr.Menu.SubmenuItem" TargetType="{x:Type MenuItem}">
+            <Border x:Name="Bd" CornerRadius="5" SnapsToDevicePixels="True"
+                    Background="{TemplateBinding Background}"
+                    TextElement.Foreground="{TemplateBinding Foreground}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ContentPresenter Grid.Column="0" ContentSource="Header" RecognizesAccessKey="True"
+                                      Margin="12,6,12,6" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{TemplateBinding InputGestureText}"
+                               Margin="0,6,12,6" VerticalAlignment="Center" Opacity="0.7" />
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsHighlighted" Value="True">
+                    <Setter TargetName="Bd" Property="Background"
+                            Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter TargetName="Bd" Property="TextElement.Foreground"
+                            Value="{DynamicResource Sanduhr.Brush.TextMuted}" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <!-- Submenu header (the Accounts ▸ item): header + themed ▸ arrow, and a
+             themed transparent Popup that reuses the same glass/border/shadow
+             chrome as the ContextMenu so the submenu matches its parent. -->
+        <ControlTemplate x:Key="Sanduhr.Menu.SubmenuHeader" TargetType="{x:Type MenuItem}">
+            <Border x:Name="Bd" CornerRadius="5" SnapsToDevicePixels="True"
+                    Background="{TemplateBinding Background}"
+                    TextElement.Foreground="{TemplateBinding Foreground}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ContentPresenter Grid.Column="0" ContentSource="Header" RecognizesAccessKey="True"
+                                      Margin="12,6,12,6" VerticalAlignment="Center" />
+                    <TextBlock x:Name="arrow" Grid.Column="1" Text="&#x25B8;" FontSize="11"
+                               Margin="0,0,10,0" VerticalAlignment="Center"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                    <Popup x:Name="PART_Popup" Grid.ColumnSpan="2"
+                           AllowsTransparency="True" Focusable="False"
+                           IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                           Placement="Right" HorizontalOffset="-4" VerticalOffset="-6"
+                           PopupAnimation="{DynamicResource {x:Static SystemParameters.MenuPopupAnimationKey}}">
+                        <Border Margin="6" CornerRadius="8" Padding="4" SnapsToDevicePixels="True"
+                                Background="{DynamicResource Sanduhr.Brush.GlassChrome}"
+                                BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="14" ShadowDepth="2" Direction="270"
+                                                  Opacity="0.45" Color="#000000" />
+                            </Border.Effect>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <ScrollViewer.Resources>
+                                    <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                                </ScrollViewer.Resources>
+                                <ItemsPresenter SnapsToDevicePixels="True"
+                                                KeyboardNavigation.DirectionalNavigation="Cycle" />
+                            </ScrollViewer>
+                        </Border>
+                    </Popup>
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsHighlighted" Value="True">
+                    <Setter TargetName="Bd" Property="Background"
+                            Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                    <Setter TargetName="arrow" Property="Foreground"
+                            Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                </Trigger>
+                <Trigger Property="IsSubmenuOpen" Value="True">
+                    <Setter TargetName="Bd" Property="Background"
+                            Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                    <Setter TargetName="arrow" Property="Foreground"
+                            Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter TargetName="Bd" Property="TextElement.Foreground"
+                            Value="{DynamicResource Sanduhr.Brush.TextMuted}" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <!-- Top-level header (Menu-bar style — not used by the widget/tray context
+             menus, but provided so the implicit MenuItem style covers all four
+             roles). Same chrome, popup drops below instead of to the side. -->
+        <ControlTemplate x:Key="Sanduhr.Menu.TopLevelHeader" TargetType="{x:Type MenuItem}">
+            <Border x:Name="Bd" CornerRadius="5" SnapsToDevicePixels="True"
+                    Background="{TemplateBinding Background}"
+                    TextElement.Foreground="{TemplateBinding Foreground}">
+                <Grid>
+                    <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"
+                                      Margin="12,6,12,6" VerticalAlignment="Center" />
+                    <Popup x:Name="PART_Popup"
+                           AllowsTransparency="True" Focusable="False"
+                           IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                           Placement="Bottom" VerticalOffset="2"
+                           PopupAnimation="{DynamicResource {x:Static SystemParameters.MenuPopupAnimationKey}}">
+                        <Border Margin="6" CornerRadius="8" Padding="4" SnapsToDevicePixels="True"
+                                Background="{DynamicResource Sanduhr.Brush.GlassChrome}"
+                                BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="14" ShadowDepth="2" Direction="270"
+                                                  Opacity="0.45" Color="#000000" />
+                            </Border.Effect>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <ScrollViewer.Resources>
+                                    <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                                </ScrollViewer.Resources>
+                                <ItemsPresenter SnapsToDevicePixels="True"
+                                                KeyboardNavigation.DirectionalNavigation="Cycle" />
+                            </ScrollViewer>
+                        </Border>
+                    </Popup>
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsHighlighted" Value="True">
+                    <Setter TargetName="Bd" Property="Background"
+                            Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                </Trigger>
+                <Trigger Property="IsSubmenuOpen" Value="True">
+                    <Setter TargetName="Bd" Property="Background"
+                            Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter TargetName="Bd" Property="TextElement.Foreground"
+                            Value="{DynamicResource Sanduhr.Brush.TextMuted}" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <!-- Implicit MenuItem style: default to the leaf template, swap by Role.
+             Applies app-wide so every menu (widget right-click + tray) is themed,
+             including the dynamically-built account items from AccountMenuBuilder. -->
+        <Style TargetType="{x:Type MenuItem}">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Template" Value="{StaticResource Sanduhr.Menu.SubmenuItem}" />
+            <Style.Triggers>
+                <Trigger Property="Role" Value="TopLevelHeader">
+                    <Setter Property="Template" Value="{StaticResource Sanduhr.Menu.TopLevelHeader}" />
+                </Trigger>
+                <Trigger Property="Role" Value="TopLevelItem">
+                    <Setter Property="Template" Value="{StaticResource Sanduhr.Menu.SubmenuItem}" />
+                </Trigger>
+                <Trigger Property="Role" Value="SubmenuHeader">
+                    <Setter Property="Template" Value="{StaticResource Sanduhr.Menu.SubmenuHeader}" />
+                </Trigger>
+                <Trigger Property="Role" Value="SubmenuItem">
+                    <Setter Property="Template" Value="{StaticResource Sanduhr.Menu.SubmenuItem}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Implicit ContextMenu style: themed glass popup, 1px themed border,
+             rounded corners + padding, soft drop shadow. The ContextMenu's own
+             popup is created with AllowsTransparency=true by WPF, so the rounded
+             corners + shadow margin render clean (no grey system backdrop). -->
+        <Style TargetType="{x:Type ContextMenu}">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassChrome}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="HasDropShadow" Value="True" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ContextMenu}">
+                        <Border Margin="6" CornerRadius="8" Padding="4" SnapsToDevicePixels="True"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="14" ShadowDepth="2" Direction="270"
+                                                  Opacity="0.45" Color="#000000" />
+                            </Border.Effect>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <ScrollViewer.Resources>
+                                    <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                                </ScrollViewer.Resources>
+                                <ItemsPresenter SnapsToDevicePixels="True"
+                                                KeyboardNavigation.DirectionalNavigation="Cycle" />
+                            </ScrollViewer>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Menu separator: thin themed line, not the default grey. Keyed to
+             MenuItem.SeparatorStyleKey so WPF applies it ONLY to separators inside
+             menus (leaving any other Separator untouched). -->
+        <Style x:Key="{x:Static MenuItem.SeparatorStyleKey}" TargetType="{x:Type Separator}">
+            <Setter Property="Margin" Value="8,4" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Separator}">
+                        <Border Height="1" SnapsToDevicePixels="True"
+                                Background="{DynamicResource Sanduhr.Brush.Border}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Application.Resources>
 </Application>

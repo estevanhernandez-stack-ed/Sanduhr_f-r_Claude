@@ -62,11 +62,10 @@ public partial class MainWindow : Window
             return;
         _menuBuilt = true;
 
-        var menu = new ContextMenu
-        {
-            Background = new SolidColorBrush(Color.FromRgb(0x1c, 0x1c, 0x1c)),
-            Foreground = new SolidColorBrush(Color.FromRgb(0xe8, 0xe4, 0xdc)),
-        };
+        // No inline brushes: the implicit ContextMenu / MenuItem styles in
+        // App.xaml theme this from the active palette (DynamicResource, so it
+        // re-tints live on a theme switch).
+        var menu = new ContextMenu();
 
         var accounts = new MenuItem { Header = "Accounts" };
         // Placeholder so the submenu arrow renders; replaced on open.
