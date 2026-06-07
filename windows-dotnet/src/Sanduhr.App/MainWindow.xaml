@@ -91,6 +91,11 @@
         </Style>
     </Window.Resources>
 
+    <!-- Keyboard: Ctrl+P toggles Deep Work focus mode (parity with widget.py). -->
+    <Window.InputBindings>
+        <KeyBinding Modifiers="Control" Key="P" Command="{Binding ToggleFocusCommand}" />
+    </Window.InputBindings>
+
     <!-- Root glass panel. On Win11 22H2+ this rides over Mica (semi-opaque
          obsidian so text stays legible); on older Windows it's the solid
          fallback (App switches the window background + this fill). -->
@@ -234,8 +239,29 @@
                 </Border>
             </Grid>
 
-            <!-- Content -->
-            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+            <!-- Tool strip — Focus + Game affordances (port of widget.py's tool
+                 strip between the cards and the footer). Docked above the footer.
+                 AutomationProperties.Name set so screen readers + MS Store review
+                 tooling read them (the v2.0.1 rejection lesson). -->
+            <Border DockPanel.Dock="Bottom" Height="28"
+                    Background="{DynamicResource Sanduhr.Brush.FooterBg}">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Button Style="{StaticResource ChromeButton}" Content="Focus"
+                            Command="{Binding ToggleFocusCommand}"
+                            ToolTip="Deep Work focus timer (Ctrl+P)"
+                            AutomationProperties.Name="Deep Work focus timer" />
+                    <Button Style="{StaticResource ChromeButton}" Content="Game"
+                            Command="{Binding StartGameCommand}"
+                            ToolTip="Play the cooldown snake"
+                            AutomationProperties.Name="Cooldown snake game" />
+                </StackPanel>
+            </Border>
+
+            <!-- Content host: the cards scroller, the focus-mode hourglass (which
+                 replaces the cards while active), and the snake overlay on top. -->
+            <Grid x:Name="ContentHost">
+            <ScrollViewer x:Name="CardsScroller"
+                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                           Padding="10,8">
                 <StackPanel>
                     <!-- Active-account switcher (widget.py _account_btn parity): a flat
@@ -359,6 +385,13 @@
                     </ItemsControl>
                 </StackPanel>
             </ScrollViewer>
+
+                <!-- Focus mode: replaces the cards while active (hidden otherwise). -->
+                <views:FocusTimer x:Name="FocusView" Visibility="Collapsed" />
+
+                <!-- Cooldown snake: overlays everything while playing. -->
+                <views:CooldownGame x:Name="GameView" Visibility="Collapsed" />
+            </Grid>
         </DockPanel>
     </Border>
 </Window>

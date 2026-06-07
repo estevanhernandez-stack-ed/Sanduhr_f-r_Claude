@@ -162,6 +162,45 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>The focus-timer duration in minutes (settings.json
+    /// "focus_mode_duration"), defaulting to 25 — parity with
+    /// <c>widget.py</c>'s <c>settings.get("focus_mode_duration", 25)</c>.
+    /// Clamped to the 1–120 range on read.</summary>
+    public int LoadFocusDuration()
+    {
+        var root = Read();
+        try
+        {
+            int v = root["focus_mode_duration"]?.GetValue<int>() ?? 25;
+            return Math.Clamp(v, 1, 120);
+        }
+        catch { return 25; }
+    }
+
+    public void SaveFocusDuration(int minutes)
+    {
+        var root = Read();
+        root["focus_mode_duration"] = Math.Clamp(minutes, 1, 120);
+        Write(root);
+    }
+
+    /// <summary>The cooldown-snake high score (settings.json "snake_high_score"),
+    /// defaulting to 0 — parity with <c>widget.py</c>'s
+    /// <c>settings.get("snake_high_score", 0)</c>.</summary>
+    public int LoadSnakeHighScore()
+    {
+        var root = Read();
+        try { return root["snake_high_score"]?.GetValue<int>() ?? 0; }
+        catch { return 0; }
+    }
+
+    public void SaveSnakeHighScore(int score)
+    {
+        var root = Read();
+        root["snake_high_score"] = score;
+        Write(root);
+    }
+
     public IReadOnlyList<string> LoadTierOrder() => LoadStringArray("tier_order");
 
     public void SaveTierOrder(IEnumerable<string> order)

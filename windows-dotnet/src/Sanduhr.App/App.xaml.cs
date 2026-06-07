@@ -86,6 +86,17 @@ public partial class App : Application
         var addAccount = new MenuItem { Header = "Add account" };
         addAccount.Click += async (_, _) => await RunSignInAsync(embedded: true);
 
+        // Focus + Game affordances (parity with widget.py's tray entries).
+        var focus = new MenuItem { Header = "Deep Work (Focus)" };
+        focus.Click += (_, _) => _vm?.ToggleFocusCommand.Execute(null);
+
+        var game = new MenuItem { Header = "Cooldown Snake" };
+        game.Click += (_, _) =>
+        {
+            ShowWindow();
+            _vm?.StartGameCommand.Execute(null);
+        };
+
         var quit = new MenuItem { Header = "Quit Sanduhr" };
         quit.Click += (_, _) => QuitApp();
 
@@ -95,6 +106,9 @@ public partial class App : Application
         menu.Items.Add(new Separator());
         menu.Items.Add(accounts);
         menu.Items.Add(addAccount);
+        menu.Items.Add(new Separator());
+        menu.Items.Add(focus);
+        menu.Items.Add(game);
         menu.Items.Add(new Separator());
         menu.Items.Add(quit);
         _tray.ContextMenu = menu;

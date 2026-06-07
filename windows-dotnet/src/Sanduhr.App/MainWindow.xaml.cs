@@ -42,8 +42,12 @@ public partial class MainWindow : Window
         LocationChanged += (_, _) => { _saveDebounce.Stop(); _saveDebounce.Start(); };
 
         // DataContext is assigned by App AFTER construction, so build the right-click
-        // menu once the window is loaded (and the VM is present).
-        Loaded += (_, _) => EnsureWidgetContextMenu();
+        // menu + wire focus/game once the window is loaded (and the VM is present).
+        Loaded += (_, _) =>
+        {
+            EnsureWidgetContextMenu();
+            WireFocusAndGame();
+        };
     }
 
     private WidgetViewModel? Vm => DataContext as WidgetViewModel;
@@ -85,12 +89,78 @@ public partial class MainWindow : Window
 
         menu.Items.Add(new Separator());
 
+        var focus = new MenuItem { Header = "Deep Work (Focus)", Command = Vm.ToggleFocusCommand };
+        menu.Items.Add(focus);
+
+        var game = new MenuItem { Header = "Cooldown Snake", Command = Vm.StartGameCommand };
+        menu.Items.Add(game);
+
+        menu.Items.Add(new Separator());
+
         var hide = new MenuItem { Header = "Hide" };
         hide.Click += (_, _) => Hide();
         menu.Items.Add(hide);
 
         RootBorder.ContextMenu = menu;
     }
+
+    // -- focus mode + cooldown game -------------------------------------------
+
+    private bool _focusWired;
+
+    /// <summary>Wire the focus timer + snake overlay to the VM's affordance events
+    /// and seed their palettes. Idempotent (Loaded can fire more than once).</summary>
+    private void WireFocusAndGame()
+    {
+        if (_focusWired || Vm is null)
+            return;
+        _focusWired = true;
+
+        FocusView.ApplyPalette(Vm.Palette);
+        GameView.ApplyPalette(Vm.Palette);
+
+        Vm.FocusToggleRequested += ToggleFocusMode;
+        Vm.GameStartRequested += StartCooldownGame;
+        Vm.ThemeChanged += p =>
+        {
+            FocusView.ApplyPalette(p);
+            GameView.ApplyPalette(p);
+        };
+
+        // Session complete → restore the cards. The in-panel Stop button keeps the
+        // user on the focus page (setup state); the Focus affordance toggles out.
+        FocusView.Finished += ExitFocusMode;
+        FocusView.Started += minutes => Vm?.SaveFocusDuration(minutes);
+
+        GameView.Finished += () => Focus();
+        GameView.HighScoreChanged += score => Vm?.SaveSnakeHighScore(score);
+    }
+
+    /// <summary>Enter focus mode if out, exit if in — ports
+    /// <c>widget._toggle_focus_mode</c>.</summary>
+    private void ToggleFocusMode()
+    {
+        if (FocusView.IsActive || FocusView.Visibility == Visibility.Visible)
+            ExitFocusMode();
+        else
+            EnterFocusMode();
+    }
+
+    private void EnterFocusMode()
+    {
+        CardsScroller.Visibility = Visibility.Collapsed;
+        FocusView.Visibility = Visibility.Visible;
+        FocusView.Start(Vm?.LoadFocusDuration() ?? 25);
+    }
+
+    private void ExitFocusMode()
+    {
+        FocusView.Stop();
+        FocusView.Visibility = Visibility.Collapsed;
+        CardsScroller.Visibility = Visibility.Visible;
+    }
+
+    private void StartCooldownGame() => GameView.Start(Vm?.LoadSnakeHighScore() ?? 0);
 
     protected override void OnSourceInitialized(EventArgs e)
     {

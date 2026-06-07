@@ -779,10 +779,30 @@
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
-                            <TextBlock Text="Coming in later builds" FontSize="11" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}" Margin="0,0,0,6" />
-                            <TextBlock FontSize="11" Foreground="{DynamicResource Sanduhr.Brush.TextDim}" TextWrapping="Wrap"
-                                       Text="• Focus timer (hourglass), cooldown game, and auto-start" />
+                            <!-- Startup (item 10) — off by default; dual mechanism by install type. -->
+                            <TextBlock Text="Startup" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+
+                            <!-- Unpackaged: a real toggle that writes the HKCU Run entry. -->
+                            <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                      Content="Start Sanduhr when Windows starts"
+                                      IsChecked="{Binding General.AutoStartEnabled, Mode=TwoWay}"
+                                      Visibility="{Binding General.IsUnpackaged, Converter={StaticResource BoolVis}}" />
+
+                            <!-- Packaged (Store): can't flip the manifest StartupTask without
+                                 WinRT — deep-link to Windows Settings → Startup apps instead. -->
+                            <StackPanel Visibility="{Binding General.IsPackaged, Converter={StaticResource BoolVis}}">
+                                <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                           Text="This Store install manages auto-start in Windows Settings. Sanduhr is off by default — turn it on under Startup apps." />
+                                <Button Style="{StaticResource FlatButton}" HorizontalAlignment="Left"
+                                        Content="Open Windows Startup settings…"
+                                        Command="{Binding General.OpenStartupSettingsCommand}" />
+                            </StackPanel>
+
+                            <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                       Text="Off by default. When on, Sanduhr launches hidden in the tray at sign-in." />
                         </StackPanel>
                     </Border>
                 </TabItem>

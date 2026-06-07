@@ -124,6 +124,16 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// payload.</summary>
     public event Action<ThemePalette>? ThemeChanged;
 
+    /// <summary>Raised by the Focus affordance (title-bar button, right-click,
+    /// tray, Ctrl+P) — the window toggles focus mode in/out, replacing the tier
+    /// cards with the hourglass while active. Timer/render plumbing lives in the
+    /// View; this is the entry point (port of <c>widget._toggle_focus_mode</c>).</summary>
+    public event Action? FocusToggleRequested;
+
+    /// <summary>Raised by the Game affordance — the window shows the cooldown snake
+    /// overlay (port of <c>widget</c>'s <c>_btn_snake</c> → <c>start_game</c>).</summary>
+    public event Action? GameStartRequested;
+
     public ThemePalette Palette => _palette;
 
     /// <summary>The user theme drop-in folder, for the Settings "Open themes folder"
@@ -159,6 +169,18 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     /// <summary>Persist the Local CC tab's "show breakdowns" preference.</summary>
     public void SaveLocalCcShowBreakdowns(bool show) => _settings.SaveLocalCcShowBreakdowns(show);
+
+    /// <summary>The saved focus-timer duration (settings.json "focus_mode_duration").</summary>
+    public int LoadFocusDuration() => _settings.LoadFocusDuration();
+
+    /// <summary>Persist the focus-timer duration chosen for a session.</summary>
+    public void SaveFocusDuration(int minutes) => _settings.SaveFocusDuration(minutes);
+
+    /// <summary>The saved cooldown-snake high score (settings.json "snake_high_score").</summary>
+    public int LoadSnakeHighScore() => _settings.LoadSnakeHighScore();
+
+    /// <summary>Persist a new cooldown-snake high score.</summary>
+    public void SaveSnakeHighScore(int score) => _settings.SaveSnakeHighScore(score);
 
     public WidgetViewModel()
     {
@@ -499,6 +521,16 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// state survives relaunch.</summary>
     [RelayCommand]
     private void ToggleThemes() => IsThemesExpanded = !IsThemesExpanded;
+
+    /// <summary>Focus affordance entry point — raises <see cref="FocusToggleRequested"/>
+    /// so the window enters/exits focus mode (hourglass replaces the cards).</summary>
+    [RelayCommand]
+    private void ToggleFocus() => FocusToggleRequested?.Invoke();
+
+    /// <summary>Game affordance entry point — raises <see cref="GameStartRequested"/>
+    /// so the window shows the cooldown snake overlay.</summary>
+    [RelayCommand]
+    private void StartGame() => GameStartRequested?.Invoke();
 
     partial void OnIsThemesExpandedChanged(bool value) => _settings.SaveThemesExpanded(value);
 
