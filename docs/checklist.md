@@ -79,7 +79,7 @@ Pairs with `docs/scope.md`, `docs/prd.md`, `docs/spec.md`. Parity rewrite of a s
   Acceptance (prd): the hourglass drains in proportion to wall-clock time AND reads clearly as a branded-glass hourglass (vessel + falling stream visible, crisp themed sand, no haze); ported physics keeps `test_focus_physics` green; cooldown game functional; auto-start opt-in, off by default; the cert unique-value story holds.
   Verify: `dotnet run` → run a focus session — confirm the sand drains on schedule, the vessel + neck stream are legible, grains match the active theme, and the glass carries the brand tint; play the game; toggle auto-start on/off. **Milestone D checkpoint — feature-for-feature parity reached.**
 
-- [ ] **11. MSIX + Velopack + release prep (Milestone E gate — pre-ship)**
+- [x] **11. MSIX + Velopack + release prep (Milestone E gate — pre-ship)**
   Spec ref: `spec.md > Release` + `spec.md > Stack / packages` (Velopack, MSIX manifest)
   What to build: `Sanduhr.App/Package.appxmanifest` (reuse identity `626LabsLLC.SanduhrfrClaude` / Publisher `CN=177BCE59-...`, add `windows.startupTask` extension); custom `Program` so `VelopackApp.Build().Run()` precedes WPF; Velopack GitHub `Setup.exe` + delta; MSIX build via `scripts/makeappx`; version **v3.0.0** (4th component MUST be `.0` per the playbook); GitNexus indexes the new tree. Follow RORORO's `release-playbook.md` merged with Sanduhr's `docs/ms-store-submission-playbook.md` (Partner Center, reviewer letter, draft-release discipline, listing "What's new").
   Acceptance: single-version dual build (Store MSIX + GitHub/Velopack); manifest valid; version 4th-component `.0`; playbook steps enumerated for the actual submission.
