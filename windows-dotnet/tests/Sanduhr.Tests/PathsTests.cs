@@ -31,6 +31,16 @@ public class PathsTests
     }
 
     [Fact]
+    public void Themes_and_sounds_dirs_live_under_appdata()
+    {
+        using var temp = new TempDir();
+        var paths = new Paths(temp.Path);
+        var dir = Path.Combine(temp.Path, "Sanduhr");
+        Assert.Equal(Path.Combine(dir, "themes"), paths.ThemesDir);
+        Assert.Equal(Path.Combine(dir, "sounds"), paths.SoundsDir);
+    }
+
+    [Fact]
     public void Legacy_v1_paths_live_under_home()
     {
         using var temp = new TempDir();

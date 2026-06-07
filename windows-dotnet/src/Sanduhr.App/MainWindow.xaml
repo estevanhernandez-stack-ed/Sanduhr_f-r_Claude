@@ -106,7 +106,7 @@
                 <Border.Background>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                         <GradientStop Offset="0" Color="{DynamicResource Sanduhr.Color.Accent}" />
-                        <GradientStop Offset="1" Color="#006C63FF" />
+                        <GradientStop Offset="1" Color="{DynamicResource Sanduhr.Color.AccentFade}" />
                     </LinearGradientBrush>
                 </Border.Background>
             </Border>
@@ -143,6 +143,72 @@
                             Click="CloseButton_Click" ToolTip="Hide to tray" />
                 </StackPanel>
             </Grid>
+
+            <!-- Theme strip: a horizontal row of theme names below the title bar.
+                 Click a name to switch instantly (live re-tint + persisted to
+                 settings.json "theme"). Built-ins first, then user drop-ins. The
+                 active theme reads in the accent color. Parity with widget.py's
+                 "click a theme name in the strip below the title". -->
+            <Border DockPanel.Dock="Top"
+                    Background="{DynamicResource Sanduhr.Brush.TitleBg}"
+                    Padding="8,2,8,3">
+                <ItemsControl ItemsSource="{Binding Themes}"
+                              shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Content="{Binding Name}"
+                                    Command="{Binding DataContext.StripSelectThemeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{Binding Key}"
+                                    Cursor="Hand"
+                                    ToolTip="Switch to this theme">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Setter Property="BorderThickness" Value="0" />
+                                        <Setter Property="Padding" Value="6,2" />
+                                        <Setter Property="Margin" Value="1,1" />
+                                        <Setter Property="FontSize" Value="10" />
+                                        <Setter Property="FontWeight" Value="Normal" />
+                                        <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border x:Name="chip" CornerRadius="5"
+                                                            Background="{TemplateBinding Background}"
+                                                            Padding="{TemplateBinding Padding}">
+                                                        <TextBlock Text="{TemplateBinding Content}"
+                                                                   Foreground="{TemplateBinding Foreground}"
+                                                                   FontWeight="{TemplateBinding FontWeight}"
+                                                                   FontSize="{TemplateBinding FontSize}" />
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="chip" Property="Background" Value="#22FFFFFF" />
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <!-- Active theme reads in the accent color, semibold. -->
+                                            <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
 
             <!-- Footer -->
             <Grid DockPanel.Dock="Bottom" Height="26"

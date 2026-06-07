@@ -65,6 +65,16 @@ public sealed class Paths
 
     public string SettingsFile => Path.Combine(AppDataDir, "settings.json");
 
+    /// <summary>User theme drop-in folder: <c>%APPDATA%\Sanduhr\themes</c>.
+    /// Parity with <c>settings_dialog._themes_dir</c> / <c>themes.load_user_themes</c>.
+    /// Not auto-created here — the theme loader creates it on scan.</summary>
+    public string ThemesDir => Path.Combine(AppDataDir, "themes");
+
+    /// <summary>Generated-chime cache folder: <c>%APPDATA%\Sanduhr\sounds</c>.
+    /// Parity with <c>sounds._sounds_dir</c>. Not auto-created here — the player
+    /// creates it lazily on first play.</summary>
+    public string SoundsDir => Path.Combine(AppDataDir, "sounds");
+
     public string LogFile => Path.Combine(AppDataDir, "sanduhr.log");
 
     public string LastErrorFile => Path.Combine(AppDataDir, "last_error.json");

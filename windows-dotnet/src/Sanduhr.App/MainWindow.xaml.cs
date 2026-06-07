@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Sanduhr.App.Interop;
 using Sanduhr.App.Services;
+using Sanduhr.App.Theming;
 using Sanduhr.App.ViewModels;
 using Sanduhr.App.Views;
 using Sanduhr.Core;
@@ -95,17 +96,30 @@ public partial class MainWindow : Window
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        ApplyBackdrop();
+        ApplyBackdropForTheme(Vm?.Palette ?? ThemePalette.Obsidian);
     }
 
     /// <summary>
-    /// Apply Mica when the OS supports it (Win11 22H2+): a Transparent window
-    /// background plus a sheet-of-glass frame extension so the backdrop fills
-    /// the window, with the root panel's semi-opaque obsidian keeping text
-    /// legible. Otherwise paint a solid obsidian fallback.
+    /// Set the window backdrop for the active theme. Glass themes get Mica when the
+    /// OS supports it (Win11 22H2+): a Transparent window background plus a
+    /// sheet-of-glass frame extension so the backdrop fills the window, with the
+    /// root panel's semi-opaque glass keeping text legible. A Matrix-style opt-out
+    /// theme renders <b>solid</b> — Mica is disabled and the window paints the
+    /// theme's solid <c>bg</c> (the phosphor-terminal look). Older Windows always
+    /// falls back to the solid background. Safe to call repeatedly on a live switch.
     /// </summary>
-    private void ApplyBackdrop()
+    public void ApplyBackdropForTheme(ThemePalette palette)
     {
+        var solidBg = Application.Current.Resources["Sanduhr.Brush.Bg"] as Brush ?? Brushes.Black;
+
+        if (palette.OptsOutOfMica)
+        {
+            MicaHelper.DisableBackdrop(this);
+            Background = solidBg;
+            Chrome.GlassFrameThickness = new Thickness(0);
+            return;
+        }
+
         bool mica = MicaHelper.TryApplyMica(this);
         if (mica)
         {
@@ -114,7 +128,7 @@ public partial class MainWindow : Window
         }
         else
         {
-            Background = Application.Current.Resources["Sanduhr.Brush.Bg"] as Brush ?? Brushes.Black;
+            Background = solidBg;
             Chrome.GlassFrameThickness = new Thickness(0);
         }
     }

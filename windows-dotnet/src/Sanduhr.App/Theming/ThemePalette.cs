@@ -1,87 +1,117 @@
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
+using Sanduhr.Core;
 
 namespace Sanduhr.App.Theming;
 
 /// <summary>
-/// A single Sanduhr color theme — the obsidian-like default for this milestone.
-/// Ported from <c>themes.py</c>'s "obsidian" entry. The full 5-palette
-/// <c>ThemeModel</c> + the runtime switcher are item 8; this type stays
-/// <b>injectable</b> (construct a different palette, call <see cref="Apply"/>)
-/// so item 8 only has to swap the instance, not rewrite the binding surface.
+/// The WPF adapter over a Core <see cref="ThemeDefinition"/>: parses the theme's
+/// hex colors into <see cref="Color"/>s and projects the full dial set into
+/// <c>Sanduhr.*</c> DynamicResources via <see cref="Apply"/>. Every view binds to
+/// those resources, so re-applying a different palette at runtime re-tints the
+/// whole widget with no XAML changes — the item-8 theme switcher just swaps the
+/// instance and calls <see cref="Apply"/>.
 ///
-/// All views bind to the registered brushes via
-/// <c>{DynamicResource Sanduhr.Brush.*}</c>, so re-applying a new palette at
-/// runtime re-tints the whole widget with no XAML changes.
+/// Ported from <c>widget.apply_theme</c>: chrome strips get a denser glass alpha
+/// than cards (0.92 vs the theme's <c>glass_alpha</c>); a Mica-opt-out theme
+/// (Matrix) forces both to 1.0 so it renders solid.
 /// </summary>
 public sealed class ThemePalette
 {
-    public required string Name { get; init; }
-    public required Color Bg { get; init; }
-    public required Color Glass { get; init; }
-    public required Color GlassOnMica { get; init; }
-    public required Color TitleBg { get; init; }
-    public required Color Border { get; init; }
-    public required Color Text { get; init; }
-    public required Color TextSecondary { get; init; }
-    public required Color TextDim { get; init; }
-    public required Color TextMuted { get; init; }
-    public required Color Accent { get; init; }
-    public required Color BarBg { get; init; }
-    public required Color FooterBg { get; init; }
-    public required Color PaceMarker { get; init; }
-    public required Color Sparkline { get; init; }
+    /// <summary>The catalog key this palette was built from (lowercase, e.g.
+    /// "obsidian"). Persisted to <c>settings.json</c> and used to mark the active
+    /// entry in the theme strip.</summary>
+    public string Key { get; }
 
-    /// <summary>Glass fill alpha for the root panel laid over Mica (parity with
-    /// the Python chrome alpha 0.92 — mostly solid, faint Mica bleed at edges).</summary>
-    public double ChromeAlpha { get; init; } = 0.92;
+    public ThemeDefinition Definition { get; }
 
-    /// <summary>Card glass alpha (Python obsidian glass_alpha 0.85).</summary>
-    public double CardAlpha { get; init; } = 0.85;
+    public string Name => Definition.Name;
 
-    /// <summary>The shipped obsidian-like default (themes.py "obsidian").</summary>
-    public static ThemePalette Obsidian { get; } = new()
+    public Color Bg { get; }
+    public Color Glass { get; }
+    public Color GlassOnMica { get; }
+    public Color TitleBg { get; }
+    public Color Border { get; }
+    public Color Text { get; }
+    public Color TextSecondary { get; }
+    public Color TextDim { get; }
+    public Color TextMuted { get; }
+    public Color Accent { get; }
+    public Color BarBg { get; }
+    public Color FooterBg { get; }
+    public Color PaceMarker { get; }
+    public Color Sparkline { get; }
+    public Color? BorderTint { get; }
+    public Color? InnerHighlightColor { get; }
+    public double InnerHighlightAlpha { get; }
+
+    /// <summary>Matrix-style solid phosphor terminal: skip Mica, paint solid,
+    /// monospace numerics, tight corners.</summary>
+    public bool OptsOutOfMica => Definition.OptsOutOfMica;
+
+    /// <summary>Card glass alpha (the theme's <c>glass_alpha</c>); 1.0 when the
+    /// theme opts out of Mica so cards render opaque.</summary>
+    public double CardAlpha => Definition.GlassAlpha;
+
+    /// <summary>Card border alpha (the theme's <c>border_alpha</c>).</summary>
+    public double BorderAlpha => Definition.BorderAlpha;
+
+    /// <summary>Chrome strip glass alpha — denser than cards so light text stays
+    /// legible against Mica bleed (widget.apply_theme: 0.92, or 1.0 for opt-out).</summary>
+    public double ChromeAlpha => Definition.OptsOutOfMica ? 1.0 : 0.92;
+
+    /// <summary>Card corner radius (the theme's <c>card_corner_radius</c>);
+    /// defaults to the obsidian 10 px, Matrix tightens to 2 px.</summary>
+    public int CardCornerRadius => Definition.CardCornerRadius ?? 10;
+
+    public ThemePalette(string key, ThemeDefinition def)
     {
-        Name = "Obsidian",
-        Bg = Hex("#0d0d0d"),
-        Glass = Hex("#1c1c1c"),
-        GlassOnMica = Hex("#1a1a1c"),
-        TitleBg = Hex("#161616"),
-        Border = Hex("#333333"),
-        Text = Hex("#e8e4dc"),
-        TextSecondary = Hex("#b8b4ac"),
-        TextDim = Hex("#777777"),
-        TextMuted = Hex("#555555"),
-        Accent = Hex("#6c63ff"),
-        BarBg = Hex("#2a2a2a"),
-        FooterBg = Hex("#111111"),
-        PaceMarker = Hex("#ff6b6b"),
-        Sparkline = Hex("#6c63ff"),
-        ChromeAlpha = 0.92,
-        CardAlpha = 0.85,
-    };
+        Key = key;
+        Definition = def;
+        Bg = Hex(def.Bg);
+        Glass = Hex(def.Glass);
+        GlassOnMica = Hex(def.GlassOnMica);
+        TitleBg = Hex(def.TitleBg);
+        Border = Hex(def.Border);
+        Text = Hex(def.Text);
+        TextSecondary = Hex(def.TextSecondary);
+        TextDim = Hex(def.TextDim);
+        TextMuted = Hex(def.TextMuted);
+        Accent = Hex(def.Accent);
+        BarBg = Hex(def.BarBg);
+        FooterBg = Hex(def.FooterBg);
+        PaceMarker = Hex(def.PaceMarker);
+        Sparkline = Hex(def.Sparkline);
+        BorderTint = def.BorderTint is null ? null : Hex(def.BorderTint);
+        InnerHighlightColor = def.InnerHighlight is null ? null : Hex(def.InnerHighlight.Color);
+        InnerHighlightAlpha = def.InnerHighlight?.Alpha ?? 0.0;
+    }
+
+    /// <summary>The shipped obsidian default (themes.py "obsidian"). Keeps the
+    /// item-5 look as the fallback when no saved theme resolves.</summary>
+    public static ThemePalette Obsidian { get; } = new("obsidian", ThemeCatalog.BuiltIns["obsidian"]);
 
     /// <summary>
     /// The bar fill / percentage color ramp for a utilization, 1:1 with
     /// <c>themes.usage_color</c>: &lt;50 green, &lt;75 yellow, &lt;90 orange, else red.
+    /// Delegates to Core so the ramp has a single source of truth.
     /// </summary>
-    public static Color UsageColor(int pct)
-    {
-        if (pct < 50) return Hex("#4ade80");
-        if (pct < 75) return Hex("#facc15");
-        if (pct < 90) return Hex("#fb923c");
-        return Hex("#f87171");
-    }
+    public static Color UsageColor(int pct) => Hex(ThemeCatalog.UsageColor(pct));
 
     /// <summary>
-    /// Register this palette's brushes/colors into a resource dictionary under
-    /// stable <c>Sanduhr.*</c> keys. Idempotent — overwrites existing keys, so
-    /// item 8 can re-apply a different palette live. The root glass fill carries
-    /// <see cref="ChromeAlpha"/> so Mica bleeds subtly at the panel edges.
+    /// Register this palette into a resource dictionary under stable
+    /// <c>Sanduhr.*</c> keys. Idempotent — overwrites existing keys so a live
+    /// theme switch re-tints everything. Applies the full dial set: card alpha
+    /// from <c>glass_alpha</c>, border from <c>border_alpha</c>/<c>border_tint</c>,
+    /// inner-highlight edge, accent stripe/sparkline, card corner radius, the
+    /// value-label font (monospace for terminal themes), and the accent-bloom
+    /// glow (terminal themes only — parity with widget.py).
     /// </summary>
     public void Apply(ResourceDictionary res)
     {
         Set(res, "Sanduhr.Color.Accent", Accent);
+        Set(res, "Sanduhr.Color.AccentFade", Color.FromArgb(0, Accent.R, Accent.G, Accent.B));
         Set(res, "Sanduhr.Color.PaceMarker", PaceMarker);
         Set(res, "Sanduhr.Color.BarBg", BarBg);
         Set(res, "Sanduhr.Color.Sparkline", Sparkline);
@@ -92,13 +122,66 @@ public sealed class ThemePalette
         SetBrush(res, "Sanduhr.Brush.CardGlass", WithAlpha(GlassOnMica, CardAlpha));
         SetBrush(res, "Sanduhr.Brush.TitleBg", WithAlpha(TitleBg, ChromeAlpha));
         SetBrush(res, "Sanduhr.Brush.FooterBg", WithAlpha(FooterBg, ChromeAlpha));
-        SetBrush(res, "Sanduhr.Brush.Border", WithAlpha(Border, 0.30));
+        SetBrush(res, "Sanduhr.Brush.Border", WithAlpha(BorderTint ?? Border, BorderAlpha));
         SetBrush(res, "Sanduhr.Brush.Text", Text);
         SetBrush(res, "Sanduhr.Brush.TextSecondary", TextSecondary);
         SetBrush(res, "Sanduhr.Brush.TextDim", TextDim);
         SetBrush(res, "Sanduhr.Brush.TextMuted", TextMuted);
         SetBrush(res, "Sanduhr.Brush.Accent", Accent);
         SetBrush(res, "Sanduhr.Brush.PaceMarker", PaceMarker);
+
+        // 1-px top-edge light catch (inner_highlight); Transparent when the theme
+        // leaves it null (restrained themes).
+        SetBrush(res, "Sanduhr.Brush.InnerHighlight",
+            InnerHighlightColor is { } ih ? WithAlpha(ih, InnerHighlightAlpha) : Colors.Transparent);
+
+        // Card corner-radius dial (Matrix tightens to 2 px for the CRT feel).
+        res["Sanduhr.CardCornerRadius"] = new CornerRadius(CardCornerRadius);
+
+        // Value-label font: monospace for terminal themes (Matrix → Cascadia Code,
+        // falling back to Consolas via WPF's built-in comma fallback), else the
+        // widget default. The numeric/tier text is the only surface that switches.
+        res["Sanduhr.Font.Value"] = ResolveValueFont();
+
+        // Accent-bloom glow on the value label — applied ONLY for monospace
+        // terminal themes (widget._apply_monospace_if_needed gates the bloom drop
+        // shadow on monospace_font being set). Non-terminal themes get an inert,
+        // invisible effect so the DynamicResource always resolves to an Effect.
+        res["Sanduhr.Effect.ValueBloom"] = BuildValueBloom();
+    }
+
+    private FontFamily ResolveValueFont()
+    {
+        if (!string.IsNullOrEmpty(Definition.MonospaceFont))
+        {
+            var fallback = string.IsNullOrEmpty(Definition.MonospaceFallback)
+                ? "Consolas"
+                : Definition.MonospaceFallback;
+            // WPF resolves the comma list left-to-right, skipping uninstalled
+            // families automatically — no manual exactMatch probe needed.
+            return new FontFamily($"{Definition.MonospaceFont}, {fallback}");
+        }
+        return new FontFamily("Segoe UI Variable Display, Segoe UI");
+    }
+
+    private Effect BuildValueBloom()
+    {
+        if (!string.IsNullOrEmpty(Definition.MonospaceFont))
+        {
+            var glow = new DropShadowEffect
+            {
+                ShadowDepth = 0,
+                Direction = 0,
+                BlurRadius = Definition.AccentBloom.Blur,
+                Color = Accent,
+                Opacity = Definition.AccentBloom.Alpha,
+            };
+            glow.Freeze();
+            return glow;
+        }
+        var inert = new DropShadowEffect { ShadowDepth = 0, BlurRadius = 0, Opacity = 0 };
+        inert.Freeze();
+        return inert;
     }
 
     private static void Set(ResourceDictionary res, string key, Color c) => res[key] = c;

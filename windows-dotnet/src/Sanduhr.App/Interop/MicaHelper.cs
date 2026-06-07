@@ -34,6 +34,7 @@ public static class MicaHelper
     private const int DWMWCP_ROUND = 2;
 
     // DWM_SYSTEMBACKDROP_TYPE.
+    private const int DWMSBT_NONE = 1;       // No backdrop (solid)
     private const int DWMSBT_MAINWINDOW = 2; // Mica
 
     // Win11 21H2 = build 22000 (dark mode + rounded corners).
@@ -82,6 +83,25 @@ public static class MicaHelper
         int backdrop = DWMSBT_MAINWINDOW;
         int hr = DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, sizeof(int));
         return hr == 0;
+    }
+
+    /// <summary>
+    /// Disable the system backdrop so the window renders solid — the Matrix
+    /// theme's phosphor-terminal opt-out (parity with <c>mica.disable_mica</c>).
+    /// Sets <c>DWMSBT_NONE</c> and collapses the extended frame so no Mica bleeds
+    /// at the edges. No-op (harmless DWM error) on Windows without backdrop support.
+    /// </summary>
+    public static void DisableBackdrop(Window window)
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero)
+            return;
+
+        int backdrop = DWMSBT_NONE;
+        DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, sizeof(int));
+
+        var margins = new MARGINS { Left = 0, Right = 0, Top = 0, Bottom = 0 };
+        DwmExtendFrameIntoClientArea(hwnd, ref margins);
     }
 
     [StructLayout(LayoutKind.Sequential)]

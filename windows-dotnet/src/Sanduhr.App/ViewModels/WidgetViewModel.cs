@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http;
 using System.Text.Json.Nodes;
+using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -39,6 +41,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private readonly DispatcherTimer _riffTimer;
 
     private ThemePalette _palette = ThemePalette.Obsidian;
+    private Dictionary<string, ThemeDefinition> _themes = new();
     private IClaudeApiClient? _client;
     private UsageFetcher? _fetcher;
     private JsonObject? _lastData;
@@ -51,6 +54,11 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private int _riffIndex;
 
     public ObservableCollection<TierCardViewModel> Tiers { get; } = new();
+
+    /// <summary>The theme strip's entries — built-ins (in display order) then any
+    /// loaded user themes, each marked active or not. Bound to the strip below the
+    /// title bar; a click routes to <see cref="StripSelectThemeCommand"/>.</summary>
+    public ObservableCollection<ThemeStripItemViewModel> Themes { get; } = new();
 
     [ObservableProperty] private string _statusText = "Connecting…";
     [ObservableProperty] private bool _pinned;
@@ -95,7 +103,21 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// the registry so their checkmarks and rows stay in sync.</summary>
     public event Action? AccountsChanged;
 
+    /// <summary>Raised after a theme is applied (startup or a live switch) so the
+    /// window can swap its backdrop — Mica for glass themes, solid for a Matrix-
+    /// style opt-out theme. The HWND work lives in the View; the palette is the
+    /// payload.</summary>
+    public event Action<ThemePalette>? ThemeChanged;
+
     public ThemePalette Palette => _palette;
+
+    /// <summary>The user theme drop-in folder, for the Settings "Open themes folder"
+    /// and save/reload flows.</summary>
+    public string ThemesDir => _paths.ThemesDir;
+
+    /// <summary>True when <paramref name="key"/> resolves to a loaded theme
+    /// (built-in or user). Lets the Settings tab guard Apply before switching.</summary>
+    public bool HasTheme(string key) => _themes.ContainsKey(key);
 
     /// <summary>Account labels in registry order — drives the quick-switch menus.</summary>
     public IReadOnlyList<string> ListAccounts() => _accounts.ListAccounts();
@@ -121,6 +143,20 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _tickTimer.Tick += (_, _) => OnTick();
         _riffTimer = new DispatcherTimer { Interval = RiffInterval };
         _riffTimer.Tick += (_, _) => RotateRiff();
+
+        // Resolve the saved theme (settings.json "theme" key), merge in user
+        // drop-ins, and build the strip. The palette object is set here so the
+        // window's first paint uses the right colors; App applies it to the
+        // Application resources before Show (no obsidian->saved flash).
+        RebuildThemeMap();
+        var savedKey = _settings.LoadTheme();
+        if (!_themes.TryGetValue(savedKey, out var def))
+        {
+            savedKey = "obsidian";
+            def = _themes[savedKey];
+        }
+        _palette = new ThemePalette(savedKey, def);
+        BuildThemeStrip(savedKey);
     }
 
     /// <summary>Wire the active account, start the timers, and kick the first
@@ -133,6 +169,91 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _refreshTimer.Start();
         await RefreshAsync();
     }
+
+    // -- theming --------------------------------------------------------------
+
+    /// <summary>Push the active palette into the Application resources so every
+    /// <c>{DynamicResource Sanduhr.*}</c> binding resolves. Called by App once
+    /// before the window is shown (avoids an obsidian→saved-theme flash).</summary>
+    public void ApplyThemeResources()
+    {
+        if (Application.Current is { } app)
+            _palette.Apply(app.Resources);
+    }
+
+    /// <summary>Rebuild the merged theme map: the 6 built-ins plus any valid user
+    /// drop-ins from <c>%APPDATA%\Sanduhr\themes</c> (user themes override a
+    /// built-in of the same key). Invalid files are skipped + logged, 1:1 with
+    /// <c>themes.load_user_themes</c>.</summary>
+    private void RebuildThemeMap()
+    {
+        var map = new Dictionary<string, ThemeDefinition>(ThemeCatalog.BuiltIns);
+        foreach (var (key, def) in ThemeCatalog.LoadUserThemes(_paths.ThemesDir, Log))
+            map[key] = def;
+        _themes = map;
+    }
+
+    /// <summary>Rebuild the strip collection: built-ins in display order, then any
+    /// user themes (sorted), with <paramref name="activeKey"/> marked active.</summary>
+    private void BuildThemeStrip(string activeKey)
+    {
+        Themes.Clear();
+        foreach (var key in ThemeCatalog.BuiltInOrder)
+            if (_themes.TryGetValue(key, out var def))
+                Themes.Add(new ThemeStripItemViewModel(key, def.Name, key == activeKey));
+
+        var userKeys = _themes.Keys
+            .Where(k => !ThemeCatalog.BuiltIns.ContainsKey(k))
+            .OrderBy(k => k, StringComparer.Ordinal);
+        foreach (var key in userKeys)
+            Themes.Add(new ThemeStripItemViewModel(key, _themes[key].Name, key == activeKey));
+    }
+
+    /// <summary>Apply a theme by catalog key: re-tint the live resources, recolor
+    /// existing cards, persist the choice, update the strip's active marker, and
+    /// raise <see cref="ThemeChanged"/> so the window swaps its backdrop. Silent
+    /// (no chime) — callers add their own cue (the strip plays a toggle tick; the
+    /// Settings tab plays a save confirmation).</summary>
+    public void ApplyThemeByKey(string key)
+    {
+        if (!_themes.TryGetValue(key, out var def))
+            return;
+
+        _palette = new ThemePalette(key, def);
+        ApplyThemeResources();
+
+        foreach (var card in Tiers)
+            card.ApplyPalette(_palette);
+
+        _settings.SaveTheme(key);
+        foreach (var item in Themes)
+            item.IsActive = item.Key == key;
+
+        ThemeChanged?.Invoke(_palette);
+    }
+
+    /// <summary>The theme strip's click handler — apply the theme instantly and
+    /// play a soft toggle tick (the visible re-tint is the real confirmation,
+    /// mirroring the Python build's "the change IS the confirmation" pattern).</summary>
+    [RelayCommand]
+    private void StripSelectTheme(string? key)
+    {
+        if (string.IsNullOrEmpty(key))
+            return;
+        ApplyThemeByKey(key);
+        Sounds.PlayToggle();
+    }
+
+    /// <summary>Reload user theme drop-ins from disk and rebuild the strip,
+    /// keeping the current theme active. Called from the Settings Themes tab after
+    /// a save / reload / delete.</summary>
+    public void ReloadUserThemes()
+    {
+        RebuildThemeMap();
+        BuildThemeStrip(_palette.Key);
+    }
+
+    private static void Log(string message) => Debug.WriteLine($"[Sanduhr.Themes] {message}");
 
     private void RebuildFetcher()
     {

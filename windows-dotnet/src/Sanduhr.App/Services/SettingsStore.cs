@@ -111,6 +111,23 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>The saved theme key (settings.json "theme"), defaulting to
+    /// "obsidian" when absent — parity with <c>widget.py</c>'s
+    /// <c>settings.get("theme", "obsidian")</c>.</summary>
+    public string LoadTheme()
+    {
+        var root = Read();
+        try { return root["theme"]?.GetValue<string>() ?? "obsidian"; }
+        catch { return "obsidian"; }
+    }
+
+    public void SaveTheme(string key)
+    {
+        var root = Read();
+        root["theme"] = key;
+        Write(root);
+    }
+
     public IReadOnlyList<string> LoadTierOrder() => LoadStringArray("tier_order");
 
     public void SaveTierOrder(IEnumerable<string> order)

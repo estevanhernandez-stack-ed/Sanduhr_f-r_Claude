@@ -68,6 +68,17 @@ public sealed partial class TierCardViewModel : ObservableObject
     /// <summary>Re-derive only the time-based labels (no refetch).</summary>
     public void Tick(DateTimeOffset now) => RefreshTimeDerived(now);
 
+    /// <summary>Recolor against a newly applied theme without a refetch — the
+    /// theme-strip live switch path. The bar/value color stays usage-derived
+    /// (theme-independent); the pace tick + sparkline pick up the new accent
+    /// hues, and the next 30 s tick refreshes the pace/burn label brushes.</summary>
+    public void ApplyPalette(ThemePalette palette)
+    {
+        _palette = palette;
+        PaceTickColor = palette.PaceMarker;
+        SparklineColor = palette.Sparkline;
+    }
+
     private void RefreshTimeDerived(DateTimeOffset now)
     {
         PaceFraction = Pacing.PaceFrac(_resetsAt, TierKey, now) ?? double.NaN;

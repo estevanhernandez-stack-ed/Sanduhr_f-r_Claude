@@ -22,8 +22,13 @@
 
     <Border Background="{DynamicResource Sanduhr.Brush.CardGlass}"
             BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
-            BorderThickness="1" CornerRadius="10"
+            BorderThickness="1" CornerRadius="{DynamicResource Sanduhr.CardCornerRadius}"
             Padding="14,12" Margin="0,0,0,8">
+      <Grid>
+        <!-- 1-px top-edge light catch (inner_highlight); Transparent when the
+             active theme leaves it null. -->
+        <Border Height="1" VerticalAlignment="Top" Margin="2,0"
+                Background="{DynamicResource Sanduhr.Brush.InnerHighlight}" />
         <StackPanel>
             <!-- Row 1: label · sparkline · value -->
             <Grid>
@@ -42,6 +47,8 @@
                                            LineColor="{Binding SparklineColor}" />
                 <TextBlock Grid.Column="2" Text="{Binding ValueText}" VerticalAlignment="Center"
                            FontSize="15" FontWeight="Bold"
+                           FontFamily="{DynamicResource Sanduhr.Font.Value}"
+                           Effect="{DynamicResource Sanduhr.Effect.ValueBloom}"
                            Foreground="{Binding BarColor, Converter={StaticResource ColorBrush}}" />
             </Grid>
 
@@ -81,5 +88,6 @@
                            Visibility="{Binding BurnText, Converter={StaticResource StrVis}}" />
             </Grid>
         </StackPanel>
+      </Grid>
     </Border>
 </UserControl>

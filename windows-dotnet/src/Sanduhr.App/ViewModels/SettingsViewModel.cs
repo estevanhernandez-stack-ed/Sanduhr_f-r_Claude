@@ -15,12 +15,17 @@ public sealed class SettingsViewModel
 {
     public AccountsViewModel Accounts { get; }
 
+    /// <summary>Backs the Themes tab (item 8): paste/save/apply, copy agent prompt,
+    /// open folder, installed-themes management.</summary>
+    public ThemesViewModel Themes { get; }
+
     /// <summary>Assembly version for the General tab footer (e.g. "3.0.0").</summary>
     public string Version { get; }
 
     public SettingsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync)
     {
         Accounts = new AccountsViewModel(widget, addAccountAsync);
+        Themes = new ThemesViewModel(widget);
         var v = Assembly.GetExecutingAssembly().GetName().Version;
         Version = v is null ? "3.0.0" : $"{v.Major}.{v.Minor}.{v.Build}";
     }

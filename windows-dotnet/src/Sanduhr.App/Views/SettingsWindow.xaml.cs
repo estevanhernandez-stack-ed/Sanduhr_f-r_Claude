@@ -21,5 +21,7 @@ internal partial class SettingsWindow : Window
         InitializeComponent();
         // Modal dialogs spawned by the Accounts tab (rename, confirm) parent to us.
         ViewModel.Accounts.AttachOwner(this);
+        // Themes-tab message boxes (save / copy / errors) parent to us too.
+        ViewModel.Themes.AttachOwner(this);
     }
 }

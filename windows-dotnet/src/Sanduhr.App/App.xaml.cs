@@ -28,10 +28,13 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        // Inject the (single, default) obsidian palette. Item 8 swaps this.
-        ThemePalette.Obsidian.Apply(Resources);
-
         _vm = new WidgetViewModel();
+        // Apply the saved theme's palette to the Application resources before the
+        // window is shown so the first paint is correct (no obsidian→saved flash).
+        _vm.ApplyThemeResources();
+        // A live theme switch (strip or Settings) raises ThemeChanged — the window
+        // swaps its backdrop (Mica for glass themes, solid for a Matrix opt-out).
+        _vm.ThemeChanged += p => _window?.ApplyBackdropForTheme(p);
         _vm.TrayPercentChanged += OnTrayPercentChanged;
         _vm.SignInRequested += () => RunSignInAsync(embedded: true);
         _vm.PasteKeyRequested += () => RunSignInAsync(embedded: false);
