@@ -160,7 +160,7 @@
                  (scoped in below) appears instead of the vanilla WPF one. Uses the
                  shared ThemeSwatchTemplate + the SAME Themes collection as
                  Settings → Themes, so the active highlight stays in sync. -->
-            <Border DockPanel.Dock="Top"
+            <Border x:Name="ThemesHeader" DockPanel.Dock="Top"
                     Background="{DynamicResource Sanduhr.Brush.TitleBg}"
                     Padding="6,2,4,4">
                 <StackPanel>

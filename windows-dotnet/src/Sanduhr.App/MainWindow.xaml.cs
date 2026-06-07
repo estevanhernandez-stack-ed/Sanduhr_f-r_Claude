@@ -132,8 +132,25 @@ public partial class MainWindow : Window
         FocusView.Finished += ExitFocusMode;
         FocusView.Started += minutes => Vm?.SaveFocusDuration(minutes);
 
-        GameView.Finished += () => Focus();
+        GameView.Finished += ExitGame;
         GameView.HighScoreChanged += score => Vm?.SaveSnakeHighScore(score);
+    }
+
+    /// <summary>Hide the content chrome — the tier cards (which carry the account
+    /// switcher + StatusText) and the "Themes" disclosure row above them. Shared by
+    /// focus mode and the cooldown game so both overlays read as one clean surface
+    /// (the game's score no longer collides with the Themes header).</summary>
+    private void HideContentChrome()
+    {
+        CardsScroller.Visibility = Visibility.Collapsed;
+        ThemesHeader.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>Restore the content chrome hidden by <see cref="HideContentChrome"/>.</summary>
+    private void ShowContentChrome()
+    {
+        CardsScroller.Visibility = Visibility.Visible;
+        ThemesHeader.Visibility = Visibility.Visible;
     }
 
     /// <summary>Enter focus mode if out, exit if in — ports
@@ -148,7 +165,7 @@ public partial class MainWindow : Window
 
     private void EnterFocusMode()
     {
-        CardsScroller.Visibility = Visibility.Collapsed;
+        HideContentChrome();
         FocusView.Visibility = Visibility.Visible;
         // Land on the setup state (stepper + Start) seeded with the saved duration —
         // the user adjusts the minutes and clicks Start. Do NOT auto-start; Start
@@ -160,10 +177,27 @@ public partial class MainWindow : Window
     {
         FocusView.Stop();
         FocusView.Visibility = Visibility.Collapsed;
-        CardsScroller.Visibility = Visibility.Visible;
+        ShowContentChrome();
     }
 
-    private void StartCooldownGame() => GameView.Start(Vm?.LoadSnakeHighScore() ?? 0);
+    /// <summary>Open the cooldown snake. Mirrors focus mode: hide the content chrome
+    /// first so the board (and its score) own the surface with nothing behind to
+    /// collide with.</summary>
+    private void StartCooldownGame()
+    {
+        HideContentChrome();
+        GameView.Start(Vm?.LoadSnakeHighScore() ?? 0);
+    }
+
+    /// <summary>Game closed (Esc) — restore the content chrome and refocus the
+    /// window. If focus mode is the layer underneath, leave the chrome hidden so we
+    /// don't pull it out from under the active hourglass.</summary>
+    private void ExitGame()
+    {
+        if (FocusView.Visibility != Visibility.Visible)
+            ShowContentChrome();
+        Focus();
+    }
 
     protected override void OnSourceInitialized(EventArgs e)
     {

@@ -36,21 +36,30 @@ public sealed class SnakeBoard : FrameworkElement
         dim.Freeze();
         dc.DrawRectangle(dim, null, new Rect(0, 0, w, h));
 
-        double box = Math.Min(w, h) - 20;
+        // Reserve a top band for the score/best row so the text always sits INSIDE
+        // the control. The board centers in the area below it. (Bug fix: the score
+        // used to draw above a near-square centered board at negative Y and bleed up
+        // out of the control into the Themes header row above.)
+        const double headerH = 24;
+        double availH = h - headerH;
+        double box = Math.Min(w, availH) - 20;
+        if (box < 40)
+            box = Math.Max(0, Math.Min(w, availH));
         double cell = box / game.GridSize;
         double offX = (w - box) / 2;
-        double offY = (h - box) / 2;
+        double offY = headerH + (availH - box) / 2;
 
         // Grid border.
         var borderPen = new Pen(new SolidColorBrush(Palette.Border), 2);
         borderPen.Freeze();
         dc.DrawRectangle(null, borderPen, new Rect(offX, offY, box, box));
 
-        // Score (left) + best (right) above the board.
-        DrawText(dc, $"Score: {game.Score}", Palette.TextDim, 12, FontWeights.Bold,
-            new Point(offX, offY - 20));
-        DrawTextRight(dc, $"Best: {game.HighScore}", Palette.TextDim, 12, FontWeights.Bold,
-            offX + box, offY - 20);
+        // Score (left) + best (right) in the reserved header band — primary ink for
+        // readable contrast over the dimmed board on every theme.
+        DrawText(dc, $"Score: {game.Score}", Palette.Text, 12, FontWeights.Bold,
+            new Point(offX, headerH - 4));
+        DrawTextRight(dc, $"Best: {game.HighScore}", Palette.Text, 12, FontWeights.Bold,
+            offX + box, headerH - 4);
 
         // Snake — rounded cells, tail alpha-fades out (ported).
         int count = game.Snake.Count;
