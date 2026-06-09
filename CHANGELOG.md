@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Subscription-tier badge in the footer.** Shows which Claude plan the tracked account is on (Pro / Team / Max / Max ×20) as a small right-aligned footer badge. The plan was already in the `/api/organizations` response we fetch for the org id — we only kept `uuid` and discarded the rest; now we read `rate_limit_tier` (corroborated by `billing_type` + `capabilities`) off the same org. The visible badge is the clean, store-safe plan name; the hover tooltip **rotates** through a collection of tongue-in-cheek riffs (Max ×20 → Plaid Max · Maximum Overdrive · Ridiculous Speed · Galaxy Brain Max; Max → Maximum Effort · Max Headroom · Big Max) so it's something different each time. Hidden entirely for API/prepaid orgs (e.g. `auto_prepaid_tier_0`) so it never shows a wrong label. New pure `plan.py` mapping module (defensive substring parse, gated on a real subscription) with full unit coverage.
+
 ## v2.3.0-windows — 2026-05-06
 
 **Platform:** Windows

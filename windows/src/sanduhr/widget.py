@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from sanduhr import accounts, cc_logs, credentials, history, mica, paths, themes
+from sanduhr import accounts, cc_logs, credentials, history, mica, paths, plan, themes
 from sanduhr.tiers import _format_tokens_compact
 from sanduhr.focus import FocusTimerWidget
 from sanduhr.game import SnakeOverlay
@@ -81,6 +81,9 @@ class SanduhrWidget(QWidget):
         self._thread: Optional[QThread] = None
         self._fetcher: Optional[UsageFetcher] = None
         self._last: Optional[dict] = None
+        # Round-robin index into the active tier's easter-egg riffs so the
+        # footer plan-badge tooltip shows a different one each tick.
+        self._plan_riff_idx = 0
         # Anchor for the local-CC token-burn delta. Set on every
         # successful fetch; the delta = tokens consumed in CC sessions
         # since this timestamp. None = no fetch landed yet.
@@ -355,6 +358,14 @@ class SanduhrWidget(QWidget):
         ft.addWidget(self._cc_delta_lbl)
         ft.addStretch()
         
+        # Subscription-tier badge: clean plan name (e.g. "Max ×20"), with
+        # a rotating tongue-in-cheek riff in the tooltip. Hidden until a
+        # recognized subscription lands. See plan.plan_label.
+        self._plan_lbl = QLabel("")
+        self._plan_lbl.setObjectName("PlanBadge")
+        self._plan_lbl.setVisible(False)
+        ft.addWidget(self._plan_lbl)
+
         sonnet = QPushButton("Use Sonnet")
         sonnet.setFlat(True)
         sonnet.setCursor(Qt.PointingHandCursor)
@@ -1345,6 +1356,7 @@ class SanduhrWidget(QWidget):
         # fetches as CC events stream in.
         self._refresh_cc_delta()
         self._update_footer()
+        self._update_plan_badge()
 
     @Slot(str, str)
     def _on_fetch_failed(self, kind: str, message: str) -> None:
@@ -1461,6 +1473,7 @@ class SanduhrWidget(QWidget):
                 )
         self._refresh_cc_delta()
         self._update_footer()
+        self._update_plan_badge()
 
     def _refresh_cc_delta(self) -> None:
         """Recompute the per-tier and aggregate local-CC token deltas
@@ -1497,6 +1510,35 @@ class SanduhrWidget(QWidget):
         self._cc_delta_lbl.setText(
             f" · CC +{_format_tokens_compact(total)}" if total > 0 else ""
         )
+
+    def _update_plan_badge(self) -> None:
+        """Set the footer subscription-tier badge from the last fetch.
+
+        Badge text is the clean plan name; the tooltip rotates through
+        that tier's easter-egg riffs (round-robin) so it's something
+        different each time the user hovers. Hidden when the account
+        isn't a recognized subscription (e.g. an API/prepaid org), so it
+        never shows a wrong or empty label.
+        """
+        account = (self._last or {}).get("_account") or {}
+        badge = plan.plan_label(
+            account.get("rate_limit_tier"),
+            account.get("billing_type"),
+            account.get("capabilities"),
+        )
+        if badge is None:
+            self._plan_lbl.setText("")
+            self._plan_lbl.setToolTip("")
+            self._plan_lbl.setVisible(False)
+            return
+        self._plan_lbl.setText(badge.name)
+        if badge.riffs:
+            riff = badge.riffs[self._plan_riff_idx % len(badge.riffs)]
+            self._plan_riff_idx += 1
+            self._plan_lbl.setToolTip(f"{badge.name} — {riff}")
+        else:
+            self._plan_lbl.setToolTip(badge.name)
+        self._plan_lbl.setVisible(True)
 
     # -- geometry persistence --------------------------------------
 
