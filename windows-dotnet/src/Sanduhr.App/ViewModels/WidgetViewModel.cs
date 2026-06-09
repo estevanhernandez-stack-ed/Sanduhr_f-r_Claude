@@ -485,7 +485,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         }
         catch (SessionExpiredException)
         {
-            Fail("Session expired — re-add your key.");
+            Fail("Session expired — sign in again.");
         }
         catch (CloudflareBlockedException)
         {
