@@ -1,0 +1,105 @@
+<UserControl x:Class="Sanduhr.App.Views.TierCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Sanduhr.App.Controls"
+             xmlns:conv="clr-namespace:Sanduhr.App.Converters"
+             xmlns:vm="clr-namespace:Sanduhr.App.ViewModels"
+             mc:Ignorable="d"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             d:DataContext="{d:DesignInstance vm:TierCardViewModel}"
+             AllowDrop="True"
+             Cursor="SizeAll">
+    <UserControl.Resources>
+        <conv:StringToVisibilityConverter x:Key="StrVis" />
+        <conv:ColorToBrushConverter x:Key="ColorBrush" />
+        <BooleanToVisibilityConverter x:Key="BoolVis" />
+    </UserControl.Resources>
+    <UserControl.ContextMenu>
+        <ContextMenu>
+            <MenuItem Header="Hide this tier" Click="OnHideClick" />
+        </ContextMenu>
+    </UserControl.ContextMenu>
+
+    <Border Background="{DynamicResource Sanduhr.Brush.CardGlass}"
+            BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
+            BorderThickness="1" CornerRadius="{DynamicResource Sanduhr.CardCornerRadius}"
+            Padding="14,12" Margin="0,0,0,8">
+      <Grid>
+        <!-- 1-px top-edge light catch (inner_highlight); Transparent when the
+             active theme leaves it null. -->
+        <Border Height="1" VerticalAlignment="Top" Margin="2,0"
+                Background="{DynamicResource Sanduhr.Brush.InnerHighlight}" />
+        <StackPanel>
+            <!-- Row 1: label · sparkline · local-CC badge · value -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                           FontSize="13" TextTrimming="CharacterEllipsis" />
+                <controls:SparklineControl Grid.Column="1" Width="100" Height="16"
+                                           Margin="8,0"
+                                           VerticalAlignment="Center"
+                                           Values="{Binding Sparkline}"
+                                           LineColor="{Binding SparklineColor}" />
+                <!-- Local CC token-burn delta: "+Nk" tokens burned in this tier
+                     since the last API fetch landed. Hidden at zero. Sits between
+                     the sparkline and the % so it reads as "what's happening right
+                     now" while % is the canonical fetched state (parity with
+                     tiers.py row1 order). -->
+                <TextBlock Grid.Column="2" Text="{Binding LocalDelta}" VerticalAlignment="Center"
+                           Margin="0,0,6,0" FontSize="10"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                           Visibility="{Binding HasLocalDelta, Converter={StaticResource BoolVis}}"
+                           ToolTip="Tokens consumed in this tier from local Claude Code sessions since the last API fetch landed.&#x0a;&#x0a;The /usage endpoint lags actual consumption by minutes — this is the live delta. Resets to zero each time a fresh fetch arrives (every ~5 min)." />
+                <TextBlock Grid.Column="3" Text="{Binding ValueText}" VerticalAlignment="Center"
+                           FontSize="15" FontWeight="Bold"
+                           FontFamily="{DynamicResource Sanduhr.Font.Value}"
+                           Effect="{DynamicResource Sanduhr.Effect.ValueBloom}"
+                           Foreground="{Binding BarColor, Converter={StaticResource ColorBrush}}" />
+            </Grid>
+
+            <!-- Row 2: utilization bar + pace ghost -->
+            <controls:UsageBar Height="18" Margin="0,6,0,0"
+                               Value="{Binding Utilization}"
+                               FillColor="{Binding BarColor}"
+                               TrackColor="{DynamicResource Sanduhr.Color.BarBg}"
+                               PaceFraction="{Binding PaceFraction}"
+                               PaceColor="{Binding PaceTickColor}" />
+
+            <!-- Row 3: reset countdown · pace label -->
+            <Grid Margin="0,6,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding ResetCountdown}" FontSize="11"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                           Visibility="{Binding ResetCountdown, Converter={StaticResource StrVis}}" />
+                <TextBlock Grid.Column="1" Text="{Binding PaceLabel}" FontSize="11"
+                           Foreground="{Binding PaceBrush}"
+                           Visibility="{Binding PaceLabel, Converter={StaticResource StrVis}}" />
+            </Grid>
+
+            <!-- Row 4: reset datetime · burn projection -->
+            <Grid Margin="0,2,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding ResetDateTime}" FontSize="11"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextMuted}"
+                           Visibility="{Binding ResetDateTime, Converter={StaticResource StrVis}}" />
+                <TextBlock Grid.Column="1" Text="{Binding BurnText}" FontSize="11"
+                           Foreground="{Binding BurnBrush}"
+                           Visibility="{Binding BurnText, Converter={StaticResource StrVis}}" />
+            </Grid>
+        </StackPanel>
+      </Grid>
+    </Border>
+</UserControl>

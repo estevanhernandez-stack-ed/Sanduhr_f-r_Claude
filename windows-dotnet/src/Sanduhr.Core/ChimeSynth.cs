@@ -1,0 +1,118 @@
+namespace Sanduhr.Core;
+
+/// <summary>
+/// PCM-WAV chime synthesis — the pure, platform-free half of <c>sounds.py</c>.
+/// Builds 16-bit mono WAV blobs for the four UI cues (success / error / info /
+/// toggle) so the byte-shape is unit-testable in Core; the App's <c>Sounds</c>
+/// writes these to <c>%APPDATA%\Sanduhr\sounds</c> and plays them async.
+///
+/// Parity note: the note sequences, sample rate, attack/release envelope, and
+/// the conservative ~25%-of-full-scale amplitude all match <c>sounds.py</c>
+/// verbatim, so the generated WAVs are byte-identical to the Python build's.
+/// </summary>
+public static class ChimeSynth
+{
+    /// <summary>A single tone: a frequency in Hz held for a duration in seconds.</summary>
+    public readonly record struct Note(double Frequency, double DurationSeconds);
+
+    // ~25% of full-scale 16-bit (32767). Background-of-attention, not announcements.
+    private const double Amplitude = 8000.0;
+    private const double AttackSeconds = 0.005;
+    private const double ReleaseSeconds = 0.030;
+
+    /// <summary>Ascending C-E-G arpeggio — save / action success.</summary>
+    public static readonly IReadOnlyList<Note> Success = new[]
+    {
+        new Note(261.63, 0.10), // C4
+        new Note(329.63, 0.10), // E4
+        new Note(392.00, 0.16), // G4 (slightly longer landing)
+    };
+
+    /// <summary>Descending D-B-G arpeggio — failures / invalid input.</summary>
+    public static readonly IReadOnlyList<Note> Error = new[]
+    {
+        new Note(293.66, 0.10), // D4
+        new Note(246.94, 0.10), // B3
+        new Note(196.00, 0.18), // G3 (low landing)
+    };
+
+    /// <summary>Two-beat E tap — neutral / informational.</summary>
+    public static readonly IReadOnlyList<Note> Info = new[]
+    {
+        new Note(329.63, 0.08), // E4
+        new Note(329.63, 0.12), // E4 (same pitch, two-beat tap)
+    };
+
+    /// <summary>Single brief A tap — checkbox / toggle interactions.</summary>
+    public static readonly IReadOnlyList<Note> Toggle = new[]
+    {
+        new Note(440.00, 0.04), // A4
+    };
+
+    /// <summary>
+    /// Build a 16-bit mono PCM-WAV blob from <paramref name="notes"/> played
+    /// sequentially. Each note carries a 5 ms linear attack + 30 ms release so
+    /// the boundaries don't click. Header is the canonical 44-byte RIFF/WAVE.
+    /// 1:1 with <c>sounds._build_wav</c>.
+    /// </summary>
+    public static byte[] BuildWav(IReadOnlyList<Note> notes, int sampleRate = 44100)
+    {
+        var samples = new List<byte>();
+        double attack = AttackSeconds * sampleRate;
+        double release = ReleaseSeconds * sampleRate;
+
+        foreach (var note in notes)
+        {
+            int n = (int)(sampleRate * note.DurationSeconds);
+            for (int i = 0; i < n; i++)
+            {
+                double t = (double)i / sampleRate;
+                double attackEnv = attack > 0 ? Math.Min(1.0, i / attack) : 1.0;
+                double releaseEnv = release > 0 ? Math.Min(1.0, (n - i) / release) : 1.0;
+                double env = attackEnv * releaseEnv;
+                int sample = (int)(Amplitude * env * Math.Sin(2 * Math.PI * note.Frequency * t));
+                short s16 = (short)Math.Clamp(sample, short.MinValue, short.MaxValue);
+                samples.Add((byte)(s16 & 0xff));
+                samples.Add((byte)((s16 >> 8) & 0xff));
+            }
+        }
+
+        int dataSize = samples.Count;
+        var wav = new byte[44 + dataSize];
+        WriteAscii(wav, 0, "RIFF");
+        WriteInt32(wav, 4, 36 + dataSize);
+        WriteAscii(wav, 8, "WAVE");
+        WriteAscii(wav, 12, "fmt ");
+        WriteInt32(wav, 16, 16);               // PCM fmt chunk size
+        WriteInt16(wav, 20, 1);                // PCM format
+        WriteInt16(wav, 22, 1);                // mono
+        WriteInt32(wav, 24, sampleRate);
+        WriteInt32(wav, 28, sampleRate * 2);   // byte rate (mono * 16-bit)
+        WriteInt16(wav, 32, 2);                // block align
+        WriteInt16(wav, 34, 16);               // bits per sample
+        WriteAscii(wav, 36, "data");
+        WriteInt32(wav, 40, dataSize);
+        samples.CopyTo(wav, 44);
+        return wav;
+    }
+
+    private static void WriteAscii(byte[] buf, int offset, string s)
+    {
+        for (int i = 0; i < s.Length; i++)
+            buf[offset + i] = (byte)s[i];
+    }
+
+    private static void WriteInt32(byte[] buf, int offset, int value)
+    {
+        buf[offset] = (byte)(value & 0xff);
+        buf[offset + 1] = (byte)((value >> 8) & 0xff);
+        buf[offset + 2] = (byte)((value >> 16) & 0xff);
+        buf[offset + 3] = (byte)((value >> 24) & 0xff);
+    }
+
+    private static void WriteInt16(byte[] buf, int offset, int value)
+    {
+        buf[offset] = (byte)(value & 0xff);
+        buf[offset + 1] = (byte)((value >> 8) & 0xff);
+    }
+}

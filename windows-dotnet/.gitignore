@@ -1,0 +1,33 @@
+# .NET build output
+bin/
+obj/
+
+# IDE / user
+.vs/
+*.user
+*.suo
+
+# Test + coverage
+[Tt]est[Rr]esults/
+*.coverage
+*.trx
+
+# Velopack / MSIX build artifacts
+[Rr]eleases/
+*.msix
+*.appx
+*.appxbundle
+*.nupkg
+AppPackages/
+
+# Build script output (build-msix.ps1 / build-velopack-release.ps1 emit here)
+dist/
+
+# Signing material — never commit
+*.pfx
+*.snk
+
+# WebView2 runtime profiles. These live under %APPDATA%\Sanduhr\ (outside the
+# repo) in production, but guard against a stray profile being created in-tree.
+webview2/
+webview2-fetch/

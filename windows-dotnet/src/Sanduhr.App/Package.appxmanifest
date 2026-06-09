@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap rescap desktop">
+
+  <!-- Identity block: Partner Center-reserved. Carried over UNCHANGED from the Python build's
+       MSIX (windows/msix/Package.appxmanifest.template) so the .NET rebuild submits into the
+       SAME Store listing. Do not modify Name or Publisher without updating the Partner Center
+       reservation, or Store ingestion will reject the submission. Version is patched into the
+       STAGED copy by scripts/build-msix.ps1 (the committed value here is the source of truth,
+       kept in lockstep with <Version> in Sanduhr.App.csproj). 4th component MUST be .0. -->
+  <Identity
+    Name="626LabsLLC.SanduhrfrClaude"
+    Publisher="CN=177BCE59-0966-4975-9962-10E36652141F"
+    Version="3.0.0.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Sanduhr für Claude</DisplayName>
+    <PublisherDisplayName>626Labs LLC</PublisherDisplayName>
+    <Logo>Package\Logos\StoreLogo.png</Logo>
+    <!-- Trademark disclaimer is required for nominative-use of "Claude" / "claude.ai" per the
+         Store playbook (10.1.4.4.a). Long-form disclaimer lives in the Store description +
+         privacy policy; this is the abbreviated manifest form. -->
+    <Description>Native Windows desktop widget that tracks Claude.ai subscription usage with burn-rate projections, pace markers, sparklines, and Win11 Mica glass. "Claude" and "claude.ai" are trademarks of Anthropic PBC, used nominatively; Sanduhr für Claude is an independent third-party tool. A 626 Labs product.</Description>
+  </Properties>
+
+  <Dependencies>
+    <!-- Windows 10 1809 (build 17763) floor: Mica requires Win11 22H2+, but the app degrades
+         to a solid-color backdrop on older builds (see spec > Glass / Mica). .NET 10 Desktop
+         Runtime is bundled self-contained by build-msix.ps1, so no framework dependency. -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-US" />
+  </Resources>
+
+  <Applications>
+    <Application Id="Sanduhr"
+                 Executable="Sanduhr.exe"
+                 EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Sanduhr für Claude"
+        Description="Claude.ai usage tracker widget"
+        BackgroundColor="#0f182b"
+        Square150x150Logo="Package\Logos\Square150x150Logo.png"
+        Square44x44Logo="Package\Logos\Square44x44Logo.png">
+        <uap:DefaultTile
+          Wide310x150Logo="Package\Logos\Wide310x150Logo.png"
+          Square71x71Logo="Package\Logos\Square71x71Logo.png"
+          Square310x310Logo="Package\Logos\Square310x310Logo.png">
+          <uap:ShowNameOnTiles>
+            <uap:ShowOn Tile="square150x150Logo" />
+            <uap:ShowOn Tile="wide310x150Logo" />
+            <uap:ShowOn Tile="square310x310Logo" />
+          </uap:ShowNameOnTiles>
+        </uap:DefaultTile>
+        <uap:SplashScreen Image="Package\Logos\SplashScreen.png" BackgroundColor="#0f182b" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <!-- Auto-start (run-on-login) for the packaged/Store install, OFF by default. The user
+             opts in from Settings > General; flipping a packaged StartupTask needs the WinRT
+             StartupTask API (not bundled), so StartupManager (Core/Startup.cs) deep-links to
+             Windows Settings > Startup apps where Sanduhr appears thanks to this declaration.
+             TaskId is the contract between the manifest and that Settings entry. -->
+        <desktop:Extension
+          Category="windows.startupTask"
+          Executable="Sanduhr.exe"
+          EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask
+            TaskId="SanduhrAutoStart"
+            Enabled="false"
+            DisplayName="Sanduhr für Claude" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- runFullTrust ONLY. The app reads/writes %APPDATA%\Sanduhr\ directly (settings, history,
+         logs, user theme drop-ins, WebView2 profile) and calls the DWM API for Mica — both need
+         the app outside the MSIX sandbox. runFullTrust is a rescap capability and needs a
+         justification field on Store submission (see the reviewer letter). No broadFileSystemAccess,
+         no internetClient (outgoing HTTPS needs no declaration for a full-trust desktop app). -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

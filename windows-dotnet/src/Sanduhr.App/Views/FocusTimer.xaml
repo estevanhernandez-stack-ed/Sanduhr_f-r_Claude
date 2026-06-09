@@ -1,0 +1,115 @@
+<UserControl x:Class="Sanduhr.App.Views.FocusTimer"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="clr-namespace:Sanduhr.App.Controls"
+             mc:Ignorable="d"
+             d:DesignHeight="320" d:DesignWidth="380">
+
+    <UserControl.Resources>
+        <!-- Primary accent button (Start / Stop). -->
+        <Style x:Key="FocusAction" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Padding" Value="24,8" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bg" CornerRadius="8" Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Opacity" Value="0.88" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Round stepper button (− / +). -->
+        <Style x:Key="Stepper" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Glass}" />
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bg" CornerRadius="14" Background="{TemplateBinding Background}"
+                                BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Active header: mm:ss countdown + label. -->
+        <StackPanel Grid.Row="0" x:Name="ActiveHeader" Visibility="Collapsed"
+                    HorizontalAlignment="Center" Margin="0,8,0,2">
+            <TextBlock x:Name="TimeLabel" Text="25:00" HorizontalAlignment="Center"
+                       FontSize="30" FontWeight="Bold"
+                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+            <TextBlock Text="Deep Work Active" HorizontalAlignment="Center" FontSize="11"
+                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+        </StackPanel>
+
+        <!-- The hourglass (active). -->
+        <controls:HourglassControl Grid.Row="1" x:Name="Hourglass" Visibility="Collapsed" />
+
+        <!-- Setup (inactive): heading + duration stepper. -->
+        <StackPanel Grid.Row="1" x:Name="SetupPanel" VerticalAlignment="Center" HorizontalAlignment="Center">
+            <TextBlock Text="Deep Work" HorizontalAlignment="Center" FontSize="16" FontWeight="SemiBold"
+                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+            <TextBlock Text="A distraction-free focus block. Watch the sand drain."
+                       HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                       MaxWidth="240" Margin="0,4,0,16" FontSize="11"
+                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Button x:Name="MinusButton" Style="{StaticResource Stepper}" Content="&#x2212;"
+                        Click="MinusButton_Click" ToolTip="Fewer minutes"
+                        AutomationProperties.Name="Decrease focus duration" />
+                <Border MinWidth="64" Margin="10,0" VerticalAlignment="Center"
+                        AutomationProperties.Name="Focus duration in minutes">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock x:Name="MinutesText" Text="25" FontSize="22" FontWeight="Bold"
+                                   Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                        <TextBlock Text="min" Margin="4,0,0,2" VerticalAlignment="Bottom" FontSize="11"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                    </StackPanel>
+                </Border>
+                <Button x:Name="PlusButton" Style="{StaticResource Stepper}" Content="+"
+                        Click="PlusButton_Click" ToolTip="More minutes"
+                        AutomationProperties.Name="Increase focus duration" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Start / Stop. -->
+        <Button Grid.Row="2" x:Name="ActionButton" Style="{StaticResource FocusAction}"
+                Content="Start" HorizontalAlignment="Center" Margin="0,12,0,4"
+                Click="ActionButton_Click"
+                AutomationProperties.Name="Start or stop focus session" />
+    </Grid>
+</UserControl>
