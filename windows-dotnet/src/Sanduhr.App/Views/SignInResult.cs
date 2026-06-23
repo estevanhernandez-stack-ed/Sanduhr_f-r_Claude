@@ -22,4 +22,8 @@ public abstract record SignInResult
 
     /// <summary>Capture failed; <paramref name="Message"/> is user-facing.</summary>
     public sealed record Failed(string Message) : SignInResult;
+
+    /// <summary>The user chose to bounce from the manual-paste modal to the embedded
+    /// sign-in flow ("Use the secure sign-in window instead").</summary>
+    public sealed record UseEmbedded : SignInResult;
 }

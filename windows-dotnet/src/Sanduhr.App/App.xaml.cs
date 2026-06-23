@@ -157,7 +157,7 @@ public partial class App : Application
         var coordinator = new SignInCoordinator();
         SignInOutcome outcome = embedded
             ? await coordinator.SignInEmbeddedAsync(_window)
-            : coordinator.SignInManual(_window);
+            : await coordinator.SignInManual(_window);
 
         if (outcome.Added && _vm is not null)
             await _vm.ReloadAfterSignInAsync();

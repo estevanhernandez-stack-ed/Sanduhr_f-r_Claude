@@ -84,7 +84,7 @@ public sealed class SignInCoordinator
             ShowMessage(owner,
                 $"Couldn't prepare the sign-in browser profile: {ex.Message}",
                 MessageBoxButton.OK);
-            return SignInManual(owner);
+            return await SignInManual(owner, o => RunEmbeddedAsync(o, persist));
         }
 
         var window = new SignInWindow(dir, persist);
@@ -104,7 +104,9 @@ public sealed class SignInCoordinator
                 var retry = ShowMessage(owner,
                     $"{f.Message}\n\nPaste a sessionKey by hand instead?",
                     MessageBoxButton.YesNo);
-                return retry == MessageBoxResult.Yes ? SignInManual(owner) : SignInOutcome.NotAdded;
+                return retry == MessageBoxResult.Yes
+                    ? await SignInManual(owner, o => RunEmbeddedAsync(o, persist))
+                    : SignInOutcome.NotAdded;
 
             default: // Cancelled
                 return SignInOutcome.NotAdded;
@@ -125,16 +127,24 @@ public sealed class SignInCoordinator
         return active;
     }
 
-    /// <summary>Open the manual sessionKey-paste fallback directly.</summary>
-    public SignInOutcome SignInManual(Window? owner)
+    /// <summary>Open the manual sessionKey-paste fallback. <paramref name="bounceTo"/>
+    /// is the embedded flow to re-enter if the user clicks "Use the secure sign-in
+    /// window instead" — defaults to the add-account embedded flow; the coordinator's
+    /// own fallbacks pass their originating flow so a re-auth that bounces stays a
+    /// re-auth.</summary>
+    public async Task<SignInOutcome> SignInManual(Window? owner, Func<Window?, Task<SignInOutcome>>? bounceTo = null)
     {
         var suggested = _accounts.GetActive() is null ? "Personal" : NextFreeLabel();
-        var window = new ManualKeyWindow(suggested, PersistManual);
+        var window = new ManualKeyWindow(suggested, PersistManual, IsRuntimeAvailable());
         SetOwner(window, owner);
         window.ShowDialog();
-        return window.Result is SignInResult.Success s
-            ? new SignInOutcome(true, s.Label)
-            : SignInOutcome.NotAdded;
+
+        return window.Result switch
+        {
+            SignInResult.Success s => new SignInOutcome(true, s.Label),
+            SignInResult.UseEmbedded => await (bounceTo ?? SignInEmbeddedAsync)(owner),
+            _ => SignInOutcome.NotAdded,
+        };
     }
 
     // -- persistence semantics ------------------------------------------------
@@ -226,7 +236,7 @@ public sealed class SignInCoordinator
         // false == "Paste a key instead".  null == closed / Learn More only.
         if (choice == true)
             return await retryEmbedded(owner);
-        return choice == false ? SignInManual(owner) : SignInOutcome.NotAdded;
+        return choice == false ? await SignInManual(owner, retryEmbedded) : SignInOutcome.NotAdded;
     }
 
     private static void SetOwner(Window window, Window? owner)
