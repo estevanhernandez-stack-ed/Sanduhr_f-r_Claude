@@ -91,6 +91,70 @@ public sealed class SignInCoordinator
         }
     }
 
+    /// <summary>
+    /// Re-authenticate the ACTIVE account in place — the same embedded WebView2 flow
+    /// as <see cref="SignInEmbeddedAsync"/>, but the captured cookies overwrite the
+    /// existing active slot instead of allocating a new label. Preserves the account's
+    /// history file (keyed by label) and avoids registry litter. Used by the widget's
+    /// Expired/Blocked recovery card.
+    /// </summary>
+    public async Task<SignInOutcome> ReauthenticateActiveAsync(Window? owner)
+    {
+        if (!IsRuntimeAvailable())
+            return ShowRuntimeMissingThenMaybeManual(owner);
+
+        string dir;
+        try
+        {
+            dir = _userData.AllocateNew();
+            _userData.SweepStale(exclude: dir);
+        }
+        catch (Exception ex)
+        {
+            ShowMessage(owner,
+                $"Couldn't prepare the sign-in browser profile: {ex.Message}",
+                MessageBoxButton.OK);
+            return SignInManual(owner);
+        }
+
+        var window = new SignInWindow(dir, PersistReauth);
+        SetOwner(window, owner);
+        var result = await window.RunAsync().ConfigureAwait(true);
+
+        switch (result)
+        {
+            case SignInResult.Success s:
+                _userData.SweepStale();
+                return new SignInOutcome(true, s.Label);
+
+            case SignInResult.RuntimeMissing:
+                return ShowRuntimeMissingThenMaybeManual(owner);
+
+            case SignInResult.Failed f:
+                var retry = ShowMessage(owner,
+                    $"{f.Message}\n\nPaste a sessionKey by hand instead?",
+                    MessageBoxButton.YesNo);
+                return retry == MessageBoxResult.Yes ? SignInManual(owner) : SignInOutcome.NotAdded;
+
+            default: // Cancelled
+                return SignInOutcome.NotAdded;
+        }
+    }
+
+    /// <summary>Re-auth save: overwrite the ACTIVE account's slots in place. If somehow
+    /// no active account exists, fall back to first-run create-"Personal" semantics.</summary>
+    private string PersistReauth(CapturedCookies cookies)
+    {
+        var active = _accounts.GetActive();
+        if (active is null)
+        {
+            _credentials.Save(cookies.SessionKey, cookies.CfClearance);
+            return _accounts.GetActive() ?? "Personal";
+        }
+        _credentials.Save(cookies.SessionKey, cookies.CfClearance); // overwrites the active slot in place
+        return active;
+    }
+
     /// <summary>Open the manual sessionKey-paste fallback directly.</summary>
     public SignInOutcome SignInManual(Window? owner)
     {
