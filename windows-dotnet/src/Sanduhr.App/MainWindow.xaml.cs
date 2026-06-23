@@ -143,20 +143,19 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Hide the content chrome — the tier cards (which carry the account
-    /// switcher + StatusText) and the "Themes" disclosure row above them. Shared by
-    /// focus mode and the cooldown game so both overlays read as one clean surface
-    /// (the game's score no longer collides with the Themes header).</summary>
+    /// switcher + StatusText) and the bottom icon strip. Shared by focus mode and the
+    /// cooldown game so both overlays read as one clean surface.</summary>
     private void HideContentChrome()
     {
         CardsScroller.Visibility = Visibility.Collapsed;
-        ThemesHeader.Visibility = Visibility.Collapsed;
+        BottomIconStrip.Visibility = Visibility.Collapsed;
     }
 
     /// <summary>Restore the content chrome hidden by <see cref="HideContentChrome"/>.</summary>
     private void ShowContentChrome()
     {
         CardsScroller.Visibility = Visibility.Visible;
-        ThemesHeader.Visibility = Visibility.Visible;
+        BottomIconStrip.Visibility = Visibility.Visible;
     }
 
     /// <summary>Enter focus mode if out, exit if in — ports
@@ -171,6 +170,7 @@ public partial class MainWindow : Window
 
     private void EnterFocusMode()
     {
+        ThemePopup.IsOpen = false; // a Popup is a top-level HWND — close it so it can't float over the hourglass
         HideContentChrome();
         FocusView.Visibility = Visibility.Visible;
         // Land on the setup state (stepper + Start) seeded with the saved duration —
@@ -191,6 +191,7 @@ public partial class MainWindow : Window
     /// collide with.</summary>
     private void StartCooldownGame()
     {
+        ThemePopup.IsOpen = false; // close the swatch flyout so it can't float over the board
         HideContentChrome();
         GameView.Start(Vm?.LoadSnakeHighScore() ?? 0);
     }
@@ -211,6 +212,8 @@ public partial class MainWindow : Window
     /// measure (Python uses QTimer.singleShot(0) for the same reason).</summary>
     private void OnCompactChanged(bool compact)
     {
+        // Hide the toolbar in compact (footer stays), like the Python tool strip.
+        BottomIconStrip.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         if (compact)
         {
             _expandedHeight = ActualHeight;
