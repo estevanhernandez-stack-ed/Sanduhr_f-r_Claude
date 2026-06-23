@@ -40,6 +40,8 @@ internal partial class SignInWindow : Window
     private bool _captured;
     private bool _firstNavComplete;
     private DispatcherTimer? _pollTimer;
+    private DispatcherTimer? _loadTimeout;
+    private bool _loadFailed;
 
     /// <param name="userDataDir">App-owned WebView2 profile folder (already allocated).</param>
     /// <param name="persist">
@@ -92,10 +94,10 @@ internal partial class SignInWindow : Window
 
             WebView.CoreWebView2.Navigate(ClaudeSignIn.LoginUrl);
 
-            // Poll fallback — the load-bearing fix for "the window never closed."
-            _pollTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1500) };
-            _pollTimer.Tick += (_, _) => _ = TryCaptureAsync("poll");
-            _pollTimer.Start();
+            // Poll fallback — the load-bearing fix for "the window never closed." Plus a
+            // load timeout that surfaces an error + escape hatch if the page never paints
+            // (offline / blocked), instead of an indefinite "Loading claude.ai…".
+            StartCaptureTimers();
         }
         catch (WebView2RuntimeNotFoundException)
         {
@@ -120,13 +122,72 @@ internal partial class SignInWindow : Window
         if (!_firstNavComplete && e.IsSuccess)
         {
             _firstNavComplete = true;
+            StopLoadTimeout();
             LoadingOverlay.Visibility = Visibility.Collapsed;
+        }
+        else if (!_firstNavComplete && !e.IsSuccess)
+        {
+            // The first load itself failed (offline / DNS / cert). Surface the error +
+            // escape hatch rather than waiting out the full timeout on a dead load.
+            ShowLoadError("claude.ai didn't load. Check your connection and try again.");
         }
         _ = TryCaptureAsync("nav");
     }
 
     private void OnSourceChanged(object? sender, CoreWebView2SourceChangedEventArgs e)
         => _ = TryCaptureAsync("source");
+
+    /// <summary>Start (or restart, after a "Try again") the capture poll and the
+    /// first-load timeout.</summary>
+    private void StartCaptureTimers()
+    {
+        _pollTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1500) };
+        _pollTimer.Tick += (_, _) => _ = TryCaptureAsync("poll");
+        _pollTimer.Start();
+
+        _loadTimeout = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        _loadTimeout.Tick += (_, _) =>
+        {
+            if (!_firstNavComplete && !_captured)
+                ShowLoadError("claude.ai didn't load in time. Check your connection and try again.");
+        };
+        _loadTimeout.Start();
+    }
+
+    /// <summary>Swap the loading overlay for an error panel with retry + manual-paste
+    /// escape hatch. Marks the window load-failed so a subsequent user close reports
+    /// <see cref="SignInResult.Failed"/> (offering manual paste) rather than a Cancel.</summary>
+    private void ShowLoadError(string message)
+    {
+        if (_captured)
+            return;
+        _loadFailed = true;
+        StopPoll();
+        StopLoadTimeout();
+        Log($"load error surfaced: {message}");
+        LoadingOverlay.Visibility = Visibility.Collapsed;
+        ErrorMessage.Text = message;
+        ErrorPanel.Visibility = Visibility.Visible;
+    }
+
+    private void OnTryAgainClick(object sender, RoutedEventArgs e)
+    {
+        _loadFailed = false;
+        ErrorPanel.Visibility = Visibility.Collapsed;
+        LoadingOverlay.Visibility = Visibility.Visible;
+        try
+        {
+            WebView.CoreWebView2?.Navigate(ClaudeSignIn.LoginUrl);
+            StartCaptureTimers();
+        }
+        catch (Exception ex)
+        {
+            ShowLoadError($"Couldn't restart the sign-in browser: {ex.Message}");
+        }
+    }
+
+    private void OnPasteInsteadClick(object sender, RoutedEventArgs e)
+        => CompleteAndClose(new SignInResult.Failed("Couldn't load the embedded sign-in."));
 
     private async Task TryCaptureAsync(string trigger)
     {
@@ -192,8 +253,13 @@ internal partial class SignInWindow : Window
     private void OnClosed(object? sender, EventArgs e)
     {
         StopPoll();
-        // If the window closed before we completed (user clicked X), report Cancelled.
-        _tcs.TrySetResult(new SignInResult.Cancelled());
+        StopLoadTimeout();
+        // If the window closed while showing a load error (user clicked X after a failed
+        // load), report Failed so the coordinator offers the manual-paste fallback. A
+        // clean close before any error is a deliberate Cancel.
+        _tcs.TrySetResult(_loadFailed
+            ? new SignInResult.Failed("The sign-in window closed after a load error.")
+            : new SignInResult.Cancelled());
     }
 
     private void StopPoll()
@@ -202,9 +268,16 @@ internal partial class SignInWindow : Window
         _pollTimer = null;
     }
 
+    private void StopLoadTimeout()
+    {
+        _loadTimeout?.Stop();
+        _loadTimeout = null;
+    }
+
     private void CompleteAndClose(SignInResult result)
     {
         StopPoll();
+        StopLoadTimeout();
         _tcs.TrySetResult(result);
         if (IsVisible)
             Close();

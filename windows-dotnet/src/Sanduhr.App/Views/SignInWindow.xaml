@@ -77,6 +77,30 @@
                                MaxWidth="320" />
                 </StackPanel>
             </Border>
+
+            <!-- Error panel: shown when the first load fails or times out, so the user
+                 can retry the embedded flow or fall back to manual paste instead of
+                 being stranded on an indefinite "Loading claude.ai…". -->
+            <Border x:Name="ErrorPanel" Background="#0d0d0d" Visibility="Collapsed">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="360">
+                    <TextBlock Text="Couldn't load the sign-in page"
+                               Foreground="#f22f89" FontSize="14" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" Margin="0,0,0,8" />
+                    <TextBlock x:Name="ErrorMessage"
+                               Text="Check your connection and try again."
+                               Foreground="#e8e4dc" Opacity="0.8" FontSize="12"
+                               TextWrapping="Wrap" TextAlignment="Center"
+                               HorizontalAlignment="Center" Margin="0,0,0,16" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="Try again" Click="OnTryAgainClick"
+                                Cursor="Hand" Padding="18,8" Margin="0,0,8,0"
+                                Foreground="#0d0d0d" Background="#17d4fa" BorderThickness="0" />
+                        <Button Content="Paste a key instead" Click="OnPasteInsteadClick"
+                                Cursor="Hand" Padding="18,8"
+                                Foreground="#e8e4dc" Background="#1c1c1c" BorderThickness="0" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
         </Grid>
     </Grid>
 </Window>
