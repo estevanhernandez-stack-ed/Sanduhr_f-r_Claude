@@ -6,6 +6,21 @@
 
 - **Subscription-tier badge in the footer.** Shows which Claude plan the tracked account is on (Pro / Team / Max / Max ×20) as a small right-aligned footer badge. The plan was already in the `/api/organizations` response we fetch for the org id — we only kept `uuid` and discarded the rest; now we read `rate_limit_tier` (corroborated by `billing_type` + `capabilities`) off the same org. The visible badge is the clean, store-safe plan name; the hover tooltip **rotates** through a collection of tongue-in-cheek riffs (Max ×20 → Plaid Max · Maximum Overdrive · Ridiculous Speed · Galaxy Brain Max; Max → Maximum Effort · Max Headroom · Big Max) so it's something different each time. Hidden entirely for API/prepaid orgs (e.g. `auto_prepaid_tier_0`) so it never shows a wrong label. New pure `plan.py` mapping module (defensive substring parse, gated on a real subscription) with full unit coverage.
 
+## v3.0.0-windows — 2026-06-22
+
+**Platform:** Windows (.NET 10 / WPF rebuild)
+**The Windows app is rebuilt from PySide6/Python onto a native .NET 10 / WPF stack, feature-for-feature, with a frictionless embedded sign-in and one-click session recovery.**
+
+### Added
+
+- **Embedded "Sign in to Claude" — no DevTools.** Sign in on the real `claude.ai` page inside a secure in-app WebView2 window; Sanduhr reads the `sessionKey` cookie straight off the app-owned cookie jar and stores it in the Windows Credential Manager. The old "open DevTools, copy the cookie, paste it" ritual is now an optional power-user fallback (`Settings → Accounts → Add by sessionKey`).
+- **One-click session recovery.** An expired or Cloudflare-challenged session now shows an actionable card ("Session expired — sign in again") that re-authenticates the active account **in place** — history preserved, no duplicate account created. Replaces the previous dead, non-interactive status string.
+- **Legacy migration on launch.** Pre-v2.2.0 single-slot keyring keys and v1 plaintext config are promoted to a `Personal` account at startup, so an upgrader keeps their account and history instead of landing on the first-run prompt.
+
+### Changed
+
+- **Native .NET 10 / WPF — no Electron.** Win11 Mica backdrop, tray-resident, with a pure `Sanduhr.Core` (fully xUnit-covered) split from the WPF shell. Reads the **same** `%APPDATA%\Sanduhr\` files and Credential Manager slots as the Python build — zero migration for v2.2.0+ users.
+
 ## v2.3.0-windows — 2026-05-06
 
 **Platform:** Windows
