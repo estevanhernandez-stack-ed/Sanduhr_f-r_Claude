@@ -45,13 +45,33 @@ public sealed class SignInCoordinator
     }
 
     /// <summary>
-    /// Run the embedded WebView2 login. Falls back to the manual-paste modal when
-    /// the WebView2 runtime is missing or capture fails.
+    /// Run the embedded WebView2 login (add-account semantics). Falls back to the
+    /// manual-paste modal when the WebView2 runtime is missing or capture fails.
     /// </summary>
-    public async Task<SignInOutcome> SignInEmbeddedAsync(Window? owner)
+    public Task<SignInOutcome> SignInEmbeddedAsync(Window? owner)
+        => RunEmbeddedAsync(owner, PersistEmbedded);
+
+    /// <summary>
+    /// Re-authenticate the ACTIVE account in place — the same embedded WebView2 flow,
+    /// but the captured cookies overwrite the existing active slot instead of
+    /// allocating a new label. Preserves the account's history file (keyed by label)
+    /// and avoids registry litter. Used by the widget's Expired/Blocked recovery card.
+    /// </summary>
+    public Task<SignInOutcome> ReauthenticateActiveAsync(Window? owner)
+        => RunEmbeddedAsync(owner, PersistReauth);
+
+    /// <summary>
+    /// The shared embedded-sign-in engine. <paramref name="persist"/> decides the
+    /// account semantics: <see cref="PersistEmbedded"/> adds (first-run "Personal" or
+    /// a new slot), <see cref="PersistReauth"/> overwrites the active slot in place.
+    /// A runtime-missing → install → Retry path re-enters THIS method with the SAME
+    /// persist delegate, so a post-install retry keeps the original semantics (a
+    /// re-auth stays in-place, an add stays an add).
+    /// </summary>
+    private async Task<SignInOutcome> RunEmbeddedAsync(Window? owner, Func<CapturedCookies, string> persist)
     {
         if (!IsRuntimeAvailable())
-            return ShowRuntimeMissingThenMaybeManual(owner);
+            return await ShowRuntimeMissingThenMaybeManual(owner, o => RunEmbeddedAsync(o, persist));
 
         string dir;
         try
@@ -67,7 +87,7 @@ public sealed class SignInCoordinator
             return SignInManual(owner);
         }
 
-        var window = new SignInWindow(dir, PersistEmbedded);
+        var window = new SignInWindow(dir, persist);
         SetOwner(window, owner);
         var result = await window.RunAsync().ConfigureAwait(true);
 
@@ -78,57 +98,7 @@ public sealed class SignInCoordinator
                 return new SignInOutcome(true, s.Label);
 
             case SignInResult.RuntimeMissing:
-                return ShowRuntimeMissingThenMaybeManual(owner);
-
-            case SignInResult.Failed f:
-                var retry = ShowMessage(owner,
-                    $"{f.Message}\n\nPaste a sessionKey by hand instead?",
-                    MessageBoxButton.YesNo);
-                return retry == MessageBoxResult.Yes ? SignInManual(owner) : SignInOutcome.NotAdded;
-
-            default: // Cancelled
-                return SignInOutcome.NotAdded;
-        }
-    }
-
-    /// <summary>
-    /// Re-authenticate the ACTIVE account in place — the same embedded WebView2 flow
-    /// as <see cref="SignInEmbeddedAsync"/>, but the captured cookies overwrite the
-    /// existing active slot instead of allocating a new label. Preserves the account's
-    /// history file (keyed by label) and avoids registry litter. Used by the widget's
-    /// Expired/Blocked recovery card.
-    /// </summary>
-    public async Task<SignInOutcome> ReauthenticateActiveAsync(Window? owner)
-    {
-        if (!IsRuntimeAvailable())
-            return ShowRuntimeMissingThenMaybeManual(owner);
-
-        string dir;
-        try
-        {
-            dir = _userData.AllocateNew();
-            _userData.SweepStale(exclude: dir);
-        }
-        catch (Exception ex)
-        {
-            ShowMessage(owner,
-                $"Couldn't prepare the sign-in browser profile: {ex.Message}",
-                MessageBoxButton.OK);
-            return SignInManual(owner);
-        }
-
-        var window = new SignInWindow(dir, PersistReauth);
-        SetOwner(window, owner);
-        var result = await window.RunAsync().ConfigureAwait(true);
-
-        switch (result)
-        {
-            case SignInResult.Success s:
-                _userData.SweepStale();
-                return new SignInOutcome(true, s.Label);
-
-            case SignInResult.RuntimeMissing:
-                return ShowRuntimeMissingThenMaybeManual(owner);
+                return await ShowRuntimeMissingThenMaybeManual(owner, o => RunEmbeddedAsync(o, persist));
 
             case SignInResult.Failed f:
                 var retry = ShowMessage(owner,
@@ -205,7 +175,7 @@ public sealed class SignInCoordinator
 
     // -- WebView2 runtime + fallbacks -----------------------------------------
 
-    private static bool IsRuntimeAvailable()
+    internal static bool IsRuntimeAvailable()
     {
         try
         {
@@ -222,12 +192,16 @@ public sealed class SignInCoordinator
         }
     }
 
-    private SignInOutcome ShowRuntimeMissingThenMaybeManual(Window? owner)
+    private async Task<SignInOutcome> ShowRuntimeMissingThenMaybeManual(
+        Window? owner, Func<Window?, Task<SignInOutcome>> retryEmbedded)
     {
         var modal = new WebView2NotInstalledWindow();
         SetOwner(modal, owner);
         var choice = modal.ShowDialog();
-        // false == "Paste a key instead"; true == went to installer; null == closed.
+        // true  == the modal's Retry found the runtime — re-enter the embedded flow.
+        // false == "Paste a key instead".  null == closed / Learn More only.
+        if (choice == true)
+            return await retryEmbedded(owner);
         return choice == false ? SignInManual(owner) : SignInOutcome.NotAdded;
     }
 

@@ -28,6 +28,13 @@
                    Opacity="0.85"
                    Margin="0,12,0,0" />
 
+        <TextBlock x:Name="StatusText" Grid.Row="2"
+                   Text="Finish the WebView2 install, then click Retry."
+                   TextWrapping="Wrap" FontSize="12"
+                   Foreground="#17d4fa" VerticalAlignment="Center"
+                   Visibility="Collapsed"
+                   Margin="0,12,0,0" />
+
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button x:Name="PasteKeyButton" Content="Paste a key instead" Padding="16,8" Margin="0,0,8,0"
                     Background="#1c1c1c" Foreground="#e8e4dc" BorderBrush="#5A6982" BorderThickness="1"
@@ -37,6 +44,10 @@
                     Background="#1c1c1c" Foreground="#e8e4dc" BorderBrush="#5A6982" BorderThickness="1"
                     Cursor="Hand"
                     Click="OnLearnMoreClick" />
+            <Button x:Name="RetryButton" Content="Retry" Padding="16,8" Margin="0,0,8,0"
+                    Background="#17d4fa" Foreground="#0d0d0d" BorderThickness="0"
+                    FontWeight="Bold" Cursor="Hand" Visibility="Collapsed"
+                    Click="OnRetryClick" />
             <Button x:Name="InstallButton" Content="Install Now" Padding="16,8" IsDefault="True"
                     Background="#17d4fa" Foreground="#0d0d0d" BorderThickness="0"
                     FontWeight="Bold" Cursor="Hand"
