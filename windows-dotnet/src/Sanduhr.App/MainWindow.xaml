@@ -335,14 +335,14 @@
                                     </LinearGradientBrush>
                                 </Border.Background>
                             </Border>
-                            <TextBlock Text="Track your Claude usage"
+                            <TextBlock Text="{Binding PromptHeadline}"
                                        FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center"
                                        Foreground="{DynamicResource Sanduhr.Brush.Text}" />
-                            <TextBlock Text="Sign in once in a secure window. Sanduhr reads your usage automatically — no DevTools, no copy-paste."
+                            <TextBlock Text="{Binding PromptSubtitle}"
                                        FontSize="11" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="280"
                                        Margin="0,6,0,16"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                            <Button Command="{Binding SignInCommand}" Cursor="Hand"
+                            <Button Command="{Binding PrimaryAuthCommand}" Content="{Binding PromptPrimaryLabel}" Cursor="Hand"
                                     HorizontalAlignment="Center" Padding="22,9" FontSize="13" FontWeight="SemiBold"
                                     Foreground="#0d0d0d" BorderThickness="0">
                                 <Button.Template>
@@ -358,7 +358,6 @@
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
                                 </Button.Template>
-                                Sign in to Claude
                             </Button>
                             <Button Command="{Binding PasteKeyCommand}" Cursor="Hand" Content="Paste a key instead"
                                     HorizontalAlignment="Center" Margin="0,12,0,0"

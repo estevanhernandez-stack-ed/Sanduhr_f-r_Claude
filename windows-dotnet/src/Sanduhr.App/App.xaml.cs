@@ -38,6 +38,7 @@ public partial class App : Application
         _vm.ThemeChanged += p => _window?.ApplyBackdropForTheme(p);
         _vm.TrayPercentChanged += OnTrayPercentChanged;
         _vm.SignInRequested += () => RunSignInAsync(embedded: true);
+        _vm.ReauthRequested += RunReauthAsync;
         _vm.PasteKeyRequested += () => RunSignInAsync(embedded: false);
         _vm.SettingsRequested += ShowSettingsAsync;
         // Keep an open Settings window's account list in sync with quick-switches
@@ -158,6 +159,19 @@ public partial class App : Application
             ? await coordinator.SignInEmbeddedAsync(_window)
             : coordinator.SignInManual(_window);
 
+        if (outcome.Added && _vm is not null)
+            await _vm.ReloadAfterSignInAsync();
+    }
+
+    /// <summary>
+    /// Re-authenticate the active account IN PLACE (the widget's Expired/Blocked
+    /// recovery card routes here), then rebuild + refetch. Distinct from
+    /// <see cref="RunSignInAsync"/>, which adds a NEW account.
+    /// </summary>
+    private async Task RunReauthAsync()
+    {
+        var coordinator = new SignInCoordinator();
+        var outcome = await coordinator.ReauthenticateActiveAsync(_window);
         if (outcome.Added && _vm is not null)
             await _vm.ReloadAfterSignInAsync();
     }
