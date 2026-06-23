@@ -99,6 +99,10 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// FirstRun → add-account sign-in; Expired/Blocked → in-place re-auth.</summary>
     [ObservableProperty] private SignInReason _reason = SignInReason.None;
 
+    /// <summary>Active sparkline style, cycled by the Graph control. Seeded from
+    /// settings in the ctor; drives both the live card render and the toolbar glyph.</summary>
+    [ObservableProperty] private SparklineStyle _sparklineStyle = SparklineStyle.Classic;
+
     /// <summary>Visibility of the recovery card — any non-None reason shows it.</summary>
     public bool ShowSignInPrompt => Reason != SignInReason.None;
     /// <summary>Card headline for the current reason (empty when hidden).</summary>
@@ -232,6 +236,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // Application resources before Show (no obsidian->saved flash).
         RebuildThemeMap();
         var savedKey = _settings.LoadTheme();
+        _sparklineStyle = _settings.LoadSparklineStyle();
         if (!_themes.TryGetValue(savedKey, out var def))
         {
             savedKey = "obsidian";
@@ -577,6 +582,22 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void ToggleThemes() => IsThemesExpanded = !IsThemesExpanded;
 
+    /// <summary>Cycle the sparkline style (Classic ↔ Horizon) across every card with
+    /// no refetch — AffectsRender re-renders each control, mirroring the theme-strip
+    /// live switch. Persisted (a deliberate upgrade; Python resets to classic each
+    /// launch).</summary>
+    [RelayCommand]
+    private void CycleSparklineStyle()
+    {
+        var styles = (SparklineStyle[])Enum.GetValues(typeof(SparklineStyle));
+        int i = Array.IndexOf(styles, SparklineStyle);
+        SparklineStyle = styles[(i + 1) % styles.Length];
+        foreach (var card in Tiers)
+            card.ApplyStyle(SparklineStyle);
+        _settings.SaveSparklineStyle(SparklineStyle);
+        Sounds.PlayToggle();
+    }
+
     /// <summary>Focus affordance entry point — raises <see cref="FocusToggleRequested"/>
     /// so the window enters/exits focus mode (hourglass replaces the cards).</summary>
     [RelayCommand]
@@ -694,7 +715,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             int? limit = GetInt(tier, "limit");
             var historyValues = _history.Load(key);
 
-            vm.Update(util, resetsAt, used, limit, historyValues, _palette, now);
+            vm.Update(util, resetsAt, used, limit, historyValues, _palette, SparklineStyle, now);
             if (util > highest) highest = util;
         }
 

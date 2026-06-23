@@ -46,7 +46,8 @@
                                            Margin="8,0"
                                            VerticalAlignment="Center"
                                            Values="{Binding Sparkline}"
-                                           LineColor="{Binding SparklineColor}" />
+                                           LineColor="{Binding SparklineColor}"
+                                           SparklineStyle="{Binding SparklineStyle}" />
                 <!-- Local CC token-burn delta: "+Nk" tokens burned in this tier
                      since the last API fetch landed. Hidden at zero. Sits between
                      the sparkline and the % so it reads as "what's happening right

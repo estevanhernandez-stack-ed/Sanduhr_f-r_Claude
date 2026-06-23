@@ -38,6 +38,7 @@ public sealed partial class TierCardViewModel : ObservableObject
     [ObservableProperty] private bool _hasBurn;
     [ObservableProperty] private IReadOnlyList<int> _sparkline = Array.Empty<int>();
     [ObservableProperty] private Color _sparklineColor = Colors.White;
+    [ObservableProperty] private SparklineStyle _sparklineStyle = SparklineStyle.Classic;
 
     /// <summary>The "+Nk" Local CC token-burn badge text (e.g. "+1.5k").</summary>
     [ObservableProperty] private string _localDelta = "";
@@ -57,7 +58,7 @@ public sealed partial class TierCardViewModel : ObservableObject
     /// <summary>Full refresh on a fresh fetch.</summary>
     public void Update(
         int util, string? resetsAt, int? used, int? limit,
-        IReadOnlyList<int> history, ThemePalette palette, DateTimeOffset now)
+        IReadOnlyList<int> history, ThemePalette palette, SparklineStyle sparklineStyle, DateTimeOffset now)
     {
         _util = util;
         _resetsAt = resetsAt;
@@ -69,6 +70,7 @@ public sealed partial class TierCardViewModel : ObservableObject
         PaceTickColor = palette.PaceMarker;
         Sparkline = history;
         SparklineColor = palette.Sparkline;
+        SparklineStyle = sparklineStyle;
 
         RefreshTimeDerived(now);
     }
@@ -105,6 +107,10 @@ public sealed partial class TierCardViewModel : ObservableObject
         PaceTickColor = palette.PaceMarker;
         SparklineColor = palette.Sparkline;
     }
+
+    /// <summary>Apply a newly-cycled sparkline style without a refetch — the Graph
+    /// control's live switch path (mirrors <see cref="ApplyPalette"/>).</summary>
+    public void ApplyStyle(SparklineStyle style) => SparklineStyle = style;
 
     private void RefreshTimeDerived(DateTimeOffset now)
     {
