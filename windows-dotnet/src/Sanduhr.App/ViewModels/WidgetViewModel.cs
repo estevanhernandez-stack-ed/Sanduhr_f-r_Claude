@@ -360,10 +360,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         var creds = _credentials.Load();
         if (string.IsNullOrEmpty(creds.SessionKey))
         {
-            // Empty state: the widget shows the "Sign in to Claude" prompt instead
-            // of a status line, so clear StatusText to avoid the redundant message.
+            // No active account → first-run prompt. Wipe any signed-in chrome too, so a
+            // sign-out (or a removed last account) doesn't leave a stale plan badge,
+            // account label, or footer on screen.
             Reason = SignInReason.FirstRun;
             StatusText = "";
+            ClearSignedInChrome();
             TrayPercentChanged?.Invoke(-1);
             return;
         }
@@ -601,6 +603,14 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         Reason = reason;
         StatusText = "";
+        ClearSignedInChrome();
+        TrayPercentChanged?.Invoke(-1);
+    }
+
+    /// <summary>Wipe the signed-in chrome — tier cards, plan badge, account label,
+    /// footer — so a no-account / expired / signed-out state never shows stale data.</summary>
+    private void ClearSignedInChrome()
+    {
         Tiers.Clear();
         _lastData = null;
         HasPlanBadge = false;
@@ -608,7 +618,6 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         AccountSwitcherText = "";
         AccountSwitcherClickable = false;
         FooterText = "";
-        TrayPercentChanged?.Invoke(-1);
     }
 
     private void OnTick()
