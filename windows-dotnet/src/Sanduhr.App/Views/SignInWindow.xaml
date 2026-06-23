@@ -50,75 +50,82 @@
         </Border>
 
         <Grid Grid.Row="1">
-            <wv:WebView2 x:Name="WebView" />
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-            <!-- Loading overlay; hidden once claude.ai first paints. Covers the
-                 slow CoreWebView2Environment.CreateAsync + EnsureCoreWebView2Async
-                 + first Navigate window. -->
-            <Border x:Name="LoadingOverlay" Background="#0d0d0d">
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="Loading claude.ai…"
-                               Foreground="#17d4fa"
-                               FontSize="14" FontWeight="SemiBold"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,0,12" />
-                    <ProgressBar IsIndeterminate="True"
-                                 Width="220" Height="4"
-                                 Foreground="#17d4fa"
-                                 Background="#1c1c1c"
-                                 BorderThickness="0" />
-                    <TextBlock Text="First open can take a few seconds on a fresh WebView2 install."
-                               Foreground="#e8e4dc"
-                               Opacity="0.55"
-                               FontSize="11"
-                               Margin="0,12,0,0"
-                               HorizontalAlignment="Center"
-                               TextWrapping="Wrap"
-                               MaxWidth="320" />
-                </StackPanel>
-            </Border>
-
-            <!-- Error panel: shown when the first load fails or times out, so the user
-                 can retry the embedded flow or fall back to manual paste instead of
-                 being stranded on an indefinite "Loading claude.ai…". -->
-            <Border x:Name="ErrorPanel" Background="#0d0d0d" Visibility="Collapsed">
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="360">
-                    <TextBlock Text="Couldn't load the sign-in page"
-                               Foreground="#f22f89" FontSize="14" FontWeight="SemiBold"
-                               HorizontalAlignment="Center" Margin="0,0,0,8" />
-                    <TextBlock x:Name="ErrorMessage"
-                               Text="Check your connection and try again."
-                               Foreground="#e8e4dc" Opacity="0.8" FontSize="12"
-                               TextWrapping="Wrap" TextAlignment="Center"
-                               HorizontalAlignment="Center" Margin="0,0,0,16" />
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button Content="Try again" Click="OnTryAgainClick"
-                                Cursor="Hand" Padding="18,8" Margin="0,0,8,0"
-                                Foreground="#0d0d0d" Background="#17d4fa" BorderThickness="0" />
-                        <Button Content="Paste a key instead" Click="OnPasteInsteadClick"
-                                Cursor="Hand" Padding="18,8"
-                                Foreground="#e8e4dc" Background="#1c1c1c" BorderThickness="0" />
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-
-            <!-- Google-OAuth notice. Google refuses sign-in inside embedded webviews
-                 (the page renders blank), so when the user lands on a Google auth host
-                 we surface guidance + an escape rather than leaving them on a white void. -->
-            <Border x:Name="GoogleNotice" VerticalAlignment="Top" Background="#241a00"
+            <!-- Google-OAuth notice docks ABOVE the browser in its own row. A WPF
+                 overlay can't paint on top of the native WebView2 control (airspace),
+                 so the banner must occupy real layout space rather than overlap —
+                 otherwise it renders behind the page and is invisible. -->
+            <Border x:Name="GoogleNotice" Grid.Row="0" Background="#241a00"
                     BorderBrush="#7a5b00" BorderThickness="0,0,0,1" Padding="14,10"
                     Visibility="Collapsed">
                 <StackPanel>
-                    <TextBlock Text="Google sign-in may not load here"
+                    <TextBlock Text="Google sign-in won't load here"
                                Foreground="#ffcf4d" FontWeight="SemiBold" FontSize="12" />
                     <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#e8e4dc" Opacity="0.85"
                                Margin="0,4,0,8"
-                               Text="Google blocks sign-in inside embedded windows. If this page is blank, go back and use email or a passkey on the Claude page — or close this and paste a key by hand." />
+                               Text="Google blocks sign-in inside embedded windows. Go back and use email or a passkey on the Claude page — or close this and paste a key by hand." />
                     <Button Content="Close &amp; paste a key instead" Click="OnGoogleNoticePasteClick"
                             HorizontalAlignment="Left" Cursor="Hand" Padding="12,6"
                             Background="#1c1c1c" Foreground="#e8e4dc" BorderBrush="#7a5b00" BorderThickness="1" />
                 </StackPanel>
             </Border>
+
+            <Grid Grid.Row="1">
+                <wv:WebView2 x:Name="WebView" />
+
+                <!-- Loading overlay; hidden once claude.ai first paints. Covers the
+                     slow CoreWebView2Environment.CreateAsync + EnsureCoreWebView2Async
+                     + first Navigate window. -->
+                <Border x:Name="LoadingOverlay" Background="#0d0d0d">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="Loading claude.ai…"
+                                   Foreground="#17d4fa"
+                                   FontSize="14" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,12" />
+                        <ProgressBar IsIndeterminate="True"
+                                     Width="220" Height="4"
+                                     Foreground="#17d4fa"
+                                     Background="#1c1c1c"
+                                     BorderThickness="0" />
+                        <TextBlock Text="First open can take a few seconds on a fresh WebView2 install."
+                                   Foreground="#e8e4dc"
+                                   Opacity="0.55"
+                                   FontSize="11"
+                                   Margin="0,12,0,0"
+                                   HorizontalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   MaxWidth="320" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Error panel: shown when the first load fails or times out. The WebView
+                     is collapsed when this shows (airspace), so the panel is visible. -->
+                <Border x:Name="ErrorPanel" Background="#0d0d0d" Visibility="Collapsed">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="360">
+                        <TextBlock Text="Couldn't load the sign-in page"
+                                   Foreground="#f22f89" FontSize="14" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" Margin="0,0,0,8" />
+                        <TextBlock x:Name="ErrorMessage"
+                                   Text="Check your connection and try again."
+                                   Foreground="#e8e4dc" Opacity="0.8" FontSize="12"
+                                   TextWrapping="Wrap" TextAlignment="Center"
+                                   HorizontalAlignment="Center" Margin="0,0,0,16" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Button Content="Try again" Click="OnTryAgainClick"
+                                    Cursor="Hand" Padding="18,8" Margin="0,0,8,0"
+                                    Foreground="#0d0d0d" Background="#17d4fa" BorderThickness="0" />
+                            <Button Content="Paste a key instead" Click="OnPasteInsteadClick"
+                                    Cursor="Hand" Padding="18,8"
+                                    Foreground="#e8e4dc" Background="#1c1c1c" BorderThickness="0" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Grid>
     </Grid>
 </Window>

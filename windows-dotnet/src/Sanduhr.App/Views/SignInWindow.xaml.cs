@@ -170,6 +170,7 @@ internal partial class SignInWindow : Window
         StopLoadTimeout();
         Log($"load error surfaced: {message}");
         LoadingOverlay.Visibility = Visibility.Collapsed;
+        WebView.Visibility = Visibility.Collapsed; // native control yields so the WPF panel shows (airspace)
         ErrorMessage.Text = message;
         ErrorPanel.Visibility = Visibility.Visible;
     }
@@ -178,6 +179,7 @@ internal partial class SignInWindow : Window
     {
         _loadFailed = false;
         ErrorPanel.Visibility = Visibility.Collapsed;
+        WebView.Visibility = Visibility.Visible;
         LoadingOverlay.Visibility = Visibility.Visible;
         try
         {
