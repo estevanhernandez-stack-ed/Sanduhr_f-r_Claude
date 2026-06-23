@@ -31,7 +31,7 @@
 
 ---
 
-## Tier 2 — embedded window hardening (pending build)
+## Tier 2 — embedded window hardening (built)
 
 - ⬜ **T2-a · Slow/blocked load → timeout + escape hatch.** Disconnect network → "Sign in to Claude" → after the timeout the loading overlay becomes an error panel with **"Try again"** + **"Paste a key instead"**; the latter reaches `ManualKeyWindow` (the coordinator's Failed→manual branch fires — proving load-failure is distinct from user-cancel).
 - ⬜ **T2-b · First-load failure (not a hang).** Force a failed first navigation → error panel appears instead of an indefinite "Loading claude.ai…".
@@ -41,7 +41,7 @@
 
 ---
 
-## Tier 3 — manual fallback polish (pending build)
+## Tier 3 — manual fallback polish (built)
 
 - ⬜ **T3-a · Help affordance.** `ManualKeyWindow` → the DevTools steps are tucked behind a collapsed **"Where do I find this?"**, not shouted in the subtitle.
 - ⬜ **T3-b · Bounce to embedded.** With WebView2 available, `ManualKeyWindow` → **"Use the secure sign-in window instead"** → closes the modal and opens the embedded flow. (Hidden when WebView2 is absent.)
