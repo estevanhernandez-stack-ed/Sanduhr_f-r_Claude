@@ -131,11 +131,15 @@ internal partial class SignInWindow : Window
             // escape hatch rather than waiting out the full timeout on a dead load.
             ShowLoadError("claude.ai didn't load. Check your connection and try again.");
         }
+        UpdateOAuthNotice();
         _ = TryCaptureAsync("nav");
     }
 
     private void OnSourceChanged(object? sender, CoreWebView2SourceChangedEventArgs e)
-        => _ = TryCaptureAsync("source");
+    {
+        UpdateOAuthNotice();
+        _ = TryCaptureAsync("source");
+    }
 
     /// <summary>Start (or restart, after a "Try again") the capture poll and the
     /// first-load timeout.</summary>
@@ -188,6 +192,20 @@ internal partial class SignInWindow : Window
 
     private void OnPasteInsteadClick(object sender, RoutedEventArgs e)
         => CompleteAndClose(new SignInResult.Failed("Couldn't load the embedded sign-in."));
+
+    /// <summary>Show the Google-OAuth guidance banner while the WebView is on a Google
+    /// auth host (where sign-in renders blank), and hide it back on claude.ai.</summary>
+    private void UpdateOAuthNotice()
+    {
+        var host = SafeHost(WebView.CoreWebView2?.Source);
+        var onGoogle = host.StartsWith("accounts.google", StringComparison.OrdinalIgnoreCase)
+                       || host.StartsWith("accounts.youtube", StringComparison.OrdinalIgnoreCase);
+        GoogleNotice.Visibility = onGoogle ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnGoogleNoticePasteClick(object sender, RoutedEventArgs e)
+        => CompleteAndClose(new SignInResult.Failed(
+            "Google sign-in won't load in the embedded window. Paste a sessionKey instead, or use email / a passkey on the Claude page."));
 
     private async Task TryCaptureAsync(string trigger)
     {
