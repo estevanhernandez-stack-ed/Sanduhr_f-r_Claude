@@ -8,6 +8,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sanduhr.App.Services;
+using Sanduhr.App.Views;
 
 namespace Sanduhr.App.ViewModels;
 
@@ -218,11 +219,8 @@ public sealed partial class ThemesViewModel : ObservableObject
         if (SelectedTheme is null)
             return;
         var name = SelectedTheme;
-        var result = _owner is not null
-            ? MessageBox.Show(_owner, $"Delete {name}?", "Themes",
-                MessageBoxButton.YesNo, MessageBoxImage.None)
-            : MessageBox.Show($"Delete {name}?", "Themes",
-                MessageBoxButton.YesNo, MessageBoxImage.None);
+        var result = ThemedDialog.Show(_owner, "Themes", $"Delete {name}?",
+            MessageBoxButton.YesNo, ThemedDialogKind.Warning);
         if (result != MessageBoxResult.Yes)
             return;
 
@@ -267,17 +265,13 @@ public sealed partial class ThemesViewModel : ObservableObject
     private void Error(string message)
     {
         Sounds.PlayError();
-        Show(message);
+        Show(message, ThemedDialogKind.Warning);
     }
 
-    private void Info(string message) => Show(message);
+    private void Info(string message) => Show(message, ThemedDialogKind.Info);
 
-    private void Show(string message)
-    {
-        // MessageBoxImage.None suppresses the OS beep — our chime already played.
-        if (_owner is not null)
-            MessageBox.Show(_owner, message, "Themes", MessageBoxButton.OK, MessageBoxImage.None);
-        else
-            MessageBox.Show(message, "Themes", MessageBoxButton.OK, MessageBoxImage.None);
-    }
+    private void Show(string message, ThemedDialogKind kind)
+        // The caller already played a semantic chime (success / error / info), so the
+        // dialog stays silent to avoid doubling up.
+        => ThemedDialog.Show(_owner, "Themes", message, MessageBoxButton.OK, kind, playSound: false);
 }

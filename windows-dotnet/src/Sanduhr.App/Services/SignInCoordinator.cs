@@ -108,6 +108,10 @@ public sealed class SignInCoordinator
                     ? await SignInManual(owner, o => RunEmbeddedAsync(o, persist))
                     : SignInOutcome.NotAdded;
 
+            case SignInResult.UseManual:
+                // Straight to manual paste (e.g. the Google notice) — no extra confirm.
+                return await SignInManual(owner, o => RunEmbeddedAsync(o, persist));
+
             default: // Cancelled
                 return SignInOutcome.NotAdded;
         }
@@ -246,7 +250,5 @@ public sealed class SignInCoordinator
     }
 
     private static MessageBoxResult ShowMessage(Window? owner, string text, MessageBoxButton buttons)
-        => owner is not null && owner.IsLoaded
-            ? MessageBox.Show(owner, text, "Sign in to Claude", buttons, MessageBoxImage.Warning)
-            : MessageBox.Show(text, "Sign in to Claude", buttons, MessageBoxImage.Warning);
+        => ThemedDialog.Show(owner, "Sign in to Claude", text, buttons, ThemedDialogKind.Warning);
 }

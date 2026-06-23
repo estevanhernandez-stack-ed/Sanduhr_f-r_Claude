@@ -206,8 +206,7 @@ internal partial class SignInWindow : Window
     }
 
     private void OnGoogleNoticePasteClick(object sender, RoutedEventArgs e)
-        => CompleteAndClose(new SignInResult.Failed(
-            "Google sign-in won't load in the embedded window. Paste a sessionKey instead, or use email / a passkey on the Claude page."));
+        => CompleteAndClose(new SignInResult.UseManual());
 
     private async Task TryCaptureAsync(string trigger)
     {

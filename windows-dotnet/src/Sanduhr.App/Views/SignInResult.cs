@@ -26,4 +26,8 @@ public abstract record SignInResult
     /// <summary>The user chose to bounce from the manual-paste modal to the embedded
     /// sign-in flow ("Use the secure sign-in window instead").</summary>
     public sealed record UseEmbedded : SignInResult;
+
+    /// <summary>The user chose to go straight to manual paste (e.g. from the Google-OAuth
+    /// notice), skipping the "paste by hand?" confirm.</summary>
+    public sealed record UseManual : SignInResult;
 }

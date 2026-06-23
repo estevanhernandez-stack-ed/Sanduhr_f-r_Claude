@@ -132,9 +132,7 @@ public sealed partial class AccountsViewModel : ObservableObject
             $"Remove the '{item.Label}' account from Sanduhr?\n\n" +
             "This deletes the stored credentials and the local " +
             $"history.{item.Label}.json file. Cannot be undone.";
-        var result = _owner is not null && _owner.IsLoaded
-            ? MessageBox.Show(_owner, text, "Sign out", MessageBoxButton.YesNo, MessageBoxImage.Warning)
-            : MessageBox.Show(text, "Sign out", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        var result = ThemedDialog.Show(_owner, "Sign out", text, MessageBoxButton.YesNo, ThemedDialogKind.Warning);
         if (result != MessageBoxResult.Yes)
             return;
         await _widget.SignOutAccountAsync(item.Label);
@@ -149,10 +147,5 @@ public sealed partial class AccountsViewModel : ObservableObject
     }
 
     private void ShowError(string message)
-    {
-        if (_owner is not null && _owner.IsLoaded)
-            MessageBox.Show(_owner, message, "Accounts", MessageBoxButton.OK, MessageBoxImage.Warning);
-        else
-            MessageBox.Show(message, "Accounts", MessageBoxButton.OK, MessageBoxImage.Warning);
-    }
+        => ThemedDialog.Show(_owner, "Accounts", message, MessageBoxButton.OK, ThemedDialogKind.Warning);
 }
