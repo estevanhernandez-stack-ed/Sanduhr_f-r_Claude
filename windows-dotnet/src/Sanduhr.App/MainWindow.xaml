@@ -94,6 +94,7 @@
     <!-- Keyboard: Ctrl+P toggles Deep Work focus mode (parity with widget.py). -->
     <Window.InputBindings>
         <KeyBinding Modifiers="Control" Key="P" Command="{Binding ToggleFocusCommand}" />
+        <KeyBinding Modifiers="Control" Key="D" Command="{Binding ToggleCompactCommand}" />
     </Window.InputBindings>
 
     <!-- Root glass panel. On Win11 22H2+ this rides over Mica (semi-opaque

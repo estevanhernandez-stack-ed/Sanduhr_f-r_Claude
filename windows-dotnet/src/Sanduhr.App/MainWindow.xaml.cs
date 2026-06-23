@@ -22,6 +22,7 @@ public partial class MainWindow : Window
 {
     private readonly SettingsStore _settings;
     private readonly DispatcherTimer _saveDebounce;
+    private double _expandedHeight;
 
     public MainWindow()
     {
@@ -87,6 +88,10 @@ public partial class MainWindow : Window
         var refresh = new MenuItem { Header = "Refresh", Command = Vm.RefreshCommand };
         menu.Items.Add(refresh);
 
+        var compact = new MenuItem { Command = Vm.ToggleCompactCommand };
+        menu.Opened += (_, _) => compact.Header = (Vm?.IsCompact ?? false) ? "Expand" : "Compact Mode";
+        menu.Items.Add(compact);
+
         menu.Items.Add(new Separator());
 
         var focus = new MenuItem { Header = "Deep Work (Focus)", Command = Vm.ToggleFocusCommand };
@@ -121,6 +126,7 @@ public partial class MainWindow : Window
 
         Vm.FocusToggleRequested += ToggleFocusMode;
         Vm.GameStartRequested += StartCooldownGame;
+        Vm.CompactChanged += OnCompactChanged;
         Vm.ThemeChanged += p =>
         {
             FocusView.ApplyPalette(p);
@@ -199,6 +205,28 @@ public partial class MainWindow : Window
         Focus();
     }
 
+    /// <summary>Compact toggled — auto-size the window's HEIGHT to the single remaining
+    /// card (width untouched, matching Python), restoring the expanded height on the
+    /// way out. Deferred a layout pass so the card collection has settled before we
+    /// measure (Python uses QTimer.singleShot(0) for the same reason).</summary>
+    private void OnCompactChanged(bool compact)
+    {
+        if (compact)
+        {
+            _expandedHeight = ActualHeight;
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+            {
+                SizeToContent = SizeToContent.Height;
+            }));
+        }
+        else
+        {
+            SizeToContent = SizeToContent.Manual;
+            if (_expandedHeight > 0)
+                Height = _expandedHeight;
+        }
+    }
+
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
@@ -273,6 +301,12 @@ public partial class MainWindow : Window
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        // Double-click the title bar toggles compact mode (widget.py parity).
+        if (e.ClickCount == 2)
+        {
+            Vm?.ToggleCompactCommand.Execute(null);
+            return;
+        }
         if (e.ButtonState == MouseButtonState.Pressed)
             DragMove();
     }

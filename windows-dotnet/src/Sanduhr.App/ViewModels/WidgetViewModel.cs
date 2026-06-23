@@ -66,6 +66,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     [ObservableProperty] private string _statusText = "Connecting…";
     [ObservableProperty] private bool _pinned;
+    [ObservableProperty] private bool _isCompact;
 
     /// <summary>Widget "Themes" header expand/collapse state — false (collapsed) by
     /// default so the swatch grid is tucked away under the thin header at rest.
@@ -122,6 +123,10 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     /// <summary>Highest active-tier % for the tray glyph; -1 when no data.</summary>
     public event Action<int>? TrayPercentChanged;
+
+    /// <summary>Raised when compact mode toggles — the window hides its toolbar and
+    /// auto-sizes its height to the single remaining card.</summary>
+    public event Action<bool>? CompactChanged;
 
     /// <summary>Raised by the "Sign in to Claude" command — App opens the embedded
     /// WebView2 <c>SignInWindow</c> flow, then calls <see cref="ReloadAfterSignInAsync"/>.</summary>
@@ -576,6 +581,19 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _settings.SavePinned(Pinned);
     }
 
+    /// <summary>Toggle compact mode — collapse the card list to the busiest tier and
+    /// signal the window to hide its toolbar + auto-size. Re-renders from the cached
+    /// fetch, never a refetch (parity with widget._toggle_compact). In-memory only:
+    /// resets to expanded each launch, matching Python.</summary>
+    [RelayCommand]
+    private void ToggleCompact()
+    {
+        IsCompact = !IsCompact;
+        if (_lastData is not null)
+            RenderCards(_lastData, DateTimeOffset.UtcNow);
+        CompactChanged?.Invoke(IsCompact);
+    }
+
     /// <summary>Toggle the widget's "Themes" swatch grid open/closed (the thin header
     /// click). Persistence rides the <see cref="OnIsThemesExpandedChanged"/> hook so the
     /// state survives relaunch.</summary>
@@ -683,6 +701,20 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             utilByKey[key] = Util(data, key);
 
         var active = TierModel.ActiveTiers(utilByKey, _savedOrder, _hidden);
+        if (IsCompact && active.Count > 0)
+        {
+            // Compact view: collapse to the single busiest tier (first-max, matching
+            // Python `max(active, key=util)`). Downstream get-or-create then destroys
+            // the rest and keeps the one complete card.
+            string top = active[0];
+            double best = utilByKey[active[0]] ?? 0;
+            foreach (var k in active)
+            {
+                double u = utilByKey[k] ?? 0;
+                if (u > best) { best = u; top = k; }
+            }
+            active = new List<string> { top };
+        }
         var activeSet = new HashSet<string>(active);
 
         // Drop cards for tiers that no longer have data / were hidden.
@@ -770,7 +802,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         if (_lastFetchAt is null) { FooterText = ""; return; }
         string ts = _lastFetchAt.Value.ToString("h:mm tt", CultureInfo.InvariantCulture);
-        string mode = Pinned ? "Pinned" : "Float";
+        string mode = IsCompact ? "Compact" : (Pinned ? "Pinned" : "Float");
         // Aggregate Local CC burn since the anchor, appended as "· CC +Nk" when
         // there's been activity — parity with widget._update_footer's _cc_delta_lbl.
         string cc = "";
@@ -788,6 +820,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     }
 
     partial void OnPinnedChanged(bool value) => UpdateFooter();
+    partial void OnIsCompactChanged(bool value) => UpdateFooter();
 
     // -- drag-reorder + hide (persisted) --------------------------------------
 
