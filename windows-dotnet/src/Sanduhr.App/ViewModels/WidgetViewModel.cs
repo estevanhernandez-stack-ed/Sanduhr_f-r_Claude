@@ -535,20 +535,14 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         }
         catch (SessionExpiredException)
         {
-            // Surface the actionable recovery card (one-click in-place re-auth) instead
-            // of a dead status string. The stored key is non-empty but rejected, so
-            // RebuildFetcher's empty-key gate never fires — set the reason here.
-            Reason = SignInReason.Expired;
-            StatusText = "";
-            TrayPercentChanged?.Invoke(-1);
+            // Stored key rejected (non-empty, so RebuildFetcher's empty gate never fires):
+            // show the actionable recovery card and wipe the now-stale signed-in chrome.
+            EnterRecoveryState(SignInReason.Expired);
         }
         catch (CloudflareBlockedException)
         {
-            // Cloudflare challenge — re-auth re-captures a fresh cf_clearance silently,
-            // so point at the same recovery card rather than the manual cf_clearance box.
-            Reason = SignInReason.Blocked;
-            StatusText = "";
-            TrayPercentChanged?.Invoke(-1);
+            // Cloudflare challenge — re-auth re-captures a fresh cf_clearance silently.
+            EnterRecoveryState(SignInReason.Blocked);
         }
         catch (NetworkException)
         {
@@ -596,6 +590,24 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private void Fail(string message)
     {
         StatusText = message;
+        TrayPercentChanged?.Invoke(-1);
+    }
+
+    /// <summary>Drop the widget into a clean recovery state: show the reason card and
+    /// wipe the now-stale signed-in chrome (tier cards, plan badge, account label,
+    /// footer) so an expired/blocked session reads as fully signed out. The credential
+    /// stays put so "Sign in again" refreshes the same account in place.</summary>
+    private void EnterRecoveryState(SignInReason reason)
+    {
+        Reason = reason;
+        StatusText = "";
+        Tiers.Clear();
+        _lastData = null;
+        HasPlanBadge = false;
+        PlanTooltip = "";
+        AccountSwitcherText = "";
+        AccountSwitcherClickable = false;
+        FooterText = "";
         TrayPercentChanged?.Invoke(-1);
     }
 
