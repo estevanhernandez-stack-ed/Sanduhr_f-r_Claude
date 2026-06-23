@@ -223,6 +223,15 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// fetch. Called once after the window is shown.</summary>
     public async void Start()
     {
+        // One-time legacy promotion BEFORE the first fetcher build: a pre-v2.2.0
+        // single-slot keyring key / v1 plaintext config is promoted to a "Personal"
+        // account so an upgrader isn't wrongly shown the first-run card. MigrateFromV1
+        // / MigrateLegacy are idempotent (no-op on a populated registry) and swallow
+        // their own Json/IO faults; guard anyway so a migration fault never blocks
+        // first paint.
+        try { _credentials.MigrateFromV1(); }
+        catch (Exception ex) { Debug.WriteLine($"[Sanduhr.Migrate] skipped: {ex.Message}"); }
+
         RebuildFetcher();
         RefreshAccountLabel();
         _tickTimer.Start();
