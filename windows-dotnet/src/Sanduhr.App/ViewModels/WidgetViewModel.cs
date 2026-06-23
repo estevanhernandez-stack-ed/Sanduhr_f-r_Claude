@@ -94,9 +94,27 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _planTooltip = "";
     [ObservableProperty] private bool _hasPlanBadge;
 
-    /// <summary>True when there's no active account — drives the widget's
-    /// "Sign in to Claude" empty-state prompt (item 6 first-run entry point).</summary>
-    [ObservableProperty] private bool _showSignInPrompt;
+    /// <summary>Why the widget is showing a sign-in recovery card (None = hidden).
+    /// Drives the card's visibility, copy, and which action its primary button fires:
+    /// FirstRun → add-account sign-in; Expired/Blocked → in-place re-auth.</summary>
+    [ObservableProperty] private SignInReason _reason = SignInReason.None;
+
+    /// <summary>Visibility of the recovery card — any non-None reason shows it.</summary>
+    public bool ShowSignInPrompt => Reason != SignInReason.None;
+    /// <summary>Card headline for the current reason (empty when hidden).</summary>
+    public string PromptHeadline => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason).Headline;
+    /// <summary>Card subtitle for the current reason (empty when hidden).</summary>
+    public string PromptSubtitle => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason).Subtitle;
+    /// <summary>Primary-button label for the current reason (empty when hidden).</summary>
+    public string PromptPrimaryLabel => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason).PrimaryLabel;
+
+    partial void OnReasonChanged(SignInReason value)
+    {
+        OnPropertyChanged(nameof(ShowSignInPrompt));
+        OnPropertyChanged(nameof(PromptHeadline));
+        OnPropertyChanged(nameof(PromptSubtitle));
+        OnPropertyChanged(nameof(PromptPrimaryLabel));
+    }
 
     /// <summary>Highest active-tier % for the tray glyph; -1 when no data.</summary>
     public event Action<int>? TrayPercentChanged;
@@ -104,6 +122,11 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// <summary>Raised by the "Sign in to Claude" command — App opens the embedded
     /// WebView2 <c>SignInWindow</c> flow, then calls <see cref="ReloadAfterSignInAsync"/>.</summary>
     public event Func<Task>? SignInRequested;
+
+    /// <summary>Raised by the recovery card when the ACTIVE account needs re-auth
+    /// (Expired/Blocked) — App routes this to <c>SignInCoordinator.ReauthenticateActiveAsync</c>,
+    /// which refreshes the existing account in place rather than adding a new one.</summary>
+    public event Func<Task>? ReauthRequested;
 
     /// <summary>Raised by the "Paste a key instead" command — App opens the manual
     /// sessionKey fallback modal.</summary>
@@ -339,12 +362,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         {
             // Empty state: the widget shows the "Sign in to Claude" prompt instead
             // of a status line, so clear StatusText to avoid the redundant message.
-            ShowSignInPrompt = true;
+            Reason = SignInReason.FirstRun;
             StatusText = "";
             TrayPercentChanged?.Invoke(-1);
             return;
         }
-        ShowSignInPrompt = false;
+        Reason = SignInReason.None;
         // WebView2-backed transport (item 3 pivot): a raw HttpClient can't pass
         // Cloudflare's fingerprint binding, but a real authenticated browser can.
         // Same (sessionKey, cfClearance) shape as ClaudeApiClient, same interface.
@@ -368,6 +391,23 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         if (SignInRequested is not null)
             await SignInRequested.Invoke();
+    }
+
+    /// <summary>The recovery card's primary button. FirstRun → add-account sign-in;
+    /// Expired/Blocked → in-place re-auth of the active account.</summary>
+    [RelayCommand]
+    private async Task PrimaryAuth()
+    {
+        if (Reason is SignInReason.Expired or SignInReason.Blocked)
+        {
+            if (ReauthRequested is not null)
+                await ReauthRequested.Invoke();
+        }
+        else
+        {
+            if (SignInRequested is not null)
+                await SignInRequested.Invoke();
+        }
     }
 
     [RelayCommand]
@@ -490,15 +530,25 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             RefreshCcDelta();
             UpdatePlanBadge();
             StatusText = "";
+            Reason = SignInReason.None;
             UpdateFooter();
         }
         catch (SessionExpiredException)
         {
-            Fail("Session expired — re-add your key.");
+            // Surface the actionable recovery card (one-click in-place re-auth) instead
+            // of a dead status string. The stored key is non-empty but rejected, so
+            // RebuildFetcher's empty-key gate never fires — set the reason here.
+            Reason = SignInReason.Expired;
+            StatusText = "";
+            TrayPercentChanged?.Invoke(-1);
         }
         catch (CloudflareBlockedException)
         {
-            Fail("Cloudflare — add cf_clearance.");
+            // Cloudflare challenge — re-auth re-captures a fresh cf_clearance silently,
+            // so point at the same recovery card rather than the manual cf_clearance box.
+            Reason = SignInReason.Blocked;
+            StatusText = "";
+            TrayPercentChanged?.Invoke(-1);
         }
         catch (NetworkException)
         {
