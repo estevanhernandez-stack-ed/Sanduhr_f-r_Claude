@@ -239,7 +239,9 @@
                 </Border.Style>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Button x:Name="ThemeIconButton" Style="{StaticResource IconStripButton}"
-                            Content="🎨" Command="{Binding ToggleThemesCommand}"
+                            Content="🎨"
+                            PreviewMouseLeftButtonDown="ThemeIconButton_PreviewMouseLeftButtonDown"
+                            Click="ThemeIconButton_Click"
                             ToolTip="{Binding ActiveThemeName, StringFormat='Theme: {0} (click to switch)'}"
                             AutomationProperties.Name="Theme switcher" />
                     <Popup x:Name="ThemePopup" PlacementTarget="{Binding ElementName=ThemeIconButton}"

@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     private readonly SettingsStore _settings;
     private readonly DispatcherTimer _saveDebounce;
     private double _expandedHeight;
+    private bool _themePopupWasOpen;
 
     public MainWindow()
     {
@@ -155,7 +156,8 @@ public partial class MainWindow : Window
     private void ShowContentChrome()
     {
         CardsScroller.Visibility = Visibility.Visible;
-        BottomIconStrip.Visibility = Visibility.Visible;
+        // Respect compact: don't un-hide the toolbar if focus/game was exited while compact.
+        BottomIconStrip.Visibility = (Vm?.IsCompact ?? false) ? Visibility.Collapsed : Visibility.Visible;
     }
 
     /// <summary>Enter focus mode if out, exit if in — ports
@@ -317,6 +319,19 @@ public partial class MainWindow : Window
     /// <summary>× hides the widget to the tray — the app stays alive. Real quit
     /// lives in the tray menu (orderOut equivalent).</summary>
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Hide();
+
+    // The 🎨 icon toggles the theme flyout. With StaysOpen=False the popup is dismissed
+    // on mouse-DOWN outside it, so without this guard the trailing Click would reopen it
+    // when the user clicks the icon to CLOSE an open flyout. Record the pre-down state
+    // and only open when it was closed.
+    private void ThemeIconButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        => _themePopupWasOpen = ThemePopup.IsOpen;
+
+    private void ThemeIconButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_themePopupWasOpen)
+            ThemePopup.IsOpen = true;
+    }
 
     // -- drag-reorder drop ----------------------------------------------------
 
