@@ -139,8 +139,9 @@ public sealed class SignInCoordinator
 
     // -- persistence semantics ------------------------------------------------
 
-    /// <summary>Embedded-flow save: first account auto-creates "Personal";
-    /// subsequent ones get a named slot and become active.</summary>
+    /// <summary>Embedded-flow save: the first account auto-creates "Personal";
+    /// subsequent ones prompt for a name (defaulting to the next free slot) and
+    /// become active.</summary>
     private string PersistEmbedded(CapturedCookies cookies)
     {
         if (_accounts.GetActive() is null)
@@ -148,10 +149,33 @@ public sealed class SignInCoordinator
             _credentials.Save(cookies.SessionKey, cookies.CfClearance);
             return _accounts.GetActive() ?? "Personal";
         }
-        var label = NextFreeLabel();
+        var label = PromptForAccountName(NextFreeLabel());
         _accounts.AddAccount(label, cookies.SessionKey!, cookies.CfClearance);
         _accounts.SetActive(label);
         return label;
+    }
+
+    /// <summary>Ask the user to name a newly-added account during embedded sign-in,
+    /// defaulting to (and falling back to) <paramref name="suggested"/> — the next free
+    /// "Account N" slot. Validated like <c>ManualKeyWindow</c> (1-32 of [A-Za-z0-9 _-],
+    /// unique); an empty, invalid, or cancelled entry keeps the suggested label.</summary>
+    private string PromptForAccountName(string suggested)
+    {
+        var prompt = new TextPromptWindow("Name this account", "Account name", suggested);
+        if (Application.Current?.MainWindow is { IsLoaded: true } main)
+            prompt.Owner = main;
+        if (prompt.ShowDialog() != true)
+            return suggested;
+
+        var name = prompt.Value.Trim();
+        var existing = new HashSet<string>(_accounts.ListAccounts(), StringComparer.OrdinalIgnoreCase);
+        if (name.Length == 0
+            || !System.Text.RegularExpressions.Regex.IsMatch(name, "^[A-Za-z0-9 _-]{1,32}$")
+            || existing.Contains(name))
+        {
+            return suggested;
+        }
+        return name;
     }
 
     /// <summary>Manual-flow save: explicit user-named slot, then make it active.</summary>
