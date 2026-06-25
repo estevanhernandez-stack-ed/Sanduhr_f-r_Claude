@@ -13,29 +13,23 @@ resubmission.
 ## What's new in this version
 
 ```
-Sanduhr is rebuilt from the ground up as a native Windows app — faster, lighter,
-and at home on Windows 11 with Mica glass.
+Sanduhr is rebuilt from the ground up as a native Windows app — same Sanduhr,
+faster and lighter, with a self-contained installer that needs no extra runtime.
 
-Sign in the easy way
+Easier sign-in
 - Sign in on the real Claude page right inside the app. No more opening DevTools
-  or copying cookies by hand.
+  or pasting your session cookie by hand.
 - If your session ever expires, a one-tap card signs you back in — your history
-  stays put.
+  and accounts stay put.
 
-Everything one click away
-- A new bottom tool strip puts every feature in reach: themes, settings, the usage
-  graph, compact mode, the focus timer, and the cooldown game. Every button is
-  labeled for screen readers.
-
-See your usage your way
-- New graph modes: a clean line view, or a layered "horizon" band view of your
-  30-day history.
-- Compact mode collapses the widget down to the limit you care about most.
-
-Polish
-- Themed in-app dialogs that match your colors.
+Also new
 - The taskbar button now follows your pin: pinned and on top, it stays out of your
   taskbar; unpinned, it's there when you need it.
+- Sharper, native window chrome.
+
+Everything you already rely on — burn-rate projection, the pace ghost, the 30-day
+graph, the focus timer, your themes, multi-account, and local Claude Code
+token-burn — carries over unchanged.
 
 Independent third-party tool. Sanduhr für Claude is not affiliated with, endorsed
 by, or associated with Anthropic PBC. "Claude" and "claude.ai" are trademarks of
