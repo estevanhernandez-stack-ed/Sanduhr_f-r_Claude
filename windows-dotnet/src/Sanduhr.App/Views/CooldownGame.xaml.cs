@@ -63,9 +63,15 @@ public partial class CooldownGame : UserControl
         _timer.Start();
         Board.InvalidateVisual();
 
-        // Take keyboard focus so arrow keys land here.
-        Focus();
-        Keyboard.Focus(this);
+        // Take keyboard focus so arrow keys + Esc land here. Deferred: Focus() no-ops on
+        // an element that isn't laid out yet (we just set Visibility=Visible), which left
+        // the game unresponsive to keys — you could neither play nor Esc out.
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+        {
+            Focusable = true;
+            Focus();
+            Keyboard.Focus(this);
+        }));
     }
 
     /// <summary>Stop the loop, hide the overlay, and signal completion.</summary>

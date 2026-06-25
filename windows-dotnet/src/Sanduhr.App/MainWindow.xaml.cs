@@ -22,6 +22,7 @@ public partial class MainWindow : Window
 {
     private readonly SettingsStore _settings;
     private readonly DispatcherTimer _saveDebounce;
+    private const double ExpandedMinHeight = 400; // matches Window MinHeight; dropped in compact so the window can shrink
     private double _expandedHeight;
     private bool _themePopupWasOpen;
 
@@ -156,8 +157,7 @@ public partial class MainWindow : Window
     private void ShowContentChrome()
     {
         CardsScroller.Visibility = Visibility.Visible;
-        // Respect compact: don't un-hide the toolbar if focus/game was exited while compact.
-        BottomIconStrip.Visibility = (Vm?.IsCompact ?? false) ? Visibility.Collapsed : Visibility.Visible;
+        BottomIconStrip.Visibility = Visibility.Visible;
     }
 
     /// <summary>Enter focus mode if out, exit if in — ports
@@ -214,11 +214,16 @@ public partial class MainWindow : Window
     /// measure (Python uses QTimer.singleShot(0) for the same reason).</summary>
     private void OnCompactChanged(bool compact)
     {
-        // Hide the toolbar in compact (footer stays), like the Python tool strip.
-        BottomIconStrip.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        // The strip stays visible in compact so the user can click the compact icon to
+        // expand again (slight deviation from Python, which hid the tool strip and only
+        // offered double-click).
         if (compact)
         {
             _expandedHeight = ActualHeight;
+            // Drop the min-height floor — MinHeight=400 was clamping SizeToContent so the
+            // window never actually shrank — then auto-size the height to the single
+            // card. Width untouched, matching Python.
+            MinHeight = 0;
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
             {
                 SizeToContent = SizeToContent.Height;
@@ -227,6 +232,7 @@ public partial class MainWindow : Window
         else
         {
             SizeToContent = SizeToContent.Manual;
+            MinHeight = ExpandedMinHeight;
             if (_expandedHeight > 0)
                 Height = _expandedHeight;
         }
@@ -236,6 +242,20 @@ public partial class MainWindow : Window
     {
         base.OnSourceInitialized(e);
         ApplyBackdropForTheme(Vm?.Palette ?? ThemePalette.Obsidian);
+    }
+
+    /// <summary>Safety net: Esc always exits the snake overlay, even if the game lost
+    /// keyboard focus. PreviewKeyDown tunnels from the window first, so this fires
+    /// before anything can swallow the key — the user can never get trapped in the game.</summary>
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape && GameView.Visibility == Visibility.Visible)
+        {
+            GameView.Stop();
+            e.Handled = true;
+            return;
+        }
+        base.OnPreviewKeyDown(e);
     }
 
     /// <summary>
