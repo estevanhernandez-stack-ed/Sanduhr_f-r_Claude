@@ -17,8 +17,10 @@ Sanduhr is rebuilt from the ground up as a native Windows app — same Sanduhr,
 faster and lighter, with a self-contained installer that needs no extra runtime.
 
 Easier sign-in
-- Sign in on the real Claude page right inside the app. No more opening DevTools
-  or pasting your session cookie by hand.
+- Most sign-in methods now work on the real Claude page right inside the app —
+  no DevTools, no cookie hunt.
+- Signing in with Google? Google blocks that inside apps, so Sanduhr now walks
+  you through a quick session-key paste with clear, step-by-step guidance.
 - If your session ever expires, a one-tap card signs you back in — your history
   and accounts stay put.
 
@@ -88,9 +90,9 @@ WHY PEOPLE KEEP IT OPEN
 WHAT YOU NEED
 
 Your own active Claude Pro, Team, or Enterprise subscription. On first run, sign in
-on the real Claude page right inside the app — no DevTools, no cookie-pasting; the app
-walks you through it. (Power users can still paste a session key by hand if they
-prefer.) That's it.
+on the real Claude page right inside the app — no DevTools needed. (Signing in with
+Google? Google blocks that inside apps, so Sanduhr walks you through a quick one-time
+session-key paste, step by step.) That's it.
 
 PRIVACY BY DESIGN
 
@@ -110,9 +112,10 @@ Built by 626 Labs for Claude power users who want to pace themselves, not just t
 ```
 
 > Deltas from the approved v2.3 description:
-> 1. **WHAT YOU NEED** — "one-time paste of your claude.ai session cookie" → "sign in on the real
->    Claude page right inside the app … (paste fallback retained)". This is the headline change of
->    the login-hardening release; the old wording is now wrong.
+> 1. **WHAT YOU NEED** — "one-time paste of your claude.ai session cookie" → in-app sign-in on the
+>    real Claude page for most methods, with **Google routed to a guided session-key paste** (Google
+>    blocks OAuth in embedded webviews — the gap is real, so we name it). The old blanket "paste"
+>    wording was wrong for non-Google users; the new copy is honest both ways.
 > 2. **"Built to live on your desktop"** — prepended "every feature one click away on the bottom
 >    tool strip" so the public copy matches the new navigation (and the screenshots).
 > 3. Dropped the stale "(v2.3.0)" tag on the Claude Code token-burn bullet.

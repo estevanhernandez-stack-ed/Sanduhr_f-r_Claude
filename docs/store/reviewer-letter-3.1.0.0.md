@@ -27,8 +27,10 @@ claude.ai/login. We do NOT intercept or read the password — we only read back
 our own cookie jar's claude.ai sessionKey after a successful sign-in and store
 it in the Windows Credential Manager (DPAPI). The WebView2 profile is an
 app-owned, isolated folder; no other browser's cookies are read. A manual
-session-key paste is retained as a fallback. (The Python build used that manual
-paste as the primary path; the in-app sign-in is the main user-facing change.)
+session-key paste is retained as a fallback — and is the intended path for
+Google sign-in, which Google blocks inside embedded webviews: the app detects
+the bounce and guides the user to paste (expected behavior, not a bug). The
+Python build used that manual paste as its primary path.
 
 Preserved from v2.x — no regression on your prior review points:
 - Navigation: every feature stays on one always-visible bottom tool strip, each
@@ -54,23 +56,21 @@ Estevan Hernandez
 
 ```
 Updates the same app last shipped as Python v2.3 — same Identity
-(626LabsLLC.SanduhrfrClaude) and Publisher CN. A full rebuild of v2.3 from
-Python to .NET 10 / WPF: same features, same data posture. No telemetry;
-declares ONLY runFullTrust.
+(626LabsLLC.SanduhrfrClaude) and Publisher CN. A rebuild of v2.3 to .NET 10 /
+WPF: same features, same data posture. No telemetry; declares ONLY runFullTrust.
 
-Main user-facing change: sign-in. A WebView2 window loads the real
-claude.ai/login; we never read the password, only our own cookie jar's
-sessionKey, stored in Windows Credential Manager. Manual paste retained as
-fallback.
+Main change: sign-in. A WebView2 window loads the real claude.ai/login; we never
+read the password, only our own cookie jar's sessionKey, stored in Windows
+Credential Manager. Manual paste is retained as fallback — and is the expected
+path for Google sign-in, which Google blocks in embedded webviews (not a bug).
 
-Preserved from v2.x (no regression): every feature is on one visible bottom
-tool strip with accessible names + tooltips, nothing right-click-only; dialogs
-are themed and legible in light or dark mode. runFullTrust is for
-%APPDATA%\Sanduhr\ file access + the DWM Mica API only.
+Preserved from v2.x (no regression): every feature on one visible tool strip with
+accessible names; dialogs themed + legible in light/dark mode. runFullTrust is
+for %APPDATA%\Sanduhr\ access + the DWM Mica API only.
 
-"Claude"/"claude.ai" are Anthropic PBC trademarks, used nominatively. Sanduhr
-für Claude is an independent third-party tool, not affiliated with or endorsed
-by Anthropic PBC.
+"Claude"/"claude.ai" are Anthropic PBC trademarks, used nominatively. Sanduhr für
+Claude is an independent third-party tool, not affiliated with or endorsed by
+Anthropic PBC.
 
 Estevan Hernandez, 626 Labs LLC
 ```
