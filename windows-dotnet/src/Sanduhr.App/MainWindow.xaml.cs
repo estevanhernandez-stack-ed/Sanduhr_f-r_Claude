@@ -55,6 +55,12 @@ public partial class MainWindow : Window
 
     private WidgetViewModel? Vm => DataContext as WidgetViewModel;
 
+    private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(WidgetViewModel.Pinned))
+            ShowInTaskbar = !(Vm?.Pinned ?? false);
+    }
+
     // -- account access from the widget body ----------------------------------
 
     /// <summary>The widget's right-click menu (currently the gap this item closes):
@@ -129,6 +135,11 @@ public partial class MainWindow : Window
         Vm.FocusToggleRequested += ToggleFocusMode;
         Vm.GameStartRequested += StartCooldownGame;
         Vm.CompactChanged += OnCompactChanged;
+
+        // Taskbar button tracks pin state: pinned (always-on-top) needs no taskbar
+        // entry since it floats on top; unpinned shows one so a buried widget is findable.
+        ShowInTaskbar = !Vm.Pinned;
+        Vm.PropertyChanged += OnVmPropertyChanged;
         Vm.ThemeChanged += p =>
         {
             FocusView.ApplyPalette(p);
