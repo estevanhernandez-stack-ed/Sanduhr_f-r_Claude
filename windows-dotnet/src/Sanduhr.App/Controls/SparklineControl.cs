@@ -88,9 +88,9 @@ public sealed class SparklineControl : FrameworkElement
         dc.DrawGeometry(null, pen, geo);
     }
 
-    /// <summary>Heer/Tufte horizon mode — translucent absolute-scale bands (the
-    /// geometry is the unit-tested <see cref="HorizonBands"/> in Core). Each bar is
-    /// drawn in the sparkline color at the band's alpha; stacking darkens peaks.</summary>
+    /// <summary>Layered horizon mode — normalized, translucent bands (the geometry is
+    /// the unit-tested <see cref="HorizonBands"/> in Core). Each bar is drawn in the
+    /// sparkline color at the band's alpha; stacking darkens peaks, lulls fade.</summary>
     private void RenderHorizon(DrawingContext dc, IReadOnlyList<int> values, double w, double h)
     {
         var c = LineColor;

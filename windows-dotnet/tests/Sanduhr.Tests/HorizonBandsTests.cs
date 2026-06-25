@@ -5,9 +5,9 @@ using Xunit;
 
 namespace Sanduhr.Tests;
 
-/// <summary>Port of windows/tests/test_horizon_sparkline.py — guards the absolute-scale
-/// horizon math (the easiest porting bug: reusing the classic line's min/max
-/// normalization would flatten the bands).</summary>
+/// <summary>Guards the horizon sparkline math: peaks must accumulate more ink than
+/// lulls, and (the live-test lesson) low / flat usage data must still render visibly
+/// rather than looking empty.</summary>
 public class HorizonBandsTests
 {
     [Fact]
@@ -19,19 +19,29 @@ public class HorizonBandsTests
         double colW = Math.Max(1, 120.0 / values.Length);
         double InkAt(int i) => bars.Where(b => Math.Abs(b.X - i * colW) < 0.5).Sum(b => b.Alpha);
 
-        double peak = InkAt(5); // v = 100
-        double lull = InkAt(0); // v = 5
+        double peak = InkAt(5); // the 100 run
+        double lull = InkAt(0); // the 5 run
         Assert.True(peak > lull * 1.5, $"peak ink {peak} should exceed 1.5x lull ink {lull}");
         Assert.True(peak > 0 && lull > 0);
     }
 
     [Fact]
-    public void Uses_absolute_scale_not_min_max_normalized()
+    public void Flat_data_renders_a_visible_baseline()
     {
-        // All-equal 100s reach the top band (alpha 0.78). A min/max-normalized scale
-        // (all equal → flat) would never produce a top-band bar.
-        var bars = HorizonBands.Compute(new[] { 100, 100, 100 }, w: 30, h: 16);
-        Assert.Contains(bars, b => Math.Abs(b.Alpha - 0.78) < 0.001);
+        // A tier sitting at a steady value must read as data, not an empty graph — the
+        // baseline floor + flat-range fallback guarantee a visible band.
+        var bars = HorizonBands.Compute(new[] { 9, 9, 9 }, w: 30, h: 16);
+        Assert.NotEmpty(bars);
+        Assert.All(bars, b => Assert.True(b.Height >= 1));
+    }
+
+    [Fact]
+    public void Low_but_varying_data_fills_the_height()
+    {
+        // Normalized to its own range, low single-digit usage should still reach the
+        // top band (alpha 0.80) at its peak instead of a faint sliver.
+        var bars = HorizonBands.Compute(new[] { 2, 5, 3, 9, 4 }, w: 50, h: 16);
+        Assert.Contains(bars, b => Math.Abs(b.Alpha - 0.80) < 0.001);
     }
 
     [Fact]

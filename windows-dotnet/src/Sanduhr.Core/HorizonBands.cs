@@ -5,14 +5,13 @@ namespace Sanduhr.Core;
 public readonly record struct HorizonBar(double X, double Y, double Width, double Height, double Alpha);
 
 /// <summary>
-/// Pure geometry for the Heer/Tufte horizon sparkline — ported from the Python
-/// build's <c>_paint_horizon</c>. The values are absolute 0..100 utilization,
-/// <b>NOT</b> min/max-normalized like the classic line; that distinction is the
-/// whole point of the mode and the easiest porting bug, so the math lives here in
-/// Core where it is unit-tested. Each band contributes one bar per column whose
-/// value crosses into it; stacking the translucent bands (source-over) darkens
-/// peaks. The App layer draws each <see cref="HorizonBar"/> with the sparkline
-/// color at its alpha.
+/// Pure geometry for the layered "horizon" sparkline. Inspired by the Heer/Tufte
+/// horizon chart, but tuned for a usage widget where values are often low and
+/// flat: the data is <b>normalized to its own [min, max]</b> (the same scale the
+/// classic line uses, so the sparkline fills the height and reads as data rather
+/// than a faint sliver), then folded into stacked translucent bands so peaks darken
+/// and lulls fade. A small baseline floor keeps the lowest column visible. The App
+/// layer draws each <see cref="HorizonBar"/> with the sparkline color at its alpha.
 /// </summary>
 public static class HorizonBands
 {
@@ -26,20 +25,31 @@ public static class HorizonBands
 
         int n = values.Count;
         double colW = Math.Max(1, w / n);
-        double bandSize = 100.0 / bands;
 
+        int mn = int.MaxValue, mx = int.MinValue;
+        foreach (var v in values)
+        {
+            if (v < mn) mn = v;
+            if (v > mx) mx = v;
+        }
+        double rng = mx != mn ? mx - mn : 1; // flat data → uniform baseline, never invisible
+
+        double bandFrac = 1.0 / bands;
         for (int band = 0; band < bands; band++)
         {
-            double bandFloor = band * bandSize;
-            double bandCeil = (band + 1) * bandSize;
-            double alpha = 0.18 + 0.20 * band; // 0.18 / 0.38 / 0.58 / 0.78 for 4 bands
+            double floorFrac = band * bandFrac;
+            double ceilFrac = (band + 1) * bandFrac;
+            double alpha = 0.32 + 0.16 * band; // 0.32 / 0.48 / 0.64 / 0.80 for 4 bands
             for (int i = 0; i < n; i++)
             {
-                double v = values[i];
-                if (v <= bandFloor)
+                // Normalize to the data range, then lift into [0.12, 1.0] so the lowest
+                // column still shows a visible baseline (flat data renders a thin band
+                // rather than nothing).
+                double frac = 0.12 + 0.88 * (values[i] - mn) / rng;
+                if (frac <= floorFrac)
                     continue;
-                double eff = Math.Min(v, bandCeil);
-                double barH = Math.Max(1, eff / 100.0 * h); // absolute scale, never min/max-normalized
+                double eff = Math.Min(frac, ceilFrac);
+                double barH = Math.Max(1, eff * h);
                 bars.Add(new HorizonBar(i * colW, h - barH, Math.Max(1, colW), barH, alpha));
             }
         }
