@@ -49,12 +49,15 @@
          Setting StartupObject suppresses the WPF-generated Main in App.g.cs (the build
          uses Program.Main instead). See Program.cs. -->
     <StartupObject>Sanduhr.App.Program</StartupObject>
-    <!-- v3.0.0 signals the platform shift (Python/PySide6 -> .NET 10/WPF). MSIX requires a
-         4-part version with the 4th component .0 (Partner Center rejects non-zero revisions).
-         Keep these three in lockstep with <Identity Version> in Package.appxmanifest. -->
-    <Version>3.0.0.0</Version>
-    <AssemblyVersion>3.0.0.0</AssemblyVersion>
-    <FileVersion>3.0.0.0</FileVersion>
+    <!-- v3.1.0: the feature overhaul on the .NET base (recovery hardening, themed dialogs,
+         graph cycle, compact mode, the consolidated tool strip). v3.0.0 was the platform
+         rebuild (Python/PySide6 -> .NET 10/WPF); it never shipped to the Store (which is on
+         Python v2.3), so 3.1.0 is the .NET Store debut. MSIX requires a 4-part version with the
+         4th component .0 (Partner Center rejects non-zero revisions). Keep these three in
+         lockstep with <Identity Version> in Package.appxmanifest. -->
+    <Version>3.1.0.0</Version>
+    <AssemblyVersion>3.1.0.0</AssemblyVersion>
+    <FileVersion>3.1.0.0</FileVersion>
   </PropertyGroup>
 
 </Project>
