@@ -211,24 +211,13 @@ public sealed partial class HistoryTabViewModel : ObservableObject
             return;
         }
         Changed?.Invoke();
-        Sounds.PlayInfo();
         Info("Local usage history file removed.");
     }
 
     private void Info(string message)
-    {
-        if (_owner is not null)
-            MessageBox.Show(_owner, message, "History", MessageBoxButton.OK, MessageBoxImage.None);
-        else
-            MessageBox.Show(message, "History", MessageBoxButton.OK, MessageBoxImage.None);
-    }
+        => ThemedDialog.Show(_owner, "History", message, MessageBoxButton.OK, ThemedDialogKind.Info);
 
     private bool Confirm(string message)
-    {
-        Sounds.PlayError(); // warning chime (parity with the styled warning box)
-        var result = _owner is not null
-            ? MessageBox.Show(_owner, message, "Clear history?", MessageBoxButton.YesNo, MessageBoxImage.None)
-            : MessageBox.Show(message, "Clear history?", MessageBoxButton.YesNo, MessageBoxImage.None);
-        return result == MessageBoxResult.Yes;
-    }
+        => ThemedDialog.Show(_owner, "Clear history?", message, MessageBoxButton.YesNo, ThemedDialogKind.Warning)
+           == MessageBoxResult.Yes;
 }

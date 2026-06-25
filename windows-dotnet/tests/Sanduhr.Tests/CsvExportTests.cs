@@ -103,8 +103,14 @@ public class CsvExportTests
 
         var r = CsvExport.Build(f.History, f.Accounts, account: "Personal");
         Assert.Equal(1, r.RowCount);
-        Assert.DoesNotContain("70", r.Text);
-        Assert.Contains("30", r.Text);
+        // Assert against the util_pct column, not a bare substring of the whole CSV:
+        // a high-precision timestamp can contain "70"/"30" by coincidence (e.g. the
+        // .666770 microseconds of a midnight-UTC export), which made this test flaky
+        // depending on the wall clock. Mirror the column-split assertion used by
+        // All_accounts_export_includes_account_column_and_spans_accounts.
+        var dataRows = Lines(r.Text).Skip(1).Select(l => l.Split(',')).ToList();
+        Assert.Contains(dataRows, c => c[^1] == "30");
+        Assert.DoesNotContain(dataRows, c => c[^1] == "70");
     }
 
     [Fact]

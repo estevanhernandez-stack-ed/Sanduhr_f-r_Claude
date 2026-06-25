@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Input;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.Views;
@@ -24,11 +25,12 @@ internal partial class ManualKeyWindow : Window
     /// Saves (label, cookies) and returns the final label. May throw
     /// (invalid/duplicate label, credential write failure) — shown inline.
     /// </param>
-    public ManualKeyWindow(string suggestedLabel, Func<string, CapturedCookies, string> persist)
+    public ManualKeyWindow(string suggestedLabel, Func<string, CapturedCookies, string> persist, bool embeddedAvailable = false)
     {
         _persist = persist;
         InitializeComponent();
         LabelBox.Text = suggestedLabel;
+        UseEmbeddedLink.Visibility = embeddedAvailable ? Visibility.Visible : Visibility.Collapsed;
         Loaded += (_, _) => SessionKeyBox.Focus();
     }
 
@@ -69,6 +71,22 @@ internal partial class ManualKeyWindow : Window
         DialogResult = false;
         Close();
     }
+
+    /// <summary>"Use the secure sign-in window instead" — close with a UseEmbedded
+    /// result so the coordinator bounces to the embedded sign-in flow. Only visible
+    /// when the WebView2 runtime is present.</summary>
+    private void OnUseEmbeddedClick(object sender, MouseButtonEventArgs e)
+    {
+        Result = new SignInResult.UseEmbedded();
+        DialogResult = false; // close; the coordinator reads Result, not DialogResult
+        Close();
+    }
+
+    /// <summary>Toggle the collapsed "Where do I find the sessionKey?" DevTools steps.</summary>
+    private void OnHelpToggleClick(object sender, MouseButtonEventArgs e)
+        => HelpSteps.Visibility = HelpSteps.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
 
     private void ShowError(string message)
     {

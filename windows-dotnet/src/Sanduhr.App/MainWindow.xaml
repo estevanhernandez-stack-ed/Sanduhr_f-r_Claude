@@ -66,10 +66,14 @@
             </Setter>
         </Style>
 
+        <!-- Native Windows close button: full-height, flush far-right, red (#c42b1c)
+             hover — matches Explorer/Settings chrome (the MS Store reviewer's "native
+             app" instinct, per the submission playbook). The window content is clipped
+             to the 10px corner radius (code-behind) so the window rounding crops this
+             button's top-right corner, exactly how real Win11 caption buttons behave. -->
         <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource ChromeButton}">
             <Setter Property="Width" Value="46" />
             <Setter Property="FontSize" Value="14" />
-            <!-- Close stays as-is: full-height, flush far-right, square red hover. -->
             <Setter Property="Height" Value="34" />
             <Setter Property="Margin" Value="0" />
             <Setter Property="VerticalAlignment" Value="Stretch" />
@@ -89,11 +93,69 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Bottom-strip icon button: a single glyph that lifts (translate up) and gets
+             a soft rounded hover chip on mouse-over. Icon-only, so every instance MUST
+             carry both AutomationProperties.Name and ToolTip (MS Store accessibility),
+             and IsHitTestVisibleInChrome=True or WindowChrome treats the click as a drag. -->
+        <Style x:Key="IconStripButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Margin" Value="1,0" />
+            <Setter Property="FontFamily" Value="Segoe UI Emoji" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+            <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <TranslateTransform Y="0" />
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="chip" CornerRadius="6" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="chip" Property="Background" Value="#26FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Trigger.EnterActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                                 To="-3" Duration="0:0:0.10" />
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </Trigger.EnterActions>
+                    <Trigger.ExitActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                                 To="0" Duration="0:0:0.10" />
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </Trigger.ExitActions>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <!-- Keyboard: Ctrl+P toggles Deep Work focus mode (parity with widget.py). -->
     <Window.InputBindings>
         <KeyBinding Modifiers="Control" Key="P" Command="{Binding ToggleFocusCommand}" />
+        <KeyBinding Modifiers="Control" Key="D" Command="{Binding ToggleCompactCommand}" />
     </Window.InputBindings>
 
     <!-- Root glass panel. On Win11 22H2+ this rides over Mica (semi-opaque
@@ -104,7 +166,7 @@
             Background="{DynamicResource Sanduhr.Brush.GlassChrome}"
             BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
             BorderThickness="1">
-        <DockPanel LastChildFill="True">
+        <DockPanel x:Name="ContentDock" LastChildFill="True">
 
             <!-- Accent gradient strip -->
             <Border DockPanel.Dock="Top" Height="2" CornerRadius="10,10,0,0">
@@ -126,103 +188,12 @@
                                ToolTip="Drag to move" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Style="{StaticResource ChromeButton}" Content="Settings"
-                            Command="{Binding OpenSettingsCommand}" ToolTip="Open settings" />
-                    <Button Style="{StaticResource ChromeButton}" Content="Refresh"
-                            Command="{Binding RefreshCommand}" ToolTip="Refresh usage now" />
-                    <Button Command="{Binding TogglePinCommand}">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource ChromeButton}">
-                                <Setter Property="Content" Value="Pin" />
-                                <Setter Property="ToolTip" Value="Pin always on top" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding Pinned}" Value="True">
-                                        <Setter Property="Content" Value="Unpin" />
-                                        <Setter Property="ToolTip" Value="Unpin (currently always on top)" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
+                    <!-- Settings / Refresh / Pin moved to the bottom icon strip; only the
+                         close (tray-hide) affordance stays in the title bar. -->
                     <Button Style="{StaticResource CloseButton}" Content="&#x2715;"
                             Click="CloseButton_Click" ToolTip="Hide to tray" />
                 </StackPanel>
             </Grid>
-
-            <!-- Theme swatch area: a wrapping row of discreet name-entries below the
-                 title bar. Each entry IS the theme name, rendered in the theme's accent
-                 ink and its own font, with a thin accent underline as the only extra
-                 color cue (active = bold + fuller underline). Click to switch instantly
-                 (live re-tint + persisted to settings.json "theme" + soft chime).
-                 Built-ins first, then user drop-ins. Compact: at 420px wide the names
-                 wrap to ~2 short rows for the ~10 common themes, so no scrollbar shows.
-                 If many user themes push past the cap, the slim themed scrollbar
-                 (scoped in below) appears instead of the vanilla WPF one. Uses the
-                 shared ThemeSwatchTemplate + the SAME Themes collection as
-                 Settings → Themes, so the active highlight stays in sync. -->
-            <Border x:Name="ThemesHeader" DockPanel.Dock="Top"
-                    Background="{DynamicResource Sanduhr.Brush.TitleBg}"
-                    Padding="6,2,4,4">
-                <StackPanel>
-                    <!-- Thin, full-width "Themes" disclosure header. Clicking toggles
-                         the swatch grid below (ToggleThemesCommand → IsThemesExpanded,
-                         persisted to settings.json "themes_expanded"). Subtle by design:
-                         chevron + label in the muted/dim chrome inks, pointing-hand
-                         cursor, faint hover chip. When collapsed it also shows the live
-                         theme name ("Themes · Matrix"); that name hides once expanded. -->
-                    <Button Command="{Binding ToggleThemesCommand}" Cursor="Hand"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            ToolTip="Show or hide the theme switcher"
-                            shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Border x:Name="hdr" CornerRadius="5" Background="Transparent" Padding="6,3">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock x:Name="chev" Text="&#x25B8;" FontSize="9"
-                                                   VerticalAlignment="Center" Margin="0,0,6,0"
-                                                   Foreground="{DynamicResource Sanduhr.Brush.TextMuted}" />
-                                        <TextBlock Text="Themes" FontSize="11" VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
-                                        <TextBlock x:Name="activeName" VerticalAlignment="Center"
-                                                   FontSize="11" Margin="6,0,0,0"
-                                                   Foreground="{DynamicResource Sanduhr.Brush.TextMuted}">
-                                            <Run Text="·&#160;" /><Run Text="{Binding ActiveThemeName, Mode=OneWay}" />
-                                        </TextBlock>
-                                    </StackPanel>
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="hdr" Property="Background" Value="#16FFFFFF" />
-                                    </Trigger>
-                                    <!-- Expanded: chevron points down, drop the redundant name. -->
-                                    <DataTrigger Binding="{Binding IsThemesExpanded}" Value="True">
-                                        <Setter TargetName="chev" Property="Text" Value="&#x25BE;" />
-                                        <Setter TargetName="activeName" Property="Visibility" Value="Collapsed" />
-                                    </DataTrigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
-
-                    <!-- Collapsible swatch grid: visibility bound to IsThemesExpanded. -->
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                                  MaxHeight="96" Margin="0,2,0,2"
-                                  Visibility="{Binding IsThemesExpanded, Converter={StaticResource BoolVis}}">
-                        <ScrollViewer.Resources>
-                            <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
-                        </ScrollViewer.Resources>
-                        <ItemsControl ItemsSource="{Binding Themes}"
-                                      ItemTemplate="{StaticResource ThemeSwatchTemplate}"
-                                      shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel Orientation="Horizontal" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </StackPanel>
-            </Border>
 
             <!-- Footer -->
             <Grid DockPanel.Dock="Bottom" Height="26"
@@ -239,21 +210,119 @@
                 </Border>
             </Grid>
 
-            <!-- Tool strip — Focus + Game affordances (port of widget.py's tool
-                 strip between the cards and the footer). Docked above the footer.
-                 AutomationProperties.Name set so screen readers + MS Store review
-                 tooling read them (the v2.0.1 rejection lesson). -->
-            <Border DockPanel.Dock="Bottom" Height="28"
-                    Background="{DynamicResource Sanduhr.Brush.FooterBg}">
+            <!-- Bottom icon strip — the consolidated toolbar (Theme, Settings, Graph,
+                 Compact, Focus, Snake, Refresh, Pin). Quiet (dim) at rest, brightens on
+                 hover; each icon also lifts on its own hover (IconStripButton). Docked
+                 above the footer. Theme opens the swatch flyout; Graph/Pin swap on state.
+                 Every icon carries AutomationProperties.Name + ToolTip (MS Store) and
+                 IsHitTestVisibleInChrome (via the shared style). -->
+            <Border x:Name="BottomIconStrip" DockPanel.Dock="Bottom" Height="34"
+                    Background="{DynamicResource Sanduhr.Brush.FooterBg}"
+                    Opacity="0.6">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1.0" Duration="0:0:0.14" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0.6" Duration="0:0:0.14" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Button Style="{StaticResource ChromeButton}" Content="Focus"
+                    <Button x:Name="ThemeIconButton" Style="{StaticResource IconStripButton}"
+                            Content="🎨"
+                            PreviewMouseLeftButtonDown="ThemeIconButton_PreviewMouseLeftButtonDown"
+                            Click="ThemeIconButton_Click"
+                            ToolTip="{Binding ActiveThemeName, StringFormat='Theme: {0} (click to switch)'}"
+                            AutomationProperties.Name="Theme switcher" />
+                    <Popup x:Name="ThemePopup" PlacementTarget="{Binding ElementName=ThemeIconButton}"
+                           Placement="Top" StaysOpen="False" AllowsTransparency="True"
+                           IsOpen="{Binding IsThemesExpanded, Mode=TwoWay}">
+                        <Border CornerRadius="10" Background="{DynamicResource Sanduhr.Brush.GlassChrome}"
+                                BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1"
+                                Padding="6" Width="264" Margin="0,0,0,6">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                          MaxHeight="200">
+                                <ScrollViewer.Resources>
+                                    <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                                </ScrollViewer.Resources>
+                                <ItemsControl ItemsSource="{Binding Themes}"
+                                              ItemTemplate="{StaticResource ThemeSwatchTemplate}"
+                                              shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+                    </Popup>
+
+                    <Button Style="{StaticResource IconStripButton}" Content="⚙"
+                            Command="{Binding OpenSettingsCommand}"
+                            ToolTip="Settings" AutomationProperties.Name="Settings" />
+
+                    <Button Command="{Binding CycleSparklineStyleCommand}"
+                            AutomationProperties.Name="Cycle graph style">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource IconStripButton}">
+                                <Setter Property="Content" Value="📊" />
+                                <Setter Property="ToolTip" Value="Graph: classic line (click to cycle)" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SparklineStyle}" Value="Horizon">
+                                        <Setter Property="Content" Value="📈" />
+                                        <Setter Property="ToolTip" Value="Graph: horizon bands (click to cycle)" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+
+                    <Button Style="{StaticResource IconStripButton}" Content="↕"
+                            Command="{Binding ToggleCompactCommand}"
+                            ToolTip="Compact mode (Ctrl+D)" AutomationProperties.Name="Compact mode" />
+
+                    <Button Style="{StaticResource IconStripButton}" Content="⏳"
                             Command="{Binding ToggleFocusCommand}"
                             ToolTip="Deep Work focus timer (Ctrl+P)"
                             AutomationProperties.Name="Deep Work focus timer" />
-                    <Button Style="{StaticResource ChromeButton}" Content="Game"
+
+                    <Button Style="{StaticResource IconStripButton}" Content="🐍"
                             Command="{Binding StartGameCommand}"
-                            ToolTip="Play the cooldown snake"
-                            AutomationProperties.Name="Cooldown snake game" />
+                            ToolTip="Cooldown snake game" AutomationProperties.Name="Cooldown snake game" />
+
+                    <Button Style="{StaticResource IconStripButton}" Content="🔄"
+                            Command="{Binding RefreshCommand}"
+                            ToolTip="Refresh usage now" AutomationProperties.Name="Refresh usage" />
+
+                    <Button Command="{Binding TogglePinCommand}"
+                            AutomationProperties.Name="Pin on top">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource IconStripButton}">
+                                <Setter Property="Content" Value="📌" />
+                                <Setter Property="ToolTip" Value="Pin always on top" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Pinned}" Value="True">
+                                        <Setter Property="ToolTip" Value="Unpin (currently always on top)" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                 </StackPanel>
             </Border>
 
@@ -335,14 +404,14 @@
                                     </LinearGradientBrush>
                                 </Border.Background>
                             </Border>
-                            <TextBlock Text="Track your Claude usage"
+                            <TextBlock Text="{Binding PromptHeadline}"
                                        FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center"
                                        Foreground="{DynamicResource Sanduhr.Brush.Text}" />
-                            <TextBlock Text="Sign in once in a secure window. Sanduhr reads your usage automatically — no DevTools, no copy-paste."
+                            <TextBlock Text="{Binding PromptSubtitle}"
                                        FontSize="11" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="280"
                                        Margin="0,6,0,16"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                            <Button Command="{Binding SignInCommand}" Cursor="Hand"
+                            <Button Command="{Binding PrimaryAuthCommand}" Content="{Binding PromptPrimaryLabel}" Cursor="Hand"
                                     HorizontalAlignment="Center" Padding="22,9" FontSize="13" FontWeight="SemiBold"
                                     Foreground="#0d0d0d" BorderThickness="0">
                                 <Button.Template>
@@ -358,7 +427,6 @@
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
                                 </Button.Template>
-                                Sign in to Claude
                             </Button>
                             <Button Command="{Binding PasteKeyCommand}" Cursor="Hand" Content="Paste a key instead"
                                     HorizontalAlignment="Center" Margin="0,12,0,0"

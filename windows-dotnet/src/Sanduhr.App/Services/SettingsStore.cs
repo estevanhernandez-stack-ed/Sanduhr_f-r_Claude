@@ -145,6 +145,28 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>The saved sparkline style (settings.json "sparkline_style"),
+    /// defaulting to Classic. A deliberate upgrade over the Python build, which reset
+    /// the graph mode to classic each launch.</summary>
+    public SparklineStyle LoadSparklineStyle()
+    {
+        var root = Read();
+        try
+        {
+            return Enum.TryParse<SparklineStyle>(root["sparkline_style"]?.GetValue<string>(), out var s)
+                ? s
+                : SparklineStyle.Classic;
+        }
+        catch { return SparklineStyle.Classic; }
+    }
+
+    public void SaveSparklineStyle(SparklineStyle style)
+    {
+        var root = Read();
+        root["sparkline_style"] = style.ToString();
+        Write(root);
+    }
+
     /// <summary>The Local CC tab's "show project &amp; skill breakdown" preference
     /// (settings.json "local_cc_show_breakdowns"), defaulting to true — parity with
     /// <c>local_cc_dialog</c>'s default-on breakdown tables.</summary>

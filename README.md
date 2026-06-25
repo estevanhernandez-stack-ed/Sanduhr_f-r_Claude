@@ -129,15 +129,23 @@ Drop a custom theme JSON into `~/Library/Application Support/Sanduhr/themes/` (m
 
 ## First-run setup
 
+### The easy way (Windows 11 native) — no DevTools
+
+Launch Sanduhr and click **Sign in to Claude**. A secure in-app window opens on the real `claude.ai` login page; sign in normally (Google, email, or passkey) and Sanduhr captures your session automatically. No DevTools, no copy-paste. Your credentials are stored in the Windows Credential Manager, never in a file.
+
+**Session expired?** Sanduhr shows **Session expired — sign in again** with a one-click button that re-authenticates the active account in place — your history is kept and no duplicate account is created. You can also re-authenticate any account from **Settings → Accounts**.
+
+### Manual sessionKey (power-user / Python build)
+
+Prefer to paste the key by hand, or running the cross-platform Python build?
+
 1. Go to [claude.ai](https://claude.ai) and sign in.
 2. Open DevTools (`⌥⌘I` on macOS, `F12` on Windows).
 3. Navigate to **Application → Cookies → claude.ai**.
 4. Copy the value of the `sessionKey` cookie.
-5. Paste it into Sanduhr's first-launch dialog.
+5. Paste it into Sanduhr (Windows native: **Settings → Accounts → Add by sessionKey**).
 
 Sanduhr hits two `claude.ai` endpoints — the same ones the settings page uses — to read your usage, and stores the cookie in your platform's native secure credential store (Keychain / Credential Manager). Nothing else leaves your machine.
-
-**Key expired?** `sessionKey` cookies expire when you log out or after extended inactivity. Paste a fresh one in Settings → Credentials.
 
 ---
 

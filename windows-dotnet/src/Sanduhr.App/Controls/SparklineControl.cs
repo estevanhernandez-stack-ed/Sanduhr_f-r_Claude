@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using Sanduhr.Core;
 
 namespace Sanduhr.App.Controls;
 
@@ -30,6 +31,17 @@ public sealed class SparklineControl : FrameworkElement
         set => SetValue(LineColorProperty, value);
     }
 
+    // Named SparklineStyle, NOT Style — Style would shadow FrameworkElement.Style.
+    public static readonly DependencyProperty SparklineStyleProperty = DependencyProperty.Register(
+        nameof(SparklineStyle), typeof(SparklineStyle), typeof(SparklineControl),
+        new FrameworkPropertyMetadata(SparklineStyle.Classic, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public SparklineStyle SparklineStyle
+    {
+        get => (SparklineStyle)GetValue(SparklineStyleProperty);
+        set => SetValue(SparklineStyleProperty, value);
+    }
+
     protected override void OnRender(DrawingContext dc)
     {
         var values = Values;
@@ -40,6 +52,12 @@ public sealed class SparklineControl : FrameworkElement
         double h = ActualHeight;
         if (w < 10 || h < 4)
             return;
+
+        if (SparklineStyle == SparklineStyle.Horizon)
+        {
+            RenderHorizon(dc, values, w, h);
+            return;
+        }
 
         int mn = int.MaxValue, mx = int.MinValue;
         foreach (var v in values) { if (v < mn) mn = v; if (v > mx) mx = v; }
@@ -68,5 +86,19 @@ public sealed class SparklineControl : FrameworkElement
         }
         geo.Freeze();
         dc.DrawGeometry(null, pen, geo);
+    }
+
+    /// <summary>Layered horizon mode — normalized, translucent bands (the geometry is
+    /// the unit-tested <see cref="HorizonBands"/> in Core). Each bar is drawn in the
+    /// sparkline color at the band's alpha; stacking darkens peaks, lulls fade.</summary>
+    private void RenderHorizon(DrawingContext dc, IReadOnlyList<int> values, double w, double h)
+    {
+        var c = LineColor;
+        foreach (var bar in HorizonBands.Compute(values, w, h))
+        {
+            var brush = new SolidColorBrush(Color.FromArgb((byte)(bar.Alpha * 255), c.R, c.G, c.B));
+            brush.Freeze();
+            dc.DrawRectangle(brush, null, new Rect(bar.X, bar.Y, bar.Width, bar.Height));
+        }
     }
 }

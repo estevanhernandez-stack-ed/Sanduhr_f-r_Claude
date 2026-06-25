@@ -66,6 +66,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     [ObservableProperty] private string _statusText = "Connecting…";
     [ObservableProperty] private bool _pinned;
+    [ObservableProperty] private bool _isCompact;
 
     /// <summary>Widget "Themes" header expand/collapse state — false (collapsed) by
     /// default so the swatch grid is tucked away under the thin header at rest.
@@ -94,16 +95,47 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _planTooltip = "";
     [ObservableProperty] private bool _hasPlanBadge;
 
-    /// <summary>True when there's no active account — drives the widget's
-    /// "Sign in to Claude" empty-state prompt (item 6 first-run entry point).</summary>
-    [ObservableProperty] private bool _showSignInPrompt;
+    /// <summary>Why the widget is showing a sign-in recovery card (None = hidden).
+    /// Drives the card's visibility, copy, and which action its primary button fires:
+    /// FirstRun → add-account sign-in; Expired/Blocked → in-place re-auth.</summary>
+    [ObservableProperty] private SignInReason _reason = SignInReason.None;
+
+    /// <summary>Active sparkline style, cycled by the Graph control. Seeded from
+    /// settings in the ctor; drives both the live card render and the toolbar glyph.</summary>
+    [ObservableProperty] private SparklineStyle _sparklineStyle = SparklineStyle.Classic;
+
+    /// <summary>Visibility of the recovery card — any non-None reason shows it.</summary>
+    public bool ShowSignInPrompt => Reason != SignInReason.None;
+    /// <summary>Card headline for the current reason (empty when hidden).</summary>
+    public string PromptHeadline => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason).Headline;
+    /// <summary>Card subtitle for the current reason (empty when hidden).</summary>
+    public string PromptSubtitle => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason).Subtitle;
+    /// <summary>Primary-button label for the current reason (empty when hidden).</summary>
+    public string PromptPrimaryLabel => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason).PrimaryLabel;
+
+    partial void OnReasonChanged(SignInReason value)
+    {
+        OnPropertyChanged(nameof(ShowSignInPrompt));
+        OnPropertyChanged(nameof(PromptHeadline));
+        OnPropertyChanged(nameof(PromptSubtitle));
+        OnPropertyChanged(nameof(PromptPrimaryLabel));
+    }
 
     /// <summary>Highest active-tier % for the tray glyph; -1 when no data.</summary>
     public event Action<int>? TrayPercentChanged;
 
+    /// <summary>Raised when compact mode toggles — the window hides its toolbar and
+    /// auto-sizes its height to the single remaining card.</summary>
+    public event Action<bool>? CompactChanged;
+
     /// <summary>Raised by the "Sign in to Claude" command — App opens the embedded
     /// WebView2 <c>SignInWindow</c> flow, then calls <see cref="ReloadAfterSignInAsync"/>.</summary>
     public event Func<Task>? SignInRequested;
+
+    /// <summary>Raised by the recovery card when the ACTIVE account needs re-auth
+    /// (Expired/Blocked) — App routes this to <c>SignInCoordinator.ReauthenticateActiveAsync</c>,
+    /// which refreshes the existing account in place rather than adding a new one.</summary>
+    public event Func<Task>? ReauthRequested;
 
     /// <summary>Raised by the "Paste a key instead" command — App opens the manual
     /// sessionKey fallback modal.</summary>
@@ -209,6 +241,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // Application resources before Show (no obsidian->saved flash).
         RebuildThemeMap();
         var savedKey = _settings.LoadTheme();
+        _sparklineStyle = _settings.LoadSparklineStyle();
         if (!_themes.TryGetValue(savedKey, out var def))
         {
             savedKey = "obsidian";
@@ -223,6 +256,15 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// fetch. Called once after the window is shown.</summary>
     public async void Start()
     {
+        // One-time legacy promotion BEFORE the first fetcher build: a pre-v2.2.0
+        // single-slot keyring key / v1 plaintext config is promoted to a "Personal"
+        // account so an upgrader isn't wrongly shown the first-run card. MigrateFromV1
+        // / MigrateLegacy are idempotent (no-op on a populated registry) and swallow
+        // their own Json/IO faults; guard anyway so a migration fault never blocks
+        // first paint.
+        try { _credentials.MigrateFromV1(); }
+        catch (Exception ex) { Debug.WriteLine($"[Sanduhr.Migrate] skipped: {ex.Message}"); }
+
         RebuildFetcher();
         RefreshAccountLabel();
         _tickTimer.Start();
@@ -328,14 +370,16 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         var creds = _credentials.Load();
         if (string.IsNullOrEmpty(creds.SessionKey))
         {
-            // Empty state: the widget shows the "Sign in to Claude" prompt instead
-            // of a status line, so clear StatusText to avoid the redundant message.
-            ShowSignInPrompt = true;
+            // No active account → first-run prompt. Wipe any signed-in chrome too, so a
+            // sign-out (or a removed last account) doesn't leave a stale plan badge,
+            // account label, or footer on screen.
+            Reason = SignInReason.FirstRun;
             StatusText = "";
+            ClearSignedInChrome();
             TrayPercentChanged?.Invoke(-1);
             return;
         }
-        ShowSignInPrompt = false;
+        Reason = SignInReason.None;
         // WebView2-backed transport (item 3 pivot): a raw HttpClient can't pass
         // Cloudflare's fingerprint binding, but a real authenticated browser can.
         // Same (sessionKey, cfClearance) shape as ClaudeApiClient, same interface.
@@ -359,6 +403,23 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         if (SignInRequested is not null)
             await SignInRequested.Invoke();
+    }
+
+    /// <summary>The recovery card's primary button. FirstRun → add-account sign-in;
+    /// Expired/Blocked → in-place re-auth of the active account.</summary>
+    [RelayCommand]
+    private async Task PrimaryAuth()
+    {
+        if (Reason is SignInReason.Expired or SignInReason.Blocked)
+        {
+            if (ReauthRequested is not null)
+                await ReauthRequested.Invoke();
+        }
+        else
+        {
+            if (SignInRequested is not null)
+                await SignInRequested.Invoke();
+        }
     }
 
     [RelayCommand]
@@ -481,15 +542,19 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             RefreshCcDelta();
             UpdatePlanBadge();
             StatusText = "";
+            Reason = SignInReason.None;
             UpdateFooter();
         }
         catch (SessionExpiredException)
         {
-            Fail("Session expired — re-add your key.");
+            // Stored key rejected (non-empty, so RebuildFetcher's empty gate never fires):
+            // show the actionable recovery card and wipe the now-stale signed-in chrome.
+            EnterRecoveryState(SignInReason.Expired);
         }
         catch (CloudflareBlockedException)
         {
-            Fail("Cloudflare — add cf_clearance.");
+            // Cloudflare challenge — re-auth re-captures a fresh cf_clearance silently.
+            EnterRecoveryState(SignInReason.Blocked);
         }
         catch (NetworkException)
         {
@@ -516,11 +581,40 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _settings.SavePinned(Pinned);
     }
 
+    /// <summary>Toggle compact mode — collapse the card list to the busiest tier and
+    /// signal the window to hide its toolbar + auto-size. Re-renders from the cached
+    /// fetch, never a refetch (parity with widget._toggle_compact). In-memory only:
+    /// resets to expanded each launch, matching Python.</summary>
+    [RelayCommand]
+    private void ToggleCompact()
+    {
+        IsCompact = !IsCompact;
+        if (_lastData is not null)
+            RenderCards(_lastData, DateTimeOffset.UtcNow);
+        CompactChanged?.Invoke(IsCompact);
+    }
+
     /// <summary>Toggle the widget's "Themes" swatch grid open/closed (the thin header
     /// click). Persistence rides the <see cref="OnIsThemesExpandedChanged"/> hook so the
     /// state survives relaunch.</summary>
     [RelayCommand]
     private void ToggleThemes() => IsThemesExpanded = !IsThemesExpanded;
+
+    /// <summary>Cycle the sparkline style (Classic ↔ Horizon) across every card with
+    /// no refetch — AffectsRender re-renders each control, mirroring the theme-strip
+    /// live switch. Persisted (a deliberate upgrade; Python resets to classic each
+    /// launch).</summary>
+    [RelayCommand]
+    private void CycleSparklineStyle()
+    {
+        var styles = (SparklineStyle[])Enum.GetValues(typeof(SparklineStyle));
+        int i = Array.IndexOf(styles, SparklineStyle);
+        SparklineStyle = styles[(i + 1) % styles.Length];
+        foreach (var card in Tiers)
+            card.ApplyStyle(SparklineStyle);
+        _settings.SaveSparklineStyle(SparklineStyle);
+        Sounds.PlayToggle();
+    }
 
     /// <summary>Focus affordance entry point — raises <see cref="FocusToggleRequested"/>
     /// so the window enters/exits focus mode (hourglass replaces the cards).</summary>
@@ -538,6 +632,31 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         StatusText = message;
         TrayPercentChanged?.Invoke(-1);
+    }
+
+    /// <summary>Drop the widget into a clean recovery state: show the reason card and
+    /// wipe the now-stale signed-in chrome (tier cards, plan badge, account label,
+    /// footer) so an expired/blocked session reads as fully signed out. The credential
+    /// stays put so "Sign in again" refreshes the same account in place.</summary>
+    private void EnterRecoveryState(SignInReason reason)
+    {
+        Reason = reason;
+        StatusText = "";
+        ClearSignedInChrome();
+        TrayPercentChanged?.Invoke(-1);
+    }
+
+    /// <summary>Wipe the signed-in chrome — tier cards, plan badge, account label,
+    /// footer — so a no-account / expired / signed-out state never shows stale data.</summary>
+    private void ClearSignedInChrome()
+    {
+        Tiers.Clear();
+        _lastData = null;
+        HasPlanBadge = false;
+        PlanTooltip = "";
+        AccountSwitcherText = "";
+        AccountSwitcherClickable = false;
+        FooterText = "";
     }
 
     private void OnTick()
@@ -582,6 +701,20 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             utilByKey[key] = Util(data, key);
 
         var active = TierModel.ActiveTiers(utilByKey, _savedOrder, _hidden);
+        if (IsCompact && active.Count > 0)
+        {
+            // Compact view: collapse to the single busiest tier (first-max, matching
+            // Python `max(active, key=util)`). Downstream get-or-create then destroys
+            // the rest and keeps the one complete card.
+            string top = active[0];
+            double best = utilByKey[active[0]] ?? 0;
+            foreach (var k in active)
+            {
+                double u = utilByKey[k] ?? 0;
+                if (u > best) { best = u; top = k; }
+            }
+            active = new List<string> { top };
+        }
         var activeSet = new HashSet<string>(active);
 
         // Drop cards for tiers that no longer have data / were hidden.
@@ -614,7 +747,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             int? limit = GetInt(tier, "limit");
             var historyValues = _history.Load(key);
 
-            vm.Update(util, resetsAt, used, limit, historyValues, _palette, now);
+            vm.Update(util, resetsAt, used, limit, historyValues, _palette, SparklineStyle, now);
             if (util > highest) highest = util;
         }
 
@@ -669,7 +802,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         if (_lastFetchAt is null) { FooterText = ""; return; }
         string ts = _lastFetchAt.Value.ToString("h:mm tt", CultureInfo.InvariantCulture);
-        string mode = Pinned ? "Pinned" : "Float";
+        string mode = IsCompact ? "Compact" : (Pinned ? "Pinned" : "Float");
         // Aggregate Local CC burn since the anchor, appended as "· CC +Nk" when
         // there's been activity — parity with widget._update_footer's _cc_delta_lbl.
         string cc = "";
@@ -687,6 +820,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     }
 
     partial void OnPinnedChanged(bool value) => UpdateFooter();
+    partial void OnIsCompactChanged(bool value) => UpdateFooter();
 
     // -- drag-reorder + hide (persisted) --------------------------------------
 

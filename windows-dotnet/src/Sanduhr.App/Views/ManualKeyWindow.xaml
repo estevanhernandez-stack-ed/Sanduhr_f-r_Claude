@@ -3,7 +3,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Add account by sessionKey"
-        Height="430" Width="520"
+        Height="470" Width="520"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Background="#0d0d0d">
@@ -23,10 +23,23 @@
 
         <TextBlock Grid.Row="0" Text="Add account by sessionKey"
                    FontSize="16" FontWeight="Bold" Foreground="#17d4fa" />
-        <TextBlock Grid.Row="1"
-                   Text="The power-user path. Paste the sessionKey cookie from claude.ai (DevTools → Application → Cookies). It's stored in the Windows Credential Manager, never in a file."
-                   TextWrapping="Wrap" FontSize="11" Foreground="#e8e4dc" Opacity="0.7"
-                   Margin="0,6,0,0" />
+        <StackPanel Grid.Row="1" Margin="0,6,0,0">
+            <TextBlock Text="The power-user path. Paste your claude.ai sessionKey cookie — it's stored in the Windows Credential Manager, never in a file."
+                       TextWrapping="Wrap" FontSize="11" Foreground="#e8e4dc" Opacity="0.7" />
+            <TextBlock x:Name="UseEmbeddedLink" Margin="0,8,0,0" Cursor="Hand"
+                       Visibility="Collapsed" MouseLeftButtonUp="OnUseEmbeddedClick">
+                <Run Text="Use the secure sign-in window instead" Foreground="#17d4fa"
+                     TextDecorations="Underline" FontSize="11" />
+            </TextBlock>
+            <TextBlock x:Name="HelpToggle" Margin="0,6,0,0" Cursor="Hand"
+                       MouseLeftButtonUp="OnHelpToggleClick">
+                <Run Text="Where do I find the sessionKey?" Foreground="#b8b4ac"
+                     TextDecorations="Underline" FontSize="11" />
+            </TextBlock>
+            <TextBlock x:Name="HelpSteps" Margin="0,6,0,0" Visibility="Collapsed"
+                       TextWrapping="Wrap" FontSize="11" Foreground="#e8e4dc" Opacity="0.7"
+                       Text="On claude.ai: open DevTools (F12) → Application → Cookies → claude.ai, then copy the value of the sessionKey cookie." />
+        </StackPanel>
 
         <TextBlock Grid.Row="2" Text="Account name" FontSize="11" Foreground="#b8b4ac" Margin="0,16,0,4" />
         <TextBox Grid.Row="3" x:Name="LabelBox" FontSize="13" Padding="8,6"

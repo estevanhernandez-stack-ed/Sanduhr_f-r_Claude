@@ -65,6 +65,24 @@ public class CredentialStoreTests
     }
 
     [Fact]
+    public void Save_overwrites_the_active_accounts_key_in_place()
+    {
+        // The behaviour the in-place re-auth path (SignInCoordinator.PersistReauth)
+        // depends on: a second Save against an existing active account refreshes its
+        // key in place rather than creating a new slot — no "Account 2", same label,
+        // history (keyed by label) untouched.
+        using var f = new Fixture();
+        f.Credentials.Save(sessionKey: "old-key");      // auto-creates "Personal", active
+        var before = f.Accounts.ListAccounts().Count;
+
+        f.Credentials.Save(sessionKey: "new-key");      // re-auth: overwrite active in place
+
+        Assert.Equal(before, f.Accounts.ListAccounts().Count);     // no new slot
+        Assert.Equal("new-key", f.Credentials.Load().SessionKey);  // refreshed in place
+        Assert.Equal("Personal", f.Accounts.GetActive());          // same active label
+    }
+
+    [Fact]
     public void Save_session_key_only()
     {
         using var f = new Fixture();

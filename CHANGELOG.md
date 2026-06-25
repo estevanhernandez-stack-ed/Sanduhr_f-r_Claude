@@ -1,10 +1,42 @@
 # Changelog
 
-## [Unreleased]
+## v3.1.0-windows — 2026-06-25
+
+**Platform:** Windows (.NET 10 / WPF). The first feature release on the native base — and the .NET app's Microsoft Store debut (the Store was on Python v2.3; v3.0.0 was never submitted).
 
 ### Added
 
-- **Subscription-tier badge in the footer.** Shows which Claude plan the tracked account is on (Pro / Team / Max / Max ×20) as a small right-aligned footer badge. The plan was already in the `/api/organizations` response we fetch for the org id — we only kept `uuid` and discarded the rest; now we read `rate_limit_tier` (corroborated by `billing_type` + `capabilities`) off the same org. The visible badge is the clean, store-safe plan name; the hover tooltip **rotates** through a collection of tongue-in-cheek riffs (Max ×20 → Plaid Max · Maximum Overdrive · Ridiculous Speed · Galaxy Brain Max; Max → Maximum Effort · Max Headroom · Big Max) so it's something different each time. Hidden entirely for API/prepaid orgs (e.g. `auto_prepaid_tier_0`) so it never shows a wrong label. New pure `plan.py` mapping module (defensive substring parse, gated on a real subscription) with full unit coverage.
+- **Consolidated tool strip.** Every top-level action now lives on one visible bottom icon strip — 🎨 Theme · ⚙ Settings · 📊 Graph · ↕ Compact · ⏳ Focus · 🐍 Snake · 🔄 Refresh · 📌 Pin — each with an accessible name + tooltip. Quiet at rest, brightens on hover; nothing hides behind a right-click menu.
+- **Graph cycle (📊).** Toggle the tier sparklines between a Classic line and a layered Horizon band view (normalized to the data so low/flat usage still reads). Persisted across launches.
+- **Compact mode (↕ / Ctrl+D / double-click).** Collapse the widget to its busiest tier and auto-size the window to it.
+- **Themed in-app dialogs.** A glass dialog that follows the active theme and plays a soft procedural chime replaces every native Windows MessageBox — no system chrome, no system ding.
+- **Theme swatch flyout** from the toolbar, plus a **taskbar button that tracks pin state** — pinned (always-on-top) hides it, unpinned shows it so a buried widget stays findable.
+
+### Changed
+
+- **One-click in-place session recovery.** An expired or Cloudflare-challenged session now shows an actionable "Sign in again" card that re-authenticates the active account **in place** — history preserved, no duplicate account — instead of a dead status line.
+- **Google-SSO guidance.** Google blocks OAuth inside embedded windows; the sign-in window now detects the bounce and routes Google users to the quick key-paste path.
+- **Legacy migration wired at startup**, so a pre-v2.2.0 upgrader keeps their account and history.
+- **Native close button** restored, with the window content clipped to the rounded corner so the window shape crops the caption button (like Win11's own).
+
+### Fixed
+
+- Stale account / plan badge / cards are wiped on session expiry **and** explicit sign-out.
+- Sign-in window timeout + error escape hatch; **Esc reliably exits** the cooldown snake.
+
+## v3.0.0-windows — 2026-06-22
+
+**Platform:** Windows (.NET 10 / WPF rebuild). The native foundation — rebuilt from Python/PySide6, feature-for-feature. (Prepped for the Store but superseded by v3.1.0 before submitting.)
+
+### Added
+
+- **Native .NET 10 / WPF rebuild** from Python/PySide6 — Win11 Mica backdrop, tray-resident, with a pure `Sanduhr.Core` (fully xUnit-covered) split from the WPF shell.
+- **Embedded "Sign in to Claude"** WebView2 window — sign in on the real `claude.ai` page; Sanduhr reads the `sessionKey` cookie off its own app-owned jar and stores it in the Windows Credential Manager (DevTools paste retained as a fallback).
+- **Subscription-tier badge in the footer.** Shows which Claude plan the tracked account is on (Pro / Team / Max / Max ×20), read from `rate_limit_tier` off the org response (corroborated by `billing_type` + `capabilities`); a rotating tongue-in-cheek hover tooltip; hidden for API/prepaid orgs so it never shows a wrong label.
+
+### Changed
+
+- Reads the **same** `%APPDATA%\Sanduhr\` files and Credential Manager slots as the Python build — zero migration for v2.2.0+ users.
 
 ## v2.3.0-windows — 2026-05-06
 

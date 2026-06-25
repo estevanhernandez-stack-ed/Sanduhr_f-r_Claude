@@ -22,6 +22,9 @@ public partial class MainWindow : Window
 {
     private readonly SettingsStore _settings;
     private readonly DispatcherTimer _saveDebounce;
+    private const double ExpandedMinHeight = 400; // matches Window MinHeight; dropped in compact so the window can shrink
+    private double _expandedHeight;
+    private bool _themePopupWasOpen;
 
     public MainWindow()
     {
@@ -41,6 +44,11 @@ public partial class MainWindow : Window
         RestoreFrame();
         LocationChanged += (_, _) => { _saveDebounce.Stop(); _saveDebounce.Start(); };
 
+        // Clip the content to the window's 10px rounded corner so the caption buttons and
+        // edges are cropped by the window shape (native Win11 caption-button behavior).
+        // Clip-only — never persists the frame, so it stays independent of move-only SaveFrame.
+        ContentDock.SizeChanged += (_, _) => UpdateContentClip();
+
         // DataContext is assigned by App AFTER construction, so build the right-click
         // menu + wire focus/game once the window is loaded (and the VM is present).
         Loaded += (_, _) =>
@@ -51,6 +59,18 @@ public partial class MainWindow : Window
     }
 
     private WidgetViewModel? Vm => DataContext as WidgetViewModel;
+
+    private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(WidgetViewModel.Pinned))
+            ShowInTaskbar = !(Vm?.Pinned ?? false);
+    }
+
+    /// <summary>Clip the content to the window's rounded corner (radius 9, inside the
+    /// 10px border) so caption buttons + bottom strip are cropped by the window shape.</summary>
+    private void UpdateContentClip()
+        => ContentDock.Clip = new System.Windows.Media.RectangleGeometry(
+            new Rect(0, 0, ContentDock.ActualWidth, ContentDock.ActualHeight), 9, 9);
 
     // -- account access from the widget body ----------------------------------
 
@@ -87,6 +107,10 @@ public partial class MainWindow : Window
         var refresh = new MenuItem { Header = "Refresh", Command = Vm.RefreshCommand };
         menu.Items.Add(refresh);
 
+        var compact = new MenuItem { Command = Vm.ToggleCompactCommand };
+        menu.Opened += (_, _) => compact.Header = (Vm?.IsCompact ?? false) ? "Expand" : "Compact Mode";
+        menu.Items.Add(compact);
+
         menu.Items.Add(new Separator());
 
         var focus = new MenuItem { Header = "Deep Work (Focus)", Command = Vm.ToggleFocusCommand };
@@ -121,6 +145,12 @@ public partial class MainWindow : Window
 
         Vm.FocusToggleRequested += ToggleFocusMode;
         Vm.GameStartRequested += StartCooldownGame;
+        Vm.CompactChanged += OnCompactChanged;
+
+        // Taskbar button tracks pin state: pinned (always-on-top) needs no taskbar
+        // entry since it floats on top; unpinned shows one so a buried widget is findable.
+        ShowInTaskbar = !Vm.Pinned;
+        Vm.PropertyChanged += OnVmPropertyChanged;
         Vm.ThemeChanged += p =>
         {
             FocusView.ApplyPalette(p);
@@ -137,20 +167,19 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Hide the content chrome — the tier cards (which carry the account
-    /// switcher + StatusText) and the "Themes" disclosure row above them. Shared by
-    /// focus mode and the cooldown game so both overlays read as one clean surface
-    /// (the game's score no longer collides with the Themes header).</summary>
+    /// switcher + StatusText) and the bottom icon strip. Shared by focus mode and the
+    /// cooldown game so both overlays read as one clean surface.</summary>
     private void HideContentChrome()
     {
         CardsScroller.Visibility = Visibility.Collapsed;
-        ThemesHeader.Visibility = Visibility.Collapsed;
+        BottomIconStrip.Visibility = Visibility.Collapsed;
     }
 
     /// <summary>Restore the content chrome hidden by <see cref="HideContentChrome"/>.</summary>
     private void ShowContentChrome()
     {
         CardsScroller.Visibility = Visibility.Visible;
-        ThemesHeader.Visibility = Visibility.Visible;
+        BottomIconStrip.Visibility = Visibility.Visible;
     }
 
     /// <summary>Enter focus mode if out, exit if in — ports
@@ -165,6 +194,7 @@ public partial class MainWindow : Window
 
     private void EnterFocusMode()
     {
+        ThemePopup.IsOpen = false; // a Popup is a top-level HWND — close it so it can't float over the hourglass
         HideContentChrome();
         FocusView.Visibility = Visibility.Visible;
         // Land on the setup state (stepper + Start) seeded with the saved duration —
@@ -185,6 +215,7 @@ public partial class MainWindow : Window
     /// collide with.</summary>
     private void StartCooldownGame()
     {
+        ThemePopup.IsOpen = false; // close the swatch flyout so it can't float over the board
         HideContentChrome();
         GameView.Start(Vm?.LoadSnakeHighScore() ?? 0);
     }
@@ -199,10 +230,54 @@ public partial class MainWindow : Window
         Focus();
     }
 
+    /// <summary>Compact toggled — auto-size the window's HEIGHT to the single remaining
+    /// card (width untouched, matching Python), restoring the expanded height on the
+    /// way out. Deferred a layout pass so the card collection has settled before we
+    /// measure (Python uses QTimer.singleShot(0) for the same reason).</summary>
+    private void OnCompactChanged(bool compact)
+    {
+        // The strip stays visible in compact so the user can click the compact icon to
+        // expand again (slight deviation from Python, which hid the tool strip and only
+        // offered double-click).
+        if (compact)
+        {
+            _expandedHeight = ActualHeight;
+            // Drop the min-height floor — MinHeight=400 was clamping SizeToContent so the
+            // window never actually shrank — then auto-size the height to the single
+            // card. Width untouched, matching Python.
+            MinHeight = 0;
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+            {
+                SizeToContent = SizeToContent.Height;
+            }));
+        }
+        else
+        {
+            SizeToContent = SizeToContent.Manual;
+            MinHeight = ExpandedMinHeight;
+            if (_expandedHeight > 0)
+                Height = _expandedHeight;
+        }
+    }
+
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
         ApplyBackdropForTheme(Vm?.Palette ?? ThemePalette.Obsidian);
+    }
+
+    /// <summary>Safety net: Esc always exits the snake overlay, even if the game lost
+    /// keyboard focus. PreviewKeyDown tunnels from the window first, so this fires
+    /// before anything can swallow the key — the user can never get trapped in the game.</summary>
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape && GameView.Visibility == Visibility.Visible)
+        {
+            GameView.Stop();
+            e.Handled = true;
+            return;
+        }
+        base.OnPreviewKeyDown(e);
     }
 
     /// <summary>
@@ -273,6 +348,12 @@ public partial class MainWindow : Window
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        // Double-click the title bar toggles compact mode (widget.py parity).
+        if (e.ClickCount == 2)
+        {
+            Vm?.ToggleCompactCommand.Execute(null);
+            return;
+        }
         if (e.ButtonState == MouseButtonState.Pressed)
             DragMove();
     }
@@ -280,6 +361,19 @@ public partial class MainWindow : Window
     /// <summary>× hides the widget to the tray — the app stays alive. Real quit
     /// lives in the tray menu (orderOut equivalent).</summary>
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Hide();
+
+    // The 🎨 icon toggles the theme flyout. With StaysOpen=False the popup is dismissed
+    // on mouse-DOWN outside it, so without this guard the trailing Click would reopen it
+    // when the user clicks the icon to CLOSE an open flyout. Record the pre-down state
+    // and only open when it was closed.
+    private void ThemeIconButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        => _themePopupWasOpen = ThemePopup.IsOpen;
+
+    private void ThemeIconButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_themePopupWasOpen)
+            ThemePopup.IsOpen = true;
+    }
 
     // -- drag-reorder drop ----------------------------------------------------
 

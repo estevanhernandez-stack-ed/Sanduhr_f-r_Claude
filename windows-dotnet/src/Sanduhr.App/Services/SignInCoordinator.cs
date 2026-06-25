@@ -45,13 +45,33 @@ public sealed class SignInCoordinator
     }
 
     /// <summary>
-    /// Run the embedded WebView2 login. Falls back to the manual-paste modal when
-    /// the WebView2 runtime is missing or capture fails.
+    /// Run the embedded WebView2 login (add-account semantics). Falls back to the
+    /// manual-paste modal when the WebView2 runtime is missing or capture fails.
     /// </summary>
-    public async Task<SignInOutcome> SignInEmbeddedAsync(Window? owner)
+    public Task<SignInOutcome> SignInEmbeddedAsync(Window? owner)
+        => RunEmbeddedAsync(owner, PersistEmbedded);
+
+    /// <summary>
+    /// Re-authenticate the ACTIVE account in place — the same embedded WebView2 flow,
+    /// but the captured cookies overwrite the existing active slot instead of
+    /// allocating a new label. Preserves the account's history file (keyed by label)
+    /// and avoids registry litter. Used by the widget's Expired/Blocked recovery card.
+    /// </summary>
+    public Task<SignInOutcome> ReauthenticateActiveAsync(Window? owner)
+        => RunEmbeddedAsync(owner, PersistReauth);
+
+    /// <summary>
+    /// The shared embedded-sign-in engine. <paramref name="persist"/> decides the
+    /// account semantics: <see cref="PersistEmbedded"/> adds (first-run "Personal" or
+    /// a new slot), <see cref="PersistReauth"/> overwrites the active slot in place.
+    /// A runtime-missing → install → Retry path re-enters THIS method with the SAME
+    /// persist delegate, so a post-install retry keeps the original semantics (a
+    /// re-auth stays in-place, an add stays an add).
+    /// </summary>
+    private async Task<SignInOutcome> RunEmbeddedAsync(Window? owner, Func<CapturedCookies, string> persist)
     {
         if (!IsRuntimeAvailable())
-            return ShowRuntimeMissingThenMaybeManual(owner);
+            return await ShowRuntimeMissingThenMaybeManual(owner, o => RunEmbeddedAsync(o, persist));
 
         string dir;
         try
@@ -64,10 +84,10 @@ public sealed class SignInCoordinator
             ShowMessage(owner,
                 $"Couldn't prepare the sign-in browser profile: {ex.Message}",
                 MessageBoxButton.OK);
-            return SignInManual(owner);
+            return await SignInManual(owner, o => RunEmbeddedAsync(o, persist));
         }
 
-        var window = new SignInWindow(dir, PersistEmbedded);
+        var window = new SignInWindow(dir, persist);
         SetOwner(window, owner);
         var result = await window.RunAsync().ConfigureAwait(true);
 
@@ -78,35 +98,64 @@ public sealed class SignInCoordinator
                 return new SignInOutcome(true, s.Label);
 
             case SignInResult.RuntimeMissing:
-                return ShowRuntimeMissingThenMaybeManual(owner);
+                return await ShowRuntimeMissingThenMaybeManual(owner, o => RunEmbeddedAsync(o, persist));
 
             case SignInResult.Failed f:
                 var retry = ShowMessage(owner,
                     $"{f.Message}\n\nPaste a sessionKey by hand instead?",
                     MessageBoxButton.YesNo);
-                return retry == MessageBoxResult.Yes ? SignInManual(owner) : SignInOutcome.NotAdded;
+                return retry == MessageBoxResult.Yes
+                    ? await SignInManual(owner, o => RunEmbeddedAsync(o, persist))
+                    : SignInOutcome.NotAdded;
+
+            case SignInResult.UseManual:
+                // Straight to manual paste (e.g. the Google notice) — no extra confirm.
+                return await SignInManual(owner, o => RunEmbeddedAsync(o, persist));
 
             default: // Cancelled
                 return SignInOutcome.NotAdded;
         }
     }
 
-    /// <summary>Open the manual sessionKey-paste fallback directly.</summary>
-    public SignInOutcome SignInManual(Window? owner)
+    /// <summary>Re-auth save: overwrite the ACTIVE account's slots in place. If somehow
+    /// no active account exists, fall back to first-run create-"Personal" semantics.</summary>
+    private string PersistReauth(CapturedCookies cookies)
+    {
+        var active = _accounts.GetActive();
+        if (active is null)
+        {
+            _credentials.Save(cookies.SessionKey, cookies.CfClearance);
+            return _accounts.GetActive() ?? "Personal";
+        }
+        _credentials.Save(cookies.SessionKey, cookies.CfClearance); // overwrites the active slot in place
+        return active;
+    }
+
+    /// <summary>Open the manual sessionKey-paste fallback. <paramref name="bounceTo"/>
+    /// is the embedded flow to re-enter if the user clicks "Use the secure sign-in
+    /// window instead" — defaults to the add-account embedded flow; the coordinator's
+    /// own fallbacks pass their originating flow so a re-auth that bounces stays a
+    /// re-auth.</summary>
+    public async Task<SignInOutcome> SignInManual(Window? owner, Func<Window?, Task<SignInOutcome>>? bounceTo = null)
     {
         var suggested = _accounts.GetActive() is null ? "Personal" : NextFreeLabel();
-        var window = new ManualKeyWindow(suggested, PersistManual);
+        var window = new ManualKeyWindow(suggested, PersistManual, IsRuntimeAvailable());
         SetOwner(window, owner);
         window.ShowDialog();
-        return window.Result is SignInResult.Success s
-            ? new SignInOutcome(true, s.Label)
-            : SignInOutcome.NotAdded;
+
+        return window.Result switch
+        {
+            SignInResult.Success s => new SignInOutcome(true, s.Label),
+            SignInResult.UseEmbedded => await (bounceTo ?? SignInEmbeddedAsync)(owner),
+            _ => SignInOutcome.NotAdded,
+        };
     }
 
     // -- persistence semantics ------------------------------------------------
 
-    /// <summary>Embedded-flow save: first account auto-creates "Personal";
-    /// subsequent ones get a named slot and become active.</summary>
+    /// <summary>Embedded-flow save: the first account auto-creates "Personal";
+    /// subsequent ones prompt for a name (defaulting to the next free slot) and
+    /// become active.</summary>
     private string PersistEmbedded(CapturedCookies cookies)
     {
         if (_accounts.GetActive() is null)
@@ -114,10 +163,33 @@ public sealed class SignInCoordinator
             _credentials.Save(cookies.SessionKey, cookies.CfClearance);
             return _accounts.GetActive() ?? "Personal";
         }
-        var label = NextFreeLabel();
+        var label = PromptForAccountName(NextFreeLabel());
         _accounts.AddAccount(label, cookies.SessionKey!, cookies.CfClearance);
         _accounts.SetActive(label);
         return label;
+    }
+
+    /// <summary>Ask the user to name a newly-added account during embedded sign-in,
+    /// defaulting to (and falling back to) <paramref name="suggested"/> — the next free
+    /// "Account N" slot. Validated like <c>ManualKeyWindow</c> (1-32 of [A-Za-z0-9 _-],
+    /// unique); an empty, invalid, or cancelled entry keeps the suggested label.</summary>
+    private string PromptForAccountName(string suggested)
+    {
+        var prompt = new TextPromptWindow("Name this account", "Account name", suggested);
+        if (Application.Current?.MainWindow is { IsLoaded: true } main)
+            prompt.Owner = main;
+        if (prompt.ShowDialog() != true)
+            return suggested;
+
+        var name = prompt.Value.Trim();
+        var existing = new HashSet<string>(_accounts.ListAccounts(), StringComparer.OrdinalIgnoreCase);
+        if (name.Length == 0
+            || !System.Text.RegularExpressions.Regex.IsMatch(name, "^[A-Za-z0-9 _-]{1,32}$")
+            || existing.Contains(name))
+        {
+            return suggested;
+        }
+        return name;
     }
 
     /// <summary>Manual-flow save: explicit user-named slot, then make it active.</summary>
@@ -141,7 +213,7 @@ public sealed class SignInCoordinator
 
     // -- WebView2 runtime + fallbacks -----------------------------------------
 
-    private static bool IsRuntimeAvailable()
+    internal static bool IsRuntimeAvailable()
     {
         try
         {
@@ -158,13 +230,17 @@ public sealed class SignInCoordinator
         }
     }
 
-    private SignInOutcome ShowRuntimeMissingThenMaybeManual(Window? owner)
+    private async Task<SignInOutcome> ShowRuntimeMissingThenMaybeManual(
+        Window? owner, Func<Window?, Task<SignInOutcome>> retryEmbedded)
     {
         var modal = new WebView2NotInstalledWindow();
         SetOwner(modal, owner);
         var choice = modal.ShowDialog();
-        // false == "Paste a key instead"; true == went to installer; null == closed.
-        return choice == false ? SignInManual(owner) : SignInOutcome.NotAdded;
+        // true  == the modal's Retry found the runtime — re-enter the embedded flow.
+        // false == "Paste a key instead".  null == closed / Learn More only.
+        if (choice == true)
+            return await retryEmbedded(owner);
+        return choice == false ? await SignInManual(owner, retryEmbedded) : SignInOutcome.NotAdded;
     }
 
     private static void SetOwner(Window window, Window? owner)
@@ -174,7 +250,5 @@ public sealed class SignInCoordinator
     }
 
     private static MessageBoxResult ShowMessage(Window? owner, string text, MessageBoxButton buttons)
-        => owner is not null && owner.IsLoaded
-            ? MessageBox.Show(owner, text, "Sign in to Claude", buttons, MessageBoxImage.Warning)
-            : MessageBox.Show(text, "Sign in to Claude", buttons, MessageBoxImage.Warning);
+        => ThemedDialog.Show(owner, "Sign in to Claude", text, buttons, ThemedDialogKind.Warning);
 }
