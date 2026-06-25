@@ -203,6 +203,15 @@ These bit us on Sanduhr specifically. Inoculate against them up front.
 7. **Store listing Description has a character limit (~10k) but the
    "Short description" limit is ~200.** The short description is what
    shows up in search results — make it earn its slot.
+8. **"Notes for certification" (Notes to Publisher) caps at ~2000
+   characters.** A full reviewer letter overflows and truncates silently on
+   paste — the reviewer reads only the head and the disclosure detail at the
+   tail is lost. Write the cert-load-bearing points FIRST (past findings
+   addressed, the disclosure-surface change, the runFullTrust justification,
+   the trademark line) and trim hard to fit. Sanduhr v3.1.0's letter landed
+   at 1,709 chars; keep a sub-1000 fallback in case a field is shorter. The
+   public "What's new" and Description are SEPARATE fields with their own
+   (larger) limits — don't cram cert notes into them.
 
 ---
 
