@@ -44,6 +44,11 @@ public partial class MainWindow : Window
         RestoreFrame();
         LocationChanged += (_, _) => { _saveDebounce.Stop(); _saveDebounce.Start(); };
 
+        // Clip the content to the window's 10px rounded corner so the caption buttons and
+        // edges are cropped by the window shape (native Win11 caption-button behavior).
+        // Clip-only — never persists the frame, so it stays independent of move-only SaveFrame.
+        ContentDock.SizeChanged += (_, _) => UpdateContentClip();
+
         // DataContext is assigned by App AFTER construction, so build the right-click
         // menu + wire focus/game once the window is loaded (and the VM is present).
         Loaded += (_, _) =>
@@ -60,6 +65,12 @@ public partial class MainWindow : Window
         if (e.PropertyName == nameof(WidgetViewModel.Pinned))
             ShowInTaskbar = !(Vm?.Pinned ?? false);
     }
+
+    /// <summary>Clip the content to the window's rounded corner (radius 9, inside the
+    /// 10px border) so caption buttons + bottom strip are cropped by the window shape.</summary>
+    private void UpdateContentClip()
+        => ContentDock.Clip = new System.Windows.Media.RectangleGeometry(
+            new Rect(0, 0, ContentDock.ActualWidth, ContentDock.ActualHeight), 9, 9);
 
     // -- account access from the widget body ----------------------------------
 

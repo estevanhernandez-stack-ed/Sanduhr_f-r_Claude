@@ -66,24 +66,26 @@
             </Setter>
         </Style>
 
-        <!-- Close button: a small rounded red hover chip, inset from the window edge so
-             it clears the 10px corner radius. Modern + consistent with the chrome's
-             rounded-chip hover language, instead of a full-height square red block. -->
+        <!-- Native Windows close button: full-height, flush far-right, red (#c42b1c)
+             hover — matches Explorer/Settings chrome (the MS Store reviewer's "native
+             app" instinct, per the submission playbook). The window content is clipped
+             to the 10px corner radius (code-behind) so the window rounding crops this
+             button's top-right corner, exactly how real Win11 caption buttons behave. -->
         <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource ChromeButton}">
-            <Setter Property="Width" Value="32" />
-            <Setter Property="Height" Value="26" />
-            <Setter Property="Margin" Value="0,0,6,0" />
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Width" Value="46" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="bg" CornerRadius="6" Background="{TemplateBinding Background}">
+                        <Border x:Name="bg" Background="{TemplateBinding Background}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bg" Property="Background" Value="#E0443B" />
+                                <Setter TargetName="bg" Property="Background" Value="#C42B1C" />
                                 <Setter Property="Foreground" Value="White" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -164,7 +166,7 @@
             Background="{DynamicResource Sanduhr.Brush.GlassChrome}"
             BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
             BorderThickness="1">
-        <DockPanel LastChildFill="True">
+        <DockPanel x:Name="ContentDock" LastChildFill="True">
 
             <!-- Accent gradient strip -->
             <Border DockPanel.Dock="Top" Height="2" CornerRadius="10,10,0,0">
