@@ -45,3 +45,7 @@ releases/
 
 # Vibe Doc local scan state (has machine-absolute paths, regenerated on each scan)
 .vibe-doc/state.json
+.gitnexus
+
+# Local MCP config (carries live bearer tokens - estate rule: never commit)
+.mcp.json
