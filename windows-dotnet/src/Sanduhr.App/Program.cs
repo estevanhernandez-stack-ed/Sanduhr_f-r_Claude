@@ -1,3 +1,4 @@
+using Microsoft.Toolkit.Uwp.Notifications;
 using Velopack;
 
 namespace Sanduhr.App;
@@ -23,7 +24,14 @@ public static class Program
         // FIRST line of Main, per Velopack's contract. Handles the hook events Velopack passes
         // on its own command lines (--veloapp-install, --veloapp-updated, etc.) and returns
         // immediately on a normal run.
-        VelopackApp.Build().SetArgs(args).Run();
+        VelopackApp.Build()
+            .SetArgs(args)
+            .OnBeforeUninstallFastCallback(_ =>
+            {
+                try { ToastNotificationManagerCompat.Uninstall(); }
+                catch { /* best-effort — uninstall must never fail on toast cleanup */ }
+            })
+            .Run();
 
         var app = new App();
         app.InitializeComponent();

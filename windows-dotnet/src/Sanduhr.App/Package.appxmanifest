@@ -4,7 +4,8 @@
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
-  IgnorableNamespaces="uap rescap desktop">
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  IgnorableNamespaces="uap rescap desktop com">
 
   <!-- Identity block: Partner Center-reserved. Carried over UNCHANGED from the Python build's
        MSIX (windows/msix/Package.appxmanifest.template) so the .NET rebuild submits into the
@@ -76,6 +77,20 @@
             TaskId="SanduhrAutoStart"
             Enabled="false"
             DisplayName="Sanduhr für Claude" />
+        </desktop:Extension>
+
+        <!-- WS-B toast click-to-focus: COM activator so a packaged (MSIX) install
+             routes toast activation back into the running exe instead of spawning
+             a second instance. CLSID pairs with ToastActivatorCLSID below. -->
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="Sanduhr.exe" Arguments="-ToastActivated" DisplayName="Sanduhr Toast Activator">
+              <com:Class Id="CE26CFA1-7B8B-4242-BDD9-B4F6F26D3F5B" DisplayName="Sanduhr Toast Activator" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+        <desktop:Extension Category="windows.toastNotificationActivation">
+          <desktop:ToastNotificationActivation ToastActivatorCLSID="CE26CFA1-7B8B-4242-BDD9-B4F6F26D3F5B" />
         </desktop:Extension>
       </Extensions>
     </Application>

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using Microsoft.Toolkit.Uwp.Notifications;
 using Sanduhr.Core;
 using Windows.UI.Notifications;
@@ -73,40 +74,50 @@ public sealed class AlertService
     public void DeliverTest()
         => Deliver(
             new AlertEvent(AlertKind.Warn, "seven_day", 80, null),
-            "Weekly (test)", soundEnabled: true, snakeAtFull: false);
+            "Weekly (test)",
+            // Test alerts always chime (support tool) — the DND gate still applies.
+            soundEnabled: true, snakeAtFull: false);
 
     private static void ShowToast(AlertEvent e, string tierLabel)
     {
         var (headline, body) = e.Kind switch
         {
             AlertKind.Full => ($"{tierLabel} at 100%",
-                "Limit reached. " + ResetLine(e)),
+                JoinBody("Limit reached.", ResetLine(e))),
             AlertKind.Urgent => ($"{tierLabel} at {e.UtilizationPct}%",
-                "Nearly out of headroom. " + ResetLine(e)),
+                JoinBody("Nearly out of headroom.", ResetLine(e))),
             AlertKind.Warn => ($"{tierLabel} at {e.UtilizationPct}%",
-                ResetLine(e)),
+                JoinBody(ResetLine(e))),
             AlertKind.Projection => ($"{tierLabel} on pace to hit the cap",
                 "Current burn rate exhausts this tier before it resets."),
+            // Reset events carry the PREVIOUS window's peak in UtilizationPct
+            // (the number that made the reset newsworthy) — render it.
             _ => ($"{tierLabel} reset",
-                "Fresh window — the tank is full."),
+                $"Fresh window after peaking at {e.UtilizationPct}%."),
         };
 
-        new ToastContentBuilder()
-            .AddText(headline)
-            .AddText(body)
-            .Show(t =>
-            {
-                // Threshold alerts supersede each other per tier; tag so a newer
-                // alert replaces a stale one instead of stacking.
-                t.Tag = e.TierKey;
-                t.Group = "sanduhr-alerts";
-            });
+        var builder = new ToastContentBuilder().AddText(headline);
+        if (body.Length > 0)
+            builder.AddText(body);
+
+        builder.Show(t =>
+        {
+            // Threshold alerts supersede each other per tier; tag so a newer
+            // alert replaces a stale one instead of stacking.
+            t.Tag = e.TierKey;
+            t.Group = "sanduhr-alerts";
+        });
     }
+
+    /// <summary>Joins non-empty body fragments with a space — keeps a blank
+    /// ResetLine from leaving an empty second toast line or a trailing space.</summary>
+    private static string JoinBody(params string[] parts) =>
+        string.Join(" ", parts.Where(p => p.Length > 0));
 
     private static string ResetLine(AlertEvent e)
     {
         var until = Pacing.TimeUntil(e.ResetsAt);
-        return until is "--" ? "" : $"Resets in {until}.";
+        return until is "--" or "now" ? "" : $"Resets in {until}.";
     }
 
     /// <summary>Chime only when Windows says the user accepts notifications —

@@ -82,3 +82,5 @@ Theming rule for every scenario below: run once in the default theme, then flip 
 7. **Recovery suspension.** Break the session (bogus key), confirm recovery card, then reauth. Expect no alert storm from the recovery/re-auth cycle.
 8. **Velopack channel toast.** On an unpackaged (GitHub) install, send a test alert — the AUMID compat path must show a toast with the Sanduhr name/icon.
 9. **Theming.** Flip default/dark/light/Matrix with the Alerts tab open — zero unstyled elements.
+10. **Toast click focuses the widget.** Send a test alert, click the toast body: the widget window comes to the foreground — verify on BOTH channels, with the app running. On the MSIX channel, also verify no second Sanduhr instance appears (Task Manager) after the click.
+11. **MSIX sideload toast.** On a -Sideload MSIX build, send a test alert: toast shows with the Sanduhr name/icon, and clicking it activates (not relaunches) the app. Gate for the next Store submission.

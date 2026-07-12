@@ -96,6 +96,8 @@ public sealed class AlertEngine
             {
                 // A null-involved transition is a data hiccup, not a new window:
                 // track the value but keep the baseline and armed state.
+                // Known accepted edge: a hiccup that masks a real rollover defers the
+                // Reset one window and can carry a stale peak into it — bounded, opt-in path only.
                 s.WindowResetsAt = snap.ResetsAt;
             }
 

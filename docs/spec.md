@@ -21,7 +21,7 @@ windows-dotnet/
   Sanduhr.slnx
   src/
     Sanduhr.Core/           # net10.0 — PURE logic, no WPF, unit-testable
-    Sanduhr.App/            # net10.0-windows — WPF shell (+ Package.appxmanifest)
+    Sanduhr.App/            # net10.0-windows10.0.19041.0 — WPF shell (+ Package.appxmanifest)
   tests/
     Sanduhr.Tests/          # net10.0-windows — xUnit (ports the 286 Python tests)
 ```
@@ -30,7 +30,7 @@ MSIX manifest lives in `Sanduhr.App/Package.appxmanifest` (RORORO's approach —
 
 ## Stack / packages
 
-- **TFM:** `net10.0-windows` (App/Tests), `net10.0` (Core). `Nullable` + `ImplicitUsings` on. `UseWPF` on App.
+- **TFM:** `net10.0-windows10.0.19041.0` (App/Tests), `net10.0` (Core). `Nullable` + `ImplicitUsings` on. `UseWPF` on App.
 - **App packages** (mirror RORORO): `WPF-UI` (Fluent + Mica), `Microsoft.Web.WebView2`, `CommunityToolkit.Mvvm` (MVVM), `Hardcodet.NotifyIcon.Wpf` (tray), `Microsoft.Windows.CsWin32` (Win32/DWM Mica source-gen), `Velopack` (auto-update), `Serilog` + sinks. Custom `Program` startup so `VelopackApp.Build().Run()` precedes WPF.
 - **Core packages:** none heavy — `System.Text.Json`; HTTP via `HttpClient` (+ a Cloudflare-aware handler to replace cloudscraper; UA + `Sec-Fetch-*` headers, CF-challenge detection → typed error).
 - **Tests:** `xunit`, `Microsoft.NET.Test.Sdk`.
