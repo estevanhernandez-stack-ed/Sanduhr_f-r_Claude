@@ -65,6 +65,6 @@ Theming rule for every scenario below: run once in the default theme, then flip 
 3. **No duplicate accounts from recovery paste.** From an Expired card, use the paste path and save a key. Expect: same account label, no new "Account N" in Settings ▸ Accounts, history intact.
 4. **Settings ▸ Update sign-in, non-active account.** With two accounts, select the non-active one → "Update sign-in…". Expect the flow matching that account's origin, no active-account switch, and no fetcher hiccup on the active account.
 5. **Remove account is complete.** Remove a signed-in account. Expect: gone from the list, `history.{label}.json` gone from `%APPDATA%\Sanduhr`, confirm-dialog text matches what actually happened.
-6. **Last-account removal purges transport cookies.** Remove the only account. Expect the widget to drop to first-run, and `%APPDATA%\Sanduhr\webview2-fetch` to be deleted (or, if locked, a debug log line about the deferred purge).
+6. **Last-account removal purges transport cookies.** Remove the only account. Expect the widget to drop to first-run, and `%APPDATA%\Sanduhr\webview2-fetch` to be deleted (or, if locked, a line in %APPDATA%\Sanduhr\sanduhr.log about the deferred purge).
 7. **Rename carries history.** Rename an account with a visible history chart. Expect the chart intact under the new name and no `history.{old}.json` left behind.
 8. **First-run unchanged.** Fresh install: primary "Sign in to Claude", secondary "Paste a key instead" ADDS the account (no reauth semantics).

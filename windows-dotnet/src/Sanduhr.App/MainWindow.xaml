@@ -389,7 +389,8 @@
 
                     <!-- Empty-state: first-run "Sign in to Claude" prompt (item 6).
                          Shown when there's no active account; the headline feature's
-                         front door. The 626 cyan->magenta pairing on the accent. -->
+                         front door. The 626 cyan->magenta pairing on the accent.
+                         The gradient dot is the 626 brand mark — deliberately literal, not theme ink. -->
                     <Border Margin="2,10,2,8" Padding="18,20" CornerRadius="10"
                             Background="{DynamicResource Sanduhr.Brush.CardGlass}"
                             BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
@@ -413,7 +414,7 @@
                                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                             <Button Command="{Binding PrimaryAuthCommand}" Content="{Binding PromptPrimaryLabel}" Cursor="Hand"
                                     HorizontalAlignment="Center" Padding="22,9" FontSize="13" FontWeight="SemiBold"
-                                    Foreground="#0d0d0d" BorderThickness="0">
+                                    Foreground="{DynamicResource Sanduhr.Brush.Bg}" BorderThickness="0">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
                                         <Border x:Name="bg" CornerRadius="8" Padding="{TemplateBinding Padding}"

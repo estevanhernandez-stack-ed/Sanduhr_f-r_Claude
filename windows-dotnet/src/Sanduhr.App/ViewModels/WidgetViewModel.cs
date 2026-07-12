@@ -594,7 +594,15 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
                 await Task.Delay(300);
             }
         }
-        Debug.WriteLine("[Sanduhr] webview2-fetch purge failed — cookies remain until the next transport init");
+        try
+        {
+            File.AppendAllText(_paths.LogFile,
+                $"{DateTime.UtcNow:o} webview2-fetch purge failed — cookies remain until the next transport init{Environment.NewLine}");
+        }
+        catch
+        {
+            // Swallow — logging must not break the removal flow.
+        }
     }
 
     [RelayCommand]

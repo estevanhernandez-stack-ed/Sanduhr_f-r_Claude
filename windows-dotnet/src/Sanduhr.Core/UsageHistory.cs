@@ -209,6 +209,7 @@ public sealed class UsageHistory : IUsageHistory
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             // Best-effort — registry consistency wins over file cleanup.
+            LogBestEffortFailure("delete", active, e);
         }
     }
 
@@ -228,6 +229,23 @@ public sealed class UsageHistory : IUsageHistory
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             // Best-effort — the account keeps working, only its chart resets.
+            LogBestEffortFailure("rename", oldLabel, e);
+        }
+    }
+
+    // Best-effort trace for best-effort file ops: cleanup failures must be
+    // visible in Release builds (sanduhr.log), but logging itself must never
+    // throw either.
+    private void LogBestEffortFailure(string operation, string label, Exception e)
+    {
+        try
+        {
+            File.AppendAllText(_paths.LogFile,
+                $"{DateTime.UtcNow:o} history {operation} failed for '{label}': {e.Message}{Environment.NewLine}");
+        }
+        catch
+        {
+            // Swallow — a broken log file must not break the cleanup path.
         }
     }
 

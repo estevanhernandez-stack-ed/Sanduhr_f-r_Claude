@@ -10,7 +10,8 @@ namespace Sanduhr.App.Services;
 
 /// <summary>Result of a sign-in attempt. <see cref="Added"/> is the signal the
 /// widget should rebuild its fetcher and re-fetch; <see cref="Label"/> is the
-/// account that was saved (and made active).</summary>
+/// account that was saved — made active by add flows, updated in place (active
+/// pointer untouched) by reauth flows.</summary>
 public readonly record struct SignInOutcome(bool Added, string? Label)
 {
     public static readonly SignInOutcome NotAdded = new(false, null);
