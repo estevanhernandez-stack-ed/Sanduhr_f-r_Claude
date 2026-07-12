@@ -12,8 +12,15 @@ namespace Sanduhr.Core;
 /// </summary>
 public static class ChimeSynth
 {
-    /// <summary>A single tone: a frequency in Hz held for a duration in seconds.</summary>
-    public readonly record struct Note(double Frequency, double DurationSeconds);
+    /// <summary>A single tone: a frequency in Hz held for a duration in seconds,
+    /// at an optional level (0..1 of the sequence amplitude — lets a ring-out
+    /// decay across sequential notes; 1.0 for every pre-WS-B cue).</summary>
+    public readonly record struct Note(double Frequency, double DurationSeconds, double Level = 1.0);
+
+    /// <summary>Oscillator shape. Sine is the house voice (soft UI cues); Square
+    /// is the PSG-era console bite, used only by the opt-in snake sting — a pure
+    /// sine can never read as a codec-era alert.</summary>
+    public enum Waveform { Sine, Square }
 
     // ~25% of full-scale 16-bit (32767). Background-of-attention, not announcements.
     private const double Amplitude = 8000.0;
@@ -49,6 +56,43 @@ public static class ChimeSynth
         new Note(440.00, 0.04), // A4
     };
 
+    /// <summary>Quick rising chirp — a tier crossed the warn threshold. High and
+    /// short (~120 ms): present without lingering, same amplitude discipline.</summary>
+    public static readonly IReadOnlyList<Note> AlertWarn = new[]
+    {
+        new Note(1046.50, 0.045), // C6
+        new Note(1318.51, 0.075), // E6
+    };
+
+    /// <summary>Insistent triple-chirp zipping up and holding a beat (~180 ms) —
+    /// urgent threshold. Same chirp voice as warn, one notch more assertive.</summary>
+    public static readonly IReadOnlyList<Note> AlertUrgent = new[]
+    {
+        new Note(1318.51, 0.04),  // E6
+        new Note(1567.98, 0.04),  // G6
+        new Note(1567.98, 0.10),  // G6 held a beat
+    };
+
+    /// <summary>The 100% sting — a synthesized homage to a certain codec-era
+    /// alert ("!"), NOT a sample. Contour measured from a reference recording
+    /// (2026-07-12): a ~90 ms rising sweep from ~660 Hz through ~1.6 kHz into a
+    /// bright body near C7, then a metallic ring-out decaying over ~800 ms.
+    /// Rendered square (<see cref="Waveform.Square"/>) for the console-era bite;
+    /// the stepped Levels are the decay. Opt-in via the Alerts tab; when off,
+    /// Full uses <see cref="AlertUrgent"/>.</summary>
+    public static readonly IReadOnlyList<Note> AlertSnake = new[]
+    {
+        new Note(659.26, 0.030, 0.80),  // E5  — the grab
+        new Note(987.77, 0.030, 0.90),  // B5  — sweep
+        new Note(1480.00, 0.035, 1.00), // F#6 — sweep
+        new Note(2093.00, 0.10, 1.00),  // C7  — the "!" lands
+        new Note(2093.00, 0.12, 0.70),  // ring-out…
+        new Note(2093.00, 0.14, 0.50),
+        new Note(2093.00, 0.16, 0.34),
+        new Note(2093.00, 0.20, 0.22),
+        new Note(2093.00, 0.24, 0.13),  // …to silence
+    };
+
     /// <summary>
     /// Build a 16-bit mono PCM-WAV blob from <paramref name="notes"/> played
     /// sequentially. Each note carries a 5 ms linear attack + 30 ms release so
@@ -56,10 +100,17 @@ public static class ChimeSynth
     /// 1:1 with <c>sounds._build_wav</c>.
     /// </summary>
     public static byte[] BuildWav(IReadOnlyList<Note> notes, int sampleRate = 44100)
+        => BuildWav(notes, sampleRate, Waveform.Sine);
+
+    /// <summary>As above, with an oscillator choice. Square runs at a reduced
+    /// amplitude (its harmonics carry far more perceived energy than a sine at
+    /// the same peak) so the sting bites without breaking the house discipline.</summary>
+    public static byte[] BuildWav(IReadOnlyList<Note> notes, int sampleRate, Waveform waveform)
     {
         var samples = new List<byte>();
         double attack = AttackSeconds * sampleRate;
         double release = ReleaseSeconds * sampleRate;
+        double amplitude = waveform == Waveform.Square ? Amplitude * 0.75 : Amplitude;
 
         foreach (var note in notes)
         {
@@ -70,7 +121,10 @@ public static class ChimeSynth
                 double attackEnv = attack > 0 ? Math.Min(1.0, i / attack) : 1.0;
                 double releaseEnv = release > 0 ? Math.Min(1.0, (n - i) / release) : 1.0;
                 double env = attackEnv * releaseEnv;
-                int sample = (int)(Amplitude * env * Math.Sin(2 * Math.PI * note.Frequency * t));
+                double osc = Math.Sin(2 * Math.PI * note.Frequency * t);
+                if (waveform == Waveform.Square)
+                    osc = Math.Sign(osc);
+                int sample = (int)(amplitude * note.Level * env * osc);
                 short s16 = (short)Math.Clamp(sample, short.MinValue, short.MaxValue);
                 samples.Add((byte)(s16 & 0xff));
                 samples.Add((byte)((s16 >> 8) & 0xff));

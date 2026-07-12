@@ -39,13 +39,26 @@ public static class Sounds
     /// <summary>Brief A tap for toggle / theme-switch interactions.</summary>
     public static void PlayToggle() => Play(ChimeSynth.Toggle, "toggle");
 
-    private static void Play(IReadOnlyList<ChimeSynth.Note> notes, string cacheKey)
+    /// <summary>Warn-threshold alert chime (WS-B).</summary>
+    public static void PlayAlertWarn() => Play(ChimeSynth.AlertWarn, "alert-warn");
+
+    /// <summary>Urgent-threshold alert chime (WS-B).</summary>
+    public static void PlayAlertUrgent() => Play(ChimeSynth.AlertUrgent, "alert-urgent");
+
+    /// <summary>The opt-in 100% sting (synthesized homage — see ChimeSynth.AlertSnake).
+    /// Square wave: the one non-sine voice in the app, by design.</summary>
+    public static void PlayAlertSnake()
+        => Play(ChimeSynth.AlertSnake, "alert-snake", ChimeSynth.Waveform.Square);
+
+    private static void Play(
+        IReadOnlyList<ChimeSynth.Note> notes, string cacheKey,
+        ChimeSynth.Waveform waveform = ChimeSynth.Waveform.Sine)
     {
         if (Silent || !OperatingSystem.IsWindows())
             return;
         try
         {
-            var path = WavPathFor(notes, cacheKey);
+            var path = WavPathFor(notes, cacheKey, waveform);
             // SoundPlayer.Play() loads + plays on a background thread — non-blocking,
             // the equivalent of winsound SND_ASYNC.
             new SoundPlayer(path).Play();
@@ -56,8 +69,17 @@ public static class Sounds
         }
     }
 
-    private static string WavPathFor(IReadOnlyList<ChimeSynth.Note> notes, string cacheKey)
+    private static string WavPathFor(
+        IReadOnlyList<ChimeSynth.Note> notes, string cacheKey, ChimeSynth.Waveform waveform)
     {
+        // User override: a WAV dropped at sounds\custom\{key}.wav replaces the
+        // synthesized cue on THIS machine — same drop-in spirit as user themes.
+        // The shipped app carries only synthesized audio; what a user plays from
+        // their own files on their own machine is their business.
+        var custom = Path.Combine(new Paths().SoundsDir, "custom", cacheKey + ".wav");
+        if (File.Exists(custom))
+            return custom;
+
         if (FileCache.TryGetValue(cacheKey, out var cached) && File.Exists(cached))
             return cached;
 
@@ -66,7 +88,7 @@ public static class Sounds
         var path = Path.Combine(dir, cacheKey + ".wav");
         try
         {
-            File.WriteAllBytes(path, ChimeSynth.BuildWav(notes));
+            File.WriteAllBytes(path, ChimeSynth.BuildWav(notes, 44100, waveform));
         }
         catch (IOException)
         {

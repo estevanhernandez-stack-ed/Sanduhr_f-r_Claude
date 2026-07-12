@@ -24,7 +24,7 @@ Two assemblies, split on a hard testability boundary:
   storage, CC-log reader, API parsing, the sign-in decision logic. This is the
   parity bar: it ports the shipped Python app's behavior 1:1 and is covered by the
   full xUnit suite.
-- **`src/Sanduhr.App/`** (`net10.0-windows`) — the WPF shell. Views + view models
+- **`src/Sanduhr.App/`** (`net10.0-windows10.0.19041.0`) — the WPF shell. Views + view models
   binding to Core, the tray icon, Mica interop, the WebView2 surfaces, packaging
   manifest. Custom `Program.Main` runs `VelopackApp.Build().Run()` before WPF so
   auto-update hooks fire first.
@@ -76,7 +76,7 @@ dotnet run --project windows-dotnet/src/Sanduhr.App/Sanduhr.App.csproj
 dotnet test windows-dotnet/tests/Sanduhr.Tests/Sanduhr.Tests.csproj -c Debug
 ```
 
-The App targets `net10.0-windows` with `UseWPF`, so it builds and runs on Windows
+The App targets `net10.0-windows10.0.19041.0` with `UseWPF`, so it builds and runs on Windows
 only. Core and Tests are `net10.0`. The embedded sign-in and the usage transport
 need the **WebView2 runtime** installed (present on current Windows 11; the app
 degrades to the manual-paste fallback when it is missing).
@@ -130,7 +130,7 @@ Python app byte-for-byte (verified by the data-compat tests in the suite).
 
 | Concern | Choice |
 |---|---|
-| Runtime / language | .NET 10, C#, WPF (`net10.0-windows`) |
+| Runtime / language | .NET 10, C#, WPF (`net10.0-windows10.0.19041.0`) |
 | MVVM | `CommunityToolkit.Mvvm` |
 | Fluent + Mica | `WPF-UI` (+ CsWin32 `DwmExtendFrameIntoClientArea` / `DWMWA_SYSTEMBACKDROP_TYPE`) |
 | Embedded login + usage transport | `Microsoft.Web.WebView2` |

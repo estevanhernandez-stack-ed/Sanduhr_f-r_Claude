@@ -28,6 +28,10 @@ public sealed class SettingsViewModel
     /// <summary>Backs the General tab's auto-start control (item 10).</summary>
     public GeneralViewModel General { get; }
 
+    /// <summary>Backs the Alerts tab (WS-B): thresholds, projection/reset
+    /// toggles, sound + snake sting, and the test-alert button.</summary>
+    public AlertsViewModel Alerts { get; }
+
     /// <summary>Assembly version for the General tab footer (e.g. "3.0.0").</summary>
     public string Version { get; }
 
@@ -39,6 +43,11 @@ public sealed class SettingsViewModel
         LocalCc = new LocalCcViewModel(
             widget, widget.LoadLocalCcShowBreakdowns(), widget.SaveLocalCcShowBreakdowns);
         General = new GeneralViewModel();
+        Alerts = new AlertsViewModel(widget, () =>
+        {
+            widget.AlertService?.DeliverTest();
+            return Task.CompletedTask;
+        });
         var v = Assembly.GetExecutingAssembly().GetName().Version;
         Version = v is null ? "3.0.0" : $"{v.Major}.{v.Minor}.{v.Build}";
     }

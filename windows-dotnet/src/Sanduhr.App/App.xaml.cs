@@ -50,6 +50,8 @@ public partial class App : Application
         _window = new MainWindow { DataContext = _vm };
         _window.Show();
 
+        _vm.AttachAlertService(new AlertService(new Sanduhr.Core.Paths(), ShowWindow));
+
         SetupTray();
 
         // Load the active account's stored credential + fetch real usage now.

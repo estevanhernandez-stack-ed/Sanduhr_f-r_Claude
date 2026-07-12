@@ -37,6 +37,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private readonly UsageHistory _history;
     private readonly SettingsStore _settings;
     private readonly CcLogReader _ccReader;
+    private readonly AlertEngine _alertEngine = new();
+    private AlertConfig _alertConfig = new(true, 80, 95, true, false);
+    private AlertService? _alertService;
 
     private readonly DispatcherTimer _refreshTimer;
     private readonly DispatcherTimer _tickTimer;
@@ -192,6 +195,10 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// overlay (port of <c>widget</c>'s <c>_btn_snake</c> → <c>start_game</c>).</summary>
     public event Action? GameStartRequested;
 
+    /// <summary>Raised when any alert preference is saved — the alert pipeline
+    /// re-reads its config on the next evaluation.</summary>
+    public event Action? AlertSettingsChanged;
+
     public ThemePalette Palette => _palette;
 
     /// <summary>The user theme drop-in folder, for the Settings "Open themes folder"
@@ -240,6 +247,38 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// <summary>Persist a new cooldown-snake high score.</summary>
     public void SaveSnakeHighScore(int score) => _settings.SaveSnakeHighScore(score);
 
+    /// <summary>Alert preferences (settings.json, WS-B). Saves raise
+    /// <see cref="AlertSettingsChanged"/> so the live engine re-reads config.</summary>
+    public AlertConfig LoadAlertConfig() => _settings.LoadAlertConfig();
+
+    public void SaveAlertConfig(AlertConfig config)
+    {
+        _settings.SaveAlertConfig(config);
+        AlertSettingsChanged?.Invoke();
+    }
+
+    public bool LoadAlertSound() => _settings.LoadAlertSound();
+
+    public void SaveAlertSound(bool on)
+    {
+        _settings.SaveAlertSound(on);
+        AlertSettingsChanged?.Invoke();
+    }
+
+    public bool LoadAlertSnakeFull() => _settings.LoadAlertSnakeFull();
+
+    public void SaveAlertSnakeFull(bool on)
+    {
+        _settings.SaveAlertSnakeFull(on);
+        AlertSettingsChanged?.Invoke();
+    }
+
+    /// <summary>Alert delivery, attached by App once the main window exists
+    /// (the service needs an activation callback). Null in unit contexts.</summary>
+    public AlertService? AlertService => _alertService;
+
+    public void AttachAlertService(AlertService service) => _alertService = service;
+
     public WidgetViewModel()
     {
         _paths = new Paths();
@@ -248,6 +287,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _history = new UsageHistory(_accounts, _paths);
         _settings = new SettingsStore(_paths);
         _ccReader = new CcLogReader();
+
+        _alertConfig = _settings.LoadAlertConfig();
+        AlertSettingsChanged += () => _alertConfig = _settings.LoadAlertConfig();
 
         _pinned = _settings.LoadPinned();
         _isThemesExpanded = _settings.LoadThemesExpanded();
@@ -495,6 +537,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
         _accounts.SetActive(label);
         Tiers.Clear();
+        _alertEngine.Reset();
         _lastData = null;
         StatusText = "Switching account…";
         TrayPercentChanged?.Invoke(-1);
@@ -619,6 +662,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             _lastData = data;
             _lastFetchAt = DateTimeOffset.Now;
             RenderCards(data, DateTimeOffset.UtcNow);
+            EvaluateAlerts(data, DateTimeOffset.UtcNow);
             // Fresh fetch re-anchors the Local CC delta window: badges reset to ~0
             // here, then the 30s tick grows them as CC events stream in between fetches.
             RefreshCcDelta();
@@ -723,6 +767,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private void EnterRecoveryState(SignInReason reason)
     {
         Reason = reason;
+        _alertEngine.Reset();   // never alert off another context's baseline
         NotifyPromptCopy();
         StatusText = "";
         ClearSignedInChrome();
@@ -835,6 +880,55 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         }
 
         TrayPercentChanged?.Invoke(highest);
+    }
+
+    /// <summary>Map the fetch payload to alert snapshots — every canonical tier
+    /// with data participates, hidden or not (a cap is real whether or not its
+    /// card is shown).</summary>
+    private List<TierAlertSnapshot> BuildAlertSnapshots(JsonObject data)
+    {
+        var snaps = new List<TierAlertSnapshot>();
+        foreach (var key in TierModel.CanonicalOrder)
+        {
+            var tier = data[key] as JsonObject;
+            if (tier is null)
+                continue;
+            double? util = Util(data, key);
+            snaps.Add(new TierAlertSnapshot(
+                key,
+                util is null ? null : (int)util.Value,
+                GetInt(tier, "used"),
+                GetInt(tier, "limit"),
+                tier["resets_at"]?.GetValue<string>()));
+        }
+        return snaps;
+    }
+
+    /// <summary>Evaluate + deliver alerts for a fresh fetch. Never throws —
+    /// alerting must not break the fetch loop.</summary>
+    private void EvaluateAlerts(JsonObject data, DateTimeOffset now)
+    {
+        try
+        {
+            if (_alertService is null)
+                return;
+            var events = _alertEngine.Evaluate(BuildAlertSnapshots(data), _alertConfig, now);
+            if (events.Count == 0)
+                return;
+            bool sound = _settings.LoadAlertSound();
+            bool snake = _settings.LoadAlertSnakeFull();
+            foreach (var e in events)
+                _alertService.Deliver(e, TierModel.Label(e.TierKey), sound, snake);
+        }
+        catch (Exception e)
+        {
+            try
+            {
+                File.AppendAllText(_paths.LogFile,
+                    $"{DateTime.UtcNow:o} alert evaluate failed ({e.GetType().Name}){Environment.NewLine}");
+            }
+            catch { }
+        }
     }
 
     private void UpdatePlanBadge()

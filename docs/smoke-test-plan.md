@@ -68,3 +68,19 @@ Theming rule for every scenario below: run once in the default theme, then flip 
 6. **Last-account removal purges transport cookies.** Remove the only account. Expect the widget to drop to first-run, and `%APPDATA%\Sanduhr\webview2-fetch` to be deleted (or, if locked, a line in %APPDATA%\Sanduhr\sanduhr.log about the deferred purge).
 7. **Rename carries history.** Rename an account with a visible history chart. Expect the chart intact under the new name and no `history.{old}.json` left behind.
 8. **First-run unchanged.** Fresh install: primary "Sign in to Claude", secondary "Paste a key instead" ADDS the account (no reauth semantics).
+
+---
+
+## WS-B — threshold alerts (2026-07-12)
+
+1. **Warn crossing.** Set Warn to a value just below a live tier's current %, wait for the next fetch (or click Refresh). Expect one toast naming the tier and % plus the soft two-note chime; no repeat on subsequent fetches.
+2. **Urgent supersedes.** Set both thresholds below the live %, refresh. Expect a single Urgent toast (not two), replacing any prior toast for that tier in Action Center.
+3. **Test button.** Settings ▸ Alerts ▸ Send test alert. Expect a Warn-style toast + chime regardless of thresholds.
+4. **Focus Assist.** Enable Do Not Disturb, send a test alert. Expect: no audible chime; the toast lands in Action Center silently (deferred by Windows).
+5. **Snake.** Enable "100% plays the !", send... nothing — the sting only binds to a real Full event. Verify by temporarily setting Warn/Urgent near a tier at 100% (or accept this as covered by the ChimeSynth unit tests plus scenario 3's pipeline coverage; the sting WAV can be auditioned by toggling the setting and hitting 100% naturally).
+6. **Validation.** Set Warn 95 / Urgent 80. Expect the themed inline hint and no persistence (reopen Settings to confirm the old values).
+7. **Recovery suspension.** Break the session (bogus key), confirm recovery card, then reauth. Expect no alert storm from the recovery/re-auth cycle.
+8. **Velopack channel toast.** On an unpackaged (GitHub) install, send a test alert — the AUMID compat path must show a toast with the Sanduhr name/icon.
+9. **Theming.** Flip default/dark/light/Matrix with the Alerts tab open — zero unstyled elements.
+10. **Toast click focuses the widget.** Send a test alert, click the toast body: the widget window comes to the foreground — verify on BOTH channels, with the app running. On the MSIX channel, also verify no second Sanduhr instance appears (Task Manager) after the click.
+11. **MSIX sideload toast.** On a -Sideload MSIX build, send a test alert: toast shows with the Sanduhr name/icon, and clicking it activates (not relaunches) the app. Gate for the next Store submission.

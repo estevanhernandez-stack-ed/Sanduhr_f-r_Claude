@@ -7,6 +7,7 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:vm="clr-namespace:Sanduhr.App.ViewModels"
         xmlns:views="clr-namespace:Sanduhr.App.Views"
+        xmlns:conv="clr-namespace:Sanduhr.App.Converters"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
         Title="Sanduhr — Settings"
@@ -33,6 +34,7 @@
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolVis" />
+        <conv:StringToVisibilityConverter x:Key="StrVis" />
 
         <!-- Flat themed button (re-tints with the active theme). -->
         <Style x:Key="FlatButton" TargetType="Button">
@@ -576,6 +578,66 @@
                                         Command="{Binding DeleteCommand}" Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" Margin="0" />
                             </StackPanel>
                         </Grid>
+                    </Border>
+                </TabItem>
+
+                <!-- Alerts tab (WS-B) — thresholds, projection, sounds. -->
+                <TabItem Header="Alerts">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="16">
+                        <StackPanel DataContext="{Binding Alerts}">
+                            <TextBlock TextWrapping="Wrap" FontSize="11"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12"
+                                       Text="Get a toast and a soft chime when a tier crosses your thresholds, or when your pace will hit the cap before it resets. Toasts respect Focus Assist." />
+
+                            <CheckBox Content="Enable alerts" IsChecked="{Binding AlertsEnabled}"
+                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,10" />
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="24" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="70" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Warn at" VerticalAlignment="Center" FontSize="12"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,8,0" />
+                                <TextBox Grid.Column="1" Text="{Binding WarnPct, UpdateSourceTrigger=LostFocus}"
+                                         FontSize="12" Padding="6,4"
+                                         Background="{DynamicResource Sanduhr.Brush.Bg}"
+                                         Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                                         BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
+                                         CaretBrush="{DynamicResource Sanduhr.Brush.Text}" />
+                                <TextBlock Grid.Column="3" Text="Urgent at" VerticalAlignment="Center" FontSize="12"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,8,0" />
+                                <TextBox Grid.Column="4" Text="{Binding UrgentPct, UpdateSourceTrigger=LostFocus}"
+                                         FontSize="12" Padding="6,4"
+                                         Background="{DynamicResource Sanduhr.Brush.Bg}"
+                                         Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                                         BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
+                                         CaretBrush="{DynamicResource Sanduhr.Brush.Text}" />
+                            </Grid>
+
+                            <TextBlock Text="{Binding ValidationHint}" FontSize="11"
+                                       Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                       Visibility="{Binding ValidationHint, Converter={StaticResource StrVis}}"
+                                       Margin="0,0,0,10" />
+
+                            <CheckBox Content="Projection alerts (on pace to hit the cap before reset)"
+                                      IsChecked="{Binding ProjectionEnabled}"
+                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
+                            <CheckBox Content="Reset notifications"
+                                      IsChecked="{Binding ResetEnabled}"
+                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
+                            <CheckBox Content="Sound" IsChecked="{Binding SoundEnabled}"
+                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
+                            <CheckBox Content="100% plays the ! (you know the one)"
+                                      IsChecked="{Binding SnakeAtFull}"
+                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,14" />
+
+                            <Button Style="{StaticResource FlatButton}" Content="Send test alert"
+                                    Command="{Binding TestAlertCommand}" HorizontalAlignment="Left" />
+                        </StackPanel>
                     </Border>
                 </TabItem>
 

@@ -81,4 +81,61 @@ public class ChimeSynthTests
 
     private static int ReadInt16(byte[] b, int o)
         => b[o] | (b[o + 1] << 8);
+
+    // -- WS-B alert tones (spec §3) --------------------------------------------
+
+    [Fact]
+    public void AlertWarn_is_a_soft_ascending_two_note()
+    {
+        Assert.Equal(2, ChimeSynth.AlertWarn.Count);
+        Assert.True(ChimeSynth.AlertWarn[1].Frequency > ChimeSynth.AlertWarn[0].Frequency);
+    }
+
+    [Fact]
+    public void AlertUrgent_is_a_firmer_three_note()
+    {
+        Assert.Equal(3, ChimeSynth.AlertUrgent.Count);
+        // Lands and holds on the top note.
+        Assert.Equal(ChimeSynth.AlertUrgent[1].Frequency, ChimeSynth.AlertUrgent[2].Frequency);
+        Assert.True(ChimeSynth.AlertUrgent[2].DurationSeconds > ChimeSynth.AlertUrgent[1].DurationSeconds);
+    }
+
+    [Fact]
+    public void AlertSnake_matches_the_measured_contour()
+    {
+        // Rising sweep into a bright body (reference contour: ~660 Hz -> ~2 kHz).
+        var s = ChimeSynth.AlertSnake;
+        Assert.True(s.Count >= 6);
+        Assert.True(s[1].Frequency > s[0].Frequency);
+        Assert.True(s[2].Frequency > s[1].Frequency);
+        Assert.True(s[3].Frequency > 2000);               // the "!" body lives near C7
+        // Ring-out: everything after the landing holds the body pitch and decays.
+        for (int i = 4; i < s.Count; i++)
+        {
+            Assert.Equal(s[3].Frequency, s[i].Frequency);
+            Assert.True(s[i].Level < s[i - 1].Level);     // strictly decaying
+        }
+        Assert.True(s[^1].Level < 0.2);                   // fades to near silence
+    }
+
+    [Fact]
+    public void Square_waveform_produces_different_bytes_than_sine()
+    {
+        var sine = ChimeSynth.BuildWav(ChimeSynth.AlertSnake, 44100, ChimeSynth.Waveform.Sine);
+        var square = ChimeSynth.BuildWav(ChimeSynth.AlertSnake, 44100, ChimeSynth.Waveform.Square);
+        Assert.Equal(sine.Length, square.Length);        // same duration, same header shape
+        Assert.Equal((byte)'R', square[0]);              // valid RIFF
+        Assert.NotEqual(sine, square);                   // genuinely different oscillator
+    }
+
+    [Fact]
+    public void Alert_sequences_build_valid_wavs()
+    {
+        foreach (var seq in new[] { ChimeSynth.AlertWarn, ChimeSynth.AlertUrgent, ChimeSynth.AlertSnake })
+        {
+            var wav = ChimeSynth.BuildWav(seq);
+            Assert.True(wav.Length > 44);
+            Assert.Equal((byte)'R', wav[0]);   // RIFF header intact
+        }
+    }
 }
