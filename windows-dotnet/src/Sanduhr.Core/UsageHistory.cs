@@ -209,7 +209,7 @@ public sealed class UsageHistory : IUsageHistory
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             // Best-effort — registry consistency wins over file cleanup.
-            LogBestEffortFailure("delete", active, e);
+            LogBestEffortFailure("delete", e);
         }
     }
 
@@ -229,19 +229,21 @@ public sealed class UsageHistory : IUsageHistory
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             // Best-effort — the account keeps working, only its chart resets.
-            LogBestEffortFailure("rename", oldLabel, e);
+            LogBestEffortFailure("rename", e);
         }
     }
 
     // Best-effort trace for best-effort file ops: cleanup failures must be
     // visible in Release builds (sanduhr.log), but logging itself must never
-    // throw either.
-    private void LogBestEffortFailure(string operation, string label, Exception e)
+    // throw either. PRIVACY.md promises the log never contains account labels,
+    // so no label and no exception MESSAGE here — file-op messages embed the
+    // history.{label}.json path. Operation + exception type is the whole trace.
+    private void LogBestEffortFailure(string operation, Exception e)
     {
         try
         {
             File.AppendAllText(_paths.LogFile,
-                $"{DateTime.UtcNow:o} history {operation} failed for '{label}': {e.Message}{Environment.NewLine}");
+                $"{DateTime.UtcNow:o} history {operation} failed ({e.GetType().Name}){Environment.NewLine}");
         }
         catch
         {
