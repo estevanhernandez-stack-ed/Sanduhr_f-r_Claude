@@ -31,9 +31,9 @@ public sealed class SettingsViewModel
     /// <summary>Assembly version for the General tab footer (e.g. "3.0.0").</summary>
     public string Version { get; }
 
-    public SettingsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync)
+    public SettingsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync, Func<string, Task> updateSignInAsync)
     {
-        Accounts = new AccountsViewModel(widget, addAccountAsync);
+        Accounts = new AccountsViewModel(widget, addAccountAsync, updateSignInAsync);
         Themes = new ThemesViewModel(widget);
         History = new HistoryTabViewModel(widget);
         LocalCc = new LocalCcViewModel(

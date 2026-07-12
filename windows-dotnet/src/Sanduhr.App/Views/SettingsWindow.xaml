@@ -433,6 +433,8 @@
                                         Command="{Binding SwitchToCommand}" />
                                 <Button Style="{StaticResource FlatButton}" Content="Rename…"
                                         Command="{Binding RenameCommand}" />
+                                <Button Style="{StaticResource FlatButton}" Content="Update sign-in…"
+                                        Command="{Binding UpdateSignInCommand}" />
                                 <Button Style="{StaticResource FlatButton}" Content="Sign out"
                                         Command="{Binding SignOutCommand}" Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" />
                             </StackPanel>

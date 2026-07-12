@@ -7,6 +7,7 @@ using Sanduhr.App.Theming;
 using Sanduhr.App.Updates;
 using Sanduhr.App.ViewModels;
 using Sanduhr.App.Views;
+using Sanduhr.Core;
 
 namespace Sanduhr.App;
 
@@ -138,7 +139,7 @@ public partial class App : Application
             return Task.CompletedTask;
         }
 
-        var svm = new SettingsViewModel(_vm, () => RunSignInAsync(embedded: true));
+        var svm = new SettingsViewModel(_vm, () => RunSignInAsync(embedded: true), RunUpdateSignInAsync);
         _settingsWindow = new SettingsWindow(svm);
         if (_window is { IsLoaded: true })
             _settingsWindow.Owner = _window;
@@ -184,6 +185,22 @@ public partial class App : Application
         var coordinator = new SignInCoordinator();
         var outcome = await coordinator.ReauthenticateManualActiveAsync(_window);
         if (outcome.Added && _vm is not null)
+            await _vm.ReloadAfterSignInAsync();
+    }
+
+    /// <summary>Settings "Update sign-in…": in-place credential refresh for ANY
+    /// account, routed by that account's origin. Only reload the live fetcher
+    /// when the refreshed account is the active one.</summary>
+    private async Task RunUpdateSignInAsync(string label)
+    {
+        if (_vm is null)
+            return;
+        Window? owner = _settingsWindow ?? (Window?)_window;
+        var coordinator = new SignInCoordinator();
+        var outcome = _vm.AccountStore.GetOrigin(label) == AccountOrigin.Manual
+            ? await coordinator.ReauthenticateManualAsync(owner, label)
+            : await coordinator.ReauthenticateEmbeddedAsync(owner, label);
+        if (outcome.Added && _vm.ActiveAccount == label)
             await _vm.ReloadAfterSignInAsync();
     }
 

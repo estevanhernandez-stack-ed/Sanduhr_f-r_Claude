@@ -42,6 +42,7 @@ public sealed partial class AccountsViewModel : ObservableObject
 {
     private readonly WidgetViewModel _widget;
     private readonly Func<Task> _addAccountAsync;
+    private readonly Func<string, Task> _updateSignInAsync;
     private Window? _owner;
 
     public ObservableCollection<AccountItemViewModel> Accounts { get; } = new();
@@ -55,12 +56,14 @@ public sealed partial class AccountsViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(SwitchToCommand))]
     [NotifyCanExecuteChangedFor(nameof(RenameCommand))]
     [NotifyCanExecuteChangedFor(nameof(SignOutCommand))]
+    [NotifyCanExecuteChangedFor(nameof(UpdateSignInCommand))]
     private AccountItemViewModel? _selectedAccount;
 
-    public AccountsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync)
+    public AccountsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync, Func<string, Task> updateSignInAsync)
     {
         _widget = widget;
         _addAccountAsync = addAccountAsync;
+        _updateSignInAsync = updateSignInAsync;
         Reload();
     }
 
@@ -119,6 +122,20 @@ public sealed partial class AccountsViewModel : ObservableObject
             ShowError($"Couldn't rename: {ex.Message}");
             return;
         }
+        Reload();
+    }
+
+    /// <summary>Refresh the selected account's credentials IN PLACE — works for
+    /// non-active accounts too (pre-WS-A, only the active account could reauth,
+    /// and only from the widget's recovery card). Routing by origin happens in
+    /// the injected delegate (App owns the coordinator + window ownership).</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private async Task UpdateSignIn()
+    {
+        var item = SelectedAccount;
+        if (item is null)
+            return;
+        await _updateSignInAsync(item.Label);
         Reload();
     }
 
