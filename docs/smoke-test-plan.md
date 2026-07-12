@@ -53,3 +53,18 @@
 - ⬜ Account switch, rename, sign-out still behave (no recovery-state bleed).
 - ⬜ A normal fetch after recovery clears the card (`Reason = None`) and renders tiers.
 - ⬜ `dotnet test windows-dotnet/Sanduhr.slnx` green; full solution builds 0/0.
+
+---
+
+## WS-A — auth & accounts overhaul (2026-07-11)
+
+Theming rule for every scenario below: run once in the default theme, then flip through one dark, one light, and Matrix with the surface open — zero unstyled or stale-colored elements, live re-tint included.
+
+1. **Manual-origin expiry → paste-primary card.** Add an account via "Paste a key instead" with a deliberately bogus sessionKey. Wait for the fetch to 401. Expect the recovery card to lead with "Paste a new key" (NOT "Sign in again"); the secondary link reads "Use browser sign-in instead". Primary opens the Update sessionKey modal with the account name locked.
+2. **Embedded-origin expiry unchanged.** For a browser-signed-in account with a dead session, the card still leads with "Sign in again"; secondary reads "Paste a key instead" and opens the paste modal IN PLACE (see 3).
+3. **No duplicate accounts from recovery paste.** From an Expired card, use the paste path and save a key. Expect: same account label, no new "Account N" in Settings ▸ Accounts, history intact.
+4. **Settings ▸ Update sign-in, non-active account.** With two accounts, select the non-active one → "Update sign-in…". Expect the flow matching that account's origin, no active-account switch, and no fetcher hiccup on the active account.
+5. **Remove account is complete.** Remove a signed-in account. Expect: gone from the list, `history.{label}.json` gone from `%APPDATA%\Sanduhr`, confirm-dialog text matches what actually happened.
+6. **Last-account removal purges transport cookies.** Remove the only account. Expect the widget to drop to first-run, and `%APPDATA%\Sanduhr\webview2-fetch` to be deleted (or, if locked, a debug log line about the deferred purge).
+7. **Rename carries history.** Rename an account with a visible history chart. Expect the chart intact under the new name and no `history.{old}.json` left behind.
+8. **First-run unchanged.** Fresh install: primary "Sign in to Claude", secondary "Paste a key instead" ADDS the account (no reauth semantics).
