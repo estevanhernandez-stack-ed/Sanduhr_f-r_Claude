@@ -100,6 +100,7 @@ public sealed class AccountStore
             return;
         DeleteSafely($"sessionKey:{label}");
         DeleteSafely($"cf_clearance:{label}");
+        DeleteSafely($"origin:{label}");
         labels.Remove(label);
         WriteList(labels);
         if (GetActive() == label)
@@ -124,8 +125,12 @@ public sealed class AccountStore
             _cred.SetPassword($"sessionKey:{newLabel}", creds.SessionKey);
         if (creds.CfClearance is not null)
             _cred.SetPassword($"cf_clearance:{newLabel}", creds.CfClearance);
+        var origin = _cred.GetPassword($"origin:{oldLabel}");
+        if (origin is not null)
+            _cred.SetPassword($"origin:{newLabel}", origin);
         DeleteSafely($"sessionKey:{oldLabel}");
         DeleteSafely($"cf_clearance:{oldLabel}");
+        DeleteSafely($"origin:{oldLabel}");
         labels[labels.IndexOf(oldLabel)] = newLabel;
         WriteList(labels);
         if (GetActive() == oldLabel)
@@ -144,6 +149,22 @@ public sealed class AccountStore
             _cred.SetPassword($"sessionKey:{label}", sessionKey);
         if (cfClearance is not null)
             _cred.SetPassword($"cf_clearance:{label}", cfClearance);
+    }
+
+    /// <summary>How this account's credentials were last captured. A missing
+    /// slot (any pre-WS-A account) reads as <see cref="AccountOrigin.Embedded"/>.</summary>
+    public AccountOrigin GetOrigin(string label)
+        => _cred.GetPassword($"origin:{label}") == "manual"
+            ? AccountOrigin.Manual
+            : AccountOrigin.Embedded;
+
+    /// <summary>Record how this account's credentials were last captured — called
+    /// by every successful persist (add and in-place reauth, both flows).</summary>
+    public void SetOrigin(string label, AccountOrigin origin)
+    {
+        if (!ReadList().Contains(label))
+            throw new ArgumentException($"Account '{label}' not in registry", nameof(label));
+        _cred.SetPassword($"origin:{label}", origin == AccountOrigin.Manual ? "manual" : "embedded");
     }
 
     /// <summary>
