@@ -101,11 +101,24 @@ public class ChimeSynthTests
     }
 
     [Fact]
-    public void AlertSnake_is_a_sharp_descending_two_tone()
+    public void AlertSnake_is_a_rising_zip_held_high()
     {
-        Assert.Equal(2, ChimeSynth.AlertSnake.Count);
-        Assert.True(ChimeSynth.AlertSnake[0].Frequency > ChimeSynth.AlertSnake[1].Frequency);
-        Assert.True(ChimeSynth.AlertSnake[0].Frequency > 1000);   // the "!" bite lives up high
+        Assert.Equal(3, ChimeSynth.AlertSnake.Count);
+        Assert.True(ChimeSynth.AlertSnake[1].Frequency > ChimeSynth.AlertSnake[0].Frequency);
+        Assert.True(ChimeSynth.AlertSnake[2].Frequency > ChimeSynth.AlertSnake[1].Frequency);
+        Assert.True(ChimeSynth.AlertSnake[2].Frequency > 1000);   // the "!" lives up high
+        // The landing holds far longer than the zip steps.
+        Assert.True(ChimeSynth.AlertSnake[2].DurationSeconds > ChimeSynth.AlertSnake[0].DurationSeconds * 3);
+    }
+
+    [Fact]
+    public void Square_waveform_produces_different_bytes_than_sine()
+    {
+        var sine = ChimeSynth.BuildWav(ChimeSynth.AlertSnake, 44100, ChimeSynth.Waveform.Sine);
+        var square = ChimeSynth.BuildWav(ChimeSynth.AlertSnake, 44100, ChimeSynth.Waveform.Square);
+        Assert.Equal(sine.Length, square.Length);        // same duration, same header shape
+        Assert.Equal((byte)'R', square[0]);              // valid RIFF
+        Assert.NotEqual(sine, square);                   // genuinely different oscillator
     }
 
     [Fact]

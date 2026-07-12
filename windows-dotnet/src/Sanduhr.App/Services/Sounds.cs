@@ -45,16 +45,20 @@ public static class Sounds
     /// <summary>Urgent-threshold alert chime (WS-B).</summary>
     public static void PlayAlertUrgent() => Play(ChimeSynth.AlertUrgent, "alert-urgent");
 
-    /// <summary>The opt-in 100% sting (synthesized homage — see ChimeSynth.AlertSnake).</summary>
-    public static void PlayAlertSnake() => Play(ChimeSynth.AlertSnake, "alert-snake");
+    /// <summary>The opt-in 100% sting (synthesized homage — see ChimeSynth.AlertSnake).
+    /// Square wave: the one non-sine voice in the app, by design.</summary>
+    public static void PlayAlertSnake()
+        => Play(ChimeSynth.AlertSnake, "alert-snake", ChimeSynth.Waveform.Square);
 
-    private static void Play(IReadOnlyList<ChimeSynth.Note> notes, string cacheKey)
+    private static void Play(
+        IReadOnlyList<ChimeSynth.Note> notes, string cacheKey,
+        ChimeSynth.Waveform waveform = ChimeSynth.Waveform.Sine)
     {
         if (Silent || !OperatingSystem.IsWindows())
             return;
         try
         {
-            var path = WavPathFor(notes, cacheKey);
+            var path = WavPathFor(notes, cacheKey, waveform);
             // SoundPlayer.Play() loads + plays on a background thread — non-blocking,
             // the equivalent of winsound SND_ASYNC.
             new SoundPlayer(path).Play();
@@ -65,7 +69,8 @@ public static class Sounds
         }
     }
 
-    private static string WavPathFor(IReadOnlyList<ChimeSynth.Note> notes, string cacheKey)
+    private static string WavPathFor(
+        IReadOnlyList<ChimeSynth.Note> notes, string cacheKey, ChimeSynth.Waveform waveform)
     {
         if (FileCache.TryGetValue(cacheKey, out var cached) && File.Exists(cached))
             return cached;
@@ -75,7 +80,7 @@ public static class Sounds
         var path = Path.Combine(dir, cacheKey + ".wav");
         try
         {
-            File.WriteAllBytes(path, ChimeSynth.BuildWav(notes));
+            File.WriteAllBytes(path, ChimeSynth.BuildWav(notes, 44100, waveform));
         }
         catch (IOException)
         {

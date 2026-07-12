@@ -55,7 +55,13 @@ public sealed partial class AlertsViewModel : ObservableObject
 
     partial void OnSnakeAtFullChanged(bool value)
     {
-        if (!_loading) _widget.SaveAlertSnakeFull(value);
+        if (_loading)
+            return;
+        _widget.SaveAlertSnakeFull(value);
+        // Audition on opt-in: the sting only ever plays at a real 100% otherwise,
+        // and nobody should meet it for the first time at the worst moment.
+        if (value)
+            Services.Sounds.PlayAlertSnake();
     }
 
     private void PersistConfig()

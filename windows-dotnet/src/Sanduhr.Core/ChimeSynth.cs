@@ -15,6 +15,11 @@ public static class ChimeSynth
     /// <summary>A single tone: a frequency in Hz held for a duration in seconds.</summary>
     public readonly record struct Note(double Frequency, double DurationSeconds);
 
+    /// <summary>Oscillator shape. Sine is the house voice (soft UI cues); Square
+    /// is the PSG-era console bite, used only by the opt-in snake sting — a pure
+    /// sine can never read as a codec-era alert.</summary>
+    public enum Waveform { Sine, Square }
+
     // ~25% of full-scale 16-bit (32767). Background-of-attention, not announcements.
     private const double Amplitude = 8000.0;
     private const double AttackSeconds = 0.005;
@@ -66,12 +71,14 @@ public static class ChimeSynth
     };
 
     /// <summary>The 100% sting — a synthesized homage to a certain codec-era
-    /// alert ("!"), NOT a sample: sharp high attack falling to a held tone.
+    /// alert ("!"), NOT a sample: a fast rising zip landing on a held high tone,
+    /// rendered square (<see cref="Waveform.Square"/>) for the console-era bite.
     /// Opt-in via the Alerts tab; when off, Full uses <see cref="AlertUrgent"/>.</summary>
     public static readonly IReadOnlyList<Note> AlertSnake = new[]
     {
-        new Note(1244.51, 0.07), // D#6 — the bite
-        new Note(830.61, 0.22),  // G#5 — the fall
+        new Note(783.99, 0.045),  // G5 — the grab
+        new Note(1046.50, 0.045), // C6 — the zip
+        new Note(1318.51, 0.24),  // E6 — the "!" held
     };
 
     /// <summary>
@@ -81,10 +88,17 @@ public static class ChimeSynth
     /// 1:1 with <c>sounds._build_wav</c>.
     /// </summary>
     public static byte[] BuildWav(IReadOnlyList<Note> notes, int sampleRate = 44100)
+        => BuildWav(notes, sampleRate, Waveform.Sine);
+
+    /// <summary>As above, with an oscillator choice. Square runs at a reduced
+    /// amplitude (its harmonics carry far more perceived energy than a sine at
+    /// the same peak) so the sting bites without breaking the house discipline.</summary>
+    public static byte[] BuildWav(IReadOnlyList<Note> notes, int sampleRate, Waveform waveform)
     {
         var samples = new List<byte>();
         double attack = AttackSeconds * sampleRate;
         double release = ReleaseSeconds * sampleRate;
+        double amplitude = waveform == Waveform.Square ? Amplitude * 0.75 : Amplitude;
 
         foreach (var note in notes)
         {
@@ -95,7 +109,10 @@ public static class ChimeSynth
                 double attackEnv = attack > 0 ? Math.Min(1.0, i / attack) : 1.0;
                 double releaseEnv = release > 0 ? Math.Min(1.0, (n - i) / release) : 1.0;
                 double env = attackEnv * releaseEnv;
-                int sample = (int)(Amplitude * env * Math.Sin(2 * Math.PI * note.Frequency * t));
+                double osc = Math.Sin(2 * Math.PI * note.Frequency * t);
+                if (waveform == Waveform.Square)
+                    osc = Math.Sign(osc);
+                int sample = (int)(amplitude * env * osc);
                 short s16 = (short)Math.Clamp(sample, short.MinValue, short.MaxValue);
                 samples.Add((byte)(s16 & 0xff));
                 samples.Add((byte)((s16 >> 8) & 0xff));
