@@ -12,8 +12,10 @@ namespace Sanduhr.Core;
 /// </summary>
 public static class ChimeSynth
 {
-    /// <summary>A single tone: a frequency in Hz held for a duration in seconds.</summary>
-    public readonly record struct Note(double Frequency, double DurationSeconds);
+    /// <summary>A single tone: a frequency in Hz held for a duration in seconds,
+    /// at an optional level (0..1 of the sequence amplitude — lets a ring-out
+    /// decay across sequential notes; 1.0 for every pre-WS-B cue).</summary>
+    public readonly record struct Note(double Frequency, double DurationSeconds, double Level = 1.0);
 
     /// <summary>Oscillator shape. Sine is the house voice (soft UI cues); Square
     /// is the PSG-era console bite, used only by the opt-in snake sting — a pure
@@ -71,14 +73,23 @@ public static class ChimeSynth
     };
 
     /// <summary>The 100% sting — a synthesized homage to a certain codec-era
-    /// alert ("!"), NOT a sample: a fast rising zip landing on a held high tone,
-    /// rendered square (<see cref="Waveform.Square"/>) for the console-era bite.
-    /// Opt-in via the Alerts tab; when off, Full uses <see cref="AlertUrgent"/>.</summary>
+    /// alert ("!"), NOT a sample. Contour measured from a reference recording
+    /// (2026-07-12): a ~90 ms rising sweep from ~660 Hz through ~1.6 kHz into a
+    /// bright body near C7, then a metallic ring-out decaying over ~800 ms.
+    /// Rendered square (<see cref="Waveform.Square"/>) for the console-era bite;
+    /// the stepped Levels are the decay. Opt-in via the Alerts tab; when off,
+    /// Full uses <see cref="AlertUrgent"/>.</summary>
     public static readonly IReadOnlyList<Note> AlertSnake = new[]
     {
-        new Note(783.99, 0.045),  // G5 — the grab
-        new Note(1046.50, 0.045), // C6 — the zip
-        new Note(1318.51, 0.24),  // E6 — the "!" held
+        new Note(659.26, 0.030, 0.80),  // E5  — the grab
+        new Note(987.77, 0.030, 0.90),  // B5  — sweep
+        new Note(1480.00, 0.035, 1.00), // F#6 — sweep
+        new Note(2093.00, 0.10, 1.00),  // C7  — the "!" lands
+        new Note(2093.00, 0.12, 0.70),  // ring-out…
+        new Note(2093.00, 0.14, 0.50),
+        new Note(2093.00, 0.16, 0.34),
+        new Note(2093.00, 0.20, 0.22),
+        new Note(2093.00, 0.24, 0.13),  // …to silence
     };
 
     /// <summary>
@@ -112,7 +123,7 @@ public static class ChimeSynth
                 double osc = Math.Sin(2 * Math.PI * note.Frequency * t);
                 if (waveform == Waveform.Square)
                     osc = Math.Sign(osc);
-                int sample = (int)(amplitude * env * osc);
+                int sample = (int)(amplitude * note.Level * env * osc);
                 short s16 = (short)Math.Clamp(sample, short.MinValue, short.MaxValue);
                 samples.Add((byte)(s16 & 0xff));
                 samples.Add((byte)((s16 >> 8) & 0xff));

@@ -101,14 +101,21 @@ public class ChimeSynthTests
     }
 
     [Fact]
-    public void AlertSnake_is_a_rising_zip_held_high()
+    public void AlertSnake_matches_the_measured_contour()
     {
-        Assert.Equal(3, ChimeSynth.AlertSnake.Count);
-        Assert.True(ChimeSynth.AlertSnake[1].Frequency > ChimeSynth.AlertSnake[0].Frequency);
-        Assert.True(ChimeSynth.AlertSnake[2].Frequency > ChimeSynth.AlertSnake[1].Frequency);
-        Assert.True(ChimeSynth.AlertSnake[2].Frequency > 1000);   // the "!" lives up high
-        // The landing holds far longer than the zip steps.
-        Assert.True(ChimeSynth.AlertSnake[2].DurationSeconds > ChimeSynth.AlertSnake[0].DurationSeconds * 3);
+        // Rising sweep into a bright body (reference contour: ~660 Hz -> ~2 kHz).
+        var s = ChimeSynth.AlertSnake;
+        Assert.True(s.Count >= 6);
+        Assert.True(s[1].Frequency > s[0].Frequency);
+        Assert.True(s[2].Frequency > s[1].Frequency);
+        Assert.True(s[3].Frequency > 2000);               // the "!" body lives near C7
+        // Ring-out: everything after the landing holds the body pitch and decays.
+        for (int i = 4; i < s.Count; i++)
+        {
+            Assert.Equal(s[3].Frequency, s[i].Frequency);
+            Assert.True(s[i].Level < s[i - 1].Level);     // strictly decaying
+        }
+        Assert.True(s[^1].Level < 0.2);                   // fades to near silence
     }
 
     [Fact]

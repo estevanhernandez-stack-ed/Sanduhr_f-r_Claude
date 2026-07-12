@@ -72,6 +72,14 @@ public static class Sounds
     private static string WavPathFor(
         IReadOnlyList<ChimeSynth.Note> notes, string cacheKey, ChimeSynth.Waveform waveform)
     {
+        // User override: a WAV dropped at sounds\custom\{key}.wav replaces the
+        // synthesized cue on THIS machine — same drop-in spirit as user themes.
+        // The shipped app carries only synthesized audio; what a user plays from
+        // their own files on their own machine is their business.
+        var custom = Path.Combine(new Paths().SoundsDir, "custom", cacheKey + ".wav");
+        if (File.Exists(custom))
+            return custom;
+
         if (FileCache.TryGetValue(cacheKey, out var cached) && File.Exists(cached))
             return cached;
 
