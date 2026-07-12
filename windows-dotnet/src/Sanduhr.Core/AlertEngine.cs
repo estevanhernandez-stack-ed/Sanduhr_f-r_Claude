@@ -19,7 +19,8 @@ public sealed record AlertConfig(
 public enum AlertKind { Warn, Urgent, Full, Projection, Reset }
 
 /// <summary>An alert to deliver. TierKey resolves to a display label in the App
-/// (the engine stays UI-free).</summary>
+/// (the engine stays UI-free). For Reset events, UtilizationPct is the PREVIOUS window's peak
+/// (the number that made the reset newsworthy).</summary>
 public sealed record AlertEvent(AlertKind Kind, string TierKey, int UtilizationPct, string? ResetsAt);
 
 /// <summary>
@@ -80,15 +81,22 @@ public sealed class AlertEngine
                 s.WindowResetsAt = snap.ResetsAt;
                 s.WindowInitialized = true;
             }
-            else if (!string.Equals(s.WindowResetsAt, snap.ResetsAt, StringComparison.Ordinal))
+            else if (s.WindowResetsAt is not null && snap.ResetsAt is not null
+                     && !string.Equals(s.WindowResetsAt, snap.ResetsAt, StringComparison.Ordinal))
             {
                 if (config.Enabled && config.ResetEnabled && s.WindowPeak >= config.WarnPct)
-                    events.Add(new AlertEvent(AlertKind.Reset, snap.TierKey, pct, snap.ResetsAt));
+                    events.Add(new AlertEvent(AlertKind.Reset, snap.TierKey, s.WindowPeak, snap.ResetsAt));
                 s.WindowResetsAt = snap.ResetsAt;
                 s.WarnFired = s.UrgentFired = s.FullFired = s.ProjectionFired = false;
                 s.ProjectionFalseStreak = 0;
                 s.WindowPeak = -1;
                 s.LastPct = -1;    // new window: an immediately-high value is a fresh crossing
+            }
+            else if (!string.Equals(s.WindowResetsAt, snap.ResetsAt, StringComparison.Ordinal))
+            {
+                // A null-involved transition is a data hiccup, not a new window:
+                // track the value but keep the baseline and armed state.
+                s.WindowResetsAt = snap.ResetsAt;
             }
 
             AlertKind? candidate = null;

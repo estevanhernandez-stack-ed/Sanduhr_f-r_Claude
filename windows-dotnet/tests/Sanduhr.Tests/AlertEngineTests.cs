@@ -209,4 +209,45 @@ public class AlertEngineTests
         Eval(e, 85, On);
         Assert.Empty(Eval(e, 5, On, resetsAt: "2026-07-24T00:00:00+00:00"));
     }
+
+    [Fact]
+    public void Null_resets_at_transition_is_not_a_rollover()
+    {
+        var e = new AlertEngine();
+        var cfg = On with { ResetEnabled = true };
+        Assert.Single(Eval(e, 96, cfg));                              // Urgent fires
+        Assert.Empty(Eval(e, 96, cfg, resetsAt: null));               // hiccup: no Reset, no refire
+        Assert.Empty(Eval(e, 96, cfg));                               // back to normal: still armed-off
+    }
+
+    [Fact]
+    public void Reset_event_carries_previous_window_peak()
+    {
+        var cfg = On with { ResetEnabled = true };
+        var e = new AlertEngine();
+        Eval(e, 85, cfg);
+        var ev = Assert.Single(Eval(e, 5, cfg, resetsAt: "2026-07-24T00:00:00+00:00"));
+        Assert.Equal(AlertKind.Reset, ev.Kind);
+        Assert.Equal(85, ev.UtilizationPct);
+    }
+
+    [Fact]
+    public void Exact_threshold_and_hysteresis_boundaries()
+    {
+        var e = new AlertEngine();
+        var ev = Assert.Single(Eval(e, 80));       // crossing is inclusive at the threshold
+        Assert.Equal(AlertKind.Warn, ev.Kind);
+        Assert.Empty(Eval(e, 75));                 // exactly threshold-5: still armed-off
+        Assert.Empty(Eval(e, 74));                 // strictly below: re-arms silently
+        Assert.Single(Eval(e, 80));                // re-fires
+    }
+
+    [Fact]
+    public void Disabled_config_suppresses_projection_too()
+    {
+        var cfg = new AlertConfig(Enabled: false, WarnPct: 99, UrgentPct: 99,
+            ProjectionEnabled: true, ResetEnabled: false);
+        var e = new AlertEngine();
+        Assert.Empty(Eval(e, 95, cfg, T0, "2026-07-13T00:00:00+00:00"));
+    }
 }
