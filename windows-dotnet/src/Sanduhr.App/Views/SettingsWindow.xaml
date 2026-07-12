@@ -626,7 +626,7 @@
                             <CheckBox Content="Projection alerts (on pace to hit the cap before reset)"
                                       IsChecked="{Binding ProjectionEnabled}"
                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
-                            <CheckBox Content="Reset notifications (fresh window after a heavy one)"
+                            <CheckBox Content="Reset notifications"
                                       IsChecked="{Binding ResetEnabled}"
                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
                             <CheckBox Content="Sound" IsChecked="{Binding SoundEnabled}"
