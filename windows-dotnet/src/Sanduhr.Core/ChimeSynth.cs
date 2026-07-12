@@ -56,20 +56,21 @@ public static class ChimeSynth
         new Note(440.00, 0.04), // A4
     };
 
-    /// <summary>Soft ascending two-note — a tier crossed the warn threshold.
-    /// Background-of-attention, same amplitude discipline as the UI cues.</summary>
+    /// <summary>Quick rising chirp — a tier crossed the warn threshold. High and
+    /// short (~120 ms): present without lingering, same amplitude discipline.</summary>
     public static readonly IReadOnlyList<Note> AlertWarn = new[]
     {
-        new Note(329.63, 0.09), // E4
-        new Note(392.00, 0.16), // G4
+        new Note(1046.50, 0.045), // C6
+        new Note(1318.51, 0.075), // E6
     };
 
-    /// <summary>Firmer three-note landing-and-holding on C5 — urgent threshold.</summary>
+    /// <summary>Insistent triple-chirp zipping up and holding a beat (~180 ms) —
+    /// urgent threshold. Same chirp voice as warn, one notch more assertive.</summary>
     public static readonly IReadOnlyList<Note> AlertUrgent = new[]
     {
-        new Note(392.00, 0.09), // G4
-        new Note(523.25, 0.09), // C5
-        new Note(523.25, 0.18), // C5 held
+        new Note(1318.51, 0.04),  // E6
+        new Note(1567.98, 0.04),  // G6
+        new Note(1567.98, 0.10),  // G6 held a beat
     };
 
     /// <summary>The 100% sting — a synthesized homage to a certain codec-era
