@@ -8,7 +8,7 @@ namespace Sanduhr.App.ViewModels;
 /// Drives the Settings ▸ Alerts tab (WS-B). Edits persist immediately through
 /// the WidgetViewModel passthroughs (the tab is non-modal, matching the other
 /// tabs' apply-on-change behavior). Threshold edits are validated on change:
-/// values clamp to 50-99 and Warn must stay below Urgent — invalid combinations
+/// values clamp to 1-99 and Warn must stay below Urgent — invalid combinations
 /// revert and surface a themed inline hint instead of persisting.
 /// </summary>
 public sealed partial class AlertsViewModel : ObservableObject
@@ -62,8 +62,8 @@ public sealed partial class AlertsViewModel : ObservableObject
     {
         if (_loading)
             return;
-        int warn = Math.Clamp(WarnPct, 50, 99);
-        int urgent = Math.Clamp(UrgentPct, 50, 99);
+        int warn = Math.Clamp(WarnPct, 1, 99);
+        int urgent = Math.Clamp(UrgentPct, 1, 99);
         // Echo clamped values back so the bound UI never diverges from the store
         // (_loading doubles as the re-entrancy latch for these programmatic sets).
         if (WarnPct != warn || UrgentPct != urgent)

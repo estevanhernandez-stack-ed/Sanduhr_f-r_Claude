@@ -64,7 +64,7 @@ Semantics (the truth table the tests pin):
 New tab in `SettingsWindow` between Themes and History, all `Sanduhr.Brush.*` tokens, no literals:
 
 - Master toggle **Alerts** (default ON — alerting is the product's job; first-run behavior is sane at 80/95).
-- Warn threshold + Urgent threshold (numeric steppers, 50–99, Warn < Urgent enforced on save; invalid input reverts with themed inline hint).
+- Warn threshold + Urgent threshold (numeric steppers, 1–99, Warn < Urgent enforced on save; invalid input reverts with themed inline hint). The floor is 1, not something "sensible" like 50 — early-warning users and smoke tests both legitimately want low thresholds.
 - Toggles: Projection alerts (default on) · Reset notifications (default off) · Sound (default on) · Snake at 100% (default off).
 - **"Send test alert"** button — fires a fake Warn toast + chime through the real pipeline (the support answer to "is it working?").
 - `SettingsStore` keys (key-per-preference pattern): `alerts_enabled`, `alert_warn_pct`, `alert_urgent_pct`, `alert_projection`, `alert_reset`, `alert_sound`, `alert_snake_full`.

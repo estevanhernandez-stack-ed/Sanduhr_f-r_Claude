@@ -274,8 +274,8 @@ public sealed class SettingsStore
         try { urgent = root["alert_urgent_pct"]?.GetValue<int>() ?? 95; } catch { }
         try { projection = root["alert_projection"]?.GetValue<bool>() ?? true; } catch { }
         try { reset = root["alert_reset"]?.GetValue<bool>() ?? false; } catch { }
-        warn = Math.Clamp(warn, 50, 99);
-        urgent = Math.Clamp(urgent, 50, 99);
+        warn = Math.Clamp(warn, 1, 99);
+        urgent = Math.Clamp(urgent, 1, 99);
         if (warn >= urgent) { warn = 80; urgent = 95; }   // corrupt pair -> defaults
         return new AlertConfig(enabled, warn, urgent, projection, reset);
     }
