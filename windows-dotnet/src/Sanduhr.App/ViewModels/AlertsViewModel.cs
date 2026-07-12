@@ -64,6 +64,15 @@ public sealed partial class AlertsViewModel : ObservableObject
             return;
         int warn = Math.Clamp(WarnPct, 50, 99);
         int urgent = Math.Clamp(UrgentPct, 50, 99);
+        // Echo clamped values back so the bound UI never diverges from the store
+        // (_loading doubles as the re-entrancy latch for these programmatic sets).
+        if (WarnPct != warn || UrgentPct != urgent)
+        {
+            _loading = true;
+            WarnPct = warn;
+            UrgentPct = urgent;
+            _loading = false;
+        }
         if (warn >= urgent)
         {
             ValidationHint = "Warn must be below Urgent — not saved.";
