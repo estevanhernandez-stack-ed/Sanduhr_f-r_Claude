@@ -428,7 +428,8 @@
                                     </ControlTemplate>
                                 </Button.Template>
                             </Button>
-                            <Button Command="{Binding PasteKeyCommand}" Cursor="Hand" Content="Paste a key instead"
+                            <Button Command="{Binding SecondaryAuthCommand}" Cursor="Hand"
+                                    Content="{Binding PromptSecondaryLabel}"
                                     HorizontalAlignment="Center" Margin="0,12,0,0"
                                     Background="Transparent" BorderThickness="0" FontSize="11"
                                     Foreground="{DynamicResource Sanduhr.Brush.TextDim}">

@@ -39,6 +39,7 @@ public partial class App : Application
         _vm.TrayPercentChanged += OnTrayPercentChanged;
         _vm.SignInRequested += () => RunSignInAsync(embedded: true);
         _vm.ReauthRequested += RunReauthAsync;
+        _vm.ManualReauthRequested += RunManualReauthAsync;
         _vm.PasteKeyRequested += () => RunSignInAsync(embedded: false);
         _vm.SettingsRequested += ShowSettingsAsync;
         // Keep an open Settings window's account list in sync with quick-switches
@@ -172,6 +173,16 @@ public partial class App : Application
     {
         var coordinator = new SignInCoordinator();
         var outcome = await coordinator.ReauthenticateActiveAsync(_window);
+        if (outcome.Added && _vm is not null)
+            await _vm.ReloadAfterSignInAsync();
+    }
+
+    /// <summary>In-place MANUAL re-auth of the active account (recovery card,
+    /// manual-origin primary or paste-during-recovery secondary).</summary>
+    private async Task RunManualReauthAsync()
+    {
+        var coordinator = new SignInCoordinator();
+        var outcome = await coordinator.ReauthenticateManualActiveAsync(_window);
         if (outcome.Added && _vm is not null)
             await _vm.ReloadAfterSignInAsync();
     }

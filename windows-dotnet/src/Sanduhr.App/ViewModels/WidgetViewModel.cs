@@ -106,12 +106,20 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     /// <summary>Visibility of the recovery card — any non-None reason shows it.</summary>
     public bool ShowSignInPrompt => Reason != SignInReason.None;
+
+    /// <summary>The active account's credential origin — routes the recovery card.
+    /// Embedded when signed out (FirstRun copy doesn't branch on origin anyway).</summary>
+    private AccountOrigin ActiveOrigin
+        => _accounts.GetActive() is { } label ? _accounts.GetOrigin(label) : AccountOrigin.Embedded;
+
     /// <summary>Card headline for the current reason (empty when hidden).</summary>
-    public string PromptHeadline => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason).Headline;
+    public string PromptHeadline => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason, ActiveOrigin).Headline;
     /// <summary>Card subtitle for the current reason (empty when hidden).</summary>
-    public string PromptSubtitle => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason).Subtitle;
+    public string PromptSubtitle => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason, ActiveOrigin).Subtitle;
     /// <summary>Primary-button label for the current reason (empty when hidden).</summary>
-    public string PromptPrimaryLabel => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason).PrimaryLabel;
+    public string PromptPrimaryLabel => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason, ActiveOrigin).PrimaryLabel;
+    /// <summary>Secondary-link label for the current reason (empty when hidden).</summary>
+    public string PromptSecondaryLabel => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason, ActiveOrigin).SecondaryLabel;
 
     partial void OnReasonChanged(SignInReason value)
     {
@@ -119,6 +127,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(PromptHeadline));
         OnPropertyChanged(nameof(PromptSubtitle));
         OnPropertyChanged(nameof(PromptPrimaryLabel));
+        OnPropertyChanged(nameof(PromptSecondaryLabel));
     }
 
     /// <summary>Highest active-tier % for the tray glyph; -1 when no data.</summary>
@@ -136,6 +145,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// (Expired/Blocked) — App routes this to <c>SignInCoordinator.ReauthenticateActiveAsync</c>,
     /// which refreshes the existing account in place rather than adding a new one.</summary>
     public event Func<Task>? ReauthRequested;
+
+    /// <summary>Raised when the ACTIVE account needs an IN-PLACE manual key paste
+    /// (manual-origin account expired, or "Paste a key instead" during recovery) —
+    /// App routes this to <c>SignInCoordinator.ReauthenticateManualActiveAsync</c>.
+    /// Distinct from <see cref="PasteKeyRequested"/>, which ADDS a new account.</summary>
+    public event Func<Task>? ManualReauthRequested;
 
     /// <summary>Raised by the "Paste a key instead" command — App opens the manual
     /// sessionKey fallback modal.</summary>
@@ -405,28 +420,44 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             await SignInRequested.Invoke();
     }
 
-    /// <summary>The recovery card's primary button. FirstRun → add-account sign-in;
-    /// Expired/Blocked → in-place re-auth of the active account.</summary>
+    /// <summary>The recovery card's primary button, routed by the origin-aware
+    /// table: FirstRun → add-account sign-in; Expired/Blocked → in-place re-auth
+    /// via the method that matches how the account was created.</summary>
     [RelayCommand]
     private async Task PrimaryAuth()
     {
-        if (Reason is SignInReason.Expired or SignInReason.Blocked)
+        switch (ReauthRouting.Primary(Reason, ActiveOrigin))
         {
-            if (ReauthRequested is not null)
-                await ReauthRequested.Invoke();
-        }
-        else
-        {
-            if (SignInRequested is not null)
-                await SignInRequested.Invoke();
+            case AuthFlow.ManualReauth:
+                if (ManualReauthRequested is not null) await ManualReauthRequested.Invoke();
+                break;
+            case AuthFlow.EmbeddedReauth:
+                if (ReauthRequested is not null) await ReauthRequested.Invoke();
+                break;
+            default: // EmbeddedAdd (FirstRun)
+                if (SignInRequested is not null) await SignInRequested.Invoke();
+                break;
         }
     }
 
+    /// <summary>The recovery card's secondary link — always the OTHER method. In
+    /// recovery it re-auths IN PLACE (the pre-WS-A behavior of adding a duplicate
+    /// "Account N" here was a bug); on FirstRun it stays a manual add.</summary>
     [RelayCommand]
-    private async Task PasteKey()
+    private async Task SecondaryAuth()
     {
-        if (PasteKeyRequested is not null)
-            await PasteKeyRequested.Invoke();
+        switch (ReauthRouting.Secondary(Reason, ActiveOrigin))
+        {
+            case AuthFlow.ManualReauth:
+                if (ManualReauthRequested is not null) await ManualReauthRequested.Invoke();
+                break;
+            case AuthFlow.EmbeddedReauth:
+                if (ReauthRequested is not null) await ReauthRequested.Invoke();
+                break;
+            default: // ManualAdd (FirstRun)
+                if (PasteKeyRequested is not null) await PasteKeyRequested.Invoke();
+                break;
+        }
     }
 
     [RelayCommand]
