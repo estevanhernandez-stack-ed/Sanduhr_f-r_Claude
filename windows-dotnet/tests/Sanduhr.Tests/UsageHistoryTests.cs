@@ -305,4 +305,63 @@ public class UsageHistoryTests
         f.History.Append("five_hour", 50); // silently no-ops
         Assert.Empty(f.History.Load("five_hour"));
     }
+
+    // -- Delete / Rename (WS-A: complete account removal + rename) ------------
+
+    [Fact]
+    public void Delete_unlinks_the_history_file()
+    {
+        using var f = new Fixture("Personal");
+        f.History.Append("five_hour", 42);
+        Assert.True(File.Exists(f.Paths.HistoryFileFor("Personal")));
+        f.History.Delete("Personal");
+        Assert.False(File.Exists(f.Paths.HistoryFileFor("Personal")));
+    }
+
+    [Fact]
+    public void Delete_missing_file_is_noop()
+    {
+        using var f = new Fixture("Personal");
+        f.History.Delete("Personal"); // no file yet — must not throw
+        Assert.False(File.Exists(f.Paths.HistoryFileFor("Personal")));
+    }
+
+    [Fact]
+    public void Delete_leaves_other_accounts_untouched()
+    {
+        using var f = new Fixture("Personal", "Work");
+        f.History.AppendForAccount("five_hour", 10, "Personal");
+        f.History.AppendForAccount("five_hour", 20, "Work");
+        f.History.Delete("Personal");
+        Assert.Equal(new[] { 20 }, f.History.Load("five_hour", "Work"));
+    }
+
+    [Fact]
+    public void Rename_moves_the_history_file()
+    {
+        using var f = new Fixture("Personal");
+        f.History.Append("five_hour", 42);
+        f.History.Rename("Personal", "Home");
+        Assert.False(File.Exists(f.Paths.HistoryFileFor("Personal")));
+        Assert.Equal(new[] { 42 }, f.History.Load("five_hour", "Home"));
+    }
+
+    [Fact]
+    public void Rename_without_source_file_is_noop()
+    {
+        using var f = new Fixture("Personal");
+        f.History.Rename("Personal", "Home"); // no file yet — must not throw
+        Assert.False(File.Exists(f.Paths.HistoryFileFor("Home")));
+    }
+
+    [Fact]
+    public void Rename_overwrites_a_stale_target_file()
+    {
+        using var f = new Fixture("Personal");
+        // A stale file left under the target name (e.g. from a pre-fix rename).
+        File.WriteAllText(f.Paths.HistoryFileFor("Home"), """{"five_hour":[{"t":"2026-01-01T00:00:00+00:00","v":99}]}""");
+        f.History.Append("five_hour", 42);
+        f.History.Rename("Personal", "Home");
+        Assert.Equal(new[] { 42 }, f.History.Load("five_hour", "Home"));
+    }
 }
