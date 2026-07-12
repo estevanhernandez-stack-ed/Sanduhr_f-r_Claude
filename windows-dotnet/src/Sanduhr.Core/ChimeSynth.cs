@@ -49,6 +49,31 @@ public static class ChimeSynth
         new Note(440.00, 0.04), // A4
     };
 
+    /// <summary>Soft ascending two-note — a tier crossed the warn threshold.
+    /// Background-of-attention, same amplitude discipline as the UI cues.</summary>
+    public static readonly IReadOnlyList<Note> AlertWarn = new[]
+    {
+        new Note(329.63, 0.09), // E4
+        new Note(392.00, 0.16), // G4
+    };
+
+    /// <summary>Firmer three-note landing-and-holding on C5 — urgent threshold.</summary>
+    public static readonly IReadOnlyList<Note> AlertUrgent = new[]
+    {
+        new Note(392.00, 0.09), // G4
+        new Note(523.25, 0.09), // C5
+        new Note(523.25, 0.18), // C5 held
+    };
+
+    /// <summary>The 100% sting — a synthesized homage to a certain codec-era
+    /// alert ("!"), NOT a sample: sharp high attack falling to a held tone.
+    /// Opt-in via the Alerts tab; when off, Full uses <see cref="AlertUrgent"/>.</summary>
+    public static readonly IReadOnlyList<Note> AlertSnake = new[]
+    {
+        new Note(1244.51, 0.07), // D#6 — the bite
+        new Note(830.61, 0.22),  // G#5 — the fall
+    };
+
     /// <summary>
     /// Build a 16-bit mono PCM-WAV blob from <paramref name="notes"/> played
     /// sequentially. Each note carries a 5 ms linear attack + 30 ms release so

@@ -81,4 +81,41 @@ public class ChimeSynthTests
 
     private static int ReadInt16(byte[] b, int o)
         => b[o] | (b[o + 1] << 8);
+
+    // -- WS-B alert tones (spec §3) --------------------------------------------
+
+    [Fact]
+    public void AlertWarn_is_a_soft_ascending_two_note()
+    {
+        Assert.Equal(2, ChimeSynth.AlertWarn.Count);
+        Assert.True(ChimeSynth.AlertWarn[1].Frequency > ChimeSynth.AlertWarn[0].Frequency);
+    }
+
+    [Fact]
+    public void AlertUrgent_is_a_firmer_three_note()
+    {
+        Assert.Equal(3, ChimeSynth.AlertUrgent.Count);
+        // Lands and holds on the top note.
+        Assert.Equal(ChimeSynth.AlertUrgent[1].Frequency, ChimeSynth.AlertUrgent[2].Frequency);
+        Assert.True(ChimeSynth.AlertUrgent[2].DurationSeconds > ChimeSynth.AlertUrgent[1].DurationSeconds);
+    }
+
+    [Fact]
+    public void AlertSnake_is_a_sharp_descending_two_tone()
+    {
+        Assert.Equal(2, ChimeSynth.AlertSnake.Count);
+        Assert.True(ChimeSynth.AlertSnake[0].Frequency > ChimeSynth.AlertSnake[1].Frequency);
+        Assert.True(ChimeSynth.AlertSnake[0].Frequency > 1000);   // the "!" bite lives up high
+    }
+
+    [Fact]
+    public void Alert_sequences_build_valid_wavs()
+    {
+        foreach (var seq in new[] { ChimeSynth.AlertWarn, ChimeSynth.AlertUrgent, ChimeSynth.AlertSnake })
+        {
+            var wav = ChimeSynth.BuildWav(seq);
+            Assert.True(wav.Length > 44);
+            Assert.Equal((byte)'R', wav[0]);   // RIFF header intact
+        }
+    }
 }

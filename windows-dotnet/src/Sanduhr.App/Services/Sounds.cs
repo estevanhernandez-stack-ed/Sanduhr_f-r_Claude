@@ -39,6 +39,15 @@ public static class Sounds
     /// <summary>Brief A tap for toggle / theme-switch interactions.</summary>
     public static void PlayToggle() => Play(ChimeSynth.Toggle, "toggle");
 
+    /// <summary>Warn-threshold alert chime (WS-B).</summary>
+    public static void PlayAlertWarn() => Play(ChimeSynth.AlertWarn, "alert-warn");
+
+    /// <summary>Urgent-threshold alert chime (WS-B).</summary>
+    public static void PlayAlertUrgent() => Play(ChimeSynth.AlertUrgent, "alert-urgent");
+
+    /// <summary>The opt-in 100% sting (synthesized homage — see ChimeSynth.AlertSnake).</summary>
+    public static void PlayAlertSnake() => Play(ChimeSynth.AlertSnake, "alert-snake");
+
     private static void Play(IReadOnlyList<ChimeSynth.Note> notes, string cacheKey)
     {
         if (Silent || !OperatingSystem.IsWindows())
