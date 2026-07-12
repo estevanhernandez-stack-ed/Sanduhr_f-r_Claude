@@ -124,6 +124,16 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     partial void OnReasonChanged(SignInReason value)
     {
         OnPropertyChanged(nameof(ShowSignInPrompt));
+        NotifyPromptCopy();
+    }
+
+    /// <summary>Re-raise the recovery-card copy bindings. Needed beyond
+    /// OnReasonChanged because the copy also depends on ActiveOrigin: switching
+    /// between two accounts that are BOTH Expired/Blocked reassigns Reason to the
+    /// same value (no setter notification), yet the origin — and therefore the
+    /// card's copy — may have changed.</summary>
+    private void NotifyPromptCopy()
+    {
         OnPropertyChanged(nameof(PromptHeadline));
         OnPropertyChanged(nameof(PromptSubtitle));
         OnPropertyChanged(nameof(PromptPrimaryLabel));
@@ -672,6 +682,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private void EnterRecoveryState(SignInReason reason)
     {
         Reason = reason;
+        NotifyPromptCopy();
         StatusText = "";
         ClearSignedInChrome();
         TrayPercentChanged?.Invoke(-1);
