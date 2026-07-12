@@ -260,4 +260,60 @@ public sealed class SettingsStore
         foreach (var s in items) arr.Add(s);
         return arr;
     }
+
+    // -- WS-B alerts (spec 2026-07-12-threshold-alerts-design.md §4) ------------
+
+    /// <summary>Alert engine config. Defaults: enabled, warn 80, urgent 95,
+    /// projection on, reset notification off.</summary>
+    public AlertConfig LoadAlertConfig()
+    {
+        var root = Read();
+        bool enabled = true; int warn = 80; int urgent = 95; bool projection = true; bool reset = false;
+        try { enabled = root["alerts_enabled"]?.GetValue<bool>() ?? true; } catch { }
+        try { warn = root["alert_warn_pct"]?.GetValue<int>() ?? 80; } catch { }
+        try { urgent = root["alert_urgent_pct"]?.GetValue<int>() ?? 95; } catch { }
+        try { projection = root["alert_projection"]?.GetValue<bool>() ?? true; } catch { }
+        try { reset = root["alert_reset"]?.GetValue<bool>() ?? false; } catch { }
+        warn = Math.Clamp(warn, 50, 99);
+        urgent = Math.Clamp(urgent, 50, 99);
+        if (warn >= urgent) { warn = 80; urgent = 95; }   // corrupt pair -> defaults
+        return new AlertConfig(enabled, warn, urgent, projection, reset);
+    }
+
+    public void SaveAlertConfig(AlertConfig config)
+    {
+        var root = Read();
+        root["alerts_enabled"] = config.Enabled;
+        root["alert_warn_pct"] = config.WarnPct;
+        root["alert_urgent_pct"] = config.UrgentPct;
+        root["alert_projection"] = config.ProjectionEnabled;
+        root["alert_reset"] = config.ResetEnabled;
+        Write(root);
+    }
+
+    public bool LoadAlertSound()
+    {
+        var root = Read();
+        try { return root["alert_sound"]?.GetValue<bool>() ?? true; } catch { return true; }
+    }
+
+    public void SaveAlertSound(bool on)
+    {
+        var root = Read();
+        root["alert_sound"] = on;
+        Write(root);
+    }
+
+    public bool LoadAlertSnakeFull()
+    {
+        var root = Read();
+        try { return root["alert_snake_full"]?.GetValue<bool>() ?? false; } catch { return false; }
+    }
+
+    public void SaveAlertSnakeFull(bool on)
+    {
+        var root = Read();
+        root["alert_snake_full"] = on;
+        Write(root);
+    }
 }

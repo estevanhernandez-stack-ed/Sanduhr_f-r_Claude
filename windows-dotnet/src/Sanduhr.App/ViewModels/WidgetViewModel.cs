@@ -192,6 +192,10 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// overlay (port of <c>widget</c>'s <c>_btn_snake</c> → <c>start_game</c>).</summary>
     public event Action? GameStartRequested;
 
+    /// <summary>Raised when any alert preference is saved — the alert pipeline
+    /// re-reads its config on the next evaluation.</summary>
+    public event Action? AlertSettingsChanged;
+
     public ThemePalette Palette => _palette;
 
     /// <summary>The user theme drop-in folder, for the Settings "Open themes folder"
@@ -239,6 +243,32 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     /// <summary>Persist a new cooldown-snake high score.</summary>
     public void SaveSnakeHighScore(int score) => _settings.SaveSnakeHighScore(score);
+
+    /// <summary>Alert preferences (settings.json, WS-B). Saves raise
+    /// <see cref="AlertSettingsChanged"/> so the live engine re-reads config.</summary>
+    public AlertConfig LoadAlertConfig() => _settings.LoadAlertConfig();
+
+    public void SaveAlertConfig(AlertConfig config)
+    {
+        _settings.SaveAlertConfig(config);
+        AlertSettingsChanged?.Invoke();
+    }
+
+    public bool LoadAlertSound() => _settings.LoadAlertSound();
+
+    public void SaveAlertSound(bool on)
+    {
+        _settings.SaveAlertSound(on);
+        AlertSettingsChanged?.Invoke();
+    }
+
+    public bool LoadAlertSnakeFull() => _settings.LoadAlertSnakeFull();
+
+    public void SaveAlertSnakeFull(bool on)
+    {
+        _settings.SaveAlertSnakeFull(on);
+        AlertSettingsChanged?.Invoke();
+    }
 
     public WidgetViewModel()
     {
