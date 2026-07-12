@@ -435,7 +435,7 @@
                                         Command="{Binding RenameCommand}" />
                                 <Button Style="{StaticResource FlatButton}" Content="Update sign-in…"
                                         Command="{Binding UpdateSignInCommand}" />
-                                <Button Style="{StaticResource FlatButton}" Content="Sign out"
+                                <Button Style="{StaticResource FlatButton}" Content="Remove account…"
                                         Command="{Binding SignOutCommand}" Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" />
                             </StackPanel>
 

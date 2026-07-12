@@ -75,6 +75,12 @@ public sealed class Paths
     /// creates it lazily on first play.</summary>
     public string SoundsDir => Path.Combine(AppDataDir, "sounds");
 
+    /// <summary>Shared fetch-transport browser profile:
+    /// <c>%APPDATA%\Sanduhr\webview2-fetch</c>. Holds the ACTIVE account's
+    /// claude.ai cookies on disk — account deletion purges it when no account
+    /// remains (no future client init would ever wipe it otherwise).</summary>
+    public string WebView2FetchDir => Path.Combine(AppDataDir, "webview2-fetch");
+
     public string LogFile => Path.Combine(AppDataDir, "sanduhr.log");
 
     public string LastErrorFile => Path.Combine(AppDataDir, "last_error.json");

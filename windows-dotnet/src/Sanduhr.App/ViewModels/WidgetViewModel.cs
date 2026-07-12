@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Net.Http;
 using System.Text.Json.Nodes;
 using System.Windows;
@@ -528,40 +529,72 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Rename an account in place (same secrets, new label). The active
-    /// pointer follows the rename inside <see cref="AccountStore"/>, so the fetcher
-    /// keeps the same session — only the displayed label refreshes.</summary>
+    /// pointer follows the rename inside <see cref="AccountStore"/>, and the
+    /// history file moves with it so the chart survives the rename.</summary>
     public void RenameAccount(string oldLabel, string newLabel)
     {
         _accounts.RenameAccount(oldLabel, newLabel);
+        _history.Rename(oldLabel, newLabel);
         RefreshAccountLabel();
         AccountsChanged?.Invoke();
     }
 
     /// <summary>
-    /// Sign out (remove) an account: wipe its per-account history file, drop its
-    /// Credential-Manager slots, and — when it was the active one —
-    /// <see cref="AccountStore.RemoveAccount"/> advances the active pointer to the
-    /// first remaining account (or none). When the active account changed we rebuild
-    /// the fetcher (anti-bleed cookie wipe runs again) and refetch; signing out the
-    /// last account drops the widget into its "Sign in to Claude" empty state.
+    /// Remove an account completely: unlink its per-account history file, drop its
+    /// Credential-Manager slots (sessionKey / cf_clearance / origin), and — when it
+    /// was the active one — <see cref="AccountStore.RemoveAccount"/> advances the
+    /// active pointer to the first remaining account (or none). Removing the LAST
+    /// account also purges the shared webview2-fetch transport profile: no future
+    /// client init would ever run its anti-bleed cookie wipe, so the deleted
+    /// account's live claude.ai cookies would otherwise sit on disk indefinitely.
     /// </summary>
     public async Task SignOutAccountAsync(string label)
     {
         bool wasActive = _accounts.GetActive() == label;
-        // Wipe history BEFORE removal so the file is targeted by an explicit label
-        // (parity with the Python remove flow).
-        _history.ClearAll(label);
+        if (wasActive)
+        {
+            // Release the transport's hold on the shared profile BEFORE cleanup.
+            (_client as IDisposable)?.Dispose();
+            _client = null;
+            _fetcher = null;
+        }
+        _history.Delete(label);
         _accounts.RemoveAccount(label);
 
         if (wasActive)
         {
             Tiers.Clear();
             _lastData = null;
+            if (_accounts.ListAccounts().Count == 0)
+                await PurgeTransportProfileBestEffortAsync();
             RebuildFetcher();
             await RefreshAsync();
         }
         RefreshAccountLabel();
         AccountsChanged?.Invoke();
+    }
+
+    /// <summary>Delete the shared webview2-fetch profile directory. WebView2's
+    /// browser processes release their file locks asynchronously after Dispose,
+    /// so retry briefly; a stubborn lock is logged and left for the next client
+    /// init's cookie wipe (best-effort — the app must keep working regardless).</summary>
+    private async Task PurgeTransportProfileBestEffortAsync()
+    {
+        var profile = _paths.WebView2FetchDir;
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                if (Directory.Exists(profile))
+                    Directory.Delete(profile, recursive: true);
+                return;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                await Task.Delay(300);
+            }
+        }
+        Debug.WriteLine("[Sanduhr] webview2-fetch purge failed — cookies remain until the next transport init");
     }
 
     [RelayCommand]
