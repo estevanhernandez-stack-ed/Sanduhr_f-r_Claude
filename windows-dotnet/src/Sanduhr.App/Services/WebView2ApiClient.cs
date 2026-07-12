@@ -96,7 +96,7 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
         _sessionKey = sessionKey;
         _cfClearance = cfClearance;
         var paths = new Paths();
-        _profileDir = Path.Combine(paths.AppDataDir, "webview2-fetch");
+        _profileDir = paths.WebView2FetchDir;
         _logPath = Path.Combine(paths.AppDataDir, "fetch-debug.log");
         _dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
     }

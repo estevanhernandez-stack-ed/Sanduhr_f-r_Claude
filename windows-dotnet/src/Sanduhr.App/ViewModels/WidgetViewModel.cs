@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Net.Http;
 using System.Text.Json.Nodes;
 using System.Windows;
@@ -106,19 +107,38 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     /// <summary>Visibility of the recovery card — any non-None reason shows it.</summary>
     public bool ShowSignInPrompt => Reason != SignInReason.None;
+
+    /// <summary>The active account's credential origin — routes the recovery card.
+    /// Embedded when signed out (FirstRun copy doesn't branch on origin anyway).</summary>
+    private AccountOrigin ActiveOrigin
+        => _accounts.GetActive() is { } label ? _accounts.GetOrigin(label) : AccountOrigin.Embedded;
+
     /// <summary>Card headline for the current reason (empty when hidden).</summary>
-    public string PromptHeadline => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason).Headline;
+    public string PromptHeadline => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason, ActiveOrigin).Headline;
     /// <summary>Card subtitle for the current reason (empty when hidden).</summary>
-    public string PromptSubtitle => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason).Subtitle;
+    public string PromptSubtitle => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason, ActiveOrigin).Subtitle;
     /// <summary>Primary-button label for the current reason (empty when hidden).</summary>
-    public string PromptPrimaryLabel => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason).PrimaryLabel;
+    public string PromptPrimaryLabel => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason, ActiveOrigin).PrimaryLabel;
+    /// <summary>Secondary-link label for the current reason (empty when hidden).</summary>
+    public string PromptSecondaryLabel => Reason == SignInReason.None ? "" : SignInPromptCopy.For(Reason, ActiveOrigin).SecondaryLabel;
 
     partial void OnReasonChanged(SignInReason value)
     {
         OnPropertyChanged(nameof(ShowSignInPrompt));
+        NotifyPromptCopy();
+    }
+
+    /// <summary>Re-raise the recovery-card copy bindings. Needed beyond
+    /// OnReasonChanged because the copy also depends on ActiveOrigin: switching
+    /// between two accounts that are BOTH Expired/Blocked reassigns Reason to the
+    /// same value (no setter notification), yet the origin — and therefore the
+    /// card's copy — may have changed.</summary>
+    private void NotifyPromptCopy()
+    {
         OnPropertyChanged(nameof(PromptHeadline));
         OnPropertyChanged(nameof(PromptSubtitle));
         OnPropertyChanged(nameof(PromptPrimaryLabel));
+        OnPropertyChanged(nameof(PromptSecondaryLabel));
     }
 
     /// <summary>Highest active-tier % for the tray glyph; -1 when no data.</summary>
@@ -136,6 +156,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// (Expired/Blocked) — App routes this to <c>SignInCoordinator.ReauthenticateActiveAsync</c>,
     /// which refreshes the existing account in place rather than adding a new one.</summary>
     public event Func<Task>? ReauthRequested;
+
+    /// <summary>Raised when the ACTIVE account needs an IN-PLACE manual key paste
+    /// (manual-origin account expired, or "Paste a key instead" during recovery) —
+    /// App routes this to <c>SignInCoordinator.ReauthenticateManualActiveAsync</c>.
+    /// Distinct from <see cref="PasteKeyRequested"/>, which ADDS a new account.</summary>
+    public event Func<Task>? ManualReauthRequested;
 
     /// <summary>Raised by the "Paste a key instead" command — App opens the manual
     /// sessionKey fallback modal.</summary>
@@ -405,28 +431,44 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             await SignInRequested.Invoke();
     }
 
-    /// <summary>The recovery card's primary button. FirstRun → add-account sign-in;
-    /// Expired/Blocked → in-place re-auth of the active account.</summary>
+    /// <summary>The recovery card's primary button, routed by the origin-aware
+    /// table: FirstRun → add-account sign-in; Expired/Blocked → in-place re-auth
+    /// via the method that matches how the account was created.</summary>
     [RelayCommand]
     private async Task PrimaryAuth()
     {
-        if (Reason is SignInReason.Expired or SignInReason.Blocked)
+        switch (ReauthRouting.Primary(Reason, ActiveOrigin))
         {
-            if (ReauthRequested is not null)
-                await ReauthRequested.Invoke();
-        }
-        else
-        {
-            if (SignInRequested is not null)
-                await SignInRequested.Invoke();
+            case AuthFlow.ManualReauth:
+                if (ManualReauthRequested is not null) await ManualReauthRequested.Invoke();
+                break;
+            case AuthFlow.EmbeddedReauth:
+                if (ReauthRequested is not null) await ReauthRequested.Invoke();
+                break;
+            default: // EmbeddedAdd (FirstRun)
+                if (SignInRequested is not null) await SignInRequested.Invoke();
+                break;
         }
     }
 
+    /// <summary>The recovery card's secondary link — always the OTHER method. In
+    /// recovery it re-auths IN PLACE (the pre-WS-A behavior of adding a duplicate
+    /// "Account N" here was a bug); on FirstRun it stays a manual add.</summary>
     [RelayCommand]
-    private async Task PasteKey()
+    private async Task SecondaryAuth()
     {
-        if (PasteKeyRequested is not null)
-            await PasteKeyRequested.Invoke();
+        switch (ReauthRouting.Secondary(Reason, ActiveOrigin))
+        {
+            case AuthFlow.ManualReauth:
+                if (ManualReauthRequested is not null) await ManualReauthRequested.Invoke();
+                break;
+            case AuthFlow.EmbeddedReauth:
+                if (ReauthRequested is not null) await ReauthRequested.Invoke();
+                break;
+            default: // ManualAdd (FirstRun)
+                if (PasteKeyRequested is not null) await PasteKeyRequested.Invoke();
+                break;
+        }
     }
 
     [RelayCommand]
@@ -487,40 +529,80 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Rename an account in place (same secrets, new label). The active
-    /// pointer follows the rename inside <see cref="AccountStore"/>, so the fetcher
-    /// keeps the same session — only the displayed label refreshes.</summary>
+    /// pointer follows the rename inside <see cref="AccountStore"/>, and the
+    /// history file moves with it so the chart survives the rename.</summary>
     public void RenameAccount(string oldLabel, string newLabel)
     {
         _accounts.RenameAccount(oldLabel, newLabel);
+        _history.Rename(oldLabel, newLabel);
         RefreshAccountLabel();
         AccountsChanged?.Invoke();
     }
 
     /// <summary>
-    /// Sign out (remove) an account: wipe its per-account history file, drop its
-    /// Credential-Manager slots, and — when it was the active one —
-    /// <see cref="AccountStore.RemoveAccount"/> advances the active pointer to the
-    /// first remaining account (or none). When the active account changed we rebuild
-    /// the fetcher (anti-bleed cookie wipe runs again) and refetch; signing out the
-    /// last account drops the widget into its "Sign in to Claude" empty state.
+    /// Remove an account completely: unlink its per-account history file, drop its
+    /// Credential-Manager slots (sessionKey / cf_clearance / origin), and — when it
+    /// was the active one — <see cref="AccountStore.RemoveAccount"/> advances the
+    /// active pointer to the first remaining account (or none). Removing the LAST
+    /// account also purges the shared webview2-fetch transport profile: no future
+    /// client init would ever run its anti-bleed cookie wipe, so the deleted
+    /// account's live claude.ai cookies would otherwise sit on disk indefinitely.
     /// </summary>
     public async Task SignOutAccountAsync(string label)
     {
         bool wasActive = _accounts.GetActive() == label;
-        // Wipe history BEFORE removal so the file is targeted by an explicit label
-        // (parity with the Python remove flow).
-        _history.ClearAll(label);
+        if (wasActive)
+        {
+            // Release the transport's hold on the shared profile BEFORE cleanup.
+            (_client as IDisposable)?.Dispose();
+            _client = null;
+            _fetcher = null;
+        }
+        _history.Delete(label);
         _accounts.RemoveAccount(label);
 
         if (wasActive)
         {
             Tiers.Clear();
             _lastData = null;
+            if (_accounts.ListAccounts().Count == 0)
+                await PurgeTransportProfileBestEffortAsync();
             RebuildFetcher();
             await RefreshAsync();
         }
         RefreshAccountLabel();
         AccountsChanged?.Invoke();
+    }
+
+    /// <summary>Delete the shared webview2-fetch profile directory. WebView2's
+    /// browser processes release their file locks asynchronously after Dispose,
+    /// so retry briefly; a stubborn lock is logged and left for the next client
+    /// init's cookie wipe (best-effort — the app must keep working regardless).</summary>
+    private async Task PurgeTransportProfileBestEffortAsync()
+    {
+        var profile = _paths.WebView2FetchDir;
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                if (Directory.Exists(profile))
+                    Directory.Delete(profile, recursive: true);
+                return;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                await Task.Delay(300);
+            }
+        }
+        try
+        {
+            File.AppendAllText(_paths.LogFile,
+                $"{DateTime.UtcNow:o} webview2-fetch purge failed — cookies remain until the next transport init{Environment.NewLine}");
+        }
+        catch
+        {
+            // Swallow — logging must not break the removal flow.
+        }
     }
 
     [RelayCommand]
@@ -641,6 +723,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private void EnterRecoveryState(SignInReason reason)
     {
         Reason = reason;
+        NotifyPromptCopy();
         StatusText = "";
         ClearSignedInChrome();
         TrayPercentChanged?.Invoke(-1);

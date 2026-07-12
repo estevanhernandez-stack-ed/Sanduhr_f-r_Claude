@@ -185,4 +185,54 @@ public class AccountStoreTests
         var a = New();
         Assert.False(a.MigrateLegacy());
     }
+
+    // -- origin flag (WS-A: origin-aware reauth) ------------------------------
+
+    [Fact]
+    public void Origin_defaults_to_embedded_when_never_set()
+    {
+        var a = New();
+        a.AddAccount("Personal", "placeholder-1");
+        Assert.Equal(AccountOrigin.Embedded, a.GetOrigin("Personal"));
+    }
+
+    [Fact]
+    public void Origin_round_trips()
+    {
+        var a = New();
+        a.AddAccount("Personal", "placeholder-1");
+        a.SetOrigin("Personal", AccountOrigin.Manual);
+        Assert.Equal(AccountOrigin.Manual, a.GetOrigin("Personal"));
+        a.SetOrigin("Personal", AccountOrigin.Embedded);
+        Assert.Equal(AccountOrigin.Embedded, a.GetOrigin("Personal"));
+    }
+
+    [Fact]
+    public void Set_origin_unknown_account_raises()
+    {
+        var a = New();
+        Assert.Throws<ArgumentException>(() => a.SetOrigin("Nonexistent", AccountOrigin.Manual));
+    }
+
+    [Fact]
+    public void Remove_account_clears_origin()
+    {
+        var a = New();
+        a.AddAccount("Personal", "placeholder-1");
+        a.SetOrigin("Personal", AccountOrigin.Manual);
+        a.RemoveAccount("Personal");
+        // Re-adding the same label must not inherit the old origin.
+        a.AddAccount("Personal", "placeholder-2");
+        Assert.Equal(AccountOrigin.Embedded, a.GetOrigin("Personal"));
+    }
+
+    [Fact]
+    public void Rename_carries_origin()
+    {
+        var a = New();
+        a.AddAccount("Personal", "placeholder-1");
+        a.SetOrigin("Personal", AccountOrigin.Manual);
+        a.RenameAccount("Personal", "Home");
+        Assert.Equal(AccountOrigin.Manual, a.GetOrigin("Home"));
+    }
 }

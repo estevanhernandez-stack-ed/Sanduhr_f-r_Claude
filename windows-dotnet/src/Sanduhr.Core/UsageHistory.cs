@@ -193,6 +193,64 @@ public sealed class UsageHistory : IUsageHistory
         WriteAccountFile(active, new Dictionary<string, List<HistoryPoint>>());
     }
 
+    /// <summary>Unlink the history file for the given (or active) account —
+    /// used by full account removal, where <see cref="ClearAll"/>'s keep-the-file
+    /// invariant is exactly wrong. Best-effort: a locked or missing file never
+    /// throws. Other accounts are untouched.</summary>
+    public void Delete(string? account = null)
+    {
+        var active = ResolveAccount(account);
+        if (active is null)
+            return;
+        try
+        {
+            File.Delete(_paths.HistoryFileFor(active));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // Best-effort — registry consistency wins over file cleanup.
+            LogBestEffortFailure("delete", e);
+        }
+    }
+
+    /// <summary>Move <c>history.{oldLabel}.json</c> to the new label so a renamed
+    /// account keeps its chart. Overwrites a stale file already sitting at the
+    /// target name. Best-effort no-op when there is no source file or the move
+    /// fails — call only after the registry rename has succeeded.</summary>
+    public void Rename(string oldLabel, string newLabel)
+    {
+        var src = _paths.HistoryFileFor(oldLabel);
+        if (!File.Exists(src))
+            return;
+        try
+        {
+            File.Move(src, _paths.HistoryFileFor(newLabel), overwrite: true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // Best-effort — the account keeps working, only its chart resets.
+            LogBestEffortFailure("rename", e);
+        }
+    }
+
+    // Best-effort trace for best-effort file ops: cleanup failures must be
+    // visible in Release builds (sanduhr.log), but logging itself must never
+    // throw either. PRIVACY.md promises the log never contains account labels,
+    // so no label and no exception MESSAGE here — file-op messages embed the
+    // history.{label}.json path. Operation + exception type is the whole trace.
+    private void LogBestEffortFailure(string operation, Exception e)
+    {
+        try
+        {
+            File.AppendAllText(_paths.LogFile,
+                $"{DateTime.UtcNow:o} history {operation} failed ({e.GetType().Name}){Environment.NewLine}");
+        }
+        catch
+        {
+            // Swallow — a broken log file must not break the cleanup path.
+        }
+    }
+
     // Match Python's datetime.now(timezone.utc).isoformat(): 6-digit fractional
     // seconds + a "+00:00" offset. Parseable by both Python's
     // datetime.fromisoformat and .NET's DateTimeOffset.Parse.

@@ -34,6 +34,22 @@ internal partial class ManualKeyWindow : Window
         Loaded += (_, _) => SessionKeyBox.Focus();
     }
 
+    /// <summary>Reauth mode: update the key for an EXISTING account. The label is
+    /// shown but locked (in-place overwrite — the persist delegate targets the
+    /// label by closure, so what's displayed can't drift from what's written).</summary>
+    public static ManualKeyWindow ForReauth(
+        string label, Func<string, CapturedCookies, string> persist, bool embeddedAvailable)
+    {
+        var w = new ManualKeyWindow(label, persist, embeddedAvailable);
+        w.Title = "Update sessionKey";
+        w.HeadlineText.Text = $"Update sessionKey for '{label}'";
+        w.IntroText.Text = "Paste a fresh claude.ai sessionKey for this account. Its history and settings stay put.";
+        w.LabelBox.IsEnabled = false;
+        w.LabelBox.Opacity = 0.6;
+        w.SaveButton.Content = "Update";
+        return w;
+    }
+
     private void OnSaveClick(object sender, RoutedEventArgs e)
     {
         var label = LabelBox.Text?.Trim() ?? "";

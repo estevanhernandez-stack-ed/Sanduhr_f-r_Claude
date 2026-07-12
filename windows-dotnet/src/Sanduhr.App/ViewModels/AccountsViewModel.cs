@@ -29,7 +29,7 @@ public sealed partial class AccountItemViewModel : ObservableObject
 /// <summary>
 /// Drives the Settings ▸ Accounts tab — the multi-account registry surface ported
 /// from <c>accounts_dialog.py</c>'s <c>AccountsTab</c>. Lists every account, marks
-/// the active one, and exposes Switch / Rename / Sign out / Add. All mutations are
+/// the active one, and exposes Switch / Rename / Remove account / Add. All mutations are
 /// delegated to the <see cref="WidgetViewModel"/> (the single owner of account
 /// operations + the live fetcher), so a change here switches the widget at once and
 /// the anti-bleed transport rebuild happens in one place.
@@ -42,6 +42,7 @@ public sealed partial class AccountsViewModel : ObservableObject
 {
     private readonly WidgetViewModel _widget;
     private readonly Func<Task> _addAccountAsync;
+    private readonly Func<string, Task> _updateSignInAsync;
     private Window? _owner;
 
     public ObservableCollection<AccountItemViewModel> Accounts { get; } = new();
@@ -55,12 +56,14 @@ public sealed partial class AccountsViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(SwitchToCommand))]
     [NotifyCanExecuteChangedFor(nameof(RenameCommand))]
     [NotifyCanExecuteChangedFor(nameof(SignOutCommand))]
+    [NotifyCanExecuteChangedFor(nameof(UpdateSignInCommand))]
     private AccountItemViewModel? _selectedAccount;
 
-    public AccountsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync)
+    public AccountsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync, Func<string, Task> updateSignInAsync)
     {
         _widget = widget;
         _addAccountAsync = addAccountAsync;
+        _updateSignInAsync = updateSignInAsync;
         Reload();
     }
 
@@ -122,6 +125,20 @@ public sealed partial class AccountsViewModel : ObservableObject
         Reload();
     }
 
+    /// <summary>Refresh the selected account's credentials IN PLACE — works for
+    /// non-active accounts too (pre-WS-A, only the active account could reauth,
+    /// and only from the widget's recovery card). Routing by origin happens in
+    /// the injected delegate (App owns the coordinator + window ownership).</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private async Task UpdateSignIn()
+    {
+        var item = SelectedAccount;
+        if (item is null)
+            return;
+        await _updateSignInAsync(item.Label);
+        Reload();
+    }
+
     [RelayCommand(CanExecute = nameof(HasSelection))]
     private async Task SignOut()
     {
@@ -130,9 +147,9 @@ public sealed partial class AccountsViewModel : ObservableObject
             return;
         var text =
             $"Remove the '{item.Label}' account from Sanduhr?\n\n" +
-            "This deletes the stored credentials and the local " +
-            $"history.{item.Label}.json file. Cannot be undone.";
-        var result = ThemedDialog.Show(_owner, "Sign out", text, MessageBoxButton.YesNo, ThemedDialogKind.Warning);
+            "This deletes its saved sign-in from the Windows Credential Manager " +
+            $"and its usage-history file (history.{item.Label}.json). Cannot be undone.";
+        var result = ThemedDialog.Show(_owner, "Remove account", text, MessageBoxButton.YesNo, ThemedDialogKind.Warning);
         if (result != MessageBoxResult.Yes)
             return;
         await _widget.SignOutAccountAsync(item.Label);

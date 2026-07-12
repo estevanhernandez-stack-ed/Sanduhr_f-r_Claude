@@ -6,7 +6,7 @@
         Height="470" Width="520"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
-        Background="#0d0d0d">
+        Background="{DynamicResource Sanduhr.Brush.Bg}">
     <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -21,50 +21,72 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="Add account by sessionKey"
-                   FontSize="16" FontWeight="Bold" Foreground="#17d4fa" />
+        <TextBlock Grid.Row="0" x:Name="HeadlineText" Text="Add account by sessionKey"
+                   FontSize="16" FontWeight="Bold"
+                   Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
         <StackPanel Grid.Row="1" Margin="0,6,0,0">
-            <TextBlock Text="The power-user path. Paste your claude.ai sessionKey cookie — it's stored in the Windows Credential Manager, never in a file."
-                       TextWrapping="Wrap" FontSize="11" Foreground="#e8e4dc" Opacity="0.7" />
+            <TextBlock x:Name="IntroText"
+                       Text="The power-user path. Paste your claude.ai sessionKey cookie — it's stored in the Windows Credential Manager, never in a file."
+                       TextWrapping="Wrap" FontSize="11"
+                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
             <TextBlock x:Name="UseEmbeddedLink" Margin="0,8,0,0" Cursor="Hand"
                        Visibility="Collapsed" MouseLeftButtonUp="OnUseEmbeddedClick">
-                <Run Text="Use the secure sign-in window instead" Foreground="#17d4fa"
+                <Run Text="Use the secure sign-in window instead"
+                     Foreground="{DynamicResource Sanduhr.Brush.Accent}"
                      TextDecorations="Underline" FontSize="11" />
             </TextBlock>
             <TextBlock x:Name="HelpToggle" Margin="0,6,0,0" Cursor="Hand"
                        MouseLeftButtonUp="OnHelpToggleClick">
-                <Run Text="Where do I find the sessionKey?" Foreground="#b8b4ac"
+                <Run Text="Where do I find the sessionKey?"
+                     Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                      TextDecorations="Underline" FontSize="11" />
             </TextBlock>
             <TextBlock x:Name="HelpSteps" Margin="0,6,0,0" Visibility="Collapsed"
-                       TextWrapping="Wrap" FontSize="11" Foreground="#e8e4dc" Opacity="0.7"
+                       TextWrapping="Wrap" FontSize="11"
+                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
                        Text="On claude.ai: open DevTools (F12) → Application → Cookies → claude.ai, then copy the value of the sessionKey cookie." />
         </StackPanel>
 
-        <TextBlock Grid.Row="2" Text="Account name" FontSize="11" Foreground="#b8b4ac" Margin="0,16,0,4" />
+        <TextBlock Grid.Row="2" Text="Account name" FontSize="11"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,16,0,4" />
         <TextBox Grid.Row="3" x:Name="LabelBox" FontSize="13" Padding="8,6"
-                 Background="#1c1c1c" Foreground="#e8e4dc" BorderBrush="#333333" CaretBrush="#e8e4dc" />
+                 Background="{DynamicResource Sanduhr.Brush.Glass}"
+                 Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                 BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
+                 CaretBrush="{DynamicResource Sanduhr.Brush.Text}" />
 
-        <TextBlock Grid.Row="4" Text="sessionKey (required)" FontSize="11" Foreground="#b8b4ac" Margin="0,14,0,4" />
+        <TextBlock Grid.Row="4" Text="sessionKey (required)" FontSize="11"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,14,0,4" />
         <TextBox Grid.Row="5" x:Name="SessionKeyBox" FontSize="13" Padding="8,6"
-                 Background="#1c1c1c" Foreground="#e8e4dc" BorderBrush="#333333" CaretBrush="#e8e4dc"
+                 Background="{DynamicResource Sanduhr.Brush.Glass}"
+                 Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                 BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
+                 CaretBrush="{DynamicResource Sanduhr.Brush.Text}"
                  FontFamily="Consolas, monospace" />
 
-        <TextBlock Grid.Row="6" Text="cf_clearance (optional — only if Cloudflare blocks)" FontSize="11" Foreground="#b8b4ac" Margin="0,14,0,4" />
+        <TextBlock Grid.Row="6" Text="cf_clearance (optional — only if Cloudflare blocks)" FontSize="11"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,14,0,4" />
         <TextBox Grid.Row="7" x:Name="CfClearanceBox" FontSize="13" Padding="8,6"
-                 Background="#1c1c1c" Foreground="#e8e4dc" BorderBrush="#333333" CaretBrush="#e8e4dc"
+                 Background="{DynamicResource Sanduhr.Brush.Glass}"
+                 Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                 BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
+                 CaretBrush="{DynamicResource Sanduhr.Brush.Text}"
                  FontFamily="Consolas, monospace" />
 
-        <TextBlock Grid.Row="8" x:Name="ErrorText" Foreground="#f87171" FontSize="11"
+        <TextBlock Grid.Row="8" x:Name="ErrorText"
+                   Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" FontSize="11"
                    TextWrapping="Wrap" Margin="0,12,0,0" VerticalAlignment="Top"
                    Visibility="Collapsed" />
 
         <StackPanel Grid.Row="9" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button x:Name="CancelButton" Content="Cancel" Padding="16,8" Margin="0,0,8,0"
-                    Background="#1c1c1c" Foreground="#e8e4dc" BorderBrush="#5A6982" BorderThickness="1"
+                    Background="{DynamicResource Sanduhr.Brush.Glass}"
+                    Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                    BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1"
                     Cursor="Hand" IsCancel="True" Click="OnCancelClick" />
             <Button x:Name="SaveButton" Content="Save" Padding="20,8" IsDefault="True"
-                    Background="#17d4fa" Foreground="#0d0d0d" BorderThickness="0"
+                    Background="{DynamicResource Sanduhr.Brush.Accent}"
+                    Foreground="{DynamicResource Sanduhr.Brush.Bg}" BorderThickness="0"
                     FontWeight="Bold" Cursor="Hand" Click="OnSaveClick" />
         </StackPanel>
     </Grid>

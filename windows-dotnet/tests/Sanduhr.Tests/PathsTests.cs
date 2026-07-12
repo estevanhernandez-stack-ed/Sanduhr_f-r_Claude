@@ -49,4 +49,12 @@ public class PathsTests
         Assert.Equal(Path.Combine(home, ".claude-usage-widget", "config.json"), paths.LegacyConfigFile);
         Assert.Equal(Path.Combine(home, ".claude-usage-widget", "history.json"), paths.LegacyHistoryFile);
     }
+
+    [Fact]
+    public void WebView2FetchDir_is_under_appdata_sanduhr()
+    {
+        using var temp = new TempDir();
+        var p = new Paths(temp.Path);
+        Assert.Equal(Path.Combine(temp.Path, "Sanduhr", "webview2-fetch"), p.WebView2FetchDir);
+    }
 }
