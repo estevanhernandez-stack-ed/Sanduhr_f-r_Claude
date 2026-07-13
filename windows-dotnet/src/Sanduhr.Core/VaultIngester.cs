@@ -367,7 +367,7 @@ public sealed class VaultIngester
         foreach (var (dayKey, bucket) in merged.ByDay)
         {
             var day = DateOnly.Parse(dayKey, CultureInfo.InvariantCulture);
-            var d = new DayAgg { Total = bucket.Total };
+            var d = new DayAgg { Total = bucket.Total, Input = bucket.Input, Output = bucket.Output };
             foreach (var (m, v) in bucket.ByModel)
                 d.ByModel[m] = v;
             if (bucket.BySkill is not null)
@@ -404,6 +404,8 @@ public sealed class VaultIngester
                 if (!days.TryGetValue(day, out var d))
                     days[day] = d = new VaultRollupDay();
                 d.Total += bucket.Total;
+                d.Input += bucket.Input;
+                d.Output += bucket.Output;
                 d.Sessions++;
                 foreach (var (m, v) in bucket.ByModel)
                     d.ByModel[m] = d.ByModel.GetValueOrDefault(m) + v;
@@ -458,6 +460,8 @@ public sealed class VaultIngester
     private sealed class DayAgg
     {
         public long Total;
+        public long Input;
+        public long Output;
         public readonly Dictionary<string, long> ByModel = new();
         public readonly Dictionary<string, long> BySkill = new();
     }
@@ -553,7 +557,9 @@ public sealed class VaultIngester
         agg.CacheRead += Num(usage, "cache_read_input_tokens");
         agg.CacheCreation += Num(usage, "cache_creation_input_tokens");
 
-        long tokens = Num(usage, "input_tokens") + Num(usage, "output_tokens");
+        long input = Num(usage, "input_tokens");
+        long output = Num(usage, "output_tokens");
+        long tokens = input + output;
         if (tokens <= 0)
             return;   // matches AggregateForLocalCcTab's tokens<=0 skip
 
@@ -570,6 +576,8 @@ public sealed class VaultIngester
         if (!agg.ByDay.TryGetValue(day, out var bucket))
             agg.ByDay[day] = bucket = new DayAgg();
         bucket.Total += tokens;
+        bucket.Input += input;
+        bucket.Output += output;
         bucket.ByModel[model] = bucket.ByModel.GetValueOrDefault(model) + tokens;
         if (!string.IsNullOrEmpty(skill))
             bucket.BySkill[skill] = bucket.BySkill.GetValueOrDefault(skill) + tokens;
@@ -628,6 +636,8 @@ public sealed class VaultIngester
                 kv => new VaultDayBucket
                 {
                     Total = kv.Value.Total,
+                    Input = kv.Value.Input,
+                    Output = kv.Value.Output,
                     ByModel = new Dictionary<string, long>(kv.Value.ByModel),
                     BySkill = kv.Value.BySkill.Count > 0
                         ? new Dictionary<string, long>(kv.Value.BySkill)

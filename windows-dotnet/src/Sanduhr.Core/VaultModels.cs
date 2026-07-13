@@ -20,6 +20,15 @@ public sealed class VaultDayBucket
 {
     [JsonPropertyName("total")] public long Total { get; set; }
 
+    /// <summary>Sent-side tokens (input). Always written on new buckets;
+    /// absent on WS-C-era rows — 0 means "unsplit", and readers must treat a
+    /// day whose input+output is 0 while total &gt; 0 as legacy, not as zero
+    /// traffic (the Overview's "(partial)" rule).</summary>
+    [JsonPropertyName("input")] public long Input { get; set; }
+
+    /// <summary>Received-side tokens (output).</summary>
+    [JsonPropertyName("output")] public long Output { get; set; }
+
     [JsonPropertyName("by_model")]
     public Dictionary<string, long> ByModel { get; set; } = new();
 
@@ -96,6 +105,13 @@ public sealed class VaultSessionShard
 public sealed class VaultRollupDay
 {
     [JsonPropertyName("total")] public long Total { get; set; }
+
+    /// <summary>Sent/received split, rebuilt by the fold from bucket
+    /// input/output. 0/0 while total &gt; 0 means the month's buckets are
+    /// WS-C-era legacy (unsplit), not zero traffic.</summary>
+    [JsonPropertyName("input")] public long Input { get; set; }
+    [JsonPropertyName("output")] public long Output { get; set; }
+
     [JsonPropertyName("by_model")] public Dictionary<string, long> ByModel { get; set; } = new();
     [JsonPropertyName("by_project")] public Dictionary<string, long> ByProject { get; set; } = new();
     [JsonPropertyName("by_skill")] public Dictionary<string, long> BySkill { get; set; } = new();
