@@ -80,7 +80,8 @@ public sealed class CcLogReader
         return outp;
     }
 
-    /// <summary>All session JSONL files across known CC roots. Missing
+    /// <summary>All session JSONL files across known CC roots, including NESTED
+    /// subagent/workflow transcripts ({projectDir}\{uuid}\...\x.jsonl). Missing
     /// <c>projects/</c> subdir is fine (fresh install).</summary>
     public IReadOnlyList<string> DiscoverLogFiles()
     {
@@ -91,7 +92,7 @@ public sealed class CcLogReader
             if (!Directory.Exists(projects))
                 continue;
             foreach (var projectDir in Directory.GetDirectories(projects))
-                files.AddRange(Directory.GetFiles(projectDir, "*.jsonl"));
+                files.AddRange(Directory.GetFiles(projectDir, "*.jsonl", SearchOption.AllDirectories));
         }
         return files;
     }

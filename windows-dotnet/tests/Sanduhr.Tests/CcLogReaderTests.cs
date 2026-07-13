@@ -322,6 +322,23 @@ public class CcLogReaderTests
     }
 
     [Fact]
+    public void DiscoverLogFiles_finds_nested_subagent_transcripts()
+    {
+        using var home = new TempDir();
+        var projectDir = Path.Combine(home.Path, ".claude", "projects", "c--x-api");
+        var nested = Path.Combine(projectDir, "11111111-2222-3333-4444-555555555555", "subagents");
+        Directory.CreateDirectory(nested);
+        File.WriteAllText(Path.Combine(projectDir, "main.jsonl"), "");
+        File.WriteAllText(Path.Combine(nested, "agent-abc.jsonl"), "");
+
+        var reader = new CcLogReader(home.Path);
+        var files = reader.DiscoverLogFiles();
+
+        Assert.Contains(files, f => f.EndsWith("main.jsonl"));
+        Assert.Contains(files, f => f.EndsWith("agent-abc.jsonl"));
+    }
+
+    [Fact]
     public void AggregateTodayOnly_restricts_to_local_today()
     {
         using var home = new TempDir();

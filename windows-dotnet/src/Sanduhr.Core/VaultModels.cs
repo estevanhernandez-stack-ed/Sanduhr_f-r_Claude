@@ -54,6 +54,13 @@ public sealed class VaultSessionRow
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Cwd { get; set; }
 
+    /// <summary>The session this transcript belongs to when it is a NESTED
+    /// subagent/workflow transcript ({projectDir}\{parent-uuid}\...\x.jsonl).
+    /// Null for main transcripts. Readers fold rows by parent_session ?? uuid.</summary>
+    [JsonPropertyName("parent_session")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ParentSession { get; set; }
+
     [JsonPropertyName("first_ts")] public string FirstTs { get; set; } = "";
     [JsonPropertyName("last_ts")] public string LastTs { get; set; } = "";
     [JsonPropertyName("utc_offset_min")] public int UtcOffsetMin { get; set; }
@@ -148,6 +155,13 @@ public sealed class VaultRootMeta
     [JsonPropertyName("since")] public string Since { get; set; } = "";
     [JsonPropertyName("covered")] public List<VaultDateRange> Covered { get; set; } = new();
     [JsonPropertyName("last_ingest_ts")] public string LastIngestTs { get; set; } = "";
+
+    /// <summary>Discovery-walk generation. Absent (0) or 1 = the one-level
+    /// pre-WS-C.1 walk; the ingester invalidates checkpoints ONCE when this is
+    /// below its CurrentWalkVersion so the full re-ingest picks up nested
+    /// subagent transcripts still inside CC retention.</summary>
+    [JsonPropertyName("walk_version")]
+    public int WalkVersion { get; set; }
 }
 
 public enum ShardLoadResult
@@ -184,6 +198,7 @@ public static class VaultRowMath
                 ProjectKey = merged.ProjectKey,
                 ProjectName = merged.ProjectName,
                 Cwd = merged.Cwd,
+                ParentSession = merged.ParentSession,
                 FirstTs = merged.FirstTs,
                 LastTs = merged.LastTs,
                 UtcOffsetMin = merged.UtcOffsetMin,
@@ -209,6 +224,7 @@ public static class VaultRowMath
             ProjectKey = primary.ProjectKey,
             ProjectName = primary.ProjectName,
             Cwd = primary.Cwd,
+            ParentSession = primary.ParentSession,
             FirstTs = primary.FirstTs,
             LastTs = primary.LastTs,
             UtcOffsetMin = primary.UtcOffsetMin,
