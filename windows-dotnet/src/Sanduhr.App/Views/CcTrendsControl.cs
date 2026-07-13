@@ -93,8 +93,13 @@ public sealed class CcTrendsControl : FrameworkElement
 
         if (alignRight)
         {
+            // DrawText's origin is the layout box's TOP-LEFT; TextAlignment.Right
+            // aligns within [origin.X, origin.X + MaxTextWidth]. Shift the origin
+            // left by MaxTextWidth so the text's right edge lands exactly at x.
             ft.TextAlignment = TextAlignment.Right;
             ft.MaxTextWidth = 70;
+            dc.DrawText(ft, new Point(x - ft.MaxTextWidth, y));
+            return;
         }
 
         dc.DrawText(ft, new Point(x, y));
