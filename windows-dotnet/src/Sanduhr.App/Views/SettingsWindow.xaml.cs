@@ -61,6 +61,7 @@ internal partial class SettingsWindow : Window
         ViewModel.History.Changed += RenderHistory;
         ViewModel.ClaudeCode.Overview.Changed += RenderLocalCc;
         ViewModel.ClaudeCode.Trends.Changed += RenderTrends;
+        CalendarStrip.DayClicked += OnCalendarDayClicked;
 
         Loaded += (_, _) => RenderHistory();
         Closed += (_, _) =>
@@ -69,8 +70,18 @@ internal partial class SettingsWindow : Window
             ViewModel.History.Changed -= RenderHistory;
             ViewModel.ClaudeCode.Overview.Changed -= RenderLocalCc;
             ViewModel.ClaudeCode.Trends.Changed -= RenderTrends;
+            CalendarStrip.DayClicked -= OnCalendarDayClicked;
             ViewModel.ClaudeCode.Detach();
         };
+    }
+
+    /// <summary>Calendar day-click → jump to the Sessions ledger scoped to
+    /// that day. Swallows navigation faults per the window's global
+    /// every-UI-path-caught constraint (mirrors OpenDayInSessionsAsync's own
+    /// guard — belt and suspenders across the event-handler boundary).</summary>
+    private async void OnCalendarDayClicked(DateOnly day)
+    {
+        try { await ViewModel.ClaudeCode.OpenDayInSessionsAsync(day); } catch { }
     }
 
     /// <summary>Borderless window: paint the OS frame edge + rounded corners dark so

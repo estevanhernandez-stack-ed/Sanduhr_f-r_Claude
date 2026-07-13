@@ -222,6 +222,10 @@ public sealed partial class CcLedgerViewModel : ObservableObject
     /// user action, not the 5-minute ingest cadence).</summary>
     private IReadOnlyList<VaultSessionInfo> _lastSessions = Array.Empty<VaultSessionInfo>();
 
+    /// <summary>Set by a calendar day-click — takes priority over the scope
+    /// chips in <see cref="ScopeRange"/> until a chip is clicked again.</summary>
+    private DateOnly? _dayScope;
+
     [ObservableProperty] private string _scope = "7d";
     [ObservableProperty] private string _sortColumn = "Tokens";
     [ObservableProperty] private bool _sortDescending = true;
@@ -277,6 +281,8 @@ public sealed partial class CcLedgerViewModel : ObservableObject
 
     private (DateOnly From, DateOnly To) ScopeRange()
     {
+        if (_dayScope is { } d)
+            return (d, d);
         var today = DateOnly.FromDateTime(DateTime.Now);
         return Scope switch
         {
@@ -292,7 +298,22 @@ public sealed partial class CcLedgerViewModel : ObservableObject
     {
         if (scope is not ("Today" or "Yesterday" or "7d" or "All"))
             return;
+        _dayScope = null;   // chips always escape day mode
         Scope = scope;
+        var (from, to) = ScopeRange();
+        foreach (var row in Rows)
+            row.Rescope(from, to);
+        View.Refresh();
+        NotifyHeaders();
+    }
+
+    /// <summary>Calendar day-click entry point — scopes the ledger to a single
+    /// day. No chip's DataTrigger matches the resulting Scope string, so all
+    /// four chips correctly unhighlight; a chip click clears day mode again.</summary>
+    public void SetDayScope(DateOnly day)
+    {
+        _dayScope = day;
+        Scope = day.ToString("MMM d", CultureInfo.InvariantCulture);
         var (from, to) = ScopeRange();
         foreach (var row in Rows)
             row.Rescope(from, to);

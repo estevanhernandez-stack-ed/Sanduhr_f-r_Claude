@@ -28,6 +28,10 @@ public sealed class CcCalendarControl : FrameworkElement
     private DateOnly _windowStart = DateOnly.MinValue;
     private ThemePalette _palette = ThemePalette.Obsidian;
 
+    /// <summary>Raised when a covered, clickable day cell is left-clicked — the
+    /// owning window bridges this to the Ledger's day scope.</summary>
+    public event Action<DateOnly>? DayClicked;
+
     public CcCalendarControl()
     {
         MinHeight = 96;
@@ -139,6 +143,24 @@ public sealed class CcCalendarControl : FrameworkElement
         UpdateTooltip(e.GetPosition(this));
     }
 
+    /// <summary>Hit-tests via the SAME Cells() geometry + guards as the
+    /// tooltip — uncovered days are still clickable (the ledger honestly shows
+    /// empty for them), only the window/feed bounds gate the click.</summary>
+    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+    {
+        base.OnMouseLeftButtonUp(e);
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var p = e.GetPosition(this);
+        foreach (var (day, rect) in Cells(today, ActualWidth, ActualHeight))
+        {
+            if (day <= today && day >= _windowStart && rect.Contains(p))
+            {
+                DayClicked?.Invoke(day);
+                return;
+            }
+        }
+    }
+
     private void UpdateTooltip(Point p)
     {
         var today = DateOnly.FromDateTime(DateTime.Now);
@@ -150,10 +172,12 @@ public sealed class CcCalendarControl : FrameworkElement
                 ToolTip = _uncovered.Contains(day)
                     ? $"{day.ToString("MMM d", CultureInfo.InvariantCulture)} — no record"
                     : $"{day.ToString("MMM d", CultureInfo.InvariantCulture)} — {TokenFormat.Compact(v)} tokens";
+                Cursor = Cursors.Hand;
                 return;
             }
         }
         ToolTip = null;
+        Cursor = null;
     }
 
     /// <summary>Dotted TextDim texture — identical recipe to CcTrendsControl's
