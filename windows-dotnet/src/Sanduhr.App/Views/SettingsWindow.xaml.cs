@@ -92,8 +92,9 @@ internal partial class SettingsWindow : Window
     {
         BarStrip.SetData(ViewModel.ClaudeCode.Overview.ByDay, ViewModel.ClaudeCode.Overview.Palette);
         CalendarStrip.SetData(
-            ViewModel.ClaudeCode.Overview.ByDay,
+            ViewModel.ClaudeCode.Overview.CalendarDays,
             ViewModel.ClaudeCode.Overview.UncoveredDays,
+            ViewModel.ClaudeCode.Overview.CalendarWindowStart,
             ViewModel.ClaudeCode.Overview.Palette);
     }
 

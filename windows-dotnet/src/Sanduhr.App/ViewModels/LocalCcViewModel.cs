@@ -74,6 +74,12 @@ public sealed partial class LocalCcViewModel : ObservableObject
     private HashSet<DateOnly> _uncovered = new();
     public IReadOnlySet<DateOnly> UncoveredDays => _uncovered;
 
+    private Dictionary<DateOnly, long> _calendarByDay = new();
+    public IReadOnlyDictionary<DateOnly, long> CalendarDays => _calendarByDay;
+
+    private DateOnly _calendarWindowStart;
+    public DateOnly CalendarWindowStart => _calendarWindowStart;
+
     public ThemePalette Palette => _widget.Palette;
 
     public LocalCcViewModel(WidgetViewModel widget, bool showBreakdowns, Action<bool> persistShowBreakdowns)
@@ -191,7 +197,9 @@ public sealed partial class LocalCcViewModel : ObservableObject
         long SentWindow,
         long ReceivedWindow,
         bool WindowSplitPartial,
-        HashSet<DateOnly> Uncovered);
+        HashSet<DateOnly> Uncovered,
+        Dictionary<DateOnly, long> CalendarByDay,
+        DateOnly CalendarStart);
 
     public async Task RefreshAsync()
     {
@@ -204,7 +212,8 @@ public sealed partial class LocalCcViewModel : ObservableObject
         }
         catch
         {
-            data = new OverviewData(new(), new(), new(), "", 0, 0, 0, 0, false, new());
+            data = new OverviewData(new(), new(), new(), "", 0, 0, 0, 0, false, new(),
+                new(), DateOnly.FromDateTime(DateTime.Now));
         }
         Apply(data);
     }
@@ -251,7 +260,8 @@ public sealed partial class LocalCcViewModel : ObservableObject
                          : "history vault paused — showing live logs only",
                 sentT, recvT, sentW, recvW,
                 liveTotal > 0 && (sentW + recvW) < (long)(liveTotal * 0.95),
-                uncovered);
+                uncovered,
+                new Dictionary<DateOnly, long>(agg.ByDay), windowStart);
         }
 
         // Hot boundary: any day the vault hasn't confirmed since its midnight
@@ -261,6 +271,9 @@ public sealed partial class LocalCcViewModel : ObservableObject
         var live = reader.AggregateForLocalCcTab(LookbackDays);
         var todayAgg = reader.AggregateTodayOnly();
         var win = vault!.Reader.ReadWindow(roots, windowStart, hotStart);
+        // Calendar-only head slice — [calFrom, windowStart), never touches the
+        // 30-day `win` read above, so every existing figure stays bit-identical.
+        var winCal = vault.Reader.ReadWindow(roots, calFrom, windowStart);
 
         var byDay = new Dictionary<DateOnly, long>(win.ByDay);
         for (var d = hotStart; d <= today; d = d.AddDays(1))
@@ -269,6 +282,14 @@ public sealed partial class LocalCcViewModel : ObservableObject
             if (live.ByDay.TryGetValue(d, out var v))
                 byDay[d] = v;
         }
+
+        // Calendar dict: [calFrom, windowStart) head slice + the 30-day byDay
+        // (already windowStart..hotStart rollups + hot-day live entries) — the
+        // three source intervals are disjoint by construction, so this is a
+        // plain union, no arithmetic re-derivation.
+        var calendarByDay = new Dictionary<DateOnly, long>(winCal.ByDay);
+        foreach (var (d, v) in byDay)
+            calendarByDay[d] = v;
 
         var projects = new Dictionary<string, long>(win.ByProjectName);
         foreach (var (cwd, v) in todayAgg.ByProject)
@@ -293,7 +314,8 @@ public sealed partial class LocalCcViewModel : ObservableObject
         bool partial = windowTotal > 0 && (sentWindow + recvWindow) < (long)(windowTotal * 0.95);
 
         return new OverviewData(byDay, projects, skills, "",
-            sentToday, recvToday, sentWindow, recvWindow, partial, uncovered);
+            sentToday, recvToday, sentWindow, recvWindow, partial, uncovered,
+            calendarByDay, calFrom);
     }
 
     private void Apply(OverviewData data)
@@ -325,6 +347,8 @@ public sealed partial class LocalCcViewModel : ObservableObject
             Skills.Add(new BreakdownRow(name, TokenFormat.Compact(tokens)));
 
         _uncovered = data.Uncovered;
+        _calendarByDay = data.CalendarByDay;
+        _calendarWindowStart = data.CalendarStart;
 
         Changed?.Invoke();
     }

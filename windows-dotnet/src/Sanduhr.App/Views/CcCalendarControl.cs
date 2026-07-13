@@ -9,21 +9,23 @@ namespace Sanduhr.App.Views;
 
 /// <summary>
 /// Rolling 5-week calendar under the Overview bar strip: Monday-start weekday
-/// columns, the last 35 local days ending today. Heat = accent alpha in four
-/// perceptual steps (any nonzero day stays visibly nonzero); covered zero days
-/// get a faint tick dot; uncovered days get the dotted no-record texture
-/// (never a blank that reads as zero). Today wears a 1px accent outline.
-/// Hover shows "{MMM d} — {compact}" via mouse-move hit-testing.
+/// columns, the 5 Monday-start weeks ending with today's week — 29-35 past
+/// days depending on weekday. Heat = accent alpha in four perceptual steps
+/// (any nonzero day stays visibly nonzero); covered zero days get a faint
+/// tick dot; uncovered days get the dotted no-record texture (never a blank
+/// that reads as zero). Days before the feed's window start render fully
+/// empty — genuinely feed-less, not merely uncovered. Today wears a 1px
+/// accent outline. Hover shows "{MMM d} — {compact}" via mouse-move hit-testing.
 /// </summary>
 public sealed class CcCalendarControl : FrameworkElement
 {
-    private const int DaysBack = 34;   // 35 days inclusive of today
     private const int Rows = 5;
     private const int Cols = 7;
     private const double HeaderBand = 14;
 
     private IReadOnlyDictionary<DateOnly, long> _byDay = new Dictionary<DateOnly, long>();
     private IReadOnlySet<DateOnly> _uncovered = new HashSet<DateOnly>();
+    private DateOnly _windowStart = DateOnly.MinValue;
     private ThemePalette _palette = ThemePalette.Obsidian;
 
     public CcCalendarControl()
@@ -34,10 +36,12 @@ public sealed class CcCalendarControl : FrameworkElement
     public void SetData(
         IReadOnlyDictionary<DateOnly, long> byDay,
         IReadOnlySet<DateOnly> uncovered,
+        DateOnly windowStart,
         ThemePalette palette)
     {
         _byDay = byDay ?? new Dictionary<DateOnly, long>();
         _uncovered = uncovered ?? new HashSet<DateOnly>();
+        _windowStart = windowStart;
         _palette = palette;
         InvalidateVisual();
         UpdateTooltip(Mouse.GetPosition(this));
@@ -78,7 +82,7 @@ public sealed class CcCalendarControl : FrameworkElement
 
         foreach (var (day, rect) in Cells(today, w, h))
         {
-            if (day > today)
+            if (day > today || day < _windowStart)
                 continue;
             if (_uncovered.Contains(day))
             {
@@ -110,8 +114,10 @@ public sealed class CcCalendarControl : FrameworkElement
     /// weeks before the Monday of today's week, so: the last yielded day is at
     /// most 6 days after today (trailing future days of the current week —
     /// callers skip those via `day &gt; today`), and every yielded day is
-    /// &gt;= today-34 (inside the DaysBack data window), so no leading-cell skip
-    /// is needed.</summary>
+    /// &gt;= today-34. That's always within the vault's calendar feed (which
+    /// starts at today-34 too); on the live/degraded path the feed only knows
+    /// the last 30 days, so callers also skip `day &lt; windowStart` — those
+    /// leading cells are genuinely feed-less, not merely uncovered.</summary>
     private IEnumerable<(DateOnly Day, Rect Rect)> Cells(DateOnly today, double w, double h)
     {
         double cellW = (w - (Cols - 1) * 2) / Cols;
@@ -138,7 +144,7 @@ public sealed class CcCalendarControl : FrameworkElement
         var today = DateOnly.FromDateTime(DateTime.Now);
         foreach (var (day, rect) in Cells(today, ActualWidth, ActualHeight))
         {
-            if (day <= today && rect.Contains(p))
+            if (day <= today && day >= _windowStart && rect.Contains(p))
             {
                 long v = _byDay.GetValueOrDefault(day);
                 ToolTip = _uncovered.Contains(day)
