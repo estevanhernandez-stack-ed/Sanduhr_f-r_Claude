@@ -80,17 +80,23 @@ public sealed class CcTrendsControl : FrameworkElement
         }
 
         // Sparse labels: first and current week starts.
-        DrawLabel(dc, _weeks[0].WeekStart, 2, baselineY + 4, dpi, FlowDirection.LeftToRight);
-        var lastX = 2 + (_weeks.Count - 1) * (barW + gap);
-        DrawLabel(dc, _weeks[^1].WeekStart, lastX, baselineY + 4, dpi, FlowDirection.LeftToRight);
+        DrawLabel(dc, _weeks[0].WeekStart, 2, baselineY + 4, dpi, alignRight: false);
+        DrawLabel(dc, _weeks[^1].WeekStart, w - 2, baselineY + 4, dpi, alignRight: true);
     }
 
-    private void DrawLabel(DrawingContext dc, DateOnly day, double x, double y, double dpi, FlowDirection dir)
+    private void DrawLabel(DrawingContext dc, DateOnly day, double x, double y, double dpi, bool alignRight)
     {
         var ft = new FormattedText(
             day.ToString("MMM d", CultureInfo.InvariantCulture),
-            CultureInfo.CurrentCulture, dir, new Typeface("Segoe UI"), 9,
+            CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface("Segoe UI"), 9,
             Frozen(_palette.TextDim), dpi);
+
+        if (alignRight)
+        {
+            ft.TextAlignment = TextAlignment.Right;
+            ft.MaxTextWidth = 70;
+        }
+
         dc.DrawText(ft, new Point(x, y));
     }
 
