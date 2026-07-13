@@ -110,7 +110,11 @@ public sealed class VaultService
         {
             try
             {
-                _ingester.IngestOnce(roots, fullPaths, DateTimeOffset.UtcNow);
+                // stillConsented: PurgeRoot/EraseArchive flip consent BEFORE any
+                // mutex wait, so re-reading settings at write time gates an
+                // in-flight cycle out of a just-purged folder.
+                _ingester.IngestOnce(roots, fullPaths, DateTimeOffset.UtcNow,
+                    stillConsented: root => _settings.LoadVaultRoots().GetValueOrDefault(root));
                 IngestCompleted?.Invoke();
             }
             catch (Exception e)

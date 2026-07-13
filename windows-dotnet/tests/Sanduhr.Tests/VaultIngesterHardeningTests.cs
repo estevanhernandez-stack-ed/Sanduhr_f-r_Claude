@@ -328,6 +328,56 @@ public class VaultIngesterHardeningTests
     }
 
     [Fact]
+    public void Consent_revoked_mid_cycle_leaves_vault_byte_identical()
+    {
+        // The erase-vs-inflight-cycle guard: a cycle that snapshotted its roots
+        // before a purge flipped consent must not write a single byte — the
+        // just-purged folder stays purged instead of resurrecting.
+        using var home = new TempDir();
+        using var vault = new TempDir();
+        var path = WriteSession(home.Path, ".claude", "u1", null,
+            EventLine("2026-07-10T15:00:00Z"));
+        var (ing, _) = Make(home.Path, vault.Path);
+        ing.IngestOnce(new[] { ".claude" }, false, Now);
+
+        var snapshot = Directory.GetFiles(vault.Path, "*", SearchOption.AllDirectories)
+            .OrderBy(p => p, StringComparer.Ordinal)
+            .ToDictionary(p => p, File.ReadAllBytes);
+
+        // Source grows, then consent is revoked mid-cycle.
+        Append(path, Now.AddMinutes(-5), EventLine("2026-07-10T16:00:00Z", input: 200, output: 0));
+        var r = ing.IngestOnce(new[] { ".claude" }, false, Now, stillConsented: _ => false);
+
+        Assert.True(r.Acquired);
+        Assert.Equal(1, r.FilesSeen);
+        Assert.Equal(1, r.FilesTailParsed);                  // parsed as it would have been...
+        Assert.Equal(0, r.RootsAborted);                     // ...but a clean skip, not an abort
+
+        var after = Directory.GetFiles(vault.Path, "*", SearchOption.AllDirectories)
+            .OrderBy(p => p, StringComparer.Ordinal)
+            .ToDictionary(p => p, File.ReadAllBytes);
+        Assert.Equal(snapshot.Keys, after.Keys);
+        foreach (var (p, bytes) in snapshot)
+            Assert.Equal(bytes, after[p]);
+    }
+
+    [Fact]
+    public void Consent_revoked_from_the_start_keeps_fresh_vault_empty()
+    {
+        using var home = new TempDir();
+        using var vault = new TempDir();
+        WriteSession(home.Path, ".claude", "u1", null, EventLine("2026-07-10T15:00:00Z"));
+        var (ing, _) = Make(home.Path, vault.Path);
+
+        var r = ing.IngestOnce(new[] { ".claude" }, false, Now, stillConsented: _ => false);
+
+        Assert.True(r.Acquired);
+        Assert.Equal(1, r.FilesFullParsed);
+        Assert.Equal(0, r.RootsAborted);
+        Assert.Empty(Directory.GetFiles(vault.Path, "*", SearchOption.AllDirectories));
+    }
+
+    [Fact]
     public void First_ts_month_move_on_reingest_leaves_one_logical_session()
     {
         using var home = new TempDir();

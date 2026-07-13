@@ -115,9 +115,29 @@ public sealed partial class LocalCcViewModel : ObservableObject
                     "New usage from this home will no longer be recorded. Also erase the history already stored for it?",
                     MessageBoxButton.YesNo, ThemedDialogKind.Warning);
                 if (res == MessageBoxResult.Yes)
-                    vault.PurgeRoot(root);
+                {
+                    _ = PurgeRootAsync(vault, root);   // purge waits on the writer mutex — off the UI thread
+                    return;
+                }
             }
             _ = RefreshAsync();
+        }
+        catch
+        {
+            // The vault layer already logs faults — a UI-path exception here
+            // must never take down the Settings window.
+        }
+    }
+
+    /// <summary>Purge can sit up to 10s in the writer-mutex wait — never on the
+    /// UI thread. Fire-and-forget from OnRootToggled; refresh resumes on the UI
+    /// context after the purge lands.</summary>
+    private async Task PurgeRootAsync(VaultService vault, string root)
+    {
+        try
+        {
+            await Task.Run(() => vault.PurgeRoot(root));
+            await RefreshAsync();
         }
         catch
         {
@@ -141,7 +161,9 @@ public sealed partial class LocalCcViewModel : ObservableObject
                 MessageBoxButton.YesNo, ThemedDialogKind.Warning);
             if (res != MessageBoxResult.Yes)
                 return;
-            vault.EraseArchive();
+            // Erase waits on the writer mutex (up to 10s) — off the UI thread;
+            // the awaits resume on the UI context for the rebuild + refresh.
+            await Task.Run(() => vault.EraseArchive());
             RebuildRoots();
             await RefreshAsync();
         }

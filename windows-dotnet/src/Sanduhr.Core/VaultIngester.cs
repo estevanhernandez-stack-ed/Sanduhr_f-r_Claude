@@ -59,8 +59,15 @@ public sealed class VaultIngester
         _mutexName = mutexName ?? "Global\\Sanduhr.VaultWriter";
     }
 
+    /// <param name="stillConsented">Erase-vs-inflight-cycle guard. This cycle's
+    /// roots were snapshotted BEFORE any consent flip a purge/erase makes, and
+    /// the initial backfill can outlive the eraser's mutex-wait timeout — so
+    /// each root consults this predicate once more immediately before its write
+    /// phase. False means parse counters stand but nothing lands on disk: the
+    /// just-purged folder stays purged instead of silently resurrecting.</param>
     public VaultIngestResult IngestOnce(
-        IReadOnlyList<string> consentedRootNames, bool storeFullPaths, DateTimeOffset nowUtc)
+        IReadOnlyList<string> consentedRootNames, bool storeFullPaths, DateTimeOffset nowUtc,
+        Func<string, bool>? stillConsented = null)
     {
         using var mutex = new Mutex(initiallyOwned: false, _mutexName);
         bool acquired;
@@ -82,7 +89,7 @@ public sealed class VaultIngester
             int seen = 0, full = 0, tail = 0, skipped = 0, failed = 0, aborted = 0;
             foreach (var rootName in consentedRootNames)
             {
-                var r = IngestRoot(rootName, storeFullPaths, nowUtc);
+                var r = IngestRoot(rootName, storeFullPaths, nowUtc, stillConsented);
                 seen += r.FilesSeen; full += r.FilesFullParsed; tail += r.FilesTailParsed;
                 skipped += r.FilesSkipped; failed += r.FilesFailed; aborted += r.RootsAborted;
             }
@@ -94,7 +101,8 @@ public sealed class VaultIngester
         }
     }
 
-    private VaultIngestResult IngestRoot(string rootName, bool storeFullPaths, DateTimeOffset nowUtc)
+    private VaultIngestResult IngestRoot(
+        string rootName, bool storeFullPaths, DateTimeOffset nowUtc, Func<string, bool>? stillConsented)
     {
         int seen = 0, full = 0, tailParsed = 0, skipped = 0, failed = 0;
 
@@ -244,6 +252,15 @@ public sealed class VaultIngester
             // stamp becomes immortal bookkeeping and defeats the size bound.
             if (ParseIso(entry.LastSeenTs) is not { } lastSeen || lastSeen < pruneBefore)
                 checkpoints.Entries.Remove(k);
+        }
+
+        // Write-phase consent recheck (see IngestOnce's stillConsented doc):
+        // consent revoked after this cycle snapshotted its roots means the
+        // parse work above is discarded — a clean skip, not an abort.
+        if (stillConsented is not null && !stillConsented(rootName))
+        {
+            Log("root writes skipped (consent revoked)");
+            return new VaultIngestResult(true, seen, full, tailParsed, skipped, failed, 0);
         }
 
         // WRITE ORDER (binding): session shards -> rollups -> checkpoints -> meta.
