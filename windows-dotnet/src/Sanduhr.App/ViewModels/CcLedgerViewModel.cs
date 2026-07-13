@@ -107,6 +107,11 @@ public sealed partial class LedgerRowViewModel : ObservableObject
             ? $"{(int)span.TotalHours}h {span.Minutes}m"
             : $"{Math.Max(1, (int)span.TotalMinutes)}m");
         sb.Append("  ·  Lifetime: ").Append(TokenFormat.Compact(Info.Total)).Append(" tokens");
+        if (Info.AgentCount > 0)
+        {
+            sb.Append("\nAgents: ").Append(Info.AgentCount)
+              .Append(" · ").Append(TokenFormat.Compact(Info.AgentTokens)).Append(" tokens");
+        }
         foreach (var (day, bucket) in Info.ByDay.OrderBy(kv => kv.Key, StringComparer.Ordinal))
         {
             sb.Append('\n').Append(day).Append(": ").Append(TokenFormat.Compact(bucket.Total));

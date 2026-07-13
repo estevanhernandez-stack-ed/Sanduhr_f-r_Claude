@@ -886,12 +886,18 @@
                                                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                         <TextBlock Text="{Binding TodayText}" FontSize="22" FontWeight="Bold"
                                                    Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                        <TextBlock Text="{Binding TodaySplitText}" FontSize="10"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                                   Visibility="{Binding TodaySplitText, Converter={StaticResource StrVis}}" />
                                     </StackPanel>
                                     <StackPanel>
                                         <TextBlock Text="Last 30 days" FontSize="9"
                                                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                         <TextBlock Text="{Binding MonthText}" FontSize="22" FontWeight="Bold"
                                                    Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                        <TextBlock Text="{Binding MonthSplitText}" FontSize="10"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                                   Visibility="{Binding MonthSplitText, Converter={StaticResource StrVis}}" />
                                     </StackPanel>
                                 </StackPanel>
 

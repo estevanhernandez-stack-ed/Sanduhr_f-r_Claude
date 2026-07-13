@@ -59,6 +59,8 @@ public sealed partial class LocalCcViewModel : ObservableObject
 
     [ObservableProperty] private string _todayText = "Loading…";
     [ObservableProperty] private string _monthText = "Loading…";
+    [ObservableProperty] private string _todaySplitText = "";
+    [ObservableProperty] private string _monthSplitText = "";
     [ObservableProperty] private bool _showBreakdowns;
     [ObservableProperty] private string _statusLine = "";
 
@@ -180,7 +182,12 @@ public sealed partial class LocalCcViewModel : ObservableObject
         Dictionary<DateOnly, long> ByDay,
         Dictionary<string, long> Projects,
         Dictionary<string, long> Skills,
-        string StatusLine);
+        string StatusLine,
+        long SentToday,
+        long ReceivedToday,
+        long SentWindow,
+        long ReceivedWindow,
+        bool WindowSplitPartial);
 
     public async Task RefreshAsync()
     {
@@ -193,7 +200,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
         }
         catch
         {
-            data = new OverviewData(new(), new(), new(), "");
+            data = new OverviewData(new(), new(), new(), "", 0, 0, 0, 0, false);
         }
         Apply(data);
     }
@@ -217,11 +224,18 @@ public sealed partial class LocalCcViewModel : ObservableObject
                 var name = CcLogReader.ProjectDisplayName(cwd);
                 byName[name] = byName.GetValueOrDefault(name) + v;
             }
+            long sentW = agg.ByDayInput.Values.Sum();
+            long recvW = agg.ByDayOutput.Values.Sum();
+            long sentT = agg.ByDayInput.GetValueOrDefault(today);
+            long recvT = agg.ByDayOutput.GetValueOrDefault(today);
+            long liveTotal = agg.ByDay.Values.Sum();
             return new OverviewData(
-                new Dictionary<DateOnly, long>(agg.ByDay),
-                byName,
+                new Dictionary<DateOnly, long>(agg.ByDay), byName,
                 new Dictionary<string, long>(agg.BySkill),
-                !vaultOn ? "history vault off — these numbers are the live logs, not an archive" : "history vault paused — showing live logs only");
+                !vaultOn ? "history vault off — these numbers are the live logs, not an archive"
+                         : "history vault paused — showing live logs only",
+                sentT, recvT, sentW, recvW,
+                liveTotal > 0 && (sentW + recvW) < (long)(liveTotal * 0.95));
         }
 
         // Hot boundary: any day the vault hasn't confirmed since its midnight
@@ -250,7 +264,20 @@ public sealed partial class LocalCcViewModel : ObservableObject
         foreach (var (skill, v) in todayAgg.BySkill)
             skills[skill] = skills.GetValueOrDefault(skill) + v;
 
-        return new OverviewData(byDay, projects, skills, "");
+        long sentWindow = win.ByDayInput.Values.Sum();
+        long recvWindow = win.ByDayOutput.Values.Sum();
+        for (var d = hotStart; d <= today; d = d.AddDays(1))
+        {
+            sentWindow += live.ByDayInput.GetValueOrDefault(d);
+            recvWindow += live.ByDayOutput.GetValueOrDefault(d);
+        }
+        long sentToday = todayAgg.ByDayInput.GetValueOrDefault(today);
+        long recvToday = todayAgg.ByDayOutput.GetValueOrDefault(today);
+        long windowTotal = byDay.Values.Sum();
+        bool partial = windowTotal > 0 && (sentWindow + recvWindow) < (long)(windowTotal * 0.95);
+
+        return new OverviewData(byDay, projects, skills, "",
+            sentToday, recvToday, sentWindow, recvWindow, partial);
     }
 
     private void Apply(OverviewData data)
@@ -261,6 +288,14 @@ public sealed partial class LocalCcViewModel : ObservableObject
 
         long monthTotal = data.ByDay.Values.Sum();
         MonthText = monthTotal > 0 ? $"{TokenFormat.Compact(monthTotal)} tokens" : "No activity";
+
+        TodaySplitText = todayTotal > 0
+            ? $"↑ {TokenFormat.Compact(data.SentToday)} sent · ↓ {TokenFormat.Compact(data.ReceivedToday)} received"
+            : "";
+        MonthSplitText = monthTotal > 0
+            ? $"↑ {TokenFormat.Compact(data.SentWindow)} sent · ↓ {TokenFormat.Compact(data.ReceivedWindow)} received"
+              + (data.WindowSplitPartial ? " (partial)" : "")
+            : "";
 
         StatusLine = data.StatusLine;
         _byDay = data.ByDay;
