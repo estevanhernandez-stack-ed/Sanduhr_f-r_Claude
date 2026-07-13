@@ -156,7 +156,13 @@ public sealed partial class LedgerRowViewModel : ObservableObject
         var roots = ordered.Select(m => m.Root).Distinct(StringComparer.Ordinal)
             .OrderBy(r => r, StringComparer.Ordinal);
         if (sb.Length > 0) sb.Append('\n');
-        sb.Append("Sessions: ").Append(ordered.Count).Append("  ·  Homes: ").Append(string.Join(", ", roots));
+        sb.Append("Sessions: ").Append(ordered.Count);
+        if (Info.AgentCount > 0)
+        {
+            sb.Append("  ·  Agents: ").Append(Info.AgentCount)
+              .Append("  ·  ").Append(TokenFormat.Compact(Info.AgentTokens)).Append(" tokens");
+        }
+        sb.Append("  ·  Homes: ").Append(string.Join(", ", roots));
         return sb.ToString();
     }
 
