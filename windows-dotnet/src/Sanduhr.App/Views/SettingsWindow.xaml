@@ -283,6 +283,62 @@
             </Style.Triggers>
         </Style>
 
+        <!-- Claude Code sub-nav pills (Overview / Trends / Sessions) — same
+             accent-fill-when-active grammar as the History RangePills. -->
+        <Style x:Key="CcNavOverview" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Section}" Value="Overview">
+                    <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="CcNavTrends" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Section}" Value="Trends">
+                    <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="CcNavSessions" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Section}" Value="Sessions">
+                    <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- CRITICAL: each section Grid overrides its own DataContext to the
+             section VM (Overview/Trends/Ledger), none of which has a Section
+             property — a plain {Binding Section} DataTrigger would silently
+             never fire and every section would stay Collapsed. The trigger
+             must reach the tab VM through the ancestor TabItem. -->
+        <Style x:Key="CcSectionOverview" TargetType="Grid">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Section, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="Overview">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="CcSectionTrends" TargetType="Grid">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Section, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="Trends">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="CcSectionSessions" TargetType="Grid">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Section, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="Sessions">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- Title-bar close button — themed text, square red hover (matches the widget). -->
         <Style x:Key="CloseButton" TargetType="Button">
             <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
@@ -714,49 +770,73 @@
                     </Border>
                 </TabItem>
 
-                <!-- Local CC tab (item 9) — local Claude Code token-burn summary. -->
-                <TabItem Header="Local CC">
+                <!-- Claude Code tab (WS-C): Overview / Trends / Sessions over
+                     the usage vault + live session-log reader. -->
+                <TabItem Header="Claude Code">
                     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="16"
-                            DataContext="{Binding LocalCc}">
+                            DataContext="{Binding ClaudeCode}">
                         <Grid>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="11"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12"
-                                       Text="Token usage from local Claude Code sessions on this machine. Read directly from the session JSONL files in your ~/.claude folder — no network, no upload. Anthropic's /usage endpoint lags real consumption by minutes; this is the canonical local view of what's actually being burned." />
-
-                            <!-- Two prominent totals: Today vs Last 30 days. -->
-                            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
-                                <StackPanel Margin="0,0,32,0">
-                                    <TextBlock Text="Today" FontSize="9"
-                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                    <TextBlock Text="{Binding TodayText}" FontSize="22" FontWeight="Bold"
-                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
-                                </StackPanel>
-                                <StackPanel>
-                                    <TextBlock Text="Last 30 days" FontSize="9"
-                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                    <TextBlock Text="{Binding MonthText}" FontSize="22" FontWeight="Bold"
-                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
-                                </StackPanel>
+                            <!-- Sub-nav -->
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                <Button Content="Overview" Style="{StaticResource CcNavOverview}"
+                                        Command="{Binding SetOverviewCommand}" />
+                                <Button Content="Trends" Style="{StaticResource CcNavTrends}"
+                                        Command="{Binding SetTrendsCommand}" />
+                                <Button Content="Sessions" Style="{StaticResource CcNavSessions}"
+                                        Command="{Binding SetSessionsCommand}" />
                             </StackPanel>
 
-                            <!-- 30-day bar strip (custom-render control). -->
-                            <views:LocalCcBarStrip x:Name="BarStrip" Grid.Row="2" Height="60" Margin="0,0,0,8" />
+                            <!-- Overview -->
+                            <Grid Grid.Row="1" Style="{StaticResource CcSectionOverview}"
+                                  DataContext="{Binding Overview}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
 
-                            <CheckBox Grid.Row="3" Style="{StaticResource ThemedCheckBox}"
-                                      Content="Show project &amp; skill breakdown"
-                                      IsChecked="{Binding ShowBreakdowns, Mode=TwoWay}" Margin="0,0,0,8" />
+                                <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="11"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,8"
+                                           Text="Claude Code deletes session logs after ~30 days. Sanduhr keeps a local history vault so your trends survive — never uploaded, per-home opt-in, erase any time below." />
 
-                            <!-- Per-project + per-skill tables side by side. -->
-                            <Grid Grid.Row="4"
-                                  Visibility="{Binding ShowBreakdowns, Converter={StaticResource BoolVis}}">
+                                <TextBlock Grid.Row="1" FontSize="11" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                           Text="{Binding StatusLine}"
+                                           Visibility="{Binding StatusLine, Converter={StaticResource StrVis}}" />
+
+                                <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,12">
+                                    <StackPanel Margin="0,0,32,0">
+                                        <TextBlock Text="Today" FontSize="9"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                        <TextBlock Text="{Binding TodayText}" FontSize="22" FontWeight="Bold"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="Last 30 days" FontSize="9"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                        <TextBlock Text="{Binding MonthText}" FontSize="22" FontWeight="Bold"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <views:LocalCcBarStrip x:Name="BarStrip" Grid.Row="3" Height="60" Margin="0,0,0,8" />
+
+                                <CheckBox Grid.Row="4" Style="{StaticResource ThemedCheckBox}"
+                                          Content="Show project &amp; skill breakdown"
+                                          IsChecked="{Binding ShowBreakdowns, Mode=TwoWay}" Margin="0,0,0,8" />
+
+                                <!-- Per-project + per-skill tables side by side. -->
+                                <Grid Grid.Row="5"
+                                      Visibility="{Binding ShowBreakdowns, Converter={StaticResource BoolVis}}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="12" />
@@ -818,7 +898,41 @@
                                         </ScrollViewer>
                                     </Border>
                                 </DockPanel>
+                                </Grid>
+
+                                <!-- Data stewardship (spec: WS-A delete-completeness precedent). -->
+                                <StackPanel Grid.Row="6" Margin="0,10,0,0">
+                                    <TextBlock Text="History vault" FontSize="9" Margin="0,0,0,4"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <ItemsControl ItemsSource="{Binding Roots}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,16,4"
+                                                          Content="{Binding Name}"
+                                                          IsChecked="{Binding IsEnabled, Mode=TwoWay}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                        <Button Style="{StaticResource FlatButton}" Content="Erase archive"
+                                                Command="{Binding EraseArchiveCommand}"
+                                                Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" />
+                                        <Button Style="{StaticResource FlatButton}" Content="Open vault folder"
+                                                Command="{Binding OpenVaultFolderCommand}" />
+                                    </StackPanel>
+                                </StackPanel>
                             </Grid>
+
+                            <!-- Trends (content lands in Task 7) -->
+                            <Grid Grid.Row="1" Style="{StaticResource CcSectionTrends}" />
+
+                            <!-- Sessions (content lands in Task 8) -->
+                            <Grid Grid.Row="1" Style="{StaticResource CcSectionSessions}" />
                         </Grid>
                     </Border>
                 </TabItem>

@@ -5,9 +5,9 @@ namespace Sanduhr.App.ViewModels;
 /// <summary>
 /// Backs the tabbed <c>SettingsWindow</c> (port of <c>settings_dialog.py</c>'s
 /// shell): the <b>Accounts</b> tab (multi-account), <b>Themes</b> (item 8),
-/// <b>History</b> + <b>Local CC</b> (item 9), and the <b>General</b> tab — which
-/// surfaces version + the active account and now hosts the item-10 auto-start
-/// control via <see cref="GeneralViewModel"/>.
+/// <b>History</b> (item 9) + <b>Claude Code</b> (WS-C), and the <b>General</b>
+/// tab — which surfaces version + the active account and now hosts the
+/// item-10 auto-start control via <see cref="GeneralViewModel"/>.
 /// </summary>
 public sealed class SettingsViewModel
 {
@@ -21,9 +21,9 @@ public sealed class SettingsViewModel
     /// all-accounts overlay, Week/Month window, CSV export, Clear history.</summary>
     public HistoryTabViewModel History { get; }
 
-    /// <summary>Backs the Local CC tab (item 9): local Claude Code token-burn
-    /// summary — today / 30-day totals, daily bar strip, project + skill breakdowns.</summary>
-    public LocalCcViewModel LocalCc { get; }
+    /// <summary>Backs the Claude Code tab (WS-C): Overview / Trends / Sessions
+    /// over the usage vault + live reader.</summary>
+    public ClaudeCodeTabViewModel ClaudeCode { get; }
 
     /// <summary>Backs the General tab's auto-start control (item 10).</summary>
     public GeneralViewModel General { get; }
@@ -40,8 +40,8 @@ public sealed class SettingsViewModel
         Accounts = new AccountsViewModel(widget, addAccountAsync, updateSignInAsync);
         Themes = new ThemesViewModel(widget);
         History = new HistoryTabViewModel(widget);
-        LocalCc = new LocalCcViewModel(
-            widget, widget.LoadLocalCcShowBreakdowns(), widget.SaveLocalCcShowBreakdowns);
+        ClaudeCode = new ClaudeCodeTabViewModel(widget, new LocalCcViewModel(
+            widget, widget.LoadLocalCcShowBreakdowns(), widget.SaveLocalCcShowBreakdowns));
         General = new GeneralViewModel();
         Alerts = new AlertsViewModel(widget, () =>
         {
