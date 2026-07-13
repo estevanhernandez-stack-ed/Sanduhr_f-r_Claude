@@ -219,7 +219,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
                 new Dictionary<DateOnly, long>(agg.ByDay),
                 byName,
                 new Dictionary<string, long>(agg.BySkill),
-                degraded ? "history vault paused — showing live logs only" : "");
+                !vaultOn ? "history vault off — these numbers are the live logs, not an archive" : "history vault paused — showing live logs only");
         }
 
         // Hot boundary: any day the vault hasn't confirmed since its midnight
