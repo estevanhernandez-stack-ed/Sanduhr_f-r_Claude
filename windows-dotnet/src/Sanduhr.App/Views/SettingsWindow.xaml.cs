@@ -54,6 +54,7 @@ internal partial class SettingsWindow : Window
         ViewModel.Themes.AttachOwner(this);
         ViewModel.History.AttachOwner(this);
         ViewModel.ClaudeCode.Overview.AttachOwner(this);
+        ViewModel.ClaudeCode.Ledger.AttachOwner(this);
         ViewModel.ClaudeCode.Attach();
 
         // Bridge the custom-render controls to their VMs.

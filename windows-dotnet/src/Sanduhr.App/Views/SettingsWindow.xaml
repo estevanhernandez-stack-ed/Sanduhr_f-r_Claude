@@ -338,6 +338,42 @@
             </Style.Triggers>
         </Style>
 
+        <!-- Ledger scope chips — the section Grid's DataContext IS the
+             CcLedgerViewModel, so a plain {Binding Scope} DataTrigger resolves
+             directly (same grammar as the Trends pills above). -->
+        <Style x:Key="LedgerChipToday" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Scope}" Value="Today">
+                    <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="LedgerChipYesterday" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Scope}" Value="Yesterday">
+                    <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="LedgerChip7d" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Scope}" Value="7d">
+                    <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="LedgerChipAll" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Scope}" Value="All">
+                    <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- CRITICAL: each section Grid overrides its own DataContext to the
              section VM (Overview/Trends/Ledger), none of which has a Section
              property — a plain {Binding Section} DataTrigger would silently
@@ -1018,8 +1054,136 @@
                                            Text="{Binding FooterText}" />
                             </Grid>
 
-                            <!-- Sessions (content lands in Task 8) -->
-                            <Grid Grid.Row="1" Style="{StaticResource CcSectionSessions}" />
+                            <!-- Sessions (Ledger). The ListBox OWNS scrolling:
+                                 star-sized row, no ancestor ScrollViewer (the
+                                 spec's named in-repo trap), recycling
+                                 virtualization, pixel scroll. -->
+                            <Grid Grid.Row="1" Style="{StaticResource CcSectionSessions}"
+                                  DataContext="{Binding Ledger}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource AccentButton}"
+                                            Content="Export CSV…" Command="{Binding ExportCsvCommand}" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="Today" Style="{StaticResource LedgerChipToday}"
+                                                Command="{Binding SetScopeCommand}" CommandParameter="Today" />
+                                        <Button Content="Yesterday" Style="{StaticResource LedgerChipYesterday}"
+                                                Command="{Binding SetScopeCommand}" CommandParameter="Yesterday" />
+                                        <Button Content="7 days" Style="{StaticResource LedgerChip7d}"
+                                                Command="{Binding SetScopeCommand}" CommandParameter="7d" />
+                                        <Button Content="All" Style="{StaticResource LedgerChipAll}"
+                                                Command="{Binding SetScopeCommand}" CommandParameter="All" />
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <!-- Sort header row — glyph carries direction, never color alone. -->
+                                <Grid Grid.Row="1" Margin="4,0,4,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="150" />
+                                        <ColumnDefinition Width="110" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource FlatButton}" HorizontalAlignment="Left"
+                                            Content="{Binding LastActiveHeader}" FontSize="10"
+                                            Command="{Binding SortByCommand}" CommandParameter="LastActive" />
+                                    <Button Grid.Column="1" Style="{StaticResource FlatButton}" HorizontalAlignment="Left"
+                                            Content="{Binding ProjectHeader}" FontSize="10"
+                                            Command="{Binding SortByCommand}" CommandParameter="Project" />
+                                    <TextBlock Grid.Column="2" Text="Models" FontSize="10" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <Button Grid.Column="3" Style="{StaticResource FlatButton}" HorizontalAlignment="Right"
+                                            Content="{Binding TokensHeader}" FontSize="10"
+                                            Command="{Binding SortByCommand}" CommandParameter="Tokens" />
+                                </Grid>
+
+                                <Border Grid.Row="2" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
+                                        BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
+                                    <Grid>
+                                        <ListBox ItemsSource="{Binding View}" Background="Transparent" BorderThickness="0"
+                                                 HorizontalContentAlignment="Stretch"
+                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                 VirtualizingPanel.IsVirtualizing="True"
+                                                 VirtualizingPanel.VirtualizationMode="Recycling"
+                                                 VirtualizingPanel.ScrollUnit="Pixel">
+                                            <ListBox.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <VirtualizingStackPanel />
+                                                </ItemsPanelTemplate>
+                                            </ListBox.ItemsPanel>
+                                            <ListBox.ItemContainerStyle>
+                                                <Style TargetType="ListBoxItem">
+                                                    <Setter Property="Padding" Value="0" />
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                    <Setter Property="Focusable" Value="False" />
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="ListBoxItem">
+                                                                <ContentPresenter />
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                            </ListBox.ItemContainerStyle>
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel>
+                                                        <ToggleButton IsChecked="{Binding IsExpanded, Mode=TwoWay}" Cursor="Hand">
+                                                            <ToggleButton.Template>
+                                                                <ControlTemplate TargetType="ToggleButton">
+                                                                    <Border x:Name="rowBg" Background="Transparent" Padding="8,5">
+                                                                        <ContentPresenter />
+                                                                    </Border>
+                                                                    <ControlTemplate.Triggers>
+                                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                                            <Setter TargetName="rowBg" Property="Background"
+                                                                                    Value="{DynamicResource Sanduhr.Brush.Glass}" />
+                                                                        </Trigger>
+                                                                    </ControlTemplate.Triggers>
+                                                                </ControlTemplate>
+                                                            </ToggleButton.Template>
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="90" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="150" />
+                                                                    <ColumnDefinition Width="110" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBlock Grid.Column="0" Text="{Binding LastActiveText}" FontSize="11"
+                                                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                                <TextBlock Grid.Column="1" Text="{Binding ProjectText}" FontSize="11"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           ToolTip="{Binding CwdTooltip}"
+                                                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                                                <TextBlock Grid.Column="2" Text="{Binding ModelBadge}" FontSize="10"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                                <TextBlock Grid.Column="3" Text="{Binding ScopedTokensText}" FontSize="11"
+                                                                           HorizontalAlignment="Right" Typography.NumeralAlignment="Tabular"
+                                                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                                            </Grid>
+                                                        </ToggleButton>
+                                                        <Border Padding="16,2,8,8"
+                                                                Visibility="{Binding IsExpanded, Converter={StaticResource BoolVis}}">
+                                                            <TextBlock Text="{Binding DetailText}" FontSize="10" TextWrapping="Wrap"
+                                                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                        <TextBlock Text="{Binding EmptyText}" FontSize="11" TextWrapping="Wrap"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                                   Visibility="{Binding EmptyText, Converter={StaticResource StrVis}}" />
+                                    </Grid>
+                                </Border>
+                            </Grid>
                         </Grid>
                     </Border>
                 </TabItem>
