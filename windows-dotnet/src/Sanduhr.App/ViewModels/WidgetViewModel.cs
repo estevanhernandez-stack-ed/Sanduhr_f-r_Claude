@@ -279,6 +279,18 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     public void AttachAlertService(AlertService service) => _alertService = service;
 
+    private VaultService? _vault;
+    private DateOnly _lastTickDate = DateOnly.FromDateTime(DateTime.Now);
+    private long _ccDeltaTotal;
+    private bool _ccScanRunning;
+
+    /// <summary>The usage-vault service, attached by App AFTER the consent
+    /// prompt resolves (never before — attach order IS the consent gate).
+    /// Null in unit contexts.</summary>
+    public VaultService? Vault => _vault;
+
+    public void AttachVaultService(VaultService service) => _vault = service;
+
     public WidgetViewModel()
     {
         _paths = new Paths();
@@ -651,6 +663,11 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task RefreshAsync()
     {
+        // Vault ingest rides the 5-min cycle: fire-and-forget, single-flight,
+        // never awaited (spec: Ingestion). Runs even when signed out — the
+        // Local CC surfaces work without an account.
+        _vault?.TriggerIngest();
+
         if (_fetcher is null || _refreshing)
             return;
         _refreshing = true;
@@ -663,9 +680,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             _lastFetchAt = DateTimeOffset.Now;
             RenderCards(data, DateTimeOffset.UtcNow);
             EvaluateAlerts(data, DateTimeOffset.UtcNow);
-            // Fresh fetch re-anchors the Local CC delta window: badges reset to ~0
-            // here, then the 30s tick grows them as CC events stream in between fetches.
-            RefreshCcDelta();
+            // Fresh fetch re-anchors the Local CC delta window: badges/footer
+            // reset to ~0 now; the async scan grows them between fetches.
+            _ccDeltaTotal = 0;
+            foreach (var vm in Tiers)
+                vm.SetLocalDelta(0);
+            _ = RefreshCcDerivedAsync();
             UpdatePlanBadge();
             StatusText = "";
             Reason = SignInReason.None;
@@ -789,37 +809,64 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     private void OnTick()
     {
+        // Day rollover: trigger an immediate ingest so yesterday's number
+        // closes within ~30s of midnight (hot-day rule), not at the next
+        // 5-minute fetch.
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        if (today != _lastTickDate)
+        {
+            _lastTickDate = today;
+            _vault?.TriggerIngest();
+        }
+
         if (_lastData is null)
             return;
         var now = DateTimeOffset.UtcNow;
         foreach (var vm in Tiers)
             vm.Tick(now);
-        RefreshCcDelta();
-        UpdateFooter();
+        _ = RefreshCcDerivedAsync();
     }
 
-    /// <summary>
-    /// Recompute the per-tier Local CC token-burn deltas since <c>_lastFetchAt</c>
-    /// and push them into the card badges. Ports <c>widget._refresh_cc_delta</c>:
-    /// no-op before the first fetch; the CC-log model→tier mapping lives in
-    /// <see cref="CcLogReader.TokensSinceByTier"/>; tiers with no local activity get
-    /// zero (badge hidden). Defensive — log-file IO never takes down the widget.
-    /// </summary>
-    private void RefreshCcDelta()
+    /// <summary>ONE shared TokensSince walk feeding BOTH the per-tier badges
+    /// and the footer's "CC +Nk" (the tick previously ran two synchronous
+    /// walks on the UI thread). Off the UI thread via Task.Run; the await
+    /// continuation returns to the dispatcher (DispatcherTimer ticks run on
+    /// the UI thread), so the property/collection writes stay UI-safe.</summary>
+    private async Task RefreshCcDerivedAsync()
     {
-        if (_lastFetchAt is null)
+        if (_lastFetchAt is null || _ccScanRunning)
             return;
-        Dictionary<string, long> byTier;
+        _ccScanRunning = true;
         try
         {
-            byTier = _ccReader.TokensSinceByTier(_lastFetchAt.Value);
+            var anchor = _lastFetchAt.Value;
+            Dictionary<string, long> byModel;
+            try
+            {
+                byModel = await Task.Run(() => _ccReader.TokensSince(anchor)).ConfigureAwait(true);
+            }
+            catch
+            {
+                byModel = new Dictionary<string, long>();
+            }
+            long total = 0;
+            var byTier = new Dictionary<string, long>();
+            foreach (var (model, tokens) in byModel)
+            {
+                total += tokens;
+                var tier = CcLogReader.TierForModel(model);
+                if (tier is not null)
+                    byTier[tier] = byTier.GetValueOrDefault(tier) + tokens;
+            }
+            foreach (var vm in Tiers)
+                vm.SetLocalDelta(byTier.GetValueOrDefault(vm.TierKey));
+            _ccDeltaTotal = total;
+            UpdateFooter();
         }
-        catch
+        finally
         {
-            byTier = new Dictionary<string, long>();
+            _ccScanRunning = false;
         }
-        foreach (var vm in Tiers)
-            vm.SetLocalDelta(byTier.GetValueOrDefault(vm.TierKey));
     }
 
     private void RenderCards(JsonObject data, DateTimeOffset now)
@@ -980,19 +1027,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         if (_lastFetchAt is null) { FooterText = ""; return; }
         string ts = _lastFetchAt.Value.ToString("h:mm tt", CultureInfo.InvariantCulture);
         string mode = IsCompact ? "Compact" : (Pinned ? "Pinned" : "Float");
-        // Aggregate Local CC burn since the anchor, appended as "· CC +Nk" when
-        // there's been activity — parity with widget._update_footer's _cc_delta_lbl.
-        string cc = "";
-        try
-        {
-            long total = _ccReader.TokensSince(_lastFetchAt.Value).Values.Sum();
-            if (total > 0)
-                cc = $"  ·  CC +{TokenFormat.Compact(total)}";
-        }
-        catch
-        {
-            // Log-file IO must never break the footer.
-        }
+        // The CC delta is computed by RefreshCcDerivedAsync's single shared
+        // walk — the footer never does its own file IO anymore.
+        string cc = _ccDeltaTotal > 0 ? $"  ·  CC +{TokenFormat.Compact(_ccDeltaTotal)}" : "";
         FooterText = $"Updated {ts}  ·  {mode}{cc}";
     }
 

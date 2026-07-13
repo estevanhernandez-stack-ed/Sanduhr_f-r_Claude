@@ -316,4 +316,58 @@ public sealed class SettingsStore
         root["alert_snake_full"] = on;
         Write(root);
     }
+
+    // -- WS-C usage vault (spec 2026-07-12-usage-vault-design.md) ---------------
+
+    /// <summary>Whether the first-run per-root consent dialog has been shown.
+    /// Consent is PROMPTED, never silent — a silently-archived employer root is
+    /// the tenant breach the design review named.</summary>
+    public bool LoadVaultPrompted()
+    {
+        var root = Read();
+        try { return root["vault_prompted"]?.GetValue<bool>() ?? false; } catch { return false; }
+    }
+
+    public void SaveVaultPrompted(bool prompted)
+    {
+        var root = Read();
+        root["vault_prompted"] = prompted;
+        Write(root);
+    }
+
+    /// <summary>Per-root vault consent ({".claude": true, ...}). A root absent
+    /// from the map is NOT consented. Consent-off is the erasure tombstone —
+    /// purge flips it so the next cycle can't re-backfill.</summary>
+    public IReadOnlyDictionary<string, bool> LoadVaultRoots()
+    {
+        var root = Read();
+        var result = new Dictionary<string, bool>(StringComparer.Ordinal);
+        if (root["vault_roots"] is JsonObject map)
+        {
+            foreach (var (name, node) in map)
+            {
+                try { result[name] = node?.GetValue<bool>() ?? false; }
+                catch { result[name] = false; }
+            }
+        }
+        return result;
+    }
+
+    public void SaveVaultRoots(IReadOnlyDictionary<string, bool> roots)
+    {
+        var root = Read();
+        var map = new JsonObject();
+        foreach (var (name, on) in roots)
+            map[name] = on;
+        root["vault_roots"] = map;
+        Write(root);
+    }
+
+    /// <summary>Hidden setting (no UI): store full cwd paths in session rows.
+    /// Off by default — the vault stores basename + hash only.</summary>
+    public bool LoadVaultStoreFullPaths()
+    {
+        var root = Read();
+        try { return root["vault_store_full_paths"]?.GetValue<bool>() ?? false; } catch { return false; }
+    }
 }
