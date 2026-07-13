@@ -771,10 +771,12 @@
                 </TabItem>
 
                 <!-- Claude Code tab (WS-C): Overview / Trends / Sessions over
-                     the usage vault + live session-log reader. -->
-                <TabItem Header="Claude Code">
-                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="16"
-                            DataContext="{Binding ClaudeCode}">
+                     the usage vault + live session-log reader.
+                     DataContext must live ON the TabItem: the CcSection* visibility triggers resolve
+                     DataContext.Section through AncestorType=TabItem (a child-level DataContext never
+                     reaches them). -->
+                <TabItem Header="Claude Code" DataContext="{Binding ClaudeCode}">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="16">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
