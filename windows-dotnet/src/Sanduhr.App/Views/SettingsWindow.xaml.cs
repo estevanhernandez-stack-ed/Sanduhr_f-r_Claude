@@ -59,6 +59,7 @@ internal partial class SettingsWindow : Window
         // Bridge the custom-render controls to their VMs.
         ViewModel.History.Changed += RenderHistory;
         ViewModel.ClaudeCode.Overview.Changed += RenderLocalCc;
+        ViewModel.ClaudeCode.Trends.Changed += RenderTrends;
 
         Loaded += (_, _) => RenderHistory();
         Closed += (_, _) =>
@@ -66,6 +67,7 @@ internal partial class SettingsWindow : Window
             _localCcTimer.Stop();
             ViewModel.History.Changed -= RenderHistory;
             ViewModel.ClaudeCode.Overview.Changed -= RenderLocalCc;
+            ViewModel.ClaudeCode.Trends.Changed -= RenderTrends;
             ViewModel.ClaudeCode.Detach();
         };
     }
@@ -87,6 +89,9 @@ internal partial class SettingsWindow : Window
 
     private void RenderLocalCc()
         => BarStrip.SetData(ViewModel.ClaudeCode.Overview.ByDay, ViewModel.ClaudeCode.Overview.Palette);
+
+    private void RenderTrends()
+        => TrendsChart.SetData(ViewModel.ClaudeCode.Trends.Weeks, ViewModel.ClaudeCode.Trends.Palette);
 
     /// <summary>Refresh + timer-arm the Claude Code tab only while it's selected so
     /// we don't walk session logs on a tab the user can't see (parity with the

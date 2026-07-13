@@ -16,16 +16,19 @@ public sealed partial class ClaudeCodeTabViewModel : ObservableObject
 
     public LocalCcViewModel Overview { get; }
 
+    public CcTrendsViewModel Trends { get; }
+
     /// <summary>Set by the window on tab selection — ingest-completed refreshes
     /// only run while the user can see the tab.</summary>
     public bool IsTabActive { get; set; }
 
     [ObservableProperty] private string _section = "Overview";
 
-    public ClaudeCodeTabViewModel(WidgetViewModel widget, LocalCcViewModel overview)
+    public ClaudeCodeTabViewModel(WidgetViewModel widget, LocalCcViewModel overview, CcTrendsViewModel trends)
     {
         _widget = widget;
         Overview = overview;
+        Trends = trends;
         _ingestHandler = () => Application.Current?.Dispatcher.BeginInvoke(async () =>
         {
             try
@@ -63,7 +66,9 @@ public sealed partial class ClaudeCodeTabViewModel : ObservableObject
             case "Overview":
                 await Overview.RefreshAsync();
                 break;
-            // Task 7 adds: case "Trends": await Trends.RefreshAsync(); break;
+            case "Trends":
+                await Trends.RefreshAsync();
+                break;
             // Task 8 adds: case "Sessions": await Ledger.RefreshAsync(); break;
         }
     }

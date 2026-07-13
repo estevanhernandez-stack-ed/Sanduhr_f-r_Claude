@@ -309,6 +309,35 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <!-- Trends range pills — the section Grid's DataContext IS the
+             CcTrendsViewModel (unlike CcSectionTrends above), so a plain
+             {Binding WeeksBack} DataTrigger resolves directly. -->
+        <Style x:Key="TrendsPill4" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding WeeksBack}" Value="4">
+                    <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="TrendsPill12" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding WeeksBack}" Value="12">
+                    <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="TrendsPill26" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding WeeksBack}" Value="26">
+                    <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                    <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- CRITICAL: each section Grid overrides its own DataContext to the
              section VM (Overview/Trends/Ledger), none of which has a Section
              property — a plain {Binding Section} DataTrigger would silently
@@ -930,8 +959,64 @@
                                 </StackPanel>
                             </Grid>
 
-                            <!-- Trends (content lands in Task 7) -->
-                            <Grid Grid.Row="1" Style="{StaticResource CcSectionTrends}" />
+                            <!-- Trends -->
+                            <Grid Grid.Row="1" Style="{StaticResource CcSectionTrends}"
+                                  DataContext="{Binding Trends}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                                    <TextBlock Text="Window:" VerticalAlignment="Center" FontSize="12"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,8,0" />
+                                    <Button Content="4 weeks" Style="{StaticResource TrendsPill4}"
+                                            Command="{Binding SetWeeksCommand}" CommandParameter="4" />
+                                    <Button Content="12 weeks" Style="{StaticResource TrendsPill12}"
+                                            Command="{Binding SetWeeksCommand}" CommandParameter="12" />
+                                    <Button Content="26 weeks" Style="{StaticResource TrendsPill26}"
+                                            Command="{Binding SetWeeksCommand}" CommandParameter="26" />
+                                </StackPanel>
+
+                                <TextBlock Grid.Row="1" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,6"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                           Text="{Binding InfoText}"
+                                           Visibility="{Binding InfoText, Converter={StaticResource StrVis}}" />
+
+                                <Border Grid.Row="2" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
+                                        BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1" Padding="8">
+                                    <views:CcTrendsControl x:Name="TrendsChart" />
+                                </Border>
+
+                                <DockPanel Grid.Row="3" Margin="0,8,0,0" MaxHeight="120">
+                                    <TextBlock DockPanel.Dock="Top" Text="Top projects (window)" FontSize="9"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,4" />
+                                    <ItemsControl ItemsSource="{Binding TopProjects}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,1">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding Tokens}" FontSize="11" Margin="8,0,0,0"
+                                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </DockPanel>
+
+                                <TextBlock Grid.Row="4" FontSize="10" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="{Binding FooterText}" />
+                            </Grid>
 
                             <!-- Sessions (content lands in Task 8) -->
                             <Grid Grid.Row="1" Style="{StaticResource CcSectionSessions}" />
