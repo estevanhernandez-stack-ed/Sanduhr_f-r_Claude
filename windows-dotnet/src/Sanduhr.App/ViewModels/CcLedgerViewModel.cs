@@ -65,22 +65,30 @@ public sealed partial class LedgerRowViewModel : ObservableObject
             : info.ProjectName;
         LastActiveText = Relative(info.LastTs);
         ModelBadge = BuildBadge(info.ByModel);
-        Rescope(from, to);
+        RescopeCore(from, to);
+        // Single rebuild per Update() — Rescope() has its own rebuild for the
+        // scope-chip-only path below; calling it from here would double-build
+        // an expanded group row's detail.
         if (IsExpanded)
             DetailText = BuildDetail();
     }
 
     public void Rescope(DateOnly from, DateOnly to)
     {
-        _scopeFrom = from;
-        _scopeTo = to;
-        ScopedTokens = VaultReader.TokensInScope(Info, from, to);
-        ScopedTokensText = ScopedTokens > 0 ? TokenFormat.Compact(ScopedTokens) : "—";
+        RescopeCore(from, to);
         // Session-row detail doesn't echo the current scope, but a group row's
         // member list does (per-session scoped tokens) — rebuild it here so an
         // expanded group stays honest across a scope-chip click.
         if (IsGroup && IsExpanded)
             DetailText = BuildDetail();
+    }
+
+    private void RescopeCore(DateOnly from, DateOnly to)
+    {
+        _scopeFrom = from;
+        _scopeTo = to;
+        ScopedTokens = VaultReader.TokensInScope(Info, from, to);
+        ScopedTokensText = ScopedTokens > 0 ? TokenFormat.Compact(ScopedTokens) : "—";
     }
 
     partial void OnIsExpandedChanged(bool value)
@@ -232,8 +240,16 @@ public sealed partial class CcLedgerViewModel : ObservableObject
     {
         if (_loading)
             return;
-        _persistGroupByProject(value);
-        Present();
+        try
+        {
+            _persistGroupByProject(value);
+            Present();
+        }
+        catch
+        {
+            // A mode-toggle fault must never become an unhandled dispatcher
+            // exception (global constraint: every UI path caught).
+        }
     }
 
     public void AttachOwner(Window owner) => _owner = owner;
@@ -300,26 +316,68 @@ public sealed partial class CcLedgerViewModel : ObservableObject
         bool? ok = _owner is not null ? dialog.ShowDialog(_owner) : dialog.ShowDialog();
         if (ok != true)
             return;
-        var rows = View.Cast<LedgerRowViewModel>()
-            .Select(r => new VaultLedgerCsv.Row(
-                r.Info.Uuid, r.Info.Root, r.ProjectText,
-                r.Info.FirstTs.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),
-                r.Info.LastTs.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),
-                r.ScopedTokens, r.Info.Total,
-                string.Join(";", r.Info.ByModel.OrderByDescending(kv => kv.Value)
-                    .Select(kv => $"{kv.Key}:{kv.Value}"))))
-            .ToList();
+        var rows = BuildCsvRows();
         var built = VaultLedgerCsv.Build(rows);
         try
         {
             File.WriteAllText(dialog.FileName, built.Text);
-            ThemedDialog.Show(_owner, "Export complete", $"Wrote {built.RowCount} rows.");
+            ThemedDialog.Show(_owner, "Export complete", $"Wrote {built.RowCount} session rows.");
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             ThemedDialog.Show(_owner, "Export failed", "Could not write the file. Is it open elsewhere?",
                 kind: ThemedDialogKind.Warning);
         }
+    }
+
+    /// <summary>CSV always exports session-level rows (product decision) —
+    /// even in stack-by-project mode, where the visible rows are project
+    /// aggregates and a project key has no business sitting under the
+    /// "session" header. Built straight from <see cref="_lastSessions"/>,
+    /// scoped to the active range, and sorted to mirror the active column as
+    /// closely as per-session values allow: same SortColumn/SortDescending
+    /// semantics as <see cref="LedgerSort"/> (Project text disambiguated the
+    /// same way row display is), ties by LastTs. In flat mode this reproduces
+    /// today's row set and order exactly, since flat rows are already 1:1
+    /// with sessions.</summary>
+    private List<VaultLedgerCsv.Row> BuildCsvRows()
+    {
+        var (from, to) = ScopeRange();
+
+        var nameGroups = _lastSessions.GroupBy(s => s.ProjectName, StringComparer.Ordinal)
+            .Where(g => g.Select(s => s.ProjectKey).Distinct(StringComparer.Ordinal).Count() > 1)
+            .Select(g => g.Key)
+            .ToHashSet(StringComparer.Ordinal);
+
+        string ProjectTextFor(VaultSessionInfo info) => nameGroups.Contains(info.ProjectName)
+            ? $"{info.ProjectName} ~{info.ProjectKey[^Math.Min(8, info.ProjectKey.Length)..]}"
+            : info.ProjectName;
+
+        var scoped = _lastSessions
+            .Select(s => (Info: s, ScopedTokens: VaultReader.TokensInScope(s, from, to), ProjectText: ProjectTextFor(s)))
+            .ToList();
+
+        scoped.Sort((a, b) =>
+        {
+            int cmp = SortColumn switch
+            {
+                "LastActive" => a.Info.LastTs.CompareTo(b.Info.LastTs),
+                "Project" => string.Compare(a.ProjectText, b.ProjectText, StringComparison.OrdinalIgnoreCase),
+                _ => a.ScopedTokens.CompareTo(b.ScopedTokens),
+            };
+            if (cmp == 0)
+                cmp = a.Info.LastTs.CompareTo(b.Info.LastTs);
+            return SortDescending ? -cmp : cmp;
+        });
+
+        return scoped.Select(x => new VaultLedgerCsv.Row(
+                x.Info.Uuid, x.Info.Root, x.ProjectText,
+                x.Info.FirstTs.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),
+                x.Info.LastTs.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"),
+                x.ScopedTokens, x.Info.Total,
+                string.Join(";", x.Info.ByModel.OrderByDescending(kv => kv.Value)
+                    .Select(kv => $"{kv.Key}:{kv.Value}"))))
+            .ToList();
     }
 
     public async Task RefreshAsync()
