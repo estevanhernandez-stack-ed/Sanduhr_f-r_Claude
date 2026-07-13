@@ -161,7 +161,10 @@ public sealed class VaultStore
     /// <summary>Ingest-side only (the read path never mutates). Rename to a
     /// timestamped .bad (uniquified, never overwritten — for months older than
     /// JSONL retention the .bad IS the archive) and delete checkpoints.json so
-    /// the next cycle re-ingests everything still on disk.</summary>
+    /// the next cycle re-ingests everything still on disk. Checkpoints are deleted
+    /// FIRST — a crash between the two steps then leaves the corrupt shard in place
+    /// with no checkpoints, which the next cycle re-quarantines; the reverse order
+    /// would strand stale checkpoints pointing at a vanished shard.</summary>
     public void QuarantineSessionShard(string rootName, string month, DateTimeOffset nowUtc)
     {
         var src = SessionShardPath(rootName, month);
@@ -172,19 +175,19 @@ public sealed class VaultStore
             dest = $"{src}.{stamp}-{n++}.bad";
         try
         {
-            File.Move(src, dest);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            LogBestEffort("quarantine", e);
-        }
-        try
-        {
             File.Delete(CheckpointsPath(rootName));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             LogBestEffort("quarantine-checkpoints", e);
+        }
+        try
+        {
+            File.Move(src, dest);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            LogBestEffort("quarantine", e);
         }
     }
 
