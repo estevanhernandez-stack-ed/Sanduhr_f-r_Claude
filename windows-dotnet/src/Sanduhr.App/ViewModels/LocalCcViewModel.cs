@@ -112,8 +112,9 @@ public sealed partial class LocalCcViewModel : ObservableObject
             {
                 vault.SetRootConsent(root, false);
                 var res = ThemedDialog.Show(_owner, $"Stop archiving {root}?",
-                    "New usage from this home will no longer be recorded. Also erase the history already stored for it?",
-                    MessageBoxButton.YesNo, ThemedDialogKind.Warning);
+                    "Archiving is off for this home either way. Erase the history already stored for it?",
+                    MessageBoxButton.YesNo, ThemedDialogKind.Warning,
+                    primaryLabel: "Erase it", secondaryLabel: "Keep data");
                 if (res == MessageBoxResult.Yes)
                 {
                     _ = PurgeRootAsync(vault, root);   // purge waits on the writer mutex — off the UI thread
@@ -158,7 +159,8 @@ public sealed partial class LocalCcViewModel : ObservableObject
                 return;
             var res = ThemedDialog.Show(_owner, "Erase usage history?",
                 "Deletes the entire local vault and turns archiving off for every home. This cannot be undone.",
-                MessageBoxButton.YesNo, ThemedDialogKind.Warning);
+                MessageBoxButton.YesNo, ThemedDialogKind.Warning,
+                primaryLabel: "Erase everything", secondaryLabel: "Cancel");
             if (res != MessageBoxResult.Yes)
                 return;
             // Erase waits on the writer mutex (up to 10s) — off the UI thread;
