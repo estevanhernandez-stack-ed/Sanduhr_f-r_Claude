@@ -251,8 +251,29 @@ public static class VaultRowMath
             ByDay = new Dictionary<string, VaultDayBucket>(),
         };
         foreach (var row in rows)
+        {
             foreach (var (day, bucket) in row.ByDay)
-                merged.ByDay[day] = bucket;   // day-in-own-month invariant: no key collides
+            {
+                // Slices of ONE file can't collide (day-in-own-month invariant),
+                // but multi-file logical folds reuse this merge and DO collide:
+                // same-day buckets sum into a fresh bucket, never mutating inputs.
+                if (!merged.ByDay.TryGetValue(day, out var acc))
+                {
+                    merged.ByDay[day] = acc = new VaultDayBucket();
+                }
+                acc.Total += bucket.Total;
+                acc.Input += bucket.Input;
+                acc.Output += bucket.Output;
+                foreach (var (m, v) in bucket.ByModel)
+                    acc.ByModel[m] = acc.ByModel.GetValueOrDefault(m) + v;
+                if (bucket.BySkill is not null)
+                {
+                    acc.BySkill ??= new Dictionary<string, long>();
+                    foreach (var (s, v) in bucket.BySkill)
+                        acc.BySkill[s] = acc.BySkill.GetValueOrDefault(s) + v;
+                }
+            }
+        }
         RecomputeRowAggregates(merged);
         return merged;
     }

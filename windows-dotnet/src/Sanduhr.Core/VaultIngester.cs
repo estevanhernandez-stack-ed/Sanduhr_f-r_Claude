@@ -397,8 +397,10 @@ public sealed class VaultIngester
         }
 
         var days = new Dictionary<string, VaultRollupDay>(StringComparer.Ordinal);
-        foreach (var row in shard.Sessions.Values)
+        var sessionsPerDay = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        foreach (var (uuid, row) in shard.Sessions)
         {
+            var logicalId = row.ParentSession ?? uuid;
             foreach (var (day, bucket) in row.ByDay)
             {
                 if (!days.TryGetValue(day, out var d))
@@ -406,15 +408,22 @@ public sealed class VaultIngester
                 d.Total += bucket.Total;
                 d.Input += bucket.Input;
                 d.Output += bucket.Output;
-                d.Sessions++;
                 foreach (var (m, v) in bucket.ByModel)
                     d.ByModel[m] = d.ByModel.GetValueOrDefault(m) + v;
                 d.ByProject[row.ProjectKey] = d.ByProject.GetValueOrDefault(row.ProjectKey) + bucket.Total;
                 if (bucket.BySkill is not null)
                     foreach (var (s, v) in bucket.BySkill)
                         d.BySkill[s] = d.BySkill.GetValueOrDefault(s) + v;
+
+                // Sessions = DISTINCT LOGICAL sessions touching the day — a
+                // main transcript plus its N agent files is ONE session.
+                if (!sessionsPerDay.TryGetValue(day, out var set))
+                    sessionsPerDay[day] = set = new HashSet<string>(StringComparer.Ordinal);
+                set.Add(logicalId);
             }
         }
+        foreach (var (day, set) in sessionsPerDay)
+            days[day].Sessions = set.Count;
         _store.SaveRollupShard(rootName, month, new VaultRollupShard
         {
             SchemaVersion = VaultSchema.CurrentSchemaVersion,

@@ -470,7 +470,8 @@ public sealed partial class CcLedgerViewModel : ObservableObject
         return new VaultSessionInfo(
             projectKey, root, projectKey, first.ProjectName, null,
             members.Min(m => m.FirstTs), members.Max(m => m.LastTs),
-            total, byModel, bySkill, byDay, null);
+            total, byModel, bySkill, byDay, null,
+            members.Sum(m => m.AgentCount), members.Sum(m => m.AgentTokens));
     }
 
     /// <summary>Re-presents Rows from <see cref="_lastSessions"/> under the
