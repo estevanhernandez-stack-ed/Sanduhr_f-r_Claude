@@ -20,6 +20,7 @@ public sealed class Paths
 {
     private readonly string _appDataBase;
     private readonly string _homeDir;
+    private readonly string _localAppDataBase;
 
     /// <param name="appDataBase">
     /// The roaming-AppData base (the parent of the <c>Sanduhr</c> folder).
@@ -31,12 +32,19 @@ public sealed class Paths
     /// <see cref="Environment.SpecialFolder.UserProfile"/>. Mirrors Python's
     /// <c>Path.home()</c>.
     /// </param>
-    public Paths(string? appDataBase = null, string? homeDir = null)
+    /// <param name="localAppDataBase">
+    /// The local (non-roaming) AppData base used for the usage vault. Defaults
+    /// to <see cref="Environment.SpecialFolder.LocalApplicationData"/>
+    /// (== <c>%LOCALAPPDATA%</c>).
+    /// </param>
+    public Paths(string? appDataBase = null, string? homeDir = null, string? localAppDataBase = null)
     {
         _appDataBase = appDataBase
             ?? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         _homeDir = homeDir
             ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        _localAppDataBase = localAppDataBase
+            ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
     }
 
     /// <summary>
@@ -84,6 +92,12 @@ public sealed class Paths
     public string LogFile => Path.Combine(AppDataDir, "sanduhr.log");
 
     public string LastErrorFile => Path.Combine(AppDataDir, "last_error.json");
+
+    /// <summary>Usage-vault root: <c>%LOCALAPPDATA%\Sanduhr\vault</c>. LOCAL, not
+    /// roaming, by design — enterprise roaming profiles must never sync the
+    /// work-activity archive off the machine. Not auto-created; the VaultStore
+    /// creates per-root dirs lazily on first write.</summary>
+    public string VaultDir => Path.Combine(_localAppDataBase, "Sanduhr", "vault");
 
     /// <summary>v1 plaintext config location — read-only, used for migration.</summary>
     public string LegacyConfigFile

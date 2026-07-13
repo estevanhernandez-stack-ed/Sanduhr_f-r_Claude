@@ -1,0 +1,158 @@
+using System.Text.Json.Serialization;
+
+namespace Sanduhr.Core;
+
+/// <summary>
+/// Wire schema for the usage vault (spec 2026-07-12-usage-vault-design.md).
+/// Session shards are the irreplaceable primary record: raw model strings
+/// (never tiers), unconditional totals, per-local-day buckets. Meaning changes
+/// take a NEW field name; readers accept every schema_version &lt;= CurrentSchemaVersion
+/// forever — the source to re-derive old shards is gone.
+/// </summary>
+public static class VaultSchema
+{
+    public const int CurrentSchemaVersion = 1;
+}
+
+/// <summary>One local calendar day inside a session row. Total is unconditional
+/// (every timestamped token-bearing event); by_model keys are raw CC model strings.</summary>
+public sealed class VaultDayBucket
+{
+    [JsonPropertyName("total")] public long Total { get; set; }
+
+    [JsonPropertyName("by_model")]
+    public Dictionary<string, long> ByModel { get; set; } = new();
+
+    /// <summary>Per-day skill split — needed so the rollup fold (per-day by_skill)
+    /// reads exactly one shard. Omitted when the day had no attributed events.</summary>
+    [JsonPropertyName("by_skill")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, long>? BySkill { get; set; }
+}
+
+public sealed class VaultCacheTokens
+{
+    [JsonPropertyName("read")] public long Read { get; set; }
+    [JsonPropertyName("creation")] public long Creation { get; set; }
+}
+
+/// <summary>
+/// One session's aggregates (or one month-slice of a session when
+/// <see cref="Continuation"/> is true). Row invariant:
+/// <c>Total == sum(ByDay[*].Total)</c> — every row is self-consistent, so the
+/// rollup fold for a day reads exactly one month's shard. EventCount,
+/// SkippedLines and CacheTokens live on the PRIMARY row only (slices carry 0 /
+/// null — they cannot be split by month from day buckets).
+/// </summary>
+public sealed class VaultSessionRow
+{
+    [JsonPropertyName("project_key")] public string ProjectKey { get; set; } = "";
+    [JsonPropertyName("project_name")] public string ProjectName { get; set; } = "";
+
+    /// <summary>Populated ONLY when the store_full_paths setting (off by default) is on.</summary>
+    [JsonPropertyName("cwd")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Cwd { get; set; }
+
+    [JsonPropertyName("first_ts")] public string FirstTs { get; set; } = "";
+    [JsonPropertyName("last_ts")] public string LastTs { get; set; } = "";
+    [JsonPropertyName("utc_offset_min")] public int UtcOffsetMin { get; set; }
+    [JsonPropertyName("event_count")] public long EventCount { get; set; }
+    [JsonPropertyName("skipped_lines")] public long SkippedLines { get; set; }
+    [JsonPropertyName("continuation")] public bool Continuation { get; set; }
+    [JsonPropertyName("total")] public long Total { get; set; }
+
+    [JsonPropertyName("by_model")]
+    public Dictionary<string, long> ByModel { get; set; } = new();
+
+    [JsonPropertyName("cache_tokens")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public VaultCacheTokens? CacheTokens { get; set; }
+
+    [JsonPropertyName("by_skill")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, long>? BySkill { get; set; }
+
+    [JsonPropertyName("by_day")]
+    public Dictionary<string, VaultDayBucket> ByDay { get; set; } = new();
+}
+
+public sealed class VaultSessionShard
+{
+    [JsonPropertyName("schema_version")] public int SchemaVersion { get; set; } = VaultSchema.CurrentSchemaVersion;
+    [JsonPropertyName("writer_version")] public string WriterVersion { get; set; } = "";
+    [JsonPropertyName("sessions")] public Dictionary<string, VaultSessionRow> Sessions { get; set; } = new();
+}
+
+/// <summary>Rollups are a DECLARED DERIVED CACHE — deletable at any time,
+/// rebuilt by folding the month's session shard. Never a second truth.</summary>
+public sealed class VaultRollupDay
+{
+    [JsonPropertyName("total")] public long Total { get; set; }
+    [JsonPropertyName("by_model")] public Dictionary<string, long> ByModel { get; set; } = new();
+    [JsonPropertyName("by_project")] public Dictionary<string, long> ByProject { get; set; } = new();
+    [JsonPropertyName("by_skill")] public Dictionary<string, long> BySkill { get; set; } = new();
+    [JsonPropertyName("sessions")] public int Sessions { get; set; }
+}
+
+public sealed class VaultRollupShard
+{
+    [JsonPropertyName("schema_version")] public int SchemaVersion { get; set; } = VaultSchema.CurrentSchemaVersion;
+    [JsonPropertyName("days")] public Dictionary<string, VaultRollupDay> Days { get; set; } = new();
+}
+
+/// <summary>Bookkeeping only — the "vault outlives its sources" property belongs
+/// to shards, not checkpoints. Keyed by SHA-256 of the lowercased absolute path
+/// so this file is never a readable path ledger.</summary>
+public sealed class VaultCheckpointEntry
+{
+    [JsonPropertyName("mtime_ticks")] public long MtimeTicks { get; set; }
+    [JsonPropertyName("length")] public long Length { get; set; }
+    [JsonPropertyName("offset")] public long Offset { get; set; }
+    [JsonPropertyName("tail_guard")] public string TailGuard { get; set; } = "";
+
+    /// <summary>Fingerprint of the stored rows this checkpoint corresponds to
+    /// (sum of the session's row totals / event counts). A tail parse is only
+    /// trusted when the stored rows MATCH this fingerprint — after a crash
+    /// between the shard write and the checkpoint write, the rows are newer
+    /// than the checkpoint and a seeded tail parse would double-count; the
+    /// mismatch forces the idempotent full reparse instead.</summary>
+    [JsonPropertyName("row_total")] public long RowTotal { get; set; }
+    [JsonPropertyName("row_events")] public long RowEvents { get; set; }
+    [JsonPropertyName("row_cache_read")] public long RowCacheRead { get; set; }
+    [JsonPropertyName("row_cache_creation")] public long RowCacheCreation { get; set; }
+
+    [JsonPropertyName("months")] public List<string> Months { get; set; } = new();
+    [JsonPropertyName("sealed")] public bool Sealed { get; set; }
+    [JsonPropertyName("last_seen")] public string LastSeenTs { get; set; } = "";
+}
+
+public sealed class VaultCheckpointFile
+{
+    [JsonPropertyName("schema_version")] public int SchemaVersion { get; set; } = VaultSchema.CurrentSchemaVersion;
+    [JsonPropertyName("entries")] public Dictionary<string, VaultCheckpointEntry> Entries { get; set; } = new();
+}
+
+public sealed class VaultDateRange
+{
+    [JsonPropertyName("from")] public string From { get; set; } = "";
+    [JsonPropertyName("to")] public string To { get; set; } = "";
+}
+
+/// <summary>Per-root vault metadata: birth date (Trends footer), ingest-coverage
+/// ranges (the "no record" texture), and the last successful ingest stamp
+/// (degraded-mode gate). Lives inside the root's folder so purging the folder
+/// purges the bookkeeping with it.</summary>
+public sealed class VaultRootMeta
+{
+    [JsonPropertyName("since")] public string Since { get; set; } = "";
+    [JsonPropertyName("covered")] public List<VaultDateRange> Covered { get; set; } = new();
+    [JsonPropertyName("last_ingest_ts")] public string LastIngestTs { get; set; } = "";
+}
+
+public enum ShardLoadResult
+{
+    Ok,
+    Missing,
+    Corrupt,
+}

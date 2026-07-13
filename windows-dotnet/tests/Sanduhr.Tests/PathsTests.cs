@@ -57,4 +57,27 @@ public class PathsTests
         var p = new Paths(temp.Path);
         Assert.Equal(Path.Combine(temp.Path, "Sanduhr", "webview2-fetch"), p.WebView2FetchDir);
     }
+
+    [Fact]
+    public void VaultDir_lives_under_local_appdata_not_roaming()
+    {
+        using var roaming = new TempDir();
+        using var home = new TempDir();
+        using var local = new TempDir();
+        var paths = new Paths(roaming.Path, home.Path, local.Path);
+        Assert.Equal(Path.Combine(local.Path, "Sanduhr", "vault"), paths.VaultDir);
+        Assert.StartsWith(local.Path, paths.VaultDir);
+        Assert.False(paths.VaultDir.StartsWith(roaming.Path, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void VaultDir_is_not_auto_created()
+    {
+        using var roaming = new TempDir();
+        using var home = new TempDir();
+        using var local = new TempDir();
+        var paths = new Paths(roaming.Path, home.Path, local.Path);
+        _ = paths.VaultDir;
+        Assert.False(Directory.Exists(paths.VaultDir));
+    }
 }
