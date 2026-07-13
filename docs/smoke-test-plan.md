@@ -84,3 +84,22 @@ Theming rule for every scenario below: run once in the default theme, then flip 
 9. **Theming.** Flip default/dark/light/Matrix with the Alerts tab open — zero unstyled elements.
 10. **Toast click focuses the widget.** Send a test alert, click the toast body: the widget window comes to the foreground — verify on BOTH channels, with the app running. On the MSIX channel, also verify no second Sanduhr instance appears (Task Manager) after the click.
 11. **MSIX sideload toast.** On a -Sideload MSIX build, send a test alert: toast shows with the Sanduhr name/icon, and clicking it activates (not relaunches) the app. Gate for the next Store submission.
+
+---
+
+## WS-C — usage vault + Claude Usage tab (2026-07-12)
+
+Theming rule as above: run once in the default theme, then flip dark / light / Matrix with the surface open — zero unstyled elements (hatch + no-record textures included).
+
+1. **First-run consent.** Fresh settings.json (`vault_prompted` absent): launch shows the themed per-home consent dialog once, pre-checked. "Keep history" → `%LOCALAPPDATA%\Sanduhr\vault\.claude*\sessions-*.json` appear within ~1 min. Relaunch: no re-prompt.
+2. **Not now is honored.** Decline the dialog: no vault folder appears, ever; Overview falls back to live logs with no status line; Sessions shows the vault-off empty state.
+3. **Overview parity.** With the vault fresh, Overview's Today / Last 30 days match the pre-WS-C numbers (within one 30s refresh of each other).
+4. **Degraded honesty.** Stop ingestion (Task Manager: suspend the app > 15 min, or temporarily set the machine clock forward): Overview shows "history vault paused — showing live logs only" and live numbers. Resume: line clears within a cycle.
+5. **Ledger answers "what ate 800k yesterday".** Sessions ▸ Yesterday chip: token column shows yesterday-only burn, top row is yesterday's heaviest session, expansion shows its per-day/model breakdown.
+6. **Scroll + expansion survive refresh.** Expand a row, scroll mid-list, wait 5+ min (an ingest cycle): scroll position and the expanded row survive.
+7. **Two processes, no clobber.** Run the Store build and a Velopack/debug build simultaneously for 10+ min: `sanduhr.log` shows "ingest skipped (writer mutex held)" lines from one side; no `.bad` files; session totals stay correct.
+8. **Erase archive is real.** Settings ▸ Claude Usage ▸ Erase archive → confirm: vault folder empties, all root checkboxes untick, and NO files reappear over the next 10 min (consent tombstone holds).
+9. **Per-root purge.** Untick one home → choose erase: that folder is gone, the other home's folder untouched; re-tick: backfill restores it within a cycle.
+10. **Trends honesty.** On a fresh vault, Trends shows ~4 seeded weeks; earlier weeks show the dotted no-record texture (not zero bars); current week hatched; footer names the birth date.
+11. **Privacy spot-check.** Open `sanduhr.log` after a full session: no paths, no project names, no skill names, no JSONL content. Open `checkpoints.json`: hex keys only.
+12. **MSIX virtualization re-check.** On the Store/MSIX build, confirm vault writes land at the REAL `%LOCALAPPDATA%\Sanduhr\vault` (spike verified virtualization off on 3.1.0 — re-verify on this package build).

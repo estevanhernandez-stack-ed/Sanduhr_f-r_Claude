@@ -66,13 +66,23 @@ internal partial class ThemedDialog : Window
     }
 
     /// <summary>Themed drop-in for <c>MessageBox.Show</c>. Centers on
-    /// <paramref name="owner"/> when one is loaded, else on screen.</summary>
+    /// <paramref name="owner"/> when one is loaded, else on screen.
+    /// <paramref name="primaryLabel"/> / <paramref name="secondaryLabel"/> override the
+    /// default Yes/No (or OK) button text — a generic Yes/No cannot carry a consequence
+    /// like "erase history"; the button must say what it does. Result mapping is
+    /// unchanged: primary still returns Yes/OK, secondary still returns No.</summary>
     public static MessageBoxResult Show(Window? owner, string title, string message,
         MessageBoxButton buttons = MessageBoxButton.OK,
         ThemedDialogKind kind = ThemedDialogKind.Info,
-        bool playSound = true)
+        bool playSound = true,
+        string? primaryLabel = null,
+        string? secondaryLabel = null)
     {
         var dlg = new ThemedDialog(title, message, buttons, kind, playSound);
+        if (primaryLabel is not null)
+            dlg.PrimaryButton.Content = primaryLabel;
+        if (secondaryLabel is not null)
+            dlg.SecondaryButton.Content = secondaryLabel;
         if (owner is not null && owner.IsLoaded)
             dlg.Owner = owner;
         else

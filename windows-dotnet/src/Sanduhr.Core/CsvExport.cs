@@ -88,7 +88,7 @@ public static class CsvExport
 
     /// <summary>RFC-4180 minimal quoting (Python csv QUOTE_MINIMAL): quote a field
     /// only when it contains a comma, quote, CR, or LF; embedded quotes are doubled.</summary>
-    private static string Escape(string field)
+    internal static string Escape(string field)
     {
         if (field.IndexOfAny(QuoteTriggers) < 0)
             return field;

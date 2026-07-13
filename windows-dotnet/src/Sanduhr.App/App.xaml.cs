@@ -54,6 +54,14 @@ public partial class App : Application
 
         SetupTray();
 
+        // Usage vault (WS-C): consent resolves BEFORE the service attaches —
+        // attach order is the consent gate; Start()'s first fetch cycle then
+        // kicks the initial backfill through the attached service.
+        var vaultService = new VaultService(new SettingsStore(new Sanduhr.Core.Paths()), _vm.CcReader);
+        if (vaultService.NeedsConsentPrompt)
+            vaultService.SaveConsent(VaultConsentDialog.ShowConsent(_window, vaultService.DetectedRootNames()));
+        _vm.AttachVaultService(vaultService);
+
         // Load the active account's stored credential + fetch real usage now.
         _vm.Start();
 

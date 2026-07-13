@@ -320,4 +320,29 @@ public class CcLogReaderTests
         var third = reader.AggregateForLocalCcTab(daysBack: 30);
         Assert.Equal(200 + 1998, third.ByDay.Values.Sum());
     }
+
+    [Fact]
+    public void AggregateTodayOnly_restricts_to_local_today()
+    {
+        using var home = new TempDir();
+        var today = DateTimeOffset.Now;
+        var yesterday = today.AddDays(-1);
+        WriteSession(home.Path, ".claude", "p1", "s1",
+            AssistantEvent(Iso(yesterday), "claude-fable-5", 111, 0, cwd: "C:\\p\\api"),
+            AssistantEvent(Iso(today), "claude-fable-5", 42, 0, cwd: "C:\\p\\api"));
+
+        var reader = new CcLogReader(home.Path);
+        var agg = reader.AggregateTodayOnly();
+
+        // "Today" is wall-clock-relative: if local midnight rolled over
+        // between building the fixture and aggregating, the assertions are
+        // undefined — bail out rather than flake (a rerun covers it).
+        if (DateOnly.FromDateTime(today.LocalDateTime) != DateOnly.FromDateTime(DateTime.Now))
+            return;
+
+        var todayKey = DateOnly.FromDateTime(today.LocalDateTime);
+        Assert.Equal(42, agg.ByDay.GetValueOrDefault(todayKey));
+        Assert.Single(agg.ByDay);                             // yesterday excluded
+        Assert.Equal(42, agg.ByProject.Values.Sum());
+    }
 }

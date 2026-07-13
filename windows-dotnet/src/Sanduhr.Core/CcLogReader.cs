@@ -59,6 +59,9 @@ public sealed class CcLogReader
     private int? _cacheDaysBack;
     private LocalCcAggregate? _cacheResult;
 
+    private DateTimeOffset _todayCacheComputedAt = DateTimeOffset.MinValue;
+    private LocalCcAggregate? _todayCacheResult;
+
     public CcLogReader(string? homeDir = null)
     {
         _homeDir = homeDir ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -246,9 +249,11 @@ public sealed class CcLogReader
         return bySkill;
     }
 
-    /// <summary>Map a CC <c>message.model</c> string to a Sanduhr tier key, or
-    /// null for unrecognized models.</summary>
-    public string? ModelToTierKey(string? model)
+    /// <summary>Static tier projection over a raw CC model string — the vault's
+    /// READ-TIME tier mapping (raw strings are stored; a mapping fix here
+    /// retroactively heals all history). Null for unrecognized models —
+    /// callers must keep unmapped tokens visible, never drop them.</summary>
+    public static string? TierForModel(string? model)
     {
         if (string.IsNullOrEmpty(model))
             return null;
@@ -259,6 +264,10 @@ public sealed class CcLogReader
         }
         return null;
     }
+
+    /// <summary>Map a CC <c>message.model</c> string to a Sanduhr tier key, or
+    /// null for unrecognized models.</summary>
+    public string? ModelToTierKey(string? model) => TierForModel(model);
 
     /// <summary>Same as <see cref="TokensSince"/> but keyed by Sanduhr tier.
     /// Models that don't map to a known tier are dropped.</summary>
@@ -340,6 +349,63 @@ public sealed class CcLogReader
         return result;
     }
 
+    /// <summary>Single-pass aggregate restricted to events whose LOCAL calendar
+    /// date is today — the Overview's live-today source. The vault serves days
+    /// strictly before today; this serves today; never both (the exclusion rule
+    /// that prevents double-counting the vault's partial today row). Cached for
+    /// <see cref="AggCacheTtlSec"/> seconds, independently of the 30-day cache.</summary>
+    public LocalCcAggregate AggregateTodayOnly()
+    {
+        lock (_cacheLock)
+        {
+            if (_todayCacheResult is not null
+                && (DateTimeOffset.UtcNow - _todayCacheComputedAt).TotalSeconds < AggCacheTtlSec)
+            {
+                return _todayCacheResult;
+            }
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        // Offset AT MIDNIGHT, not now — on the DST fall-back day the current
+        // offset would place the cutoff an hour late and the mtime prefilter
+        // could skip files last written between 00:00 and 01:00 local.
+        var midnightLocal = today.ToDateTime(TimeOnly.MinValue);
+        var midnightUtc = new DateTimeOffset(
+            midnightLocal, TimeZoneInfo.Local.GetUtcOffset(midnightLocal)).ToUniversalTime();
+        var byDay = new Dictionary<DateOnly, long>();
+        var byProject = new Dictionary<string, long>();
+        var bySkill = new Dictionary<string, long>();
+
+        foreach (var path in DiscoverLogFiles())
+        {
+            if (!FileMtimeAfter(path, midnightUtc))
+                continue;
+            foreach (var ev in IterUsageEvents(path))
+            {
+                if (ev.Timestamp is null)
+                    continue;
+                var tokens = Tokens(ev);
+                if (tokens <= 0)
+                    continue;
+                if (LocalDate(ev.Timestamp.Value) != today)
+                    continue;
+                byDay[today] = byDay.GetValueOrDefault(today) + tokens;
+                if (!string.IsNullOrEmpty(ev.Cwd))
+                    byProject[ev.Cwd] = byProject.GetValueOrDefault(ev.Cwd) + tokens;
+                if (!string.IsNullOrEmpty(ev.AttributionSkill))
+                    bySkill[ev.AttributionSkill] = bySkill.GetValueOrDefault(ev.AttributionSkill) + tokens;
+            }
+        }
+
+        var result = new LocalCcAggregate(byDay, byProject, bySkill);
+        lock (_cacheLock)
+        {
+            _todayCacheComputedAt = DateTimeOffset.UtcNow;
+            _todayCacheResult = result;
+        }
+        return result;
+    }
+
     /// <summary>Force the next <see cref="AggregateForLocalCcTab"/> to recompute.</summary>
     public void InvalidateCache()
     {
@@ -347,6 +413,8 @@ public sealed class CcLogReader
         {
             _cacheComputedAt = DateTimeOffset.MinValue;
             _cacheResult = null;
+            _todayCacheComputedAt = DateTimeOffset.MinValue;
+            _todayCacheResult = null;
         }
     }
 
