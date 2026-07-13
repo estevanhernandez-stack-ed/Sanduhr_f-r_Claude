@@ -34,6 +34,7 @@ public sealed class VaultIngester
     private const int CoverageMarginDays = 25;      // CC retention (~30d) minus safety
     private const int CheckpointPruneDays = 7;
     internal const int TailGuardBytes = 64;
+    internal static readonly TimeSpan QuiesceAfter = TimeSpan.FromHours(1);
 
     private readonly string _homeDir;
     private readonly VaultStore _store;
@@ -121,33 +122,75 @@ public sealed class VaultIngester
             long statLen = fi.Length;
             long statMtime = fi.LastWriteTimeUtc.Ticks;
             checkpoints.Entries.TryGetValue(key, out var cp);
+            var uuid = Path.GetFileNameWithoutExtension(fi.Name);
 
-            if (cp is not null && cp.MtimeTicks == statMtime && cp.Length == statLen)
+            bool unchanged = cp is not null && cp.MtimeTicks == statMtime && cp.Length == statLen;
+            bool quiesced = nowUtc - fi.LastWriteTimeUtc >= QuiesceAfter;
+
+            if (unchanged && (cp!.Sealed || !quiesced))
             {
-                // Task 3 adds the quiesce-then-seal verify pass here.
                 cp.LastSeenTs = nowIso;
                 skipped++;
                 continue;
             }
 
-            // Task 3 adds the guarded tail-parse branch here (grown + guard match).
-            var uuid = Path.GetFileNameWithoutExtension(fi.Name);
+            // Live paths: (A) unchanged+quiesced+unsealed -> whole-file verify
+            // parse, then seal; (B) grown + verified guard -> tail parse seeded
+            // from the stored rows; (C) everything else -> full reparse.
+            bool sealAfter = unchanged;
+            bool wantTail = !unchanged && cp is not null && !cp.Sealed
+                && statLen > cp.Length && cp.Offset > 0 && cp.TailGuard.Length > 0;
+
+            SessionAgg? seed = null;
+            if (wantTail)
+            {
+                bool corruptSeed = false;
+                seed = SeedFromStored(rootName, uuid, cp!.Months, shardCache, nowUtc, ref corruptSeed);
+                if (corruptSeed)
+                    return new VaultIngestResult(true, seen, full, tailParsed, skipped, failed, 1);
+                // Crash-vs-tail guard: a crash that landed the shard but not the
+                // checkpoint leaves stored rows NEWER than cp — seeding a tail
+                // from them would double-count. Fingerprint mismatch -> full
+                // reparse (idempotent row replace), which converges. Cache
+                // counters are part of the fingerprint because a cache-only
+                // tail changes no token totals. (Residual: a tail that changed
+                // ONLY skipped_lines slips through and briefly double-counts
+                // that counter — cosmetic, heals at the quiesce-seal verify.)
+                if (seed is not null
+                    && (seed.ByDay.Values.Sum(d => d.Total) != cp.RowTotal
+                        || seed.EventCount != cp.RowEvents
+                        || seed.CacheRead != cp.RowCacheRead
+                        || seed.CacheCreation != cp.RowCacheCreation))
+                {
+                    seed = null;
+                }
+            }
+
             SessionAgg agg;
             long endOffset;
             string tailGuard;
+            bool usedTail = false;
             try
             {
                 using var fs = new FileStream(
                     fi.FullName, FileMode.Open, FileAccess.Read,
                     FileShare.ReadWrite | FileShare.Delete);
-                agg = new SessionAgg();
-                endOffset = ParseLines(fs, 0, agg);
+                if (seed is not null && fs.Length >= cp!.Offset
+                    && GuardAt(fs, cp.Offset) == cp.TailGuard)
+                {
+                    agg = seed;
+                    endOffset = ParseLines(fs, cp.Offset, agg);
+                    usedTail = true;
+                }
+                else
+                {
+                    agg = new SessionAgg();
+                    endOffset = ParseLines(fs, 0, agg);
+                }
                 tailGuard = GuardAt(fs, endOffset);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
-                // Read failed: advance NO checkpoint, replace NO row — but touch
-                // LastSeen so a merely-locked file never gets pruned.
                 if (cp is not null)
                     cp.LastSeenTs = nowIso;
                 Log2("file-open", e);
@@ -172,11 +215,7 @@ public sealed class VaultIngester
                 dirtyMonths.Add(month);
             }
             if (corrupt)
-            {
-                // Quarantine already invalidated this root's checkpoints — abort
-                // the root's cycle; the next cycle full-re-ingests and converges.
                 return new VaultIngestResult(true, seen, full, tailParsed, skipped, failed, 1);
-            }
 
             checkpoints.Entries[key] = new VaultCheckpointEntry
             {
@@ -189,10 +228,10 @@ public sealed class VaultIngester
                 RowCacheRead = newRows.Values.Sum(r => r.CacheTokens?.Read ?? 0),
                 RowCacheCreation = newRows.Values.Sum(r => r.CacheTokens?.Creation ?? 0),
                 Months = newRows.Keys.OrderBy(m => m, StringComparer.Ordinal).ToList(),
-                Sealed = false,
+                Sealed = sealAfter,
                 LastSeenTs = nowIso,
             };
-            full++;
+            if (usedTail) tailParsed++; else full++;
         }
 
         // Prune bookkeeping for files missing from the walk for > 7 days —
@@ -253,6 +292,53 @@ public sealed class VaultIngester
         shard.WriterVersion = _writerVersion;
         cache[month] = shard;
         return shard;
+    }
+
+    /// <summary>Reconstruct a parse aggregate from a session's stored rows
+    /// (primary + slices) so a tail parse folds into a COPY of the stored row.
+    /// Null when no rows exist (e.g. a previously zero-event session) — the
+    /// caller falls back to a full reparse.</summary>
+    private SessionAgg? SeedFromStored(
+        string rootName, string uuid, List<string> months,
+        Dictionary<string, VaultSessionShard> cache, DateTimeOffset nowUtc, ref bool corrupt)
+    {
+        var rows = new List<VaultSessionRow>();
+        foreach (var month in months)
+        {
+            var shard = GetShard(cache, rootName, month, nowUtc, ref corrupt);
+            if (corrupt)
+                return null;
+            if (shard.Sessions.TryGetValue(uuid, out var row))
+                rows.Add(row);
+        }
+        if (rows.Count == 0)
+            return null;
+
+        var merged = VaultRowMath.Merge(rows);
+        var agg = new SessionAgg
+        {
+            FirstTs = ParseIso(merged.FirstTs),
+            LastTs = ParseIso(merged.LastTs),
+            EventCount = merged.EventCount,
+            SkippedLines = merged.SkippedLines,
+            Cwd = merged.Cwd,
+            CacheRead = merged.CacheTokens?.Read ?? 0,
+            CacheCreation = merged.CacheTokens?.Creation ?? 0,
+            SeedProjectKey = merged.ProjectKey,
+            SeedProjectName = merged.ProjectName,
+        };
+        foreach (var (dayKey, bucket) in merged.ByDay)
+        {
+            var day = DateOnly.Parse(dayKey, CultureInfo.InvariantCulture);
+            var d = new DayAgg { Total = bucket.Total };
+            foreach (var (m, v) in bucket.ByModel)
+                d.ByModel[m] = v;
+            if (bucket.BySkill is not null)
+                foreach (var (s, v) in bucket.BySkill)
+                    d.BySkill[s] = v;
+            agg.ByDay[day] = d;
+        }
+        return agg;
     }
 
     private void RebuildRollups(
@@ -347,6 +433,8 @@ public sealed class VaultIngester
         public string? Cwd;
         public long CacheRead;
         public long CacheCreation;
+        public string? SeedProjectKey;
+        public string? SeedProjectName;
         public readonly Dictionary<DateOnly, DayAgg> ByDay = new();
     }
 
@@ -457,13 +545,26 @@ public sealed class VaultIngester
         if (agg.EventCount == 0 || agg.FirstTs is null || agg.LastTs is null)
             return new Dictionary<string, VaultSessionRow>();
 
-        var projectKey = agg.Cwd is null
-            ? "(none)"
-            : $"{CcLogReader.ProjectDisplayName(agg.Cwd)}~{VaultStore.PathKey(agg.Cwd)[..8]}";
+        string projectKey, projectName;
+        if (agg.Cwd is not null)
+        {
+            projectName = CcLogReader.ProjectDisplayName(agg.Cwd);
+            projectKey = $"{projectName}~{VaultStore.PathKey(agg.Cwd)[..8]}";
+        }
+        else if (agg.SeedProjectKey is not null)
+        {
+            projectKey = agg.SeedProjectKey;
+            projectName = agg.SeedProjectName ?? "(none)";
+        }
+        else
+        {
+            projectKey = "(none)";
+            projectName = "(none)";
+        }
         var merged = new VaultSessionRow
         {
             ProjectKey = projectKey,
-            ProjectName = agg.Cwd is null ? "(none)" : CcLogReader.ProjectDisplayName(agg.Cwd),
+            ProjectName = projectName,
             Cwd = storeFullPaths ? agg.Cwd : null,
             FirstTs = IsoUtc(agg.FirstTs.Value),
             LastTs = IsoUtc(agg.LastTs.Value),
