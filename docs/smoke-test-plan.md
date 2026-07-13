@@ -103,3 +103,14 @@ Theming rule as above: run once in the default theme, then flip dark / light / M
 10. **Trends honesty.** On a fresh vault, Trends shows ~4 seeded weeks; earlier weeks show the dotted no-record texture (not zero bars); current week hatched; footer names the birth date.
 11. **Privacy spot-check.** Open `sanduhr.log` after a full session: no paths, no project names, no skill names, no JSONL content. Open `checkpoints.json`: hex keys only.
 12. **MSIX virtualization re-check.** On the Store/MSIX build, confirm vault writes land at the REAL `%LOCALAPPDATA%\Sanduhr\vault` (spike verified virtualization off on 3.1.0 — re-verify on this package build).
+
+---
+
+## WS-C.1 — subagent coverage, split, chip, calendar (2026-07-13)
+
+1. **The jump.** First launch on this build: within a cycle, Overview's 30-day total rises sharply (subagent transcripts now count) and `sanduhr.log` shows one "walk upgraded" line per home. Second launch: no further jump, no repeated upgrade line.
+2. **Ledger folds agents.** A subagent-heavy session shows ONE ledger row; its expansion carries "Agents: N · X tokens"; the flat list has no agent-* rows.
+3. **Split lines.** Overview shows "↑ … sent · ↓ … received" under both figures; the 30-day line carries "(partial)" while pre-upgrade days remain in the window, and today's line never does.
+4. **Calendar honesty.** 5-week grid below the strip: heat where there's history, dotted no-record texture on uncovered days, faint tick on covered-zero days, today outlined; hover names the day + count ("no record" on textured cells). Vault off → all texture.
+5. **% chip.** Widget tier cards: the % sits on a chip and reads clearly over BOTH sparkline styles in default/dark/light/Matrix.
+6. **Regression trio.** Stack toggle still stacks; erase dialogs still say "Erase it / Keep data"; the paused/off status lines still show in their states.
