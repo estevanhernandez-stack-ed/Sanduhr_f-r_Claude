@@ -51,9 +51,7 @@ public sealed class CcCalendarControl : FrameworkElement
         double dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
 
         var today = DateOnly.FromDateTime(DateTime.Now);
-        var gridTop = HeaderBand;
         double cellW = (w - (Cols - 1) * 2) / Cols;
-        double cellH = (h - gridTop - (Rows - 1) * 2) / Rows;
 
         // Weekday header (Monday-start initials).
         string[] initials = { "M", "T", "W", "T", "F", "S", "S" };
@@ -107,21 +105,22 @@ public sealed class CcCalendarControl : FrameworkElement
         }
     }
 
-    /// <summary>Cell geometry: 5 rows x 7 Monday-start columns, bottom row ends
-    /// at today's week; the top row leads with empty cells before day 1.</summary>
+    /// <summary>Cell geometry: 5 rows x 7 Monday-start columns, end-anchored so
+    /// the bottom row is ALWAYS today's Monday-start week. Grid start is 4 full
+    /// weeks before the Monday of today's week, so: the last yielded day is at
+    /// most 6 days after today (trailing future days of the current week —
+    /// callers skip those via `day &gt; today`), and every yielded day is
+    /// &gt;= today-34 (inside the DaysBack data window), so no leading-cell skip
+    /// is needed.</summary>
     private IEnumerable<(DateOnly Day, Rect Rect)> Cells(DateOnly today, double w, double h)
     {
         double cellW = (w - (Cols - 1) * 2) / Cols;
         double cellH = (h - HeaderBand - (Rows - 1) * 2) / Rows;
-        var first = today.AddDays(-DaysBack);
-        // Monday-align the grid start (may precede `first`; those cells skip).
-        int firstDow = ((int)first.DayOfWeek + 6) % 7;
-        var gridStart = first.AddDays(-firstDow);
+        int todayDow = ((int)today.DayOfWeek + 6) % 7;          // Monday = 0
+        var gridStart = today.AddDays(-todayDow).AddDays(-28);  // 4 weeks before this week's Monday
         for (int i = 0; i < Rows * Cols; i++)
         {
             var day = gridStart.AddDays(i);
-            if (day < first)
-                continue;
             int row = i / Cols, col = i % Cols;
             yield return (day, new Rect(
                 col * (cellW + 2), HeaderBand + row * (cellH + 2), cellW, cellH));
