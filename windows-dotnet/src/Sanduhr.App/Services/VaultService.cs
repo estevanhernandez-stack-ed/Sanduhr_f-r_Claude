@@ -85,8 +85,22 @@ public sealed class VaultService
     {
         if (Interlocked.CompareExchange(ref _ingestRunning, 1, 0) != 0)
             return;   // previous run still going -> skip this cycle
-        var roots = ConsentedRootNames();
-        bool fullPaths = _settings.LoadVaultStoreFullPaths();
+
+        IReadOnlyList<string> roots;
+        bool fullPaths;
+        try
+        {
+            roots = ConsentedRootNames();
+            fullPaths = _settings.LoadVaultStoreFullPaths();
+        }
+        catch (Exception e)
+        {
+            // Prelude threw before dispatch -> latch must not jam forever.
+            LogBestEffort("ingest", e);
+            Interlocked.Exchange(ref _ingestRunning, 0);
+            return;
+        }
+
         if (roots.Count == 0)
         {
             Interlocked.Exchange(ref _ingestRunning, 0);
@@ -115,7 +129,7 @@ public sealed class VaultService
     public void PurgeRoot(string root)
     {
         SetRootConsent(root, false);
-        _store.PurgeRoot(root);
+        RunUnderWriterMutex(() => _store.PurgeRoot(root));
     }
 
     public void EraseArchive()
@@ -124,7 +138,37 @@ public sealed class VaultService
         foreach (var root in DetectedRootNames())
             map[root] = false;
         _settings.SaveVaultRoots(map);
-        _store.PurgeAll();
+        RunUnderWriterMutex(() => _store.PurgeAll());
+    }
+
+    /// <summary>Serializes a deletion against the ingester's cross-process writer
+    /// mutex so an in-flight ingest cycle (roots already snapshotted before the
+    /// consent flip) can't recreate a just-purged folder after we delete it. A
+    /// stuck/dead holder must not make Erase hang forever, so a timeout proceeds
+    /// anyway (best-effort) rather than blocking the user's erasure request.</summary>
+    private void RunUnderWriterMutex(Action action)
+    {
+        using var mutex = new Mutex(initiallyOwned: false, "Global\\Sanduhr.VaultWriter");
+        bool acquired;
+        try
+        {
+            acquired = mutex.WaitOne(TimeSpan.FromSeconds(10));
+        }
+        catch (AbandonedMutexException)
+        {
+            acquired = true;   // previous holder died; state converges by design
+        }
+        if (!acquired)
+            LogBestEffort("purge-mutex", new TimeoutException());
+        try
+        {
+            action();
+        }
+        finally
+        {
+            if (acquired)
+                mutex.ReleaseMutex();
+        }
     }
 
     public void OpenVaultFolder()
