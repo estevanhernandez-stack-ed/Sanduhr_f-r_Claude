@@ -42,7 +42,8 @@ public sealed class SettingsViewModel
         History = new HistoryTabViewModel(widget);
         ClaudeCode = new ClaudeCodeTabViewModel(widget, new LocalCcViewModel(
             widget, widget.LoadLocalCcShowBreakdowns(), widget.SaveLocalCcShowBreakdowns),
-            new CcTrendsViewModel(widget), new CcLedgerViewModel(widget));
+            new CcTrendsViewModel(widget),
+            new CcLedgerViewModel(widget, widget.LoadLedgerGroupByProject(), widget.SaveLedgerGroupByProject));
         General = new GeneralViewModel();
         Alerts = new AlertsViewModel(widget, () =>
         {

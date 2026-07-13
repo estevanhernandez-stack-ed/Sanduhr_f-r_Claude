@@ -235,6 +235,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// <summary>Persist the Local CC tab's "show breakdowns" preference.</summary>
     public void SaveLocalCcShowBreakdowns(bool show) => _settings.SaveLocalCcShowBreakdowns(show);
 
+    /// <summary>The Sessions Ledger's "stack by project" preference (settings.json).</summary>
+    public bool LoadLedgerGroupByProject() => _settings.LoadLedgerGroupByProject();
+
+    /// <summary>Persist the Ledger's "stack by project" preference.</summary>
+    public void SaveLedgerGroupByProject(bool groupByProject) => _settings.SaveLedgerGroupByProject(groupByProject);
+
     /// <summary>The saved focus-timer duration (settings.json "focus_mode_duration").</summary>
     public int LoadFocusDuration() => _settings.LoadFocusDuration();
 

@@ -370,4 +370,20 @@ public sealed class SettingsStore
         var root = Read();
         try { return root["vault_store_full_paths"]?.GetValue<bool>() ?? false; } catch { return false; }
     }
+
+    /// <summary>The Sessions Ledger's "stack by project" preference (settings.json
+    /// "ledger_group_by_project"), defaulting to TRUE — the project stack is the
+    /// new default; the flat per-session view is one click away.</summary>
+    public bool LoadLedgerGroupByProject()
+    {
+        var root = Read();
+        try { return root["ledger_group_by_project"]?.GetValue<bool>() ?? true; } catch { return true; }
+    }
+
+    public void SaveLedgerGroupByProject(bool groupByProject)
+    {
+        var root = Read();
+        root["ledger_group_by_project"] = groupByProject;
+        Write(root);
+    }
 }

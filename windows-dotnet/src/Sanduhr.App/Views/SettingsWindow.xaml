@@ -1069,6 +1069,10 @@
                                 <DockPanel Grid.Row="0" Margin="0,0,0,8">
                                     <Button DockPanel.Dock="Right" Style="{StaticResource AccentButton}"
                                             Content="Export CSV…" Command="{Binding ExportCsvCommand}" />
+                                    <CheckBox DockPanel.Dock="Right" Style="{StaticResource ThemedCheckBox}"
+                                              Margin="0,0,12,0" VerticalAlignment="Center"
+                                              Content="Stack by project"
+                                              IsChecked="{Binding GroupByProject, Mode=TwoWay}" />
                                     <StackPanel Orientation="Horizontal">
                                         <Button Content="Today" Style="{StaticResource LedgerChipToday}"
                                                 Command="{Binding SetScopeCommand}" CommandParameter="Today" />
