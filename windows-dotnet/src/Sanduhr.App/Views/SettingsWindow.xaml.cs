@@ -89,7 +89,13 @@ internal partial class SettingsWindow : Window
             ViewModel.History.Palette);
 
     private void RenderLocalCc()
-        => BarStrip.SetData(ViewModel.ClaudeCode.Overview.ByDay, ViewModel.ClaudeCode.Overview.Palette);
+    {
+        BarStrip.SetData(ViewModel.ClaudeCode.Overview.ByDay, ViewModel.ClaudeCode.Overview.Palette);
+        CalendarStrip.SetData(
+            ViewModel.ClaudeCode.Overview.ByDay,
+            ViewModel.ClaudeCode.Overview.UncoveredDays,
+            ViewModel.ClaudeCode.Overview.Palette);
+    }
 
     private void RenderTrends()
         => TrendsChart.SetData(ViewModel.ClaudeCode.Trends.Weeks, ViewModel.ClaudeCode.Trends.Palette);

@@ -867,6 +867,7 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                     <RowDefinition Height="*" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
@@ -903,12 +904,15 @@
 
                                 <views:LocalCcBarStrip x:Name="BarStrip" Grid.Row="3" Height="60" Margin="0,0,0,8" />
 
-                                <CheckBox Grid.Row="4" Style="{StaticResource ThemedCheckBox}"
+                                <views:CcCalendarControl x:Name="CalendarStrip" Grid.Row="4"
+                                                         Height="96" Margin="0,0,0,8" />
+
+                                <CheckBox Grid.Row="5" Style="{StaticResource ThemedCheckBox}"
                                           Content="Show project &amp; skill breakdown"
                                           IsChecked="{Binding ShowBreakdowns, Mode=TwoWay}" Margin="0,0,0,8" />
 
                                 <!-- Per-project + per-skill tables side by side. -->
-                                <Grid Grid.Row="5"
+                                <Grid Grid.Row="6"
                                       Visibility="{Binding ShowBreakdowns, Converter={StaticResource BoolVis}}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -974,7 +978,7 @@
                                 </Grid>
 
                                 <!-- Data stewardship (spec: WS-A delete-completeness precedent). -->
-                                <StackPanel Grid.Row="6" Margin="0,10,0,0">
+                                <StackPanel Grid.Row="7" Margin="0,10,0,0">
                                     <TextBlock Text="History vault" FontSize="9" Margin="0,0,0,4"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                     <ItemsControl ItemsSource="{Binding Roots}">

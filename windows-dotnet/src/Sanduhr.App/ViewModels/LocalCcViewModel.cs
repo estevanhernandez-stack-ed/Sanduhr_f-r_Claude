@@ -71,6 +71,9 @@ public sealed partial class LocalCcViewModel : ObservableObject
     private Dictionary<DateOnly, long> _byDay = new();
     public IReadOnlyDictionary<DateOnly, long> ByDay => _byDay;
 
+    private HashSet<DateOnly> _uncovered = new();
+    public IReadOnlySet<DateOnly> UncoveredDays => _uncovered;
+
     public ThemePalette Palette => _widget.Palette;
 
     public LocalCcViewModel(WidgetViewModel widget, bool showBreakdowns, Action<bool> persistShowBreakdowns)
@@ -187,7 +190,8 @@ public sealed partial class LocalCcViewModel : ObservableObject
         long ReceivedToday,
         long SentWindow,
         long ReceivedWindow,
-        bool WindowSplitPartial);
+        bool WindowSplitPartial,
+        HashSet<DateOnly> Uncovered);
 
     public async Task RefreshAsync()
     {
@@ -200,7 +204,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
         }
         catch
         {
-            data = new OverviewData(new(), new(), new(), "", 0, 0, 0, 0, false);
+            data = new OverviewData(new(), new(), new(), "", 0, 0, 0, 0, false, new());
         }
         Apply(data);
     }
@@ -214,6 +218,17 @@ public sealed partial class LocalCcViewModel : ObservableObject
         bool vaultOn = roots.Count > 0;
         bool degraded = vaultOn
             && (lastIngest is null || DateTimeOffset.UtcNow - lastIngest.Value > DegradedAfter);
+
+        var calFrom = today.AddDays(-34);
+        var uncovered = new HashSet<DateOnly>();
+        var covered = (vault is not null && roots.Count > 0)
+            ? vault.Reader.CoveredSet(roots, calFrom, today)
+            : new HashSet<DateOnly>();
+        for (var d = calFrom; d <= today; d = d.AddDays(1))
+        {
+            if (!covered.Contains(d))
+                uncovered.Add(d);
+        }
 
         if (!vaultOn || degraded)
         {
@@ -235,7 +250,8 @@ public sealed partial class LocalCcViewModel : ObservableObject
                 !vaultOn ? "history vault off — these numbers are the live logs, not an archive"
                          : "history vault paused — showing live logs only",
                 sentT, recvT, sentW, recvW,
-                liveTotal > 0 && (sentW + recvW) < (long)(liveTotal * 0.95));
+                liveTotal > 0 && (sentW + recvW) < (long)(liveTotal * 0.95),
+                uncovered);
         }
 
         // Hot boundary: any day the vault hasn't confirmed since its midnight
@@ -277,7 +293,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
         bool partial = windowTotal > 0 && (sentWindow + recvWindow) < (long)(windowTotal * 0.95);
 
         return new OverviewData(byDay, projects, skills, "",
-            sentToday, recvToday, sentWindow, recvWindow, partial);
+            sentToday, recvToday, sentWindow, recvWindow, partial, uncovered);
     }
 
     private void Apply(OverviewData data)
@@ -307,6 +323,8 @@ public sealed partial class LocalCcViewModel : ObservableObject
         Skills.Clear();
         foreach (var (name, tokens) in data.Skills.OrderByDescending(kv => kv.Value).Take(10))
             Skills.Add(new BreakdownRow(name, TokenFormat.Compact(tokens)));
+
+        _uncovered = data.Uncovered;
 
         Changed?.Invoke();
     }
