@@ -11,7 +11,7 @@ namespace Sanduhr.App.Views;
 /// Tabbed settings window (port of <c>settings_dialog.py</c>'s shell). Hosts the
 /// Accounts tab (multi-account management), the Themes tab (swatch grid +
 /// agent-assisted theme creation), the History tab (30-day chart + CSV export),
-/// the Claude Code tab (WS-C: Overview / Trends / Sessions over the usage vault
+/// the Claude Usage tab (WS-C: Overview / Trends / Sessions over the usage vault
 /// + live session-log reader), and a thin General tab.
 /// Opened non-modally and kept single-instance by the App so a live account switch
 /// from here reflects in the widget immediately.
@@ -21,10 +21,10 @@ namespace Sanduhr.App.Views;
 /// app-level <c>Sanduhr.Brush.*</c> DynamicResources, so the whole window —
 /// including the title bar — re-tints live when the active theme changes.
 ///
-/// The History chart and the Claude Code Overview bar strip are custom
+/// The History chart and the Claude Usage Overview bar strip are custom
 /// <c>OnRender</c> controls that can't bind their data declaratively, so this
 /// code-behind bridges them: it re-pushes data on the VMs' <c>Changed</c>
-/// events, renders the chart on load, and drives the Claude Code tab's show +
+/// events, renders the chart on load, and drives the Claude Usage tab's show +
 /// 30-second refresh (parity with the Python tab's showEvent/hideEvent timer)
 /// only while that tab is selected.
 /// </summary>
@@ -94,7 +94,7 @@ internal partial class SettingsWindow : Window
     private void RenderTrends()
         => TrendsChart.SetData(ViewModel.ClaudeCode.Trends.Weeks, ViewModel.ClaudeCode.Trends.Palette);
 
-    /// <summary>Refresh + timer-arm the Claude Code tab only while it's selected so
+    /// <summary>Refresh + timer-arm the Claude Usage tab only while it's selected so
     /// we don't walk session logs on a tab the user can't see (parity with the
     /// Python tab's showEvent/hideEvent). The History chart re-renders on
     /// (re)selection too, since the control has no size until its tab is first
@@ -105,8 +105,8 @@ internal partial class SettingsWindow : Window
             return; // ignore bubbled selection changes from inner controls (combo, lists)
 
         var header = (Tabs.SelectedItem as TabItem)?.Header as string;
-        ViewModel.ClaudeCode.IsTabActive = header == "Claude Code";
-        if (header == "Claude Code")
+        ViewModel.ClaudeCode.IsTabActive = header == "Claude Usage";
+        if (header == "Claude Usage")
         {
             await ViewModel.ClaudeCode.RefreshActiveAsync();
             _localCcTimer.Start();

@@ -9,7 +9,7 @@ namespace Sanduhr.App.Views;
 /// PROMPTED; silent-on for an employer root is the breach WS-E's review
 /// named"). Returns a consent map covering every detected root; closing or
 /// "Not now" returns all-false. Either way the caller marks vault_prompted so
-/// the dialog shows once — the Claude Code tab owns changes afterwards.
+/// the dialog shows once — the Claude Usage tab owns changes afterwards.
 /// </summary>
 internal partial class VaultConsentDialog : Window
 {

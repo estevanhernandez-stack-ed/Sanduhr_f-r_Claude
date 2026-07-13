@@ -5,7 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 namespace Sanduhr.App.ViewModels;
 
 /// <summary>
-/// Parent of the Settings → Claude Code tab: owns the Overview / Trends /
+/// Parent of the Settings → Claude Usage tab: owns the Overview / Trends /
 /// Sessions sub-nav state and fans refreshes to the active section. Sections
 /// are added as they land (Task 6: Overview; Task 7: Trends; Task 8: Sessions).
 /// </summary>

@@ -38,7 +38,7 @@ public sealed partial class VaultRootToggleViewModel : ObservableObject
 }
 
 /// <summary>
-/// Overview section of the Claude Code tab. Sourcing (spec, binding): the
+/// Overview section of the Claude Usage tab. Sourcing (spec, binding): the
 /// vault's rollups serve days strictly BEFORE the hot boundary (local date of
 /// the last successful ingest); the live reader serves hot days — never both
 /// for one day. A stale vault (no ingest for 3 cycles) degrades the whole

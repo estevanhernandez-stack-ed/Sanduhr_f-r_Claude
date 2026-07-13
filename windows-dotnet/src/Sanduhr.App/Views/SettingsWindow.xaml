@@ -283,7 +283,7 @@
             </Style.Triggers>
         </Style>
 
-        <!-- Claude Code sub-nav pills (Overview / Trends / Sessions) — same
+        <!-- Claude Usage sub-nav pills (Overview / Trends / Sessions) — same
              accent-fill-when-active grammar as the History RangePills. -->
         <Style x:Key="CcNavOverview" TargetType="Button" BasedOn="{StaticResource FlatButton}">
             <Style.Triggers>
@@ -835,12 +835,12 @@
                     </Border>
                 </TabItem>
 
-                <!-- Claude Code tab (WS-C): Overview / Trends / Sessions over
+                <!-- Claude Usage tab (WS-C): Overview / Trends / Sessions over
                      the usage vault + live session-log reader.
                      DataContext must live ON the TabItem: the CcSection* visibility triggers resolve
                      DataContext.Section through AncestorType=TabItem (a child-level DataContext never
                      reaches them). -->
-                <TabItem Header="Claude Code" DataContext="{Binding ClaudeCode}">
+                <TabItem Header="Claude Usage" DataContext="{Binding ClaudeCode}">
                     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="16">
                         <Grid>
                             <Grid.RowDefinitions>

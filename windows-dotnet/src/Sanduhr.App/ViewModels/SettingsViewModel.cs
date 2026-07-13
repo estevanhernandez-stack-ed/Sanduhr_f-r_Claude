@@ -5,7 +5,7 @@ namespace Sanduhr.App.ViewModels;
 /// <summary>
 /// Backs the tabbed <c>SettingsWindow</c> (port of <c>settings_dialog.py</c>'s
 /// shell): the <b>Accounts</b> tab (multi-account), <b>Themes</b> (item 8),
-/// <b>History</b> (item 9) + <b>Claude Code</b> (WS-C), and the <b>General</b>
+/// <b>History</b> (item 9) + <b>Claude Usage</b> (WS-C), and the <b>General</b>
 /// tab — which surfaces version + the active account and now hosts the
 /// item-10 auto-start control via <see cref="GeneralViewModel"/>.
 /// </summary>
@@ -21,7 +21,7 @@ public sealed class SettingsViewModel
     /// all-accounts overlay, Week/Month window, CSV export, Clear history.</summary>
     public HistoryTabViewModel History { get; }
 
-    /// <summary>Backs the Claude Code tab (WS-C): Overview / Trends / Sessions
+    /// <summary>Backs the Claude Usage tab (WS-C): Overview / Trends / Sessions
     /// over the usage vault + live reader.</summary>
     public ClaudeCodeTabViewModel ClaudeCode { get; }
 

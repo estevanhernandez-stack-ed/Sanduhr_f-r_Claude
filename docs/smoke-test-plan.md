@@ -87,7 +87,7 @@ Theming rule for every scenario below: run once in the default theme, then flip 
 
 ---
 
-## WS-C — usage vault + Claude Code tab (2026-07-12)
+## WS-C — usage vault + Claude Usage tab (2026-07-12)
 
 Theming rule as above: run once in the default theme, then flip dark / light / Matrix with the surface open — zero unstyled elements (hatch + no-record textures included).
 
@@ -98,7 +98,7 @@ Theming rule as above: run once in the default theme, then flip dark / light / M
 5. **Ledger answers "what ate 800k yesterday".** Sessions ▸ Yesterday chip: token column shows yesterday-only burn, top row is yesterday's heaviest session, expansion shows its per-day/model breakdown.
 6. **Scroll + expansion survive refresh.** Expand a row, scroll mid-list, wait 5+ min (an ingest cycle): scroll position and the expanded row survive.
 7. **Two processes, no clobber.** Run the Store build and a Velopack/debug build simultaneously for 10+ min: `sanduhr.log` shows "ingest skipped (writer mutex held)" lines from one side; no `.bad` files; session totals stay correct.
-8. **Erase archive is real.** Settings ▸ Claude Code ▸ Erase archive → confirm: vault folder empties, all root checkboxes untick, and NO files reappear over the next 10 min (consent tombstone holds).
+8. **Erase archive is real.** Settings ▸ Claude Usage ▸ Erase archive → confirm: vault folder empties, all root checkboxes untick, and NO files reappear over the next 10 min (consent tombstone holds).
 9. **Per-root purge.** Untick one home → choose erase: that folder is gone, the other home's folder untouched; re-tick: backfill restores it within a cycle.
 10. **Trends honesty.** On a fresh vault, Trends shows ~4 seeded weeks; earlier weeks show the dotted no-record texture (not zero bars); current week hatched; footer names the birth date.
 11. **Privacy spot-check.** Open `sanduhr.log` after a full session: no paths, no project names, no skill names, no JSONL content. Open `checkpoints.json`: hex keys only.

@@ -49,3 +49,4 @@ releases/
 
 # Local MCP config (carries live bearer tokens - estate rule: never commit)
 .mcp.json
+*_wpftmp.csproj
