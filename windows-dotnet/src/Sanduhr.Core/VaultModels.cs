@@ -156,3 +156,92 @@ public enum ShardLoadResult
     Missing,
     Corrupt,
 }
+
+/// <summary>
+/// Row algebra shared by the ingester (split a parsed session into per-month
+/// rows) and every reader (merge a session's primary + continuation slices
+/// back into one logical session). Merge(SplitByMonth(x)) == x.
+/// </summary>
+public static class VaultRowMath
+{
+    /// <summary>Split a merged session row into per-month rows keyed yyyy-MM.
+    /// The primary month is the month of the earliest by_day key (== the local
+    /// date of first_ts, since the first counted event defines both). Each row's
+    /// Total/ByModel/BySkill are recomputed from ITS OWN day buckets (row
+    /// invariant); EventCount/SkippedLines/CacheTokens ride the primary only.</summary>
+    public static Dictionary<string, VaultSessionRow> SplitByMonth(VaultSessionRow merged)
+    {
+        var result = new Dictionary<string, VaultSessionRow>();
+        if (merged.ByDay.Count == 0)
+            return result;
+        var primaryMonth = merged.ByDay.Keys.Min(StringComparer.Ordinal)![..7];
+
+        foreach (var group in merged.ByDay.GroupBy(kv => kv.Key[..7]))
+        {
+            bool primary = group.Key == primaryMonth;
+            var row = new VaultSessionRow
+            {
+                ProjectKey = merged.ProjectKey,
+                ProjectName = merged.ProjectName,
+                Cwd = merged.Cwd,
+                FirstTs = merged.FirstTs,
+                LastTs = merged.LastTs,
+                UtcOffsetMin = merged.UtcOffsetMin,
+                EventCount = primary ? merged.EventCount : 0,
+                SkippedLines = primary ? merged.SkippedLines : 0,
+                Continuation = !primary,
+                CacheTokens = primary ? merged.CacheTokens : null,
+                ByDay = group.ToDictionary(kv => kv.Key, kv => kv.Value),
+            };
+            RecomputeRowAggregates(row);
+            result[group.Key] = row;
+        }
+        return result;
+    }
+
+    /// <summary>Merge one session's rows (primary + slices, any order) into a
+    /// single logical row. Continuation is false on the result.</summary>
+    public static VaultSessionRow Merge(IReadOnlyList<VaultSessionRow> rows)
+    {
+        var primary = rows.FirstOrDefault(r => !r.Continuation) ?? rows[0];
+        var merged = new VaultSessionRow
+        {
+            ProjectKey = primary.ProjectKey,
+            ProjectName = primary.ProjectName,
+            Cwd = primary.Cwd,
+            FirstTs = primary.FirstTs,
+            LastTs = primary.LastTs,
+            UtcOffsetMin = primary.UtcOffsetMin,
+            EventCount = rows.Sum(r => r.EventCount),
+            SkippedLines = rows.Sum(r => r.SkippedLines),
+            Continuation = false,
+            CacheTokens = rows.Select(r => r.CacheTokens).FirstOrDefault(c => c is not null),
+            ByDay = new Dictionary<string, VaultDayBucket>(),
+        };
+        foreach (var row in rows)
+            foreach (var (day, bucket) in row.ByDay)
+                merged.ByDay[day] = bucket;   // day-in-own-month invariant: no key collides
+        RecomputeRowAggregates(merged);
+        return merged;
+    }
+
+    /// <summary>Total/ByModel/BySkill := sums of the row's own day buckets.</summary>
+    public static void RecomputeRowAggregates(VaultSessionRow row)
+    {
+        long total = 0;
+        var byModel = new Dictionary<string, long>();
+        var bySkill = new Dictionary<string, long>();
+        foreach (var bucket in row.ByDay.Values)
+        {
+            total += bucket.Total;
+            foreach (var (m, v) in bucket.ByModel)
+                byModel[m] = byModel.GetValueOrDefault(m) + v;
+            if (bucket.BySkill is not null)
+                foreach (var (s, v) in bucket.BySkill)
+                    bySkill[s] = bySkill.GetValueOrDefault(s) + v;
+        }
+        row.Total = total;
+        row.ByModel = byModel;
+        row.BySkill = bySkill.Count > 0 ? bySkill : null;
+    }
+}

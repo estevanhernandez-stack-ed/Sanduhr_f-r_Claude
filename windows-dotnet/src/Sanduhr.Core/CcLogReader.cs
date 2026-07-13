@@ -246,9 +246,11 @@ public sealed class CcLogReader
         return bySkill;
     }
 
-    /// <summary>Map a CC <c>message.model</c> string to a Sanduhr tier key, or
-    /// null for unrecognized models.</summary>
-    public string? ModelToTierKey(string? model)
+    /// <summary>Static tier projection over a raw CC model string — the vault's
+    /// READ-TIME tier mapping (raw strings are stored; a mapping fix here
+    /// retroactively heals all history). Null for unrecognized models —
+    /// callers must keep unmapped tokens visible, never drop them.</summary>
+    public static string? TierForModel(string? model)
     {
         if (string.IsNullOrEmpty(model))
             return null;
@@ -259,6 +261,10 @@ public sealed class CcLogReader
         }
         return null;
     }
+
+    /// <summary>Map a CC <c>message.model</c> string to a Sanduhr tier key, or
+    /// null for unrecognized models.</summary>
+    public string? ModelToTierKey(string? model) => TierForModel(model);
 
     /// <summary>Same as <see cref="TokensSince"/> but keyed by Sanduhr tier.
     /// Models that don't map to a known tier are dropped.</summary>
