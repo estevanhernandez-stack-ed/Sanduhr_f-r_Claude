@@ -253,7 +253,7 @@ public class VaultReaderTests
                 ["2026-07-10"] = new() { Total = 200 },
                 ["2026-07-11"] = new() { Total = 300 },
             },
-            null);
+            null, 0, 0);
 
         Assert.Equal(500, VaultReader.TokensInScope(info, new DateOnly(2026, 7, 10), new DateOnly(2026, 7, 11)));
         Assert.Equal(300, VaultReader.TokensInScope(info, new DateOnly(2026, 7, 11), new DateOnly(2026, 7, 11)));

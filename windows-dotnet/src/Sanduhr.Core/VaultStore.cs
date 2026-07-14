@@ -110,6 +110,21 @@ public sealed class VaultStore
         }
     }
 
+    /// <summary>Best-effort standalone checkpoint invalidation — the
+    /// walk_version upgrade's tool. The next cycle full-re-ingests everything
+    /// still on disk (idempotent by design).</summary>
+    public void DeleteCheckpoints(string rootName)
+    {
+        try
+        {
+            File.Delete(CheckpointsPath(rootName));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            LogBestEffort("checkpoints-delete", e);
+        }
+    }
+
     public void SaveCheckpoints(string rootName, VaultCheckpointFile file)
         => WriteAtomic(CheckpointsPath(rootName), JsonSerializer.Serialize(file, JsonOpts), throwOnFailure: false);
 

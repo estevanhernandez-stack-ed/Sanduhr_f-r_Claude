@@ -107,6 +107,11 @@ public sealed partial class LedgerRowViewModel : ObservableObject
             ? $"{(int)span.TotalHours}h {span.Minutes}m"
             : $"{Math.Max(1, (int)span.TotalMinutes)}m");
         sb.Append("  ·  Lifetime: ").Append(TokenFormat.Compact(Info.Total)).Append(" tokens");
+        if (Info.AgentCount > 0)
+        {
+            sb.Append("\nAgents: ").Append(Info.AgentCount)
+              .Append(" · ").Append(TokenFormat.Compact(Info.AgentTokens)).Append(" tokens");
+        }
         foreach (var (day, bucket) in Info.ByDay.OrderBy(kv => kv.Key, StringComparer.Ordinal))
         {
             sb.Append('\n').Append(day).Append(": ").Append(TokenFormat.Compact(bucket.Total));
@@ -151,7 +156,13 @@ public sealed partial class LedgerRowViewModel : ObservableObject
         var roots = ordered.Select(m => m.Root).Distinct(StringComparer.Ordinal)
             .OrderBy(r => r, StringComparer.Ordinal);
         if (sb.Length > 0) sb.Append('\n');
-        sb.Append("Sessions: ").Append(ordered.Count).Append("  ·  Homes: ").Append(string.Join(", ", roots));
+        sb.Append("Sessions: ").Append(ordered.Count);
+        if (Info.AgentCount > 0)
+        {
+            sb.Append("  ·  Agents: ").Append(Info.AgentCount)
+              .Append("  ·  ").Append(TokenFormat.Compact(Info.AgentTokens)).Append(" tokens");
+        }
+        sb.Append("  ·  Homes: ").Append(string.Join(", ", roots));
         return sb.ToString();
     }
 
@@ -211,11 +222,24 @@ public sealed partial class CcLedgerViewModel : ObservableObject
     /// user action, not the 5-minute ingest cadence).</summary>
     private IReadOnlyList<VaultSessionInfo> _lastSessions = Array.Empty<VaultSessionInfo>();
 
+    /// <summary>Set by a calendar day-click — takes priority over the scope
+    /// chips in <see cref="ScopeRange"/> until a chip is clicked again.</summary>
+    private DateOnly? _dayScope;
+
+    /// <summary>Chip scope active before the calendar click that entered day
+    /// mode — where <see cref="ClearDayScope"/> returns to.</summary>
+    private string _preDayScope = "7d";
+
     [ObservableProperty] private string _scope = "7d";
     [ObservableProperty] private string _sortColumn = "Tokens";
     [ObservableProperty] private bool _sortDescending = true;
     [ObservableProperty] private string _emptyText = "";
     [ObservableProperty] private bool _groupByProject;
+
+    /// <summary>Drives the day chip's visibility — the only visible indicator
+    /// that a calendar day-click is still filtering the list (the four scope
+    /// chips all unhighlight in day mode; see <see cref="SetDayScope"/>).</summary>
+    [ObservableProperty] private bool _isDayMode;
 
     public ObservableCollection<LedgerRowViewModel> Rows { get; } = new();
 
@@ -266,6 +290,8 @@ public sealed partial class CcLedgerViewModel : ObservableObject
 
     private (DateOnly From, DateOnly To) ScopeRange()
     {
+        if (_dayScope is { } d)
+            return (d, d);
         var today = DateOnly.FromDateTime(DateTime.Now);
         return Scope switch
         {
@@ -281,6 +307,9 @@ public sealed partial class CcLedgerViewModel : ObservableObject
     {
         if (scope is not ("Today" or "Yesterday" or "7d" or "All"))
             return;
+        _dayScope = null;   // chips always escape day mode
+        IsDayMode = false;
+        View.Filter = null; // ...and take the day-mode filter with them
         Scope = scope;
         var (from, to) = ScopeRange();
         foreach (var row in Rows)
@@ -288,6 +317,37 @@ public sealed partial class CcLedgerViewModel : ObservableObject
         View.Refresh();
         NotifyHeaders();
     }
+
+    /// <summary>Calendar day-click entry point — scopes the ledger to a single
+    /// day AND filters the list to that day's sessions (out-of-scope rows are
+    /// hidden, not just dashed) — a bare scope with every session still
+    /// visible read as broken to the owner smoke. No chip's DataTrigger
+    /// matches the resulting Scope string, so all four chips correctly
+    /// unhighlight; a chip click clears day mode (and the filter) again.</summary>
+    public void SetDayScope(DateOnly day)
+    {
+        if (_dayScope is null)
+            _preDayScope = Scope; // capture only on entry — a second day-click must not overwrite it with a day string
+        _dayScope = day;
+        IsDayMode = true;
+        Scope = day.ToString("MMM d", CultureInfo.InvariantCulture);
+        var (from, to) = ScopeRange();
+        foreach (var row in Rows)
+            row.Rescope(from, to);
+        View.Filter = item => item is LedgerRowViewModel r && r.ScopedTokens > 0;
+        View.Refresh();
+        NotifyHeaders();
+        // Day-mode empty must read as "nothing happened that day", never the
+        // vault-off/no-sessions-yet copy — those are about the vault, not the day.
+        EmptyText = View.IsEmpty
+            ? $"No sessions on {day.ToString("MMM d", CultureInfo.InvariantCulture)}."
+            : "";
+    }
+
+    /// <summary>Day chip's dismiss action — returns to whichever chip scope
+    /// was active before the calendar click that entered day mode.</summary>
+    [RelayCommand]
+    private void ClearDayScope() => SetScope(_preDayScope);
 
     [RelayCommand]
     private void SortBy(string column)
@@ -470,7 +530,8 @@ public sealed partial class CcLedgerViewModel : ObservableObject
         return new VaultSessionInfo(
             projectKey, root, projectKey, first.ProjectName, null,
             members.Min(m => m.FirstTs), members.Max(m => m.LastTs),
-            total, byModel, bySkill, byDay, null);
+            total, byModel, bySkill, byDay, null,
+            members.Sum(m => m.AgentCount), members.Sum(m => m.AgentTokens));
     }
 
     /// <summary>Re-presents Rows from <see cref="_lastSessions"/> under the
@@ -505,6 +566,19 @@ public sealed partial class CcLedgerViewModel : ObservableObject
                 Rows.Add(new LedgerRowViewModel(src.Key, src.Info, from, to, disambiguate, src.IsGroup, src.Members));
         }
         View.Refresh();
+
+        if (_dayScope is { } day)
+        {
+            // Day-mode empty must read as "nothing happened that day", never
+            // the vault-off/no-sessions-yet copy — those are about the vault,
+            // not the day. A non-empty day-mode view falls through below,
+            // where Rows.Count > 0 already yields "".
+            if (View.IsEmpty)
+            {
+                EmptyText = $"No sessions on {day.ToString("MMM d", CultureInfo.InvariantCulture)}.";
+                return;
+            }
+        }
 
         var vault = _widget.Vault;
         EmptyText = Rows.Count > 0 ? ""

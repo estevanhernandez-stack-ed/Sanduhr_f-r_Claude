@@ -322,6 +322,23 @@ public class CcLogReaderTests
     }
 
     [Fact]
+    public void DiscoverLogFiles_finds_nested_subagent_transcripts()
+    {
+        using var home = new TempDir();
+        var projectDir = Path.Combine(home.Path, ".claude", "projects", "c--x-api");
+        var nested = Path.Combine(projectDir, "11111111-2222-3333-4444-555555555555", "subagents");
+        Directory.CreateDirectory(nested);
+        File.WriteAllText(Path.Combine(projectDir, "main.jsonl"), "");
+        File.WriteAllText(Path.Combine(nested, "agent-abc.jsonl"), "");
+
+        var reader = new CcLogReader(home.Path);
+        var files = reader.DiscoverLogFiles();
+
+        Assert.Contains(files, f => f.EndsWith("main.jsonl"));
+        Assert.Contains(files, f => f.EndsWith("agent-abc.jsonl"));
+    }
+
+    [Fact]
     public void AggregateTodayOnly_restricts_to_local_today()
     {
         using var home = new TempDir();
@@ -344,5 +361,43 @@ public class CcLogReaderTests
         Assert.Equal(42, agg.ByDay.GetValueOrDefault(todayKey));
         Assert.Single(agg.ByDay);                             // yesterday excluded
         Assert.Equal(42, agg.ByProject.Values.Sum());
+    }
+
+    [Fact]
+    public void Aggregates_carry_per_day_input_and_output()
+    {
+        using var home = new TempDir();
+        var yesterday = DateTimeOffset.Now.AddDays(-1);
+        WriteSession(home.Path, ".claude", "p1", "s1",
+            AssistantEvent(Iso(yesterday), "claude-fable-5", 700, 70),
+            AssistantEvent(Iso(yesterday), "claude-fable-5", 20, 2));
+
+        var reader = new CcLogReader(home.Path);
+        var agg = reader.AggregateForLocalCcTab(30);
+
+        var day = DateOnly.FromDateTime(yesterday.LocalDateTime);
+        Assert.Equal(720, agg.ByDayInput[day]);
+        Assert.Equal(72, agg.ByDayOutput[day]);
+        Assert.Equal(792, agg.ByDay[day]);
+        Assert.Equal(agg.ByDay[day], agg.ByDayInput[day] + agg.ByDayOutput[day]);
+    }
+
+    [Fact]
+    public void AggregateTodayOnly_carries_split_too()
+    {
+        using var home = new TempDir();
+        var today = DateTimeOffset.Now;
+        WriteSession(home.Path, ".claude", "p1", "s1",
+            AssistantEvent(Iso(today), "claude-fable-5", 40, 4));
+
+        var reader = new CcLogReader(home.Path);
+        var agg = reader.AggregateTodayOnly();
+
+        // Same midnight-race guard as the existing AggregateTodayOnly test.
+        if (DateOnly.FromDateTime(today.LocalDateTime) != DateOnly.FromDateTime(DateTime.Now))
+            return;
+        var todayKey = DateOnly.FromDateTime(today.LocalDateTime);
+        Assert.Equal(40, agg.ByDayInput.GetValueOrDefault(todayKey));
+        Assert.Equal(4, agg.ByDayOutput.GetValueOrDefault(todayKey));
     }
 }

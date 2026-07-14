@@ -58,11 +58,20 @@
                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                            Visibility="{Binding HasLocalDelta, Converter={StaticResource BoolVis}}"
                            ToolTip="Tokens consumed in this tier from local Claude Code sessions since the last API fetch landed.&#x0a;&#x0a;The /usage endpoint lags actual consumption by minutes — this is the live delta. Resets to zero each time a fresh fetch arrives (every ~5 min)." />
-                <TextBlock Grid.Column="3" Text="{Binding ValueText}" VerticalAlignment="Center"
-                           FontSize="15" FontWeight="Bold"
-                           FontFamily="{DynamicResource Sanduhr.Font.Value}"
-                           Effect="{DynamicResource Sanduhr.Effect.ValueBloom}"
-                           Foreground="{Binding BarColor, Converter={StaticResource ColorBrush}}" />
+                <!-- % backplate chip: the value used to sit bare over the
+                     sparkline and blended in several themes. The chip carries
+                     the contrast; the ink keeps the severity color. -->
+                <Border Grid.Column="3" VerticalAlignment="Center" CornerRadius="4"
+                        Padding="6,1"
+                        Background="{DynamicResource Sanduhr.Brush.Bg}"
+                        BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
+                        BorderThickness="1">
+                    <TextBlock Text="{Binding ValueText}" VerticalAlignment="Center"
+                               FontSize="15" FontWeight="Bold"
+                               FontFamily="{DynamicResource Sanduhr.Font.Value}"
+                               Effect="{DynamicResource Sanduhr.Effect.ValueBloom}"
+                               Foreground="{Binding BarColor, Converter={StaticResource ColorBrush}}" />
+                </Border>
             </Grid>
 
             <!-- Row 2: utilization bar + pace ghost -->

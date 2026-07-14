@@ -4,11 +4,15 @@ namespace Sanduhr.Core;
 
 /// <summary>Merged closed-day window across consented roots (Overview's
 /// vault side). ByProjectName merges by display name — parity with the live
-/// tab's basename merge.</summary>
+/// tab's basename merge. ByDayInput/ByDayOutput carry the sent/received split
+/// from rollup days; a day at 0/0 while ByDay shows tokens is WS-C-era legacy
+/// (unsplit), not zero traffic.</summary>
 public sealed record VaultWindow(
     Dictionary<DateOnly, long> ByDay,
     Dictionary<string, long> ByProjectName,
-    Dictionary<string, long> BySkill);
+    Dictionary<string, long> BySkill,
+    Dictionary<DateOnly, long> ByDayInput,
+    Dictionary<DateOnly, long> ByDayOutput);
 
 /// <summary>One Trends bar. HasNoRecordGap = some day of the week (clamped to
 /// today) is not covered by EVERY consented root — rendered as the "no record"
@@ -16,7 +20,10 @@ public sealed record VaultWindow(
 /// widget-off fortnight must not read as a vacation).</summary>
 public sealed record VaultWeek(DateOnly WeekStart, long Total, bool IsCurrent, bool HasNoRecordGap);
 
-/// <summary>One logical session — primary + continuation slices merged.</summary>
+/// <summary>One logical session — the main transcript plus its nested
+/// subagent transcripts (parent_session ?? uuid), each member's primary +
+/// continuation slices merged first. AgentCount/AgentTokens summarize the
+/// members whose file-uuid differs from the logical id.</summary>
 public sealed record VaultSessionInfo(
     string Uuid,
     string Root,
@@ -29,7 +36,9 @@ public sealed record VaultSessionInfo(
     Dictionary<string, long> ByModel,
     Dictionary<string, long>? BySkill,
     Dictionary<string, VaultDayBucket> ByDay,
-    VaultCacheTokens? Cache);
+    VaultCacheTokens? Cache,
+    int AgentCount,
+    long AgentTokens);
 
 /// <summary>
 /// Read side of the vault. NEVER mutates: corrupt or missing shards degrade to
@@ -53,6 +62,8 @@ public sealed class VaultReader
         var byDay = new Dictionary<DateOnly, long>();
         var byProject = new Dictionary<string, long>();
         var bySkill = new Dictionary<string, long>();
+        var byDayInput = new Dictionary<DateOnly, long>();
+        var byDayOutput = new Dictionary<DateOnly, long>();
         foreach (var root in roots)
         {
             foreach (var month in MonthsBetween(fromInclusive, toExclusive))
@@ -64,6 +75,8 @@ public sealed class VaultReader
                     if (!TryDay(dayKey, out var date) || date < fromInclusive || date >= toExclusive)
                         continue;
                     byDay[date] = byDay.GetValueOrDefault(date) + day.Total;
+                    byDayInput[date] = byDayInput.GetValueOrDefault(date) + day.Input;
+                    byDayOutput[date] = byDayOutput.GetValueOrDefault(date) + day.Output;
                     foreach (var (projectKey, v) in day.ByProject)
                     {
                         var name = ProjectNameOf(projectKey);
@@ -74,7 +87,7 @@ public sealed class VaultReader
                 }
             }
         }
-        return new VaultWindow(byDay, byProject, bySkill);
+        return new VaultWindow(byDay, byProject, bySkill, byDayInput, byDayOutput);
     }
 
     public IReadOnlyList<VaultWeek> ReadWeeks(IReadOnlyList<string> roots, int weeks, DateOnly today)
@@ -132,15 +145,42 @@ public sealed class VaultReader
                     list.Add(row);
                 }
             }
+            // Logical fold: a session = its main transcript + nested subagent
+            // transcripts (parent_session ?? uuid). Identity comes from the
+            // main member when present; an aged-out main leaves the ordinal-
+            // first member to speak for the group.
+            var byLogical = new Dictionary<string, List<(string FileUuid, VaultSessionRow Row)>>(StringComparer.Ordinal);
             foreach (var (uuid, rows) in byUuid)
             {
                 var merged = VaultRowMath.Merge(rows);
-                if (!TryTs(merged.FirstTs, out var first) || !TryTs(merged.LastTs, out var last))
+                var logicalId = merged.ParentSession ?? uuid;
+                if (!byLogical.TryGetValue(logicalId, out var list))
+                    byLogical[logicalId] = list = new List<(string, VaultSessionRow)>();
+                list.Add((uuid, merged));
+            }
+            foreach (var (logicalId, members) in byLogical)
+            {
+                members.Sort((a, b) => string.CompareOrdinal(a.FileUuid, b.FileUuid));
+                var identity = members.Where(m => m.FileUuid == logicalId).Select(m => m.Row).FirstOrDefault()
+                               ?? members[0].Row;
+                var fold = VaultRowMath.Merge(members.Select(m => m.Row).ToList());
+                // Merge() takes first_ts/last_ts/cache from the primary; a
+                // logical fold needs min/max/sums across members instead.
+                var firstTs = members.Min(m => ParseTsOrMax(m.Row.FirstTs));
+                var lastTs = members.Max(m => ParseTsOrMin(m.Row.LastTs));
+                long cacheRead = members.Sum(m => m.Row.CacheTokens?.Read ?? 0);
+                long cacheCreation = members.Sum(m => m.Row.CacheTokens?.Creation ?? 0);
+                int agentCount = members.Count(m => m.FileUuid != logicalId);
+                long agentTokens = members.Where(m => m.FileUuid != logicalId).Sum(m => m.Row.Total);
+                if (firstTs == DateTimeOffset.MaxValue || lastTs == DateTimeOffset.MinValue)
                     continue;
                 result.Add(new VaultSessionInfo(
-                    uuid, root, merged.ProjectKey, merged.ProjectName, merged.Cwd,
-                    first, last, merged.Total, merged.ByModel, merged.BySkill,
-                    merged.ByDay, merged.CacheTokens));
+                    logicalId, root, identity.ProjectKey, identity.ProjectName, identity.Cwd,
+                    firstTs, lastTs, fold.Total, fold.ByModel, fold.BySkill, fold.ByDay,
+                    (cacheRead + cacheCreation) > 0
+                        ? new VaultCacheTokens { Read = cacheRead, Creation = cacheCreation }
+                        : null,
+                    agentCount, agentTokens));
             }
         }
         return result;
@@ -185,6 +225,23 @@ public sealed class VaultReader
                 min = ts;
         }
         return min;
+    }
+
+    /// <summary>Batch coverage: every day in [from, to] covered by EVERY
+    /// consented root. Metas load once — the per-day IsDayCovered would be
+    /// two file reads per cell on a UI path (the ReadWeeks lesson).</summary>
+    public HashSet<DateOnly> CoveredSet(IReadOnlyList<string> roots, DateOnly fromInclusive, DateOnly toInclusive)
+    {
+        var result = new HashSet<DateOnly>();
+        if (roots.Count == 0)
+            return result;
+        var metas = roots.Select(r => _store.LoadMeta(r)).ToList();
+        for (var d = fromInclusive; d <= toInclusive; d = d.AddDays(1))
+        {
+            if (IsDayCovered(metas, d))
+                result.Add(d);
+        }
+        return result;
     }
 
     /// <summary>Covered only when EVERY consented root's ranges contain the day.</summary>
@@ -239,4 +296,12 @@ public sealed class VaultReader
 
     private static bool TryTs(string s, out DateTimeOffset ts)
         => DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out ts);
+
+    // Fold-friendly wrappers: unparseable stamps become the identity for
+    // min/max, so one bad member can't sink the whole logical session.
+    private static DateTimeOffset ParseTsOrMax(string s)
+        => TryTs(s, out var ts) ? ts : DateTimeOffset.MaxValue;
+
+    private static DateTimeOffset ParseTsOrMin(string s)
+        => TryTs(s, out var ts) ? ts : DateTimeOffset.MinValue;
 }

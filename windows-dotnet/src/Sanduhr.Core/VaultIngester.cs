@@ -33,6 +33,12 @@ public sealed class VaultIngester
 {
     private const int CoverageMarginDays = 25;      // CC retention (~30d) minus safety
     private const int CheckpointPruneDays = 7;
+
+    /// <summary>Bump when the discovery walk widens; a root whose meta carries
+    /// an older value gets its checkpoints invalidated once so the re-ingest
+    /// covers the newly visible files.</summary>
+    public const int CurrentWalkVersion = 2;
+
     internal const int TailGuardBytes = 64;
     internal static readonly TimeSpan QuiesceAfter = TimeSpan.FromHours(1);
 
@@ -106,6 +112,16 @@ public sealed class VaultIngester
     {
         int seen = 0, full = 0, tailParsed = 0, skipped = 0, failed = 0;
 
+        // walk_version gate: a vault written by an older (narrower) walk
+        // re-ingests everything once. Aborted cycles leave the old meta, so
+        // this re-fires until a cycle completes — idempotent convergence.
+        var existingMeta = _store.LoadMeta(rootName);
+        if ((existingMeta?.WalkVersion ?? 0) < CurrentWalkVersion)
+        {
+            _store.DeleteCheckpoints(rootName);
+            Log("walk upgraded — checkpoints invalidated for re-ingest");
+        }
+
         var checkpoints = _store.LoadCheckpoints(rootName);
         var shardCache = new Dictionary<string, VaultSessionShard>(StringComparer.Ordinal);
         var dirtyMonths = new HashSet<string>(StringComparer.Ordinal);
@@ -113,17 +129,20 @@ public sealed class VaultIngester
 
         // Oldest-first, single-threaded; Length/LastWriteTimeUtc come off the
         // FileInfo the walk already produced (no per-file stat pass) and are
-        // the PRE-OPEN stat the checkpoint will record.
-        var files = new List<FileInfo>();
+        // the PRE-OPEN stat the checkpoint will record. Recursive since walk
+        // v2: nested subagent transcripts count too, tagged with the project
+        // dir so their parent session can be derived from the path.
+        var files = new List<(FileInfo File, string ProjectDir)>();
         var projects = new DirectoryInfo(Path.Combine(_homeDir, rootName, "projects"));
         if (projects.Exists)
         {
             foreach (var projectDir in projects.EnumerateDirectories())
-                files.AddRange(projectDir.EnumerateFiles("*.jsonl"));
+                foreach (var fi in projectDir.EnumerateFiles("*.jsonl", SearchOption.AllDirectories))
+                    files.Add((fi, projectDir.FullName));
         }
-        files.Sort((a, b) => a.LastWriteTimeUtc.CompareTo(b.LastWriteTimeUtc));
+        files.Sort((a, b) => a.File.LastWriteTimeUtc.CompareTo(b.File.LastWriteTimeUtc));
 
-        foreach (var fi in files)
+        foreach (var (fi, projectDir) in files)
         {
             seen++;
             var key = VaultStore.PathKey(fi.FullName);
@@ -131,6 +150,7 @@ public sealed class VaultIngester
             long statMtime = fi.LastWriteTimeUtc.Ticks;
             checkpoints.Entries.TryGetValue(key, out var cp);
             var uuid = Path.GetFileNameWithoutExtension(fi.Name);
+            var parentSession = ParentSessionOf(fi.FullName, projectDir);
 
             bool unchanged = cp is not null && cp.MtimeTicks == statMtime && cp.Length == statLen;
             bool quiesced = nowUtc - fi.LastWriteTimeUtc >= QuiesceAfter;
@@ -206,7 +226,7 @@ public sealed class VaultIngester
                 continue;
             }
 
-            var newRows = BuildRows(uuid, agg, storeFullPaths);
+            var newRows = BuildRows(uuid, agg, storeFullPaths, parentSession);
             var oldMonths = cp?.Months ?? new List<string>();
             var touched = new HashSet<string>(oldMonths, StringComparer.Ordinal);
             touched.UnionWith(newRows.Keys);
@@ -347,7 +367,7 @@ public sealed class VaultIngester
         foreach (var (dayKey, bucket) in merged.ByDay)
         {
             var day = DateOnly.Parse(dayKey, CultureInfo.InvariantCulture);
-            var d = new DayAgg { Total = bucket.Total };
+            var d = new DayAgg { Total = bucket.Total, Input = bucket.Input, Output = bucket.Output };
             foreach (var (m, v) in bucket.ByModel)
                 d.ByModel[m] = v;
             if (bucket.BySkill is not null)
@@ -377,22 +397,33 @@ public sealed class VaultIngester
         }
 
         var days = new Dictionary<string, VaultRollupDay>(StringComparer.Ordinal);
-        foreach (var row in shard.Sessions.Values)
+        var sessionsPerDay = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        foreach (var (uuid, row) in shard.Sessions)
         {
+            var logicalId = row.ParentSession ?? uuid;
             foreach (var (day, bucket) in row.ByDay)
             {
                 if (!days.TryGetValue(day, out var d))
                     days[day] = d = new VaultRollupDay();
                 d.Total += bucket.Total;
-                d.Sessions++;
+                d.Input += bucket.Input;
+                d.Output += bucket.Output;
                 foreach (var (m, v) in bucket.ByModel)
                     d.ByModel[m] = d.ByModel.GetValueOrDefault(m) + v;
                 d.ByProject[row.ProjectKey] = d.ByProject.GetValueOrDefault(row.ProjectKey) + bucket.Total;
                 if (bucket.BySkill is not null)
                     foreach (var (s, v) in bucket.BySkill)
                         d.BySkill[s] = d.BySkill.GetValueOrDefault(s) + v;
+
+                // Sessions = DISTINCT LOGICAL sessions touching the day — a
+                // main transcript plus its N agent files is ONE session.
+                if (!sessionsPerDay.TryGetValue(day, out var set))
+                    sessionsPerDay[day] = set = new HashSet<string>(StringComparer.Ordinal);
+                set.Add(logicalId);
             }
         }
+        foreach (var (day, set) in sessionsPerDay)
+            days[day].Sessions = set.Count;
         _store.SaveRollupShard(rootName, month, new VaultRollupShard
         {
             SchemaVersion = VaultSchema.CurrentSchemaVersion,
@@ -408,6 +439,7 @@ public sealed class VaultIngester
             meta.Since = DayKey(today);
         MergeCoverage(meta.Covered, today.AddDays(-CoverageMarginDays), today);
         meta.LastIngestTs = nowIso;
+        meta.WalkVersion = CurrentWalkVersion;
         _store.SaveMeta(rootName, meta);
     }
 
@@ -437,6 +469,8 @@ public sealed class VaultIngester
     private sealed class DayAgg
     {
         public long Total;
+        public long Input;
+        public long Output;
         public readonly Dictionary<string, long> ByModel = new();
         public readonly Dictionary<string, long> BySkill = new();
     }
@@ -532,7 +566,9 @@ public sealed class VaultIngester
         agg.CacheRead += Num(usage, "cache_read_input_tokens");
         agg.CacheCreation += Num(usage, "cache_creation_input_tokens");
 
-        long tokens = Num(usage, "input_tokens") + Num(usage, "output_tokens");
+        long input = Num(usage, "input_tokens");
+        long output = Num(usage, "output_tokens");
+        long tokens = input + output;
         if (tokens <= 0)
             return;   // matches AggregateForLocalCcTab's tokens<=0 skip
 
@@ -549,14 +585,28 @@ public sealed class VaultIngester
         if (!agg.ByDay.TryGetValue(day, out var bucket))
             agg.ByDay[day] = bucket = new DayAgg();
         bucket.Total += tokens;
+        bucket.Input += input;
+        bucket.Output += output;
         bucket.ByModel[model] = bucket.ByModel.GetValueOrDefault(model) + tokens;
         if (!string.IsNullOrEmpty(skill))
             bucket.BySkill[skill] = bucket.BySkill.GetValueOrDefault(skill) + tokens;
     }
 
+    /// <summary>parent_session per the WS-C.1 rule: for a NESTED file
+    /// ({projectDir}\{seg}\...\x.jsonl) whose first segment parses as a Guid,
+    /// that segment; otherwise null. Main transcripts sit directly in the
+    /// project dir and never have a parent.</summary>
+    internal static string? ParentSessionOf(string fullPath, string projectDir)
+    {
+        var rel = Path.GetRelativePath(projectDir, fullPath);
+        var parts = rel.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return parts.Length > 1 && Guid.TryParse(parts[0], out _) ? parts[0] : null;
+    }
+
     /// <summary>Per-month rows for a parsed session; empty when it had no
     /// counted events (zero-assistant-event sessions get no row).</summary>
-    private Dictionary<string, VaultSessionRow> BuildRows(string uuid, SessionAgg agg, bool storeFullPaths)
+    private Dictionary<string, VaultSessionRow> BuildRows(
+        string uuid, SessionAgg agg, bool storeFullPaths, string? parentSession)
     {
         _ = uuid;
         if (agg.EventCount == 0 || agg.FirstTs is null || agg.LastTs is null)
@@ -583,6 +633,7 @@ public sealed class VaultIngester
             ProjectKey = projectKey,
             ProjectName = projectName,
             Cwd = storeFullPaths ? agg.Cwd : null,
+            ParentSession = parentSession,
             FirstTs = IsoUtc(agg.FirstTs.Value),
             LastTs = IsoUtc(agg.LastTs.Value),
             UtcOffsetMin = (int)_tz.GetUtcOffset(agg.FirstTs.Value).TotalMinutes,
@@ -594,6 +645,8 @@ public sealed class VaultIngester
                 kv => new VaultDayBucket
                 {
                     Total = kv.Value.Total,
+                    Input = kv.Value.Input,
+                    Output = kv.Value.Output,
                     ByModel = new Dictionary<string, long>(kv.Value.ByModel),
                     BySkill = kv.Value.BySkill.Count > 0
                         ? new Dictionary<string, long>(kv.Value.BySkill)

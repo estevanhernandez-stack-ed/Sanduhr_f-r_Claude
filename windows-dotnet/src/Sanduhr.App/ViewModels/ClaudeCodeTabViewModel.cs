@@ -98,4 +98,23 @@ public sealed partial class ClaudeCodeTabViewModel : ObservableObject
         Section = "Sessions";
         await RefreshActiveAsync();
     }
+
+    /// <summary>Calendar day-click bridge: scope the Ledger to the clicked day
+    /// and switch to Sessions. Ledger.RefreshAsync() re-presents via
+    /// ScopeRange(), which honors the day scope, so the day survives the
+    /// vault re-read.</summary>
+    public async Task OpenDayInSessionsAsync(DateOnly day)
+    {
+        try
+        {
+            Ledger.SetDayScope(day);
+            Section = "Sessions";
+            await Ledger.RefreshAsync();
+        }
+        catch
+        {
+            // A day-click navigation fault must never become an unhandled
+            // dispatcher exception (global constraint: every UI path caught).
+        }
+    }
 }

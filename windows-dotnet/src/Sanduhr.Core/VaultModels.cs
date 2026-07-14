@@ -20,6 +20,15 @@ public sealed class VaultDayBucket
 {
     [JsonPropertyName("total")] public long Total { get; set; }
 
+    /// <summary>Sent-side tokens (input). Always written on new buckets;
+    /// absent on WS-C-era rows — 0 means "unsplit", and readers must treat a
+    /// day whose input+output is 0 while total &gt; 0 as legacy, not as zero
+    /// traffic (the Overview's "(partial)" rule).</summary>
+    [JsonPropertyName("input")] public long Input { get; set; }
+
+    /// <summary>Received-side tokens (output).</summary>
+    [JsonPropertyName("output")] public long Output { get; set; }
+
     [JsonPropertyName("by_model")]
     public Dictionary<string, long> ByModel { get; set; } = new();
 
@@ -53,6 +62,13 @@ public sealed class VaultSessionRow
     [JsonPropertyName("cwd")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Cwd { get; set; }
+
+    /// <summary>The session this transcript belongs to when it is a NESTED
+    /// subagent/workflow transcript ({projectDir}\{parent-uuid}\...\x.jsonl).
+    /// Null for main transcripts. Readers fold rows by parent_session ?? uuid.</summary>
+    [JsonPropertyName("parent_session")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ParentSession { get; set; }
 
     [JsonPropertyName("first_ts")] public string FirstTs { get; set; } = "";
     [JsonPropertyName("last_ts")] public string LastTs { get; set; } = "";
@@ -89,6 +105,13 @@ public sealed class VaultSessionShard
 public sealed class VaultRollupDay
 {
     [JsonPropertyName("total")] public long Total { get; set; }
+
+    /// <summary>Sent/received split, rebuilt by the fold from bucket
+    /// input/output. 0/0 while total &gt; 0 means the month's buckets are
+    /// WS-C-era legacy (unsplit), not zero traffic.</summary>
+    [JsonPropertyName("input")] public long Input { get; set; }
+    [JsonPropertyName("output")] public long Output { get; set; }
+
     [JsonPropertyName("by_model")] public Dictionary<string, long> ByModel { get; set; } = new();
     [JsonPropertyName("by_project")] public Dictionary<string, long> ByProject { get; set; } = new();
     [JsonPropertyName("by_skill")] public Dictionary<string, long> BySkill { get; set; } = new();
@@ -148,6 +171,13 @@ public sealed class VaultRootMeta
     [JsonPropertyName("since")] public string Since { get; set; } = "";
     [JsonPropertyName("covered")] public List<VaultDateRange> Covered { get; set; } = new();
     [JsonPropertyName("last_ingest_ts")] public string LastIngestTs { get; set; } = "";
+
+    /// <summary>Discovery-walk generation. Absent (0) or 1 = the one-level
+    /// pre-WS-C.1 walk; the ingester invalidates checkpoints ONCE when this is
+    /// below its CurrentWalkVersion so the full re-ingest picks up nested
+    /// subagent transcripts still inside CC retention.</summary>
+    [JsonPropertyName("walk_version")]
+    public int WalkVersion { get; set; }
 }
 
 public enum ShardLoadResult
@@ -184,6 +214,7 @@ public static class VaultRowMath
                 ProjectKey = merged.ProjectKey,
                 ProjectName = merged.ProjectName,
                 Cwd = merged.Cwd,
+                ParentSession = merged.ParentSession,
                 FirstTs = merged.FirstTs,
                 LastTs = merged.LastTs,
                 UtcOffsetMin = merged.UtcOffsetMin,
@@ -209,6 +240,7 @@ public static class VaultRowMath
             ProjectKey = primary.ProjectKey,
             ProjectName = primary.ProjectName,
             Cwd = primary.Cwd,
+            ParentSession = primary.ParentSession,
             FirstTs = primary.FirstTs,
             LastTs = primary.LastTs,
             UtcOffsetMin = primary.UtcOffsetMin,
@@ -219,8 +251,29 @@ public static class VaultRowMath
             ByDay = new Dictionary<string, VaultDayBucket>(),
         };
         foreach (var row in rows)
+        {
             foreach (var (day, bucket) in row.ByDay)
-                merged.ByDay[day] = bucket;   // day-in-own-month invariant: no key collides
+            {
+                // Slices of ONE file can't collide (day-in-own-month invariant),
+                // but multi-file logical folds reuse this merge and DO collide:
+                // same-day buckets sum into a fresh bucket, never mutating inputs.
+                if (!merged.ByDay.TryGetValue(day, out var acc))
+                {
+                    merged.ByDay[day] = acc = new VaultDayBucket();
+                }
+                acc.Total += bucket.Total;
+                acc.Input += bucket.Input;
+                acc.Output += bucket.Output;
+                foreach (var (m, v) in bucket.ByModel)
+                    acc.ByModel[m] = acc.ByModel.GetValueOrDefault(m) + v;
+                if (bucket.BySkill is not null)
+                {
+                    acc.BySkill ??= new Dictionary<string, long>();
+                    foreach (var (s, v) in bucket.BySkill)
+                        acc.BySkill[s] = acc.BySkill.GetValueOrDefault(s) + v;
+                }
+            }
+        }
         RecomputeRowAggregates(merged);
         return merged;
     }

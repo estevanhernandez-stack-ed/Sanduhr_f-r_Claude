@@ -19,11 +19,15 @@ public sealed record UsageEvent(
     string? AttributionSkill);
 
 /// <summary>Single-pass aggregation for the Local CC tab —
-/// <c>{by_day, by_project, by_skill}</c>.</summary>
+/// <c>{by_day, by_project, by_skill}</c> plus the per-day sent/received split
+/// (<c>ByDayInput</c>/<c>ByDayOutput</c>, accumulated under the same
+/// counted-event gate, so <c>ByDay[d] == ByDayInput[d] + ByDayOutput[d]</c>).</summary>
 public sealed record LocalCcAggregate(
     Dictionary<DateOnly, long> ByDay,
     Dictionary<string, long> ByProject,
-    Dictionary<string, long> BySkill);
+    Dictionary<string, long> BySkill,
+    Dictionary<DateOnly, long> ByDayInput,
+    Dictionary<DateOnly, long> ByDayOutput);
 
 /// <summary>
 /// Local Claude Code session-log reader, ported 1:1 from <c>cc_logs.py</c>.
@@ -80,7 +84,8 @@ public sealed class CcLogReader
         return outp;
     }
 
-    /// <summary>All session JSONL files across known CC roots. Missing
+    /// <summary>All session JSONL files across known CC roots, including NESTED
+    /// subagent/workflow transcripts ({projectDir}\{uuid}\...\x.jsonl). Missing
     /// <c>projects/</c> subdir is fine (fresh install).</summary>
     public IReadOnlyList<string> DiscoverLogFiles()
     {
@@ -91,7 +96,7 @@ public sealed class CcLogReader
             if (!Directory.Exists(projects))
                 continue;
             foreach (var projectDir in Directory.GetDirectories(projects))
-                files.AddRange(Directory.GetFiles(projectDir, "*.jsonl"));
+                files.AddRange(Directory.GetFiles(projectDir, "*.jsonl", SearchOption.AllDirectories));
         }
         return files;
     }
@@ -315,6 +320,8 @@ public sealed class CcLogReader
         var byDay = new Dictionary<DateOnly, long>();
         var byProject = new Dictionary<string, long>();
         var bySkill = new Dictionary<string, long>();
+        var byDayInput = new Dictionary<DateOnly, long>();
+        var byDayOutput = new Dictionary<DateOnly, long>();
 
         foreach (var path in DiscoverLogFiles())
         {
@@ -332,6 +339,8 @@ public sealed class CcLogReader
 
                 var localDate = LocalDate(ev.Timestamp.Value);
                 byDay[localDate] = byDay.GetValueOrDefault(localDate) + tokens;
+                byDayInput[localDate] = byDayInput.GetValueOrDefault(localDate) + ev.Usage.InputTokens;
+                byDayOutput[localDate] = byDayOutput.GetValueOrDefault(localDate) + ev.Usage.OutputTokens;
                 if (!string.IsNullOrEmpty(ev.Cwd))
                     byProject[ev.Cwd] = byProject.GetValueOrDefault(ev.Cwd) + tokens;
                 if (!string.IsNullOrEmpty(ev.AttributionSkill))
@@ -339,7 +348,7 @@ public sealed class CcLogReader
             }
         }
 
-        var result = new LocalCcAggregate(byDay, byProject, bySkill);
+        var result = new LocalCcAggregate(byDay, byProject, bySkill, byDayInput, byDayOutput);
         lock (_cacheLock)
         {
             _cacheComputedAt = DateTimeOffset.UtcNow;
@@ -375,6 +384,8 @@ public sealed class CcLogReader
         var byDay = new Dictionary<DateOnly, long>();
         var byProject = new Dictionary<string, long>();
         var bySkill = new Dictionary<string, long>();
+        var byDayInput = new Dictionary<DateOnly, long>();
+        var byDayOutput = new Dictionary<DateOnly, long>();
 
         foreach (var path in DiscoverLogFiles())
         {
@@ -390,6 +401,8 @@ public sealed class CcLogReader
                 if (LocalDate(ev.Timestamp.Value) != today)
                     continue;
                 byDay[today] = byDay.GetValueOrDefault(today) + tokens;
+                byDayInput[today] = byDayInput.GetValueOrDefault(today) + ev.Usage.InputTokens;
+                byDayOutput[today] = byDayOutput.GetValueOrDefault(today) + ev.Usage.OutputTokens;
                 if (!string.IsNullOrEmpty(ev.Cwd))
                     byProject[ev.Cwd] = byProject.GetValueOrDefault(ev.Cwd) + tokens;
                 if (!string.IsNullOrEmpty(ev.AttributionSkill))
@@ -397,7 +410,7 @@ public sealed class CcLogReader
             }
         }
 
-        var result = new LocalCcAggregate(byDay, byProject, bySkill);
+        var result = new LocalCcAggregate(byDay, byProject, bySkill, byDayInput, byDayOutput);
         lock (_cacheLock)
         {
             _todayCacheComputedAt = DateTimeOffset.UtcNow;
