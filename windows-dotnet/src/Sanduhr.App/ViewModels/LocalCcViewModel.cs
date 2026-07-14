@@ -54,11 +54,16 @@ public sealed partial class LocalCcViewModel : ObservableObject
     private readonly WidgetViewModel _widget;
     private readonly Action<bool> _persistShowBreakdowns;
     private Window? _owner;
+    // False until the first FULL Compute lands — gates preview so a stray
+    // early timer tick can only re-run the cheap vault-only pass, and so
+    // purge/erase/toggle refreshes (always after the first full apply) never
+    // flash a preview over live data.
+    private bool _hasPresented;
 
     public event Action? Changed;
 
     [ObservableProperty] private string _todayText = "Loading…";
-    [ObservableProperty] private string _monthText = "Loading…";
+    [ObservableProperty] private string _monthText = "";
     [ObservableProperty] private string _todaySplitText = "";
     [ObservableProperty] private string _monthSplitText = "";
     [ObservableProperty] private bool _showBreakdowns;
@@ -205,6 +210,22 @@ public sealed partial class LocalCcViewModel : ObservableObject
     {
         var vault = _widget.Vault;
         var reader = _widget.CcReader;
+        // First paint only: the vault serves closed days in milliseconds while
+        // the first live walk takes tens of seconds — show what's fast, keep
+        // the single "Loading…" on Today (the one live-only figure).
+        if (!_hasPresented)
+        {
+            try
+            {
+                var preview = await Task.Run(() => ComputePreview(vault)).ConfigureAwait(true);
+                if (preview is not null)
+                    Apply(preview, previewToday: true);
+            }
+            catch
+            {
+                // Preview is best-effort; the full compute below is the source of truth.
+            }
+        }
         OverviewData data;
         try
         {
@@ -216,9 +237,16 @@ public sealed partial class LocalCcViewModel : ObservableObject
                 new(), DateOnly.FromDateTime(DateTime.Now));
         }
         Apply(data);
+        _hasPresented = true;
     }
 
-    private static OverviewData Compute(VaultService? vault, CcLogReader reader)
+    /// <summary>Head shared by <see cref="Compute"/> and <see cref="ComputePreview"/> —
+    /// today/window/roots/hot-boundary framing plus the calendar coverage
+    /// gaps. Neither caller's downstream logic depends on anything here beyond
+    /// what's returned, so this is a plain extraction, not a rewrite.</summary>
+    private static (DateOnly Today, DateOnly WindowStart, IReadOnlyList<string> Roots,
+        DateTimeOffset? LastIngest, bool VaultOn, bool Degraded, DateOnly CalFrom,
+        HashSet<DateOnly> Uncovered) ComputeHead(VaultService? vault)
     {
         var today = DateOnly.FromDateTime(DateTime.Now);
         var windowStart = today.AddDays(-(LookbackDays - 1));
@@ -238,6 +266,48 @@ public sealed partial class LocalCcViewModel : ObservableObject
             if (!covered.Contains(d))
                 uncovered.Add(d);
         }
+
+        return (today, windowStart, roots, lastIngest, vaultOn, degraded, calFrom, uncovered);
+    }
+
+    /// <summary>Fast vault-only snapshot for the first paint — never touches
+    /// <paramref name="vault"/>'s live reader, so it returns in milliseconds
+    /// while the live walk runs behind it. Null when the vault can't serve
+    /// alone (off or degraded): those modes have no fast source, only the
+    /// live walk, so there is nothing to preview.</summary>
+    private static OverviewData? ComputePreview(VaultService? vault)
+    {
+        var (today, windowStart, roots, lastIngest, vaultOn, degraded, calFrom, uncovered) = ComputeHead(vault);
+        if (!vaultOn || degraded)
+            return null;
+
+        var hotStart = DateOnly.FromDateTime(lastIngest!.Value.ToLocalTime().DateTime);
+        var win = vault!.Reader.ReadWindow(roots, windowStart, hotStart);
+        // Calendar-only head slice — same union grammar as Compute, still
+        // disjoint from `win` by construction.
+        var winCal = vault.Reader.ReadWindow(roots, calFrom, windowStart);
+
+        var byDay = new Dictionary<DateOnly, long>(win.ByDay);   // no hot-day/live entries — those arrive in the full pass
+
+        var calendarByDay = new Dictionary<DateOnly, long>(winCal.ByDay);
+        foreach (var (d, v) in byDay)
+            calendarByDay[d] = v;
+
+        var projects = new Dictionary<string, long>(win.ByProjectName);
+        var skills = new Dictionary<string, long>(win.BySkill);
+
+        long sentWindow = win.ByDayInput.Values.Sum();
+        long recvWindow = win.ByDayOutput.Values.Sum();
+        long windowTotal = byDay.Values.Sum();
+        bool partial = windowTotal > 0 && (sentWindow + recvWindow) < (long)(windowTotal * 0.95);
+
+        return new OverviewData(byDay, projects, skills, "", 0, 0, sentWindow, recvWindow, partial, uncovered,
+            calendarByDay, calFrom);
+    }
+
+    private static OverviewData Compute(VaultService? vault, CcLogReader reader)
+    {
+        var (today, windowStart, roots, lastIngest, vaultOn, degraded, calFrom, uncovered) = ComputeHead(vault);
 
         if (!vaultOn || degraded)
         {
@@ -318,16 +388,24 @@ public sealed partial class LocalCcViewModel : ObservableObject
             calendarByDay, calFrom);
     }
 
-    private void Apply(OverviewData data)
+    private void Apply(OverviewData data, bool previewToday = false)
     {
         var today = DateOnly.FromDateTime(DateTime.Now);
         long todayTotal = data.ByDay.GetValueOrDefault(today);
-        TodayText = todayTotal > 0 ? $"{TokenFormat.Compact(todayTotal)} tokens" : "No activity yet";
+        // Preview's ByDay never carries hot-day/live entries, so todayTotal
+        // reads 0 even when today has real activity — previewToday pins the
+        // single "Loading…" instead of letting the 0-total path claim "No
+        // activity yet" mid-walk.
+        TodayText = previewToday
+            ? "Loading…"
+            : todayTotal > 0 ? $"{TokenFormat.Compact(todayTotal)} tokens" : "No activity yet";
 
         long monthTotal = data.ByDay.Values.Sum();
-        MonthText = monthTotal > 0 ? $"{TokenFormat.Compact(monthTotal)} tokens" : "No activity";
+        MonthText = monthTotal > 0
+            ? $"{TokenFormat.Compact(monthTotal)} tokens"
+            : previewToday ? "" : "No activity";   // a brand-new vault mid-walk must not claim "No activity"
 
-        TodaySplitText = todayTotal > 0
+        TodaySplitText = !previewToday && todayTotal > 0
             ? $"↑ {TokenFormat.Compact(data.SentToday)} sent · ↓ {TokenFormat.Compact(data.ReceivedToday)} received"
             : "";
         MonthSplitText = monthTotal > 0
