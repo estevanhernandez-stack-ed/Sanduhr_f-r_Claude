@@ -299,6 +299,7 @@ public sealed partial class CcLedgerViewModel : ObservableObject
         if (scope is not ("Today" or "Yesterday" or "7d" or "All"))
             return;
         _dayScope = null;   // chips always escape day mode
+        View.Filter = null; // ...and take the day-mode filter with them
         Scope = scope;
         var (from, to) = ScopeRange();
         foreach (var row in Rows)
@@ -308,8 +309,11 @@ public sealed partial class CcLedgerViewModel : ObservableObject
     }
 
     /// <summary>Calendar day-click entry point — scopes the ledger to a single
-    /// day. No chip's DataTrigger matches the resulting Scope string, so all
-    /// four chips correctly unhighlight; a chip click clears day mode again.</summary>
+    /// day AND filters the list to that day's sessions (out-of-scope rows are
+    /// hidden, not just dashed) — a bare scope with every session still
+    /// visible read as broken to the owner smoke. No chip's DataTrigger
+    /// matches the resulting Scope string, so all four chips correctly
+    /// unhighlight; a chip click clears day mode (and the filter) again.</summary>
     public void SetDayScope(DateOnly day)
     {
         _dayScope = day;
@@ -317,8 +321,14 @@ public sealed partial class CcLedgerViewModel : ObservableObject
         var (from, to) = ScopeRange();
         foreach (var row in Rows)
             row.Rescope(from, to);
+        View.Filter = item => item is LedgerRowViewModel r && r.ScopedTokens > 0;
         View.Refresh();
         NotifyHeaders();
+        // Day-mode empty must read as "nothing happened that day", never the
+        // vault-off/no-sessions-yet copy — those are about the vault, not the day.
+        EmptyText = View.IsEmpty
+            ? $"No sessions on {day.ToString("MMM d", CultureInfo.InvariantCulture)}."
+            : "";
     }
 
     [RelayCommand]
@@ -538,6 +548,19 @@ public sealed partial class CcLedgerViewModel : ObservableObject
                 Rows.Add(new LedgerRowViewModel(src.Key, src.Info, from, to, disambiguate, src.IsGroup, src.Members));
         }
         View.Refresh();
+
+        if (_dayScope is { } day)
+        {
+            // Day-mode empty must read as "nothing happened that day", never
+            // the vault-off/no-sessions-yet copy — those are about the vault,
+            // not the day. A non-empty day-mode view falls through below,
+            // where Rows.Count > 0 already yields "".
+            if (View.IsEmpty)
+            {
+                EmptyText = $"No sessions on {day.ToString("MMM d", CultureInfo.InvariantCulture)}.";
+                return;
+            }
+        }
 
         var vault = _widget.Vault;
         EmptyText = Rows.Count > 0 ? ""
