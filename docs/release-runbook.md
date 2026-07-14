@@ -119,8 +119,10 @@ For release #2 and later, pull the prior release's `*-full.nupkg` into `dist/rel
 (`vpk download github --repo <url> --outputDir windows-dotnet/dist/release`) and pass `-NoClean`
 so `vpk` can compute a delta.
 
-Output (`windows-dotnet/dist/release/`): `sanduhr-win-Setup.exe`, `Sanduhr-<v>-win-full.nupkg`,
-`Sanduhr-<v>-win-delta.nupkg` (#2+), `releases.win.json`.
+Output (`windows-dotnet/dist/release/`): `626Labs.Sanduhr-win-Setup.exe`,
+`626Labs.Sanduhr-<v>-full.nupkg`, `626Labs.Sanduhr-<v>-delta.nupkg` (#2+),
+`626Labs.Sanduhr-win-Portable.zip`, `releases.win.json`. (The `626Labs.` prefix is the
+Velopack packId — see the gotcha log before ever touching it.)
 
 ---
 
@@ -222,6 +224,7 @@ both proven on the .NET build.
 | `vpk` "not found" | Global tool not installed | `dotnet tool install -g vpk` |
 | Auto-updater never picks up a release | Only `Setup.exe` uploaded | Upload EVERY file from `dist/release/` (esp. `releases.win.json` + `*-full.nupkg`) |
 | Store tiles look generic / off-brand | Shipping the placeholder logos | Run `626labs-design` for the tile set before submit (Package/Logos/README.md) |
+| Velopack install DESTROYS `%LOCALAPPDATA%\Sanduhr` contents (the vault) | packId `Sanduhr` made the install dir collide with the app's data dir — the installer rollback-renames a pre-existing dir and deletes it on success (verified live 2026-07-13) | packId is `626Labs.Sanduhr` (install tree disjoint from data tree). NEVER revert — the packId froze when v3.2.0.0 published; changing it orphans every installed updater |
 
 ---
 
