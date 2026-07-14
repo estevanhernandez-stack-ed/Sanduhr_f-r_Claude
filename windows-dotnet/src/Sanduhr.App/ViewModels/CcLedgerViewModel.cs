@@ -226,11 +226,20 @@ public sealed partial class CcLedgerViewModel : ObservableObject
     /// chips in <see cref="ScopeRange"/> until a chip is clicked again.</summary>
     private DateOnly? _dayScope;
 
+    /// <summary>Chip scope active before the calendar click that entered day
+    /// mode — where <see cref="ClearDayScope"/> returns to.</summary>
+    private string _preDayScope = "7d";
+
     [ObservableProperty] private string _scope = "7d";
     [ObservableProperty] private string _sortColumn = "Tokens";
     [ObservableProperty] private bool _sortDescending = true;
     [ObservableProperty] private string _emptyText = "";
     [ObservableProperty] private bool _groupByProject;
+
+    /// <summary>Drives the day chip's visibility — the only visible indicator
+    /// that a calendar day-click is still filtering the list (the four scope
+    /// chips all unhighlight in day mode; see <see cref="SetDayScope"/>).</summary>
+    [ObservableProperty] private bool _isDayMode;
 
     public ObservableCollection<LedgerRowViewModel> Rows { get; } = new();
 
@@ -299,6 +308,7 @@ public sealed partial class CcLedgerViewModel : ObservableObject
         if (scope is not ("Today" or "Yesterday" or "7d" or "All"))
             return;
         _dayScope = null;   // chips always escape day mode
+        IsDayMode = false;
         View.Filter = null; // ...and take the day-mode filter with them
         Scope = scope;
         var (from, to) = ScopeRange();
@@ -316,7 +326,10 @@ public sealed partial class CcLedgerViewModel : ObservableObject
     /// unhighlight; a chip click clears day mode (and the filter) again.</summary>
     public void SetDayScope(DateOnly day)
     {
+        if (_dayScope is null)
+            _preDayScope = Scope; // capture only on entry — a second day-click must not overwrite it with a day string
         _dayScope = day;
+        IsDayMode = true;
         Scope = day.ToString("MMM d", CultureInfo.InvariantCulture);
         var (from, to) = ScopeRange();
         foreach (var row in Rows)
@@ -330,6 +343,11 @@ public sealed partial class CcLedgerViewModel : ObservableObject
             ? $"No sessions on {day.ToString("MMM d", CultureInfo.InvariantCulture)}."
             : "";
     }
+
+    /// <summary>Day chip's dismiss action — returns to whichever chip scope
+    /// was active before the calendar click that entered day mode.</summary>
+    [RelayCommand]
+    private void ClearDayScope() => SetScope(_preDayScope);
 
     [RelayCommand]
     private void SortBy(string column)

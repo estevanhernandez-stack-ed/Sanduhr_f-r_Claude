@@ -374,6 +374,20 @@
             </Style.Triggers>
         </Style>
 
+        <!-- Fifth chip, day mode only: a calendar day-click unhighlights all
+             four scope chips above (Scope becomes "Jul 13", no DataTrigger
+             matches) — without this, day mode has no visible indicator. -->
+        <Style x:Key="LedgerChipDay" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsDayMode}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- CRITICAL: each section Grid overrides its own DataContext to the
              section VM (Overview/Trends/Ledger), none of which has a Section
              property — a plain {Binding Section} DataTrigger would silently
@@ -1092,6 +1106,10 @@
                                                 Command="{Binding SetScopeCommand}" CommandParameter="7d" />
                                         <Button Content="All" Style="{StaticResource LedgerChipAll}"
                                                 Command="{Binding SetScopeCommand}" CommandParameter="All" />
+                                        <Button Content="{Binding Scope}" ContentStringFormat="{}{0}  ✕"
+                                                Style="{StaticResource LedgerChipDay}"
+                                                Command="{Binding ClearDayScopeCommand}"
+                                                ToolTip="Showing one day — click to go back" />
                                     </StackPanel>
                                 </DockPanel>
 
