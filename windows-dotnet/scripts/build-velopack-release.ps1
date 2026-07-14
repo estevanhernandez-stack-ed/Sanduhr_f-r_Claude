@@ -5,10 +5,11 @@
 # that's the trade for the free GitHub channel. The Store MSIX (build-msix.ps1) is the signed path.
 #
 # Output (under windows-dotnet/dist/release/):
-#   - sanduhr-win-Setup.exe          installer users download
-#   - Sanduhr-<v>-win-full.nupkg     full package (auto-updater consumes this)
-#   - Sanduhr-<v>-win-delta.nupkg    delta vs prior release (release #2+)
-#   - releases.win.json              manifest the in-app UpdateChecker pings
+#   - 626Labs.Sanduhr-win-Setup.exe        installer users download
+#   - 626Labs.Sanduhr-<v>-full.nupkg       full package (auto-updater consumes this)
+#   - 626Labs.Sanduhr-<v>-delta.nupkg      delta vs prior release (release #2+)
+#   - 626Labs.Sanduhr-win-Portable.zip     no-install portable flavor
+#   - releases.win.json                    manifest the in-app UpdateChecker pings
 #
 # Run from repo root (Sanduhr/):
 #   pwsh windows-dotnet/scripts/build-velopack-release.ps1 -Version 3.0.0.0
@@ -105,9 +106,15 @@ if (-not (Test-Path (Join-Path $publishDir 'Sanduhr.exe'))) {
 if (-not $NoClean -and (Test-Path $releaseDir)) { Remove-Item -Recurse -Force $releaseDir }
 New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
 
+# packId MUST NOT be 'Sanduhr': Velopack installs to %LOCALAPPDATA%\{packId}, and
+# %LOCALAPPDATA%\Sanduhr is the app's DATA directory (the usage vault lives there).
+# Velopack's installer renames a pre-existing install dir for rollback and deletes it
+# on success — verified 2026-07-13: an install over existing data DESTROYS the vault.
+# '626Labs.Sanduhr' keeps the install tree permanently disjoint from the data tree.
+# Frozen once the first real install exists — changing it orphans updaters.
 $vpkArgs = @(
     'pack'
-    '--packId',      'Sanduhr'
+    '--packId',      '626Labs.Sanduhr'
     '--packVersion', $packVersion
     '--packDir',     $publishDir
     '--mainExe',     'Sanduhr.exe'
