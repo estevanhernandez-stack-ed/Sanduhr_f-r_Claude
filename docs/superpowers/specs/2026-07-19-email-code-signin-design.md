@@ -21,11 +21,13 @@ clearly, at the right moments.
 
 `SignInWindow.xaml` `GoogleNotice` (~lines 58-72) + code-behind:
 
-- Headline: `Google sign-in won't load here — use an email code instead`
+- Headline: `Google sign-in won't load here — use email login instead`
 - Body copy (replaces the current single sentence): `Google blocks sign-in inside embedded
-  windows, but your Claude account works with an email code: go back, choose "Continue with
-  email," and enter your Gmail address. Claude emails you a code — type it right here and
-  you're in. Same account, nothing changes.`
+  windows. Instead, go back and choose "Continue with email" with your Gmail address —
+  Anthropic emails you a sign-in code. Type that code right here and you're in. Same
+  account, nothing changes.` (Owner copy direction 2026-07-19: say it's email login with an
+  Anthropic-provided code from the email — users should know the code comes from Anthropic,
+  not from Sanduhr.)
 - Primary button: `Back to Claude sign-in` → new handler `OnGoogleNoticeBackClick` that
   navigates the WebView to `https://claude.ai/login` (the chooser where "Continue with email"
   lives). The banner then auto-hides via the existing `UpdateOAuthNotice` host check.
@@ -38,8 +40,9 @@ clearly, at the right moments.
 ## 2. Proactive line in the sign-in intro
 
 The header copy block (~lines 38-47) gains one sentence so Google users never hit the wall at
-all: `Signed up with Google? Choose "Continue with email" and use your Gmail address — Claude
-emails you a code that works right here.` Same secondary ink as the surrounding helper text.
+all: `Signed up with Google? Use email login instead — choose "Continue with email" and enter
+the sign-in code Anthropic emails you. It works right here.` Same secondary ink as the
+surrounding helper text.
 
 ## Unchanged
 
