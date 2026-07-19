@@ -175,6 +175,7 @@ public class CcLogReaderTests
         Assert.Equal("seven_day_opus", reader.ModelToTierKey("claude-opus-4-7"));
         Assert.Equal("seven_day_opus", reader.ModelToTierKey("claude-opus-4-6"));
         Assert.Equal("seven_day_sonnet", reader.ModelToTierKey("claude-sonnet-4-6"));
+        Assert.Equal(TierModel.SevenDayFable, reader.ModelToTierKey("claude-fable-5"));
         Assert.Equal("seven_day", reader.ModelToTierKey("claude-haiku-4-5"));
     }
 

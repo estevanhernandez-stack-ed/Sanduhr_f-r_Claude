@@ -51,6 +51,7 @@ public sealed class CcLogReader
     {
         ("claude-opus", "seven_day_opus"),
         ("claude-sonnet", "seven_day_sonnet"),
+        ("claude-fable", TierModel.SevenDayFable),
         ("claude-haiku", "seven_day"), // No haiku-specific tier — fold to weekly.
     };
 
