@@ -121,7 +121,10 @@ Theming rule as above: run once in the default theme, then flip dark / light / M
 
 1. **The Fable bar.** With live data on a Max account: a "Weekly - Fable" card renders
    between Weekly - Opus and the rest, percentage matching claude.ai; it appears in the
-   Settings hide/reorder list, the History chart tier rows, and CSV export headers.
+   History chart tier rows, and CSV export ROWS carry `seven_day_fable` (headers are
+   fixed). Hide/reorder is on the widget card itself (context-menu Hide + drag) — and
+   NOTE: there is no unhide UI, so don't hide the Fable card while smoking unless you
+   want to edit settings.json to get it back.
 2. **July 20 flip.** After the entitlement change lands upstream, the bar tracks the new
    50% standard allocation with no app update.
 3. **Unknown-key log.** fetch-debug.log contains exactly one `usage: unregistered keys:`
