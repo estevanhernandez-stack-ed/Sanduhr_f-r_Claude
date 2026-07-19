@@ -36,6 +36,7 @@ public static class TierModel
     public const string SevenDay = "seven_day";
     public const string SevenDaySonnet = "seven_day_sonnet";
     public const string SevenDayOpus = "seven_day_opus";
+    public const string SevenDayFable = "seven_day_fable";
     public const string SevenDayCowork = "seven_day_cowork";
     public const string SevenDayOmelette = "seven_day_omelette";
     public const string SevenDayOauthApps = "seven_day_oauth_apps";
@@ -56,6 +57,7 @@ public static class TierModel
         SevenDay,
         SevenDaySonnet,
         SevenDayOpus,
+        SevenDayFable,
         SevenDayCowork,
         SevenDayOmelette,
         SevenDayOauthApps,
@@ -75,6 +77,7 @@ public static class TierModel
             [SevenDay] = "Weekly - All Models",
             [SevenDaySonnet] = "Weekly - Sonnet",
             [SevenDayOpus] = "Weekly - Opus",
+            [SevenDayFable] = "Weekly - Fable",
             [SevenDayCowork] = "Weekly - Cowork",
             [SevenDayOmelette] = "Weekly - Design",
             [SevenDayOauthApps] = "Weekly - OAuth Apps",
@@ -106,14 +109,23 @@ public static class TierModel
 
     // -- registry accessors ---------------------------------------------------
 
-    /// <summary>True when <paramref name="tierKey"/> is a recognized tier.</summary>
-    public static bool IsKnown(string tierKey) => LabelsByKey.ContainsKey(tierKey);
+    /// <summary>True when <paramref name="tierKey"/> is a recognized tier (static or dynamically registered).</summary>
+    public static bool IsKnown(string tierKey)
+    {
+        if (LabelsByKey.ContainsKey(tierKey)) return true;
+        lock (DynamicGate) return DynamicLabels.ContainsKey(tierKey);
+    }
 
     /// <summary>Display label for a known tier. Throws for unknown keys (mirrors the Python dict lookup).</summary>
-    public static string Label(string tierKey) =>
-        LabelsByKey.TryGetValue(tierKey, out var label)
-            ? label
-            : throw new KeyNotFoundException($"Unknown tier key: {tierKey}");
+    public static string Label(string tierKey)
+    {
+        if (LabelsByKey.TryGetValue(tierKey, out var label)) return label;
+        lock (DynamicGate)
+        {
+            if (DynamicLabels.TryGetValue(tierKey, out var dyn)) return dyn;
+        }
+        throw new KeyNotFoundException($"Unknown tier key: {tierKey}");
+    }
 
     /// <summary>True when the tier is a speculative "future use" codename / gated row.</summary>
     public static bool IsSpeculative(string tierKey) => SpeculativeTiers.Contains(tierKey);
@@ -126,6 +138,62 @@ public static class TierModel
     /// </summary>
     public static string LabelWithTag(string tierKey) =>
         IsSpeculative(tierKey) ? $"{Label(tierKey)}  ·  {FutureUseTag}" : Label(tierKey);
+
+    // -- dynamic scoped tiers (synthesized from the API's limits[] array) -----
+
+    // Append-only for the process lifetime: a tier seen once stays orderable
+    // even when a later fetch omits it (its utilization goes null, the card
+    // drops, the order slot remains). Fetch runs on a background thread while
+    // render reads on the UI thread — hence the gate.
+    private static readonly Dictionary<string, string> DynamicLabels = new(StringComparer.Ordinal);
+    private static readonly List<string> DynamicOrder = new();
+    private static readonly object DynamicGate = new();
+
+    /// <summary>Register a scoped tier synthesized from a limits[] entry.
+    /// Idempotent; statically registered keys are a no-op (the static label wins).</summary>
+    public static void RegisterScopedTier(string tierKey, string displayName)
+    {
+        lock (DynamicGate)
+        {
+            if (LabelsByKey.ContainsKey(tierKey) || DynamicLabels.ContainsKey(tierKey))
+                return;
+            DynamicLabels[tierKey] = $"Weekly - {displayName}";
+            DynamicOrder.Add(tierKey);
+        }
+    }
+
+    /// <summary>Canonical order with dynamic scoped tiers folded in after the
+    /// seven_day family (post-SevenDayOauthApps, pre-IguanaNecktie), in
+    /// registration order. Consumers that used to iterate CanonicalOrder
+    /// iterate this so dynamic tiers render/persist/chart without edits.</summary>
+    public static IReadOnlyList<string> EffectiveOrder
+    {
+        get
+        {
+            lock (DynamicGate)
+            {
+                if (DynamicOrder.Count == 0)
+                    return CanonicalOrder;
+                var order = new List<string>(CanonicalOrder.Count + DynamicOrder.Count);
+                foreach (var key in CanonicalOrder)
+                {
+                    order.Add(key);
+                    if (key == SevenDayOauthApps)
+                        order.AddRange(DynamicOrder);
+                }
+                return order;
+            }
+        }
+    }
+
+    internal static void ResetDynamicTiersForTests()
+    {
+        lock (DynamicGate)
+        {
+            DynamicLabels.Clear();
+            DynamicOrder.Clear();
+        }
+    }
 
     // -- Routines synthesis ---------------------------------------------------
 
@@ -183,7 +251,7 @@ public static class TierModel
                     ordered.Add(key);
             }
         }
-        foreach (var key in CanonicalOrder)
+        foreach (var key in EffectiveOrder)
         {
             if (seen.Add(key))
                 ordered.Add(key);
