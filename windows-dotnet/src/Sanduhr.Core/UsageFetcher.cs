@@ -40,11 +40,6 @@ public interface IUsageHistory
 /// </summary>
 public sealed class UsageFetcher
 {
-    // The tiers we persist to history, in canonical order. fetcher._HISTORY_TIERS
-    // is identical to TierModel.CanonicalOrder (five_hour … extra_usage, then
-    // the synthesized routines tier last), so we reuse the single source.
-    private static readonly IReadOnlyList<string> HistoryTiers = TierModel.CanonicalOrder;
-
     private readonly IClaudeApiClient _client;
     private readonly IUsageHistory _history;
 
@@ -89,7 +84,11 @@ public sealed class UsageFetcher
             };
         }
 
-        foreach (var tierKey in HistoryTiers)
+        // History tiers = the effective order (canonical + dynamic scoped tiers),
+        // read PER CALL — dynamics register during fetch, so a static capture
+        // would persist a stale list. fetcher._HISTORY_TIERS parity now spans
+        // both static and synthesized keys.
+        foreach (var tierKey in TierModel.EffectiveOrder)
         {
             // A tier with a non-null utilization is a data point worth recording.
             // Absent / JSON-null utilization is skipped (parity with
