@@ -489,7 +489,7 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
             foreach (var node in limits)
             {
                 if (node is not JsonObject entry) continue;
-                var kind = (string?)entry["kind"];
+                string? kind = entry["kind"] is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
                 if (kind is null or "weekly_scoped" or "session" or "weekly") continue;
                 if (ReportedUsageNames.Add("kind:" + kind))
                     (kinds ??= new()).Add(kind);
