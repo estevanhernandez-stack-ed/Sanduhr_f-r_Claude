@@ -46,6 +46,12 @@
                            TextWrapping="Wrap">
                     <Run Text="Once you're signed in, Sanduhr reads only the session cookie Claude sets, stores it in the Windows Credential Manager, and starts tracking your usage. This window closes itself." />
                 </TextBlock>
+                <TextBlock FontSize="11"
+                           Foreground="#e8e4dc"
+                           Opacity="0.65"
+                           Margin="0,6,0,0"
+                           TextWrapping="Wrap"
+                           Text="Signed up with Google? Use email login instead — choose &quot;Continue with email&quot; and enter the sign-in code Anthropic emails you. It works right here." />
             </StackPanel>
         </Border>
 
@@ -63,14 +69,31 @@
                     BorderBrush="#7a5b00" BorderThickness="0,0,0,1" Padding="14,10"
                     Visibility="Collapsed">
                 <StackPanel>
-                    <TextBlock Text="Google sign-in won't load here"
-                               Foreground="#ffcf4d" FontWeight="SemiBold" FontSize="12" />
+                    <TextBlock Text="Google sign-in won't load here — use email login instead"
+                               Foreground="#ffcf4d" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
                     <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#e8e4dc" Opacity="0.85"
                                Margin="0,4,0,8"
-                               Text="Google blocks sign-in inside embedded windows. Go back and use email or a passkey on the Claude page — or close this and paste a key by hand." />
-                    <Button Content="Close &amp; paste a key instead" Click="OnGoogleNoticePasteClick"
-                            HorizontalAlignment="Left" Cursor="Hand" Padding="12,6"
-                            Background="#1c1c1c" Foreground="#e8e4dc" BorderBrush="#7a5b00" BorderThickness="1" />
+                               Text="Google blocks sign-in inside embedded windows. Instead, go back and choose &quot;Continue with email&quot; with your Gmail address — Anthropic emails you a sign-in code. Type that code right here and you're in. Same account, nothing changes." />
+                    <Button Content="Back to Claude sign-in" Click="OnGoogleNoticeBackClick"
+                            HorizontalAlignment="Left" Cursor="Hand" Padding="12,6" FontWeight="SemiBold"
+                            Background="#17d4fa" Foreground="#0d0d0d" BorderThickness="0" />
+                    <!-- Demoted last-resort link — same underlined-TextBlock-in-a-Button
+                         template used for the secondary auth action in MainWindow.xaml,
+                         just kept on this file's own literal dark palette since this
+                         window isn't wired into the app's DynamicResource theme brushes. -->
+                    <Button Content="paste a session key by hand instead" Click="OnGoogleNoticePasteClick"
+                            HorizontalAlignment="Left" Cursor="Hand" Margin="0,8,0,0"
+                            Background="Transparent" BorderThickness="0" Padding="0"
+                            Foreground="#e8e4dc" FontSize="11">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <TextBlock Text="{TemplateBinding Content}"
+                                           TextDecorations="Underline"
+                                           Opacity="0.65"
+                                           Foreground="{TemplateBinding Foreground}" />
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
                 </StackPanel>
             </Border>
 
