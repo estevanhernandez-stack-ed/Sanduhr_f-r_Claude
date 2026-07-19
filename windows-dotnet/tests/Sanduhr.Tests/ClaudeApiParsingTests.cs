@@ -114,6 +114,42 @@ public class ClaudeApiParsingTests
         Assert.Equal("x", ClaudeApiParsing.ParseOrganizations(noCaps).OrgId);
     }
 
+    [Fact]
+    public void NonStringCapabilitiesElement_IsSkipped_SelectionContinuesToClaudeMaxOrg()
+    {
+        // Live junk shape: a non-string element (e.g. a stray numeric id) sitting
+        // in capabilities[] alongside real capability strings. The unguarded
+        // (string?)c cast used to throw InvalidOperationException here, darking
+        // org discovery entirely. A junk element must be skipped, not fatal —
+        // and the claude_max org two entries later must still win selection.
+        var withJunkElement = """
+        [
+          { "uuid": "junk-org", "capabilities": ["api", 123] },
+          { "uuid": "aaaa-1111", "rate_limit_tier": "default_claude_max_20x",
+            "billing_type": "stripe_subscription", "capabilities": ["claude_max", "chat"] }
+        ]
+        """;
+        var d = ClaudeApiParsing.ParseOrganizations(withJunkElement);
+        Assert.Equal("aaaa-1111", d.OrgId);
+    }
+
+    [Fact]
+    public void SelectedOrgWithNonStringCapability_KeepsOnlyStringElements_NoThrow()
+    {
+        // The sibling hazard: the SELECTED org's own capabilities carry a
+        // non-string element. AccountPlan.Capabilities must silently drop it
+        // rather than throwing while building the tier-badge fields.
+        var d = ClaudeApiParsing.ParseOrganizations("""
+            [{
+                "uuid": "org-123",
+                "capabilities": ["claude_max", 123, "chat"]
+            }]
+            """);
+
+        Assert.Equal("org-123", d.OrgId);
+        Assert.Equal(new[] { "claude_max", "chat" }, d.Account.Capabilities);
+    }
+
     // -- ParseUsage -----------------------------------------------------------
 
     [Fact]

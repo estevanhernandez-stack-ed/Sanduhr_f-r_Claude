@@ -27,10 +27,13 @@ internal static class ClaudeApiParsing
     internal sealed record OrgDiscovery(string OrgId, JsonObject AccountNode, AccountPlan Account);
 
     /// <summary>
-    /// Parse the <c>/api/organizations</c> response body, selecting the first org
-    /// and capturing its plan fields. Mirrors <c>ClaudeApiClient.GetOrgIdAsync</c>
-    /// 1:1 — same shape checks, same exception messages — so the HttpClient path's
-    /// parity tests cover this code transitively.
+    /// Parse the <c>/api/organizations</c> response body, selecting the org whose
+    /// <c>capabilities</c> we actually track usage for — <c>claude_max</c> preferred,
+    /// then <c>chat</c>, then the first well-formed org as last resort — and
+    /// capturing its plan fields. Same shape checks and exception messages as
+    /// <c>ClaudeApiClient.GetOrgIdAsync</c>, which delegates to this method directly
+    /// (not a parallel reimplementation), so the HttpClient path's parity tests
+    /// cover this code transitively.
     /// </summary>
     internal static OrgDiscovery ParseOrganizations(string body)
     {
@@ -52,8 +55,8 @@ internal static class ClaudeApiParsing
             if (node is not JsonObject candidate) continue;
             first ??= candidate;
             if (candidate["capabilities"] is not JsonArray candidateCaps) continue;
-            bool hasMax = candidateCaps.Any(c => (string?)c == "claude_max");
-            bool hasChat = candidateCaps.Any(c => (string?)c == "chat");
+            bool hasMax = candidateCaps.Any(c => c is JsonValue v && v.TryGetValue<string>(out var s) && s == "claude_max");
+            bool hasChat = candidateCaps.Any(c => c is JsonValue v && v.TryGetValue<string>(out var s) && s == "chat");
             if (hasMax) { selected = candidate; break; }
             if (hasChat) byChat ??= candidate;
         }
@@ -77,7 +80,8 @@ internal static class ClaudeApiParsing
             (string?)org["rate_limit_tier"],
             (string?)org["billing_type"],
             org["capabilities"] is JsonArray caps
-                ? caps.Select(e => (string?)e).Where(s => s is not null).Select(s => s!).ToArray()
+                ? caps.Select(e => e is JsonValue v && v.TryGetValue<string>(out var s) ? s : null)
+                      .Where(s => s is not null).Select(s => s!).ToArray()
                 : null);
 
         return new OrgDiscovery(uuid, accountNode, account);
