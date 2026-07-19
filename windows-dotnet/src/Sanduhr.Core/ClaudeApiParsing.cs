@@ -42,7 +42,23 @@ internal static class ClaudeApiParsing
             throw new NetworkException("Org discovery returned non-JSON");
         if (orgs.Count == 0)
             throw new NetworkException("No organizations returned for this account");
-        if (orgs[0] is not JsonObject org)
+
+        // Accounts can carry multiple orgs (a claude_max subscription org AND
+        // an API individual org, observed live 2026-07-19). orgs[0] is
+        // ordering-luck; prefer the org we actually track usage for.
+        JsonObject? selected = null, byChat = null, first = null;
+        foreach (var node in orgs)
+        {
+            if (node is not JsonObject candidate) continue;
+            first ??= candidate;
+            if (candidate["capabilities"] is not JsonArray candidateCaps) continue;
+            bool hasMax = candidateCaps.Any(c => (string?)c == "claude_max");
+            bool hasChat = candidateCaps.Any(c => (string?)c == "chat");
+            if (hasMax) { selected = candidate; break; }
+            if (hasChat) byChat ??= candidate;
+        }
+        var org = selected ?? byChat ?? first;
+        if (org is null)
             throw new NetworkException("Malformed organization entry");
 
         var uuid = (string?)org["uuid"];

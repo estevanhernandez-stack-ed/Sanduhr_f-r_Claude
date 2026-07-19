@@ -72,6 +72,48 @@ public class ClaudeApiParsingTests
     public void ParseOrganizations_missing_uuid_throws_network()
         => Assert.Throws<NetworkException>(() => ClaudeApiParsing.ParseOrganizations("[{\"name\":\"no uuid\"}]"));
 
+    // -- ParseOrganizations: capabilities-driven selection ---------------------
+    // Accounts can carry multiple orgs (a claude_max subscription org AND an API
+    // individual org, observed live on the owner's account 2026-07-19). orgs[0]
+    // was ordering-luck; selection now prefers claude_max, then chat, then first.
+
+    private const string TwoOrgFixture = """
+    [
+      { "uuid": "aaaa-1111", "name": "someone's Organization",
+        "rate_limit_tier": "default_claude_max_20x", "billing_type": "stripe_subscription",
+        "capabilities": ["claude_max", "chat"] },
+      { "uuid": "bbbb-2222", "name": "Someone's Individual Org",
+        "rate_limit_tier": "auto_trust_tier_c", "billing_type": "prepaid",
+        "capabilities": ["api", "api_individual"] }
+    ]
+    """;
+
+    [Fact]
+    public void PicksClaudeMaxOrg_RegardlessOfOrdering()
+    {
+        Assert.Equal("aaaa-1111", ClaudeApiParsing.ParseOrganizations(TwoOrgFixture).OrgId);
+        // reversed ordering must select the SAME org
+        var reversed = """
+        [
+          { "uuid": "bbbb-2222", "capabilities": ["api", "api_individual"] },
+          { "uuid": "aaaa-1111", "rate_limit_tier": "default_claude_max_20x",
+            "billing_type": "stripe_subscription", "capabilities": ["claude_max", "chat"] }
+        ]
+        """;
+        var d = ClaudeApiParsing.ParseOrganizations(reversed);
+        Assert.Equal("aaaa-1111", d.OrgId);
+        Assert.Equal("default_claude_max_20x", d.Account.RateLimitTier);   // plan fields from the SELECTED org
+    }
+
+    [Fact]
+    public void FallsBackToChat_ThenFirst()
+    {
+        var chatOnly = """[ { "uuid": "x", "capabilities": ["api"] }, { "uuid": "y", "capabilities": ["chat"] } ]""";
+        Assert.Equal("y", ClaudeApiParsing.ParseOrganizations(chatOnly).OrgId);
+        var noCaps = """[ { "uuid": "x" }, { "uuid": "y" } ]""";
+        Assert.Equal("x", ClaudeApiParsing.ParseOrganizations(noCaps).OrgId);
+    }
+
     // -- ParseUsage -----------------------------------------------------------
 
     [Fact]
