@@ -722,7 +722,7 @@
                         <StackPanel DataContext="{Binding Alerts}">
                             <TextBlock TextWrapping="Wrap" FontSize="11"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12"
-                                       Text="Get a toast and a soft chime when a tier crosses your thresholds, or when your pace will hit the cap before it resets. Toasts respect Focus Assist." />
+                                       Text="Get a toast and a soft chime when a tier crosses your thresholds, or when your pace will hit the cap before it resets. Toasts respect Focus Assist. Model-scoped weekly tiers alert silently by default — toast only, no chime." />
 
                             <CheckBox Content="Enable alerts" IsChecked="{Binding AlertsEnabled}"
                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,10" />
@@ -766,6 +766,9 @@
                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
                             <CheckBox Content="Sound" IsChecked="{Binding SoundEnabled}"
                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
+                            <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                      Content="Chime for model-scoped weekly tiers"
+                                      IsChecked="{Binding ScopedChimeEnabled}" Margin="0,0,0,6" />
                             <CheckBox Content="100% plays the ! (you know the one)"
                                       IsChecked="{Binding SnakeAtFull}"
                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,14" />

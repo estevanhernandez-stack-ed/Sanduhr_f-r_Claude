@@ -284,4 +284,30 @@ public class TierModelTests : IDisposable
         var util = new Dictionary<string, double?> { ["seven_day_zephyr"] = 12.0 };
         Assert.Contains("seven_day_zephyr", TierModel.ActiveTiers(util));
     }
+
+    // -- model-scoped tiers (alert-mute wave): sonnet/opus/fable + dynamics chime silently by default ---
+
+    [Theory]
+    [InlineData("seven_day_sonnet", true)]
+    [InlineData("seven_day_opus", true)]
+    [InlineData("seven_day_fable", true)]
+    [InlineData("five_hour", false)]
+    [InlineData("seven_day", false)]
+    [InlineData("extra_usage", false)]
+    [InlineData("routines", false)]
+    [InlineData("seven_day_cowork", false)]
+    [InlineData("seven_day_omelette", false)]
+    [InlineData("seven_day_oauth_apps", false)]
+    [InlineData("iguana_necktie", false)]
+    [InlineData("bogus_tier", false)]
+    public void IsModelScoped_flags_only_per_model_meters(string key, bool scoped)
+        => Assert.Equal(scoped, TierModel.IsModelScoped(key));
+
+    [Fact]
+    public void IsModelScoped_true_for_dynamically_registered_tier()
+    {
+        TierModel.ResetDynamicTiersForTests();
+        TierModel.RegisterScopedTier("seven_day_haiku_5", "Haiku 5");
+        Assert.True(TierModel.IsModelScoped("seven_day_haiku_5"));
+    }
 }

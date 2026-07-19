@@ -271,6 +271,14 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         AlertSettingsChanged?.Invoke();
     }
 
+    public bool LoadAlertSoundScoped() => _settings.LoadAlertSoundScoped();
+
+    public void SaveAlertSoundScoped(bool on)
+    {
+        _settings.SaveAlertSoundScoped(on);
+        AlertSettingsChanged?.Invoke();
+    }
+
     public bool LoadAlertSnakeFull() => _settings.LoadAlertSnakeFull();
 
     public void SaveAlertSnakeFull(bool on)
@@ -969,9 +977,18 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             if (events.Count == 0)
                 return;
             bool sound = _settings.LoadAlertSound();
+            bool scopedChime = _settings.LoadAlertSoundScoped();
             bool snake = _settings.LoadAlertSnakeFull();
             foreach (var e in events)
-                _alertService.Deliver(e, TierModel.Label(e.TierKey), sound, snake);
+            {
+                // Model-scoped weekly tiers (sonnet/opus/fable + dynamic per-model
+                // rows) are toast-only by default — a lone model's sub-limit
+                // pinned at 100% isn't critical while the aggregate pools have
+                // headroom. The "Chime for model-scoped weekly tiers" checkbox
+                // restores sound for whoever wants it.
+                bool audible = sound && (scopedChime || !TierModel.IsModelScoped(e.TierKey));
+                _alertService.Deliver(e, TierModel.Label(e.TierKey), audible, snake);
+            }
         }
         catch (Exception e)
         {
