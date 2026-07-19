@@ -173,6 +173,9 @@ pick up the delta.
 4. **Store listing → "What's new in this version"** — paste the public update note.
    **DO NOT SKIP — this is the public field, separate from Notes for certification (step 3).** Both
    must be filled every release.
+   Also sync **Store listing → Product features** from
+   [`store/product-features.md`](store/product-features.md) (the tracked source of truth —
+   20-bullet cap, plain text only; update the file first, then paste).
 5. Confirm the 10.1.4.4 surfaces are still clean (the three sub-clauses, below).
 6. **Submit.** Status: *In submission* → *Certification* → *Publishing* (success) or *Failed*.
    Turnaround 24-72h. A pending submission is replaced by the new one (no duplicates).
