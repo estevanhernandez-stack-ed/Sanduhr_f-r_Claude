@@ -158,7 +158,10 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
 
         var reply = await FetchAsync(RoutinesUrl, headers, ct).ConfigureAwait(true);
         if (reply.Error is not null)
+        {
+            Log($"routines: FAIL {reply.Error ?? ("HTTP " + reply.Status)}");
             throw new NetworkException($"Routines fetch failed: {reply.Error}");
+        }
         if (reply.Status == 404)
         {
             Log("routines: 404 (no code access) -> null");
@@ -200,12 +203,26 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
     }
 
     /// <summary>Map a fetch reply to its 2xx body or throw the typed error
-    /// (transport error → Network, then status mapping).</summary>
-    private static string RequireBody(FetchReply reply, string what)
+    /// (transport error → Network, then status mapping). Logs the raw error text
+    /// or status on every throw path — error text/status ONLY, never cookies or
+    /// payload values (the fetch-debug contract) — so a "fetch timed out" vs a
+    /// "Failed to fetch" is visible in fetch-debug.log without guessing.</summary>
+    private string RequireBody(FetchReply reply, string what)
     {
         if (reply.Error is not null)
+        {
+            Log($"{what}: FAIL {reply.Error ?? ("HTTP " + reply.Status)}");
             throw new NetworkException($"{what} fetch failed: {reply.Error}");
-        ClaudeApiParsing.ThrowForStatus(reply.Status, reply.Body);
+        }
+        try
+        {
+            ClaudeApiParsing.ThrowForStatus(reply.Status, reply.Body);
+        }
+        catch
+        {
+            Log($"{what}: FAIL {reply.Error ?? ("HTTP " + reply.Status)}");
+            throw;
+        }
         return reply.Body ?? "";
     }
 

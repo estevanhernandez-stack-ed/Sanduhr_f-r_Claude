@@ -53,6 +53,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private DateTimeOffset? _lastFetchAt;
     private bool _refreshing;
 
+    /// <summary>Bumped on every <see cref="RebuildFetcher"/> call (account switch,
+    /// sign-in reload, sign-out). Guards the post-switch retry in
+    /// <see cref="RetryOnceIfTransientAsync"/> — if another rebuild lands during the
+    /// retry's delay, the captured generation is stale and the retry is skipped.</summary>
+    private int _fetcherGeneration;
+
     private readonly List<string> _savedOrder;
     private readonly HashSet<string> _hidden;
     private IReadOnlyList<string> _riffs = Array.Empty<string>();
@@ -457,6 +463,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     private void RebuildFetcher()
     {
+        _fetcherGeneration++;
         (_client as IDisposable)?.Dispose();
         _client = null;
         _fetcher = null;
@@ -489,7 +496,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         RebuildFetcher();
         RefreshAccountLabel();
         AccountsChanged?.Invoke();
-        await RefreshAsync();
+        var outcome = await RefreshCoreAsync().ConfigureAwait(true);
+        await RetryOnceIfTransientAsync(outcome).ConfigureAwait(true);
     }
 
     [RelayCommand]
@@ -553,7 +561,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// a fresh <see cref="WebView2ApiClient"/> whose <c>InitAsync</c> wipes the shared
     /// transport cookie jar before injecting the new sessionKey, so the next fetch
     /// returns the NEW account's usage with no bleed — then refetches. Tier cards are
-    /// cleared first so the old account's numbers never linger during the switch.
+    /// cleared first so the old account's numbers never linger during the switch. If
+    /// that first refetch comes back TRANSIENT (the CF re-clearance race — see
+    /// <see cref="RetryOnceIfTransientAsync"/>), one delayed retry follows.
     /// </summary>
     [RelayCommand]
     private async Task SwitchAccount(string? label)
@@ -571,7 +581,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         RebuildFetcher();
         RefreshAccountLabel();
         AccountsChanged?.Invoke();
-        await RefreshAsync();
+        var outcome = await RefreshCoreAsync().ConfigureAwait(true);
+        await RetryOnceIfTransientAsync(outcome).ConfigureAwait(true);
     }
 
     /// <summary>
@@ -674,8 +685,25 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>How a <see cref="RefreshCoreAsync"/> attempt ended, so callers that
+    /// need to react (the post-switch retry) don't have to re-parse exception types
+    /// or status text. <c>Ok</c> = fresh data rendered; <c>Transient</c> = a
+    /// network-shaped failure (timeout / connection) that's worth one quick retry;
+    /// <c>Auth</c> = a recovery card is now showing (never retried here — that's
+    /// the user's job); <c>Other</c> = any other failure, or the single-flight/no-
+    /// fetcher guard tripped (nothing ran).</summary>
+    private enum RefreshOutcome { Ok, Transient, Auth, Other }
+
     [RelayCommand]
-    private async Task RefreshAsync()
+    private async Task RefreshAsync() => await RefreshCoreAsync().ConfigureAwait(true);
+
+    /// <summary>The actual fetch-and-render cycle, factored out of the public
+    /// <see cref="RefreshAsync"/> command so callers that need to know HOW it ended
+    /// (the post-switch retry in <see cref="RetryOnceIfTransientAsync"/>) can react
+    /// without re-deriving it from status text. Behavior is unchanged from the
+    /// pre-split RefreshAsync for every existing caller — same status texts, same
+    /// recovery entries, same single-flight guard via <see cref="_refreshing"/>.</summary>
+    private async Task<RefreshOutcome> RefreshCoreAsync()
     {
         // Vault ingest rides the 5-min cycle: fire-and-forget, single-flight,
         // never awaited (spec: Ingestion). Runs even when signed out — the
@@ -683,7 +711,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _vault?.TriggerIngest();
 
         if (_fetcher is null || _refreshing)
-            return;
+            return RefreshOutcome.Other;
         _refreshing = true;
         try
         {
@@ -704,34 +732,63 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             StatusText = "";
             Reason = SignInReason.None;
             UpdateFooter();
+            return RefreshOutcome.Ok;
         }
         catch (SessionExpiredException)
         {
             // Stored key rejected (non-empty, so RebuildFetcher's empty gate never fires):
             // show the actionable recovery card and wipe the now-stale signed-in chrome.
             EnterRecoveryState(SignInReason.Expired);
+            return RefreshOutcome.Auth;
         }
         catch (CloudflareBlockedException)
         {
             // Cloudflare challenge — re-auth re-captures a fresh cf_clearance silently.
             EnterRecoveryState(SignInReason.Blocked);
+            return RefreshOutcome.Auth;
         }
         catch (NetworkException)
         {
             Fail("No connection — retrying…");
+            return RefreshOutcome.Transient;
         }
         catch (HttpRequestException)
         {
             Fail("No connection — retrying…");
+            return RefreshOutcome.Transient;
         }
         catch (Exception ex)
         {
             Fail($"Error: {Truncate(ex.Message, 60)}");
+            return RefreshOutcome.Other;
         }
         finally
         {
             _refreshing = false;
         }
+    }
+
+    /// <summary>After a post-rebuild first fetch comes back TRANSIENT, retry once
+    /// after a short delay. Root cause: an account switch (and a post-sign-in
+    /// reload) cold-starts <see cref="WebView2ApiClient"/> against the SHARED
+    /// webview2-fetch profile, and its anti-bleed cookie wipe forces a fresh
+    /// Cloudflare re-clearance that can race this very first fetch — the hidden
+    /// page usually finishes clearing within a few seconds, well before the next
+    /// 5-minute timer tick. One delayed retry closes that race. Never retries an
+    /// <see cref="RefreshOutcome.Auth"/> outcome — SessionExpired/CloudflareBlocked
+    /// already routed to the recovery card, which is the correct end state.
+    /// Generation-guarded: if another switch/rebuild/sign-out lands during the
+    /// delay, <paramref name="outcome"/>'s context is stale and the retry is
+    /// skipped so it can't stomp on the newer state.</summary>
+    private async Task RetryOnceIfTransientAsync(RefreshOutcome outcome)
+    {
+        if (outcome != RefreshOutcome.Transient)
+            return;
+        int generation = _fetcherGeneration;
+        await Task.Delay(TimeSpan.FromSeconds(5)).ConfigureAwait(true);
+        if (generation != _fetcherGeneration || _fetcher is null || _lastData is not null || Reason != SignInReason.None)
+            return;
+        await RefreshCoreAsync().ConfigureAwait(true);
     }
 
     [RelayCommand]
