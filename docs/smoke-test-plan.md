@@ -114,3 +114,22 @@ Theming rule as above: run once in the default theme, then flip dark / light / M
 4. **Calendar honesty.** 5-week grid below the strip: heat where there's history, dotted no-record texture on uncovered days, faint tick on covered-zero days, today outlined; hover names the day + count ("no record" on textured cells). Vault off → all texture.
 5. **% chip.** Widget tier cards: the % sits on a chip and reads clearly over BOTH sparkline styles in default/dark/light/Matrix.
 6. **Regression trio.** Stack toggle still stacks; erase dialogs still say "Erase it / Keep data"; the paused/off status lines still show in their states.
+
+---
+
+## Scoped-limits wave (2026-07-19)
+
+1. **The Fable bar.** With live data on a Max account: a "Weekly - Fable" card renders
+   between Weekly - Opus and the rest, percentage matching claude.ai; it appears in the
+   History chart tier rows, and CSV export ROWS carry `seven_day_fable` (headers are
+   fixed). Hide/reorder is on the widget card itself (context-menu Hide + drag) — and
+   NOTE: there is no unhide UI, so don't hide the Fable card while smoking unless you
+   want to edit settings.json to get it back.
+2. **July 20 flip.** After the entitlement change lands upstream, the bar tracks the new
+   50% standard allocation with no app update.
+3. **Unknown-key log.** fetch-debug.log contains exactly one `usage: unregistered keys:`
+   line naming the null codename buckets (tangelo, …) per app session — not one per cycle.
+4. **Org stability.** Accounts with a claude_max org + an API org track the Max org's
+   usage regardless of API-side org ordering (numbers match claude.ai's settings page).
+5. **CC attribution.** Local Claude Code burn on a fable model shows as the Fable card's
+   `+Nk` badge, not only in the footer total.

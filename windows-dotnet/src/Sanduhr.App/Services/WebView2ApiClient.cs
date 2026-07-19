@@ -79,6 +79,12 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
 
     private readonly ConcurrentDictionary<string, TaskCompletionSource<FetchReply>> _pending = new();
 
+    // Names already reported to fetch-debug.log — once per process, so a new
+    // upstream vocabulary word logs exactly once instead of every 5-minute
+    // cycle. Names only, never payload values (the fetch-debug contract).
+    private static readonly HashSet<string> ReportedUsageNames = new(StringComparer.Ordinal);
+    private static readonly string[] StructuralUsageKeys = { "_account", "limits", "spend", "member_dashboard_available", "routines" };
+
     private Window? _host;
     private WebView2? _web;
     private Task? _ready;
@@ -123,8 +129,19 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
 
         var reply = await FetchAsync($"{ApiBase}/organizations/{orgId}/usage", null, ct).ConfigureAwait(true);
         var body = RequireBody(reply, "usage");
-        var data = ClaudeApiParsing.ParseUsage(body, _accountNode);
+        JsonObject data;
+        try { data = ClaudeApiParsing.ParseUsage(body, _accountNode); }
+        catch (CloudflareBlockedException)
+        {
+            // The page cleared init but is now wedged behind a challenge —
+            // EnsureReadyOrResetAsync only re-initializes when _ready is null
+            // (_ready ??= InitAsync(ct)), so drop the cached init task and let
+            // the next cycle rebuild the page.
+            _ready = null;
+            throw;
+        }
         Log($"usage: status={reply.Status} tiers={CountTiers(data)}");
+        LogUnknownUsageMembers(data);
         return data;
     }
 
@@ -165,7 +182,16 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
 
         var reply = await FetchAsync($"{ApiBase}/organizations", null, ct).ConfigureAwait(true);
         var body = RequireBody(reply, "organizations");
-        var discovery = ClaudeApiParsing.ParseOrganizations(body);
+        ClaudeApiParsing.OrgDiscovery discovery;
+        try { discovery = ClaudeApiParsing.ParseOrganizations(body); }
+        catch (CloudflareBlockedException)
+        {
+            // Same wedge as GetUsageCoreAsync: drop the cached init task so
+            // EnsureReadyOrResetAsync re-navigates the page next cycle instead
+            // of retrying fetches against a page stuck behind a challenge.
+            _ready = null;
+            throw;
+        }
         _orgId = discovery.OrgId;
         _accountNode = discovery.AccountNode;
         Account = discovery.Account;
@@ -205,6 +231,14 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
 
     private async Task InitAsync(CancellationToken ct)
     {
+        // Re-init must not strand the prior host/webview. EnsureReadyOrResetAsync's
+        // catch and the CloudflareBlockedException handlers above null out _ready to
+        // force a rebuild, and while a challenge stays wedged the 5-minute refresh
+        // timer re-enters InitAsync every cycle — without this teardown each cycle
+        // would abandon the previous hidden Window + its live msedgewebview2.exe
+        // process (and its OnWebMessageReceived subscription) instead of replacing it.
+        TearDownHostAndWebView();
+
         Directory.CreateDirectory(_profileDir);
         Log("init: creating hidden host + WebView2 environment");
 
@@ -428,6 +462,43 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
         return n;
     }
 
+    /// <summary>Flags upstream vocabulary drift: top-level usage keys this build
+    /// doesn't register and <c>limits[]</c> entry kinds it doesn't handle. Logged
+    /// once per name per process (<see cref="ReportedUsageNames"/>) — names only,
+    /// never payload values (the fetch-debug contract). Synthesis (flattening
+    /// scoped keys into <c>limits</c>) happens later in <see cref="UsageFetcher"/>,
+    /// so this sees the raw payload: <see cref="StructuralUsageKeys"/> excludes the
+    /// known structural members and <see cref="TierModel.IsKnown"/> excludes
+    /// canonical + dynamically registered tiers.</summary>
+    private void LogUnknownUsageMembers(JsonObject data)
+    {
+        List<string>? keys = null;
+        foreach (var kv in data)
+        {
+            if (StructuralUsageKeys.Contains(kv.Key) || TierModel.IsKnown(kv.Key))
+                continue;
+            if (ReportedUsageNames.Add("key:" + kv.Key))
+                (keys ??= new()).Add(kv.Key);
+        }
+        if (keys is not null)
+            Log($"usage: unregistered keys: {string.Join(", ", keys)}");
+
+        List<string>? kinds = null;
+        if (data["limits"] is JsonArray limits)
+        {
+            foreach (var node in limits)
+            {
+                if (node is not JsonObject entry) continue;
+                string? kind = entry["kind"] is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
+                if (kind is null or "weekly_scoped" or "session" or "weekly") continue;
+                if (ReportedUsageNames.Add("kind:" + kind))
+                    (kinds ??= new()).Add(kind);
+            }
+        }
+        if (kinds is not null)
+            Log($"usage: unhandled limit kinds: {string.Join(", ", kinds)}");
+    }
+
     private static string SafeHost(string? url)
         => Uri.TryCreate(url, UriKind.Absolute, out var u) ? u.Host : "(?)";
 
@@ -465,28 +536,38 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
         }
     }
 
+    /// <summary>
+    /// Unsubscribe + dispose/close the current <see cref="_web"/>/<see cref="_host"/>
+    /// (if any) and null the fields. Shared by <see cref="InitAsync"/> (tearing down
+    /// a prior instance before re-init) and <see cref="Dispose"/> (final teardown).
+    /// Every step is independently try/catch-swallowed: a half-initialized prior
+    /// instance (e.g. <see cref="_web"/> constructed but its CoreWebView2 never came
+    /// up) must not throw and block whichever caller needs teardown to complete —
+    /// InitAsync's re-init in particular must never fail because the OLD instance
+    /// didn't clean up nicely.
+    /// </summary>
+    private void TearDownHostAndWebView()
+    {
+        try
+        {
+            if (_web?.CoreWebView2 is not null)
+                _web.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
+        }
+        catch { /* best-effort */ }
+        try { _web?.Dispose(); } catch { /* best-effort */ }
+        try { _host?.Close(); } catch { /* best-effort */ }
+        _web = null;
+        _host = null;
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
 
-        void TearDown()
-        {
-            try
-            {
-                if (_web?.CoreWebView2 is not null)
-                    _web.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
-            }
-            catch { /* best-effort */ }
-            try { _web?.Dispose(); } catch { /* best-effort */ }
-            try { _host?.Close(); } catch { /* best-effort */ }
-            _web = null;
-            _host = null;
-        }
-
         if (_dispatcher.CheckAccess())
-            TearDown();
+            TearDownHostAndWebView();
         else
-            _dispatcher.Invoke(TearDown);
+            _dispatcher.Invoke(TearDownHostAndWebView);
     }
 }

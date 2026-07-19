@@ -27,22 +27,52 @@ internal static class ClaudeApiParsing
     internal sealed record OrgDiscovery(string OrgId, JsonObject AccountNode, AccountPlan Account);
 
     /// <summary>
-    /// Parse the <c>/api/organizations</c> response body, selecting the first org
-    /// and capturing its plan fields. Mirrors <c>ClaudeApiClient.GetOrgIdAsync</c>
-    /// 1:1 — same shape checks, same exception messages — so the HttpClient path's
-    /// parity tests cover this code transitively.
+    /// Parse the <c>/api/organizations</c> response body, selecting the org whose
+    /// <c>capabilities</c> we actually track usage for — <c>claude_max</c> preferred,
+    /// then <c>chat</c>, then the first well-formed org as last resort — and
+    /// capturing its plan fields. Same shape checks and exception messages as
+    /// <c>ClaudeApiClient.GetOrgIdAsync</c>, which delegates to this method directly
+    /// (not a parallel reimplementation), so the HttpClient path's parity tests
+    /// cover this code transitively.
     /// </summary>
     internal static OrgDiscovery ParseOrganizations(string body)
     {
         JsonNode? root;
         try { root = JsonNode.Parse(body); }
-        catch (JsonException e) { throw new NetworkException("Org discovery returned non-JSON", e); }
+        catch (JsonException e)
+        {
+            // Cloudflare can serve a challenge page WITH HTTP 200 — a
+            // status-only check (ThrowForStatus/CheckAsync handle 403) never
+            // sees it, and the generic non-JSON error left the UI stuck on
+            // "No connection — retrying…". Only a parse FAILURE consults the
+            // CF sniffer, so JSON payloads containing the word "cloudflare"
+            // can never false-positive.
+            if (ClaudeApiClient.LooksLikeCloudflare(body))
+                throw new CloudflareBlockedException("Cloudflare challenge in 2xx body -- cf_clearance needed");
+            throw new NetworkException("Org discovery returned non-JSON", e);
+        }
 
         if (root is not JsonArray orgs)
             throw new NetworkException("Org discovery returned non-JSON");
         if (orgs.Count == 0)
             throw new NetworkException("No organizations returned for this account");
-        if (orgs[0] is not JsonObject org)
+
+        // Accounts can carry multiple orgs (a claude_max subscription org AND
+        // an API individual org, observed live 2026-07-19). orgs[0] is
+        // ordering-luck; prefer the org we actually track usage for.
+        JsonObject? selected = null, byChat = null, first = null;
+        foreach (var node in orgs)
+        {
+            if (node is not JsonObject candidate) continue;
+            first ??= candidate;
+            if (candidate["capabilities"] is not JsonArray candidateCaps) continue;
+            bool hasMax = candidateCaps.Any(c => c is JsonValue v && v.TryGetValue<string>(out var s) && s == "claude_max");
+            bool hasChat = candidateCaps.Any(c => c is JsonValue v && v.TryGetValue<string>(out var s) && s == "chat");
+            if (hasMax) { selected = candidate; break; }
+            if (hasChat) byChat ??= candidate;
+        }
+        var org = selected ?? byChat ?? first;
+        if (org is null)
             throw new NetworkException("Malformed organization entry");
 
         var uuid = (string?)org["uuid"];
@@ -61,7 +91,8 @@ internal static class ClaudeApiParsing
             (string?)org["rate_limit_tier"],
             (string?)org["billing_type"],
             org["capabilities"] is JsonArray caps
-                ? caps.Select(e => (string?)e).Where(s => s is not null).Select(s => s!).ToArray()
+                ? caps.Select(e => e is JsonValue v && v.TryGetValue<string>(out var s) ? s : null)
+                      .Where(s => s is not null).Select(s => s!).ToArray()
                 : null);
 
         return new OrgDiscovery(uuid, accountNode, account);
@@ -78,7 +109,18 @@ internal static class ClaudeApiParsing
     {
         JsonNode? root;
         try { root = JsonNode.Parse(body); }
-        catch (JsonException e) { throw new NetworkException("Usage endpoint returned non-JSON", e); }
+        catch (JsonException e)
+        {
+            // Cloudflare can serve a challenge page WITH HTTP 200 — a
+            // status-only check (ThrowForStatus/CheckAsync handle 403) never
+            // sees it, and the generic non-JSON error left the UI stuck on
+            // "No connection — retrying…". Only a parse FAILURE consults the
+            // CF sniffer, so JSON payloads containing the word "cloudflare"
+            // can never false-positive.
+            if (ClaudeApiClient.LooksLikeCloudflare(body))
+                throw new CloudflareBlockedException("Cloudflare challenge in 2xx body -- cf_clearance needed");
+            throw new NetworkException("Usage endpoint returned non-JSON", e);
+        }
 
         if (root is not JsonObject data)
             throw new NetworkException("Usage endpoint returned non-object JSON");

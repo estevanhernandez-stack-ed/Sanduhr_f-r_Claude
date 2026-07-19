@@ -878,7 +878,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private void RenderCards(JsonObject data, DateTimeOffset now)
     {
         var utilByKey = new Dictionary<string, double?>();
-        foreach (var key in TierModel.CanonicalOrder)
+        foreach (var key in TierModel.EffectiveOrder)
             utilByKey[key] = Util(data, key);
 
         var active = TierModel.ActiveTiers(utilByKey, _savedOrder, _hidden);
@@ -935,13 +935,13 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         TrayPercentChanged?.Invoke(highest);
     }
 
-    /// <summary>Map the fetch payload to alert snapshots — every canonical tier
-    /// with data participates, hidden or not (a cap is real whether or not its
-    /// card is shown).</summary>
+    /// <summary>Map the fetch payload to alert snapshots — every known tier
+    /// (canonical + dynamic scoped) with data participates, hidden or not (a
+    /// cap is real whether or not its card is shown).</summary>
     private List<TierAlertSnapshot> BuildAlertSnapshots(JsonObject data)
     {
         var snaps = new List<TierAlertSnapshot>();
-        foreach (var key in TierModel.CanonicalOrder)
+        foreach (var key in TierModel.EffectiveOrder)
         {
             var tier = data[key] as JsonObject;
             if (tier is null)

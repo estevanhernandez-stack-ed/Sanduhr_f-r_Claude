@@ -40,11 +40,6 @@ public interface IUsageHistory
 /// </summary>
 public sealed class UsageFetcher
 {
-    // The tiers we persist to history, in canonical order. fetcher._HISTORY_TIERS
-    // is identical to TierModel.CanonicalOrder (five_hour … extra_usage, then
-    // the synthesized routines tier last), so we reuse the single source.
-    private static readonly IReadOnlyList<string> HistoryTiers = TierModel.CanonicalOrder;
-
     private readonly IClaudeApiClient _client;
     private readonly IUsageHistory _history;
 
@@ -89,7 +84,55 @@ public sealed class UsageFetcher
             };
         }
 
-        foreach (var tierKey in HistoryTiers)
+        // Per-model weekly caps ship in the top-level limits[] array
+        // (kind=weekly_scoped, keyed by scope.model.display_name — model.id is
+        // null in live payloads, the display name is the only stable handle).
+        // The flat seven_day_* vocabulary is migrating out upstream
+        // (opus/sonnet now arrive null), so synthesize a flat key per scoped
+        // entry and let the whole tier pipeline pick it up. A NON-null
+        // upstream key of the same name always wins; JSON-null or absent is
+        // synthesized over.
+        if (data["limits"] is JsonArray limits)
+        {
+            foreach (var node in limits)
+            {
+                // One malformed entry must never dark the whole fetch — upstream
+                // drift is exactly what this block exists to absorb. A stray
+                // non-string "kind"/"display_name" (or any other shape surprise)
+                // throws on the explicit JsonNode->string cast; catch it and
+                // move on to the next entry instead of failing every tier.
+                try
+                {
+                    if (node is not JsonObject entry) continue;
+                    if ((string?)entry["kind"] != "weekly_scoped") continue;
+                    string? displayName = (string?)entry["scope"]?["model"]?["display_name"];
+                    if (string.IsNullOrWhiteSpace(displayName)) continue;
+
+                    string slug = ScopedSlug(displayName);
+                    if (slug.Length == 0) continue; // all-punctuation names slug to "" — don't register "seven_day_"
+
+                    string key = "seven_day_" + slug;
+                    TierModel.RegisterScopedTier(key, displayName.Trim());
+                    if (data.ContainsKey(key) && data[key] is not null)
+                        continue;
+                    data[key] = new JsonObject
+                    {
+                        ["utilization"] = entry["percent"]?.DeepClone(),
+                        ["resets_at"] = entry["resets_at"]?.DeepClone(),
+                    };
+                }
+                catch
+                {
+                    // Malformed entry — skip it, not the whole fetch.
+                }
+            }
+        }
+
+        // History tiers = the effective order (canonical + dynamic scoped tiers),
+        // read PER CALL — dynamics register during fetch, so a static capture
+        // would persist a stale list. fetcher._HISTORY_TIERS parity now spans
+        // both static and synthesized keys.
+        foreach (var tierKey in TierModel.EffectiveOrder)
         {
             // A tier with a non-null utilization is a data point worth recording.
             // Absent / JSON-null utilization is skipped (parity with
@@ -111,5 +154,29 @@ public sealed class UsageFetcher
         }
 
         return data;
+    }
+
+    /// <summary>Community slug convention for scoped-limit keys:
+    /// "Fable" → fable, "Haiku 5" → haiku_5. Lowercase, non-alphanumeric runs
+    /// collapse to '_', trimmed — so a display-name tweak upstream maps to a
+    /// stable key wherever possible.</summary>
+    internal static string ScopedSlug(string displayName)
+    {
+        var sb = new System.Text.StringBuilder(displayName.Length);
+        bool lastUnderscore = false;
+        foreach (char c in displayName.ToLowerInvariant())
+        {
+            if (c is >= 'a' and <= 'z' or >= '0' and <= '9')
+            {
+                sb.Append(c);
+                lastUnderscore = false;
+            }
+            else if (!lastUnderscore && sb.Length > 0)
+            {
+                sb.Append('_');
+                lastUnderscore = true;
+            }
+        }
+        return sb.ToString().TrimEnd('_');
     }
 }

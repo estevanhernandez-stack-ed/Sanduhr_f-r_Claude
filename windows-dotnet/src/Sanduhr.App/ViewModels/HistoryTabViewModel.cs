@@ -118,7 +118,7 @@ public sealed partial class HistoryTabViewModel : ObservableObject
         string? selected = SelectedOption?.Account;
         var rows = new List<ChartRow>();
 
-        foreach (var key in TierModel.CanonicalOrder)
+        foreach (var key in TierModel.EffectiveOrder)
         {
             var series = new List<ChartSeries>();
             if (selected is null)

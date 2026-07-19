@@ -10,9 +10,21 @@ namespace Sanduhr.Tests;
 /// assertions from test_tier_card.py / test_fetcher.py. Rendering is item 5
 /// and out of scope here.
 /// </summary>
-public class TierModelTests
+public class TierModelTests : IDisposable
 {
     private static readonly DateTimeOffset Now = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+    // TierModel's dynamic scoped-tier registry is process-global static
+    // state (see TierModel.RegisterScopedTier). xUnit creates a fresh
+    // TierModelTests instance per test but does NOT isolate static state
+    // between them, and execution order within the class is not guaranteed
+    // to match declaration order — so a dynamic-tier test running directly
+    // before an older, untouched test (e.g. ResolveOrder_honors_saved_order_
+    // then_appends_remainder) can leak a registered key into it. Each test
+    // that registers a dynamic tier already resets at its own opening line;
+    // this Dispose() closes the other side of the gate so no test leaves
+    // dynamic state behind for whichever test runs next.
+    public void Dispose() => TierModel.ResetDynamicTiersForTests();
 
     // -- canonical registry ---------------------------------------------------
 
@@ -25,6 +37,7 @@ public class TierModelTests
             "seven_day",
             "seven_day_sonnet",
             "seven_day_opus",
+            "seven_day_fable",
             "seven_day_cowork",
             "seven_day_omelette",
             "seven_day_oauth_apps",
@@ -204,5 +217,71 @@ public class TierModelTests
         var hidden = new HashSet<string> { "seven_day_sonnet" };
         var active = TierModel.ActiveTiers(util, savedOrder: null, hiddenTiers: hidden);
         Assert.Equal(new[] { "five_hour", "routines" }, active);
+    }
+
+    // -- scoped-limits wave: seven_day_fable + dynamic registry + EffectiveOrder ---
+
+    [Fact]
+    public void SevenDayFable_IsStaticallyRegistered()
+    {
+        TierModel.ResetDynamicTiersForTests();
+        Assert.True(TierModel.IsKnown(TierModel.SevenDayFable));
+        Assert.Equal("Weekly - Fable", TierModel.Label(TierModel.SevenDayFable));
+        int fable = TierModel.CanonicalOrder.ToList().IndexOf(TierModel.SevenDayFable);
+        int opus = TierModel.CanonicalOrder.ToList().IndexOf(TierModel.SevenDayOpus);
+        Assert.Equal(opus + 1, fable);
+        Assert.False(TierModel.IsSpeculative(TierModel.SevenDayFable));
+    }
+
+    [Fact]
+    public void EffectiveOrder_EqualsCanonical_WhenNoDynamics()
+    {
+        TierModel.ResetDynamicTiersForTests();
+        Assert.Equal(TierModel.CanonicalOrder, TierModel.EffectiveOrder);
+    }
+
+    [Fact]
+    public void RegisterScopedTier_AddsKnownLabeledKey_InFamilyPosition()
+    {
+        TierModel.ResetDynamicTiersForTests();
+        TierModel.RegisterScopedTier("seven_day_haiku_5", "Haiku 5");
+        Assert.True(TierModel.IsKnown("seven_day_haiku_5"));
+        Assert.Equal("Weekly - Haiku 5", TierModel.Label("seven_day_haiku_5"));
+        var order = TierModel.EffectiveOrder.ToList();
+        Assert.Equal(order.IndexOf(TierModel.SevenDayOauthApps) + 1, order.IndexOf("seven_day_haiku_5"));
+        Assert.True(order.IndexOf("seven_day_haiku_5") < order.IndexOf(TierModel.IguanaNecktie));
+    }
+
+    [Fact]
+    public void RegisterScopedTier_IsIdempotent_AndStaticKeysNoOp()
+    {
+        TierModel.ResetDynamicTiersForTests();
+        TierModel.RegisterScopedTier("seven_day_zephyr", "Zephyr");
+        TierModel.RegisterScopedTier("seven_day_zephyr", "Zephyr Again");
+        Assert.Equal("Weekly - Zephyr", TierModel.Label("seven_day_zephyr"));
+        Assert.Equal(1, TierModel.EffectiveOrder.Count(k => k == "seven_day_zephyr"));
+        TierModel.RegisterScopedTier(TierModel.SevenDayFable, "Renamed");
+        Assert.Equal("Weekly - Fable", TierModel.Label(TierModel.SevenDayFable));
+    }
+
+    [Fact]
+    public void ResolveOrder_SurfacesDynamics_AndSavedDynamicKeysResolve()
+    {
+        TierModel.ResetDynamicTiersForTests();
+        TierModel.RegisterScopedTier("seven_day_zephyr", "Zephyr");
+        var resolved = TierModel.ResolveOrder(null);
+        Assert.Contains("seven_day_zephyr", resolved);
+        var savedFirst = TierModel.ResolveOrder(new[] { "seven_day_zephyr", "bogus_key" });
+        Assert.Equal("seven_day_zephyr", savedFirst[0]);
+        Assert.DoesNotContain("bogus_key", savedFirst);
+    }
+
+    [Fact]
+    public void ActiveTiers_RendersDynamicWithData()
+    {
+        TierModel.ResetDynamicTiersForTests();
+        TierModel.RegisterScopedTier("seven_day_zephyr", "Zephyr");
+        var util = new Dictionary<string, double?> { ["seven_day_zephyr"] = 12.0 };
+        Assert.Contains("seven_day_zephyr", TierModel.ActiveTiers(util));
     }
 }

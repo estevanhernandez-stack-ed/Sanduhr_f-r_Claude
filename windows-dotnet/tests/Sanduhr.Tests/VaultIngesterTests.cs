@@ -450,7 +450,7 @@ public class VaultIngesterTests
         Assert.Equal("seven_day_opus", CcLogReader.TierForModel("claude-opus-4-8"));
         Assert.Equal("seven_day_sonnet", CcLogReader.TierForModel("claude-sonnet-5"));
         Assert.Equal("seven_day", CcLogReader.TierForModel("claude-haiku-4-5-20251001"));
-        Assert.Null(CcLogReader.TierForModel("claude-fable-5"));
+        Assert.Equal(TierModel.SevenDayFable, CcLogReader.TierForModel("claude-fable-5"));
         Assert.Null(CcLogReader.TierForModel("<synthetic>"));
         Assert.Null(CcLogReader.TierForModel(null));
         Assert.Equal(CcLogReader.TierForModel("claude-sonnet-5"), new CcLogReader().ModelToTierKey("claude-sonnet-5"));

@@ -17,6 +17,33 @@ namespace Sanduhr.Tests;
 /// </summary>
 public class ClaudeApiParsingTests
 {
+    // -- CF-challenge-on-200 classification ------------------------------------
+    // Cloudflare can serve a challenge page WITH HTTP 200; a status-only check
+    // never sees it, so both parse entry points must sniff the body on a JSON
+    // parse FAILURE and classify it as CloudflareBlockedException rather than
+    // the generic non-JSON NetworkException.
+
+    private const string ChallengeHtml = "<html><head><title>Just a moment...</title></head><body>cf-challenge</body></html>";
+
+    [Fact]
+    public void ParseUsage_ChallengeBodyOn200_ThrowsCloudflareBlocked()
+        => Assert.Throws<CloudflareBlockedException>(() => ClaudeApiParsing.ParseUsage(ChallengeHtml, null));
+
+    [Fact]
+    public void ParseOrganizations_ChallengeBody_ThrowsCloudflareBlocked()
+        => Assert.Throws<CloudflareBlockedException>(() => ClaudeApiParsing.ParseOrganizations(ChallengeHtml));
+
+    [Fact]
+    public void ValidJson_ContainingCloudflareText_ParsesNormally()
+    {
+        var data = ClaudeApiParsing.ParseUsage("""{ "note": "we love cloudflare", "five_hour": null }""", null);
+        Assert.Equal("we love cloudflare", (string?)data["note"]);
+    }
+
+    [Fact]
+    public void NonCfGarbage_StillThrowsNetworkException()
+        => Assert.Throws<NetworkException>(() => ClaudeApiParsing.ParseUsage("<html>plain error page</html>", null));
+
     // -- ParseOrganizations ---------------------------------------------------
 
     [Fact]
@@ -71,6 +98,84 @@ public class ClaudeApiParsingTests
     [Fact]
     public void ParseOrganizations_missing_uuid_throws_network()
         => Assert.Throws<NetworkException>(() => ClaudeApiParsing.ParseOrganizations("[{\"name\":\"no uuid\"}]"));
+
+    // -- ParseOrganizations: capabilities-driven selection ---------------------
+    // Accounts can carry multiple orgs (a claude_max subscription org AND an API
+    // individual org, observed live on the owner's account 2026-07-19). orgs[0]
+    // was ordering-luck; selection now prefers claude_max, then chat, then first.
+
+    private const string TwoOrgFixture = """
+    [
+      { "uuid": "aaaa-1111", "name": "someone's Organization",
+        "rate_limit_tier": "default_claude_max_20x", "billing_type": "stripe_subscription",
+        "capabilities": ["claude_max", "chat"] },
+      { "uuid": "bbbb-2222", "name": "Someone's Individual Org",
+        "rate_limit_tier": "auto_trust_tier_c", "billing_type": "prepaid",
+        "capabilities": ["api", "api_individual"] }
+    ]
+    """;
+
+    [Fact]
+    public void PicksClaudeMaxOrg_RegardlessOfOrdering()
+    {
+        Assert.Equal("aaaa-1111", ClaudeApiParsing.ParseOrganizations(TwoOrgFixture).OrgId);
+        // reversed ordering must select the SAME org
+        var reversed = """
+        [
+          { "uuid": "bbbb-2222", "capabilities": ["api", "api_individual"] },
+          { "uuid": "aaaa-1111", "rate_limit_tier": "default_claude_max_20x",
+            "billing_type": "stripe_subscription", "capabilities": ["claude_max", "chat"] }
+        ]
+        """;
+        var d = ClaudeApiParsing.ParseOrganizations(reversed);
+        Assert.Equal("aaaa-1111", d.OrgId);
+        Assert.Equal("default_claude_max_20x", d.Account.RateLimitTier);   // plan fields from the SELECTED org
+    }
+
+    [Fact]
+    public void FallsBackToChat_ThenFirst()
+    {
+        var chatOnly = """[ { "uuid": "x", "capabilities": ["api"] }, { "uuid": "y", "capabilities": ["chat"] } ]""";
+        Assert.Equal("y", ClaudeApiParsing.ParseOrganizations(chatOnly).OrgId);
+        var noCaps = """[ { "uuid": "x" }, { "uuid": "y" } ]""";
+        Assert.Equal("x", ClaudeApiParsing.ParseOrganizations(noCaps).OrgId);
+    }
+
+    [Fact]
+    public void NonStringCapabilitiesElement_IsSkipped_SelectionContinuesToClaudeMaxOrg()
+    {
+        // Live junk shape: a non-string element (e.g. a stray numeric id) sitting
+        // in capabilities[] alongside real capability strings. The unguarded
+        // (string?)c cast used to throw InvalidOperationException here, darking
+        // org discovery entirely. A junk element must be skipped, not fatal —
+        // and the claude_max org two entries later must still win selection.
+        var withJunkElement = """
+        [
+          { "uuid": "junk-org", "capabilities": ["api", 123] },
+          { "uuid": "aaaa-1111", "rate_limit_tier": "default_claude_max_20x",
+            "billing_type": "stripe_subscription", "capabilities": ["claude_max", "chat"] }
+        ]
+        """;
+        var d = ClaudeApiParsing.ParseOrganizations(withJunkElement);
+        Assert.Equal("aaaa-1111", d.OrgId);
+    }
+
+    [Fact]
+    public void SelectedOrgWithNonStringCapability_KeepsOnlyStringElements_NoThrow()
+    {
+        // The sibling hazard: the SELECTED org's own capabilities carry a
+        // non-string element. AccountPlan.Capabilities must silently drop it
+        // rather than throwing while building the tier-badge fields.
+        var d = ClaudeApiParsing.ParseOrganizations("""
+            [{
+                "uuid": "org-123",
+                "capabilities": ["claude_max", 123, "chat"]
+            }]
+            """);
+
+        Assert.Equal("org-123", d.OrgId);
+        Assert.Equal(new[] { "claude_max", "chat" }, d.Account.Capabilities);
+    }
 
     // -- ParseUsage -----------------------------------------------------------
 

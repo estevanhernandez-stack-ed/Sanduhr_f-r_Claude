@@ -62,11 +62,11 @@ public sealed class HistoryChart : FrameworkElement
         var textSecondary = Frozen(_palette.TextSecondary);
         var textDim = Frozen(_palette.TextDim);
 
-        // Stable left-gutter width from the FULL canonical label set (parity with
+        // Stable left-gutter width from the FULL effective label set (parity with
         // Python computing label_w over all _TIER_LABELS, not just rows present),
         // so the gutter doesn't jitter as tiers gain/lose data.
         double labelW = 0;
-        foreach (var key in TierModel.CanonicalOrder)
+        foreach (var key in TierModel.EffectiveOrder)
             labelW = Math.Max(labelW, MeasureWidth(TierModel.Label(key), typeface, FontSize, dpi));
         labelW += 12;
 
