@@ -12,8 +12,16 @@ namespace Sanduhr.Tests;
 /// the history append (isolated to a temp APPDATA in Python) becomes a recording
 /// fake <see cref="IUsageHistory"/>.
 /// </summary>
-public class UsageFetcherTests
+public class UsageFetcherTests : IDisposable
 {
+    // TierModel's dynamic scoped-tier registry is process-global static state
+    // (see TierModel.RegisterScopedTier). The scoped-limits synthesis tests
+    // below register dynamic tiers via UsageFetcher.FetchAsync; each such test
+    // resets at its own opening line (parity with TierModelTests), and this
+    // Dispose() closes the other side of the gate so no test leaves dynamic
+    // state behind for whichever test runs next in the class.
+    public void Dispose() => TierModel.ResetDynamicTiersForTests();
+
     // -- fakes ----------------------------------------------------------------
 
     private sealed class FakeClient : IClaudeApiClient
@@ -49,6 +57,17 @@ public class UsageFetcherTests
     }
 
     private static JsonObject Obj(string json) => (JsonObject)JsonNode.Parse(json)!;
+
+    /// <summary>Fetch helper for the scoped-limits synthesis tests: a stub
+    /// client that parses <paramref name="body"/> as the usage payload and
+    /// returns a null Routines budget (no code-access endpoint involved),
+    /// against a fresh or caller-supplied <see cref="IUsageHistory"/>.</summary>
+    private static Task<JsonObject> FetchWith(string body, IUsageHistory? history = null)
+    {
+        var client = new FakeClient { Usage = () => Obj(body) };
+        var fetcher = new UsageFetcher(client, history ?? new RecordingHistory());
+        return fetcher.FetchAsync();
+    }
 
     // -- success / data flow --------------------------------------------------
 
@@ -205,5 +224,109 @@ public class UsageFetcherTests
     {
         public IReadOnlyList<int> Append(string tierKey, int utilization, string? resetsAt = null)
             => throw new InvalidOperationException("disk full");
+    }
+
+    // -- scoped-limits wave: synthesize seven_day_* from limits[] -------------
+    //
+    // Verbatim from the 2026-07-19 live probe of the owner's Max account —
+    // this exact shape (weekly_scoped kind, null model.id, display_name-only
+    // handle, opus/sonnet migrating to null) is the contract these tests pin.
+
+    private const string LiveLimitsFixture = """
+    {
+      "five_hour": { "utilization": 12, "resets_at": "2026-07-20T03:00:00Z" },
+      "seven_day": { "utilization": 34, "resets_at": "2026-07-26T05:59:59Z" },
+      "seven_day_opus": null,
+      "seven_day_sonnet": null,
+      "extra_usage": { "utilization": 19, "resets_at": null },
+      "limits": [
+        { "kind": "session", "group": "session", "percent": 12, "severity": "normal",
+          "resets_at": "2026-07-20T03:00:00Z", "scope": null, "is_active": true },
+        { "kind": "weekly", "group": "weekly", "percent": 34, "severity": "normal",
+          "resets_at": "2026-07-26T05:59:59Z", "is_active": true, "scope": null },
+        { "kind": "weekly_scoped", "group": "weekly", "percent": 7, "severity": "normal",
+          "resets_at": "2026-07-26T05:59:59Z", "is_active": false,
+          "scope": { "model": { "id": null, "display_name": "Fable" }, "surface": null } }
+      ]
+    }
+    """;
+
+    [Fact]
+    public async Task Synthesizes_SevenDayFable_FromWeeklyScopedLimit()
+    {
+        TierModel.ResetDynamicTiersForTests();
+        var data = await FetchWith(LiveLimitsFixture);
+        var fable = Assert.IsType<JsonObject>(data["seven_day_fable"]);
+        Assert.Equal(7, (int)fable["utilization"]!.GetValue<double>());
+        Assert.Equal("2026-07-26T05:59:59Z", (string?)fable["resets_at"]);
+    }
+
+    [Fact]
+    public async Task NonScoped_And_Scopeless_Limits_AreIgnored()
+    {
+        TierModel.ResetDynamicTiersForTests();
+        var data = await FetchWith(LiveLimitsFixture);
+        // session/weekly group entries must NOT synthesize keys ("seven_day_" + nothing)
+        Assert.All(data.Select(kv => kv.Key), k => Assert.False(k == "seven_day_"));
+        Assert.Null(data["session"]);
+    }
+
+    [Fact]
+    public async Task DoesNotOverwrite_NonNull_UpstreamKey()
+    {
+        TierModel.ResetDynamicTiersForTests();
+        var body = LiveLimitsFixture.Replace("\"seven_day_opus\": null",
+            "\"seven_day_opus\": null, \"seven_day_fable\": { \"utilization\": 99, \"resets_at\": null }");
+        var data = await FetchWith(body);
+        Assert.Equal(99, (int)data["seven_day_fable"]!["utilization"]!.GetValue<double>());
+    }
+
+    [Fact]
+    public async Task Fills_JsonNull_UpstreamKey()
+    {
+        TierModel.ResetDynamicTiersForTests();
+        var body = LiveLimitsFixture.Replace("\"seven_day_opus\": null",
+            "\"seven_day_opus\": null, \"seven_day_fable\": null");
+        var data = await FetchWith(body);
+        Assert.Equal(7, (int)data["seven_day_fable"]!["utilization"]!.GetValue<double>());
+    }
+
+    [Fact]
+    public async Task NullPercent_SynthesizesNullUtilization()
+    {
+        TierModel.ResetDynamicTiersForTests();
+        var body = LiveLimitsFixture.Replace("\"percent\": 7", "\"percent\": null");
+        var data = await FetchWith(body);
+        var fable = Assert.IsType<JsonObject>(data["seven_day_fable"]);
+        Assert.Null(fable["utilization"]);
+    }
+
+    [Fact]
+    public async Task MissingOrMalformed_Limits_NoOp()
+    {
+        TierModel.ResetDynamicTiersForTests();
+        var noLimits = await FetchWith("""{ "five_hour": { "utilization": 1, "resets_at": null } }""");
+        Assert.Null(noLimits["seven_day_fable"]);
+        var badLimits = await FetchWith("""{ "limits": { "not": "an array" } }""");
+        Assert.Null(badLimits["seven_day_fable"]);
+        var junkEntries = await FetchWith("""{ "limits": [ 42, null, { "kind": "weekly_scoped" } ] }""");
+        Assert.Null(junkEntries["seven_day_fable"]);
+    }
+
+    [Theory]
+    [InlineData("Fable", "fable")]
+    [InlineData("Haiku 5", "haiku_5")]
+    [InlineData("  Weird--Name!! ", "weird_name")]
+    public void ScopedSlug_NormalizesDisplayNames(string display, string slug)
+        => Assert.Equal(slug, UsageFetcher.ScopedSlug(display));
+
+    [Fact]
+    public async Task SynthesizedTier_RegistersAndPersistsToHistory()
+    {
+        TierModel.ResetDynamicTiersForTests();
+        var history = new RecordingHistory();
+        var data = await FetchWith(LiveLimitsFixture, history);
+        Assert.True(TierModel.IsKnown("seven_day_fable"));
+        Assert.Contains(history.Appends, a => a.Tier == "seven_day_fable" && a.Util == 7);
     }
 }

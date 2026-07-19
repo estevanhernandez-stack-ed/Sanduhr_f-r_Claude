@@ -84,6 +84,35 @@ public sealed class UsageFetcher
             };
         }
 
+        // Per-model weekly caps ship in the top-level limits[] array
+        // (kind=weekly_scoped, keyed by scope.model.display_name — model.id is
+        // null in live payloads, the display name is the only stable handle).
+        // The flat seven_day_* vocabulary is migrating out upstream
+        // (opus/sonnet now arrive null), so synthesize a flat key per scoped
+        // entry and let the whole tier pipeline pick it up. A NON-null
+        // upstream key of the same name always wins; JSON-null or absent is
+        // synthesized over.
+        if (data["limits"] is JsonArray limits)
+        {
+            foreach (var node in limits)
+            {
+                if (node is not JsonObject entry) continue;
+                if ((string?)entry["kind"] != "weekly_scoped") continue;
+                string? displayName = (string?)entry["scope"]?["model"]?["display_name"];
+                if (string.IsNullOrWhiteSpace(displayName)) continue;
+
+                string key = "seven_day_" + ScopedSlug(displayName);
+                TierModel.RegisterScopedTier(key, displayName.Trim());
+                if (data.ContainsKey(key) && data[key] is not null)
+                    continue;
+                data[key] = new JsonObject
+                {
+                    ["utilization"] = entry["percent"]?.DeepClone(),
+                    ["resets_at"] = entry["resets_at"]?.DeepClone(),
+                };
+            }
+        }
+
         // History tiers = the effective order (canonical + dynamic scoped tiers),
         // read PER CALL — dynamics register during fetch, so a static capture
         // would persist a stale list. fetcher._HISTORY_TIERS parity now spans
@@ -110,5 +139,29 @@ public sealed class UsageFetcher
         }
 
         return data;
+    }
+
+    /// <summary>Community slug convention for scoped-limit keys:
+    /// "Fable" → fable, "Haiku 5" → haiku_5. Lowercase, non-alphanumeric runs
+    /// collapse to '_', trimmed — so a display-name tweak upstream maps to a
+    /// stable key wherever possible.</summary>
+    internal static string ScopedSlug(string displayName)
+    {
+        var sb = new System.Text.StringBuilder(displayName.Length);
+        bool lastUnderscore = false;
+        foreach (char c in displayName.ToLowerInvariant())
+        {
+            if (c is >= 'a' and <= 'z' or >= '0' and <= '9')
+            {
+                sb.Append(c);
+                lastUnderscore = false;
+            }
+            else if (!lastUnderscore && sb.Length > 0)
+            {
+                sb.Append('_');
+                lastUnderscore = true;
+            }
+        }
+        return sb.ToString().TrimEnd('_');
     }
 }
