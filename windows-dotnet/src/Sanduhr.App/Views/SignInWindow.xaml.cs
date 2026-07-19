@@ -205,6 +205,13 @@ internal partial class SignInWindow : Window
         GoogleNotice.Visibility = onGoogle ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    /// <summary>Primary path off the Google-bounce banner — sends the WebView back to the
+    /// login chooser so the user can pick "Continue with email". No manual visibility
+    /// toggle here: the banner hides itself once <see cref="UpdateOAuthNotice"/> sees the
+    /// WebView land back on a claude.ai host.</summary>
+    private void OnGoogleNoticeBackClick(object sender, RoutedEventArgs e)
+        => WebView.CoreWebView2?.Navigate(ClaudeSignIn.LoginUrl);
+
     private void OnGoogleNoticePasteClick(object sender, RoutedEventArgs e)
         => CompleteAndClose(new SignInResult.UseManual());
 
