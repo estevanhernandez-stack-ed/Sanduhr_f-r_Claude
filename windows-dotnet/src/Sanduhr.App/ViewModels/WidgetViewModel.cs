@@ -789,6 +789,11 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         if (outcome != RefreshOutcome.Transient)
             return;
+        // The transient failure here is the post-rebuild settle race, not an
+        // outage — fetch-debug proved the connection was fine while the generic
+        // "No connection" text showed. Say what's actually happening for the
+        // retry window; a failed retry falls back to the honest Fail() text.
+        StatusText = "Reconnecting…";
         int generation = _fetcherGeneration;
         await Task.Delay(TimeSpan.FromSeconds(5)).ConfigureAwait(true);
         if (generation != _fetcherGeneration || _fetcher is null || _lastData is not null || Reason != SignInReason.None)

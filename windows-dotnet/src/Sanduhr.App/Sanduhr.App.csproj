@@ -51,15 +51,15 @@
          Setting StartupObject suppresses the WPF-generated Main in App.g.cs (the build
          uses Program.Main instead). See Program.cs. -->
     <StartupObject>Sanduhr.App.Program</StartupObject>
-    <!-- v3.2.0: the Claude Usage tab — opt-in local usage vault (WS-C), subagent-transcript
-         coverage + sent/received split + rolling calendar (WS-C.1), sessions ledger, trends.
-         v3.1.0 was the feature overhaul on the .NET base and the .NET Store debut; v3.0.0 was
-         the platform rebuild (Python/PySide6 -> .NET 10/WPF), never shipped. MSIX requires a
-         4-part version with the 4th component .0 (Partner Center rejects non-zero revisions).
-         Keep these three in lockstep with <Identity Version> in Package.appxmanifest. -->
-    <Version>3.2.0.0</Version>
-    <AssemblyVersion>3.2.0.0</AssemblyVersion>
-    <FileVersion>3.2.0.0</FileVersion>
+    <!-- v3.3.0: the Fable release — model-scoped weekly limit bars synthesized generically
+         from the API's limits[] array (shipped the day before Fable went standard on Max),
+         email-code sign-in walkthrough for Google users, scoped-tier alert quieting, switch
+         retry. v3.2.0 was the Claude Usage tab + usage vault. MSIX requires a 4-part version
+         with the 4th component .0 (Partner Center rejects non-zero revisions). Keep these
+         three in lockstep with <Identity Version> in Package.appxmanifest. -->
+    <Version>3.3.0.0</Version>
+    <AssemblyVersion>3.3.0.0</AssemblyVersion>
+    <FileVersion>3.3.0.0</FileVersion>
   </PropertyGroup>
 
 </Project>
