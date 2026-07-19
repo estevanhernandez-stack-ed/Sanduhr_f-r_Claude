@@ -79,6 +79,12 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
 
     private readonly ConcurrentDictionary<string, TaskCompletionSource<FetchReply>> _pending = new();
 
+    // Names already reported to fetch-debug.log — once per process, so a new
+    // upstream vocabulary word logs exactly once instead of every 5-minute
+    // cycle. Names only, never payload values (the fetch-debug contract).
+    private static readonly HashSet<string> ReportedUsageNames = new(StringComparer.Ordinal);
+    private static readonly string[] StructuralUsageKeys = { "_account", "limits", "spend", "member_dashboard_available", "routines" };
+
     private Window? _host;
     private WebView2? _web;
     private Task? _ready;
@@ -135,6 +141,7 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
             throw;
         }
         Log($"usage: status={reply.Status} tiers={CountTiers(data)}");
+        LogUnknownUsageMembers(data);
         return data;
     }
 
@@ -453,6 +460,43 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
             if (kv.Key != "_account" && kv.Value is JsonObject)
                 n++;
         return n;
+    }
+
+    /// <summary>Flags upstream vocabulary drift: top-level usage keys this build
+    /// doesn't register and <c>limits[]</c> entry kinds it doesn't handle. Logged
+    /// once per name per process (<see cref="ReportedUsageNames"/>) — names only,
+    /// never payload values (the fetch-debug contract). Synthesis (flattening
+    /// scoped keys into <c>limits</c>) happens later in <see cref="UsageFetcher"/>,
+    /// so this sees the raw payload: <see cref="StructuralUsageKeys"/> excludes the
+    /// known structural members and <see cref="TierModel.IsKnown"/> excludes
+    /// canonical + dynamically registered tiers.</summary>
+    private void LogUnknownUsageMembers(JsonObject data)
+    {
+        List<string>? keys = null;
+        foreach (var kv in data)
+        {
+            if (StructuralUsageKeys.Contains(kv.Key) || TierModel.IsKnown(kv.Key))
+                continue;
+            if (ReportedUsageNames.Add("key:" + kv.Key))
+                (keys ??= new()).Add(kv.Key);
+        }
+        if (keys is not null)
+            Log($"usage: unregistered keys: {string.Join(", ", keys)}");
+
+        List<string>? kinds = null;
+        if (data["limits"] is JsonArray limits)
+        {
+            foreach (var node in limits)
+            {
+                if (node is not JsonObject entry) continue;
+                var kind = (string?)entry["kind"];
+                if (kind is null or "weekly_scoped" or "session" or "weekly") continue;
+                if (ReportedUsageNames.Add("kind:" + kind))
+                    (kinds ??= new()).Add(kind);
+            }
+        }
+        if (kinds is not null)
+            Log($"usage: unhandled limit kinds: {string.Join(", ", kinds)}");
     }
 
     private static string SafeHost(string? url)
