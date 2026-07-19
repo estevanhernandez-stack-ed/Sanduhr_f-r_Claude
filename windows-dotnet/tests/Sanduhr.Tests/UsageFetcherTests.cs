@@ -298,6 +298,7 @@ public class UsageFetcherTests : IDisposable
         var body = LiveLimitsFixture.Replace("\"percent\": 7", "\"percent\": null");
         var data = await FetchWith(body);
         var fable = Assert.IsType<JsonObject>(data["seven_day_fable"]);
+        Assert.True(fable.ContainsKey("utilization")); // present-with-null, not omitted
         Assert.Null(fable["utilization"]);
     }
 
@@ -328,5 +329,83 @@ public class UsageFetcherTests : IDisposable
         var data = await FetchWith(LiveLimitsFixture, history);
         Assert.True(TierModel.IsKnown("seven_day_fable"));
         Assert.Contains(history.Appends, a => a.Tier == "seven_day_fable" && a.Util == 7);
+    }
+
+    // "Fable" above is already a static canonical key (TierModel.SevenDayFable),
+    // so its IsKnown assertion above is tautological and its history assertion
+    // would pass even if RegisterScopedTier were a no-op. "Haiku 5" is NOT in
+    // TierModel.CanonicalOrder — this is the proof that a truly dynamic tier
+    // both registers AND persists to history within the SAME FetchAsync call.
+    private const string DynamicScopedLimitsFixture = """
+    {
+      "five_hour": { "utilization": 12, "resets_at": "2026-07-20T03:00:00Z" },
+      "limits": [
+        { "kind": "weekly_scoped", "group": "weekly", "percent": 42, "severity": "normal",
+          "resets_at": "2026-07-26T05:59:59Z", "is_active": true,
+          "scope": { "model": { "id": null, "display_name": "Haiku 5" }, "surface": null } }
+      ]
+    }
+    """;
+
+    [Fact]
+    public async Task DynamicScopedTier_RegistersAndPersistsToHistory_InSameFetch()
+    {
+        TierModel.ResetDynamicTiersForTests();
+        Assert.False(TierModel.IsKnown("seven_day_haiku_5")); // sanity: truly dynamic, not statically known
+        var history = new RecordingHistory();
+
+        var data = await FetchWith(DynamicScopedLimitsFixture, history);
+
+        Assert.True(TierModel.IsKnown("seven_day_haiku_5"));
+        var haiku = Assert.IsType<JsonObject>(data["seven_day_haiku_5"]);
+        Assert.Equal(42, (int)haiku["utilization"]!.GetValue<double>());
+        Assert.Contains(history.Appends, a => a.Tier == "seven_day_haiku_5" && a.Util == 42);
+    }
+
+    [Fact]
+    public async Task MalformedEntry_IsSkipped_ValidEntryStillSynthesizes()
+    {
+        // One junk `kind` (a number) and one junk `display_name` (a number)
+        // must not dark the whole fetch — the valid Fable entry between them
+        // still synthesizes. Regression for the pre-fix behavior where the
+        // explicit JsonNode->string cast threw InvalidOperationException with
+        // no try/catch, failing FetchAsync entirely on a single bad entry.
+        TierModel.ResetDynamicTiersForTests();
+        var body = """
+        {
+          "limits": [
+            { "kind": 42 },
+            { "kind": "weekly_scoped", "percent": 7, "resets_at": "2026-07-26T05:59:59Z",
+              "scope": { "model": { "display_name": "Fable" } } },
+            { "kind": "weekly_scoped", "scope": { "model": { "display_name": 7 } } }
+          ]
+        }
+        """;
+
+        var data = await FetchWith(body); // must not throw
+
+        var fable = Assert.IsType<JsonObject>(data["seven_day_fable"]);
+        Assert.Equal(7, (int)fable["utilization"]!.GetValue<double>());
+    }
+
+    [Fact]
+    public async Task AllPunctuation_DisplayName_YieldsNoEmptySlugKey()
+    {
+        // "!!!" passes the IsNullOrWhiteSpace guard but slugs to "", which
+        // would register the bogus "seven_day_" key without the length guard.
+        TierModel.ResetDynamicTiersForTests();
+        var body = """
+        {
+          "limits": [
+            { "kind": "weekly_scoped", "percent": 5, "resets_at": null,
+              "scope": { "model": { "display_name": "!!!" } } }
+          ]
+        }
+        """;
+
+        var data = await FetchWith(body);
+
+        Assert.False(data.ContainsKey("seven_day_"));
+        Assert.False(TierModel.IsKnown("seven_day_"));
     }
 }

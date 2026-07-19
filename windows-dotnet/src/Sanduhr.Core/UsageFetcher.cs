@@ -96,20 +96,35 @@ public sealed class UsageFetcher
         {
             foreach (var node in limits)
             {
-                if (node is not JsonObject entry) continue;
-                if ((string?)entry["kind"] != "weekly_scoped") continue;
-                string? displayName = (string?)entry["scope"]?["model"]?["display_name"];
-                if (string.IsNullOrWhiteSpace(displayName)) continue;
-
-                string key = "seven_day_" + ScopedSlug(displayName);
-                TierModel.RegisterScopedTier(key, displayName.Trim());
-                if (data.ContainsKey(key) && data[key] is not null)
-                    continue;
-                data[key] = new JsonObject
+                // One malformed entry must never dark the whole fetch — upstream
+                // drift is exactly what this block exists to absorb. A stray
+                // non-string "kind"/"display_name" (or any other shape surprise)
+                // throws on the explicit JsonNode->string cast; catch it and
+                // move on to the next entry instead of failing every tier.
+                try
                 {
-                    ["utilization"] = entry["percent"]?.DeepClone(),
-                    ["resets_at"] = entry["resets_at"]?.DeepClone(),
-                };
+                    if (node is not JsonObject entry) continue;
+                    if ((string?)entry["kind"] != "weekly_scoped") continue;
+                    string? displayName = (string?)entry["scope"]?["model"]?["display_name"];
+                    if (string.IsNullOrWhiteSpace(displayName)) continue;
+
+                    string slug = ScopedSlug(displayName);
+                    if (slug.Length == 0) continue; // all-punctuation names slug to "" — don't register "seven_day_"
+
+                    string key = "seven_day_" + slug;
+                    TierModel.RegisterScopedTier(key, displayName.Trim());
+                    if (data.ContainsKey(key) && data[key] is not null)
+                        continue;
+                    data[key] = new JsonObject
+                    {
+                        ["utilization"] = entry["percent"]?.DeepClone(),
+                        ["resets_at"] = entry["resets_at"]?.DeepClone(),
+                    };
+                }
+                catch
+                {
+                    // Malformed entry — skip it, not the whole fetch.
+                }
             }
         }
 
