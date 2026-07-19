@@ -224,6 +224,14 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
 
     private async Task InitAsync(CancellationToken ct)
     {
+        // Re-init must not strand the prior host/webview. EnsureReadyOrResetAsync's
+        // catch and the CloudflareBlockedException handlers above null out _ready to
+        // force a rebuild, and while a challenge stays wedged the 5-minute refresh
+        // timer re-enters InitAsync every cycle — without this teardown each cycle
+        // would abandon the previous hidden Window + its live msedgewebview2.exe
+        // process (and its OnWebMessageReceived subscription) instead of replacing it.
+        TearDownHostAndWebView();
+
         Directory.CreateDirectory(_profileDir);
         Log("init: creating hidden host + WebView2 environment");
 
@@ -484,28 +492,38 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
         }
     }
 
+    /// <summary>
+    /// Unsubscribe + dispose/close the current <see cref="_web"/>/<see cref="_host"/>
+    /// (if any) and null the fields. Shared by <see cref="InitAsync"/> (tearing down
+    /// a prior instance before re-init) and <see cref="Dispose"/> (final teardown).
+    /// Every step is independently try/catch-swallowed: a half-initialized prior
+    /// instance (e.g. <see cref="_web"/> constructed but its CoreWebView2 never came
+    /// up) must not throw and block whichever caller needs teardown to complete —
+    /// InitAsync's re-init in particular must never fail because the OLD instance
+    /// didn't clean up nicely.
+    /// </summary>
+    private void TearDownHostAndWebView()
+    {
+        try
+        {
+            if (_web?.CoreWebView2 is not null)
+                _web.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
+        }
+        catch { /* best-effort */ }
+        try { _web?.Dispose(); } catch { /* best-effort */ }
+        try { _host?.Close(); } catch { /* best-effort */ }
+        _web = null;
+        _host = null;
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
 
-        void TearDown()
-        {
-            try
-            {
-                if (_web?.CoreWebView2 is not null)
-                    _web.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
-            }
-            catch { /* best-effort */ }
-            try { _web?.Dispose(); } catch { /* best-effort */ }
-            try { _host?.Close(); } catch { /* best-effort */ }
-            _web = null;
-            _host = null;
-        }
-
         if (_dispatcher.CheckAccess())
-            TearDown();
+            TearDownHostAndWebView();
         else
-            _dispatcher.Invoke(TearDown);
+            _dispatcher.Invoke(TearDownHostAndWebView);
     }
 }
