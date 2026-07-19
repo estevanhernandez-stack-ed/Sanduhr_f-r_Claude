@@ -116,6 +116,30 @@ public static class TierModel
         lock (DynamicGate) return DynamicLabels.ContainsKey(tierKey);
     }
 
+    /// <summary>
+    /// True when <paramref name="tierKey"/> is a per-model weekly meter: the
+    /// statically-registered sonnet/opus/fable rows, or any tier synthesized
+    /// via <see cref="RegisterScopedTier"/> (future per-model rollouts land
+    /// there — see the DynamicLabels registry below). These are sub-limits
+    /// scoped to a single model rather than the account's aggregate pools, so
+    /// an account that never touches that model can sit pinned near 100%
+    /// indefinitely — not a critical signal while five_hour, seven_day,
+    /// extra_usage, and routines still have headroom. WidgetViewModel's
+    /// alert-delivery path uses this to make model-scoped crossings
+    /// visual-only (toast, no chime) by default, restorable per-user via the
+    /// Settings "Chime for model-scoped weekly tiers" checkbox.
+    /// seven_day_cowork/omelette/oauth_apps and iguana_necktie are excluded
+    /// deliberately: those are speculative NULL rows (see
+    /// <see cref="SpeculativeTiers"/>), not per-model meters, so a future
+    /// surprise there should still chime.
+    /// </summary>
+    public static bool IsModelScoped(string tierKey)
+    {
+        if (tierKey == SevenDaySonnet || tierKey == SevenDayOpus || tierKey == SevenDayFable)
+            return true;
+        lock (DynamicGate) return DynamicLabels.ContainsKey(tierKey);
+    }
+
     /// <summary>Display label for a known tier. Throws for unknown keys (mirrors the Python dict lookup).</summary>
     public static string Label(string tierKey)
     {

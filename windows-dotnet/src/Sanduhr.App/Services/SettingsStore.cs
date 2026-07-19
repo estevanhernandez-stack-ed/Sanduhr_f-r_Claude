@@ -304,6 +304,24 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>Whether model-scoped weekly tiers (sonnet/opus/fable + dynamic
+    /// per-model rows) chime like everything else. Defaults FALSE: a single
+    /// model's sub-limit sitting at 100% isn't critical while the aggregate
+    /// pools have headroom, so scoped crossings are visual-only unless the
+    /// user opts back in.</summary>
+    public bool LoadAlertSoundScoped()
+    {
+        var root = Read();
+        try { return root["alert_sound_scoped"]?.GetValue<bool>() ?? false; } catch { return false; }
+    }
+
+    public void SaveAlertSoundScoped(bool on)
+    {
+        var root = Read();
+        root["alert_sound_scoped"] = on;
+        Write(root);
+    }
+
     public bool LoadAlertSnakeFull()
     {
         var root = Read();

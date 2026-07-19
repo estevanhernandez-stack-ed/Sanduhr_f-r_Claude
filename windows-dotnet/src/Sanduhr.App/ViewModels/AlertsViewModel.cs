@@ -23,6 +23,7 @@ public sealed partial class AlertsViewModel : ObservableObject
     [ObservableProperty] private bool _projectionEnabled;
     [ObservableProperty] private bool _resetEnabled;
     [ObservableProperty] private bool _soundEnabled;
+    [ObservableProperty] private bool _scopedChimeEnabled;
     [ObservableProperty] private bool _snakeAtFull;
     [ObservableProperty] private string _validationHint = "";
 
@@ -38,6 +39,7 @@ public sealed partial class AlertsViewModel : ObservableObject
         ProjectionEnabled = cfg.ProjectionEnabled;
         ResetEnabled = cfg.ResetEnabled;
         SoundEnabled = widget.LoadAlertSound();
+        ScopedChimeEnabled = widget.LoadAlertSoundScoped();
         SnakeAtFull = widget.LoadAlertSnakeFull();
         _loading = false;
     }
@@ -51,6 +53,11 @@ public sealed partial class AlertsViewModel : ObservableObject
     partial void OnSoundEnabledChanged(bool value)
     {
         if (!_loading) _widget.SaveAlertSound(value);
+    }
+
+    partial void OnScopedChimeEnabledChanged(bool value)
+    {
+        if (!_loading) _widget.SaveAlertSoundScoped(value);
     }
 
     partial void OnSnakeAtFullChanged(bool value)
