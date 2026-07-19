@@ -123,7 +123,17 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
 
         var reply = await FetchAsync($"{ApiBase}/organizations/{orgId}/usage", null, ct).ConfigureAwait(true);
         var body = RequireBody(reply, "usage");
-        var data = ClaudeApiParsing.ParseUsage(body, _accountNode);
+        JsonObject data;
+        try { data = ClaudeApiParsing.ParseUsage(body, _accountNode); }
+        catch (CloudflareBlockedException)
+        {
+            // The page cleared init but is now wedged behind a challenge —
+            // EnsureReadyOrResetAsync only re-initializes when _ready is null
+            // (_ready ??= InitAsync(ct)), so drop the cached init task and let
+            // the next cycle rebuild the page.
+            _ready = null;
+            throw;
+        }
         Log($"usage: status={reply.Status} tiers={CountTiers(data)}");
         return data;
     }
@@ -165,7 +175,16 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
 
         var reply = await FetchAsync($"{ApiBase}/organizations", null, ct).ConfigureAwait(true);
         var body = RequireBody(reply, "organizations");
-        var discovery = ClaudeApiParsing.ParseOrganizations(body);
+        ClaudeApiParsing.OrgDiscovery discovery;
+        try { discovery = ClaudeApiParsing.ParseOrganizations(body); }
+        catch (CloudflareBlockedException)
+        {
+            // Same wedge as GetUsageCoreAsync: drop the cached init task so
+            // EnsureReadyOrResetAsync re-navigates the page next cycle instead
+            // of retrying fetches against a page stuck behind a challenge.
+            _ready = null;
+            throw;
+        }
         _orgId = discovery.OrgId;
         _accountNode = discovery.AccountNode;
         Account = discovery.Account;

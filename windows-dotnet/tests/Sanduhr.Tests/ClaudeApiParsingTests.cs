@@ -17,6 +17,33 @@ namespace Sanduhr.Tests;
 /// </summary>
 public class ClaudeApiParsingTests
 {
+    // -- CF-challenge-on-200 classification ------------------------------------
+    // Cloudflare can serve a challenge page WITH HTTP 200; a status-only check
+    // never sees it, so both parse entry points must sniff the body on a JSON
+    // parse FAILURE and classify it as CloudflareBlockedException rather than
+    // the generic non-JSON NetworkException.
+
+    private const string ChallengeHtml = "<html><head><title>Just a moment...</title></head><body>cf-challenge</body></html>";
+
+    [Fact]
+    public void ParseUsage_ChallengeBodyOn200_ThrowsCloudflareBlocked()
+        => Assert.Throws<CloudflareBlockedException>(() => ClaudeApiParsing.ParseUsage(ChallengeHtml, null));
+
+    [Fact]
+    public void ParseOrganizations_ChallengeBody_ThrowsCloudflareBlocked()
+        => Assert.Throws<CloudflareBlockedException>(() => ClaudeApiParsing.ParseOrganizations(ChallengeHtml));
+
+    [Fact]
+    public void ValidJson_ContainingCloudflareText_ParsesNormally()
+    {
+        var data = ClaudeApiParsing.ParseUsage("""{ "note": "we love cloudflare", "five_hour": null }""", null);
+        Assert.Equal("we love cloudflare", (string?)data["note"]);
+    }
+
+    [Fact]
+    public void NonCfGarbage_StillThrowsNetworkException()
+        => Assert.Throws<NetworkException>(() => ClaudeApiParsing.ParseUsage("<html>plain error page</html>", null));
+
     // -- ParseOrganizations ---------------------------------------------------
 
     [Fact]

@@ -39,7 +39,18 @@ internal static class ClaudeApiParsing
     {
         JsonNode? root;
         try { root = JsonNode.Parse(body); }
-        catch (JsonException e) { throw new NetworkException("Org discovery returned non-JSON", e); }
+        catch (JsonException e)
+        {
+            // Cloudflare can serve a challenge page WITH HTTP 200 — a
+            // status-only check (ThrowForStatus/CheckAsync handle 403) never
+            // sees it, and the generic non-JSON error left the UI stuck on
+            // "No connection — retrying…". Only a parse FAILURE consults the
+            // CF sniffer, so JSON payloads containing the word "cloudflare"
+            // can never false-positive.
+            if (ClaudeApiClient.LooksLikeCloudflare(body))
+                throw new CloudflareBlockedException("Cloudflare challenge in 2xx body -- cf_clearance needed");
+            throw new NetworkException("Org discovery returned non-JSON", e);
+        }
 
         if (root is not JsonArray orgs)
             throw new NetworkException("Org discovery returned non-JSON");
@@ -98,7 +109,18 @@ internal static class ClaudeApiParsing
     {
         JsonNode? root;
         try { root = JsonNode.Parse(body); }
-        catch (JsonException e) { throw new NetworkException("Usage endpoint returned non-JSON", e); }
+        catch (JsonException e)
+        {
+            // Cloudflare can serve a challenge page WITH HTTP 200 — a
+            // status-only check (ThrowForStatus/CheckAsync handle 403) never
+            // sees it, and the generic non-JSON error left the UI stuck on
+            // "No connection — retrying…". Only a parse FAILURE consults the
+            // CF sniffer, so JSON payloads containing the word "cloudflare"
+            // can never false-positive.
+            if (ClaudeApiClient.LooksLikeCloudflare(body))
+                throw new CloudflareBlockedException("Cloudflare challenge in 2xx body -- cf_clearance needed");
+            throw new NetworkException("Usage endpoint returned non-JSON", e);
+        }
 
         if (root is not JsonObject data)
             throw new NetworkException("Usage endpoint returned non-object JSON");
