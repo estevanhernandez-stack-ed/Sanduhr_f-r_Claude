@@ -220,7 +220,9 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
         }
         catch
         {
-            Log($"{what}: FAIL {reply.Error ?? ("HTTP " + reply.Status)}");
+            // reply.Error is provably null here — the reply.Error is not null branch
+            // above already returned/threw before this catch can run.
+            Log($"{what}: FAIL HTTP {reply.Status}");
             throw;
         }
         return reply.Body ?? "";

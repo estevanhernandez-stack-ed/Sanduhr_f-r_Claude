@@ -493,6 +493,11 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// embedded or manual sign-in so the widget starts tracking at once.</summary>
     public async Task ReloadAfterSignInAsync()
     {
+        // Null first, parity with SwitchAccount: an add-account sign-in SetActive's the
+        // new account before this runs, so a stale _lastData from the PRIOR account would
+        // make RetryOnceIfTransientAsync's "_lastData is not null" guard skip the retry —
+        // the exact cold-transport/CF race this method exists to cover.
+        _lastData = null;
         RebuildFetcher();
         RefreshAccountLabel();
         AccountsChanged?.Invoke();

@@ -766,9 +766,9 @@
                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
                             <CheckBox Content="Sound" IsChecked="{Binding SoundEnabled}"
                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
-                            <CheckBox Style="{StaticResource ThemedCheckBox}"
-                                      Content="Chime for model-scoped weekly tiers"
-                                      IsChecked="{Binding ScopedChimeEnabled}" Margin="0,0,0,6" />
+                            <CheckBox Content="Chime for model-scoped weekly tiers"
+                                      IsChecked="{Binding ScopedChimeEnabled}"
+                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
                             <CheckBox Content="100% plays the ! (you know the one)"
                                       IsChecked="{Binding SnakeAtFull}"
                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,14" />
