@@ -178,7 +178,7 @@ pick up the delta.
    20-bullet cap, plain text only; update the file first, then paste).
 5. Confirm the 10.1.4.4 surfaces are still clean (the three sub-clauses, below).
 6. **Submit.** Status: *In submission* → *Certification* → *Publishing* (success) or *Failed*.
-   Turnaround 24-72h. A pending submission is replaced by the new one (no duplicates).
+   Turnaround: typically 2-3 hours (observed across 3.1-3.3 submissions), occasionally overnight depending on submission time; plan for 24-72h worst case. A pending submission is replaced by the new one (no duplicates).
 
 ### The 10.1.4.4 acceptance tests (from the Python build's two rejections)
 
