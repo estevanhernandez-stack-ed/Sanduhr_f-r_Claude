@@ -46,6 +46,7 @@ internal static class Helpers
     public static McpConfig Config(string snapshotPath, params (string Name, string Path)[] roots) => new()
     {
         SnapshotPath = snapshotPath,
+        VaultDir = Path.Combine(Path.GetDirectoryName(snapshotPath)!, "vault"),
         ConsentedRoots = roots,
         RootsFound = roots.Select(r => r.Name).ToList(),
     };

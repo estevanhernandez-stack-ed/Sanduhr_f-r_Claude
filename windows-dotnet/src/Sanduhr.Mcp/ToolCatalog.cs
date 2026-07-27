@@ -3,11 +3,13 @@ using System.Text.Json.Nodes;
 namespace Sanduhr.Mcp;
 
 /// <summary>
-/// The tools/list catalog. Exactly three tools (design review must-fix #3:
-/// get_reset_schedule was killed as a wrong-single-call subset of get_usage).
-/// Descriptions carry the behavioral trigger — without it the feature never
-/// fires. No tool accepts free-form paths or globs: params are closed enums and
-/// booleans (the file-oracle guard, must-fix #11).
+/// The tools/list catalog: five read-only tools. (The design review's must-fix
+/// #3 still holds — no strict-subset tools like get_reset_schedule; the two
+/// abilities-wave additions answer questions get_usage does NOT: per-model
+/// attribution and durable daily history.) Descriptions carry the behavioral
+/// trigger — without it the feature never fires. No tool accepts free-form
+/// paths or globs: params are closed enums and booleans (the file-oracle
+/// guard, must-fix #11).
 /// </summary>
 public static class ToolCatalog
 {
@@ -49,6 +51,48 @@ public static class ToolCatalog
                     {
                         ["type"] = "boolean",
                         ["description"] = "Return full project paths instead of basenames. Default false.",
+                    },
+                },
+                ["additionalProperties"] = false,
+            }),
+        Tool(
+            "get_model_usage",
+            "Which models are burning the budget: per-model local Claude Code token totals over " +
+            "a window, joined with each model's weekly meter utilization from the live snapshot. " +
+            "Use when choosing between models for a big job - a model whose per-model weekly " +
+            "meter is hot is the one to avoid. Token counts are a proxy (input+output, cache " +
+            "excluded), never convertible to quota %. Scoped to consented Claude Code homes.",
+            new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["window_days"] = new JsonObject
+                    {
+                        ["type"] = "integer",
+                        ["enum"] = new JsonArray { 1, 7, 30 },
+                        ["description"] = "Lookback window. Default 7.",
+                    },
+                },
+                ["additionalProperties"] = false,
+            }),
+        Tool(
+            "get_usage_history",
+            "Daily local Claude Code usage history from Sanduhr's durable vault (survives Claude " +
+            "Code's ~30-day log cleanup): tokens per day with sent/received split, window totals, " +
+            "top projects. Trend and attribution data, not quota - use get_usage for headroom. " +
+            "Days without a record are omitted, never fabricated as zero. Scoped to consented " +
+            "Claude Code homes.",
+            new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["window_days"] = new JsonObject
+                    {
+                        ["type"] = "integer",
+                        ["enum"] = new JsonArray { 7, 30, 90 },
+                        ["description"] = "Lookback window in days. Default 30.",
                     },
                 },
                 ["additionalProperties"] = false,

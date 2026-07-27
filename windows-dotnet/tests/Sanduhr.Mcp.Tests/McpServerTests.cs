@@ -33,12 +33,12 @@ public class McpServerTests
     }
 
     [Fact]
-    public void Tools_list_has_exactly_three_read_only_tools()
+    public void Tools_list_has_exactly_five_read_only_tools()
     {
         using var tmp = new TempDir();
         var res = Run(tmp, Req(1, "tools/list"));
         var tools = (JsonArray)((JsonObject)res.Single()["result"]!)["tools"]!;
-        Assert.Equal(new[] { "get_usage", "get_local_burn_by_project", "ping" },
+        Assert.Equal(new[] { "get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping" },
             tools.Select(t => (string?)t!["name"]).ToArray());
         Assert.All(tools, t => Assert.True(t!["annotations"]!["readOnlyHint"]!.GetValue<bool>()));
         // The behavioral trigger IS the feature (review: without it, never fires).
