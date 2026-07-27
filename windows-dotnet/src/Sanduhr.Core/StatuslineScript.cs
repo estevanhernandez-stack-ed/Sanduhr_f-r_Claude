@@ -4,8 +4,8 @@ namespace Sanduhr.Core;
 /// The Claude Code statusline script, embedded as source so the widget is the
 /// script's updater (the script has no update channel of its own — WS-E). The
 /// installer writes this to <see cref="Paths.StatuslineScriptFile"/> with a
-/// UTF-8 BOM (Windows PowerShell 5.1 mis-decodes BOM-less UTF-8, and the
-/// separator glyph is non-ASCII).
+/// UTF-8 BOM (Windows PowerShell 5.1 mis-decodes BOM-less UTF-8; the body is
+/// ASCII-only today, the BOM guards any future non-ASCII edit).
 ///
 /// The script mirrors <see cref="SnapshotContract"/>'s staleness bands and
 /// schema guard — a Core test pins the embedded constants to the contract so
@@ -15,7 +15,7 @@ public static class StatuslineScript
 {
     /// <summary>Bumped when the script body changes; the installer re-writes the
     /// script whenever the installed copy differs from this source.</summary>
-    public const int Version = 1;
+    public const int Version = 2;
 
     /// <summary>PowerShell 5.1-compatible script body. Reads the snapshot per the
     /// reader contract (one-shot read, any parse failure = missing), renders per
@@ -76,8 +76,10 @@ foreach ($tier in @($snap.tiers)) {
   $parts += ('{0} {1}%' -f $label, [int]$tier.utilization)
 }
 
-$line = $parts -join ' · '
-if ($resetSuffix -and $line) { $line = $line + ' · ' + $resetSuffix }
+# Output stays ASCII-only: PowerShell encodes redirected stdout per the legacy
+# console codepage while Claude Code decodes it as UTF-8 - non-ASCII mojibakes.
+$line = $parts -join ' | '
+if ($resetSuffix -and $line) { $line = $line + ' | ' + $resetSuffix }
 
 if ([string]$snap.status -eq 'error') {
   # Fetch is failing: stale becomes actionable, with last-good numbers when we have them.
@@ -86,12 +88,12 @@ if ([string]$snap.status -eq 'error') {
     'cloudflare'      { 'blocked - reauth' }
     default           { 'offline' }
   }
-  if ($line) { Write-Output ('sanduhr: {0} · last {1}' -f $kind, $line) } else { Write-Output ('sanduhr: {0}' -f $kind) }
+  if ($line) { Write-Output ('sanduhr: {0} | last {1}' -f $kind, $line) } else { Write-Output ('sanduhr: {0}' -f $kind) }
   exit 0
 }
 
 if (-not $line) { exit 0 }
-if ($age -ge 450) { $line = $line + (' · {0}m' -f [int][Math]::Floor($age / 60)) }
+if ($age -ge 450) { $line = $line + (' ({0}m ago)' -f [int][Math]::Floor($age / 60)) }
 Write-Output $line
 """;
 }

@@ -1020,15 +1020,15 @@
                                                 Command="{Binding OpenVaultFolderCommand}" />
                                     </StackPanel>
 
-                                    <!-- WS-E statusline bridge: consent-gated install into ONE CC home. -->
-                                    <TextBlock Text="Claude Code statusline" FontSize="9" Margin="0,12,0,4"
+                                    <!-- WS-E statusline bridge: consent-gated install into ONE CC home.
+                                         Compact by design — the fixed 620px window clips anything taller
+                                         below the fold; the tooltip + consent dialog carry the explanation. -->
+                                    <TextBlock Text="Claude Code statusline" FontSize="9" Margin="0,10,0,4"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                    <TextBlock TextWrapping="Wrap" FontSize="11"
-                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
-                                               Text="Show your live session + weekly percentages under the Claude Code prompt — real cap numbers, right where the tokens burn." />
-                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                    <StackPanel Orientation="Horizontal">
                                         <Button Style="{StaticResource FlatButton}" Content="Install statusline…"
                                                 Command="{Binding InstallStatuslineCommand}"
+                                                ToolTip="Show your live session + weekly percentages under the Claude Code prompt — real cap numbers, right where the tokens burn."
                                                 Visibility="{Binding StatuslineNotInstalled, Converter={StaticResource BoolVis}}" />
                                         <Button Style="{StaticResource FlatButton}" Content="Remove statusline"
                                                 Command="{Binding RemoveStatuslineCommand}"

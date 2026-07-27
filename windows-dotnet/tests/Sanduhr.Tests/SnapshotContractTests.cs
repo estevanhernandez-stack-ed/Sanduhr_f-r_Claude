@@ -79,6 +79,15 @@ public class SnapshotContractTests
     }
 
     [Fact]
+    public void Script_output_stays_ascii_only()
+    {
+        // PowerShell encodes redirected stdout per the legacy console codepage
+        // while Claude Code decodes it as UTF-8 — any non-ASCII glyph in the
+        // script body mojibakes on the statusline (found live in the 3.4 smoke).
+        Assert.DoesNotMatch("[^\u0000-\u007F]", StatuslineScript.Content);
+    }
+
+    [Fact]
     public void Script_maps_every_error_kind_the_writer_emits()
     {
         Assert.Contains(SnapshotContract.ErrorSessionExpired, StatuslineScript.Content);
