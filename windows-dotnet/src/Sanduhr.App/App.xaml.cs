@@ -62,6 +62,16 @@ public partial class App : Application
             vaultService.SaveConsent(VaultConsentDialog.ShowConsent(_window, vaultService.DetectedRootNames()));
         _vm.AttachVaultService(vaultService);
 
+        // Statusline bridge (WS-E): the script has no update channel of its own —
+        // the widget is its updater. Refresh the installed copy on every start
+        // while the integration is enabled (idempotent single-file write).
+        if (_vm.LoadStatuslineEnabled())
+        {
+            new StatuslineInstaller(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                _vm.StatuslineBinDir).InstallScript();
+        }
+
         // Load the active account's stored credential + fetch real usage now.
         _vm.Start();
 

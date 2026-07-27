@@ -93,6 +93,20 @@ public sealed class Paths
 
     public string LastErrorFile => Path.Combine(AppDataDir, "last_error.json");
 
+    /// <summary>Statusline/MCP rendezvous file (WS-E): the widget's active-account
+    /// usage snapshot, written atomically each fetch when the Claude Code
+    /// statusline integration is enabled. Read-only for every consumer.</summary>
+    public string SnapshotFile => Path.Combine(AppDataDir, "snapshot.json");
+
+    /// <summary>Helper-script folder: <c>%APPDATA%\Sanduhr\bin</c>. OUTSIDE both
+    /// package trees deliberately (WS-E) — the statusline script must survive an
+    /// app update swap; the widget re-writes it on install and on start.
+    /// Not auto-created; the installer creates it on first install.</summary>
+    public string StatuslineBinDir => Path.Combine(AppDataDir, "bin");
+
+    /// <summary>The installed statusline script path.</summary>
+    public string StatuslineScriptFile => Path.Combine(StatuslineBinDir, "sanduhr-statusline.ps1");
+
     /// <summary>Usage-vault root: <c>%LOCALAPPDATA%\Sanduhr\vault</c>. LOCAL, not
     /// roaming, by design — enterprise roaming profiles must never sync the
     /// work-activity archive off the machine. Not auto-created; the VaultStore

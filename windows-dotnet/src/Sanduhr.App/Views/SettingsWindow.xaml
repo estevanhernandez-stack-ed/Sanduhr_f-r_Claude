@@ -1019,6 +1019,25 @@
                                         <Button Style="{StaticResource FlatButton}" Content="Open vault folder"
                                                 Command="{Binding OpenVaultFolderCommand}" />
                                     </StackPanel>
+
+                                    <!-- WS-E statusline bridge: consent-gated install into ONE CC home. -->
+                                    <TextBlock Text="Claude Code statusline" FontSize="9" Margin="0,12,0,4"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <TextBlock TextWrapping="Wrap" FontSize="11"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                               Text="Show your live session + weekly percentages under the Claude Code prompt — real cap numbers, right where the tokens burn." />
+                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                        <Button Style="{StaticResource FlatButton}" Content="Install statusline…"
+                                                Command="{Binding InstallStatuslineCommand}"
+                                                Visibility="{Binding StatuslineNotInstalled, Converter={StaticResource BoolVis}}" />
+                                        <Button Style="{StaticResource FlatButton}" Content="Remove statusline"
+                                                Command="{Binding RemoveStatuslineCommand}"
+                                                Visibility="{Binding StatuslineInstalled, Converter={StaticResource BoolVis}}" />
+                                    </StackPanel>
+                                    <TextBlock TextWrapping="Wrap" FontSize="10.5" Margin="0,4,0,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                               Text="{Binding StatuslineStatusText}"
+                                               Visibility="{Binding StatuslineStatusText, Converter={StaticResource StrVis}}" />
                                 </StackPanel>
                             </Grid>
 

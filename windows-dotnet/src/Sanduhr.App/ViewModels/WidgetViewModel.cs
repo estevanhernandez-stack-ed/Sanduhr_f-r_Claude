@@ -293,6 +293,84 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         AlertSettingsChanged?.Invoke();
     }
 
+    // -- WS-E statusline bridge -----------------------------------------------
+
+    /// <summary>Whether the statusline snapshot writer is on (settings.json).</summary>
+    public bool LoadStatuslineEnabled() => _settings.LoadStatuslineEnabled();
+
+    /// <summary>Flip the snapshot writer. Enabling writes immediately from the
+    /// cached fetch (the statusline lights up at the next prompt, not the next
+    /// 5-minute poll); disabling deletes the file — consent revocation revokes
+    /// the artifact, not just the writer.</summary>
+    public void SaveStatuslineEnabled(bool on)
+    {
+        _settings.SaveStatuslineEnabled(on);
+        _statuslineEnabled = on;
+        if (!on)
+            _snapshotWriter?.Delete();
+        else if (_lastData is not null)
+            WriteSnapshotOk(_lastData);
+    }
+
+    /// <summary>The CC home the statusline was installed into (removal targets
+    /// the same home the consent chose).</summary>
+    public string? LoadStatuslineCcHome() => _settings.LoadStatuslineCcHome();
+
+    public void SaveStatuslineCcHome(string ccHomeName) => _settings.SaveStatuslineCcHome(ccHomeName);
+
+    /// <summary>Where the statusline helper script installs — OUTSIDE the package
+    /// trees so it survives app updates (the widget re-writes it on start).</summary>
+    public string StatuslineBinDir => _paths.StatuslineBinDir;
+
+    /// <summary>Write a status=ok snapshot from a successful fetch. No-op while
+    /// the integration is off; never throws into the fetch path.</summary>
+    private void WriteSnapshotOk(JsonObject data)
+    {
+        if (!_statuslineEnabled)
+            return;
+        try
+        {
+            _snapshotWriter?.WriteOk(data, HasPlanBadge ? PlanBadgeName : null,
+                _accounts.GetActive(), DateTimeOffset.UtcNow);
+        }
+        catch
+        {
+            // Snapshot is instrumentation for an external consumer — a failure
+            // must never surface into the fetch/render cycle.
+        }
+    }
+
+    /// <summary>Write a status=error snapshot (last-good tiers kept) so the
+    /// statusline can say "reauth needed" instead of going silently stale.</summary>
+    private void WriteSnapshotError(string errorKind)
+    {
+        if (!_statuslineEnabled)
+            return;
+        try
+        {
+            _snapshotWriter?.WriteError(errorKind, HasPlanBadge ? PlanBadgeName : null,
+                _accounts.GetActive(), DateTimeOffset.UtcNow);
+        }
+        catch
+        {
+            // Same posture as WriteSnapshotOk.
+        }
+    }
+
+    /// <summary>WS-A LogBestEffortFailure convention: operation + exception type
+    /// only — no labels, no contents.</summary>
+    private void LogSnapshotFailure(string line)
+    {
+        try
+        {
+            File.AppendAllText(_paths.LogFile, $"{DateTime.UtcNow:o} {line}{Environment.NewLine}");
+        }
+        catch
+        {
+            // Logging must never break the caller.
+        }
+    }
+
     /// <summary>Alert delivery, attached by App once the main window exists
     /// (the service needs an activation callback). Null in unit contexts.</summary>
     public AlertService? AlertService => _alertService;
@@ -303,6 +381,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private DateOnly _lastTickDate = DateOnly.FromDateTime(DateTime.Now);
     private long _ccDeltaTotal;
     private bool _ccScanRunning;
+
+    /// <summary>WS-E statusline bridge: the one writer of snapshot.json. Gated
+    /// by <see cref="_statuslineEnabled"/> — the file exists only while the
+    /// integration is installed and on.</summary>
+    private SnapshotWriter? _snapshotWriter;
+    private bool _statuslineEnabled;
 
     /// <summary>The usage-vault service, attached by App AFTER the consent
     /// prompt resolves (never before — attach order IS the consent gate).
@@ -322,6 +406,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
         _alertConfig = _settings.LoadAlertConfig();
         AlertSettingsChanged += () => _alertConfig = _settings.LoadAlertConfig();
+
+        _snapshotWriter = new SnapshotWriter(_paths.SnapshotFile, LogSnapshotFailure);
+        _statuslineEnabled = _settings.LoadStatuslineEnabled();
 
         _pinned = _settings.LoadPinned();
         _isThemesExpanded = _settings.LoadThemesExpanded();
@@ -498,6 +585,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // make RetryOnceIfTransientAsync's "_lastData is not null" guard skip the retry —
         // the exact cold-transport/CF race this method exists to cover.
         _lastData = null;
+        _snapshotWriter?.Delete();   // same no-bleed rule as SwitchAccount
         RebuildFetcher();
         RefreshAccountLabel();
         AccountsChanged?.Invoke();
@@ -577,6 +665,10 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             return;
 
         _accounts.SetActive(label);
+        // Snapshot is deleted synchronously BEFORE the switch completes — no
+        // window where the new account's freshness wraps the old account's
+        // numbers (WS-E). The next successful fetch rewrites it.
+        _snapshotWriter?.Delete();
         Tiers.Clear();
         _alertEngine.Reset();
         _lastData = null;
@@ -650,6 +742,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         {
             Tiers.Clear();
             _lastData = null;
+            // The snapshot belongs to the active account — removal revokes the
+            // artifact, not just the writer (WS-E lifecycle-delete rule).
+            _snapshotWriter?.Delete();
             if (_accounts.ListAccounts().Count == 0)
                 await PurgeTransportProfileBestEffortAsync();
             RebuildFetcher();
@@ -737,28 +832,33 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             StatusText = "";
             Reason = SignInReason.None;
             UpdateFooter();
+            WriteSnapshotOk(data);
             return RefreshOutcome.Ok;
         }
         catch (SessionExpiredException)
         {
             // Stored key rejected (non-empty, so RebuildFetcher's empty gate never fires):
             // show the actionable recovery card and wipe the now-stale signed-in chrome.
+            WriteSnapshotError(SnapshotContract.ErrorSessionExpired);
             EnterRecoveryState(SignInReason.Expired);
             return RefreshOutcome.Auth;
         }
         catch (CloudflareBlockedException)
         {
             // Cloudflare challenge — re-auth re-captures a fresh cf_clearance silently.
+            WriteSnapshotError(SnapshotContract.ErrorCloudflare);
             EnterRecoveryState(SignInReason.Blocked);
             return RefreshOutcome.Auth;
         }
         catch (NetworkException)
         {
+            WriteSnapshotError(SnapshotContract.ErrorNetwork);
             Fail("No connection — retrying…");
             return RefreshOutcome.Transient;
         }
         catch (HttpRequestException)
         {
+            WriteSnapshotError(SnapshotContract.ErrorNetwork);
             Fail("No connection — retrying…");
             return RefreshOutcome.Transient;
         }

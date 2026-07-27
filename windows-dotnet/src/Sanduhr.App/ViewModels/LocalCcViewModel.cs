@@ -92,6 +92,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
         _widget = widget;
         _showBreakdowns = showBreakdowns;
         _persistShowBreakdowns = persistShowBreakdowns;
+        _statuslineInstalled = widget.LoadStatuslineEnabled();
         _widget.ThemeChanged += _ => Changed?.Invoke();
         RebuildRoots();
     }
@@ -165,6 +166,95 @@ public sealed partial class LocalCcViewModel : ObservableObject
 
     [RelayCommand]
     private void OpenVaultFolder() => _widget.Vault?.OpenVaultFolder();
+
+    // -- WS-E statusline bridge (spec 2026-07-12-statusline-mcp-design.md) ------
+
+    /// <summary>True while the Claude Code statusline integration is installed —
+    /// drives which of Install/Remove shows.</summary>
+    [ObservableProperty] private bool _statuslineInstalled;
+
+    /// <summary>One-line outcome under the buttons ("Installed to .claude…" /
+    /// failure copy). Empty = hidden.</summary>
+    [ObservableProperty] private string _statuslineStatusText = "";
+
+    /// <summary>Inverse for the Install button's visibility (no inverse-bool
+    /// converter in the resource set).</summary>
+    public bool StatuslineNotInstalled => !StatuslineInstalled;
+
+    partial void OnStatuslineInstalledChanged(bool value)
+        => OnPropertyChanged(nameof(StatuslineNotInstalled));
+
+    private StatuslineInstaller MakeStatuslineInstaller() => new(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        _widget.StatuslineBinDir);
+
+    /// <summary>Consent-gated install: detect CC homes, ask WHICH home (never a
+    /// silent default — one of them can be an employer tenant), write the script,
+    /// register the statusLine key with a timestamped backup, flip the writer on.</summary>
+    [RelayCommand]
+    private void InstallStatusline()
+    {
+        try
+        {
+            var installer = MakeStatuslineInstaller();
+            var homes = installer.DetectCcHomes();
+            if (homes.Count == 0)
+            {
+                StatuslineStatusText = "No Claude Code install found (no ~/.claude or ~/.claude-personal).";
+                return;
+            }
+            var chosen = StatuslineConsentDialog.ShowConsent(
+                _owner, homes, installer.ScriptPath, installer.SettingsPathFor);
+            if (chosen is null)
+                return;
+            if (!installer.InstallScript())
+            {
+                StatuslineStatusText = "Couldn't write the statusline script — see sanduhr.log.";
+                Sounds.PlayError();
+                return;
+            }
+            if (!installer.Register(chosen))
+            {
+                StatuslineStatusText = $"Couldn't safely edit {chosen}\\settings.json (it didn't parse) — nothing was changed.";
+                Sounds.PlayError();
+                return;
+            }
+            _widget.SaveStatuslineCcHome(chosen);
+            _widget.SaveStatuslineEnabled(true);   // writes the first snapshot from the cached fetch
+            StatuslineInstalled = true;
+            StatuslineStatusText = $"Installed to {chosen} — shows under the prompt at Claude Code's next refresh.";
+            Sounds.PlaySaveConfirmation();
+        }
+        catch
+        {
+            StatuslineStatusText = "Install failed — see sanduhr.log.";
+            Sounds.PlayError();
+        }
+    }
+
+    /// <summary>Full removal: deregister from the SAME home the install chose,
+    /// delete the script and the snapshot. Never touches a foreign statusLine.</summary>
+    [RelayCommand]
+    private void RemoveStatusline()
+    {
+        try
+        {
+            var installer = MakeStatuslineInstaller();
+            var home = _widget.LoadStatuslineCcHome();
+            bool deregistered = string.IsNullOrEmpty(home) || installer.Deregister(home);
+            installer.RemoveScript();
+            _widget.SaveStatuslineEnabled(false);   // deletes snapshot.json
+            StatuslineInstalled = false;
+            StatuslineStatusText = deregistered
+                ? "Removed."
+                : "Removed here, but settings.json couldn't be edited — delete its statusLine entry manually.";
+        }
+        catch
+        {
+            StatuslineStatusText = "Remove failed — see sanduhr.log.";
+            Sounds.PlayError();
+        }
+    }
 
     [RelayCommand]
     private async Task EraseArchive()

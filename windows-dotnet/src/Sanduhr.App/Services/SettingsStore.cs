@@ -389,6 +389,40 @@ public sealed class SettingsStore
         try { return root["vault_store_full_paths"]?.GetValue<bool>() ?? false; } catch { return false; }
     }
 
+    // -- WS-E statusline bridge (spec 2026-07-12-statusline-mcp-design.md) ------
+
+    /// <summary>Whether the Claude Code statusline snapshot writer is on
+    /// (settings.json "statusline_enabled"). Default FALSE — the snapshot file
+    /// is opt-in, created only through the consented install flow.</summary>
+    public bool LoadStatuslineEnabled()
+    {
+        var root = Read();
+        try { return root["statusline_enabled"]?.GetValue<bool>() ?? false; } catch { return false; }
+    }
+
+    public void SaveStatuslineEnabled(bool on)
+    {
+        var root = Read();
+        root["statusline_enabled"] = on;
+        Write(root);
+    }
+
+    /// <summary>Which Claude Code home the statusline was registered in
+    /// (settings.json "statusline_cc_home", e.g. ".claude-personal"). Recorded at
+    /// install so removal targets the SAME home the consent chose.</summary>
+    public string? LoadStatuslineCcHome()
+    {
+        var root = Read();
+        try { return root["statusline_cc_home"]?.GetValue<string>(); } catch { return null; }
+    }
+
+    public void SaveStatuslineCcHome(string ccHomeName)
+    {
+        var root = Read();
+        root["statusline_cc_home"] = ccHomeName;
+        Write(root);
+    }
+
     /// <summary>The Sessions Ledger's "stack by project" preference (settings.json
     /// "ledger_group_by_project"), defaulting to TRUE — the project stack is the
     /// new default; the flat per-session view is one click away.</summary>
