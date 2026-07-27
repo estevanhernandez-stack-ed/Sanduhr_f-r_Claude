@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "app": "Sanduhr",
+  "adapter": "agnostic-dotnet-stdio-mcp",
+  "generatedAt": "2026-07-27T04:00:00Z",
+  "x-schema-note": "transport.type values stdio-mcp/file/exec extend the v1 (HTTP-only) schema - deliberate, documented in ~/.claude-personal/plugins/data/vibe-access/adapter-notes/dotnet-stdio-mcp.md. Everything else conforms.",
+  "x-contract": {
+    "staleness_seconds": { "fresh_below": 450, "dead_above": 900 },
+    "status_enum": ["ok", "stale", "no_data"],
+    "reason_enum": ["missing", "malformed", "disabled", "widget_not_polling", "schema_unsupported", "invalid_params"],
+    "fetch_error_enum": ["session_expired", "cloudflare", "network"],
+    "reason_vs_fetch_error": "separate channels: reason covers data availability, fetch_error covers widget-fetch failures carried in an otherwise-served snapshot; both can be null",
+    "failure_shape": "typed tool results carrying status/reason/remedy - NEVER MCP protocol errors, never isError:true",
+    "env_overrides_dev_tier_only": ["SANDUHR_SNAPSHOT_PATH", "SANDUHR_CC_ROOTS"]
+  },
+  "baseUrls": {
+    "dev": "stdio://sanduhr-mcp"
+  },
+  "discoveryRoute": null,
+  "affordances": [
+    {
+      "id": "mcp.get-usage",
+      "description": "MCP tool get_usage: Claude subscription quota headroom from the widget's snapshot, plus local CC burn SINCE that snapshot's captured_at (consented roots only; null when nothing consented). Server computes age_seconds/resets_in_seconds; reset-crossed tiers serve utilization null, never the stale percent. status ok|stale|no_data with reason+remedy; widget fetch failures surface as fetch_error with last-good tiers (reason stays null - separate channels). account carries a hashed ref plus plan; plan is a tier name (e.g. 'Max 20x'), not an identity label. Data class: usage-metrics.",
+      "tier": "prod-safe",
+      "kind": "read",
+      "transport": { "type": "stdio-mcp", "method": "tools/call", "path": "/get_usage" },
+      "input": null,
+      "output": { "shape": "status, reason, remedy, fetch_error, as_of, age_seconds, scope:'active_account_only', account{ref,plan}, data_lag_note, schema_version, tiers[{key,label,utilization_pct,headroom_pct,resets_at,resets_in_seconds,reset_crossed,pace{verdict,delta_pct}|null,projection{expires_before_reset,expires_in_seconds}|null,used,limit}], local_burn_since_snapshot{total_tokens,by_tier,caveat}|null" },
+      "auth": "none",
+      "authDetail": "none-local-ambient: stdio child of the user's own CLI; ambient user authority. A token here would be theater - any local process can read snapshot.json directly.",
+      "destructive": false,
+      "sourceRef": "windows-dotnet/src/Sanduhr.Mcp/ToolLogic.cs:BuildUsage",
+      "origin": "existing",
+      "verified": {
+        "status": "pass",
+        "at": "2026-07-27T04:00:00Z",
+        "runId": "af4bba22938cc9f2a",
+        "detail": "Cold-agent black-box pass over stdio: 7 snapshot states (ok/stale/dead/error/missing/malformed/schema2) all typed correctly; isError never set; burn anchor proven = captured_at via counter-probe; account ref stays 8-hex."
+      }
+    },
+    {
+      "id": "mcp.get-local-burn-by-project",
+      "description": "MCP tool get_local_burn_by_project: attribute recent local CC token burn to projects, keyed PER Claude Code home (the tenant wall - results never merge homes). Params are a closed set: window_days enum 1|7|30, full_paths bool (basenames by default). Zero consented roots -> no_data/disabled; invalid window -> no_data/invalid_params (typed, never a protocol error). Every ok response echoes window_days/since/full_paths and names roots_scanned. Data class: local-fs-paths, cross-tenant-risk. Attribution only - token counts are a proxy, never convertible to quota %.",
+      "tier": "prod-safe",
+      "kind": "read",
+      "transport": { "type": "stdio-mcp", "method": "tools/call", "path": "/get_local_burn_by_project" },
+      "input": { "window_days": "integer enum [1,7,30], default 7", "full_paths": "boolean, default false" },
+      "output": { "shape": "status, reason, remedy, window_days, since, full_paths, roots_scanned[], roots[{root,total_tokens,projects[{name,tokens}]}], files_scanned, caveat" },
+      "auth": "none",
+      "authDetail": "none-local-ambient + consent map: reads only CC homes flagged true in %APPDATA%/Sanduhr/settings.json mcp_roots (absent = nothing consented, fail closed). No free-form paths - the file-oracle guard.",
+      "destructive": false,
+      "sourceRef": "windows-dotnet/src/Sanduhr.Mcp/ToolLogic.cs:BuildBurn",
+      "origin": "existing",
+      "verified": {
+        "status": "pass",
+        "at": "2026-07-27T04:00:00Z",
+        "runId": "af4bba22938cc9f2a",
+        "detail": "Cold-agent pass: per-root keying held; basenames by default (full fixture path absent from response); full_paths opt-in worked; window filter correct at 1/7; window 3 rejected as typed invalid_params; no-consent path returned disabled with remedy."
+      }
+    },
+    {
+      "id": "mcp.ping",
+      "description": "MCP tool ping: health + verify anchor. server_version, snapshot schema supported, snapshot path/presence/age, CC roots found vs consented. cc_roots_found is the machine's discovery scan of well-known homes; cc_roots_consented reflects the active consent source (settings map, or the dev env override when set) - the two lists can disagree by design. Distinguishes server-broken from data-absent; call it first when get_usage returns no_data.",
+      "tier": "prod-safe",
+      "kind": "read",
+      "transport": { "type": "stdio-mcp", "method": "tools/call", "path": "/ping" },
+      "input": null,
+      "output": { "shape": "server_version, snapshot_schema_supported, snapshot_path, snapshot_found, snapshot_age_seconds, cc_roots_found[], cc_roots_consented[]" },
+      "auth": "none",
+      "authDetail": "none-local-ambient",
+      "destructive": false,
+      "sourceRef": "windows-dotnet/src/Sanduhr.Mcp/ToolLogic.cs:BuildPing",
+      "origin": "existing",
+      "verified": {
+        "status": "pass",
+        "at": "2026-07-27T04:00:00Z",
+        "runId": "af4bba22938cc9f2a",
+        "detail": "Cold-agent pass: snapshot_found/age/path all matched the env-selected fixture; consented reflected the override while found reported the real machine scan."
+      }
+    },
+    {
+      "id": "snapshot.file.read",
+      "description": "The rendezvous artifact itself: %APPDATA%/Sanduhr/snapshot.json, schema v1. One writer (the widget, atomic temp+swap each 5-min fetch while the statusline integration is on), N read-only consumers. Raw facts only - no precomputed pace/countdowns. account_ref is a SHA-256 prefix, never the label. Deleted on account switch, sign-out, and integration removal - consumers treat missing as no-data, never cache last-known-good.",
+      "tier": "prod-safe",
+      "kind": "read",
+      "transport": { "type": "file", "method": "GET", "path": "/snapshot.json" },
+      "input": null,
+      "output": { "shape": "schema_version, writer_version, captured_at, account_ref, plan, status ok|error, error_kind, tiers[]" },
+      "auth": "none",
+      "authDetail": "none-local-ambient: user-profile file ACLs are the boundary.",
+      "destructive": false,
+      "sourceRef": "windows-dotnet/src/Sanduhr.Core/SnapshotWriter.cs",
+      "origin": "existing",
+      "verified": {
+        "status": "pass",
+        "at": "2026-07-27T04:00:00Z",
+        "runId": "af4bba22938cc9f2a",
+        "detail": "Cold-agent pass: parses per documented shape; account_ref matches ^[0-9a-f]{8}$; no readable identity anywhere in the file."
+      }
+    },
+    {
+      "id": "statusline.render",
+      "description": "Claude Code statusline render: PS 5.1-compatible script at %APPDATA%/Sanduhr/bin/sanduhr-statusline.ps1, spawned per prompt by Claude Code. Staleness bands mirror SnapshotContract: fresh <450s renders numbers; stale <=900s renders numbers + age marker; dead REPLACES the numbers with an explicit 'start widget' line (never blank); missing = empty output, the uninstalled look. ASCII-only output by contract (PowerShell redirect encoding vs UTF-8 consumers). The widget is the script's update channel.",
+      "tier": "prod-safe",
+      "kind": "read",
+      "transport": { "type": "exec", "method": "GET", "path": "/bin/sanduhr-statusline.ps1" },
+      "input": null,
+      "output": { "shape": "one ASCII line or empty" },
+      "auth": "none",
+      "authDetail": "none-local-ambient",
+      "destructive": false,
+      "sourceRef": "windows-dotnet/src/Sanduhr.Core/StatuslineScript.cs",
+      "origin": "existing",
+      "verified": {
+        "status": "pass",
+        "at": "2026-07-27T04:00:00Z",
+        "runId": "af4bba22938cc9f2a",
+        "detail": "Cold-agent pass: fresh/stale/dead/missing all rendered per the band table; raw-byte capture confirmed pure ASCII in every scenario."
+      }
+    }
+  ]
+}
