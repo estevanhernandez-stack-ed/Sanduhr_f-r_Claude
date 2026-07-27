@@ -423,6 +423,68 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    // -- WS-E MCP integration (registration slice) ------------------------------
+
+    /// <summary>Whether the Sanduhr MCP server integration is installed
+    /// (settings.json "mcp_enabled"). Default FALSE — consent-gated install.</summary>
+    public bool LoadMcpEnabled()
+    {
+        var root = Read();
+        try { return root["mcp_enabled"]?.GetValue<bool>() ?? false; } catch { return false; }
+    }
+
+    public void SaveMcpEnabled(bool on)
+    {
+        var root = Read();
+        root["mcp_enabled"] = on;
+        Write(root);
+    }
+
+    /// <summary>Which CC home the MCP server was registered in
+    /// (settings.json "mcp_cc_home") — removal targets the same home.</summary>
+    public string? LoadMcpCcHome()
+    {
+        var root = Read();
+        try { return root["mcp_cc_home"]?.GetValue<string>(); } catch { return null; }
+    }
+
+    public void SaveMcpCcHome(string ccHomeName)
+    {
+        var root = Read();
+        root["mcp_cc_home"] = ccHomeName;
+        Write(root);
+    }
+
+    /// <summary>Per-root MCP read consent ({".claude-personal": true, ...}) —
+    /// the map the SERVER reads (settings.json "mcp_roots"). A root absent from
+    /// the map is NOT consented; tool results become conversation content, so
+    /// this is a separate, stricter gate than the vault's. Unchecked by default
+    /// at install (the design review's tenant-wall requirement).</summary>
+    public IReadOnlyDictionary<string, bool> LoadMcpRoots()
+    {
+        var root = Read();
+        var result = new Dictionary<string, bool>(StringComparer.Ordinal);
+        if (root["mcp_roots"] is JsonObject map)
+        {
+            foreach (var (name, node) in map)
+            {
+                try { result[name] = node?.GetValue<bool>() ?? false; }
+                catch { result[name] = false; }
+            }
+        }
+        return result;
+    }
+
+    public void SaveMcpRoots(IReadOnlyDictionary<string, bool> roots)
+    {
+        var root = Read();
+        var map = new JsonObject();
+        foreach (var (name, on) in roots)
+            map[name] = on;
+        root["mcp_roots"] = map;
+        Write(root);
+    }
+
     /// <summary>The Sessions Ledger's "stack by project" preference (settings.json
     /// "ledger_group_by_project"), defaulting to TRUE — the project stack is the
     /// new default; the flat per-session view is one click away.</summary>

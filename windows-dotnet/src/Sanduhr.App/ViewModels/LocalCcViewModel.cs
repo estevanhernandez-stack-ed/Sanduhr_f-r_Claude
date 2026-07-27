@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -11,6 +12,33 @@ namespace Sanduhr.App.ViewModels;
 
 /// <summary>One row in the breakdown tables — display name + compact tokens.</summary>
 public sealed record BreakdownRow(string Name, string Tokens);
+
+/// <summary>A per-root MCP burn-attribution consent toggle. Writes straight to
+/// the mcp_roots map the server reads; NEW Claude Code sessions pick the change
+/// up (a running server resolved its config at spawn).</summary>
+public sealed partial class McpRootToggleViewModel : ObservableObject
+{
+    private readonly LocalCcViewModel _owner;
+    private bool _loading = true;
+
+    public string Name { get; }
+
+    [ObservableProperty] private bool _isEnabled;
+
+    public McpRootToggleViewModel(LocalCcViewModel owner, string name, bool enabled)
+    {
+        _owner = owner;
+        Name = name;
+        IsEnabled = enabled;
+        _loading = false;
+    }
+
+    partial void OnIsEnabledChanged(bool value)
+    {
+        if (!_loading)
+            _owner.OnMcpRootToggled(Name, value);
+    }
+}
 
 /// <summary>A per-root vault consent toggle in the stewardship strip.</summary>
 public sealed partial class VaultRootToggleViewModel : ObservableObject
@@ -93,8 +121,10 @@ public sealed partial class LocalCcViewModel : ObservableObject
         _showBreakdowns = showBreakdowns;
         _persistShowBreakdowns = persistShowBreakdowns;
         _statuslineInstalled = widget.LoadStatuslineEnabled();
+        _mcpInstalled = widget.LoadMcpEnabled();
         _widget.ThemeChanged += _ => Changed?.Invoke();
         RebuildRoots();
+        RebuildMcpRoots();
     }
 
     partial void OnShowBreakdownsChanged(bool value) => _persistShowBreakdowns(value);
@@ -228,6 +258,138 @@ public sealed partial class LocalCcViewModel : ObservableObject
         catch
         {
             StatuslineStatusText = "Install failed — see sanduhr.log.";
+            Sounds.PlayError();
+        }
+    }
+
+    // -- WS-E MCP integration (registration slice) ------------------------------
+
+    /// <summary>True while the MCP integration is installed.</summary>
+    [ObservableProperty] private bool _mcpInstalled;
+
+    /// <summary>One-line outcome under the MCP buttons. Empty = hidden.</summary>
+    [ObservableProperty] private string _mcpStatusText = "";
+
+    public bool McpNotInstalled => !McpInstalled;
+
+    partial void OnMcpInstalledChanged(bool value)
+        => OnPropertyChanged(nameof(McpNotInstalled));
+
+    /// <summary>Burn-attribution consent toggles, shown while installed.</summary>
+    public ObservableCollection<McpRootToggleViewModel> McpRoots { get; } = new();
+
+    private McpIntegrationInstaller MakeMcpInstaller() => new(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        _widget.SanduhrAppDataDir);
+
+    /// <summary>Where the widget's own build carries the server (csproj copy
+    /// target puts it at &lt;app&gt;\mcp\ on every channel).</summary>
+    private static string McpSourceDir => Path.Combine(AppContext.BaseDirectory, "mcp");
+
+    private void RebuildMcpRoots()
+    {
+        McpRoots.Clear();
+        if (!McpInstalled)
+            return;
+        var consent = _widget.LoadMcpRoots();
+        foreach (var home in MakeMcpInstaller().DetectCcHomes())
+            McpRoots.Add(new McpRootToggleViewModel(this, home, consent.GetValueOrDefault(home)));
+    }
+
+    internal void OnMcpRootToggled(string root, bool on)
+    {
+        try
+        {
+            var map = new Dictionary<string, bool>(_widget.LoadMcpRoots().ToDictionary(p => p.Key, p => p.Value), StringComparer.Ordinal)
+            {
+                [root] = on,
+            };
+            _widget.SaveMcpRoots(map);
+        }
+        catch
+        {
+            // Consent persistence failure must never take down Settings; the
+            // fail-closed server treats an unwritten root as not consented.
+        }
+    }
+
+    /// <summary>Consent-gated install: pick the home, choose burn-attribution
+    /// roots (off by default), copy server files into a fresh version dir,
+    /// point the launcher, register in .claude.json with a backup.</summary>
+    [RelayCommand]
+    private void InstallMcp()
+    {
+        try
+        {
+            var installer = MakeMcpInstaller();
+            var homes = installer.DetectCcHomes();
+            if (homes.Count == 0)
+            {
+                McpStatusText = "No Claude Code install found (no ~/.claude or ~/.claude-personal).";
+                return;
+            }
+            if (!Directory.Exists(McpSourceDir))
+            {
+                McpStatusText = "Server files missing from this build (mcp\\ folder) - reinstall Sanduhr.";
+                Sounds.PlayError();
+                return;
+            }
+            var consent = McpConsentDialog.ShowConsent(
+                _owner, homes, _widget.LoadStatuslineCcHome(), installer.LauncherPath, installer.ConfigPathFor);
+            if (consent is null)
+                return;
+            if (installer.RefreshInstall(McpSourceDir) is null)
+            {
+                McpStatusText = "Couldn't copy the server files - see sanduhr.log.";
+                Sounds.PlayError();
+                return;
+            }
+            var reg = installer.Register(consent.CcHome);
+            if (!reg.Ok)
+            {
+                McpStatusText = $"Couldn't safely edit {consent.CcHome}\\.claude.json (it didn't parse) - nothing was changed.";
+                Sounds.PlayError();
+                return;
+            }
+            _widget.SaveMcpCcHome(consent.CcHome);
+            _widget.SaveMcpRoots(consent.Roots);
+            _widget.SaveMcpEnabled(true);
+            McpInstalled = true;
+            RebuildMcpRoots();
+            McpStatusText = reg.PriorCommand is { Length: > 0 } prior && !prior.Equals(installer.LauncherPath, StringComparison.OrdinalIgnoreCase)
+                ? $"Installed to {consent.CcHome} (replaced an older entry: {prior}). New Claude Code sessions pick it up."
+                : $"Installed to {consent.CcHome} - new Claude Code sessions pick it up.";
+            Sounds.PlaySaveConfirmation();
+        }
+        catch
+        {
+            McpStatusText = "Install failed - see sanduhr.log.";
+            Sounds.PlayError();
+        }
+    }
+
+    /// <summary>Full removal: deregister from the SAME home the install chose
+    /// (foreign entries untouched), delete launcher + version dirs, clear the
+    /// consent map's effect by disabling the integration flag.</summary>
+    [RelayCommand]
+    private void RemoveMcp()
+    {
+        try
+        {
+            var installer = MakeMcpInstaller();
+            var home = _widget.LoadMcpCcHome();
+            bool deregistered = string.IsNullOrEmpty(home) || installer.Deregister(home);
+            installer.RemoveIntegrationFiles();
+            _widget.SaveMcpEnabled(false);
+            McpInstalled = false;
+            McpRoots.Clear();
+            McpStatusText = deregistered
+                ? "Removed."
+                : "Files removed, but .claude.json couldn't be edited - delete its mcpServers.sanduhr entry manually.";
+        }
+        catch
+        {
+            McpStatusText = "Remove failed - see sanduhr.log.";
             Sounds.PlayError();
         }
     }

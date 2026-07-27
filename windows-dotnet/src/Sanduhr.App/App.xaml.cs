@@ -72,6 +72,21 @@ public partial class App : Application
                 _vm.StatuslineBinDir).InstallScript();
         }
 
+        // MCP integration (WS-E registration slice): same widget-as-updater rule.
+        // A newer app build carries a newer server; refresh the version dir +
+        // launcher so new Claude Code sessions get it. Version-dir indirection
+        // means running sessions keep their pinned copy — no lock fight.
+        if (_vm.LoadMcpEnabled())
+        {
+            string mcpSource = System.IO.Path.Combine(AppContext.BaseDirectory, "mcp");
+            if (System.IO.Directory.Exists(mcpSource))
+            {
+                new McpIntegrationInstaller(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    _vm.SanduhrAppDataDir).RefreshInstall(mcpSource);
+            }
+        }
+
         // Load the active account's stored credential + fetch real usage now.
         _vm.Start();
 

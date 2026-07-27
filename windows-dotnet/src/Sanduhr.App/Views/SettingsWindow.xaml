@@ -11,7 +11,7 @@
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
         Title="Sanduhr — Settings"
-        Height="620" Width="540"
+        Height="700" Width="540"
         MinHeight="520" MinWidth="480"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
@@ -1038,6 +1038,40 @@
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
                                                Text="{Binding StatuslineStatusText}"
                                                Visibility="{Binding StatuslineStatusText, Converter={StaticResource StrVis}}" />
+
+                                    <!-- WS-E MCP integration: consent-gated install; burn-attribution
+                                         roots stay per-home checkboxes, off by default. -->
+                                    <TextBlock Text="Claude quota tools (MCP)" FontSize="9" Margin="0,10,0,4"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Style="{StaticResource FlatButton}" Content="Install MCP server…"
+                                                Command="{Binding InstallMcpCommand}"
+                                                ToolTip="Let Claude check your live caps before spawning agents or picking a bigger model - read-only, consent-gated."
+                                                Visibility="{Binding McpNotInstalled, Converter={StaticResource BoolVis}}" />
+                                        <Button Style="{StaticResource FlatButton}" Content="Remove MCP server"
+                                                Command="{Binding RemoveMcpCommand}"
+                                                Visibility="{Binding McpInstalled, Converter={StaticResource BoolVis}}" />
+                                    </StackPanel>
+                                    <ItemsControl ItemsSource="{Binding McpRoots}" Margin="0,4,0,0"
+                                                  Visibility="{Binding McpInstalled, Converter={StaticResource BoolVis}}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,16,4"
+                                                          Content="{Binding Name}"
+                                                          ToolTip="Allow project-level burn attribution from this Claude Code home"
+                                                          IsChecked="{Binding IsEnabled, Mode=TwoWay}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock TextWrapping="Wrap" FontSize="10.5" Margin="0,4,0,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                               Text="{Binding McpStatusText}"
+                                               Visibility="{Binding McpStatusText, Converter={StaticResource StrVis}}" />
                                 </StackPanel>
                             </Grid>
 

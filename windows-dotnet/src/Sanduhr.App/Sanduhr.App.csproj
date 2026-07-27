@@ -62,4 +62,22 @@
     <FileVersion>3.3.0.0</FileVersion>
   </PropertyGroup>
 
+  <!-- WS-E MCP integration: the widget carries the server build in its own
+       output (mcp\) so the in-app installer has a source to copy from on every
+       channel. ReferenceOutputAssembly=false keeps this a build-order + payload
+       relationship only — the App never links the MCP assembly. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Sanduhr.Mcp\Sanduhr.Mcp.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
+  </ItemGroup>
+  <Target Name="CopyMcpServerOutput" AfterTargets="Build">
+    <ItemGroup>
+      <McpServerFiles Include="..\Sanduhr.Mcp\bin\$(Configuration)\net10.0\**\*"
+                      Exclude="..\Sanduhr.Mcp\bin\$(Configuration)\net10.0\*.pdb" />
+    </ItemGroup>
+    <Copy SourceFiles="@(McpServerFiles)"
+          DestinationFiles="@(McpServerFiles->'$(OutDir)mcp\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>
