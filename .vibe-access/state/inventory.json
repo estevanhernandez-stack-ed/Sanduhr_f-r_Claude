@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "app": "Sanduhr",
+  "adapter": "agnostic-dotnet-stdio-mcp",
+  "generatedAt": "2026-07-27T03:20:00Z",
+  "routes": [],
+  "unmapped": [
+    {
+      "sourceRef": "windows-dotnet/src/Sanduhr.Mcp/ToolCatalog.cs:get_usage",
+      "reason": "stdio-MCP tool, not an HTTP route - v1 inventory schema is HTTP-bound. Modeled in agent-access.json with the extended transport type 'stdio-mcp' (see adapter notes)."
+    },
+    {
+      "sourceRef": "windows-dotnet/src/Sanduhr.Mcp/ToolCatalog.cs:get_local_burn_by_project",
+      "reason": "stdio-MCP tool - same as above. Carries cross-tenant-risk data class (per-root CC home scoping)."
+    },
+    {
+      "sourceRef": "windows-dotnet/src/Sanduhr.Mcp/ToolCatalog.cs:ping",
+      "reason": "stdio-MCP tool - same as above. The verify anchor."
+    },
+    {
+      "sourceRef": "windows-dotnet/src/Sanduhr.Core/SnapshotWriter.cs -> %APPDATA%/Sanduhr/snapshot.json",
+      "reason": "File affordance (the rendezvous artifact itself) - no HTTP transport exists. Modeled with extended transport type 'file'."
+    },
+    {
+      "sourceRef": "windows-dotnet/src/Sanduhr.Core/StatuslineScript.cs -> %APPDATA%/Sanduhr/bin/sanduhr-statusline.ps1",
+      "reason": "Exec affordance (Claude Code spawns the render script per prompt) - modeled with extended transport type 'exec'."
+    }
+  ]
+}

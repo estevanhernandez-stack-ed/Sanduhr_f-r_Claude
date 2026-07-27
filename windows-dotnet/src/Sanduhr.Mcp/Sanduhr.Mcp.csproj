@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>sanduhr-mcp</AssemblyName>
+    <RootNamespace>Sanduhr.Mcp</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Rides the app's release train — bump with the widget so ping's
+         server_version means something (the writer_version lesson from #53). -->
+    <Version>3.4.0</Version>
+  </PropertyGroup>
+
+  <!-- Trust boundary BY CONSTRUCTION (WS-E design review must-fix #11): this
+       project deliberately has NO reference to Sanduhr.Core. It source-links
+       exactly the four files it needs, so CredentialStore /
+       WindowsCredentialManager / the WebView2 transport are not merely unused —
+       they are not part of the compilation. The cert letter's "cannot touch
+       credentials" claim is structural. A test pins this file's link list to
+       the allowlist; widening it is a design decision, not a convenience. -->
+  <ItemGroup>
+    <Compile Include="..\Sanduhr.Core\SnapshotContract.cs" Link="Core\SnapshotContract.cs" />
+    <Compile Include="..\Sanduhr.Core\Pacing.cs" Link="Core\Pacing.cs" />
+    <Compile Include="..\Sanduhr.Core\TierModel.cs" Link="Core\TierModel.cs" />
+    <Compile Include="..\Sanduhr.Core\CcLogReader.cs" Link="Core\CcLogReader.cs" />
+  </ItemGroup>
+
+</Project>
