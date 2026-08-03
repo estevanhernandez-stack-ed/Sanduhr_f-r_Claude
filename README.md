@@ -45,7 +45,7 @@ brew install --cask sanduhr
 and drag to Applications.
 
 - Developer ID signed + Apple-notarized → no Gatekeeper warnings.
-- NSVisualEffectView vibrancy, Keychain-backed credentials.
+- NSVisualEffectView vibrancy. Credentials are currently stored in a permissions-restricted plaintext file (`~/Library/Application Support/Sanduhr/credentials.json`), not Keychain — see [mac/README.md](mac/README.md#first-run).
 - Auto-updates via [Sparkle](https://sparkle-project.org) (24h check
   interval); `brew upgrade --cask sanduhr` also works.
 - Cask lives in [the personal tap][tap]. Submission to core
@@ -61,7 +61,7 @@ and drag to Applications.
 Download **`Sanduhr-Setup-vX.Y.Z.exe`** from [Releases](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases), click through the SmartScreen "unknown publisher" warning (signing deferred per [threat model](docs/generated/threat-model.md)), and run the installer.
 
 - Win11 Mica glass backdrop (Win10 falls back to solid theme color).
-- Windows Credential Manager storage (service `com.626labs.sanduhr`, matching the macOS Keychain).
+- Windows Credential Manager storage (service `com.626labs.sanduhr`). Uninstall does not clear these entries — use Sign Out first, or delete them from Credential Manager yourself.
 - Full source under [`windows/`](windows/).
 - **MSIX submission to Microsoft Store is in review** — Store approval eliminates the SmartScreen prompt and unlocks `winget install sanduhr`.
 
@@ -99,7 +99,7 @@ Single-file tkinter app with auto-installing `cloudscraper` dep. Works on macOS,
 
 ### Privacy & control
 
-- **OS-native credential storage** — Windows Credential Manager / macOS Keychain. Cleared on uninstall. Never plaintext.
+- **OS-native credential storage on Windows** — Windows Credential Manager (service `com.626labs.sanduhr`). Uninstall does **not** clear these entries on either channel (GitHub `.exe` or Microsoft Store) — use Sign Out (below) first, or delete the entries from Credential Manager yourself. **macOS stores credentials in a permissions-restricted plaintext file today, not Keychain** — see [mac/README.md](mac/README.md#first-run). Keychain migration is planned.
 - **Multi-account support** *(Windows v2.2.0+)* — track multiple Claude accounts (Personal + Work) in one install. Per-account credentials, per-account history, switch active account from the widget label or Settings → Accounts. Sign-out is account-scoped — the others stay intact.
 - **30-day local history** *(Windows v2.1.0+)* — rolling per-account history file in `%APPDATA%\Sanduhr\history.{Account}.json`. Settings → History shows a stacked per-tier line chart with Week / Month windows + per-account / All-accounts overlay views. Export as CSV to analyze with any agent.
 - **One-click sign-out** — Settings → Credentials → save with an empty sessionKey. Confirmation dialog, then that account's credentials and history are wiped from the OS store. Other accounts left intact.
@@ -145,7 +145,7 @@ Prefer to paste the key by hand, or running the cross-platform Python build?
 4. Copy the value of the `sessionKey` cookie.
 5. Paste it into Sanduhr (Windows native: **Settings → Accounts → Add by sessionKey**).
 
-Sanduhr hits two `claude.ai` endpoints — the same ones the settings page uses — to read your usage, and stores the cookie in your platform's native secure credential store (Keychain / Credential Manager). Nothing else leaves your machine.
+Sanduhr hits two `claude.ai` endpoints — the same ones the settings page uses — to read your usage, and stores the cookie in Windows Credential Manager on Windows or, on macOS today, a permissions-restricted plaintext file (not Keychain; migration planned). Nothing else leaves your machine.
 
 ---
 

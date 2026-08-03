@@ -1,7 +1,7 @@
 # Sanduhr für Claude — macOS (SwiftUI)
 
 Native Mac rewrite of the [Python/tkinter widget](../sanduhr.py). Feature parity
-plus real vibrancy, SF Pro, Keychain-backed credentials, and no dock icon.
+plus real vibrancy, SF Pro, and no dock icon.
 
 ## Build
 
@@ -39,8 +39,15 @@ alias — drag across to install, eject the DMG, done. Uses only `hdiutil` +
 3. Copy the `sessionKey` value.
 4. In Sanduhr, click **Continue** on the onboarding sheet, then paste the key.
 
-The key is stored in the macOS Keychain (service `com.626labs.sanduhr`,
-account `sessionKey`) — not in a plaintext file like the Python version.
+The key is currently stored in a permissions-restricted plaintext file at
+`~/Library/Application Support/Sanduhr/credentials.json` (mode `0600`,
+readable only by your user account) — **not** the macOS Keychain, despite
+the type name `KeychainStore` in the code. Now that the app ships
+Developer ID signed and notarized, migrating to the real Keychain is next;
+see that file's doc comment for why it was deferred. Dragging Sanduhr to
+the Trash does not remove this file — delete
+`~/Library/Application Support/Sanduhr/` manually, or sign out in the app
+first (Settings → Credentials → save with an empty key).
 
 ### Cloudflare fallback
 
@@ -50,7 +57,7 @@ Most accounts don't need this.
 
 ## Files
 
-- `sessionKey` + `cf_clearance` → Keychain
+- `sessionKey` + `cf_clearance` → `~/Library/Application Support/Sanduhr/credentials.json` (plaintext, mode `0600` — not Keychain; see First run above)
 - Selected theme → `UserDefaults` (`theme`)
 - Sparkline history → `~/Library/Application Support/Sanduhr/history.json`
 - Window position → `UserDefaults` (`windowFrame`)

@@ -45,10 +45,11 @@ Anthropic's privacy policy governs what they do with those requests: <https://ww
 
 ## How you remove your data
 
-- **Clear credentials only:** Windows Start → Credential Manager → delete entries under service `com.626labs.sanduhr`. Or: open Sanduhr → Settings → clear the field and save.
+- **Recommended: Sign Out.** Open Sanduhr → Settings → Credentials → save with an empty `sessionKey` for the account you want cleared. This deletes that account's Windows Credential Manager entries and its local history file.
+- **Clear credentials manually:** Windows Start → Credential Manager → delete entries under service `com.626labs.sanduhr`.
 - **Clear local storage:** delete `%APPDATA%\Sanduhr\` and `%LOCALAPPDATA%\Sanduhr\`.
-- **Full uninstall + data wipe:** Start → Apps & features → Sanduhr für Claude → Uninstall, and check "Also remove my settings and history" on the uninstall dialog. Credential Manager entries are cleared automatically on uninstall regardless of that checkbox.
-- **Note for Microsoft Store installs:** uninstalling from Apps & features does **not** remove `%LOCALAPPDATA%\Sanduhr` (Windows leaves per-user app data behind). If you want the usage vault gone after uninstall, delete that folder manually.
+- **Uninstall does not wipe credentials.** Start → Apps & features → Sanduhr für Claude → Uninstall removes the installed app files only. It does **not** delete your Windows Credential Manager entries under `com.626labs.sanduhr`, on either the GitHub (.exe) or Microsoft Store install — sign out first, or delete the entries yourself afterward.
+- **Note for Microsoft Store installs:** uninstalling from Apps & features also does **not** remove `%LOCALAPPDATA%\Sanduhr` (Windows leaves per-user app data behind). If you want the usage vault gone after uninstall, delete that folder manually.
 
 ## Third-party services Sanduhr does not use
 
