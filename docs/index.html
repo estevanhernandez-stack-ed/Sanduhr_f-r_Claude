@@ -644,7 +644,7 @@
 
         <div class="platform-card">
           <h3>macOS <span class="badge">native SwiftUI</span></h3>
-          <p class="meta">NSVisualEffectView vibrancy &middot; Keychain-backed credentials &middot; Developer ID signed + notarized &middot; Sparkle auto-updates &middot; drag-install DMG.</p>
+          <p class="meta">NSVisualEffectView vibrancy &middot; local plaintext credentials today, Keychain migration planned &middot; Developer ID signed + notarized &middot; Sparkle auto-updates &middot; drag-install DMG.</p>
           <div class="actions">
             <a class="primary" href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases">Latest .dmg</a>
             <a href="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/tree/main/mac">Source</a>
@@ -711,7 +711,7 @@
         </div>
         <div class="feature">
           <h4>OS-native credential storage</h4>
-          <p>Session key lives in Windows Credential Manager (service <code>com.626labs.sanduhr</code>) or macOS Keychain &mdash; same service name on both, cleared on uninstall, never plaintext.</p>
+          <p>Session key lives in Windows Credential Manager (service <code>com.626labs.sanduhr</code>) on Windows; uninstalling doesn&rsquo;t clear it on either Windows channel &mdash; use Sign Out in the app first. On macOS it&rsquo;s currently stored in a permissions-restricted plaintext file, not Keychain; migration is planned.</p>
         </div>
         <div class="feature">
           <h4>Auto-updates on Mac</h4>

@@ -11,10 +11,18 @@ The app makes exactly one kind of outbound network request: HTTPS to
 `claude.ai`, using **your own session cookie**, to read **your own** usage
 numbers from the same endpoints the claude.ai settings page already calls.
 
-Your session cookie is stored in your platform's native secure credential
-store (Windows Credential Manager or macOS Keychain). It never touches a
-plaintext file on disk, never goes over the network to anyone except
-`claude.ai`, and is wiped when you uninstall.
+Your session cookie is stored in Windows Credential Manager on Windows
+(service `com.626labs.sanduhr`). On macOS it is currently stored in a
+permissions-restricted plaintext file at `~/Library/Application
+Support/Sanduhr/credentials.json` (mode `0600`, readable only by your user
+account) — not the Keychain; migrating to the Keychain is next now that the
+macOS build ships Developer ID signed and notarized. Either way it never
+goes over the network to anyone except `claude.ai`. **Uninstalling Sanduhr
+does not remove these credentials**, on Windows (either the GitHub `.exe`
+or Microsoft Store install) or on macOS — use Sign Out in the app to clear
+an account's credentials before you uninstall, or delete them manually
+(Windows Credential Manager entries under `com.626labs.sanduhr`; the macOS
+file above).
 
 Multi-account installs (v2.2.0+) store one session cookie per named account
 using slot names like `sessionKey:Personal` and `sessionKey:Work` under the
