@@ -322,6 +322,19 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// trees so it survives app updates (the widget re-writes it on start).</summary>
     public string StatuslineBinDir => _paths.StatuslineBinDir;
 
+    /// <summary>The Sanduhr app-data dir — the MCP installer's root for the
+    /// launcher (bin\) and versioned server dirs (mcp\).</summary>
+    public string SanduhrAppDataDir => _paths.AppDataDir;
+
+    // -- WS-E MCP integration facade -------------------------------------------
+
+    public bool LoadMcpEnabled() => _settings.LoadMcpEnabled();
+    public void SaveMcpEnabled(bool on) => _settings.SaveMcpEnabled(on);
+    public string? LoadMcpCcHome() => _settings.LoadMcpCcHome();
+    public void SaveMcpCcHome(string ccHomeName) => _settings.SaveMcpCcHome(ccHomeName);
+    public IReadOnlyDictionary<string, bool> LoadMcpRoots() => _settings.LoadMcpRoots();
+    public void SaveMcpRoots(IReadOnlyDictionary<string, bool> roots) => _settings.SaveMcpRoots(roots);
+
     /// <summary>Write a status=ok snapshot from a successful fetch. No-op while
     /// the integration is off; never throws into the fetch path.</summary>
     private void WriteSnapshotOk(JsonObject data)
