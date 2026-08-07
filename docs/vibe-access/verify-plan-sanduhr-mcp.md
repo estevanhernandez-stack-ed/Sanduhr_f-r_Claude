@@ -12,11 +12,19 @@ ways the review flagged (virtualization, alias launch, update-under-lock).
 | Run | Date | Channel | Result | runId |
 |---|---|---|---|---|
 | 1 | 2026-07-27 | dev (Debug exe) | **5/5 affordances PASS, 27 checks** | af4bba22938cc9f2a |
+| 2 | 2026-07-27 | dev (Debug exe) | **Delta (abilities wave): 3/3 in-scope PASS + regression spot-check** | abb80276ee14af7ae |
 
 Run-1 notes: one plan deviation (fresh-state burn expected 3100, got 0) was
 counter-probed by the agent and traced to fixture event timestamps predating
 the snapshot anchor — server correct, kit fixed (`mcp-verify-fixtures.ps1`).
 Seven contract observations were folded back into the manifest descriptions.
+
+Run-2 notes (7-tool wave: pacing depth + get_model_usage + get_usage_history):
+pace anchor proven to be CALL time (cooldown = ideal − age_seconds — manifest
+updated to say so); the kit gained `state-fresh-fable` (meter-join coverage)
+and the no-consent probe guidance below; history's `to` is the LOCAL calendar
+day while fixture keys derive from UTC — schedule verify runs away from
+midnight or expect day-count skew.
 
 ## How to re-run
 
@@ -51,7 +59,19 @@ Seven contract observations were folded back into the manifest descriptions.
   stale→numbers + age marker; dead→'start widget' line (never blank);
   missing→empty. Pure ASCII in every case (raw-byte capture).
 
+- **get_model_usage:** window guard (enum 1|7|30); ranked models with share;
+  tier mapping; meter join from the fable-tier state; unmapped model visible
+  with null tier; missing snapshot still serves tokens with null meters.
+- **get_usage_history:** window guard (enum 7|30|90); totals + sent/received
+  split; gap days OMITTED (never zero); project display names only (no ~hash);
+  empty vault → missing + vault remedy; disabled checked before vault.
+
 Env redirection (dev tier only, never shipped config):
 `SANDUHR_SNAPSHOT_PATH=<state>\snapshot.json`,
-`SANDUHR_CC_ROOTS=<roots dir>` (';' list). Drive: newline-delimited JSON-RPC
+`SANDUHR_CC_ROOTS=<roots dir>` (';' list),
+`SANDUHR_VAULT_DIR=<vault dir>`. Drive: newline-delimited JSON-RPC
 on stdin; tool payloads arrive as `result.content[0].text` (JSON string).
+
+No-consent probe on a machine with LIVE consent: an absent/empty
+`SANDUHR_CC_ROOTS` falls through to the real settings map (by design) — reach
+the disabled path by pointing the override at a nonexistent directory instead.

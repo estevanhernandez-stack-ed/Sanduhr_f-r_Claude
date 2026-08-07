@@ -38,7 +38,14 @@ public class TrustBoundaryTests
             .OrderBy(x => x)
             .ToArray();
         Assert.Equal(
-            new[] { "CcLogReader.cs", "Pacing.cs", "SnapshotContract.cs", "TierModel.cs" },
+            new[]
+            {
+                "CcLogReader.cs", "Pacing.cs", "SnapshotContract.cs", "TierModel.cs",
+                // Abilities wave: vault READS only — the drift watchlist bans
+                // MCP-side vault writes; VaultStore's write methods have no call
+                // sites in the server (cold-verified tool surface).
+                "VaultModels.cs", "VaultReader.cs", "VaultStore.cs",
+            },
             linked);
     }
 

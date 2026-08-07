@@ -11,7 +11,7 @@
     "fetch_error_enum": ["session_expired", "cloudflare", "network"],
     "reason_vs_fetch_error": "separate channels: reason covers data availability, fetch_error covers widget-fetch failures carried in an otherwise-served snapshot; both can be null",
     "failure_shape": "typed tool results carrying status/reason/remedy - NEVER MCP protocol errors, never isError:true",
-    "env_overrides_dev_tier_only": ["SANDUHR_SNAPSHOT_PATH", "SANDUHR_CC_ROOTS"]
+    "env_overrides_dev_tier_only": ["SANDUHR_SNAPSHOT_PATH", "SANDUHR_CC_ROOTS", "SANDUHR_VAULT_DIR"]
   },
   "baseUrls": {
     "dev": "stdio://sanduhr-mcp"
@@ -20,12 +20,12 @@
   "affordances": [
     {
       "id": "mcp.get-usage",
-      "description": "MCP tool get_usage: Claude subscription quota headroom from the widget's snapshot, plus local CC burn SINCE that snapshot's captured_at (consented roots only; null when nothing consented). Server computes age_seconds/resets_in_seconds; reset-crossed tiers serve utilization null, never the stale percent. status ok|stale|no_data with reason+remedy; widget fetch failures surface as fetch_error with last-good tiers (reason stays null - separate channels). account carries a hashed ref plus plan; plan is a tier name (e.g. 'Max 20x'), not an identity label. Data class: usage-metrics.",
+      "description": "MCP tool get_usage: Claude subscription quota headroom from the widget's snapshot, plus local CC burn SINCE that snapshot's captured_at (consented roots only; null when nothing consented). Server computes age_seconds/resets_in_seconds; reset-crossed tiers serve utilization null, never the stale percent. Pace derivations (cooldown/surplus/projected-final) are anchored AT CALL TIME - as of now, not as of the snapshot. status ok|stale|no_data with reason+remedy; widget fetch failures surface as fetch_error with last-good tiers (reason stays null - separate channels). account carries a hashed ref plus plan; plan is a tier name (e.g. 'Max 20x'), not an identity label. Data class: usage-metrics.",
       "tier": "prod-safe",
       "kind": "read",
       "transport": { "type": "stdio-mcp", "method": "tools/call", "path": "/get_usage" },
       "input": null,
-      "output": { "shape": "status, reason, remedy, fetch_error, as_of, age_seconds, scope:'active_account_only', account{ref,plan}, data_lag_note, schema_version, tiers[{key,label,utilization_pct,headroom_pct,resets_at,resets_in_seconds,reset_crossed,pace{verdict,delta_pct}|null,projection{expires_before_reset,expires_in_seconds}|null,used,limit}], local_burn_since_snapshot{total_tokens,by_tier,caveat}|null" },
+      "output": { "shape": "status, reason, remedy, fetch_error, as_of, age_seconds, scope:'active_account_only', account{ref,plan}, data_lag_note, schema_version, tiers[{key,label,utilization_pct,headroom_pct,resets_at,resets_in_seconds,reset_crossed,pace{verdict,delta_pct,cooldown_seconds|null,surplus_pct|null,projected_final_pct|null}|null,projection{expires_before_reset,expires_in_seconds}|null,used,limit}], local_burn_since_snapshot{total_tokens,by_tier,caveat}|null. Pacing depth (abilities wave): cooldown_seconds = idle time to fall back onto pace when ahead; surplus_pct = banked headroom when under; projected_final_pct = where the meter lands at reset on current momentum, capped 200" },
       "auth": "none",
       "authDetail": "none-local-ambient: stdio child of the user's own CLI; ambient user authority. A token here would be theater - any local process can read snapshot.json directly.",
       "destructive": false,
@@ -33,9 +33,9 @@
       "origin": "existing",
       "verified": {
         "status": "pass",
-        "at": "2026-07-27T04:00:00Z",
-        "runId": "af4bba22938cc9f2a",
-        "detail": "Cold-agent black-box pass over stdio: 7 snapshot states (ok/stale/dead/error/missing/malformed/schema2) all typed correctly; isError never set; burn anchor proven = captured_at via counter-probe; account ref stays 8-hex."
+        "at": "2026-07-27T05:10:00Z",
+        "runId": "abb80276ee14af7ae",
+        "detail": "Run 1 (af4bba22938cc9f2a): 7 snapshot states typed correctly, isError never set, burn anchor proven = captured_at. Run 2 delta: pacing depth proven - ahead/under verdicts, cooldown identity (10800 - age), surplus, projected-final 200 cap, pre-existing pace fields regression-checked; pace anchor confirmed call-time."
       }
     },
     {
@@ -76,6 +76,46 @@
         "at": "2026-07-27T04:00:00Z",
         "runId": "af4bba22938cc9f2a",
         "detail": "Cold-agent pass: snapshot_found/age/path all matched the env-selected fixture; consented reflected the override while found reported the real machine scan."
+      }
+    },
+    {
+      "id": "mcp.get-model-usage",
+      "description": "MCP tool get_model_usage: per-model local CC token totals over a closed window (1|7|30 days) across consented roots, each model joined with its weekly meter utilization from the live snapshot (meter_source carries the snapshot's own status/age so meter freshness is never implied). Unmapped models stay visible with tier null. The 'which model for this job' answer in one call. Data class: usage-metrics.",
+      "tier": "prod-safe",
+      "kind": "read",
+      "transport": { "type": "stdio-mcp", "method": "tools/call", "path": "/get_model_usage" },
+      "input": { "window_days": "integer enum [1,7,30], default 7" },
+      "output": { "shape": "status, window_days, since, roots_scanned[], total_tokens, models[{model,tokens,share_pct,tier_key|null,tier_label|null,meter_utilization_pct|null}], meter_source{status,as_of,age_seconds}|null, caveat" },
+      "auth": "none",
+      "authDetail": "none-local-ambient + mcp_roots consent map (fail closed).",
+      "destructive": false,
+      "sourceRef": "windows-dotnet/src/Sanduhr.Mcp/ToolLogic.cs:BuildModelUsage",
+      "origin": "existing",
+      "verified": {
+        "status": "pass",
+        "at": "2026-07-27T05:10:00Z",
+        "runId": "abb80276ee14af7ae",
+        "detail": "Delta cold verify: totals/ranking/share exact (3100; fable 3000/97%), tier mapping + meter join proven (crafted fable-tier snapshot served 57), unmapped model visible with null tier, meter_source carries snapshot status/age, missing-snapshot path serves tokens with null meters, typed invalid_params, disabled path fail-closed."
+      }
+    },
+    {
+      "id": "mcp.get-usage-history",
+      "description": "MCP tool get_usage_history: daily local CC usage from Sanduhr's durable vault (survives Claude Code's ~30-day log cleanup) over 7|30|90 days across consented roots: per-day tokens with sent/received split, window totals, top-5 projects (display names only - vault keys are name~hash and the hash never leaves). Days without a record are OMITTED, never fabricated as zero (a widget-off week must not read as a vacation). Vault reads only - the server has no vault write path by tool construction. Data class: usage-metrics, local-fs-derived.",
+      "tier": "prod-safe",
+      "kind": "read",
+      "transport": { "type": "stdio-mcp", "method": "tools/call", "path": "/get_usage_history" },
+      "input": { "window_days": "integer enum [7,30,90], default 30" },
+      "output": { "shape": "status, window_days, from, to, roots_scanned[], total_tokens, days_recorded, days[{date,tokens,sent,received}], top_projects[{name,tokens}], caveat" },
+      "auth": "none",
+      "authDetail": "none-local-ambient + mcp_roots consent map (fail closed). Vault dir env-overridable dev-tier only (SANDUHR_VAULT_DIR).",
+      "destructive": false,
+      "sourceRef": "windows-dotnet/src/Sanduhr.Mcp/ToolLogic.cs:BuildHistory",
+      "origin": "existing",
+      "verified": {
+        "status": "pass",
+        "at": "2026-07-27T05:10:00Z",
+        "runId": "abb80276ee14af7ae",
+        "detail": "Delta cold verify: totals + sent/received split exact, gap day OMITTED (no fabricated zero), project display names only (~hash suffix absent from the entire response), typed invalid_params, disabled fail-closed (checked before vault), empty vault -> missing with vault remedy."
       }
     },
     {

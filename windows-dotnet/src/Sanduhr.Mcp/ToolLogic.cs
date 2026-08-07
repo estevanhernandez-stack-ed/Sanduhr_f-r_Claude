@@ -155,15 +155,24 @@ public sealed class ToolLogic
         double? frac = crossed ? null : Pacing.PaceFrac(resetsAt, key, now);
         if (frac is { } f && util is { } u && f > 0)
         {
+            long totalSecs = key == "five_hour" ? 5L * 3600 : 7L * 86400;
             double delta = u - f * 100;
+            // cooldown/surplus/projected-final mirror Pacing.CalculateCooldown /
+            // CalculateSurplus / VelocityProjection with raw numbers instead of
+            // display strings: ahead -> how long to idle back onto pace; under ->
+            // how much banked headroom; and where the meter lands at reset if the
+            // burn keeps its momentum (capped at 200, the widget's own cap).
+            double waitFrac = u / 100.0 - f;
             tier["pace"] = new JsonObject
             {
                 ["verdict"] = Math.Abs(delta) < 5 ? "on_pace" : delta > 0 ? "ahead" : "under",
                 ["delta_pct"] = Math.Round(Math.Abs(delta)),
+                ["cooldown_seconds"] = waitFrac > 0 ? Math.Round(waitFrac * totalSecs) : null,
+                ["surplus_pct"] = f * 100.0 - u > 0 ? Math.Round(f * 100.0 - u) : null,
+                ["projected_final_pct"] = u > 0 && f > 0.01 ? Math.Round(Math.Min(200.0, u / f)) : null,
             };
             // Mirrors Pacing.BurnProjection's formula with raw numbers instead
             // of display strings: at the current rate, does 100% land before reset?
-            long totalSecs = key == "five_hour" ? 5L * 3600 : 7L * 86400;
             double ratePerFrac = u / f;
             if (u > 0 && ratePerFrac > 100 && resetInstant is { } rr)
             {
@@ -287,6 +296,165 @@ public sealed class ToolLogic
             ["roots"] = roots,
             ["files_scanned"] = filesScanned,
             ["caveat"] = BurnCaveat,
+        };
+    }
+
+    // -- get_model_usage ------------------------------------------------------
+
+    /// <summary>Which models are burning the budget: per-model local CC token
+    /// totals over the window, joined with each model's weekly meter utilization
+    /// from the snapshot (so "should I pick the bigger model" is one call).
+    /// Unmapped models stay visible with a null tier.</summary>
+    public JsonObject BuildModelUsage(int windowDays)
+    {
+        if (windowDays is not (1 or 7 or 30))
+            return NoData("invalid_params", "window_days must be 1, 7, or 30");
+        if (_config.ConsentedRoots.Count == 0)
+            return NoData("disabled",
+                "No Claude Code homes are consented for MCP reads. Enable them in the Sanduhr widget's settings (mcp_roots).");
+
+        var now = _clock();
+        var since = now.AddDays(-windowDays);
+        long total = 0;
+        var byModel = new Dictionary<string, long>(StringComparer.Ordinal);
+        foreach (var (_, rootPath) in _config.ConsentedRoots)
+        {
+            foreach (var ev in EventsSince(rootPath, since))
+            {
+                long tokens = ev.Usage.InputTokens + ev.Usage.OutputTokens;
+                if (tokens <= 0)
+                    continue;
+                string model = ev.Model is { Length: > 0 } m ? m : "(unknown)";
+                total += tokens;
+                byModel[model] = byModel.GetValueOrDefault(model) + tokens;
+            }
+        }
+
+        // Meter join: per-model weekly utilization from the snapshot, when it has
+        // one. Carried with the snapshot's own status/as_of so the agent knows
+        // how fresh the meter side is (the token side is live-log truth).
+        var (outcome, snap) = SnapshotReader.Read(_config.SnapshotPath);
+        Dictionary<string, int>? meterByTier = null;
+        JsonObject? meterSource = null;
+        if (outcome == SnapshotReadOutcome.Ok
+            && Pacing.Parse((string?)snap!["captured_at"]) is { } captured)
+        {
+            meterByTier = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var node in snap["tiers"] as JsonArray ?? new JsonArray())
+            {
+                if (node is JsonObject t && (string?)t["key"] is { Length: > 0 } k
+                    && TryInt(t["utilization"]) is { } u
+                    && !(Pacing.Parse((string?)t["resets_at"]) is { } r && r <= now))
+                {
+                    meterByTier[k] = u;
+                }
+            }
+            meterSource = new JsonObject
+            {
+                ["status"] = (string?)snap["status"],
+                ["as_of"] = (string?)snap["captured_at"],
+                ["age_seconds"] = Math.Round(SnapshotContract.AgeSeconds(captured, now)),
+            };
+        }
+
+        var models = new JsonArray();
+        foreach (var (model, tokens) in byModel.OrderByDescending(p => p.Value))
+        {
+            string? tierKey = CcLogReader.TierForModel(model);
+            models.Add(new JsonObject
+            {
+                ["model"] = model,
+                ["tokens"] = tokens,
+                ["share_pct"] = total > 0 ? Math.Round(tokens * 100.0 / total) : 0,
+                ["tier_key"] = tierKey,
+                ["tier_label"] = tierKey is not null && TierModel.IsKnown(tierKey) ? TierModel.Label(tierKey) : null,
+                ["meter_utilization_pct"] = tierKey is not null && meterByTier is not null
+                    ? (meterByTier.TryGetValue(tierKey, out int mu) ? mu : null)
+                    : null,
+            });
+        }
+
+        return new JsonObject
+        {
+            ["status"] = "ok",
+            ["reason"] = null,
+            ["remedy"] = null,
+            ["window_days"] = windowDays,
+            ["since"] = since.ToString("o"),
+            ["roots_scanned"] = ToArray(_config.ConsentedRoots.Select(r => r.Name)),
+            ["total_tokens"] = total,
+            ["models"] = models,
+            ["meter_source"] = meterSource,
+            ["caveat"] = BurnCaveat,
+        };
+    }
+
+    // -- get_usage_history ----------------------------------------------------
+
+    /// <summary>Daily usage history from the durable vault (survives CC's
+    /// ~30-day log cleanup): tokens per LOCAL calendar day with sent/received
+    /// split, window totals, top projects. Days without a record are OMITTED —
+    /// a widget-off week must never read as a zero-usage vacation.</summary>
+    public JsonObject BuildHistory(int windowDays)
+    {
+        if (windowDays is not (7 or 30 or 90))
+            return NoData("invalid_params", "window_days must be 7, 30, or 90");
+        if (_config.ConsentedRoots.Count == 0)
+            return NoData("disabled",
+                "No Claude Code homes are consented for MCP reads. Enable them in the Sanduhr widget's settings (mcp_roots).");
+
+        var today = DateOnly.FromDateTime(_clock().ToLocalTime().DateTime);
+        var from = today.AddDays(-(windowDays - 1));
+        var rootNames = _config.ConsentedRoots.Select(r => r.Name).ToList();
+
+        VaultWindow window;
+        try
+        {
+            var reader = new VaultReader(new VaultStore(_config.VaultDir));
+            window = reader.ReadWindow(rootNames, from, today.AddDays(1));
+        }
+        catch (Exception)
+        {
+            return NoData("malformed", "The usage vault could not be read - see the Sanduhr widget's Claude Usage tab.");
+        }
+
+        if (window.ByDay.Count == 0)
+            return NoData("missing",
+                "No vault history for the consented homes. Enable the history vault in the Sanduhr widget (Settings > Claude Usage) and let it ingest.");
+
+        long total = 0;
+        var days = new JsonArray();
+        foreach (var (date, tokens) in window.ByDay.OrderBy(p => p.Key))
+        {
+            total += tokens;
+            days.Add(new JsonObject
+            {
+                ["date"] = date.ToString("yyyy-MM-dd"),
+                ["tokens"] = tokens,
+                // 0/0 alongside a nonzero total is WS-C-era legacy (unsplit), not zero traffic.
+                ["sent"] = window.ByDayInput.GetValueOrDefault(date),
+                ["received"] = window.ByDayOutput.GetValueOrDefault(date),
+            });
+        }
+        var topProjects = new JsonArray();
+        foreach (var (name, tokens) in window.ByProjectName.OrderByDescending(p => p.Value).Take(5))
+            topProjects.Add(new JsonObject { ["name"] = name, ["tokens"] = tokens });
+
+        return new JsonObject
+        {
+            ["status"] = "ok",
+            ["reason"] = null,
+            ["remedy"] = null,
+            ["window_days"] = windowDays,
+            ["from"] = from.ToString("yyyy-MM-dd"),
+            ["to"] = today.ToString("yyyy-MM-dd"),
+            ["roots_scanned"] = ToArray(rootNames),
+            ["total_tokens"] = total,
+            ["days_recorded"] = days.Count,
+            ["days"] = days,
+            ["top_projects"] = topProjects,
+            ["caveat"] = "Vault rollups cover days the widget has ingested; today may be partial or absent - " +
+                         "use get_usage for live burn. Absent days are no-record, never zero. " + BurnCaveat,
         };
     }
 

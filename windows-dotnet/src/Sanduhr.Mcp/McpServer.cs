@@ -126,6 +126,18 @@ public sealed class McpServer
                 catch { /* non-bool stays default false */ }
                 payload = _tools.BuildBurn(windowDays, fullPaths);
                 break;
+            case "get_model_usage":
+                int muWindow = 7;
+                try { if (args?["window_days"] is JsonNode mw) muWindow = mw.GetValue<int>(); }
+                catch { muWindow = -1; } // non-integer -> typed invalid_params
+                payload = _tools.BuildModelUsage(muWindow);
+                break;
+            case "get_usage_history":
+                int histWindow = 30;
+                try { if (args?["window_days"] is JsonNode hw) histWindow = hw.GetValue<int>(); }
+                catch { histWindow = -1; }
+                payload = _tools.BuildHistory(histWindow);
+                break;
             case "ping":
                 payload = _tools.BuildPing();
                 break;

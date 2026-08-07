@@ -25,6 +25,13 @@
     <Compile Include="..\Sanduhr.Core\Pacing.cs" Link="Core\Pacing.cs" />
     <Compile Include="..\Sanduhr.Core\TierModel.cs" Link="Core\TierModel.cs" />
     <Compile Include="..\Sanduhr.Core\CcLogReader.cs" Link="Core\CcLogReader.cs" />
+    <!-- Vault slice (abilities wave): READ-ONLY by tool construction. The design
+         review's drift watchlist bans MCP-side vault WRITES; VaultStore's write
+         methods ride along with the type but have zero call sites in this
+         project — the tool surface exposes reads only, proven by cold verify. -->
+    <Compile Include="..\Sanduhr.Core\VaultModels.cs" Link="Core\VaultModels.cs" />
+    <Compile Include="..\Sanduhr.Core\VaultStore.cs" Link="Core\VaultStore.cs" />
+    <Compile Include="..\Sanduhr.Core\VaultReader.cs" Link="Core\VaultReader.cs" />
   </ItemGroup>
 
 </Project>
