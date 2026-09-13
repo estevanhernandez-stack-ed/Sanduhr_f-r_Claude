@@ -28,18 +28,20 @@ public sealed record UsagePublishResult(int StatusCode, bool Ok, string Message,
 }
 
 /// <summary>
-/// Builds and posts the daily usage snapshot to the 626 Labs dashboard
-/// (<c>manage_usage</c> / <c>record</c>). The payload is a per-project
-/// token-count proxy for ONE calendar day plus the widget's current quota
-/// headroom — and nothing else: no paths (basenames only, capped), no session
-/// content, no account labels, no keys. Roots the user did not mark shareable
-/// never appear in <c>homes</c> or <c>byProject</c>, even if burn was
-/// collected for them. Pure Core: the HTTP handler is injectable so tests
-/// never touch the network.
+/// Builds and posts the daily usage snapshot to an endpoint the user chose.
+/// Nothing about usage comes back to 626 Labs; the user sends it to
+/// themselves. The payload is a per-project token-count proxy for ONE
+/// calendar day plus the widget's current quota headroom — and nothing else:
+/// no paths (basenames only, capped), no session content, no account labels,
+/// no tokens. Roots the user did not mark shareable never appear in
+/// <c>homes</c> or <c>byProject</c>, even if burn was collected for them.
+/// Two body formats: <see cref="PublishBodyFormat.Sanduhr"/> is the snapshot
+/// object as-is; <see cref="PublishBodyFormat.Labs626"/> wraps it the way the
+/// 626 Labs dashboard preset expects. Pure Core: the HTTP handler is
+/// injectable so tests never touch the network.
 /// </summary>
 public static class UsagePublisher
 {
-    public const string Endpoint = "https://us-central1-project-626labs.cloudfunctions.net/mcp/api/manage_usage";
     public const string Source = "sanduhr";
     public const string Caveat = "token-count proxy from local logs; lower bound";
 
@@ -58,13 +60,16 @@ public static class UsagePublisher
 
     /// <summary>Assemble the wire payload. <paramref name="shareableRoots"/> is
     /// the consent filter: burn for any other root is dropped on the floor.
+    /// <paramref name="format"/> picks the envelope: the plain snapshot object,
+    /// or the 626 Labs <c>action: "record"</c> wrapper around the same fields.
     /// Deterministic (no clock, no IO) so the shape is fully testable.</summary>
     public static JsonObject BuildPayload(
         DateOnly date,
         string machine,
         IReadOnlyList<RootDayBurn> burnByRoot,
         IReadOnlySet<string> shareableRoots,
-        PublishQuota? quota)
+        PublishQuota? quota,
+        PublishBodyFormat format = PublishBodyFormat.Sanduhr)
     {
         var homes = new JsonArray();
         var byProject = new Dictionary<string, long>(StringComparer.Ordinal);
@@ -94,18 +99,17 @@ public static class UsagePublisher
         foreach (var (tier, tokens) in byTier.OrderByDescending(p => p.Value))
             tiers[tier] = tokens;
 
-        var payload = new JsonObject
-        {
-            ["action"] = "record",
-            ["date"] = date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            ["source"] = Source,
-            ["machine"] = machine,
-            ["homes"] = homes,
-            ["totals"] = new JsonObject { ["tokens"] = total },
-            ["byTier"] = tiers,
-            ["byProject"] = projects,
-            ["caveat"] = Caveat,
-        };
+        var payload = new JsonObject();
+        if (format == PublishBodyFormat.Labs626)
+            payload["action"] = "record";   // the dashboard's discriminator; the snapshot itself is identical
+        payload["date"] = date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        payload["source"] = Source;
+        payload["machine"] = machine;
+        payload["homes"] = homes;
+        payload["totals"] = new JsonObject { ["tokens"] = total };
+        payload["byTier"] = tiers;
+        payload["byProject"] = projects;
+        payload["caveat"] = Caveat;
         if (quota is not null)
             payload["quota"] = BuildQuota(quota);
         return payload;
@@ -171,23 +175,54 @@ public static class UsagePublisher
         return new PublishQuota(fresh ? "ok" : "stale", capturedAt, tiers);
     }
 
-    /// <summary>POST the payload. The key rides only in the Authorization
-    /// header; it is never echoed into the result message or any log line.</summary>
+    /// <summary>An endpoint the publisher will post to: an absolute http(s) URL.
+    /// Anything else (blank, relative, another scheme) never reaches the network.</summary>
+    public static bool IsUsableEndpoint(string? url)
+        => Uri.TryCreate(url?.Trim(), UriKind.Absolute, out var u)
+           && (u.Scheme == Uri.UriSchemeHttps || u.Scheme == Uri.UriSchemeHttp);
+
+    /// <summary>POST the payload to <paramref name="target"/>. The token rides
+    /// only in the header the scheme names (none at all for
+    /// <see cref="PublishAuthScheme.None"/>); it is never echoed into the
+    /// result message or any log line.</summary>
     public static async Task<UsagePublishResult> PublishAsync(
         JsonObject payload,
-        string apiKey,
+        PublishTarget target,
+        string? token,
         HttpMessageHandler? handler = null,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(apiKey))
-            return new UsagePublishResult(0, false, "No 626 Labs agent key stored.", DateTimeOffset.Now);
+        if (!IsUsableEndpoint(target.EndpointUrl))
+        {
+            string why = string.IsNullOrWhiteSpace(target.EndpointUrl)
+                ? "No publish endpoint configured."
+                : "Publish endpoint is not an absolute http(s) URL.";
+            return new UsagePublishResult(0, false, why, DateTimeOffset.Now);
+        }
+        bool needsToken = target.AuthScheme != PublishAuthScheme.None;
+        if (needsToken && string.IsNullOrWhiteSpace(token))
+            return new UsagePublishResult(0, false, "No publish token stored.", DateTimeOffset.Now);
 
         using var http = new HttpClient(handler ?? new HttpClientHandler(), disposeHandler: handler is null)
         {
             Timeout = HttpTimeout,
         };
-        using var req = new HttpRequestMessage(HttpMethod.Post, Endpoint);
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        using var req = new HttpRequestMessage(HttpMethod.Post, new Uri(target.EndpointUrl.Trim(), UriKind.Absolute));
+        switch (target.AuthScheme)
+        {
+            case PublishAuthScheme.Bearer:
+                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token!.Trim());
+                break;
+            case PublishAuthScheme.Header:
+                string name = string.IsNullOrWhiteSpace(target.AuthHeaderName)
+                    ? PublishSettingsJson.DefaultAuthHeaderName
+                    : target.AuthHeaderName.Trim();
+                if (!req.Headers.TryAddWithoutValidation(name, token!.Trim()))
+                    return new UsagePublishResult(0, false, "Auth header name is not a valid HTTP header.", DateTimeOffset.Now);
+                break;
+            case PublishAuthScheme.None:
+                break;
+        }
         req.Content = new StringContent(
             payload.ToJsonString(new JsonSerializerOptions { WriteIndented = false }),
             Encoding.UTF8, "application/json");
@@ -212,7 +247,8 @@ public static class UsagePublisher
             string message = resp.StatusCode switch
             {
                 HttpStatusCode.OK => "Published.",
-                HttpStatusCode.Unauthorized => "Key rejected (401) - check the 626 Labs agent key.",
+                HttpStatusCode.Unauthorized => "Token rejected (401) - check the publish token.",
+                HttpStatusCode.Forbidden => "Forbidden (403) - the endpoint refused this token.",
                 HttpStatusCode.TooManyRequests => "Rate limited (429) - try again later.",
                 HttpStatusCode.BadRequest => $"Rejected (400): {Snippet(body)}",
                 _ => $"HTTP {code}.",

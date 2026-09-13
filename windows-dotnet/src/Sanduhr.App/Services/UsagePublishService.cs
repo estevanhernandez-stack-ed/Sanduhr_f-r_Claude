@@ -203,17 +203,15 @@ public sealed class UsagePublishService
                 foreach (var root in shared)
                     burn.Add(_reader.BurnForLocalDay(root, Path.Combine(home, root), date));
 
+                var settings = _settings.LoadPublishSettings();
                 var quota = UsagePublisher.ReadQuota(_paths.SnapshotFile, DateTimeOffset.UtcNow);
                 var payload = UsagePublisher.BuildPayload(
                     date, Environment.MachineName, burn,
-                    new HashSet<string>(shared, StringComparer.Ordinal), quota);
+                    new HashSet<string>(shared, StringComparer.Ordinal), quota, settings.BodyFormat);
 
-                UsagePublishResult result;
-                var key = _keys.Load();
-                if (key is null)
-                    result = new UsagePublishResult(0, false, "No 626 Labs agent key stored.", DateTimeOffset.Now);
-                else
-                    result = await UsagePublisher.PublishAsync(payload, key).ConfigureAwait(false);
+                // The publisher refuses (status 0, no network) on a missing endpoint
+                // or a missing token for a scheme that needs one.
+                var result = await UsagePublisher.PublishAsync(payload, settings.Target, _keys.Load()).ConfigureAwait(false);
 
                 Record(result, date);
                 return new PublishOutcome(result, shared, burn.Sum(b => b.Total),
