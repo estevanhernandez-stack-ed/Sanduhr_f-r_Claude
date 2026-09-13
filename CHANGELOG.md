@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v3.4.1 — 2026-09-13
+
+**Platform:** Windows (.NET 10 / WPF).
 
 ### Added
 
