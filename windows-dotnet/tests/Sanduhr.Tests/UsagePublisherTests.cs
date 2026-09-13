@@ -404,6 +404,8 @@ public class UsagePublisherTests
     {
         Assert.True(UsagePublisher.IsUsableEndpoint("https://collector.example/usage"));
         Assert.True(UsagePublisher.IsUsableEndpoint("http://127.0.0.1:8080/ingest"));
+        Assert.True(UsagePublisher.IsUsableEndpoint("http://localhost:8080/ingest"));
+        Assert.False(UsagePublisher.IsUsableEndpoint("http://collector.example/usage")); // token would cross the network in clear
         Assert.False(UsagePublisher.IsUsableEndpoint(""));
         Assert.False(UsagePublisher.IsUsableEndpoint("file:///c:/x.json"));
         Assert.False(UsagePublisher.IsUsableEndpoint("collector.example/usage"));

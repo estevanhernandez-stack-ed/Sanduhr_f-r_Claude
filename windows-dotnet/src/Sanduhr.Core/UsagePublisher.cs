@@ -177,9 +177,11 @@ public static class UsagePublisher
 
     /// <summary>An endpoint the publisher will post to: an absolute http(s) URL.
     /// Anything else (blank, relative, another scheme) never reaches the network.</summary>
+    /// <summary>https anywhere; plain http only to a loopback host, because the
+    /// publish token rides in a header and must not cross a network in clear.</summary>
     public static bool IsUsableEndpoint(string? url)
         => Uri.TryCreate(url?.Trim(), UriKind.Absolute, out var u)
-           && (u.Scheme == Uri.UriSchemeHttps || u.Scheme == Uri.UriSchemeHttp);
+           && (u.Scheme == Uri.UriSchemeHttps || (u.Scheme == Uri.UriSchemeHttp && u.IsLoopback));
 
     /// <summary>POST the payload to <paramref name="target"/>. The token rides
     /// only in the header the scheme names (none at all for
@@ -196,7 +198,7 @@ public static class UsagePublisher
         {
             string why = string.IsNullOrWhiteSpace(target.EndpointUrl)
                 ? "No publish endpoint configured."
-                : "Publish endpoint is not an absolute http(s) URL.";
+                : "Publish endpoint must be an absolute https URL (plain http only for a loopback host).";
             return new UsagePublishResult(0, false, why, DateTimeOffset.Now);
         }
         bool needsToken = target.AuthScheme != PublishAuthScheme.None;
