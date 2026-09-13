@@ -179,6 +179,12 @@ pick up the delta.
 
 ## Phase 7 — Microsoft Store submission
 
+> **The order of operations lives in the Store Listing Console:** `Store-Listing-Console/docs/release-loop.md`.
+> Read it first and follow it; the steps below are the Sanduhr-specific notes on top of it. In one line:
+> copy in the sheet, `apply` and `captions` with Partner Center closed (both read back), `verify`, then the
+> person's two pages only (Packages, Notes for certification), `verify` again, `commit` from the console,
+> `inspect` after publish. Never commit from Partner Center; never open the Store listing page.
+
 Two halves, two tools, one submission, **and the API must create it.** The Ingestion API can only update, delete, or commit a submission it created itself; one started by hand in Partner Center is invisible to it (HTTP 409 InvalidState on write, 400 on delete, measured on 3.4.0). So: `apply` first, which creates the submission and writes the listing text; then the package goes in by hand in Partner Center on that same submission. Measured on RoRoRo v1.28
 (submission 1152921505701878932, 2026-09-12): a submission created through the API, with listings
 written through the API and both MSIX packages uploaded by hand, committed and reconciled in about
