@@ -40,7 +40,10 @@ public class TrustBoundaryTests
         Assert.Equal(
             new[]
             {
-                "CcLogReader.cs", "Pacing.cs", "SnapshotContract.cs", "TierModel.cs",
+                "CcLogReader.cs", "Pacing.cs", "SnapshotContract.cs",
+                // propose_theme: the lint and the model it builds, both pure. The
+                // widget owns every write under the themes folder.
+                "ThemeLint.cs", "ThemeModel.cs", "TierModel.cs",
                 // Abilities wave: vault READS only — the drift watchlist bans
                 // MCP-side vault writes; VaultStore's write methods have no call
                 // sites in the server (cold-verified tool surface).

@@ -147,6 +147,16 @@ public sealed class McpServer
                 catch { date = ""; } // non-string -> typed invalid_params from BuildPublish
                 payload = _tools.BuildPublish(date);
                 break;
+            case "propose_theme":
+                var theme = args?["theme"] as JsonObject;
+                string? saveAs = null;
+                try { if (args?["save_as"] is JsonNode sa) saveAs = sa.GetValue<string>(); }
+                catch { saveAs = ""; } // non-string -> typed invalid_params
+                bool apply = true;
+                try { if (args?["apply"] is JsonNode ap) apply = ap.GetValue<bool>(); }
+                catch { /* non-bool stays default true */ }
+                payload = _tools.BuildProposeTheme(theme, saveAs, apply);
+                break;
             default:
                 WriteError(id, -32602, $"unknown tool: {name}");
                 return;

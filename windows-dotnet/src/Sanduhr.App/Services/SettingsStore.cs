@@ -146,6 +146,22 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>Settings ▸ Themes editor mode (settings.json "themes_studio"):
+    /// true = the token studio, false (default) = the paste box.</summary>
+    public bool LoadThemesStudioMode()
+    {
+        var root = Read();
+        try { return root["themes_studio"]?.GetValue<bool>() ?? false; }
+        catch { return false; }
+    }
+
+    public void SaveThemesStudioMode(bool on)
+    {
+        var root = Read();
+        root["themes_studio"] = on;
+        Write(root);
+    }
+
     /// <summary>The saved sparkline style (settings.json "sparkline_style"),
     /// defaulting to Classic. A deliberate upgrade over the Python build, which reset
     /// the graph mode to classic each launch.</summary>

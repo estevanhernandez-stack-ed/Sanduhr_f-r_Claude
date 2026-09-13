@@ -416,6 +416,36 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     public void AttachPublishService(UsagePublishService service) => _publish = service;
 
+    private ThemeHandoffService? _themeHandoff;
+
+    /// <summary>sanduhr-mcp's propose_theme handoff. Attached by App; watches the
+    /// request file and also rides the 30-second tick. Null in unit contexts.</summary>
+    public void AttachThemeHandoffService(ThemeHandoffService service) => _themeHandoff = service;
+
+    /// <summary>The catalog key of the live palette (what the strip marks active
+    /// and settings.json remembers). The theme handoff reports it as
+    /// previous_key so an agent can offer the way back.</summary>
+    public string ActiveThemeKey => _palette.Key;
+
+    private DispatcherTimer? _statusNoticeTimer;
+
+    /// <summary>Show a message in the widget's status slot for a while, then clear
+    /// it unless something else has written there since. Used for notices that
+    /// are not errors: a theme applied from Claude Code, for one.</summary>
+    public void ShowTransientStatus(string message, TimeSpan duration)
+    {
+        StatusText = message;
+        _statusNoticeTimer?.Stop();
+        _statusNoticeTimer = new DispatcherTimer { Interval = duration };
+        _statusNoticeTimer.Tick += (_, _) =>
+        {
+            _statusNoticeTimer?.Stop();
+            if (StatusText == message)
+                StatusText = "";
+        };
+        _statusNoticeTimer.Start();
+    }
+
     /// <summary>The widget's own version — stamped into snapshot.json as
     /// writer_version so readers can tell a dev build's file from the installed
     /// release's (Core's assembly is unversioned and would read "1.0.0").</summary>
@@ -543,6 +573,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         if (!_themes.TryGetValue(key, out var def))
             return;
 
+        _previewing = false;
         _palette = new ThemePalette(key, def);
         ActiveThemeName = _palette.Name;
         ApplyThemeResources();
@@ -569,6 +600,43 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         ApplyThemeByKey(key);
         Sounds.PlayToggle();
     }
+
+    private bool _previewing;
+
+    /// <summary>The Theme Studio's live preview: re-tint the widget from a draft
+    /// without touching the saved theme, the strip's active tile, or settings.
+    /// <see cref="EndPreview"/> (or any real apply) puts the saved theme back.</summary>
+    public void PreviewTheme(ThemeDefinition def)
+    {
+        _previewing = true;
+        var preview = new ThemePalette("studio", def);
+        if (Application.Current is { } app)
+            preview.Apply(app.Resources);
+        foreach (var card in Tiers)
+            card.ApplyPalette(preview);
+        ThemeChanged?.Invoke(preview);
+    }
+
+    /// <summary>Drop a studio preview and paint the saved theme again. No-op
+    /// when nothing is being previewed.</summary>
+    public void EndPreview()
+    {
+        if (!_previewing)
+            return;
+        _previewing = false;
+        ApplyThemeResources();
+        foreach (var card in Tiers)
+            card.ApplyPalette(_palette);
+        ThemeChanged?.Invoke(_palette);
+    }
+
+    /// <summary>A theme's definition by catalog key (built-in or loaded user
+    /// theme), for the studio's "Start from". Null when unknown.</summary>
+    public ThemeDefinition? GetThemeDefinition(string key)
+        => _themes.TryGetValue(key, out var def) ? def : null;
+
+    public bool LoadThemesStudioMode() => _settings.LoadThemesStudioMode();
+    public void SaveThemesStudioMode(bool on) => _settings.SaveThemesStudioMode(on);
 
     /// <summary>Reload user theme drop-ins from disk and rebuild the strip,
     /// keeping the current theme active. Called from the Settings Themes tab after
@@ -1038,6 +1106,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // the service, never awaited — and before the signed-out early return,
         // since the publisher reads local logs, not the claude.ai session.
         _publish?.Tick(DateTimeOffset.Now);
+        _themeHandoff?.Tick();
 
         if (_lastData is null)
             return;
@@ -1332,6 +1401,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _refreshTimer.Stop();
         _tickTimer.Stop();
         _riffTimer.Stop();
+        _statusNoticeTimer?.Stop();
+        _themeHandoff?.Dispose();
         (_client as IDisposable)?.Dispose();
     }
 }

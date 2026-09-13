@@ -211,5 +211,12 @@ public sealed class ThemePalette
             (byte)Math.Round(c.B + (255 - c.B) * amount));
     }
 
-    private static Color Hex(string hex) => (Color)ColorConverter.ConvertFromString(hex)!;
+    /// <summary>Parse through the lint's rule (#rrggbb only); a value that does
+    /// not parse paints magenta instead of throwing, so a studio preview mid
+    /// keystroke or a hand-edited file can never take the apply path down. The
+    /// lint marks the field either way.</summary>
+    private static Color Hex(string hex)
+        => ThemeLint.TryParseHex(hex, out var c)
+            ? Color.FromRgb((byte)Math.Round(c.R * 255), (byte)Math.Round(c.G * 255), (byte)Math.Round(c.B * 255))
+            : Colors.Magenta;
 }

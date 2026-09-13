@@ -75,6 +75,7 @@ internal partial class SettingsWindow : Window
             CalendarStrip.DayClicked -= OnCalendarDayClicked;
             ViewModel.ClaudeCode.Detach();
             ViewModel.Publish.Detach();
+            ViewModel.Themes.Detach();
         };
     }
 

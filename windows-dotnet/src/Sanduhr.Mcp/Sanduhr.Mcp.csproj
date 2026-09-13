@@ -45,6 +45,10 @@
     <Compile Include="..\Sanduhr.Core\Pacing.cs" Link="Core\Pacing.cs" />
     <Compile Include="..\Sanduhr.Core\TierModel.cs" Link="Core\TierModel.cs" />
     <Compile Include="..\Sanduhr.Core\CcLogReader.cs" Link="Core\CcLogReader.cs" />
+    <!-- propose_theme: the lint (pure) and the theme model it builds. No IO, no
+         credentials; the widget still owns every write under the themes folder. -->
+    <Compile Include="..\Sanduhr.Core\ThemeModel.cs" Link="Core\ThemeModel.cs" />
+    <Compile Include="..\Sanduhr.Core\ThemeLint.cs" Link="Core\ThemeLint.cs" />
     <!-- Vault slice (abilities wave): READ-ONLY by tool construction. The design
          review's drift watchlist bans MCP-side vault WRITES; VaultStore's write
          methods ride along with the type but have zero call sites in this

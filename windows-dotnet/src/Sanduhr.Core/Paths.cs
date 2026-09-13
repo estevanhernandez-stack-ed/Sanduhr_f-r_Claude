@@ -39,11 +39,20 @@ public sealed class Paths
     /// </param>
     public Paths(string? appDataBase = null, string? homeDir = null, string? localAppDataBase = null)
     {
+        // Dev-tier override (never set by shipped config): SANDUHR_DEV_PROFILE names a
+        // folder that stands in for both AppData bases, so a development build can run
+        // beside the installed widget without touching its settings, snapshot, vault,
+        // or themes. Credentials still come from Windows Credential Manager.
+        string? devProfile = Environment.GetEnvironmentVariable("SANDUHR_DEV_PROFILE");
+        if (string.IsNullOrWhiteSpace(devProfile))
+            devProfile = null;
         _appDataBase = appDataBase
+            ?? (devProfile is null ? null : Path.Combine(devProfile, "roaming"))
             ?? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         _homeDir = homeDir
             ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         _localAppDataBase = localAppDataBase
+            ?? (devProfile is null ? null : Path.Combine(devProfile, "local"))
             ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
     }
 

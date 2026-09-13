@@ -332,6 +332,9 @@
             <ScrollViewer x:Name="CardsScroller"
                           VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                           Padding="10,8">
+                <ScrollViewer.Resources>
+                    <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                </ScrollViewer.Resources>
                 <StackPanel>
                     <!-- Active-account switcher (widget.py _account_btn parity): a flat
                          clickable label at the top of the content, above status + cards.

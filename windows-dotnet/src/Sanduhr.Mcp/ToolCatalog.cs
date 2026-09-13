@@ -147,6 +147,47 @@ public static class ToolCatalog
                 },
                 ["additionalProperties"] = false,
             },
+            readOnly: false),
+        Tool(
+            "propose_theme",
+            "Give the Sanduhr widget a new color theme. Call when the user asks for a theme, a " +
+            "new look, or colors from an image, a palette, or a vibe. Write the palette per " +
+            "docs/themes/AGENT_PROMPT.md: fourteen role-named #rrggbb colors (bg, glass, " +
+            "glass_on_mica, title_bg, border, footer_bg, bar_bg, text, text_secondary, text_dim, " +
+            "text_muted, accent, pace_marker, sparkline) plus name and optional dials (glass_alpha " +
+            "0.7-0.9, border_alpha 0.2-0.6, border_tint, accent_bloom, inner_highlight). Rules: dark " +
+            "base (bg/glass luminance under 0.25); text at 4.5:1 or better on the card; text_secondary, " +
+            "text_dim, text_muted the same hue as text at decreasing luminance; one accent hue shared " +
+            "by accent, sparkline and border_tint; pace_marker visible on every bar fill (a " +
+            "complementary hue works). The server lints first: status rejected with findings means " +
+            "fix the named fields and call again, nothing was written. Otherwise the widget saves the " +
+            "theme under its themes folder and applies it (apply: false saves without switching); the " +
+            "result names the previous theme's key so the user can go back, and carries any warnings.",
+            new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["theme"] = new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["description"] = "The palette JSON: name, the fourteen #rrggbb colors, optional dials.",
+                    },
+                    ["save_as"] = new JsonObject
+                    {
+                        ["type"] = "string",
+                        ["pattern"] = "^[a-z0-9][a-z0-9-]{0,39}$",
+                        ["description"] = "File key under the themes folder. Default: the name, slugged.",
+                    },
+                    ["apply"] = new JsonObject
+                    {
+                        ["type"] = "boolean",
+                        ["description"] = "Apply after saving. Default true.",
+                    },
+                },
+                ["required"] = new JsonArray("theme"),
+                ["additionalProperties"] = false,
+            },
             readOnly: false));
 
     private static JsonObject Tool(string name, string description, JsonObject inputSchema, bool readOnly = true) => new()
