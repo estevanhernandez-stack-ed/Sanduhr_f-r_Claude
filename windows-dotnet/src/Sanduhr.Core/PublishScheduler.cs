@@ -18,7 +18,14 @@ public enum PublishVerdict
     Backoff,
 }
 
-public readonly record struct PublishDecision(PublishVerdict Verdict, DateOnly TargetDate);
+/// <summary>
+/// <paramref name="TargetDate"/> is the day the next run reports (yesterday,
+/// local). <paramref name="NextRunAt"/> is when the scheduler will actually
+/// fire next, local wall-clock: the earliest publish-time slot at or after now
+/// whose target day is still unpublished; <c>now</c> itself when a run is due;
+/// the retry moment during backoff; null when publishing is off.
+/// </summary>
+public readonly record struct PublishDecision(PublishVerdict Verdict, DateOnly TargetDate, DateTime? NextRunAt);
 
 /// <summary>
 /// The pure decision behind the widget's daily publish: fire once per target
@@ -38,16 +45,23 @@ public static class PublishScheduler
         DateOnly? lastOkDate,
         DateTimeOffset? lastAttemptAt)
     {
+        var now = nowLocal.LocalDateTime;
+        var today = DateOnly.FromDateTime(now);
         var target = UsagePublisher.DefaultDate(nowLocal);
         if (!enabled)
-            return new(PublishVerdict.Disabled, target);
+            return new(PublishVerdict.Disabled, target, null);
         if (lastOkDate == target)
-            return new(PublishVerdict.AlreadyPublished, target);
-        if (TimeOnly.FromDateTime(nowLocal.LocalDateTime) < publishTime)
-            return new(PublishVerdict.BeforePublishTime, target);
+        {
+            // Today's slot reports a day that is already out. Whether that slot
+            // is still ahead or behind us, the next real run is tomorrow's slot,
+            // which reports today.
+            return new(PublishVerdict.AlreadyPublished, target, today.AddDays(1).ToDateTime(publishTime));
+        }
+        if (TimeOnly.FromDateTime(now) < publishTime)
+            return new(PublishVerdict.BeforePublishTime, target, today.ToDateTime(publishTime));
         if (lastAttemptAt is { } attempt && nowLocal - attempt < RetryInterval)
-            return new(PublishVerdict.Backoff, target);
-        return new(PublishVerdict.Run, target);
+            return new(PublishVerdict.Backoff, target, (attempt + RetryInterval).LocalDateTime);
+        return new(PublishVerdict.Run, target, now);
     }
 
     /// <summary>Parse a user-entered "HH:mm" (24h). Null on anything else —

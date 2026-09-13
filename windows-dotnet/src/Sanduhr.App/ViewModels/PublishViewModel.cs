@@ -401,10 +401,15 @@ public sealed partial class PublishViewModel : ObservableObject
         else
         {
             var decision = PublishScheduler.Decide(DateTimeOffset.Now, s.Enabled, s.PublishTime, s.LastOkDate, s.LastAttemptAt);
+            // NextRunAt is the scheduler's own answer for when it fires next;
+            // never derive a date from TargetDate here (that is the day being
+            // reported, not the day the run happens).
             next = decision.Verdict switch
             {
-                PublishVerdict.AlreadyPublished => $" Next: {decision.TargetDate.AddDays(1):yyyy-MM-dd} at {PublishScheduler.FormatPublishTime(s.PublishTime)}.",
-                PublishVerdict.BeforePublishTime => $" Next: today at {PublishScheduler.FormatPublishTime(s.PublishTime)} for {decision.TargetDate:yyyy-MM-dd}.",
+                PublishVerdict.AlreadyPublished when decision.NextRunAt is { } n
+                    => string.Create(CultureInfo.InvariantCulture, $" Next: {n:yyyy-MM-dd} at {n:HH:mm}."),
+                PublishVerdict.BeforePublishTime when decision.NextRunAt is { } n
+                    => string.Create(CultureInfo.InvariantCulture, $" Next: {n:yyyy-MM-dd} at {n:HH:mm} for {decision.TargetDate:yyyy-MM-dd}."),
                 PublishVerdict.Backoff => " Retrying within 15 minutes.",
                 PublishVerdict.Run => $" Due now for {decision.TargetDate:yyyy-MM-dd}.",
                 _ => "",

@@ -10,6 +10,11 @@
   - snapshot older than 15 minutes, no fresh history, written by 3.4.0 or later → `status: stale`, `reason: widget_not_polling`, as before.
 - `ping` gains `required_widget_version`, `snapshot_writer_meets_floor`, `history_found` / `history_age_seconds` / `history_fresh`, and `usage_status` / `usage_reason` / `remedy` (the same diagnosis `get_usage` returns). The `get_usage` and `ping` tool descriptions state the floor.
 
+### Fixed
+
+- **Settings dropdowns showed the option's type name when closed.** The Publish usage Preset and Auth boxes (and the History account selector) rendered `PublishPresetOption { Value = ...` instead of the label once the list was closed; the open list was fine. The themed ComboBox template now honors `DisplayMemberPath` in the closed box the way the stock WPF template does.
+- **Publish usage "Next:" named a slot that had already fired.** Right after a successful publish the status line said "Next: today at 06:45" when the scheduler would not run again until tomorrow. The scheduler now reports when it actually fires next (tomorrow's slot after today's day is out; today's slot before the publish time; "due now" once it has passed) and the status line prints that.
+
 ## v3.4.0 — 2026-09-13
 
 **Platform:** Windows (.NET 10 / WPF).
