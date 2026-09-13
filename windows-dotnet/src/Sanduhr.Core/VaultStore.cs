@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace Sanduhr.Core;
 
@@ -21,11 +22,6 @@ namespace Sanduhr.Core;
 public sealed class VaultStore
 {
     private const int WriteRetries = 3;
-
-    private static readonly JsonSerializerOptions JsonOpts = new()
-    {
-        WriteIndented = false,
-    };
 
     private readonly string _vaultDir;
     private readonly string? _logFile;
@@ -59,21 +55,21 @@ public sealed class VaultStore
     // -- session shards --------------------------------------------------------
 
     public ShardLoadResult TryLoadSessionShard(string rootName, string month, out VaultSessionShard shard)
-        => TryLoad(SessionShardPath(rootName, month), out shard);
+        => TryLoad(SessionShardPath(rootName, month), VaultJsonContext.Default.VaultSessionShard, out shard);
 
     /// <summary>Throws (IOException or UnauthorizedAccessException) when the
     /// atomic replace still fails after retries — the caller aborts the root's
     /// cycle (checkpoints must not advance past a shard that never landed).</summary>
     public void SaveSessionShard(string rootName, string month, VaultSessionShard shard)
-        => WriteAtomic(SessionShardPath(rootName, month), JsonSerializer.Serialize(shard, JsonOpts), throwOnFailure: true);
+        => WriteAtomic(SessionShardPath(rootName, month), JsonSerializer.Serialize(shard, VaultJsonContext.Default.VaultSessionShard), throwOnFailure: true);
 
     // -- rollup shards (derived cache) -----------------------------------------
 
     public ShardLoadResult TryLoadRollupShard(string rootName, string month, out VaultRollupShard shard)
-        => TryLoad(RollupShardPath(rootName, month), out shard);
+        => TryLoad(RollupShardPath(rootName, month), VaultJsonContext.Default.VaultRollupShard, out shard);
 
     public void SaveRollupShard(string rootName, string month, VaultRollupShard shard)
-        => WriteAtomic(RollupShardPath(rootName, month), JsonSerializer.Serialize(shard, JsonOpts), throwOnFailure: false);
+        => WriteAtomic(RollupShardPath(rootName, month), JsonSerializer.Serialize(shard, VaultJsonContext.Default.VaultRollupShard), throwOnFailure: false);
 
     public void DeleteRollupShard(string rootName, string month)
     {
@@ -95,7 +91,7 @@ public sealed class VaultStore
             return new VaultCheckpointFile();
         try
         {
-            return JsonSerializer.Deserialize<VaultCheckpointFile>(File.ReadAllText(p))
+            return JsonSerializer.Deserialize(File.ReadAllText(p), VaultJsonContext.Default.VaultCheckpointFile)
                    ?? new VaultCheckpointFile();
         }
         catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
@@ -126,7 +122,7 @@ public sealed class VaultStore
     }
 
     public void SaveCheckpoints(string rootName, VaultCheckpointFile file)
-        => WriteAtomic(CheckpointsPath(rootName), JsonSerializer.Serialize(file, JsonOpts), throwOnFailure: false);
+        => WriteAtomic(CheckpointsPath(rootName), JsonSerializer.Serialize(file, VaultJsonContext.Default.VaultCheckpointFile), throwOnFailure: false);
 
     // -- meta --------------------------------------------------------------------
 
@@ -137,7 +133,7 @@ public sealed class VaultStore
             return null;
         try
         {
-            return JsonSerializer.Deserialize<VaultRootMeta>(File.ReadAllText(p));
+            return JsonSerializer.Deserialize(File.ReadAllText(p), VaultJsonContext.Default.VaultRootMeta);
         }
         catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
         {
@@ -147,7 +143,7 @@ public sealed class VaultStore
     }
 
     public void SaveMeta(string rootName, VaultRootMeta meta)
-        => WriteAtomic(MetaPath(rootName), JsonSerializer.Serialize(meta, JsonOpts), throwOnFailure: false);
+        => WriteAtomic(MetaPath(rootName), JsonSerializer.Serialize(meta, VaultJsonContext.Default.VaultRootMeta), throwOnFailure: false);
 
     // -- discovery / quarantine / purge ------------------------------------------
 
@@ -234,14 +230,14 @@ public sealed class VaultStore
 
     // -- plumbing -----------------------------------------------------------------
 
-    private ShardLoadResult TryLoad<T>(string path, out T value) where T : new()
+    private ShardLoadResult TryLoad<T>(string path, JsonTypeInfo<T> typeInfo, out T value) where T : new()
     {
         value = new T();
         if (!File.Exists(path))
             return ShardLoadResult.Missing;
         try
         {
-            var parsed = JsonSerializer.Deserialize<T>(File.ReadAllText(path));
+            var parsed = JsonSerializer.Deserialize(File.ReadAllText(path), typeInfo);
             if (parsed is null)
                 return ShardLoadResult.Corrupt;
             value = parsed;

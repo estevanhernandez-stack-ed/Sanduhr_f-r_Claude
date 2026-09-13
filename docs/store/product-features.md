@@ -27,7 +27,7 @@ live listing's 18 bullets consolidate to 15 here to make room under the cap.
 15. Multi-account: track Personal and Work Claude accounts in one install and switch from the widget
 16. Deep-work focus timer (pixel hourglass) + cooldown snake game
 17. Full keyboard shortcuts + Help tab
-18. Credentials stored in Windows Credential Manager, cleared on uninstall
+18. Credentials stored in Windows Credential Manager; use in-app Sign Out to clear them (uninstall doesn't)
 19. No telemetry, no analytics, no ads, no 626Labs account needed
 20. Independent third-party tool; not affiliated with Anthropic
 

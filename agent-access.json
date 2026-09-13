@@ -6,8 +6,11 @@
   "x-schema-note": "transport.type values stdio-mcp/file/exec extend the v1 (HTTP-only) schema - deliberate, documented in ~/.claude-personal/plugins/data/vibe-access/adapter-notes/dotnet-stdio-mcp.md. Everything else conforms.",
   "x-contract": {
     "staleness_seconds": { "fresh_below": 450, "dead_above": 900 },
-    "status_enum": ["ok", "stale", "no_data"],
-    "reason_enum": ["missing", "malformed", "disabled", "widget_not_polling", "schema_unsupported", "invalid_params"],
+    "status_enum": ["ok", "stale", "degraded", "no_data"],
+    "reason_enum": ["missing", "malformed", "disabled", "widget_not_polling", "widget_too_old", "schema_unsupported", "invalid_params", "publishing_off", "no_endpoint_url", "no_publish_token", "widget_not_responding", "unavailable", "request_write_failed", "busy"],
+    "required_widget_version": "3.4.0",
+    "degraded_note": "issue #63: snapshot missing/dead but history.<account>.json has a point within dead_above -> status degraded, reason widget_too_old, tiers from the history point (utilization + resets_at only; used/limit/plan null), data_source 'history'. A dead snapshot with writer_version below 3.4.0 and no fresh history is stale/widget_too_old (leftover), not widget_not_polling.",
+    "publish_status_enum": ["ok", "error", "disabled", "no_endpoint", "no_token", "queued", "no_data"],
     "fetch_error_enum": ["session_expired", "cloudflare", "network"],
     "reason_vs_fetch_error": "separate channels: reason covers data availability, fetch_error covers widget-fetch failures carried in an otherwise-served snapshot; both can be null",
     "failure_shape": "typed tool results carrying status/reason/remedy - NEVER MCP protocol errors, never isError:true",
@@ -25,7 +28,7 @@
       "kind": "read",
       "transport": { "type": "stdio-mcp", "method": "tools/call", "path": "/get_usage" },
       "input": null,
-      "output": { "shape": "status, reason, remedy, fetch_error, as_of, age_seconds, scope:'active_account_only', account{ref,plan}, data_lag_note, schema_version, tiers[{key,label,utilization_pct,headroom_pct,resets_at,resets_in_seconds,reset_crossed,pace{verdict,delta_pct,cooldown_seconds|null,surplus_pct|null,projected_final_pct|null}|null,projection{expires_before_reset,expires_in_seconds}|null,used,limit}], local_burn_since_snapshot{total_tokens,by_tier,caveat}|null. Pacing depth (abilities wave): cooldown_seconds = idle time to fall back onto pace when ahead; surplus_pct = banked headroom when under; projected_final_pct = where the meter lands at reset on current momentum, capped 200" },
+      "output": { "shape": "status, reason, remedy, fetch_error, as_of, age_seconds, writer_version, scope:'active_account_only', account{ref,plan}, data_lag_note, schema_version, tiers[{key,label,utilization_pct,headroom_pct,resets_at,resets_in_seconds,reset_crossed,pace{verdict,delta_pct,cooldown_seconds|null,surplus_pct|null,projected_final_pct|null}|null,projection{expires_before_reset,expires_in_seconds}|null,used,limit}], local_burn_since_snapshot{total_tokens,by_tier,caveat}|null. Pacing depth (abilities wave): cooldown_seconds = idle time to fall back onto pace when ahead; surplus_pct = banked headroom when under; projected_final_pct = where the meter lands at reset on current momentum, capped 200" },
       "auth": "none",
       "authDetail": "none-local-ambient: stdio child of the user's own CLI; ambient user authority. A token here would be theater - any local process can read snapshot.json directly.",
       "destructive": false,
@@ -65,7 +68,7 @@
       "kind": "read",
       "transport": { "type": "stdio-mcp", "method": "tools/call", "path": "/ping" },
       "input": null,
-      "output": { "shape": "server_version, snapshot_schema_supported, snapshot_path, snapshot_found, snapshot_age_seconds, cc_roots_found[], cc_roots_consented[]" },
+      "output": { "shape": "server_version, snapshot_schema_supported, snapshot_path, snapshot_found, snapshot_age_seconds, snapshot_writer_version, cc_roots_found[], cc_roots_consented[]" },
       "auth": "none",
       "authDetail": "none-local-ambient",
       "destructive": false,
@@ -116,6 +119,26 @@
         "at": "2026-07-27T05:10:00Z",
         "runId": "abb80276ee14af7ae",
         "detail": "Delta cold verify: totals + sent/received split exact, gap day OMITTED (no fabricated zero), project display names only (~hash suffix absent from the entire response), typed invalid_params, disabled fail-closed (checked before vault), empty vault -> missing with vault remedy."
+      }
+    },
+    {
+      "id": "mcp.publish-usage",
+      "description": "MCP tool publish_usage: queue a one-day usage upload to the publish endpoint the user configured in Sanduhr (any URL of their own; the 626 Labs dashboard is a preset) and return the widget's typed result. HANDOFF, not upload: the server writes %APPDATA%/Sanduhr/publish-request.json and polls publish-result.json; the Sanduhr widget's 30s tick performs the POST with the token it alone holds (Credential Manager slot publish:token). Refusals are instant and typed: disabled/publishing_off when settings.json publish.enabled is false, no_endpoint/no_endpoint_url when publish.endpoint_url is blank, no_token/no_publish_token when publish.token_stored is false and publish.auth_scheme is not none; queued/widget_not_responding after the 45s wait (request stays for the widget's next tick, expires after 24h). Payload = per-project BASENAME token counts for the homes the user ticked, tier split, quota status (stale/no_data never carry percentages); body format sanduhr (the snapshot object) or 626labs (the same fields under action:record). Data class: usage-metrics, off-machine (opt-in, user-chosen destination).",
+      "tier": "prod-safe",
+      "kind": "write",
+      "transport": { "type": "stdio-mcp", "method": "tools/call", "path": "/publish_usage" },
+      "input": { "date": "string YYYY-MM-DD, default yesterday (local)" },
+      "output": { "shape": "status ok|error|disabled|no_endpoint|no_token|queued|no_data, reason, remedy, date, request_id, http_status, message, at, homes[], total_tokens, projects, quota_status" },
+      "auth": "none",
+      "authDetail": "none-local-ambient for the request; the upload itself is authenticated by the widget with the publish token (bearer, a named header, or none per the user's auth scheme), which this server cannot read (trust boundary pinned by TrustBoundaryTests).",
+      "destructive": false,
+      "sourceRef": "windows-dotnet/src/Sanduhr.Mcp/ToolLogic.cs:BuildPublish",
+      "origin": "added",
+      "verified": {
+        "status": "unverified",
+        "at": null,
+        "runId": null,
+        "detail": "Added 2026-09-13 with the publish feature, generalized the same day to a user-chosen endpoint; needs a cold-agent pass per the verify plan (disabled / no_endpoint / no_token / queued / ok via a fake widget answering the request file)."
       }
     },
     {

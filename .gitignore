@@ -50,3 +50,9 @@ releases/
 # Local MCP config (carries live bearer tokens - estate rule: never commit)
 .mcp.json
 *_wpftmp.csproj
+
+# Build output: build-velopack-release.ps1 stitches this ICO from the targetsize PNGs beside it
+windows-dotnet/src/Sanduhr.App/Package/Logos/AppIcon.ico
+
+# vibe-iterate local state (atlas, radar cache, per-machine config)
+.vibe-iterate/

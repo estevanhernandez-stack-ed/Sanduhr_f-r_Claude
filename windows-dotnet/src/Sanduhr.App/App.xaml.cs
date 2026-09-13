@@ -62,6 +62,15 @@ public partial class App : Application
             vaultService.SaveConsent(VaultConsentDialog.ShowConsent(_window, vaultService.DetectedRootNames()));
         _vm.AttachVaultService(vaultService);
 
+        // Publish usage: everything defaults off (toggle + every home, no endpoint),
+        // so attaching is inert until the user opts in under Settings > Publish usage.
+        // The publish token rides the same Credential Manager seam as the accounts.
+        _vm.AttachPublishService(new UsagePublishService(
+            new SettingsStore(new Sanduhr.Core.Paths()),
+            _vm.CcReader,
+            new Sanduhr.Core.Paths(),
+            new PublishTokenStore(new WindowsCredentialManager(AccountStore.Service))));
+
         // Statusline bridge (WS-E): the script has no update channel of its own —
         // the widget is its updater. Refresh the installed copy on every start
         // while the integration is enabled (idempotent single-file write).
@@ -70,6 +79,21 @@ public partial class App : Application
             new StatuslineInstaller(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 _vm.StatuslineBinDir).InstallScript();
+        }
+
+        // MCP integration (WS-E registration slice): same widget-as-updater rule.
+        // A newer app build carries a newer server; refresh the version dir +
+        // launcher so new Claude Code sessions get it. Version-dir indirection
+        // means running sessions keep their pinned copy — no lock fight.
+        if (_vm.LoadMcpEnabled())
+        {
+            string mcpSource = System.IO.Path.Combine(AppContext.BaseDirectory, "mcp");
+            if (System.IO.Directory.Exists(mcpSource))
+            {
+                new McpIntegrationInstaller(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    _vm.SanduhrAppDataDir).RefreshInstall(mcpSource);
+            }
         }
 
         // Load the active account's stored credential + fetch real usage now.

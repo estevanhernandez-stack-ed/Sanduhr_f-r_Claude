@@ -14,8 +14,8 @@
 # The Store flavor leaves the MSIX UNSIGNED on purpose -- Store ingestion re-signs with the
 # Microsoft publisher cert. Self-signing a Store upload fails ingestion.
 #
-# Logo gate (pattern x): fails fast if any required asset is missing or looks like a stub.
-# These are PLACEHOLDERS until the 626labs-design skill produces branded tiles -- see
+# Logo gate (pattern x): fails fast if any required asset is missing or looks like a stub. The set
+# is generated from the committed brand art by scripts/generate-store-assets.ps1 -- see
 # src/Sanduhr.App/Package/Logos/README.md. -AllowPlaceholders bypasses for early-dev smoke only.
 
 [CmdletBinding(DefaultParameterSetName = 'Store')]
@@ -69,8 +69,8 @@ function Test-LogosPresent {
     if ($suspicious.Count) { Write-Host "[logos] SUSPICIOUS:" -ForegroundColor Yellow; $suspicious | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow } }
     if (($missing.Count -or $suspicious.Count) -and -not $AllowPlaceholders) {
         Write-Host ''
-        Write-Host '[logos] FAIL -- run windows-dotnet/scripts/generate-store-assets.ps1, then replace with' -ForegroundColor Red
-        Write-Host '[logos] branded art via the 626labs-design skill. See Package/Logos/README.md.' -ForegroundColor Red
+        Write-Host '[logos] FAIL -- run windows-dotnet/scripts/generate-store-assets.ps1 (branded set from the' -ForegroundColor Red
+        Write-Host '[logos] committed lockup + app icon). See Package/Logos/README.md.' -ForegroundColor Red
         Write-Host '[logos] Early-dev bypass only: pass -AllowPlaceholders.' -ForegroundColor Red
         return $false
     }
@@ -78,7 +78,7 @@ function Test-LogosPresent {
         Write-Host '[logos] WARN -- building with -AllowPlaceholders. DO NOT submit this to the Store.' -ForegroundColor Yellow
     } else {
         Write-Host "[logos] OK -- all $($requiredLogos.Count) required assets present." -ForegroundColor Green
-        Write-Host '[logos] NOTE -- these may still be PLACEHOLDERS. Confirm branded art before submit.' -ForegroundColor Yellow
+        Write-Host '[logos] NOTE -- regenerate with generate-store-assets.ps1 if the brand art changed.' -ForegroundColor Yellow
     }
     return $true
 }
@@ -99,7 +99,7 @@ function Get-SdkTool {
 function Resolve-Version {
     if ($Version) { $v = $Version }
     else {
-        $csproj = Get-Content $appProject -Raw
+        $csproj = [System.IO.File]::ReadAllText($appProject, [System.Text.Encoding]::UTF8)
         if ($csproj -match '<Version>([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)</Version>') { $v = $Matches[1] }
         else { throw "Could not read a 4-part <Version> from $appProject -- pass -Version explicitly." }
     }
@@ -152,7 +152,9 @@ New-Item -ItemType Directory -Path $stage -Force | Out-Null
 Copy-Item "$publishDir\*" $stage -Recurse -Force
 
 # Patch the Identity Version into the STAGED manifest copy (committed manifest stays untouched).
-[xml]$m = Get-Content $manifestPath
+# Read as UTF-8 explicitly: Windows PowerShell 5.1 reads a BOM-less file as ANSI, which turned
+# "für" into "fÃ¼r" in the staged manifest and Partner Center rejected the unreserved name (3.4.0).
+[xml]$m = [System.IO.File]::ReadAllText($manifestPath, [System.Text.Encoding]::UTF8)
 $m.Package.Identity.Version = $ver
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 $ws = New-Object System.Xml.XmlWriterSettings

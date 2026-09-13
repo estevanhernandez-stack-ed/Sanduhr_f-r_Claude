@@ -44,7 +44,7 @@ public class TrustBoundaryTests
                 // Abilities wave: vault READS only — the drift watchlist bans
                 // MCP-side vault writes; VaultStore's write methods have no call
                 // sites in the server (cold-verified tool surface).
-                "VaultModels.cs", "VaultReader.cs", "VaultStore.cs",
+                "VaultJson.cs", "VaultModels.cs", "VaultReader.cs", "VaultStore.cs",
             },
             linked);
     }

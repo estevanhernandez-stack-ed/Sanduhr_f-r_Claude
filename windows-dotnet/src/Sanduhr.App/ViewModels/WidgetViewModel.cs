@@ -322,6 +322,19 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// trees so it survives app updates (the widget re-writes it on start).</summary>
     public string StatuslineBinDir => _paths.StatuslineBinDir;
 
+    /// <summary>The Sanduhr app-data dir — the MCP installer's root for the
+    /// launcher (bin\) and versioned server dirs (mcp\).</summary>
+    public string SanduhrAppDataDir => _paths.AppDataDir;
+
+    // -- WS-E MCP integration facade -------------------------------------------
+
+    public bool LoadMcpEnabled() => _settings.LoadMcpEnabled();
+    public void SaveMcpEnabled(bool on) => _settings.SaveMcpEnabled(on);
+    public string? LoadMcpCcHome() => _settings.LoadMcpCcHome();
+    public void SaveMcpCcHome(string ccHomeName) => _settings.SaveMcpCcHome(ccHomeName);
+    public IReadOnlyDictionary<string, bool> LoadMcpRoots() => _settings.LoadMcpRoots();
+    public void SaveMcpRoots(IReadOnlyDictionary<string, bool> roots) => _settings.SaveMcpRoots(roots);
+
     /// <summary>Write a status=ok snapshot from a successful fetch. No-op while
     /// the integration is off; never throws into the fetch path.</summary>
     private void WriteSnapshotOk(JsonObject data)
@@ -395,6 +408,26 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     public void AttachVaultService(VaultService service) => _vault = service;
 
+    private UsagePublishService? _publish;
+
+    /// <summary>"Publish usage" (opt-in, user-chosen endpoint). Attached by App; its Tick rides
+    /// the 30-second <see cref="OnTick"/> loop. Null in unit contexts.</summary>
+    public UsagePublishService? Publish => _publish;
+
+    public void AttachPublishService(UsagePublishService service) => _publish = service;
+
+    /// <summary>The widget's own version — stamped into snapshot.json as
+    /// writer_version so readers can tell a dev build's file from the installed
+    /// release's (Core's assembly is unversioned and would read "1.0.0").</summary>
+    private static string AppVersion
+    {
+        get
+        {
+            var v = typeof(WidgetViewModel).Assembly.GetName().Version;
+            return v is null ? "unknown" : $"{v.Major}.{v.Minor}.{v.Build}";
+        }
+    }
+
     public WidgetViewModel()
     {
         _paths = new Paths();
@@ -407,7 +440,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _alertConfig = _settings.LoadAlertConfig();
         AlertSettingsChanged += () => _alertConfig = _settings.LoadAlertConfig();
 
-        _snapshotWriter = new SnapshotWriter(_paths.SnapshotFile, LogSnapshotFailure);
+        _snapshotWriter = new SnapshotWriter(_paths.SnapshotFile, LogSnapshotFailure, AppVersion);
         _statuslineEnabled = _settings.LoadStatuslineEnabled();
 
         _pinned = _settings.LoadPinned();
@@ -999,6 +1032,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             _lastTickDate = today;
             _vault?.TriggerIngest();
         }
+
+        // Publish usage (opt-in): the daily schedule check and the MCP
+        // handoff both ride this tick. Fire-and-forget, single-flight inside
+        // the service, never awaited — and before the signed-out early return,
+        // since the publisher reads local logs, not the claude.ai session.
+        _publish?.Tick(DateTimeOffset.Now);
 
         if (_lastData is null)
             return;

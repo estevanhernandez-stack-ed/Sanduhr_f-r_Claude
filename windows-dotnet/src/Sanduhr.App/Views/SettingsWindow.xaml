@@ -11,7 +11,7 @@
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
         Title="Sanduhr — Settings"
-        Height="620" Width="540"
+        Height="700" Width="540"
         MinHeight="520" MinWidth="480"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
@@ -190,10 +190,15 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="22" />
                                     </Grid.ColumnDefinitions>
+                                    <!-- DisplayMemberPath never produces a SelectionBoxItemTemplate; WPF
+                                         routes it through ItemTemplateSelector, so the closed box must bind
+                                         that selector too or it falls back to the item's ToString. -->
                                     <ContentPresenter Grid.Column="0" Margin="{TemplateBinding Padding}"
                                                       VerticalAlignment="Center" HorizontalAlignment="Left"
                                                       Content="{TemplateBinding SelectionBoxItem}"
-                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" />
+                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                      ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                                      ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}" />
                                     <Path Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
                                           Data="M0,0 L8,0 L4,5 Z"
                                           Fill="{DynamicResource Sanduhr.Brush.TextDim}" />
@@ -1038,6 +1043,40 @@
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
                                                Text="{Binding StatuslineStatusText}"
                                                Visibility="{Binding StatuslineStatusText, Converter={StaticResource StrVis}}" />
+
+                                    <!-- WS-E MCP integration: consent-gated install; burn-attribution
+                                         roots stay per-home checkboxes, off by default. -->
+                                    <TextBlock Text="Claude quota tools (MCP)" FontSize="9" Margin="0,10,0,4"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Style="{StaticResource FlatButton}" Content="Install MCP server…"
+                                                Command="{Binding InstallMcpCommand}"
+                                                ToolTip="Let Claude check your live caps before spawning agents or picking a bigger model - read-only, consent-gated."
+                                                Visibility="{Binding McpNotInstalled, Converter={StaticResource BoolVis}}" />
+                                        <Button Style="{StaticResource FlatButton}" Content="Remove MCP server"
+                                                Command="{Binding RemoveMcpCommand}"
+                                                Visibility="{Binding McpInstalled, Converter={StaticResource BoolVis}}" />
+                                    </StackPanel>
+                                    <ItemsControl ItemsSource="{Binding McpRoots}" Margin="0,4,0,0"
+                                                  Visibility="{Binding McpInstalled, Converter={StaticResource BoolVis}}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,16,4"
+                                                          Content="{Binding Name}"
+                                                          ToolTip="Allow project-level burn attribution from this Claude Code home"
+                                                          IsChecked="{Binding IsEnabled, Mode=TwoWay}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock TextWrapping="Wrap" FontSize="10.5" Margin="0,4,0,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                               Text="{Binding McpStatusText}"
+                                               Visibility="{Binding McpStatusText, Converter={StaticResource StrVis}}" />
                                 </StackPanel>
                             </Grid>
 
@@ -1239,6 +1278,146 @@
                                 </Border>
                             </Grid>
                         </Grid>
+                    </Border>
+                </TabItem>
+
+                <!-- Publish usage tab: opt-in daily publish to an endpoint the user chooses.
+                     Nothing comes back to us. Everything defaults OFF — master toggle, every
+                     home — and the one sentence above the controls says exactly what leaves
+                     the machine. 626 Labs is a preset, not the name of the feature. -->
+                <TabItem Header="Publish usage" DataContext="{Binding Publish}">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="20">
+                        <StackPanel>
+                            <TextBlock Text="Publish usage" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
+                            <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,12"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                       Text="Nothing about your usage comes back to us. If you want it somewhere, send it to yourself: once a day Sanduhr can post token counts per project name (folder names only, never paths) to an endpoint you choose." />
+
+                            <!-- Destination -->
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <TextBlock Text="Preset" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                <ComboBox Style="{StaticResource ThemedComboBox}" Width="190"
+                                          VerticalAlignment="Center"
+                                          ItemsSource="{Binding PresetOptions}"
+                                          DisplayMemberPath="Display"
+                                          SelectedItem="{Binding SelectedPreset, Mode=TwoWay}"
+                                          AutomationProperties.Name="Publish preset"
+                                          ToolTip="Custom endpoint, or the 626 Labs dashboard preset (fills the URL, bearer auth, and the dashboard body format)." />
+                                <TextBlock Text="{Binding PresetHint}" FontSize="10.5" VerticalAlignment="Center"
+                                           Margin="10,0,0,0" TextWrapping="Wrap" MaxWidth="260"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Visibility="{Binding PresetHint, Converter={StaticResource StrVis}}" />
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                                <TextBlock Text="Endpoint URL" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                <TextBox Style="{StaticResource Input}" Width="360"
+                                         Text="{Binding EndpointUrl, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                         AutomationProperties.Name="Publish endpoint URL"
+                                         ToolTip="Where the daily POST goes. An absolute http(s) URL you control." />
+                            </StackPanel>
+                            <TextBlock FontSize="10.5" Margin="0,0,0,8"
+                                       Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                       Text="{Binding EndpointError}"
+                                       Visibility="{Binding EndpointError, Converter={StaticResource StrVis}}" />
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock Text="Auth" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                <ComboBox Style="{StaticResource ThemedComboBox}" Width="150"
+                                          VerticalAlignment="Center"
+                                          ItemsSource="{Binding AuthOptions}"
+                                          DisplayMemberPath="Display"
+                                          SelectedItem="{Binding SelectedAuth, Mode=TwoWay}"
+                                          AutomationProperties.Name="Publish auth scheme"
+                                          ToolTip="How the token rides on the request: Authorization: Bearer, a header you name, or no credential." />
+                                <StackPanel Orientation="Horizontal" Margin="10,0,0,0"
+                                            Visibility="{Binding ShowHeaderName, Converter={StaticResource BoolVis}}">
+                                    <TextBlock Text="Header name" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <TextBox Style="{StaticResource Input}" Width="150"
+                                             Text="{Binding AuthHeaderName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                             AutomationProperties.Name="Publish auth header name"
+                                             ToolTip="The header that carries the token, e.g. X-Api-Key." />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <TextBlock Text="Token" FontSize="9" Margin="0,0,0,4"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <Button Style="{StaticResource FlatButton}" Content="Set token…"
+                                        Command="{Binding SetTokenCommand}"
+                                        AutomationProperties.Name="Set publish token"
+                                        ToolTip="Paste the token your endpoint expects. Stored in Windows Credential Manager, never in a file." />
+                                <Button Style="{StaticResource FlatButton}" Content="Clear token"
+                                        Command="{Binding ClearTokenCommand}"
+                                        AutomationProperties.Name="Clear publish token"
+                                        ToolTip="Delete the stored token. Publishing stops until a new one is set."
+                                        Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                        Visibility="{Binding HasToken, Converter={StaticResource BoolVis}}" />
+                                <TextBlock Text="{Binding TokenStatusText}" FontSize="10.5" VerticalAlignment="Center"
+                                           Margin="8,0,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,0,0,12" />
+
+                            <!-- What and when -->
+                            <TextBlock Text="Homes to share (off until you tick them)" FontSize="9" Margin="0,0,0,4"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            <ItemsControl ItemsSource="{Binding Roots}" Margin="0,0,0,10">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,16,4"
+                                                  Content="{Binding Name}"
+                                                  IsChecked="{Binding IsShared, Mode=TwoWay}"
+                                                  ToolTip="Include this Claude Code home's per-project token counts in the daily publish." />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                                <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                          Content="Publish daily at"
+                                          IsChecked="{Binding Enabled, Mode=TwoWay}"
+                                          VerticalAlignment="Center" Margin="0,0,8,0"
+                                          ToolTip="The master switch. Off means nothing is ever sent, whatever else is set here." />
+                                <TextBox Style="{StaticResource Input}" Width="64"
+                                         Text="{Binding PublishTimeText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                         AutomationProperties.Name="Publish time"
+                                         ToolTip="24-hour, local time. Publishes the previous day." />
+                                <TextBlock Text="(24-hour, local time; publishes the previous day)" FontSize="10.5"
+                                           VerticalAlignment="Center" Margin="8,0,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                            </StackPanel>
+                            <TextBlock FontSize="10.5" Margin="0,0,0,8"
+                                       Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                       Text="{Binding TimeError}"
+                                       Visibility="{Binding TimeError, Converter={StaticResource StrVis}}" />
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,6,0,12" />
+
+                            <StackPanel Orientation="Horizontal">
+                                <Button Style="{StaticResource AccentButton}" Content="Publish now"
+                                        Command="{Binding PublishNowCommand}"
+                                        AutomationProperties.Name="Publish now"
+                                        ToolTip="Publish yesterday's totals right now, regardless of the schedule." />
+                            </StackPanel>
+                            <TextBlock TextWrapping="Wrap" FontSize="10.5" Margin="0,8,0,0"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                       Text="{Binding StatusText}" />
+                            <TextBlock TextWrapping="Wrap" FontSize="10" Margin="0,10,0,0"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                       Text="The sanduhr-mcp publish_usage tool queues the same upload through this widget; it never holds the token itself. Re-publishing a day sends that day's record again." />
+                        </StackPanel>
                     </Border>
                 </TabItem>
 

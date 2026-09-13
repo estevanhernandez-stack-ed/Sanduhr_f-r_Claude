@@ -159,10 +159,10 @@ Partner Center submission, and the 10.1.4.4 acceptance gates — lives in
 
 ## Screenshots
 
-_TODO._ Add widget / focus-hourglass / sign-in screenshots here. Final Store tiles
-and marketing graphics are generated through the **`626labs-design`** skill on the
-`#0f182b` navy field with the 626 cyan→magenta accent — do not ship programmatic
-placeholders (see `src/Sanduhr.App/Package/Logos/README.md`).
+_TODO._ Add widget / focus-hourglass / sign-in screenshots here. Store tiles are
+generated from the committed brand art by `scripts/generate-store-assets.ps1`
+(see `src/Sanduhr.App/Package/Logos/README.md`); marketing graphics live under
+`docs/store-assets/`.
 
 ---
 
