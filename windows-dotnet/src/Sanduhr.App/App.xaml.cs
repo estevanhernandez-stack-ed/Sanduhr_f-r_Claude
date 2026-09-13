@@ -71,6 +71,17 @@ public partial class App : Application
             new Sanduhr.Core.Paths(),
             new PublishTokenStore(new WindowsCredentialManager(AccountStore.Service))));
 
+        // propose_theme (MCP): the widget answers theme proposals dropped next to the
+        // snapshot. Lint, save under themes\, apply when asked, reply. Watches the
+        // request file so a proposal from the terminal lands within a second.
+        var themePaths = new Sanduhr.Core.Paths();
+        _vm.AttachThemeHandoffService(new ThemeHandoffService(themePaths, _vm, msg =>
+        {
+            // PRIVACY.md contract: operation + exception type only, never theme content.
+            try { System.IO.File.AppendAllText(themePaths.LogFile, $"{DateTime.UtcNow:o} {msg}{Environment.NewLine}"); }
+            catch { }
+        }));
+
         // Statusline bridge (WS-E): the script has no update channel of its own —
         // the widget is its updater. Refresh the installed copy on every start
         // while the integration is enabled (idempotent single-file write).

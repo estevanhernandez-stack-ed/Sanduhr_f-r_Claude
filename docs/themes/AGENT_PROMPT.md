@@ -5,6 +5,23 @@ Paste this prompt into Claude, ChatGPT, or any chat agent along with a
 a ready-to-drop theme JSON that works on both the macOS and Windows
 builds of Sanduhr.
 
+## Or just ask Claude Code
+
+With the Sanduhr MCP server installed (Settings ▸ Claude Usage ▸ Install MCP
+server…), skip the paste step: tell Claude Code "make me a Sanduhr theme from
+this image" and it calls the `propose_theme` tool with the JSON below. The
+widget lints the palette, saves it, applies it, and names the theme that was
+active before. A rejected palette comes back with the fields to fix.
+
+The design rules below are measured, not just asked for: `bg`, `glass` and
+`glass_on_mica` must keep relative luminance under 0.25; `text` needs 4.5:1
+contrast on the card (`glass_on_mica` at `glass_alpha` over a mid-gray desktop)
+and `text_secondary` 3:1; the four text tokens share one hue (within 30
+degrees) at strictly decreasing luminance; `accent`, `sparkline` and
+`border_tint` share one hue; `pace_marker` must show on the green bar fill and
+the empty bar by brightness (1.4:1) or by hue (60 degrees). Anything else is a
+warning that rides along with the applied theme.
+
 ## How to use
 
 1. Copy the entire prompt below.

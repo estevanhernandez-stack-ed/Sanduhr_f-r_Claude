@@ -67,6 +67,7 @@ internal partial class McpConsentDialog : Window
             $"and a 'sanduhr' entry in {configPathFor(home)} (a timestamped backup is saved beside it first). " +
             "The helper is read-only: it can see your usage percentages and - only for homes checked above - " +
             "project-level token totals. It cannot see your keys, your accounts, or conversation content. " +
+            "It can also propose a color theme, which Sanduhr saves under its themes folder and applies; the previous theme stays one click away. " +
             "sanduhr-mcp requires widget 3.4.0 or later; Sanduhr refreshes the helper's files on every start so the two stay paired. " +
             "Remove any time with the Remove button in this tab; removal reverts everything.";
     }

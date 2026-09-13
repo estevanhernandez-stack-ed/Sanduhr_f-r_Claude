@@ -416,6 +416,36 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     public void AttachPublishService(UsagePublishService service) => _publish = service;
 
+    private ThemeHandoffService? _themeHandoff;
+
+    /// <summary>sanduhr-mcp's propose_theme handoff. Attached by App; watches the
+    /// request file and also rides the 30-second tick. Null in unit contexts.</summary>
+    public void AttachThemeHandoffService(ThemeHandoffService service) => _themeHandoff = service;
+
+    /// <summary>The catalog key of the live palette (what the strip marks active
+    /// and settings.json remembers). The theme handoff reports it as
+    /// previous_key so an agent can offer the way back.</summary>
+    public string ActiveThemeKey => _palette.Key;
+
+    private DispatcherTimer? _statusNoticeTimer;
+
+    /// <summary>Show a message in the widget's status slot for a while, then clear
+    /// it unless something else has written there since. Used for notices that
+    /// are not errors: a theme applied from Claude Code, for one.</summary>
+    public void ShowTransientStatus(string message, TimeSpan duration)
+    {
+        StatusText = message;
+        _statusNoticeTimer?.Stop();
+        _statusNoticeTimer = new DispatcherTimer { Interval = duration };
+        _statusNoticeTimer.Tick += (_, _) =>
+        {
+            _statusNoticeTimer?.Stop();
+            if (StatusText == message)
+                StatusText = "";
+        };
+        _statusNoticeTimer.Start();
+    }
+
     /// <summary>The widget's own version — stamped into snapshot.json as
     /// writer_version so readers can tell a dev build's file from the installed
     /// release's (Core's assembly is unversioned and would read "1.0.0").</summary>
@@ -1038,6 +1068,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // the service, never awaited — and before the signed-out early return,
         // since the publisher reads local logs, not the claude.ai session.
         _publish?.Tick(DateTimeOffset.Now);
+        _themeHandoff?.Tick();
 
         if (_lastData is null)
             return;
@@ -1332,6 +1363,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _refreshTimer.Stop();
         _tickTimer.Stop();
         _riffTimer.Stop();
+        _statusNoticeTimer?.Stop();
+        _themeHandoff?.Dispose();
         (_client as IDisposable)?.Dispose();
     }
 }

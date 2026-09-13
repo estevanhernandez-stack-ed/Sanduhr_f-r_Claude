@@ -7,7 +7,8 @@
   single-file mcp\sanduhr-mcp.exe. Trimming removes code the linker cannot see a use
   for, so the only proof the shipped exe works is running it: this script feeds it the
   JSON-RPC lines Claude Code would (initialize, tools/list, ping, get_usage,
-  get_local_burn_by_project, get_model_usage, get_usage_history) over stdin, with no environment overrides, and fails on
+  get_local_burn_by_project, get_model_usage, get_usage_history, and a propose_theme that must be
+  rejected without touching the widget) over stdin, with no environment overrides, and fails on
   a crash, a missing tool, or a malformed reply. It reads this machine's real
   %APPDATA%\Sanduhr paths and writes nothing.
 
@@ -37,6 +38,7 @@ $requests = @(
     '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_local_burn_by_project","arguments":{"window_days":1}}}'
     '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"get_model_usage","arguments":{"window_days":1}}}'
     '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"get_usage_history","arguments":{"window_days":7}}}'
+    '{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"propose_theme","arguments":{"apply":false,"theme":{"name":"Smoke","bg":"#0d0d0d","glass":"#1c1c1c","glass_on_mica":"#1a1a1c","title_bg":"#161616","border":"#333333","footer_bg":"#111111","bar_bg":"#2a2a2a","text":"#e8e4dc","text_secondary":"#b8b4ac","text_dim":"#777777","text_muted":"#555555","accent":"not-a-color","pace_marker":"#ff6b6b","sparkline":"#6c63ff"}}}}'
 )
 
 $psi = [System.Diagnostics.ProcessStartInfo]::new($Exe)
@@ -68,7 +70,7 @@ foreach ($line in ($stdout -split "`n")) {
     $msg = $line | ConvertFrom-Json
     if ($null -ne $msg.id) { $replies[[int]$msg.id] = $msg }
 }
-foreach ($id in 1..7) {
+foreach ($id in 1..8) {
     if (-not $replies.ContainsKey($id)) { throw "No reply for request id $id." }
     if ($replies[$id].PSObject.Properties['error']) { throw "Request $id returned an error: $($replies[$id].error | ConvertTo-Json -Compress)" }
 }
@@ -77,7 +79,7 @@ $server = $replies[1].result.serverInfo
 Write-Host "[smoke-mcp] initialize: $($server.name) $($server.version)"
 
 $tools = @($replies[2].result.tools | ForEach-Object name)
-$expected = @('get_usage', 'get_local_burn_by_project', 'get_model_usage', 'get_usage_history', 'ping', 'publish_usage')
+$expected = @('get_usage', 'get_local_burn_by_project', 'get_model_usage', 'get_usage_history', 'ping', 'publish_usage', 'propose_theme')
 $missing = @($expected | Where-Object { $tools -notcontains $_ })
 if ($missing.Count) { throw "tools/list is missing: $($missing -join ', ') (got: $($tools -join ', '))" }
 Write-Host "[smoke-mcp] tools/list: $($tools -join ', ')"
@@ -101,5 +103,12 @@ if (-not $models.status) { throw 'get_model_usage returned no status.' }
 $history = $replies[7].result.content[0].text | ConvertFrom-Json
 Write-Host "[smoke-mcp] get_usage_history: status=$($history.status) reason=$($history.reason) days_recorded=$($history.days_recorded)"
 if (-not $history.status) { throw 'get_usage_history returned no status.' }
+
+# A broken palette must be refused by the server's own lint: no request file, no widget involved.
+$theme = $replies[8].result.content[0].text | ConvertFrom-Json
+$fields = @($theme.findings | ForEach-Object field)
+Write-Host "[smoke-mcp] propose_theme (broken accent): status=$($theme.status) reason=$($theme.reason) findings=$($fields -join ',')"
+if ($theme.status -ne 'rejected' -or $fields -notcontains 'accent') { throw 'propose_theme did not reject the broken palette on the accent field.' }
+if (Test-Path (Join-Path $env:APPDATA 'Sanduhr\theme-request.json')) { throw 'propose_theme wrote a request for a palette it should have rejected.' }
 
 Write-Host '[smoke-mcp] OK' -ForegroundColor Green

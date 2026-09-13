@@ -770,7 +770,10 @@ public sealed class ToolLogic
         };
         try
         {
-            File.WriteAllText(_config.ThemeRequestPath, request.ToJsonString());
+            // Atomic: the widget watches this file and must never read a half-written one.
+            string tmp = _config.ThemeRequestPath + ".tmp";
+            File.WriteAllText(tmp, request.ToJsonString());
+            File.Move(tmp, _config.ThemeRequestPath, overwrite: true);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
