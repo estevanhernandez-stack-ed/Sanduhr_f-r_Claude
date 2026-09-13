@@ -50,6 +50,18 @@ public sealed class McpConfig
     public TimeSpan PublishWaitTimeout { get; init; } = TimeSpan.FromSeconds(45);
     public TimeSpan PublishPollInterval { get; init; } = TimeSpan.FromMilliseconds(500);
 
+    /// <summary>The theme handoff files (see Core's ThemeHandoff): propose_theme
+    /// writes the request, the widget lints, saves, applies, and writes the
+    /// result. Null = handoff unavailable.</summary>
+    public string? ThemeRequestPath { get; init; }
+    public string? ThemeResultPath { get; init; }
+
+    /// <summary>How long propose_theme waits for the widget. A theme apply takes
+    /// milliseconds and the widget watches the folder, so this covers a busy or
+    /// starting widget, not a tick.</summary>
+    public TimeSpan ThemeWaitTimeout { get; init; } = TimeSpan.FromSeconds(20);
+    public TimeSpan ThemePollInterval { get; init; } = TimeSpan.FromMilliseconds(250);
+
     private static readonly string[] KnownRootNames = { ".claude", ".claude-personal" };
 
     public static McpConfig Resolve()
@@ -114,6 +126,9 @@ public sealed class McpConfig
             // (this project cannot link that file without widening its allowlist).
             PublishRequestPath = Path.Combine(sanduhrDir, "publish-request.json"),
             PublishResultPath = Path.Combine(sanduhrDir, "publish-result.json"),
+            // Same mirror discipline for Core's ThemeHandoff file names.
+            ThemeRequestPath = Path.Combine(sanduhrDir, "theme-request.json"),
+            ThemeResultPath = Path.Combine(sanduhrDir, "theme-result.json"),
         };
     }
 

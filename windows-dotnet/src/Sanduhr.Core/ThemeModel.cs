@@ -295,65 +295,69 @@ public static class ThemeCatalog
     }
 
     /// <summary>
-    /// Validate + normalize a parsed theme JSON, applying the
-    /// <c>_DEFAULT_GLASS_TUNING</c> defaults for omitted dials. Returns null
-    /// (reported via <paramref name="warn"/>) when a required field is absent or
-    /// the JSON is malformed — same skip behavior as <c>themes._validate_theme</c>.
+    /// Validate + normalize a parsed theme JSON. Delegates to <see cref="ThemeLint"/>
+    /// (the schema errors) and reports each error via <paramref name="warn"/>;
+    /// returns null when the theme is rejected, otherwise the definition with the
+    /// <c>_DEFAULT_GLASS_TUNING</c> defaults applied for omitted dials. Design-rule
+    /// warnings are not reported here; the paste box, the studio, and the MCP tool
+    /// show them, a drop-in file just loads.
     /// </summary>
     public static ThemeDefinition? TryValidate(string key, JsonObject data, Action<string>? warn = null)
     {
+        var result = ThemeLint.Lint(data);
+        if (result.Theme is not null)
+            return result.Theme;
+
         var missing = RequiredColorFields.Where(f => !data.ContainsKey(f)).ToList();
         if (missing.Count > 0)
-        {
             warn?.Invoke($"User theme '{key}' missing required fields: {string.Join(", ", missing)}");
-            return null;
-        }
-
-        try
-        {
-            var bloom = new AccentBloom(4, 0.45);
-            if (data["accent_bloom"] is JsonObject ab)
-                bloom = new AccentBloom(IntOr(ab["blur"], 4), DoubleOr(ab["alpha"], 0.45));
-
-            InnerHighlight? inner = null;
-            if (data["inner_highlight"] is JsonObject ih && ih["color"] is JsonNode)
-                inner = new InnerHighlight(Str(ih, "color"), DoubleOr(ih["alpha"], 0.20));
-
-            return new ThemeDefinition
-            {
-                Name = Str(data, "name"),
-                Bg = Str(data, "bg"),
-                Glass = Str(data, "glass"),
-                GlassOnMica = Str(data, "glass_on_mica"),
-                TitleBg = Str(data, "title_bg"),
-                Border = Str(data, "border"),
-                Text = Str(data, "text"),
-                TextSecondary = Str(data, "text_secondary"),
-                TextDim = Str(data, "text_dim"),
-                TextMuted = Str(data, "text_muted"),
-                Accent = Str(data, "accent"),
-                BarBg = Str(data, "bar_bg"),
-                FooterBg = Str(data, "footer_bg"),
-                PaceMarker = Str(data, "pace_marker"),
-                Sparkline = Str(data, "sparkline"),
-                GlassAlpha = DoubleOr(data["glass_alpha"], 0.80),
-                BorderAlpha = DoubleOr(data["border_alpha"], 0.40),
-                BorderTint = StrOrNull(data, "border_tint"),
-                AccentBloom = bloom,
-                InnerHighlight = inner,
-                OptsOutOfMica = BoolOr(data["opts_out_of_mica"], false),
-                MonospaceFont = StrOrNull(data, "monospace_font"),
-                MonospaceFallback = StrOrNull(data, "monospace_fallback"),
-                CardCornerRadius = IntOrNull(data["card_corner_radius"]),
-                BreathPeriodMs = IntOrNull(data["breath_period_ms"]),
-                BgGrid = BoolOr(data["bg_grid"], false),
-            };
-        }
-        catch (Exception e) when (e is FormatException or InvalidOperationException)
-        {
+        foreach (var e in result.Errors.Where(e => data.ContainsKey(e.Field) || e.Field.Contains('.')))
             warn?.Invoke($"User theme '{key}' has a malformed field: {e.Message}");
-            return null;
-        }
+        return null;
+    }
+
+    /// <summary>Build the definition from JSON that <see cref="ThemeLint"/> has
+    /// already accepted: every required color present and well-formed, dials in
+    /// range. Omitted dials take the <c>_DEFAULT_GLASS_TUNING</c> defaults.</summary>
+    internal static ThemeDefinition BuildDefinition(JsonObject data)
+    {
+        var bloom = new AccentBloom(4, 0.45);
+        if (data["accent_bloom"] is JsonObject ab)
+            bloom = new AccentBloom(IntOr(ab["blur"], 4), DoubleOr(ab["alpha"], 0.45));
+
+        InnerHighlight? inner = null;
+        if (data["inner_highlight"] is JsonObject ih && ih["color"] is JsonNode)
+            inner = new InnerHighlight(Str(ih, "color"), DoubleOr(ih["alpha"], 0.20));
+
+        return new ThemeDefinition
+        {
+            Name = Str(data, "name"),
+            Bg = Str(data, "bg"),
+            Glass = Str(data, "glass"),
+            GlassOnMica = Str(data, "glass_on_mica"),
+            TitleBg = Str(data, "title_bg"),
+            Border = Str(data, "border"),
+            Text = Str(data, "text"),
+            TextSecondary = Str(data, "text_secondary"),
+            TextDim = Str(data, "text_dim"),
+            TextMuted = Str(data, "text_muted"),
+            Accent = Str(data, "accent"),
+            BarBg = Str(data, "bar_bg"),
+            FooterBg = Str(data, "footer_bg"),
+            PaceMarker = Str(data, "pace_marker"),
+            Sparkline = Str(data, "sparkline"),
+            GlassAlpha = DoubleOr(data["glass_alpha"], 0.80),
+            BorderAlpha = DoubleOr(data["border_alpha"], 0.40),
+            BorderTint = StrOrNull(data, "border_tint"),
+            AccentBloom = bloom,
+            InnerHighlight = inner,
+            OptsOutOfMica = BoolOr(data["opts_out_of_mica"], false),
+            MonospaceFont = StrOrNull(data, "monospace_font"),
+            MonospaceFallback = StrOrNull(data, "monospace_fallback"),
+            CardCornerRadius = IntOrNull(data["card_corner_radius"]),
+            BreathPeriodMs = IntOrNull(data["breath_period_ms"]),
+            BgGrid = BoolOr(data["bg_grid"], false),
+        };
     }
 
     private static string Str(JsonObject o, string key) => o[key]!.GetValue<string>();
@@ -362,11 +366,7 @@ public static class ThemeCatalog
         => o[key] is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
 
     private static double DoubleOr(JsonNode? n, double fallback)
-    {
-        if (n is null) return fallback;
-        try { return n.GetValue<double>(); }
-        catch { return fallback; }
-    }
+        => ThemeLint.TryReadNumber(n, out var v) ? v : fallback;
 
     private static bool BoolOr(JsonNode? n, bool fallback)
     {
@@ -376,16 +376,8 @@ public static class ThemeCatalog
     }
 
     private static int IntOr(JsonNode? n, int fallback)
-    {
-        if (n is null) return fallback;
-        try { return (int)Math.Round(n.GetValue<double>()); }
-        catch { return fallback; }
-    }
+        => ThemeLint.TryReadNumber(n, out var v) ? (int)Math.Round(v) : fallback;
 
     private static int? IntOrNull(JsonNode? n)
-    {
-        if (n is null) return null;
-        try { return (int)Math.Round(n.GetValue<double>()); }
-        catch { return null; }
-    }
+        => ThemeLint.TryReadNumber(n, out var v) ? (int)Math.Round(v) : null;
 }

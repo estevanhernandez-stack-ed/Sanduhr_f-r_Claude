@@ -733,6 +733,96 @@ public sealed class ToolLogic
         };
     }
 
+    // -- propose_theme --------------------------------------------------------
+
+    /// <summary>Hand the widget a palette. Lint runs here first (the same code the
+    /// widget runs), so a broken theme is refused instantly with findings and no
+    /// file is written: that is the loop an agent iterates against. A clean theme
+    /// becomes a request file; the widget lints again, saves it under the themes
+    /// folder, applies it when asked, and answers with the previous theme's key.
+    /// This server never writes a theme itself.</summary>
+    public JsonObject BuildProposeTheme(JsonObject? theme, string? saveAs, bool apply)
+    {
+        if (theme is null)
+            return Refusal("rejected", "invalid_params", "theme must be an object: the palette JSON per docs/themes/AGENT_PROMPT.md.");
+        if (saveAs is not null && !IsValidThemeKey(saveAs))
+            return Refusal("rejected", "invalid_params", "save_as must be 1-40 lowercase letters, digits or hyphens, not starting with a hyphen (omit it to slug the name).");
+
+        var lint = ThemeLint.Lint(theme);
+        if (!lint.Ok)
+        {
+            var rejected = Refusal("rejected", "invalid_theme", "Fix the fields named in findings and call again.");
+            rejected["findings"] = ThemeLint.ToJson(lint.Findings);
+            return rejected;
+        }
+
+        if (_config.ThemeRequestPath is null || _config.ThemeResultPath is null)
+            return Refusal("no_data", "unavailable", "Theme proposals are not wired on this server configuration.");
+
+        string id = Guid.NewGuid().ToString("N");
+        var request = new JsonObject
+        {
+            ["id"] = id,
+            ["requested_at"] = _clock().ToUniversalTime().ToString("o", CultureInfo.InvariantCulture),
+            ["theme"] = theme.DeepClone(),
+            ["save_as"] = saveAs,
+            ["apply"] = apply,
+        };
+        try
+        {
+            // Atomic: the widget watches this file and must never read a half-written one.
+            string tmp = _config.ThemeRequestPath + ".tmp";
+            File.WriteAllText(tmp, request.ToJsonString());
+            File.Move(tmp, _config.ThemeRequestPath, overwrite: true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return Refusal("error", "request_write_failed", $"Could not queue the request ({e.GetType().Name}).");
+        }
+
+        var deadline = DateTimeOffset.UtcNow + _config.ThemeWaitTimeout;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (TryReadResult(_config.ThemeResultPath, id) is { } result)
+            {
+                result["request_id"] = id;
+                if (result["findings"] is null)
+                    result["findings"] = ThemeLint.ToJson(lint.Findings);
+                return result;
+            }
+            Thread.Sleep(_config.ThemePollInterval);
+        }
+
+        // The request stays for the widget's next tick within its 10-minute window.
+        var queued = new JsonObject
+        {
+            ["status"] = "queued",
+            ["reason"] = "widget_not_responding",
+            ["remedy"] = "The Sanduhr widget did not answer within the wait window - start (or restart) it. "
+                         + "The request stays queued for ten minutes and runs when the widget picks it up.",
+            ["request_id"] = id,
+            ["name"] = (string?)theme["name"],
+        };
+        queued["findings"] = ThemeLint.ToJson(lint.Findings);
+        return queued;
+    }
+
+    /// <summary>Mirrors Core's ThemeHandoff.IsValidKey literally (this project
+    /// links ThemeLint and ThemeModel, not the handoff file).</summary>
+    public static bool IsValidThemeKey(string? key)
+    {
+        if (string.IsNullOrEmpty(key) || key.Length > 40)
+            return false;
+        if (!char.IsAsciiLetterLower(key[0]) && !char.IsAsciiDigit(key[0]))
+            return false;
+        foreach (char c in key)
+        {
+            if (!char.IsAsciiLetterLower(c) && !char.IsAsciiDigit(c) && c != '-')
+                return false;
+        }
+        return true;
+    }
+
     /// <summary>The refusal inputs, read from settings.json's <c>publish</c>
     /// group (mirrors Core's PublishSettingsJson vocabulary literally — this
     /// project cannot link that file). <c>CredentialReady</c> is true when a

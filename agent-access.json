@@ -142,6 +142,26 @@
       }
     },
     {
+      "id": "mcp.propose-theme",
+      "description": "MCP tool propose_theme: hand the widget a color theme (name + fourteen role-named #rrggbb colors + optional dials). The server lints first (schema errors and the measured design rules); a rejected palette returns findings and writes nothing. Otherwise the widget lints again, saves the theme under %APPDATA%/Sanduhr/themes/<key>.json, applies it unless apply:false, and answers with the previous theme's key.",
+      "tier": "prod-safe",
+      "kind": "write",
+      "transport": { "type": "stdio-mcp", "method": "tools/call", "path": "/propose_theme" },
+      "input": { "theme": "object (the palette JSON per docs/themes/AGENT_PROMPT.md), required", "save_as": "string ^[a-z0-9][a-z0-9-]{0,39}$, default: slug of name", "apply": "boolean, default true" },
+      "output": { "shape": "status applied|saved|rejected|queued|error|no_data, reason, remedy, key, name, previous_key, saved_path, request_id, findings[{level,field,message}]" },
+      "auth": "none",
+      "authDetail": "none-local-ambient; the widget owns every write under the themes folder; a built-in's name is reserved; requests expire after 10 minutes.",
+      "destructive": false,
+      "sourceRef": "windows-dotnet/src/Sanduhr.Mcp/ToolLogic.cs:BuildProposeTheme",
+      "origin": "added",
+      "verified": {
+        "status": "unverified",
+        "at": null,
+        "runId": null,
+        "detail": "Added 2026-09-13 with the agentic theming slice; needs a cold-agent pass (rejected fast path, applied round trip, reserved name, queued without widget)."
+      }
+    },
+    {
       "id": "snapshot.file.read",
       "description": "The rendezvous artifact itself: %APPDATA%/Sanduhr/snapshot.json, schema v1. One writer (the widget, atomic temp+swap each 5-min fetch while the statusline integration is on), N read-only consumers. Raw facts only - no precomputed pace/countdowns. account_ref is a SHA-256 prefix, never the label. Deleted on account switch, sign-out, and integration removal - consumers treat missing as no-data, never cache last-known-good.",
       "tier": "prod-safe",

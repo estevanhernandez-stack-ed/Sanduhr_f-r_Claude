@@ -33,6 +33,14 @@ tag `legacy/python-v2.3.0`.
 - Store-facing text (description, features, what's-new) lives in the Store Listing Console repo under
   `apps/sanduhr/copy/`; reviewer letters live here under `docs/store/`. See `docs/release-runbook.md`.
 
+## Running a dev build beside the installed widget
+
+Set `SANDUHR_DEV_PROFILE` to any folder before launching `Sanduhr.exe` from `bin\`. Both AppData
+bases (settings, snapshot, themes, vault, logs) then live under that folder, so the dev build
+never touches the installed widget's files; credentials still come from Windows Credential
+Manager, so it signs in as you. The MCP server has its own overrides (`SANDUHR_SNAPSHOT_PATH`,
+`SANDUHR_CC_ROOTS`, `SANDUHR_VAULT_DIR`) for the verify fixtures.
+
 ## Adding a theme
 
 Themes are JSON (`ThemeModel` in Core). Add a built-in under the themes resources in

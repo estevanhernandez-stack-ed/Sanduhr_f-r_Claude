@@ -33,17 +33,21 @@ public class McpServerTests
     }
 
     [Fact]
-    public void Tools_list_has_five_read_only_tools_plus_publish_usage()
+    public void Tools_list_has_five_read_only_tools_plus_publish_usage_and_propose_theme()
     {
         using var tmp = new TempDir();
         var res = Run(tmp, Req(1, "tools/list"));
         var tools = (JsonArray)((JsonObject)res.Single()["result"]!)["tools"]!;
-        Assert.Equal(new[] { "get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping", "publish_usage" },
+        Assert.Equal(new[] { "get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping", "publish_usage", "propose_theme" },
             tools.Select(t => (string?)t!["name"]).ToArray());
         Assert.All(tools.Take(5), t => Assert.True(t!["annotations"]!["readOnlyHint"]!.GetValue<bool>()));
         // publish_usage queues an upload (performed by the widget) — honestly not read-only.
         Assert.False(tools[5]!["annotations"]!["readOnlyHint"]!.GetValue<bool>());
         Assert.False(tools[5]!["annotations"]!["destructiveHint"]!.GetValue<bool>());
+        // propose_theme changes the widget's look (saved + reversible), so not read-only either.
+        Assert.False(tools[6]!["annotations"]!["readOnlyHint"]!.GetValue<bool>());
+        Assert.False(tools[6]!["annotations"]!["destructiveHint"]!.GetValue<bool>());
+        Assert.Contains("rejected with findings", (string?)tools[6]!["description"]);
         // The behavioral trigger IS the feature (review: without it, never fires).
         Assert.Contains("Call BEFORE", (string?)tools[0]!["description"]);
         Assert.Contains("never assume budget", (string?)tools[0]!["description"]);

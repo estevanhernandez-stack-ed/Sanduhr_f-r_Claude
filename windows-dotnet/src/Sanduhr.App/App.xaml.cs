@@ -71,6 +71,17 @@ public partial class App : Application
             new Sanduhr.Core.Paths(),
             new PublishTokenStore(new WindowsCredentialManager(AccountStore.Service))));
 
+        // propose_theme (MCP): the widget answers theme proposals dropped next to the
+        // snapshot. Lint, save under themes\, apply when asked, reply. Watches the
+        // request file so a proposal from the terminal lands within a second.
+        var themePaths = new Sanduhr.Core.Paths();
+        _vm.AttachThemeHandoffService(new ThemeHandoffService(themePaths, _vm, msg =>
+        {
+            // PRIVACY.md contract: operation + exception type only, never theme content.
+            try { System.IO.File.AppendAllText(themePaths.LogFile, $"{DateTime.UtcNow:o} {msg}{Environment.NewLine}"); }
+            catch { }
+        }));
+
         // Statusline bridge (WS-E): the script has no update channel of its own —
         // the widget is its updater. Refresh the installed copy on every start
         // while the integration is enabled (idempotent single-file write).
@@ -184,7 +195,22 @@ public partial class App : Application
         }
 
         var svm = new SettingsViewModel(_vm, () => RunSignInAsync(embedded: true), RunUpdateSignInAsync);
-        _settingsWindow = new SettingsWindow(svm);
+        try
+        {
+            _settingsWindow = new SettingsWindow(svm);
+        }
+        catch (Exception e)
+        {
+            // The command that opens Settings is async and swallows exceptions, so a
+            // XAML or view-model failure here would otherwise vanish: log it first.
+            try
+            {
+                System.IO.File.AppendAllText(new Sanduhr.Core.Paths().LogFile,
+                    $"{DateTime.UtcNow:o} settings window failed to open ({e.GetType().Name}: {e.Message}){Environment.NewLine}{e}{Environment.NewLine}");
+            }
+            catch { }
+            throw;
+        }
         if (_window is { IsLoaded: true })
             _settingsWindow.Owner = _window;
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
