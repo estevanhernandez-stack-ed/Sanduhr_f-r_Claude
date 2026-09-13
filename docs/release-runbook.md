@@ -281,6 +281,8 @@ both proven on the .NET build.
 | `dotnet publish` errors on a locked DLL | `Sanduhr.exe` is running | Quit from tray, re-run |
 | Store validation: "revision number other than zero" | 4th version component ≠ 0 | Bump the 3rd component; the scripts hard-fail on this |
 | `signtool` `0x8007000b` on sideload | Manifest Publisher CN ≠ the dev cert's subject | Temp-patch the manifest Publisher to the dev cert CN, build, restore (or use a cert whose CN matches) |
+| `submit_write.py apply` answers a bare HTTP 403 on `POST .../submissions` with no body, no pending submission | Transient on the Ingestion side; seen minutes after the previous version went Published (3.4.1, 2026-09-13) | Retry after a minute or two. If the retry creates the id outside the console, re-run `apply` with `--submission <id>`: the console rewrites a submission the same client created |
+| The published listing still shows the previous version's what's-new, description, and features after certification | The API-written text did not survive the commit on 3.4.0; the submission was committed from Partner Center, whose view of the listing was the old text | Commit from the console (`submit_write.py commit`), never from Partner Center, after `apply`; verify the live listing with `submit_api.py inspect` once Published |
 | MSIX launch fails "framework missing" on a fresh box | Published framework-dependent, not self-contained | `build-msix.ps1` already passes `--self-contained true`; don't flip it off |
 | Store rejects with trademark complaint | Disclaimer missing on a required surface | Re-check all six surfaces in 10.1.4.4(a) above |
 | `vpk` "not found" | Global tool not installed | `dotnet tool install -g vpk` |
