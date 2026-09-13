@@ -71,12 +71,14 @@ public static class ToolCatalog
             "publish_usage",
             "Publish one day's local Claude Code token burn (per project basename, per home " +
             "the user marked shareable in Sanduhr's settings) plus current quota headroom to " +
-            "the 626 Labs dashboard. Call when the user asks to push or sync usage to 626 Labs, " +
-            "or when the dashboard's usage for a day is missing. The Sanduhr widget performs " +
-            "the upload (it holds the key); this server only queues the request and returns " +
-            "the widget's typed result. Refuses with status disabled / no_key when publishing " +
-            "is off or no 626 Labs agent key is stored - the remedy names the setting. " +
-            "Re-publishing the same day replaces the dashboard's record for it.",
+            "the publish endpoint the user configured in Sanduhr (a URL of their own, or the " +
+            "626 Labs dashboard preset). Call when the user asks to publish, push, or sync " +
+            "usage, or when their destination is missing a day. The Sanduhr widget performs " +
+            "the upload (it holds the token); this server only queues the request and returns " +
+            "the widget's typed result. Refuses with status disabled / no_endpoint / no_token " +
+            "when publishing is off, no publish endpoint is set, or no publish token is stored " +
+            "for a scheme that needs one - the remedy names the setting. Re-publishing the " +
+            "same day sends that day's record again.",
             new JsonObject
             {
                 ["type"] = "object",

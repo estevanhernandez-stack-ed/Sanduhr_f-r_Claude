@@ -397,7 +397,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     private UsagePublishService? _publish;
 
-    /// <summary>"Publish to 626 Labs" (opt-in). Attached by App; its Tick rides
+    /// <summary>"Publish usage" (opt-in, user-chosen endpoint). Attached by App; its Tick rides
     /// the 30-second <see cref="OnTick"/> loop. Null in unit contexts.</summary>
     public UsagePublishService? Publish => _publish;
 
@@ -1020,7 +1020,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             _vault?.TriggerIngest();
         }
 
-        // Publish to 626 Labs (opt-in): the daily schedule check and the MCP
+        // Publish usage (opt-in): the daily schedule check and the MCP
         // handoff both ride this tick. Fire-and-forget, single-flight inside
         // the service, never awaited — and before the signed-out early return,
         // since the publisher reads local logs, not the claude.ai session.

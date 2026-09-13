@@ -5,25 +5,27 @@ using Sanduhr.Core;
 namespace Sanduhr.App.Services;
 
 /// <summary>
-/// App-side owner of "Publish to 626 Labs": consent state (settings.json
-/// <c>publish_626</c>), the agent key (Credential Manager via
-/// <see cref="AgentKeyStore"/>), the daily scheduler hook, the MCP handoff
+/// App-side owner of "Publish usage": consent state and destination
+/// (settings.json <c>publish</c>), the publish token (Credential Manager via
+/// <see cref="PublishTokenStore"/>), the daily scheduler hook, the MCP handoff
 /// (request file in, result file out), and the manual "Publish now". Every
 /// upload runs off the UI thread and is single-flight; the tick entry point
 /// never blocks. Mirrors <see cref="VaultService"/>'s shape on purpose.
 ///
-/// What leaves the machine, and only when the master toggle is on: for each
-/// home the user ticked, one token count per project BASENAME for one closed
-/// local day, the tier split, and the widget's current quota percentages (or
-/// an explicit stale/no_data marker). No paths, no session content, no
-/// account labels, no key echo.
+/// Nothing about usage comes back to 626 Labs; the user sends it to an
+/// endpoint they chose (626 Labs is one preset). What leaves the machine,
+/// and only when the master toggle is on: for each home the user ticked, one
+/// token count per project BASENAME for one closed local day, the tier
+/// split, and the widget's current quota percentages (or an explicit
+/// stale/no_data marker). No paths, no session content, no account labels,
+/// no token echo.
 /// </summary>
 public sealed class UsagePublishService
 {
     private readonly Paths _paths;
     private readonly SettingsStore _settings;
     private readonly CcLogReader _reader;
-    private readonly AgentKeyStore _keys;
+    private readonly PublishTokenStore _tokens;
     private int _publishRunning;
     private int _tickRunning;
 
@@ -31,12 +33,12 @@ public sealed class UsagePublishService
     /// records its outcome — ON A WORKER THREAD; UI subscribers marshal.</summary>
     public event Action? StatusChanged;
 
-    public UsagePublishService(SettingsStore settings, CcLogReader reader, Paths paths, AgentKeyStore keys)
+    public UsagePublishService(SettingsStore settings, CcLogReader reader, Paths paths, PublishTokenStore tokens)
     {
         _settings = settings;
         _reader = reader;
         _paths = paths;
-        _keys = keys;
+        _tokens = tokens;
     }
 
     // -- state ------------------------------------------------------------------
@@ -69,27 +71,39 @@ public sealed class UsagePublishService
 
     public void SetPublishTime(TimeOnly time) => _settings.SavePublishTime(time);
 
-    public bool HasKey
+    // -- destination ------------------------------------------------------------
+
+    public void SetEndpointUrl(string url) => _settings.SavePublishEndpointUrl(url);
+
+    public void SetAuthScheme(PublishAuthScheme scheme) => _settings.SavePublishAuthScheme(scheme);
+
+    public void SetAuthHeaderName(string name) => _settings.SavePublishAuthHeaderName(name);
+
+    /// <summary>Record the preset; the 626 Labs one fills its URL, bearer auth
+    /// and body format, Custom keeps the fields and uses the plain format.</summary>
+    public void ApplyPreset(PublishPreset preset) => _settings.SavePublishPreset(preset);
+
+    public bool HasToken
     {
         get
         {
-            try { return _keys.HasKey; }
+            try { return _tokens.HasToken; }
             catch { return false; }
         }
     }
 
     /// <summary>Store the key in Credential Manager and mirror ONLY its
-    /// presence into settings (for sanduhr-mcp's no_key refusal).</summary>
-    public void SaveKey(string key)
+    /// presence into settings (for sanduhr-mcp's no_token refusal).</summary>
+    public void SaveToken(string token)
     {
-        _keys.Save(key);
-        _settings.SavePublishKeyStored(HasKey);
+        _tokens.Save(token);
+        _settings.SavePublishTokenStored(HasToken);
     }
 
-    public void ClearKey()
+    public void ClearToken()
     {
-        _keys.Clear();
-        _settings.SavePublishKeyStored(false);
+        _tokens.Clear();
+        _settings.SavePublishTokenStored(false);
     }
 
     // -- the tick hook ------------------------------------------------------------
@@ -145,12 +159,17 @@ public sealed class UsagePublishService
         if (!s.Enabled)
         {
             payload = Typed("disabled", "publishing_off",
-                "Publishing is off. Turn on 'Publish to 626 Labs' in the Sanduhr widget (Settings > 626 Labs).");
+                "Publishing is off. Turn on 'Publish daily' in the Sanduhr widget (Settings > Publish usage).");
         }
-        else if (!HasKey)
+        else if (!s.HasEndpoint)
         {
-            payload = Typed("no_key", "no_agent_key",
-                "No 626 Labs agent key is stored. Add one in the Sanduhr widget (Settings > 626 Labs > Set agent key).");
+            payload = Typed("no_endpoint", "no_endpoint_url",
+                "No publish endpoint is configured. Set one in the Sanduhr widget (Settings > Publish usage > Endpoint URL, or pick a preset).");
+        }
+        else if (s.AuthScheme != PublishAuthScheme.None && !HasToken)
+        {
+            payload = Typed("no_token", "no_publish_token",
+                "No publish token is stored for the publish endpoint. Add one in the Sanduhr widget (Settings > Publish usage > Set token).");
         }
         else
         {
@@ -203,17 +222,15 @@ public sealed class UsagePublishService
                 foreach (var root in shared)
                     burn.Add(_reader.BurnForLocalDay(root, Path.Combine(home, root), date));
 
+                var settings = _settings.LoadPublishSettings();
                 var quota = UsagePublisher.ReadQuota(_paths.SnapshotFile, DateTimeOffset.UtcNow);
                 var payload = UsagePublisher.BuildPayload(
                     date, Environment.MachineName, burn,
-                    new HashSet<string>(shared, StringComparer.Ordinal), quota);
+                    new HashSet<string>(shared, StringComparer.Ordinal), quota, settings.BodyFormat);
 
-                UsagePublishResult result;
-                var key = _keys.Load();
-                if (key is null)
-                    result = new UsagePublishResult(0, false, "No 626 Labs agent key stored.", DateTimeOffset.Now);
-                else
-                    result = await UsagePublisher.PublishAsync(payload, key).ConfigureAwait(false);
+                // The publisher refuses (status 0, no network) on a missing endpoint
+                // or a missing token for a scheme that needs one.
+                var result = await UsagePublisher.PublishAsync(payload, settings.Target, _tokens.Load()).ConfigureAwait(false);
 
                 Record(result, date);
                 return new PublishOutcome(result, shared, burn.Sum(b => b.Total),
@@ -240,7 +257,7 @@ public sealed class UsagePublishService
             _settings.SavePublishAttempt(result.At, result.Message, result.Ok ? date : null);
             // PRIVACY.md contract for sanduhr.log: status codes only — never the payload, never the key.
             File.AppendAllText(_paths.LogFile,
-                $"{DateTime.UtcNow:o} publish 626 {date:yyyy-MM-dd} -> http {result.StatusCode} ({(result.Ok ? "ok" : "failed")}){Environment.NewLine}");
+                $"{DateTime.UtcNow:o} publish {date:yyyy-MM-dd} -> http {result.StatusCode} ({(result.Ok ? "ok" : "failed")}){Environment.NewLine}");
         }
         catch
         {

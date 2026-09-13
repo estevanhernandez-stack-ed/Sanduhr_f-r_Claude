@@ -36,8 +36,9 @@ Seven contract observations were folded back into the manifest descriptions.
   burn schema admits only window_days enum [1,7,30] + full_paths bool;
   publish schema admits only date (YYYY-MM-DD pattern).
 - **publish_usage (2026-09-13, unverified):** no settings → disabled/publishing_off;
-  publish_626.enabled true + key_stored false → no_key/no_agent_key; both true
-  and no widget → queued/widget_not_responding after the wait, request file
+  publish.enabled true + endpoint_url blank → no_endpoint/no_endpoint_url;
+  endpoint set + token_stored false (auth_scheme not none) → no_token/no_publish_token;
+  all set and no widget → queued/widget_not_responding after the wait, request file
   present with id/date/requested_at; a fake widget that writes
   publish-result.json for the matching id → the widget's typed result echoed
   with date + request_id. Never a protocol error; the server process makes no
