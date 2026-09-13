@@ -62,9 +62,9 @@ public partial class App : Application
             vaultService.SaveConsent(VaultConsentDialog.ShowConsent(_window, vaultService.DetectedRootNames()));
         _vm.AttachVaultService(vaultService);
 
-        // Publish to 626 Labs: everything defaults off (toggle + every home), so
-        // attaching is inert until the user opts in under Settings > 626 Labs.
-        // The agent key rides the same Credential Manager seam as the accounts.
+        // Publish usage: everything defaults off (toggle + every home, no endpoint),
+        // so attaching is inert until the user opts in under Settings > Publish usage.
+        // The publish token rides the same Credential Manager seam as the accounts.
         _vm.AttachPublishService(new UsagePublishService(
             new SettingsStore(new Sanduhr.Core.Paths()),
             _vm.CcReader,

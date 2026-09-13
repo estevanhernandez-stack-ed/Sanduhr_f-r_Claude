@@ -5,18 +5,20 @@ using Sanduhr.Core;
 namespace Sanduhr.App.Services;
 
 /// <summary>
-/// App-side owner of "Publish to 626 Labs": consent state (settings.json
-/// <c>publish_626</c>), the agent key (Credential Manager via
+/// App-side owner of "Publish usage": consent state and destination
+/// (settings.json <c>publish</c>), the publish token (Credential Manager via
 /// <see cref="PublishTokenStore"/>), the daily scheduler hook, the MCP handoff
 /// (request file in, result file out), and the manual "Publish now". Every
 /// upload runs off the UI thread and is single-flight; the tick entry point
 /// never blocks. Mirrors <see cref="VaultService"/>'s shape on purpose.
 ///
-/// What leaves the machine, and only when the master toggle is on: for each
-/// home the user ticked, one token count per project BASENAME for one closed
-/// local day, the tier split, and the widget's current quota percentages (or
-/// an explicit stale/no_data marker). No paths, no session content, no
-/// account labels, no key echo.
+/// Nothing about usage comes back to 626 Labs; the user sends it to an
+/// endpoint they chose (626 Labs is one preset). What leaves the machine,
+/// and only when the master toggle is on: for each home the user ticked, one
+/// token count per project BASENAME for one closed local day, the tier
+/// split, and the widget's current quota percentages (or an explicit
+/// stale/no_data marker). No paths, no session content, no account labels,
+/// no token echo.
 /// </summary>
 public sealed class UsagePublishService
 {
@@ -68,6 +70,18 @@ public sealed class UsagePublishService
     }
 
     public void SetPublishTime(TimeOnly time) => _settings.SavePublishTime(time);
+
+    // -- destination ------------------------------------------------------------
+
+    public void SetEndpointUrl(string url) => _settings.SavePublishEndpointUrl(url);
+
+    public void SetAuthScheme(PublishAuthScheme scheme) => _settings.SavePublishAuthScheme(scheme);
+
+    public void SetAuthHeaderName(string name) => _settings.SavePublishAuthHeaderName(name);
+
+    /// <summary>Record the preset; the 626 Labs one fills its URL, bearer auth
+    /// and body format, Custom keeps the fields and uses the plain format.</summary>
+    public void ApplyPreset(PublishPreset preset) => _settings.SavePublishPreset(preset);
 
     public bool HasToken
     {

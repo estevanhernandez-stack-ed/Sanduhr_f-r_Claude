@@ -9,8 +9,8 @@ using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
 
-/// <summary>One "share with 626 Labs" checkbox per detected Claude Code home.
-/// Default OFF for every root; the user opts each in (VaultRootToggleViewModel's shape).</summary>
+/// <summary>One "share" checkbox per detected Claude Code home. Default OFF
+/// for every root; the user opts each in (VaultRootToggleViewModel's shape).</summary>
 public sealed partial class PublishRootToggleViewModel : ObservableObject
 {
     private readonly PublishViewModel _owner;
@@ -35,24 +35,54 @@ public sealed partial class PublishRootToggleViewModel : ObservableObject
     }
 }
 
+/// <summary>A dropdown row: the enum value plus its display label.</summary>
+public sealed record PublishPresetOption(PublishPreset Value, string Display);
+
+/// <summary>A dropdown row: the enum value plus its display label.</summary>
+public sealed record PublishAuthOption(PublishAuthScheme Value, string Display);
+
 /// <summary>
-/// Backs the Settings → 626 Labs tab: master toggle (default off), per-home
-/// share checkboxes (default off), publish time (default 06:45 local), agent
-/// key set/clear (Credential Manager, masked entry), "Publish now", and the
-/// last-publish status line. Null service (unit contexts) renders inert.
+/// Backs the Settings → Publish usage tab. Nothing about usage comes back to
+/// 626 Labs; the user sends it to an endpoint they choose. Preset (custom or
+/// the 626 Labs dashboard), endpoint URL, auth scheme (+ header name), the
+/// masked publish token (Credential Manager), the master toggle (default
+/// off), per-home share checkboxes (default off), publish time (default
+/// 06:45 local), "Publish now", and the last-publish status line. Null
+/// service (unit contexts) renders inert.
 /// </summary>
 public sealed partial class PublishViewModel : ObservableObject
 {
+    public static IReadOnlyList<PublishPresetOption> PresetOptions { get; } = new[]
+    {
+        new PublishPresetOption(PublishPreset.Custom, PublishPresets.CustomDisplay),
+        new PublishPresetOption(PublishPreset.Labs626, PublishPresets.Labs626Display),
+    };
+
+    public static IReadOnlyList<PublishAuthOption> AuthOptions { get; } = new[]
+    {
+        new PublishAuthOption(PublishAuthScheme.Bearer, "Bearer token"),
+        new PublishAuthOption(PublishAuthScheme.Header, "Custom header"),
+        new PublishAuthOption(PublishAuthScheme.None, "None"),
+    };
+
     private readonly UsagePublishService? _service;
     private readonly Action _statusHandler;
     private Window? _owner;
     private bool _loading;
 
     [ObservableProperty] private bool _enabled;
+    [ObservableProperty] private PublishPresetOption _selectedPreset = PresetOptions[0];
+    [ObservableProperty] private string _presetHint = "";
+    [ObservableProperty] private string _endpointUrl = "";
+    [ObservableProperty] private string _endpointError = "";
+    [ObservableProperty] private PublishAuthOption _selectedAuth = AuthOptions[0];
+    [ObservableProperty] private bool _showHeaderName;
+    [ObservableProperty] private string _authHeaderName = PublishSettingsJson.DefaultAuthHeaderName;
+    [ObservableProperty] private bool _needsToken = true;
     [ObservableProperty] private string _publishTimeText = PublishScheduler.FormatPublishTime(PublishScheduler.DefaultPublishTime);
     [ObservableProperty] private string _timeError = "";
-    [ObservableProperty] private bool _hasKey;
-    [ObservableProperty] private string _keyStatusText = "No agent key stored.";
+    [ObservableProperty] private bool _hasToken;
+    [ObservableProperty] private string _tokenStatusText = "No token stored.";
     [ObservableProperty] private string _statusText = "Never published.";
     [ObservableProperty] private bool _isPublishing;
 
@@ -101,7 +131,8 @@ public sealed partial class PublishViewModel : ObservableObject
             Roots.Clear();
             foreach (var root in _service.DetectedRootNames())
                 Roots.Add(new PublishRootToggleViewModel(this, root, s.Roots.GetValueOrDefault(root)));
-            RefreshKey();
+            LoadDestination(s);
+            RefreshToken();
             RefreshStatus();
         }
         finally
@@ -109,6 +140,25 @@ public sealed partial class PublishViewModel : ObservableObject
             _loading = false;
         }
     }
+
+    /// <summary>Mirror the persisted destination into the fields. Callers hold
+    /// <see cref="_loading"/> so the setters do not write back.</summary>
+    private void LoadDestination(PublishSettings s)
+    {
+        SelectedPreset = PresetOptions.First(p => p.Value == s.Preset);
+        PresetHint = s.Preset == PublishPreset.Labs626 ? PublishPresets.Labs626Hint : "";
+        EndpointUrl = s.EndpointUrl;
+        EndpointError = EndpointErrorFor(s.EndpointUrl);
+        SelectedAuth = AuthOptions.First(a => a.Value == s.AuthScheme);
+        ShowHeaderName = s.AuthScheme == PublishAuthScheme.Header;
+        NeedsToken = s.AuthScheme != PublishAuthScheme.None;
+        AuthHeaderName = s.AuthHeaderName;
+    }
+
+    private static string EndpointErrorFor(string url)
+        => string.IsNullOrWhiteSpace(url) || UsagePublisher.IsUsableEndpoint(url)
+            ? ""
+            : "Use an absolute http(s) URL, e.g. https://example.com/usage.";
 
     partial void OnEnabledChanged(bool value)
     {
@@ -118,6 +168,75 @@ public sealed partial class PublishViewModel : ObservableObject
         {
             _service.SetEnabled(value);
             RefreshStatus();
+        }
+        catch { /* every UI path caught */ }
+    }
+
+    partial void OnSelectedPresetChanged(PublishPresetOption value)
+    {
+        if (_loading || _service is null || value is null)
+            return;
+        try
+        {
+            _service.ApplyPreset(value.Value);
+            _loading = true;
+            try { LoadDestination(_service.Load()); }
+            finally { _loading = false; }
+            RefreshToken();
+            RefreshStatus();
+        }
+        catch { /* every UI path caught */ }
+    }
+
+    partial void OnEndpointUrlChanged(string value)
+    {
+        if (_loading || _service is null)
+            return;
+        try
+        {
+            _service.SetEndpointUrl(value ?? "");
+            EndpointError = EndpointErrorFor(value ?? "");
+            var normalized = (value ?? "").Trim();
+            if (normalized != value)
+            {
+                _loading = true;
+                try { EndpointUrl = normalized; }
+                finally { _loading = false; }
+            }
+            RefreshStatus();
+        }
+        catch { /* every UI path caught */ }
+    }
+
+    partial void OnSelectedAuthChanged(PublishAuthOption value)
+    {
+        if (_loading || _service is null || value is null)
+            return;
+        try
+        {
+            _service.SetAuthScheme(value.Value);
+            ShowHeaderName = value.Value == PublishAuthScheme.Header;
+            NeedsToken = value.Value != PublishAuthScheme.None;
+            RefreshToken();
+            RefreshStatus();
+        }
+        catch { /* every UI path caught */ }
+    }
+
+    partial void OnAuthHeaderNameChanged(string value)
+    {
+        if (_loading || _service is null)
+            return;
+        try
+        {
+            _service.SetAuthHeaderName(value ?? "");
+            var stored = _service.Load().AuthHeaderName;
+            if (stored != value)
+            {
+                _loading = true;
+                try { AuthHeaderName = stored; }
+                finally { _loading = false; }
+            }
         }
         catch { /* every UI path caught */ }
     }
@@ -162,48 +281,48 @@ public sealed partial class PublishViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void SetKey()
+    private void SetToken()
     {
         if (_service is null)
             return;
         try
         {
-            var w = new PublishTokenWindow { Owner = _owner };
+            var w = new PublishTokenWindow(PresetHint) { Owner = _owner };
             if (w.ShowDialog() == true && !string.IsNullOrWhiteSpace(w.Token))
             {
                 _service.SaveToken(w.Token);
-                RefreshKey();
+                RefreshToken();
                 RefreshStatus();
             }
         }
         catch (Exception ex)
         {
-            KeyStatusText = $"Couldn't store the key ({ex.GetType().Name}) - see sanduhr.log.";
+            TokenStatusText = $"Couldn't store the token ({ex.GetType().Name}) - see sanduhr.log.";
         }
     }
 
     [RelayCommand]
-    private void ClearKey()
+    private void ClearToken()
     {
         if (_service is null)
             return;
         try
         {
-            var res = ThemedDialog.Show(_owner, "Remove the 626 Labs agent key?",
-                "Publishing stops until a new key is stored. The dashboard keeps what was already published.",
+            var res = ThemedDialog.Show(_owner, "Remove the publish token?",
+                "Publishing stops until a new token is stored. Anything already published stays where you sent it.",
                 MessageBoxButton.YesNo, ThemedDialogKind.Warning,
-                primaryLabel: "Remove key", secondaryLabel: "Keep it");
+                primaryLabel: "Remove token", secondaryLabel: "Keep it");
             if (res != MessageBoxResult.Yes)
                 return;
             _service.ClearToken();
-            RefreshKey();
+            RefreshToken();
             RefreshStatus();
         }
         catch { /* every UI path caught */ }
     }
 
     /// <summary>Manual publish of yesterday — bypasses the schedule and the
-    /// retry backoff, honors the toggle and share map like every other path.</summary>
+    /// retry backoff, honors the destination, toggle and share map like every other path.</summary>
     [RelayCommand]
     private async Task PublishNow()
     {
@@ -212,9 +331,20 @@ public sealed partial class PublishViewModel : ObservableObject
         IsPublishing = true;
         try
         {
-            if (!HasKey)
+            var s = _service.Load();
+            if (!s.HasEndpoint)
             {
-                StatusText = "Set a 626 Labs agent key first.";
+                StatusText = "Set an endpoint URL first.";
+                return;
+            }
+            if (!UsagePublisher.IsUsableEndpoint(s.EndpointUrl))
+            {
+                StatusText = "The endpoint URL must be an absolute http(s) URL.";
+                return;
+            }
+            if (s.AuthScheme != PublishAuthScheme.None && !HasToken)
+            {
+                StatusText = "Set a publish token first.";
                 return;
             }
             if (_service.SharedRootNames().Count == 0)
@@ -240,14 +370,16 @@ public sealed partial class PublishViewModel : ObservableObject
         }
     }
 
-    private void RefreshKey()
+    private void RefreshToken()
     {
         if (_service is null)
             return;
-        HasKey = _service.HasToken;
-        KeyStatusText = HasKey
-            ? "Agent key stored in Windows Credential Manager."
-            : "No agent key stored.";
+        HasToken = _service.HasToken;
+        TokenStatusText = !NeedsToken
+            ? (HasToken ? "Token stored, but not sent: auth is set to None." : "No token needed: auth is set to None.")
+            : HasToken
+                ? "Token stored in Windows Credential Manager."
+                : "No token stored.";
     }
 
     private void RefreshStatus()
@@ -264,6 +396,8 @@ public sealed partial class PublishViewModel : ObservableObject
         string next;
         if (!s.Enabled)
             next = " Daily publishing is off.";
+        else if (!s.HasEndpoint)
+            next = " No endpoint set, so the daily publish will refuse.";
         else
         {
             var decision = PublishScheduler.Decide(DateTimeOffset.Now, s.Enabled, s.PublishTime, s.LastOkDate, s.LastAttemptAt);

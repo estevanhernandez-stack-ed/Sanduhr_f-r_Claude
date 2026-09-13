@@ -32,8 +32,9 @@ public sealed class SettingsViewModel
     /// toggles, sound + snake sting, and the test-alert button.</summary>
     public AlertsViewModel Alerts { get; }
 
-    /// <summary>Backs the 626 Labs tab: daily usage publish (opt-in, per-home
-    /// share map, agent key, publish-now, status).</summary>
+    /// <summary>Backs the Publish usage tab: opt-in daily publish to an endpoint
+    /// the user chooses (preset, URL, auth, token, per-home share map,
+    /// publish-now, status).</summary>
     public PublishViewModel Publish { get; }
 
     /// <summary>Assembly version for the General tab footer (e.g. "3.0.0").</summary>
