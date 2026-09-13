@@ -62,6 +62,15 @@ public partial class App : Application
             vaultService.SaveConsent(VaultConsentDialog.ShowConsent(_window, vaultService.DetectedRootNames()));
         _vm.AttachVaultService(vaultService);
 
+        // Publish to 626 Labs: everything defaults off (toggle + every home), so
+        // attaching is inert until the user opts in under Settings > 626 Labs.
+        // The agent key rides the same Credential Manager seam as the accounts.
+        _vm.AttachPublishService(new UsagePublishService(
+            new SettingsStore(new Sanduhr.Core.Paths()),
+            _vm.CcReader,
+            new Sanduhr.Core.Paths(),
+            new AgentKeyStore(new WindowsCredentialManager(AccountStore.Service))));
+
         // Statusline bridge (WS-E): the script has no update channel of its own —
         // the widget is its updater. Refresh the installed copy on every start
         // while the integration is enabled (idempotent single-file write).

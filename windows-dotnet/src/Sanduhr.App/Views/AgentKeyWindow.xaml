@@ -1,0 +1,54 @@
+<Window x:Class="Sanduhr.App.Views.AgentKeyWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="626 Labs agent key"
+        Height="300" Width="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="{DynamicResource Sanduhr.Brush.Bg}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="626 Labs agent key"
+                   FontSize="16" FontWeight="Bold"
+                   Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+        <TextBlock Grid.Row="1" Margin="0,6,0,0" TextWrapping="Wrap" FontSize="11"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                   Text="Paste the agent API key from your 626 Labs dashboard (Agents ▸ register). It's stored in the Windows Credential Manager, never in a file, and is sent only to the 626 Labs dashboard when publishing." />
+
+        <TextBlock Grid.Row="2" Text="Agent key (required)" FontSize="11"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,16,0,4" />
+        <PasswordBox Grid.Row="3" x:Name="KeyBox" FontSize="13" Padding="8,6"
+                     Background="{DynamicResource Sanduhr.Brush.Glass}"
+                     Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                     BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
+                     CaretBrush="{DynamicResource Sanduhr.Brush.Text}"
+                     FontFamily="Consolas, monospace" />
+
+        <TextBlock Grid.Row="4" x:Name="ErrorText"
+                   Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" FontSize="11"
+                   TextWrapping="Wrap" Margin="0,12,0,0" VerticalAlignment="Top"
+                   Visibility="Collapsed" />
+
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Cancel" Padding="16,8" Margin="0,0,8,0"
+                    Background="{DynamicResource Sanduhr.Brush.Glass}"
+                    Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                    BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1"
+                    Cursor="Hand" IsCancel="True" Click="OnCancelClick" />
+            <Button Content="Save" Padding="20,8" IsDefault="True"
+                    Background="{DynamicResource Sanduhr.Brush.Accent}"
+                    Foreground="{DynamicResource Sanduhr.Brush.Bg}" BorderThickness="0"
+                    FontWeight="Bold" Cursor="Hand" Click="OnSaveClick" />
+        </StackPanel>
+    </Grid>
+</Window>

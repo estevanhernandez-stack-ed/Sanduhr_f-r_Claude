@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -438,4 +439,135 @@ public sealed class SettingsStore
         root["ledger_group_by_project"] = groupByProject;
         Write(root);
     }
+
+    // -- Publish to 626 Labs (settings.json "publish_626" group) ----------------
+    //
+    // {"publish_626": {"enabled": false, "roots": {".claude-personal": true},
+    //   "time": "06:45", "key_stored": false, "last_attempt_at": "...",
+    //   "last_result": "...", "last_ok_date": "YYYY-MM-DD", "last_ok_at": "..."}}
+    //
+    // The key itself NEVER lives here (Credential Manager, AgentKeyStore);
+    // key_stored is a presence mirror so sanduhr-mcp can refuse with no_key
+    // without touching credentials. A root absent from "roots" is NOT shared
+    // (the vault_roots tombstone semantics).
+
+    private const string PublishGroupKey = "publish_626";
+
+    public PublishSettings LoadPublishSettings()
+    {
+        var root = Read();
+        var g = root[PublishGroupKey] as JsonObject ?? new JsonObject();
+        bool enabled = false, keyStored = false;
+        var roots = new Dictionary<string, bool>(StringComparer.Ordinal);
+        TimeOnly time = PublishScheduler.DefaultPublishTime;
+        DateTimeOffset? lastAttemptAt = null, lastOkAt = null;
+        DateOnly? lastOkDate = null;
+        string? lastResult = null;
+
+        try { enabled = g["enabled"]?.GetValue<bool>() ?? false; } catch { }
+        try { keyStored = g["key_stored"]?.GetValue<bool>() ?? false; } catch { }
+        if (g["roots"] is JsonObject map)
+        {
+            foreach (var (name, node) in map)
+            {
+                try { roots[name] = node?.GetValue<bool>() ?? false; }
+                catch { roots[name] = false; }
+            }
+        }
+        try { time = PublishScheduler.ParsePublishTime(g["time"]?.GetValue<string>()) ?? time; } catch { }
+        try { lastResult = g["last_result"]?.GetValue<string>(); } catch { }
+        try
+        {
+            if (DateTimeOffset.TryParse(g["last_attempt_at"]?.GetValue<string>(), CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal, out var a))
+                lastAttemptAt = a;
+        }
+        catch { }
+        try
+        {
+            if (DateTimeOffset.TryParse(g["last_ok_at"]?.GetValue<string>(), CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal, out var o))
+                lastOkAt = o;
+        }
+        catch { }
+        try
+        {
+            if (DateOnly.TryParseExact(g["last_ok_date"]?.GetValue<string>(), "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
+                lastOkDate = d;
+        }
+        catch { }
+
+        return new PublishSettings(enabled, roots, time, keyStored, lastAttemptAt, lastResult, lastOkDate, lastOkAt);
+    }
+
+    private static JsonObject PublishGroup(JsonObject root)
+    {
+        if (root[PublishGroupKey] is JsonObject g)
+            return g;
+        var created = new JsonObject();
+        root[PublishGroupKey] = created;
+        return created;
+    }
+
+    public void SavePublishEnabled(bool on)
+    {
+        var root = Read();
+        PublishGroup(root)["enabled"] = on;
+        Write(root);
+    }
+
+    public void SavePublishRoots(IReadOnlyDictionary<string, bool> roots)
+    {
+        var root = Read();
+        var map = new JsonObject();
+        foreach (var (name, on) in roots)
+            map[name] = on;
+        PublishGroup(root)["roots"] = map;
+        Write(root);
+    }
+
+    public void SavePublishTime(TimeOnly time)
+    {
+        var root = Read();
+        PublishGroup(root)["time"] = PublishScheduler.FormatPublishTime(time);
+        Write(root);
+    }
+
+    public void SavePublishKeyStored(bool stored)
+    {
+        var root = Read();
+        PublishGroup(root)["key_stored"] = stored;
+        Write(root);
+    }
+
+    /// <summary>Record one attempt. <paramref name="okDate"/> is the target day
+    /// on success (null on failure — the scheduler keys "already published" off
+    /// last_ok_date, so a failure never suppresses the retry).</summary>
+    public void SavePublishAttempt(DateTimeOffset at, string result, DateOnly? okDate)
+    {
+        var root = Read();
+        var g = PublishGroup(root);
+        g["last_attempt_at"] = at.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
+        g["last_result"] = result;
+        if (okDate is { } d)
+        {
+            g["last_ok_date"] = d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            g["last_ok_at"] = at.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
+        }
+        Write(root);
+    }
 }
+
+/// <summary>The persisted "Publish to 626 Labs" state. <see cref="Roots"/> is
+/// the share map (absent = not shared); <see cref="KeyStored"/> mirrors
+/// credential presence only.</summary>
+public sealed record PublishSettings(
+    bool Enabled,
+    IReadOnlyDictionary<string, bool> Roots,
+    TimeOnly PublishTime,
+    bool KeyStored,
+    DateTimeOffset? LastAttemptAt,
+    string? LastResult,
+    DateOnly? LastOkDate,
+    DateTimeOffset? LastOkAt);
