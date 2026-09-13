@@ -23,7 +23,10 @@ public static class ToolCatalog
             "spawning subagents, launching long autonomous runs, or choosing a bigger model " +
             "for a large job. Reflects the Sanduhr widget's ACTIVE account, which may not be " +
             "the account this session bills to - confirm with the user if they run multiple " +
-            "accounts. A stale or no_data status means unknown headroom - never assume budget.",
+            "accounts. A stale or no_data status means unknown headroom - never assume budget. " +
+            "sanduhr-mcp requires widget " + ToolLogic.RequiredWidgetVersion + " or later (the " +
+            "snapshot writer): with an older widget the reason is widget_too_old, and status " +
+            "degraded serves the widget's history file instead (utilization and reset times only).",
             new JsonObject
             {
                 ["type"] = "object",
@@ -60,7 +63,10 @@ public static class ToolCatalog
             "ping",
             "Health check and verify anchor: server version, snapshot presence and age, and " +
             "which Claude Code roots exist vs are consented. Call this first when get_usage " +
-            "returns no_data, to distinguish server-broken from data-absent.",
+            "returns no_data, to distinguish server-broken from data-absent. Reports the widget " +
+            "version that wrote the snapshot against the floor sanduhr-mcp requires (widget " +
+            ToolLogic.RequiredWidgetVersion + " or later), whether the history file is fresh, " +
+            "and the same usage_status / usage_reason get_usage would return.",
             new JsonObject
             {
                 ["type"] = "object",

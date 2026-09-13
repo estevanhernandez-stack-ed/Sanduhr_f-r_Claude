@@ -47,6 +47,10 @@ public class McpServerTests
         // The behavioral trigger IS the feature (review: without it, never fires).
         Assert.Contains("Call BEFORE", (string?)tools[0]!["description"]);
         Assert.Contains("never assume budget", (string?)tools[0]!["description"]);
+        // The version floor (issue #63) is stated where the agent reads it.
+        Assert.Contains("requires widget 3.4.0 or later", (string?)tools[0]!["description"]);
+        Assert.Contains("widget_too_old", (string?)tools[0]!["description"]);
+        Assert.Contains("3.4.0 or later", (string?)tools[2]!["description"]);
         Assert.Contains("disabled / no_endpoint / no_token", (string?)tools[3]!["description"]);
         Assert.Contains("publish endpoint", (string?)tools[3]!["description"]);
         Assert.DoesNotContain("no_key", (string?)tools[3]!["description"]);

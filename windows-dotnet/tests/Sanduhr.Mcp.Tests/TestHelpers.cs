@@ -43,6 +43,32 @@ internal static class Helpers
          ]}
         """;
 
+    /// <summary>Write <c>history.{label}.json</c> beside the snapshot in the
+    /// widget's own schema: one series per tier, each point <c>{t, v, resets_at?}</c>.
+    /// Only the last point per tier matters to the reader; a two-point series
+    /// proves it reads the tail, not the head.</summary>
+    public static string WriteHistory(string dir, string label,
+        params (string Tier, DateTimeOffset At, int Util, DateTimeOffset? ResetsAt)[] points)
+    {
+        var root = new JsonObject();
+        foreach (var (tier, at, util, resetsAt) in points)
+        {
+            if (root[tier] is not JsonArray series)
+            {
+                series = new JsonArray();
+                root[tier] = series;
+                // A stale head point the reader must skip past.
+                series.Add(new JsonObject { ["t"] = Iso(at.AddDays(-20)), ["v"] = 99 });
+            }
+            var p = new JsonObject { ["t"] = Iso(at), ["v"] = util };
+            if (resetsAt is { } r) p["resets_at"] = Iso(r);
+            series.Add(p);
+        }
+        string path = Path.Combine(dir, $"history.{label}.json");
+        File.WriteAllText(path, root.ToJsonString());
+        return path;
+    }
+
     public static McpConfig Config(string snapshotPath, params (string Name, string Path)[] roots) => new()
     {
         SnapshotPath = snapshotPath,

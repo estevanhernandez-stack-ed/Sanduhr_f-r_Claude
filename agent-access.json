@@ -6,8 +6,10 @@
   "x-schema-note": "transport.type values stdio-mcp/file/exec extend the v1 (HTTP-only) schema - deliberate, documented in ~/.claude-personal/plugins/data/vibe-access/adapter-notes/dotnet-stdio-mcp.md. Everything else conforms.",
   "x-contract": {
     "staleness_seconds": { "fresh_below": 450, "dead_above": 900 },
-    "status_enum": ["ok", "stale", "no_data"],
-    "reason_enum": ["missing", "malformed", "disabled", "widget_not_polling", "schema_unsupported", "invalid_params", "publishing_off", "no_endpoint_url", "no_publish_token", "widget_not_responding", "unavailable", "request_write_failed", "busy"],
+    "status_enum": ["ok", "stale", "degraded", "no_data"],
+    "reason_enum": ["missing", "malformed", "disabled", "widget_not_polling", "widget_too_old", "schema_unsupported", "invalid_params", "publishing_off", "no_endpoint_url", "no_publish_token", "widget_not_responding", "unavailable", "request_write_failed", "busy"],
+    "required_widget_version": "3.4.0",
+    "degraded_note": "issue #63: snapshot missing/dead but history.<account>.json has a point within dead_above -> status degraded, reason widget_too_old, tiers from the history point (utilization + resets_at only; used/limit/plan null), data_source 'history'. A dead snapshot with writer_version below 3.4.0 and no fresh history is stale/widget_too_old (leftover), not widget_not_polling.",
     "publish_status_enum": ["ok", "error", "disabled", "no_endpoint", "no_token", "queued", "no_data"],
     "fetch_error_enum": ["session_expired", "cloudflare", "network"],
     "reason_vs_fetch_error": "separate channels: reason covers data availability, fetch_error covers widget-fetch failures carried in an otherwise-served snapshot; both can be null",
