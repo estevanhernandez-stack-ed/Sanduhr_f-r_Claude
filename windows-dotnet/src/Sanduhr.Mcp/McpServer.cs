@@ -129,6 +129,12 @@ public sealed class McpServer
             case "ping":
                 payload = _tools.BuildPing();
                 break;
+            case "publish_usage":
+                string? date = null;
+                try { if (args?["date"] is JsonNode d) date = d.GetValue<string>(); }
+                catch { date = ""; } // non-string -> typed invalid_params from BuildPublish
+                payload = _tools.BuildPublish(date);
+                break;
             default:
                 WriteError(id, -32602, $"unknown tool: {name}");
                 return;
