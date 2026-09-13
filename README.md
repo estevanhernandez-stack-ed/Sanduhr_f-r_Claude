@@ -67,6 +67,14 @@ and drag to Applications.
 - Full source under [`windows-dotnet/`](windows-dotnet/). The retired Python apps (tkinter v1 and the PySide6 build) were removed on 2026-09-13; they live at tag `legacy/python-v2.3.0`.
 - Step-by-step sign-in, where your data lives, the `.msix` sideload note, and uninstall behaviour: [INSTALL.md](INSTALL.md).
 
+### Claude Code integration — statusline + `sanduhr-mcp` *(Windows 3.4.0+)*
+
+Settings ▸ Claude Usage ▸ **Install statusline…** puts your usage percentages and reset times under the Claude Code prompt of the one home you pick. After each fetch the widget writes `%APPDATA%\Sanduhr\snapshot.json`; the statusline script and the `sanduhr-mcp` server (`get_usage`, `get_local_burn_by_project`, `ping`, `publish_usage`) read that file and nothing else that could hold a credential.
+
+- **`sanduhr-mcp` requires widget 3.4.0 or later.** Older widgets (the Store's 3.3.0 included) poll and keep history but have no snapshot writer, so the MCP server would read a missing file, or a dead one left behind by a development build. When that happens `get_usage` and `ping` answer `reason: widget_too_old` with the remedy "update it", and serve the widget's latest history point as `status: degraded` (utilization and reset times only) rather than nothing. `widget_not_polling` now means exactly that: nothing on the machine has polled in 15 minutes.
+- Register the server with Claude Code at user scope, never in a project `.mcp.json`: `claude mcp add --scope user sanduhr -- <path to sanduhr-mcp.exe>` (or to the `%APPDATA%\Sanduhr\bin\sanduhr-mcp.cmd` launcher when the widget has installed one). Remove it with `claude mcp remove sanduhr`. Check the pairing any time with the `ping` tool: it reports the widget version that wrote the snapshot against the 3.4.0 floor.
+- Details: [docs/superpowers/specs/2026-07-12-statusline-mcp-design.md](docs/superpowers/specs/2026-07-12-statusline-mcp-design.md), [docs/PRIVACY.md](docs/PRIVACY.md).
+
 ---
 
 ## Features
