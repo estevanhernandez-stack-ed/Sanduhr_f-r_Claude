@@ -1,8 +1,8 @@
 # Install guide — Sanduhr für Claude (Windows)
 
 This is the guide for the shipping Windows app (.NET 10 / WPF, `windows-dotnet/`). macOS users:
-see [mac/README.md](mac/README.md). The original single-file Python widget still runs from source
-(`python sanduhr.py`, Python 3.8+); the PySide6 build under `windows/` is retired.
+see [mac/README.md](mac/README.md). The original Python widgets were retired and removed on 2026-09-13
+(preserved at tag `legacy/python-v2.3.0`).
 
 ## Requirements
 

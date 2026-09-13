@@ -64,16 +64,8 @@ and drag to Applications.
 
 - Win11 Mica glass backdrop (Win10 falls back to solid theme color). Windows 10 1809+ / x64.
 - Windows Credential Manager storage (service `com.626labs.sanduhr`). Uninstall does not clear these entries on either channel — use Sign Out first, or delete them from Credential Manager yourself.
-- Full source under [`windows-dotnet/`](windows-dotnet/). The retired PySide6 build stays under [`windows/`](windows/) for reference.
+- Full source under [`windows-dotnet/`](windows-dotnet/). The retired Python apps (tkinter v1 and the PySide6 build) were removed on 2026-09-13; they live at tag `legacy/python-v2.3.0`.
 - Step-by-step sign-in, where your data lives, the `.msix` sideload note, and uninstall behaviour: [INSTALL.md](INSTALL.md).
-
-### Cross-platform — Python / tkinter (v1)
-
-```bash
-python sanduhr.py
-```
-
-Single-file tkinter app with auto-installing `cloudscraper` dep. Works on macOS, Windows, and Linux. Preserved at repo root for users who prefer running from source. Requires Python 3.8+.
 
 ---
 

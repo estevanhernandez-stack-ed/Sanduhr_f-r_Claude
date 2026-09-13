@@ -3,8 +3,8 @@ name: Windows .NET Release
 # Runs on the runbook's `v<major>.<minor>.<patch>[.<rev>]` tag (Phase 5). Tests the solution,
 # builds the unsigned Store MSIX (Partner Center re-signs), and DRAFTS the GitHub Release with it
 # attached. Velopack artifacts are built locally (Phase 4) and uploaded in Phase 6; the draft is
-# published there, never here. The legacy `windows-release.yml` (`v*-windows` tags) builds the
-# retired Python app and is untouched.
+# published there, never here. The legacy Python release workflow (`v*-windows` tags) was removed
+# with the Python app on 2026-09-13 (tag legacy/python-v2.3.0).
 
 on:
   push:

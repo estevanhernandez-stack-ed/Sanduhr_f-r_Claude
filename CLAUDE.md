@@ -6,8 +6,8 @@ markers, local Claude Code token burn, a usage vault, themes. Three apps share t
 - `windows-dotnet/` is the shipping Windows app (.NET 10 / WPF). `src/Sanduhr.App` is the WPF shell,
   `src/Sanduhr.Core` the pure, xUnit-covered logic, `src/Sanduhr.Mcp` the `sanduhr-mcp` read-only
   stdio MCP server over the snapshot seam. Tests under `tests/`. Build scripts under `scripts/`.
-- `windows/` + root `sanduhr.py` is the retired Python app (PySide6, tkinter v1). Removal is an open
-  decision, not yet taken: do not delete it, do not build on it.
+- The retired Python apps (`windows/` PySide6 build, root `sanduhr.py` tkinter v1) were removed on
+  2026-09-13 and live at tag `legacy/python-v2.3.0`. Nothing current depends on them.
 - `mac/` is the macOS SwiftUI app (Sparkle updates, Homebrew tap, its own `mac/README.md`).
 
 ## Tenancy
