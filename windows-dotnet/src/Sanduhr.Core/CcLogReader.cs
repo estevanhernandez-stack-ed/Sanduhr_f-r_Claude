@@ -303,16 +303,58 @@ public sealed class CcLogReader
         return byTier;
     }
 
+    /// <summary>Folder names Claude Code and its tooling create git worktrees
+    /// under, inside a repo. A session whose cwd sits below one of these is the
+    /// parent repo's work (a subagent in its own checkout), so burn attribution
+    /// rolls it up to the repo instead of listing one project per worktree.</summary>
+    private static readonly string[][] WorktreeMarkers =
+    {
+        new[] { ".claude", "worktrees" },
+        new[] { ".worktrees" },
+    };
+
     /// <summary>Friendly basename out of a cwd path, e.g.
     /// <c>C:\Users\estev\Projects\Sanduhr</c> → <c>Sanduhr</c>. Handles both
-    /// separators.</summary>
+    /// separators. A cwd under a worktree folder (<c>&lt;repo&gt;/.claude/worktrees/agent-x</c>,
+    /// <c>&lt;repo&gt;/.worktrees/x</c>, or deeper) names the repo, not the worktree;
+    /// callers that want the worktree itself pass the full path through instead.</summary>
     public static string ProjectDisplayName(string cwd)
     {
         if (string.IsNullOrEmpty(cwd))
             return "";
         var parts = cwd.Replace("\\", "/").TrimEnd('/').Split('/');
+        if (WorktreeParentIndex(parts) is { } repoIndex && !string.IsNullOrEmpty(parts[repoIndex]))
+            return parts[repoIndex];
         var last = parts.Length > 0 ? parts[^1] : cwd;
         return string.IsNullOrEmpty(last) ? cwd : last;
+    }
+
+    /// <summary>Index of the repo segment when <paramref name="parts"/> contains a
+    /// worktree marker followed by at least one segment (the worktree itself);
+    /// null otherwise. The first marker from the root wins, so a worktree inside a
+    /// worktree still rolls up to the outermost repo.</summary>
+    private static int? WorktreeParentIndex(string[] parts)
+    {
+        for (int i = 1; i < parts.Length; i++)
+        {
+            foreach (var marker in WorktreeMarkers)
+            {
+                if (i + marker.Length >= parts.Length)
+                    continue;   // the marker needs a worktree name after it
+                bool match = true;
+                for (int k = 0; k < marker.Length; k++)
+                {
+                    if (!string.Equals(parts[i + k], marker[k], StringComparison.OrdinalIgnoreCase))
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match)
+                    return i - 1;
+            }
+        }
+        return null;
     }
 
     /// <summary>Single-pass aggregation for the Local CC tab — one walk instead

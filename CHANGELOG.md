@@ -22,6 +22,7 @@
 
 ### Fixed
 
+- **Burn attribution listed Claude Code worktrees as their own projects.** A session running under `<repo>/.claude/worktrees/<name>` or `<repo>/.worktrees/<name>` (a subagent in its own checkout) now counts toward the repo in `get_local_burn_by_project`, the publish record, the vault, and the Claude Usage tab, so the parent stops being under-counted and the top-ten list stops filling with `agent-*` entries. `full_paths` still shows the worktree itself.
 - **Settings dropdowns showed the option's type name when closed.** The Publish usage Preset and Auth boxes (and the History account selector) rendered `PublishPresetOption { Value = ...` instead of the label once the list was closed; the open list was fine. The themed ComboBox template now honors `DisplayMemberPath` in the closed box the way the stock WPF template does.
 - **Publish usage "Next:" named a slot that had already fired.** Right after a successful publish the status line said "Next: today at 06:45" when the scheduler would not run again until tomorrow. The scheduler now reports when it actually fires next (tomorrow's slot after today's day is out; today's slot before the publish time; "due now" once it has passed) and the status line prints that.
 

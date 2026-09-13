@@ -279,6 +279,20 @@ public class CcLogReaderTests
         Assert.Equal("", CcLogReader.ProjectDisplayName(""));
     }
 
+    [Theory]
+    [InlineData("C:\\Users\\estev\\Projects\\Project-626Labs-1\\.claude\\worktrees\\agent-ada8d4609379f018f", "Project-626Labs-1")]
+    [InlineData("C:/Users/estev/Projects/Project-626Labs-1/.claude/worktrees/agent-a80669ed385edf167/functions", "Project-626Labs-1")]
+    [InlineData("/home/dev/work/foo/.worktrees/feature-x", "foo")]
+    [InlineData("/home/dev/work/foo/.worktrees/feature-x/src/deep", "foo")]
+    [InlineData("C:/Users/estev/Projects/Sanduhr/.claude/worktrees/a/.worktrees/b", "Sanduhr")]   // outermost repo wins
+    [InlineData("C:/Users/estev/Projects/Sanduhr/.claude/worktrees", "worktrees")]              // no worktree name after the marker: plain basename rule
+    [InlineData("C:/Users/estev/Projects/Sanduhr/.claude", ".claude")]
+    [InlineData("C:/Users/estev/Projects/worktrees/x", "x")]                                     // not a marker without the dot
+    public void ProjectDisplayName_rolls_worktrees_up_to_the_repo(string cwd, string expected)
+    {
+        Assert.Equal(expected, CcLogReader.ProjectDisplayName(cwd));
+    }
+
     [Fact]
     public void Aggregate_for_local_cc_tab_combines_three_views()
     {
