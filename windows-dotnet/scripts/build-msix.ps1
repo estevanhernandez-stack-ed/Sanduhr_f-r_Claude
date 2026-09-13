@@ -99,7 +99,7 @@ function Get-SdkTool {
 function Resolve-Version {
     if ($Version) { $v = $Version }
     else {
-        $csproj = Get-Content $appProject -Raw
+        $csproj = [System.IO.File]::ReadAllText($appProject, [System.Text.Encoding]::UTF8)
         if ($csproj -match '<Version>([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)</Version>') { $v = $Matches[1] }
         else { throw "Could not read a 4-part <Version> from $appProject -- pass -Version explicitly." }
     }
@@ -152,7 +152,9 @@ New-Item -ItemType Directory -Path $stage -Force | Out-Null
 Copy-Item "$publishDir\*" $stage -Recurse -Force
 
 # Patch the Identity Version into the STAGED manifest copy (committed manifest stays untouched).
-[xml]$m = Get-Content $manifestPath
+# Read as UTF-8 explicitly: Windows PowerShell 5.1 reads a BOM-less file as ANSI, which turned
+# "für" into "fÃ¼r" in the staged manifest and Partner Center rejected the unreserved name (3.4.0).
+[xml]$m = [System.IO.File]::ReadAllText($manifestPath, [System.Text.Encoding]::UTF8)
 $m.Package.Identity.Version = $ver
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 $ws = New-Object System.Xml.XmlWriterSettings
