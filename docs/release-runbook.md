@@ -192,7 +192,7 @@ Copy source of truth from 3.4.0 on: `Store-Listing-Console/apps/sanduhr/copy/` (
 voice profile, `whats-new-<v>.md`). `docs/store/` in this repo is the archive of what shipped; the
 reviewer letters stay here because they never go through the API.
 
-1. **Copy first.** In `Store-Listing-Console`, update `apps/sanduhr/copy/whats-new-<v>.md` (and
+1. **Copy first, and keep Partner Center closed until step 2 is verified.** In `Store-Listing-Console`, update `apps/sanduhr/copy/whats-new-<v>.md` (and
    `listing-copy.md` if the description, features, keywords, or copyright changed) through the
    voice pipeline: read `voice.md`, draft, copy-review, promote on Este's approval. Rebuild the
    payload and check the gates:
@@ -281,8 +281,8 @@ both proven on the .NET build.
 | `dotnet publish` errors on a locked DLL | `Sanduhr.exe` is running | Quit from tray, re-run |
 | Store validation: "revision number other than zero" | 4th version component ≠ 0 | Bump the 3rd component; the scripts hard-fail on this |
 | `signtool` `0x8007000b` on sideload | Manifest Publisher CN ≠ the dev cert's subject | Temp-patch the manifest Publisher to the dev cert CN, build, restore (or use a cert whose CN matches) |
-| `submit_write.py apply` answers a bare HTTP 403 on `POST .../submissions` with no body, no pending submission | Transient on the Ingestion side; seen minutes after the previous version went Published (3.4.1, 2026-09-13) | Retry after a minute or two. If the retry creates the id outside the console, re-run `apply` with `--submission <id>`: the console rewrites a submission the same client created |
-| The published listing still shows the previous version's what's-new, description, and features after certification | The API-written text did not survive the commit on 3.4.0; the submission was committed from Partner Center, whose view of the listing was the old text | Commit from the console (`submit_write.py commit`), never from Partner Center, after `apply`; verify the live listing with `submit_api.py inspect` once Published |
+| `submit_write.py apply` (or any API call) answers a bare HTTP 403 with no body | The Ingestion API answers 403 intermittently while the app's submission is open in a Partner Center browser session (3.4.1, 2026-09-13: every 403 of the day coincided with Este working in Partner Center; each cleared on retry a minute later) | Retry after a minute. Better: do the API half while nobody has the app open in Partner Center |
+| The API's PUT echoes the new listing text with status `PendingCommit`, but every GET of the same submission returns the previous text with status `Canceled`, and `commit` answers 409 "already committed", while Partner Center shows the same submission as pending and editable with listings "Unchanged" | Once a submission has been opened or edited in Partner Center, the API's record of it is dead: writes are accepted into nothing, reads serve the old copy, and the commit is refused. This is also why 3.4.0 shipped with the 3.3 listing text | `apply` now reads the submission back after every PUT and exits 2 on a mismatch or a `Canceled` read; never trust a 200. Order of operations: create the submission and write the text through `apply` BEFORE anyone opens it in Partner Center, confirm the read-back, then upload the package and paste the notes by hand, then commit from the console. If Partner Center has already touched the submission, finish the listing there by hand from the console page and submit there |
 | MSIX launch fails "framework missing" on a fresh box | Published framework-dependent, not self-contained | `build-msix.ps1` already passes `--self-contained true`; don't flip it off |
 | Store rejects with trademark complaint | Disclaimer missing on a required surface | Re-check all six surfaces in 10.1.4.4(a) above |
 | `vpk` "not found" | Global tool not installed | `dotnet tool install -g vpk` |
