@@ -39,7 +39,7 @@
 <body>
 <main>
   <h1><span>Sanduhr</span> — what an agent sees</h1>
-  <p class="sub">adapter agnostic-dotnet-stdio-mcp · 5 affordances, all prod-safe reads · verified 2026-07-27 (cold run af4bba22938cc9f2a, 27 checks) · rendered from agent-access.json</p>
+  <p class="sub">adapter agnostic-dotnet-stdio-mcp · 7 affordances, all prod-safe reads · cold-verified 2026-07-27 (runs af4bba22938cc9f2a + abb80276ee14af7ae) · rendered from agent-access.json</p>
 
   <div class="contract">
     <b>Contract.</b> Staleness bands: fresh &lt; <code>450s</code>, dead &gt; <code>900s</code>.
@@ -52,9 +52,9 @@
 
   <div class="card">
     <div class="head"><span class="id">mcp.get-usage</span><span class="chip">prod-safe</span><span class="chip">read</span><span class="chip">stdio-mcp · tools/call</span><span class="chip pass">verified pass</span></div>
-    <p class="desc">Claude subscription quota headroom from the widget's snapshot, plus local CC burn since that snapshot's captured_at (consented roots only). Server does all clock math (age_seconds, resets_in_seconds); reset-crossed tiers serve utilization null, never the stale percent. Widget fetch failures surface as fetch_error with last-good tiers. Call BEFORE spawning subagents or picking a bigger model; stale/no_data means unknown headroom — never assume budget.</p>
-    <div class="meta">→ status, reason, remedy, fetch_error, as_of, age_seconds, scope, account{ref,plan}, tiers[{key,label,utilization_pct,headroom_pct,resets_at,resets_in_seconds,reset_crossed,pace,projection,used,limit}], local_burn_since_snapshot</div>
-    <div class="verify"><b>PASS</b> — 7 snapshot states typed correctly; isError never set; burn anchor proven = captured_at by counter-probe; account ref stays 8-hex.</div>
+    <p class="desc">Claude subscription quota headroom from the widget's snapshot, plus local CC burn since that snapshot's captured_at (consented roots only). Server does all clock math (age_seconds, resets_in_seconds); reset-crossed tiers serve utilization null, never the stale percent. Pacing depth per tier, anchored at call time: cooldown_seconds (idle time back onto pace when ahead), surplus_pct (banked headroom when under), projected_final_pct (where the meter lands at reset, capped 200). Widget fetch failures surface as fetch_error with last-good tiers. Call BEFORE spawning subagents or picking a bigger model; stale/no_data means unknown headroom — never assume budget.</p>
+    <div class="meta">→ status, reason, remedy, fetch_error, as_of, age_seconds, scope, account{ref,plan}, tiers[{key,label,utilization_pct,headroom_pct,resets_at,resets_in_seconds,reset_crossed,pace{verdict,delta_pct,cooldown_seconds,surplus_pct,projected_final_pct},projection,used,limit}], local_burn_since_snapshot</div>
+    <div class="verify"><b>PASS</b> — run 1: 7 snapshot states typed correctly, isError never set, burn anchor = captured_at by counter-probe. Run 2: pacing depth exact (cooldown identity 10800−age, 200 cap), pre-existing fields regression-checked.</div>
   </div>
 
   <div class="card">
@@ -62,6 +62,20 @@
     <p class="desc">Attribution: which project ate the tokens, keyed PER Claude Code home — results never merge homes (the tenant wall). Closed params only: window_days ∈ {1,7,30}, full_paths bool (basenames by default). Zero consented roots → no_data/disabled. Token counts are a proxy, never convertible to quota %.</p>
     <div class="meta">window_days, full_paths → status, roots_scanned[], roots[{root,total_tokens,projects[{name,tokens}]}], files_scanned, since, caveat</div>
     <div class="verify"><b>PASS</b> — per-root keying held; no path leaks on default; typed invalid_params on bad window; fail-closed consent.</div>
+  </div>
+
+  <div class="card">
+    <div class="head"><span class="id">mcp.get-model-usage</span><span class="chip">prod-safe</span><span class="chip">read</span><span class="chip">stdio-mcp · tools/call</span><span class="chip pass">verified pass</span></div>
+    <p class="desc">Which models are burning the budget: per-model local CC token totals over a window (1/7/30 days), each joined with its weekly meter utilization from the live snapshot — the "should I pick the bigger model" answer in one call. meter_source carries the snapshot's own status and age, so meter freshness is never implied. Unmapped models stay visible with a null tier.</p>
+    <div class="meta">window_days → status, since, roots_scanned[], total_tokens, models[{model,tokens,share_pct,tier_key,tier_label,meter_utilization_pct}], meter_source{status,as_of,age_seconds}, caveat</div>
+    <div class="verify"><b>PASS</b> — totals/ranking/share exact; meter join proven; missing snapshot still serves tokens with null meters; typed guards.</div>
+  </div>
+
+  <div class="card">
+    <div class="head"><span class="id">mcp.get-usage-history</span><span class="chip">prod-safe</span><span class="chip">read</span><span class="chip">stdio-mcp · tools/call</span><span class="chip pass">verified pass</span></div>
+    <p class="desc">Daily usage history from Sanduhr's durable vault — survives Claude Code's ~30-day log cleanup. Tokens per day with sent/received split over 7/30/90 days, window totals, top-5 projects (display names only; the vault's key hashes never leave). Days without a record are omitted, never fabricated as zero: a widget-off week must not read as a vacation. Read-only by tool construction — the server has no vault write path.</p>
+    <div class="meta">window_days → status, from, to, roots_scanned[], total_tokens, days_recorded, days[{date,tokens,sent,received}], top_projects[{name,tokens}], caveat</div>
+    <div class="verify"><b>PASS</b> — totals + split exact; gap day omitted; no ~hash anywhere in the response; empty vault → missing with vault remedy; disabled checked before vault.</div>
   </div>
 
   <div class="card">

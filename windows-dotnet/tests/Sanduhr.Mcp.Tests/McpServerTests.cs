@@ -33,27 +33,27 @@ public class McpServerTests
     }
 
     [Fact]
-    public void Tools_list_has_three_read_only_tools_plus_publish_usage()
+    public void Tools_list_has_five_read_only_tools_plus_publish_usage()
     {
         using var tmp = new TempDir();
         var res = Run(tmp, Req(1, "tools/list"));
         var tools = (JsonArray)((JsonObject)res.Single()["result"]!)["tools"]!;
-        Assert.Equal(new[] { "get_usage", "get_local_burn_by_project", "ping", "publish_usage" },
+        Assert.Equal(new[] { "get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping", "publish_usage" },
             tools.Select(t => (string?)t!["name"]).ToArray());
-        Assert.All(tools.Take(3), t => Assert.True(t!["annotations"]!["readOnlyHint"]!.GetValue<bool>()));
+        Assert.All(tools.Take(5), t => Assert.True(t!["annotations"]!["readOnlyHint"]!.GetValue<bool>()));
         // publish_usage queues an upload (performed by the widget) — honestly not read-only.
-        Assert.False(tools[3]!["annotations"]!["readOnlyHint"]!.GetValue<bool>());
-        Assert.False(tools[3]!["annotations"]!["destructiveHint"]!.GetValue<bool>());
+        Assert.False(tools[5]!["annotations"]!["readOnlyHint"]!.GetValue<bool>());
+        Assert.False(tools[5]!["annotations"]!["destructiveHint"]!.GetValue<bool>());
         // The behavioral trigger IS the feature (review: without it, never fires).
         Assert.Contains("Call BEFORE", (string?)tools[0]!["description"]);
         Assert.Contains("never assume budget", (string?)tools[0]!["description"]);
         // The version floor (issue #63) is stated where the agent reads it.
         Assert.Contains("requires widget 3.4.0 or later", (string?)tools[0]!["description"]);
         Assert.Contains("widget_too_old", (string?)tools[0]!["description"]);
-        Assert.Contains("3.4.0 or later", (string?)tools[2]!["description"]);
-        Assert.Contains("disabled / no_endpoint / no_token", (string?)tools[3]!["description"]);
-        Assert.Contains("publish endpoint", (string?)tools[3]!["description"]);
-        Assert.DoesNotContain("no_key", (string?)tools[3]!["description"]);
+        Assert.Contains("3.4.0 or later", (string?)tools[4]!["description"]);
+        Assert.Contains("disabled / no_endpoint / no_token", (string?)tools[5]!["description"]);
+        Assert.Contains("publish endpoint", (string?)tools[5]!["description"]);
+        Assert.DoesNotContain("no_key", (string?)tools[5]!["description"]);
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public class McpServerTests
         using var tmp = new TempDir();
         var res = Run(tmp, Req(1, "tools/list"));
         var tools = (JsonArray)((JsonObject)res.Single()["result"]!)["tools"]!;
-        var schema = (JsonObject)tools[3]!["inputSchema"]!;
+        var schema = (JsonObject)tools[5]!["inputSchema"]!;
         var props = (JsonObject)schema["properties"]!;
         Assert.Equal(new[] { "date" }, props.Select(p => p.Key).ToArray());
         Assert.False(schema["additionalProperties"]!.GetValue<bool>());

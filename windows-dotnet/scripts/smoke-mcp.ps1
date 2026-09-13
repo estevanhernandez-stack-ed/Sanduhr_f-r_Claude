@@ -7,7 +7,7 @@
   single-file mcp\sanduhr-mcp.exe. Trimming removes code the linker cannot see a use
   for, so the only proof the shipped exe works is running it: this script feeds it the
   JSON-RPC lines Claude Code would (initialize, tools/list, ping, get_usage,
-  get_local_burn_by_project) over stdin, with no environment overrides, and fails on
+  get_local_burn_by_project, get_model_usage, get_usage_history) over stdin, with no environment overrides, and fails on
   a crash, a missing tool, or a malformed reply. It reads this machine's real
   %APPDATA%\Sanduhr paths and writes nothing.
 
@@ -35,6 +35,8 @@ $requests = @(
     '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ping","arguments":{}}}'
     '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_usage","arguments":{}}}'
     '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_local_burn_by_project","arguments":{"window_days":1}}}'
+    '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"get_model_usage","arguments":{"window_days":1}}}'
+    '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"get_usage_history","arguments":{"window_days":7}}}'
 )
 
 $psi = [System.Diagnostics.ProcessStartInfo]::new($Exe)
@@ -66,7 +68,7 @@ foreach ($line in ($stdout -split "`n")) {
     $msg = $line | ConvertFrom-Json
     if ($null -ne $msg.id) { $replies[[int]$msg.id] = $msg }
 }
-foreach ($id in 1..5) {
+foreach ($id in 1..7) {
     if (-not $replies.ContainsKey($id)) { throw "No reply for request id $id." }
     if ($replies[$id].PSObject.Properties['error']) { throw "Request $id returned an error: $($replies[$id].error | ConvertTo-Json -Compress)" }
 }
@@ -75,7 +77,7 @@ $server = $replies[1].result.serverInfo
 Write-Host "[smoke-mcp] initialize: $($server.name) $($server.version)"
 
 $tools = @($replies[2].result.tools | ForEach-Object name)
-$expected = @('get_usage', 'get_local_burn_by_project', 'ping', 'publish_usage')
+$expected = @('get_usage', 'get_local_burn_by_project', 'get_model_usage', 'get_usage_history', 'ping', 'publish_usage')
 $missing = @($expected | Where-Object { $tools -notcontains $_ })
 if ($missing.Count) { throw "tools/list is missing: $($missing -join ', ') (got: $($tools -join ', '))" }
 Write-Host "[smoke-mcp] tools/list: $($tools -join ', ')"
@@ -91,5 +93,13 @@ if (-not $usage.status) { throw 'get_usage returned no status.' }
 $burn = $replies[5].result.content[0].text | ConvertFrom-Json
 Write-Host "[smoke-mcp] get_local_burn_by_project: status=$($burn.status) roots_scanned=$(@($burn.roots_scanned).Count) window_days=$($burn.window_days)"
 if (-not $burn.status) { throw 'get_local_burn_by_project returned no status.' }
+
+$models = $replies[6].result.content[0].text | ConvertFrom-Json
+Write-Host "[smoke-mcp] get_model_usage: status=$($models.status) models=$(@($models.models).Count) meter_source=$(if ($models.meter_source) { $models.meter_source.status } else { 'none' })"
+if (-not $models.status) { throw 'get_model_usage returned no status.' }
+
+$history = $replies[7].result.content[0].text | ConvertFrom-Json
+Write-Host "[smoke-mcp] get_usage_history: status=$($history.status) reason=$($history.reason) days_recorded=$($history.days_recorded)"
+if (-not $history.status) { throw 'get_usage_history returned no status.' }
 
 Write-Host '[smoke-mcp] OK' -ForegroundColor Green

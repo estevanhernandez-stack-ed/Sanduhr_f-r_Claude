@@ -58,4 +58,48 @@ Set-Content (Join-Path $rootA 'projects\c--proj-beta\s1.jsonl') @(
   (EventLine $now.AddDays(-3) 'claude-sonnet-5' 300 200 'C:/fixture/proj-beta')
 ) -Encoding utf8
 
+# Pacing-band snapshots (abilities wave): ahead (80% with 4h of 5h left) and
+# under (10% with 2.5h left) - drive cooldown_seconds / surplus_pct /
+# projected_final_pct assertions.
+foreach ($s in @('state-ahead','state-under')) {
+  New-Item -ItemType Directory -Force (Join-Path $Root $s) | Out-Null
+}
+function PaceSnapshot([DateTimeOffset]$captured, [int]$util, [double]$hoursLeft) {
+  @"
+{"schema_version":1,"writer_version":"3.4.0","captured_at":"$(Iso $captured)","account_ref":"c0ffee42","plan":"Max 20x","status":"ok","error_kind":null,"tiers":[
+{"key":"five_hour","utilization":$util,"resets_at":"$(Iso $captured.AddHours($hoursLeft))","used":null,"limit":null}]}
+"@
+}
+Set-Content (Join-Path $Root 'state-ahead\snapshot.json') (PaceSnapshot $now.AddMinutes(-1) 80 4.0) -Encoding utf8
+Set-Content (Join-Path $Root 'state-under\snapshot.json') (PaceSnapshot $now.AddMinutes(-1) 10 2.5) -Encoding utf8
+# Note (run-2 finding): pace derivations anchor at CALL time - expected
+# cooldown/surplus values drift by age_seconds (cooldown = ideal - age).
+
+# Fable-meter state (run-2 kit gap): get_model_usage's meter join needs a
+# snapshot carrying the seven_day_fable tier.
+New-Item -ItemType Directory -Force (Join-Path $Root 'state-fresh-fable') | Out-Null
+Set-Content (Join-Path $Root 'state-fresh-fable\snapshot.json') @"
+{"schema_version":1,"writer_version":"3.4.0","captured_at":"$(Iso $now.AddMinutes(-2))","account_ref":"c0ffee42","plan":"Max 20x","status":"ok","error_kind":null,"tiers":[
+{"key":"five_hour","utilization":42,"resets_at":"$(Iso $now.AddHours(3))","used":null,"limit":null},
+{"key":"seven_day","utilization":62,"resets_at":"$(Iso $now.AddDays(5))","used":null,"limit":null},
+{"key":"seven_day_fable","utilization":57,"resets_at":"$(Iso $now.AddDays(5))","used":null,"limit":null}]}
+"@ -Encoding utf8
+
+# Vault fixture (abilities wave, get_usage_history): rollups-YYYY-MM.json under
+# vault\<rootName>\ - two recorded days (one with sent/received split + projects,
+# keyed name~hash), one deliberate gap day. Env: SANDUHR_VAULT_DIR=<Root>\vault,
+# consented root name must be 'personal-fixture' (matches SANDUHR_CC_ROOTS).
+$vaultRoot = Join-Path $Root 'vault\personal-fixture'
+New-Item -ItemType Directory -Force $vaultRoot | Out-Null
+$d1 = $now.AddDays(-2).ToString('yyyy-MM-dd')
+$d2 = $now.AddDays(-1).ToString('yyyy-MM-dd')
+$months = @($now.AddDays(-2).ToString('yyyy-MM'), $now.AddDays(-1).ToString('yyyy-MM')) | Select-Object -Unique
+foreach ($m in $months) {
+  $days = @{}
+  if ($d1.StartsWith($m)) { $days[$d1] = @{ total = 500000; input = 100000; output = 400000; by_model = @{}; by_project = @{ 'Sanduhr~abc123' = 300000; 'vibe-plugins~def456' = 200000 }; by_skill = @{}; sessions = 3 } }
+  if ($d2.StartsWith($m)) { $days[$d2] = @{ total = 250000; input = 50000; output = 200000; by_model = @{}; by_project = @{}; by_skill = @{}; sessions = 1 } }
+  @{ schema_version = 1; days = $days } | ConvertTo-Json -Depth 6 -Compress |
+    Set-Content (Join-Path $vaultRoot "rollups-$m.json") -Encoding utf8
+}
+
 Write-Output "fixtures written under $Root at $(Iso $now)"

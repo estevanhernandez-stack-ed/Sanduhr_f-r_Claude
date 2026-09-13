@@ -18,6 +18,10 @@ public sealed class McpConfig
     /// <summary>Full path of snapshot.json.</summary>
     public required string SnapshotPath { get; init; }
 
+    /// <summary>The usage-vault root (%LOCALAPPDATA%\Sanduhr\vault, or the
+    /// SANDUHR_VAULT_DIR dev override). Read-only from this process.</summary>
+    public required string VaultDir { get; init; }
+
     /// <summary>Consented CC roots: name → full path. Order is stable
     /// (.claude before .claude-personal). Empty = nothing consented.</summary>
     public required IReadOnlyList<(string Name, string Path)> ConsentedRoots { get; init; }
@@ -59,6 +63,13 @@ public sealed class McpConfig
             ? envSnap
             : Path.Combine(sanduhrDir, "snapshot.json");
 
+        string vaultDir = Environment.GetEnvironmentVariable("SANDUHR_VAULT_DIR")
+            is { Length: > 0 } envVault
+            ? envVault
+            : Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Sanduhr", "vault");
+
         var found = new List<string>();
         foreach (var name in KnownRootNames)
         {
@@ -93,6 +104,7 @@ public sealed class McpConfig
         return new McpConfig
         {
             SnapshotPath = snapshotPath,
+            VaultDir = vaultDir,
             // Follows the snapshot: the dev-tier redirect moves both together.
             HistoryDir = Path.GetDirectoryName(snapshotPath),
             ConsentedRoots = consented,

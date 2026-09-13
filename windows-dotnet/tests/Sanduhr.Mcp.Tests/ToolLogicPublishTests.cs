@@ -13,6 +13,7 @@ public class ToolLogicPublishTests
     private static McpConfig PublishConfig(TempDir tmp, TimeSpan? wait = null) => new()
     {
         SnapshotPath = Path.Combine(tmp.Path, "snapshot.json"),
+        VaultDir = Path.Combine(tmp.Path, "vault"),
         ConsentedRoots = Array.Empty<(string, string)>(),
         RootsFound = Array.Empty<string>(),
         SettingsPath = Path.Combine(tmp.Path, "settings.json"),
