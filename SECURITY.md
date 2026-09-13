@@ -11,14 +11,19 @@ The app makes exactly one kind of outbound network request: HTTPS to
 `claude.ai`, using **your own session cookie**, to read **your own** usage
 numbers from the same endpoints the claude.ai settings page already calls.
 
-The single exception is opt-in and off by default: **Publish to 626 Labs**
-(Windows, Settings ▸ 626 Labs) posts a daily per-project token-count summary
-to *your own* 626 Labs dashboard account, authenticated with an agent key you
-paste in (stored in Windows Credential Manager under `com.626labs.sanduhr`,
-slot `626labs:agentKey`). Only the Claude Code homes you tick are included,
-and only project folder names, never paths or content. The `sanduhr-mcp`
-server cannot perform that upload itself: it holds no key and makes no
-network calls; it hands the request to the widget. See
+The single exception is opt-in, off by default, and points where *you* say:
+**Publish usage** (Windows, Settings ▸ Publish usage) posts a daily
+per-project token-count summary to an endpoint URL you configure,
+authenticated the way you choose (bearer token, a header you name, or none),
+with the token stored in Windows Credential Manager under
+`com.626labs.sanduhr`, slot `publish:token`. Nothing about your usage comes
+back to us: the 626 Labs dashboard is offered as one preset destination, and
+if you pick it the record goes to your own dashboard account with a key you
+minted there. Nothing is sent unless the toggle is on, an endpoint is set,
+and at least one Claude Code home is ticked; only ticked homes are
+included, and only project folder names, never paths or content. The
+`sanduhr-mcp` server cannot perform that upload itself: it holds no token
+and makes no network calls; it hands the request to the widget. See
 [docs/PRIVACY.md](docs/PRIVACY.md) for the exact payload.
 
 Your session cookie is stored in Windows Credential Manager on Windows
