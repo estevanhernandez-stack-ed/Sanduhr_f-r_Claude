@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+**Platform:** Windows (.NET 10 / WPF).
+
+### Added
+
+- **Publish to 626 Labs (opt-in, off by default).** Settings ▸ 626 Labs: a master toggle, one "share" checkbox per detected Claude Code home (every home off until ticked), a publish time (default 06:45 local), a masked agent-key entry (Windows Credential Manager slot `626labs:agentKey`, never in a file), "Publish now", and a status line. Once a day the widget posts yesterday's per-project token counts (folder basenames only), tier split, and current quota headroom (stale/no-data markers, never stale percentages) to your 626 Labs dashboard. Failed attempts retry no more than once per 15 minutes. `settings.json` gains a `publish_626` group.
+- **`publish_usage` MCP tool.** Queues the same upload through the widget (request/result files under `%APPDATA%\Sanduhr`); the MCP server itself still holds no key and makes no network calls. Typed refusals `disabled` / `no_key` with a remedy, `queued` when the widget is not running.
+- **`writer_version` surfaced by `get_usage` and `ping`** so a dead snapshot can be told apart from a dev-build leftover; the widget now stamps its own version into `snapshot.json` instead of Core's "1.0.0".
+
+### Changed
+
+- `docs/PRIVACY.md` and `SECURITY.md` document the new opt-in destination (`us-central1-project-626labs.cloudfunctions.net`) and the exact payload.
+
 ## v3.1.0-windows — 2026-06-25
 
 **Platform:** Windows (.NET 10 / WPF). The first feature release on the native base — and the .NET app's Microsoft Store debut (the Store was on Python v2.3; v3.0.0 was never submitted).
