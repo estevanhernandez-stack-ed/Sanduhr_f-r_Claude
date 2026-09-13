@@ -366,11 +366,7 @@ public static class ThemeCatalog
         => o[key] is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
 
     private static double DoubleOr(JsonNode? n, double fallback)
-    {
-        if (n is null) return fallback;
-        try { return n.GetValue<double>(); }
-        catch { return fallback; }
-    }
+        => ThemeLint.TryReadNumber(n, out var v) ? v : fallback;
 
     private static bool BoolOr(JsonNode? n, bool fallback)
     {
@@ -380,16 +376,8 @@ public static class ThemeCatalog
     }
 
     private static int IntOr(JsonNode? n, int fallback)
-    {
-        if (n is null) return fallback;
-        try { return (int)Math.Round(n.GetValue<double>()); }
-        catch { return fallback; }
-    }
+        => ThemeLint.TryReadNumber(n, out var v) ? (int)Math.Round(v) : fallback;
 
     private static int? IntOrNull(JsonNode? n)
-    {
-        if (n is null) return null;
-        try { return (int)Math.Round(n.GetValue<double>()); }
-        catch { return null; }
-    }
+        => ThemeLint.TryReadNumber(n, out var v) ? (int)Math.Round(v) : null;
 }

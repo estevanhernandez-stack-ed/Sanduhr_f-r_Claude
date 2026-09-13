@@ -178,7 +178,7 @@ public class ThemeLintTests
         j["text"] = "#5a5a5a";
         var r = ThemeLint.Lint(j);
         Assert.True(r.Ok);
-        var f = Assert.Single(r.Warnings.Where(w => w.Field == "text"));
+        var f = Assert.Single(r.Warnings, w => w.Field == "text");
         Assert.Contains(":1", f.Message);
         Assert.Contains("4.5", f.Message);
     }

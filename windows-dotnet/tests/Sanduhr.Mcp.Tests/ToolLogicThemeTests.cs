@@ -64,7 +64,7 @@ public class ToolLogicThemeTests
     }
 
     [Fact]
-    public void Clean_theme_writes_the_request_the_widget_expects_and_returns_its_result()
+    public async Task Clean_theme_writes_the_request_the_widget_expects_and_returns_its_result()
     {
         using var tmp = new TempDir();
         var cfg = ThemeConfig(tmp, TimeSpan.FromSeconds(5));
@@ -98,7 +98,7 @@ public class ToolLogicThemeTests
         });
 
         var r = logic.BuildProposeTheme(CleanTheme(), "nebula-x", apply: false);
-        widget.Wait();
+        await widget;
 
         Assert.Equal("saved", (string?)r["status"]);
         Assert.Equal("nebula-x", (string?)r["key"]);

@@ -296,6 +296,26 @@ public static class ThemeLint
     private static string? StringOrNull(JsonNode? n)
         => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
 
+    /// <summary>Read any JSON number as a double. A node parsed from text answers
+    /// GetValue&lt;double&gt; for every numeric token, but a node built in code
+    /// (<c>["blur"] = 4</c>) only answers the CLR type it was created with, so
+    /// the studio's documents and the MCP tool's hand-built JSON need the
+    /// widening here. Strings, booleans and nulls are not numbers.</summary>
+    internal static bool TryReadNumber(JsonNode? n, out double value)
+    {
+        value = 0;
+        if (n is not JsonValue v)
+            return false;
+        if (v.TryGetValue<double>(out value)) return true;
+        if (v.TryGetValue<int>(out var i)) { value = i; return true; }
+        if (v.TryGetValue<long>(out var l)) { value = l; return true; }
+        if (v.TryGetValue<float>(out var f)) { value = f; return true; }
+        if (v.TryGetValue<decimal>(out var m)) { value = (double)m; return true; }
+        if (v.TryGetValue<short>(out var sh)) { value = sh; return true; }
+        if (v.TryGetValue<byte>(out var b)) { value = b; return true; }
+        return false;
+    }
+
     private static bool BoolOr(JsonNode n, bool fallback)
     {
         try { return n.GetValue<bool>(); }
@@ -319,12 +339,7 @@ public static class ThemeLint
         label ??= key;
         if (o[key] is not JsonNode n)
             return fallback;
-        double value;
-        try
-        {
-            value = n.GetValue<double>();
-        }
-        catch (Exception e) when (e is InvalidOperationException or FormatException)
+        if (!TryReadNumber(n, out double value))
         {
             findings.Add(Error(label, $"{label} must be a number between {min:0.##} and {max:0.##}, got {Describe(n)}."));
             return fallback;
