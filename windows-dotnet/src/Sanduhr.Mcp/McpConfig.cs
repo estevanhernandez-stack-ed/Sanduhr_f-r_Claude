@@ -26,6 +26,11 @@ public sealed class McpConfig
     /// ping reports both so a cold agent can tell "no roots" from "no consent".</summary>
     public required IReadOnlyList<string> RootsFound { get; init; }
 
+    /// <summary>Directory holding <c>history.&lt;account&gt;.json</c> — the widget's
+    /// per-fetch append log, read as the fallback source when the snapshot is
+    /// missing or dead (issue #63). Null = the snapshot's own directory.</summary>
+    public string? HistoryDir { get; init; }
+
     /// <summary>settings.json — read (never written) by publish_usage for the
     /// publish group's toggle, endpoint URL, auth scheme and token-present
     /// mirror. Null = unavailable.</summary>
@@ -88,6 +93,8 @@ public sealed class McpConfig
         return new McpConfig
         {
             SnapshotPath = snapshotPath,
+            // Follows the snapshot: the dev-tier redirect moves both together.
+            HistoryDir = Path.GetDirectoryName(snapshotPath),
             ConsentedRoots = consented,
             RootsFound = found,
             SettingsPath = Path.Combine(sanduhrDir, "settings.json"),

@@ -22,6 +22,19 @@ public sealed class ToolLogic
     private readonly CcLogReader _reader = new();
 
     public const string DataLagNote = "claude.ai's own numbers lag consumption by several minutes";
+
+    /// <summary>The first widget release with a snapshot writer. Older widgets
+    /// poll and append history but never touch snapshot.json (issue #63).</summary>
+    public const string RequiredWidgetVersion = "3.4.0";
+    public const string ReasonWidgetTooOld = "widget_too_old";
+    public const string ReasonWidgetNotPolling = "widget_not_polling";
+    public const string WidgetTooOldRemedy =
+        "The running widget has no snapshot writer (Sanduhr " + RequiredWidgetVersion + " or later is required); update it.";
+    public const string HistoryLagNote =
+        "Numbers come from the widget's history file (history.<account>.json), not snapshot.json: " +
+        "the running widget has no snapshot writer. History records utilization and reset time only; " +
+        "used, limit and plan are null because they are not recorded, not because they are zero. " + DataLagNote;
+
     public const string BurnCaveat =
         "token-count proxy from local Claude Code logs (input+output only, cache excluded); " +
         "NOT convertible to utilization %. CC deletes session logs after ~30 days; totals are lower bounds.";
@@ -39,16 +52,43 @@ public sealed class ToolLogic
 
     public JsonObject BuildPing()
     {
+        var now = _clock();
         var (outcome, snap) = SnapshotReader.Read(_config.SnapshotPath);
         double? age = null;
+        SnapshotBand? band = null;
         if (outcome == SnapshotReadOutcome.Ok
             && Pacing.Parse((string?)snap!["captured_at"]) is { } captured)
         {
-            age = Math.Round(SnapshotContract.AgeSeconds(captured, _clock()));
+            age = Math.Round(SnapshotContract.AgeSeconds(captured, now));
+            band = SnapshotContract.Band(captured, now);
         }
+        string? writerVersion = outcome == SnapshotReadOutcome.Ok ? (string?)snap!["writer_version"] : null;
+        string? accountRef = outcome == SnapshotReadOutcome.Ok ? (string?)snap!["account_ref"] : null;
+        var (history, historyAge, historyFresh) = ReadHistory(accountRef, now);
+
+        // The same classification get_usage applies, so ping alone answers
+        // "why is get_usage stale" without a second call.
+        string status;
+        string? reason = null;
+        string? remedy = null;
+        if (outcome == SnapshotReadOutcome.Missing || band == SnapshotBand.Dead)
+        {
+            (status, reason, remedy) = DeadOrMissingDiagnosis(
+                outcome != SnapshotReadOutcome.Missing, writerVersion, age, historyAge, historyFresh);
+        }
+        else if (outcome != SnapshotReadOutcome.Ok || band is null)
+        {
+            (status, reason) = ("no_data", "malformed");
+        }
+        else
+        {
+            status = band == SnapshotBand.Fresh && (string?)snap!["status"] != "error" ? "ok" : "stale";
+        }
+
         return new JsonObject
         {
             ["server_version"] = ServerVersion,
+            ["required_widget_version"] = RequiredWidgetVersion,
             ["snapshot_schema_supported"] = SnapshotContract.SchemaVersion,
             ["snapshot_path"] = _config.SnapshotPath,
             ["snapshot_found"] = outcome != SnapshotReadOutcome.Missing,
@@ -56,7 +96,16 @@ public sealed class ToolLogic
             // Which build wrote the file. "1.0.0" = a dev build (Core's unversioned
             // assembly); a dead snapshot from a version the installed widget never
             // shipped is "the installed widget predates the writer", not "not polling".
-            ["snapshot_writer_version"] = outcome == SnapshotReadOutcome.Ok ? (string?)snap!["writer_version"] : null,
+            ["snapshot_writer_version"] = writerVersion,
+            ["snapshot_writer_meets_floor"] = outcome == SnapshotReadOutcome.Ok ? WriterMeetsFloor(writerVersion) : null,
+            // The fallback source: a fresh history point beside a missing/dead
+            // snapshot is the fingerprint of a polling widget with no writer.
+            ["history_found"] = history is not null,
+            ["history_age_seconds"] = historyAge,
+            ["history_fresh"] = historyFresh,
+            ["usage_status"] = status,
+            ["usage_reason"] = reason,
+            ["remedy"] = remedy,
             ["cc_roots_found"] = ToArray(_config.RootsFound),
             ["cc_roots_consented"] = ToArray(_config.ConsentedRoots.Select(r => r.Name)),
         };
@@ -70,8 +119,19 @@ public sealed class ToolLogic
         var (outcome, snap) = SnapshotReader.Read(_config.SnapshotPath);
 
         if (outcome == SnapshotReadOutcome.Missing)
+        {
+            // No snapshot but the widget is polling (history point < 15 min old):
+            // that is a pre-3.4.0 widget, not a widget that never ran. Serve the
+            // history point, degraded, rather than nothing (issue #63).
+            var (history, historyAge, historyFresh) = ReadHistory(null, now);
+            if (historyFresh && history is not null)
+            {
+                var (_, _, remedyText) = DeadOrMissingDiagnosis(false, null, null, historyAge, true);
+                return BuildDegraded(history, historyAge!.Value, remedyText!, null, null, now);
+            }
             return NoData("missing",
                 "No usage snapshot. Start the Sanduhr widget and enable its Claude Code integration (Settings > Claude Usage).");
+        }
         if (outcome == SnapshotReadOutcome.Malformed)
             return NoData("malformed",
                 "Usage snapshot unreadable. Restart the Sanduhr widget; if it persists, delete %APPDATA%\\Sanduhr\\snapshot.json.");
@@ -92,20 +152,27 @@ public sealed class ToolLogic
         string? errorKind = (string?)snap["error_kind"];
 
         string status = band == SnapshotBand.Fresh && fileStatus != "error" ? "ok" : "stale";
-        string? reason = band == SnapshotBand.Dead ? "widget_not_polling" : null;
+        string? reason = null;
         string? writerVersion = (string?)snap["writer_version"];
-        string? remedy = band == SnapshotBand.Dead
-            ? "The Sanduhr widget has not polled for over 15 minutes - start (or restart) the widget. "
-              + $"This snapshot was written by widget build {writerVersion ?? "unknown"}; if the installed "
-              + "widget is older than that, it has no snapshot writer and the file is a dev-build leftover."
-            : fileStatus == "error"
-                ? errorKind switch
-                {
-                    SnapshotContract.ErrorSessionExpired => "The widget's claude.ai session expired - re-authenticate in the Sanduhr widget. Tiers below are last-good, not current.",
-                    SnapshotContract.ErrorCloudflare => "The widget is blocked by a Cloudflare challenge - re-authenticate in the Sanduhr widget. Tiers below are last-good, not current.",
-                    _ => "The widget's last fetch failed (network). Tiers below are last-good, not current.",
-                }
-                : null;
+        string? remedy = null;
+        if (band == SnapshotBand.Dead)
+        {
+            // Dead snapshot: is the widget dead too, or just too old to write?
+            // The history file answers — it is appended by every widget version.
+            var (history, historyAge, historyFresh) = ReadHistory((string?)snap["account_ref"], now);
+            (status, reason, remedy) = DeadOrMissingDiagnosis(true, writerVersion, ageSeconds, historyAge, historyFresh);
+            if (historyFresh && history is not null)
+                return BuildDegraded(history, historyAge!.Value, remedy!, writerVersion, ageSeconds, now);
+        }
+        else if (fileStatus == "error")
+        {
+            remedy = errorKind switch
+            {
+                SnapshotContract.ErrorSessionExpired => "The widget's claude.ai session expired - re-authenticate in the Sanduhr widget. Tiers below are last-good, not current.",
+                SnapshotContract.ErrorCloudflare => "The widget is blocked by a Cloudflare challenge - re-authenticate in the Sanduhr widget. Tiers below are last-good, not current.",
+                _ => "The widget's last fetch failed (network). Tiers below are last-good, not current.",
+            };
+        }
 
         var tiers = new JsonArray();
         foreach (var node in snap["tiers"] as JsonArray ?? new JsonArray())
@@ -124,6 +191,7 @@ public sealed class ToolLogic
             ["as_of"] = (string?)snap["captured_at"],
             ["age_seconds"] = ageSeconds,
             ["writer_version"] = writerVersion,
+            ["data_source"] = "snapshot",
             ["scope"] = "active_account_only",
             ["account"] = new JsonObject
             {
@@ -234,6 +302,125 @@ public sealed class ToolLogic
             ["caveat"] = BurnCaveat,
         };
     }
+
+    // -- stale/missing classification (issue #63) -----------------------------
+
+    /// <summary>The widget's history file next to the snapshot, plus its
+    /// freshness by the same two-missed-polls rule the snapshot uses.</summary>
+    private (HistoryLatest? History, double? AgeSeconds, bool Fresh) ReadHistory(string? preferAccountRef, DateTimeOffset now)
+    {
+        string? dir = _config.HistoryDir ?? Path.GetDirectoryName(_config.SnapshotPath);
+        var history = HistoryReader.ReadFreshest(dir, preferAccountRef, now, SnapshotContract.DeadSeconds);
+        if (history is null)
+            return (null, null, false);
+        double age = Math.Round(SnapshotContract.AgeSeconds(history.LatestAt, now));
+        return (history, age, age <= SnapshotContract.DeadSeconds);
+    }
+
+    /// <summary>True when the snapshot was written by a release that ships the
+    /// writer. Missing, unparseable, or "1.0.0" (Core's unversioned dev
+    /// assembly) all fail the floor.</summary>
+    public static bool WriterMeetsFloor(string? writerVersion)
+        => writerVersion is { Length: > 0 }
+           && Version.TryParse(writerVersion, out var v)
+           && v >= Version.Parse(RequiredWidgetVersion);
+
+    /// <summary>The one table both tools share for a snapshot that is missing or
+    /// dead (older than <see cref="SnapshotContract.DeadSeconds"/>):
+    /// <list type="bullet">
+    /// <item>history fresh → <c>degraded</c> / <c>widget_too_old</c>: the widget
+    /// polls but has no writer; the history point is served.</item>
+    /// <item>history not fresh, snapshot written below the floor → <c>stale</c> /
+    /// <c>widget_too_old</c>: the file is a leftover the installed widget can never
+    /// refresh, so "restart it" would be the wrong remedy.</item>
+    /// <item>history not fresh, writer at or above the floor → <c>stale</c> /
+    /// <c>widget_not_polling</c>: nothing on this machine has polled in 15 min.</item>
+    /// <item>no snapshot, history not fresh → <c>no_data</c> / <c>missing</c>.</item>
+    /// </list></summary>
+    private static (string Status, string? Reason, string? Remedy) DeadOrMissingDiagnosis(
+        bool snapshotPresent, string? writerVersion, double? snapshotAge, double? historyAge, bool historyFresh)
+    {
+        bool floorOk = WriterMeetsFloor(writerVersion);
+        string writer = writerVersion ?? "unknown";
+        if (historyFresh)
+        {
+            string polling = $"The widget is polling (history point {historyAge:0}s old, served below)";
+            if (!snapshotPresent)
+                return ("degraded", ReasonWidgetTooOld, $"{WidgetTooOldRemedy} {polling}; snapshot.json does not exist.");
+            string leftover = floorOk
+                ? $"snapshot.json was last written {snapshotAge:0}s ago by build {writer}. If the installed widget "
+                  + "is already 3.4.0 or later, re-enable its Claude Code integration (Settings > Claude Usage)."
+                : $"snapshot.json was last written {snapshotAge:0}s ago by build {writer}, a dev-build or pre-{RequiredWidgetVersion} leftover.";
+            return ("degraded", ReasonWidgetTooOld, $"{WidgetTooOldRemedy} {polling}; {leftover}");
+        }
+        if (!snapshotPresent)
+            return ("no_data", "missing", null);
+        if (!floorOk)
+            return ("stale", ReasonWidgetTooOld,
+                $"snapshot.json was written by build {writer}, a dev-build or pre-{RequiredWidgetVersion} leftover; "
+                + $"no released widget below {RequiredWidgetVersion} writes snapshots, so the installed widget cannot refresh it. "
+                + $"Update Sanduhr to {RequiredWidgetVersion} or later. No history file has a point in the last 15 minutes "
+                + "either, so the widget may also not be running. Tiers below are the leftover's, not current.");
+        return ("stale", ReasonWidgetNotPolling,
+            "The Sanduhr widget has not polled for over 15 minutes (no snapshot or history point in that window) - "
+            + $"start (or restart) the widget. This snapshot was written by widget build {writer}.");
+    }
+
+    /// <summary>The <c>degraded</c> get_usage payload: the latest history point
+    /// per tier, only tiers polled within the freshness window, through the same
+    /// reset-crossing / pace / projection math as the snapshot path. Fields the
+    /// history schema does not carry (used, limit, plan) are null, never
+    /// invented. The account ref is the hash of the file's label — the label
+    /// itself never appears in the payload (PRIVACY.md's snapshot rule).</summary>
+    private JsonObject BuildDegraded(HistoryLatest history, double historyAge, string remedy,
+        string? snapshotWriterVersion, double? snapshotAge, DateTimeOffset now)
+    {
+        var order = TierModel.EffectiveOrder.ToList();
+        var tiers = new JsonArray();
+        foreach (var p in history.Tiers
+                     .Where(p => SnapshotContract.AgeSeconds(p.At, now) <= SnapshotContract.DeadSeconds)
+                     .OrderBy(p => order.IndexOf(p.Key) is var i && i >= 0 ? i : int.MaxValue)
+                     .ThenBy(p => p.Key, StringComparer.Ordinal))
+        {
+            var t = new JsonObject
+            {
+                ["utilization"] = p.Utilization,
+                ["resets_at"] = p.ResetsAt,
+                ["used"] = null,
+                ["limit"] = null,
+            };
+            var tier = BuildTier(p.Key, t, now);
+            tier["as_of"] = Iso(p.At);
+            tiers.Add(tier);
+        }
+
+        return new JsonObject
+        {
+            ["status"] = "degraded",
+            ["reason"] = ReasonWidgetTooOld,
+            ["remedy"] = remedy,
+            ["fetch_error"] = null,
+            ["as_of"] = Iso(history.LatestAt),
+            ["age_seconds"] = historyAge,
+            ["writer_version"] = snapshotWriterVersion,
+            ["snapshot_age_seconds"] = snapshotAge,
+            ["required_widget_version"] = RequiredWidgetVersion,
+            ["data_source"] = "history",
+            ["scope"] = "active_account_only",
+            ["account"] = new JsonObject
+            {
+                ["ref"] = history.AccountRef,
+                ["plan"] = null,
+            },
+            ["data_lag_note"] = HistoryLagNote,
+            ["schema_version"] = SnapshotContract.SchemaVersion,
+            ["tiers"] = tiers,
+            ["local_burn_since_snapshot"] = BuildLocalBurnSince(history.LatestAt),
+        };
+    }
+
+    private static string Iso(DateTimeOffset t)
+        => t.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.ffffffzzz", CultureInfo.InvariantCulture);
 
     // -- get_local_burn_by_project --------------------------------------------
 

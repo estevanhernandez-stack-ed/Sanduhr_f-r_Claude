@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+
+- **`sanduhr-mcp` requires widget 3.4.0 or later**, and now says so instead of "widget not polling" (#63). A widget older than 3.4.0 polls and appends `history.<account>.json` but has no snapshot writer, so `snapshot.json` is missing or a dead leftover from a dev build. `get_usage` and `ping` read the history file beside the snapshot (a local file read only; the account label in the file name is hashed, never returned) and classify:
+  - snapshot missing or older than 15 minutes, history point within 15 minutes → `status: degraded`, `reason: widget_too_old`, remedy "update it (3.4.0 or later)". The per-tier fields come from the latest history point (utilization, reset time, pace, projection; `used`, `limit` and `plan` are null because history does not record them), with `data_source: "history"` and a `data_lag_note` that says so.
+  - snapshot older than 15 minutes, no fresh history, `writer_version` below 3.4.0 (or missing / `1.0.0`) → `status: stale`, `reason: widget_too_old`: the file is a dev-build or pre-3.4.0 leftover the installed widget cannot refresh.
+  - snapshot older than 15 minutes, no fresh history, written by 3.4.0 or later → `status: stale`, `reason: widget_not_polling`, as before.
+- `ping` gains `required_widget_version`, `snapshot_writer_meets_floor`, `history_found` / `history_age_seconds` / `history_fresh`, and `usage_status` / `usage_reason` / `remedy` (the same diagnosis `get_usage` returns). The `get_usage` and `ping` tool descriptions state the floor.
+
 ## v3.4.0 — 2026-09-13
 
 **Platform:** Windows (.NET 10 / WPF).
