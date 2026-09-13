@@ -573,6 +573,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         if (!_themes.TryGetValue(key, out var def))
             return;
 
+        _previewing = false;
         _palette = new ThemePalette(key, def);
         ActiveThemeName = _palette.Name;
         ApplyThemeResources();
@@ -599,6 +600,43 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         ApplyThemeByKey(key);
         Sounds.PlayToggle();
     }
+
+    private bool _previewing;
+
+    /// <summary>The Theme Studio's live preview: re-tint the widget from a draft
+    /// without touching the saved theme, the strip's active tile, or settings.
+    /// <see cref="EndPreview"/> (or any real apply) puts the saved theme back.</summary>
+    public void PreviewTheme(ThemeDefinition def)
+    {
+        _previewing = true;
+        var preview = new ThemePalette("studio", def);
+        if (Application.Current is { } app)
+            preview.Apply(app.Resources);
+        foreach (var card in Tiers)
+            card.ApplyPalette(preview);
+        ThemeChanged?.Invoke(preview);
+    }
+
+    /// <summary>Drop a studio preview and paint the saved theme again. No-op
+    /// when nothing is being previewed.</summary>
+    public void EndPreview()
+    {
+        if (!_previewing)
+            return;
+        _previewing = false;
+        ApplyThemeResources();
+        foreach (var card in Tiers)
+            card.ApplyPalette(_palette);
+        ThemeChanged?.Invoke(_palette);
+    }
+
+    /// <summary>A theme's definition by catalog key (built-in or loaded user
+    /// theme), for the studio's "Start from". Null when unknown.</summary>
+    public ThemeDefinition? GetThemeDefinition(string key)
+        => _themes.TryGetValue(key, out var def) ? def : null;
+
+    public bool LoadThemesStudioMode() => _settings.LoadThemesStudioMode();
+    public void SaveThemesStudioMode(bool on) => _settings.SaveThemesStudioMode(on);
 
     /// <summary>Reload user theme drop-ins from disk and rebuild the strip,
     /// keeping the current theme active. Called from the Settings Themes tab after

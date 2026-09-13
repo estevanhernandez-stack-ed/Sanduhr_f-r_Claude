@@ -3,12 +3,12 @@ using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sanduhr.App.Services;
 using Sanduhr.App.Views;
+using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
 
@@ -26,13 +26,37 @@ namespace Sanduhr.App.ViewModels;
 /// </summary>
 public sealed partial class ThemesViewModel : ObservableObject
 {
-    private static readonly Regex NonAlnum = new("[^a-z0-9]+", RegexOptions.Compiled);
-
     private readonly WidgetViewModel _widget;
     private Window? _owner;
 
     [ObservableProperty] private string _pasteJson = "";
     [ObservableProperty] private string _fileName = "";
+
+    /// <summary>The token editor (Studio mode). Shares the widget's theme state.</summary>
+    public ThemeStudioViewModel Studio { get; }
+
+    /// <summary>Studio mode on (token rows, the widget as live preview) or off (the
+    /// paste box). Remembered in settings.json. Switching off ends any preview.</summary>
+    [ObservableProperty] private bool _isStudioMode;
+
+    public bool IsPasteMode => !IsStudioMode;
+
+    partial void OnIsStudioModeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsPasteMode));
+        _widget.SaveThemesStudioMode(value);
+        if (value)
+            Studio.Activate();
+        else
+            Studio.Deactivate();
+    }
+
+    /// <summary>Lint findings for the paste box, live: "field: message" lines,
+    /// errors first. Empty while the box is empty or the theme is clean.</summary>
+    public ObservableCollection<ThemeFindingViewModel> PasteFindings { get; } = new();
+
+    [ObservableProperty] private bool _hasPasteFindings;
+    [ObservableProperty] private string _pasteSummary = "";
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ApplySelectedCommand))]
@@ -54,8 +78,16 @@ public sealed partial class ThemesViewModel : ObservableObject
     public ThemesViewModel(WidgetViewModel widget)
     {
         _widget = widget;
+        Studio = new ThemeStudioViewModel(widget, Error, Info, RefreshList);
+        _isStudioMode = widget.LoadThemesStudioMode();
+        if (_isStudioMode)
+            Studio.Activate();
         RefreshList();
     }
+
+    /// <summary>Settings is closing or the Themes tab is leaving: put the saved
+    /// theme back if the studio was previewing.</summary>
+    public void Detach() => Studio.Deactivate();
 
     /// <summary>Modal message boxes parent to the Settings window.</summary>
     public void AttachOwner(Window owner) => _owner = owner;
@@ -65,6 +97,7 @@ public sealed partial class ThemesViewModel : ObservableObject
     /// <c>settings_dialog._autofill_filename</c>.</summary>
     partial void OnPasteJsonChanged(string value)
     {
+        LintPaste(value);
         if (!string.IsNullOrWhiteSpace(FileName))
             return;
         try
@@ -79,6 +112,25 @@ public sealed partial class ThemesViewModel : ObservableObject
         {
             // Incomplete / invalid JSON while typing — leave the field alone.
         }
+    }
+
+    private void LintPaste(string raw)
+    {
+        PasteFindings.Clear();
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            HasPasteFindings = false;
+            PasteSummary = "";
+            return;
+        }
+        var lint = ThemeLint.Lint(raw);
+        foreach (var f in lint.Findings.OrderBy(f => f.Level == ThemeFindingLevel.Error ? 0 : 1))
+            PasteFindings.Add(new ThemeFindingViewModel(f.Field, f.Message, f.Level == ThemeFindingLevel.Error));
+        HasPasteFindings = PasteFindings.Count > 0;
+        int errors = lint.Errors.Count(), warnings = lint.Warnings.Count();
+        PasteSummary = errors > 0 ? $"{errors} to fix before this theme can be applied"
+            : warnings > 0 ? $"Applies, with {warnings} design {(warnings == 1 ? "note" : "notes")}"
+            : "Looks good";
     }
 
     [RelayCommand]
@@ -255,12 +307,9 @@ public sealed partial class ThemesViewModel : ObservableObject
         HasNoThemes = InstalledThemes.Count == 0;
     }
 
-    /// <summary>"Sunset Neon" → "sunset-neon" (settings_dialog._slugify).</summary>
-    private static string Slugify(string name)
-    {
-        var s = NonAlnum.Replace(name.Trim().ToLowerInvariant(), "-").Trim('-');
-        return s.Length == 0 ? "theme" : s;
-    }
+    /// <summary>"Sunset Neon" → "sunset-neon": the one slug rule, shared with the
+    /// studio and the MCP handoff.</summary>
+    private static string Slugify(string name) => ThemeHandoff.Slugify(name);
 
     private void Error(string message)
     {

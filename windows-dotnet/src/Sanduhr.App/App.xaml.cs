@@ -195,7 +195,22 @@ public partial class App : Application
         }
 
         var svm = new SettingsViewModel(_vm, () => RunSignInAsync(embedded: true), RunUpdateSignInAsync);
-        _settingsWindow = new SettingsWindow(svm);
+        try
+        {
+            _settingsWindow = new SettingsWindow(svm);
+        }
+        catch (Exception e)
+        {
+            // The command that opens Settings is async and swallows exceptions, so a
+            // XAML or view-model failure here would otherwise vanish: log it first.
+            try
+            {
+                System.IO.File.AppendAllText(new Sanduhr.Core.Paths().LogFile,
+                    $"{DateTime.UtcNow:o} settings window failed to open ({e.GetType().Name}: {e.Message}){Environment.NewLine}{e}{Environment.NewLine}");
+            }
+            catch { }
+            throw;
+        }
         if (_window is { IsLoaded: true })
             _settingsWindow.Owner = _window;
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
