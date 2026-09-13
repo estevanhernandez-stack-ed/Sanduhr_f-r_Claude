@@ -179,7 +179,7 @@ public sealed class ToolLogic
         {
             if (node is not JsonObject t || (string?)t["key"] is not { Length: > 0 } key)
                 continue;
-            tiers.Add(BuildTier(key, t, now));
+            tiers.Add((JsonNode)BuildTier(key, t, now));
         }
 
         var result = new JsonObject
@@ -391,7 +391,7 @@ public sealed class ToolLogic
             };
             var tier = BuildTier(p.Key, t, now);
             tier["as_of"] = Iso(p.At);
-            tiers.Add(tier);
+            tiers.Add((JsonNode)tier);
         }
 
         return new JsonObject
@@ -463,8 +463,8 @@ public sealed class ToolLogic
             }
             var projects = new JsonArray();
             foreach (var (proj, tokens) in byProject.OrderByDescending(p => p.Value))
-                projects.Add(new JsonObject { ["name"] = proj, ["tokens"] = tokens });
-            roots.Add(new JsonObject
+                projects.Add((JsonNode)new JsonObject { ["name"] = proj, ["tokens"] = tokens });
+            roots.Add((JsonNode)new JsonObject
             {
                 ["root"] = name,
                 ["total_tokens"] = rootTotal,
@@ -687,10 +687,12 @@ public sealed class ToolLogic
         return null;
     }
 
+    /// <summary>Non-generic Add only (see ToolCatalog): the generic Add&lt;T&gt;
+    /// needs serializer metadata the trimmed publish does not carry.</summary>
     private static JsonArray ToArray(IEnumerable<string> items)
     {
         var arr = new JsonArray();
-        foreach (var s in items) arr.Add(s);
+        foreach (var s in items) arr.Add((JsonNode?)s);
         return arr;
     }
 }

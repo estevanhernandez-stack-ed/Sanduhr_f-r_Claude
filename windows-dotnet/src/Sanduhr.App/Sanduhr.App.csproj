@@ -64,4 +64,54 @@
     <FileVersion>3.4.0.0</FileVersion>
   </PropertyGroup>
 
+  <!-- MCP integration: the widget carries the sanduhr-mcp server build in its own
+       output (mcp\) so the in-app installer has a source to copy from on every
+       channel. ReferenceOutputAssembly=false keeps this a build-order + payload
+       relationship only: the App never links the MCP assembly.
+
+       Two copies exist. After a plain Build (dotnet build, F5) the server's
+       framework-dependent output is copied next to the app; that needs a .NET
+       runtime on the machine, which a dev box has. On Publish the server is
+       published SELF-CONTAINED and single-file into $(PublishDir)mcp\, because
+       the Store and Velopack app is self-contained and the user's machine has no
+       runtime to run a framework-dependent sanduhr-mcp.exe. Files copied into
+       $(OutDir) by a Build-time target never reach the publish output, so the
+       publish copy is its own nested publish of the server project. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Sanduhr.Mcp\Sanduhr.Mcp.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
+  </ItemGroup>
+  <Target Name="CopyMcpServerOutput" AfterTargets="Build" Condition="'$(_IsPublishing)' != 'true'">
+    <MSBuild Projects="..\Sanduhr.Mcp\Sanduhr.Mcp.csproj" Targets="GetTargetPath"
+             Properties="Configuration=$(Configuration)" RemoveProperties="RuntimeIdentifier;SelfContained;PublishDir;OutDir;TargetFramework">
+      <Output TaskParameter="TargetOutputs" ItemName="_McpTargetPath" />
+    </MSBuild>
+    <PropertyGroup>
+      <_McpBinDir>@(_McpTargetPath->'%(RootDir)%(Directory)')</_McpBinDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <McpServerFiles Include="$(_McpBinDir)*.*" Exclude="$(_McpBinDir)*.pdb" />
+    </ItemGroup>
+    <Copy SourceFiles="@(McpServerFiles)"
+          DestinationFiles="@(McpServerFiles->'$(OutDir)mcp\%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+  <!-- Publish the server into the app payload. Its ship-shape (self-contained,
+       trimmed, single-file) is declared in Sanduhr.Mcp.csproj under a runtime
+       identifier, which the outer publish already passes down, so this is a plain
+       nested Publish with a PublishDir. PublishReadyToRun is the App's own
+       setting and must not leak into the server publish; TargetFramework and
+       OutDir must not leak either. -->
+  <Target Name="PublishMcpServer" AfterTargets="Publish" Condition="'$(RuntimeIdentifier)' != ''">
+    <PropertyGroup>
+      <_McpPublishDir>$([MSBuild]::EnsureTrailingSlash('$(PublishDir)'))mcp\</_McpPublishDir>
+    </PropertyGroup>
+    <MSBuild Projects="..\Sanduhr.Mcp\Sanduhr.Mcp.csproj" Targets="Publish"
+             Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);PublishDir=$(_McpPublishDir);PublishReadyToRun=false;DebugType=None;DebugSymbols=false;Version=$(Version)"
+             RemoveProperties="OutDir;TargetFramework;SelfContained;PublishSingleFile;PublishTrimmed" />
+    <Error Condition="!Exists('$(_McpPublishDir)sanduhr-mcp.exe')"
+           Text="sanduhr-mcp.exe missing from $(_McpPublishDir): the MCP server did not publish into the app payload." />
+    <Message Importance="high" Text="sanduhr-mcp published self-contained into $(_McpPublishDir)" />
+  </Target>
+
 </Project>

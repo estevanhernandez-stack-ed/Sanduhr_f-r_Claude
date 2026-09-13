@@ -13,6 +13,26 @@
     <Version>3.4.0</Version>
   </PropertyGroup>
 
+  <!-- How the server ships. Any publish with a runtime identifier (the App's
+       PublishMcpServer target, or a direct dotnet publish -r) produces one
+       self-contained, trimmed, single-file sanduhr-mcp.exe: the Store and
+       Velopack app is self-contained, so the user's machine has no .NET runtime
+       for a framework-dependent server. Declared here, not passed in, so the
+       App's own restore already carries the ILLink pack. A RID-less build
+       (dotnet build, the test projects) stays framework-dependent.
+       Linker warnings are errors here: the trimmer removes System.Text.Json's
+       reflection metadata, so any code path the analysis flags (the generic
+       JsonArray.Add<T>, collection initializers on JsonArray) is a crash in the
+       shipped exe, not a style note. See ToolCatalog for the rule the sources
+       follow. The release runbook still runs the published exe cold. -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>true</PublishTrimmed>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <ILLinkTreatWarningsAsErrors>true</ILLinkTreatWarningsAsErrors>
+  </PropertyGroup>
+
   <!-- Trust boundary BY CONSTRUCTION (WS-E design review must-fix #11): this
        project deliberately has NO reference to Sanduhr.Core. It source-links
        exactly the four files it needs, so CredentialStore /
