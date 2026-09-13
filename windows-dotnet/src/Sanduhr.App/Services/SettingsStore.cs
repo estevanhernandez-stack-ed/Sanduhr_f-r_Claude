@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -500,4 +501,50 @@ public sealed class SettingsStore
         root["ledger_group_by_project"] = groupByProject;
         Write(root);
     }
+
+    // -- Publish usage (settings.json "publish" group) ---------------------------
+    //
+    // Shape, vocabulary, and the one-time publish_626 -> publish migration live
+    // in Core's PublishSettingsJson (unit-tested without a disk). This store is
+    // the file wrapper: read the whole object, mutate one group, write it back.
+
+    public PublishSettings LoadPublishSettings()
+    {
+        var root = Read();
+        if (PublishSettingsJson.Migrate(root))
+            Write(root);   // one write, then the legacy group is gone
+        return PublishSettingsJson.Read(root);
+    }
+
+    private void MutatePublish(Action<JsonObject> mutate)
+    {
+        var root = Read();
+        PublishSettingsJson.Migrate(root);   // never write a fresh group beside a stale legacy one
+        mutate(root);
+        Write(root);
+    }
+
+    public void SavePublishEnabled(bool on) => MutatePublish(r => PublishSettingsJson.SetEnabled(r, on));
+
+    public void SavePublishRoots(IReadOnlyDictionary<string, bool> roots)
+        => MutatePublish(r => PublishSettingsJson.SetRoots(r, roots));
+
+    public void SavePublishTime(TimeOnly time) => MutatePublish(r => PublishSettingsJson.SetTime(r, time));
+
+    public void SavePublishTokenStored(bool stored)
+        => MutatePublish(r => PublishSettingsJson.SetTokenStored(r, stored));
+
+    public void SavePublishEndpointUrl(string url) => MutatePublish(r => PublishSettingsJson.SetEndpointUrl(r, url));
+
+    public void SavePublishAuthScheme(PublishAuthScheme scheme)
+        => MutatePublish(r => PublishSettingsJson.SetAuthScheme(r, scheme));
+
+    public void SavePublishAuthHeaderName(string name)
+        => MutatePublish(r => PublishSettingsJson.SetAuthHeaderName(r, name));
+
+    public void SavePublishPreset(PublishPreset preset) => MutatePublish(r => PublishSettingsJson.SetPreset(r, preset));
+
+    /// <summary>Record one attempt; see <see cref="PublishSettingsJson.SetAttempt"/>.</summary>
+    public void SavePublishAttempt(DateTimeOffset at, string result, DateOnly? okDate)
+        => MutatePublish(r => PublishSettingsJson.SetAttempt(r, at, result, okDate));
 }

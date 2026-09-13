@@ -31,8 +31,18 @@ Seven contract observations were folded back into the manifest descriptions.
 ## The plan
 
 - **Protocol/catalog:** initialize echoes protocolVersion; tools/list = exactly
-  get_usage, get_local_burn_by_project, ping; all readOnlyHint:true; burn
-  schema admits only window_days enum [1,7,30] + full_paths bool.
+  get_usage, get_local_burn_by_project, ping, publish_usage; the first three
+  readOnlyHint:true, publish_usage readOnlyHint:false (destructiveHint:false);
+  burn schema admits only window_days enum [1,7,30] + full_paths bool;
+  publish schema admits only date (YYYY-MM-DD pattern).
+- **publish_usage (2026-09-13, unverified):** no settings → disabled/publishing_off;
+  publish.enabled true + endpoint_url blank → no_endpoint/no_endpoint_url;
+  endpoint set + token_stored false (auth_scheme not none) → no_token/no_publish_token;
+  all set and no widget → queued/widget_not_responding after the wait, request file
+  present with id/date/requested_at; a fake widget that writes
+  publish-result.json for the matching id → the widget's typed result echoed
+  with date + request_id. Never a protocol error; the server process makes no
+  network call (observe with a socket trace).
 - **ping:** snapshot_found/age/path track the env-selected fixture;
   cc_roots_consented reflects the override; found reflects the machine scan.
 - **get_usage, one server run per state:** fresh→ok; stale→stale; dead→stale +

@@ -26,6 +26,26 @@ public sealed class McpConfig
     /// ping reports both so a cold agent can tell "no roots" from "no consent".</summary>
     public required IReadOnlyList<string> RootsFound { get; init; }
 
+    /// <summary>Directory holding <c>history.&lt;account&gt;.json</c> — the widget's
+    /// per-fetch append log, read as the fallback source when the snapshot is
+    /// missing or dead (issue #63). Null = the snapshot's own directory.</summary>
+    public string? HistoryDir { get; init; }
+
+    /// <summary>settings.json — read (never written) by publish_usage for the
+    /// publish group's toggle, endpoint URL, auth scheme and token-present
+    /// mirror. Null = unavailable.</summary>
+    public string? SettingsPath { get; init; }
+
+    /// <summary>The publish handoff files (see Core's PublishHandoff): the tool
+    /// writes the request, the widget writes the result. Null = handoff unavailable.</summary>
+    public string? PublishRequestPath { get; init; }
+    public string? PublishResultPath { get; init; }
+
+    /// <summary>How long publish_usage waits for the widget to answer before
+    /// returning a typed "queued" result. The widget's tick runs every 30s.</summary>
+    public TimeSpan PublishWaitTimeout { get; init; } = TimeSpan.FromSeconds(45);
+    public TimeSpan PublishPollInterval { get; init; } = TimeSpan.FromMilliseconds(500);
+
     private static readonly string[] KnownRootNames = { ".claude", ".claude-personal" };
 
     public static McpConfig Resolve()
@@ -73,8 +93,15 @@ public sealed class McpConfig
         return new McpConfig
         {
             SnapshotPath = snapshotPath,
+            // Follows the snapshot: the dev-tier redirect moves both together.
+            HistoryDir = Path.GetDirectoryName(snapshotPath),
             ConsentedRoots = consented,
             RootsFound = found,
+            SettingsPath = Path.Combine(sanduhrDir, "settings.json"),
+            // Mirrors Core's PublishHandoff.RequestFileName/ResultFileName literally
+            // (this project cannot link that file without widening its allowlist).
+            PublishRequestPath = Path.Combine(sanduhrDir, "publish-request.json"),
+            PublishResultPath = Path.Combine(sanduhrDir, "publish-result.json"),
         };
     }
 

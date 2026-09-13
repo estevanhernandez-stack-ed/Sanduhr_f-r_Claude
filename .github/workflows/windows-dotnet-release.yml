@@ -1,0 +1,51 @@
+name: Windows .NET Release
+
+# Runs on the runbook's `v<major>.<minor>.<patch>[.<rev>]` tag (Phase 5). Tests the solution,
+# builds the unsigned Store MSIX (Partner Center re-signs), and DRAFTS the GitHub Release with it
+# attached. Velopack artifacts are built locally (Phase 4) and uploaded in Phase 6; the draft is
+# published there, never here. The legacy Python release workflow (`v*-windows` tags) was removed
+# with the Python app on 2026-09-13 (tag legacy/python-v2.3.0).
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+.[0-9]+"
+
+defaults:
+  run:
+    working-directory: windows-dotnet
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Restore
+        run: dotnet restore
+      - name: Test (gate)
+        run: dotnet test --configuration Release
+      - name: Extract version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}" -replace "^v", ""
+          if ($v -notmatch "^\d+\.\d+\.\d+\.\d+$") { $v = "$v.0" }
+          echo "version=$v" >> $env:GITHUB_OUTPUT
+      - name: Build Store MSIX (unsigned; Partner Center signs)
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File scripts/build-msix.ps1 -Store -Version ${{ steps.ver.outputs.version }}
+      - name: Draft GitHub Release with the MSIX
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: windows-dotnet/dist/Sanduhr-Store-v${{ steps.ver.outputs.version }}.msix
+          fail_on_unmatched_files: true
+          body: |
+            Draft created by windows-dotnet-release.yml. Finish per docs/release-runbook.md Phase 6:
+            upload the Velopack files from dist/release/, set the notes, then publish.

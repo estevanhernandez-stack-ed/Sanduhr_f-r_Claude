@@ -1,5 +1,85 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- **`sanduhr-mcp` requires widget 3.4.0 or later**, and now says so instead of "widget not polling" (#63). A widget older than 3.4.0 polls and appends `history.<account>.json` but has no snapshot writer, so `snapshot.json` is missing or a dead leftover from a dev build. `get_usage` and `ping` read the history file beside the snapshot (a local file read only; the account label in the file name is hashed, never returned) and classify:
+  - snapshot missing or older than 15 minutes, history point within 15 minutes → `status: degraded`, `reason: widget_too_old`, remedy "update it (3.4.0 or later)". The per-tier fields come from the latest history point (utilization, reset time, pace, projection; `used`, `limit` and `plan` are null because history does not record them), with `data_source: "history"` and a `data_lag_note` that says so.
+  - snapshot older than 15 minutes, no fresh history, `writer_version` below 3.4.0 (or missing / `1.0.0`) → `status: stale`, `reason: widget_too_old`: the file is a dev-build or pre-3.4.0 leftover the installed widget cannot refresh.
+  - snapshot older than 15 minutes, no fresh history, written by 3.4.0 or later → `status: stale`, `reason: widget_not_polling`, as before.
+- `ping` gains `required_widget_version`, `snapshot_writer_meets_floor`, `history_found` / `history_age_seconds` / `history_fresh`, and `usage_status` / `usage_reason` / `remedy` (the same diagnosis `get_usage` returns). The `get_usage` and `ping` tool descriptions state the floor.
+
+### Fixed
+
+- **Settings dropdowns showed the option's type name when closed.** The Publish usage Preset and Auth boxes (and the History account selector) rendered `PublishPresetOption { Value = ...` instead of the label once the list was closed; the open list was fine. The themed ComboBox template now honors `DisplayMemberPath` in the closed box the way the stock WPF template does.
+- **Publish usage "Next:" named a slot that had already fired.** Right after a successful publish the status line said "Next: today at 06:45" when the scheduler would not run again until tomorrow. The scheduler now reports when it actually fires next (tomorrow's slot after today's day is out; today's slot before the publish time; "due now" once it has passed) and the status line prints that.
+
+## v3.4.0 — 2026-09-13
+
+**Platform:** Windows (.NET 10 / WPF).
+
+### Added
+
+- **Claude Code statusline bridge.** Settings ▸ Claude Usage ▸ "Install statusline…" puts your usage percentages and reset times under the Claude Code prompt of the one home you pick, after a consent dialog and a timestamped backup of that home's `settings.json`; "Remove statusline" reverts the entry (only if it still points at Sanduhr's script) and deletes the snapshot. After each fetch the widget writes `%APPDATA%\Sanduhr\snapshot.json` atomically (percentages, reset times, plan, a short account hash; never keys or labels); on a failed fetch it keeps the last-good tiers so "stale" stays actionable.
+- **`sanduhr-mcp`.** A read-only stdio MCP server (`get_usage`, `get_local_burn_by_project`, `ping`) over the same snapshot and your local Claude Code logs, built from `windows-dotnet/src/Sanduhr.Mcp`. It source-links four Core files and has no project or package references, so it cannot touch credentials or the network; `TrustBoundaryTests` pins that.
+- **Publish usage (opt-in, off by default).** Nothing about your usage comes back to us. If you want it somewhere, send it to yourself: once a day Sanduhr can post token counts per project name (folder names only, never paths) to an endpoint you choose. Settings ▸ Publish usage has a Preset dropdown (Custom endpoint, or the 626 Labs dashboard preset, which fills the URL and auth for you and points you at your dashboard's Agents panel for the key), an Endpoint URL, an Auth scheme (bearer token, a header you name, or none), a masked "Set token" entry (Windows Credential Manager slot `publish:token`, never in a file), one "share" checkbox per detected Claude Code home (every home off until you tick it), a "Publish daily at" switch with the time (default 06:45 local), "Publish now", and a status line. Nothing is sent unless the switch is on, an endpoint is set, and at least one home is ticked. What goes out for a day: the date, your machine name, which homes you ticked, one token count per project name, a per-model-tier split, and the widget's current quota percentages (an explicit stale/no-data marker when they are not fresh, never stale numbers). Failed attempts retry no more than once per 15 minutes.
+- **`publish_usage` MCP tool.** Queues the same upload through the widget (request/result files under `%APPDATA%\Sanduhr`); the MCP server itself holds no token and makes no network calls. Typed refusals `disabled` / `no_endpoint` / `no_token`, each with a remedy that names the setting, and `queued` when the widget is not running.
+- **`writer_version` surfaced by `get_usage` and `ping`** so a dead snapshot can be told apart from a dev-build leftover; the widget now stamps its own version into `snapshot.json` instead of Core's "1.0.0".
+
+### Changed
+
+- **Two body formats.** `sanduhr` (the default for a custom endpoint) posts the snapshot object as-is: `date`, `source`, `machine`, `homes`, `totals`, `byTier`, `byProject`, `quota`, `caveat`. `626labs` (set by the preset) wraps the same fields the way the 626 Labs dashboard expects.
+- `settings.json` gains a `publish` group (`enabled`, `roots`, `time`, `endpoint_url`, `auth_scheme`, `auth_header_name`, `body_format`, `preset`, `token_stored`, `last_*`). A `publish_626` group from an earlier build migrates on first launch to the 626 Labs preset with its settings intact, including which homes you had ticked; a `626labs:agentKey` credential moves to `publish:token` on first use.
+- `docs/PRIVACY.md` and `SECURITY.md` describe Publish usage as an optional, user-configured outbound publish with the 626 Labs dashboard as one preset, and list the exact payload.
+
+## v3.3.0 — 2026-07-19
+
+**Platform:** Windows (.NET 10 / WPF). The Fable release: model-scoped weekly meters that appear on their own, email-code sign-in for Google users, quieter per-model alerts.
+
+### Added
+
+- **Model-scoped weekly limit meters.** When the claude.ai usage API publishes a per-model weekly allowance (the Claude Fable 5 allowance came first), a "Weekly - Fable" meter appears alongside your other limits. Scoped tiers are synthesized generically from the API's `limits[]` array, so a limit for any new model shows up without an app update. Local Claude Code burn for `claude-fable` models is attributed to the Fable tier.
+- **Email-code sign-in guidance for Google users.** Google blocks OAuth inside embedded windows; the sign-in window now detects the bounce and walks you to claude.ai's own "Continue with email" login, where you enter the one-time code Anthropic emails you, right inside the app. The manual session-key paste stays as a fallback.
+- **Reconnecting status** for the transient window right after an account switch, instead of a bare error.
+
+### Changed
+
+- Per-model weekly limit alerts are visual-only by default; one checkbox in Settings ▸ Alerts restores their chime. Aggregate limit alerts are unchanged.
+- Unregistered usage keys and unhandled limit kinds are logged once per process, so a new API field is visible in `sanduhr.log` without spamming it.
+
+### Fixed
+
+- **GitHub-channel installer no longer collides with the data folder.** The Velopack package id is now `626Labs.Sanduhr`, so Setup.exe installs to `%LOCALAPPDATA%\626Labs.Sanduhr`. With the old id a fresh install over existing data renamed and then deleted `%LOCALAPPDATA%\Sanduhr`, taking the usage vault with it.
+- One automatic retry after a failed first fetch following an account switch (Cloudflare re-clearance raced the cold transport), armed on the add-account path too.
+- Two-org accounts select the `claude_max` / chat organization instead of riding `orgs[0]` ordering luck; non-string `capabilities` entries are guarded.
+- A Cloudflare challenge served on a 2xx is classified as Blocked and the wedged WebView2 page re-navigates; the prior WebView2 host is disposed on re-init (a hidden window leaked per wedged cycle).
+- Junk entries in the usage response skip instead of darkening the whole fetch.
+
+## v3.2.0 — 2026-07-13
+
+**Platform:** Windows (.NET 10 / WPF). The Claude Usage release: a local usage vault that outlives Claude Code's own log deletion, threshold alerts with toasts, and an accounts overhaul.
+
+### Added
+
+- **Claude Usage tab (Settings).** Overview with today and last-30-days totals split into sent and received tokens, a 30-day bar strip and a rolling five-week calendar (click a day to jump to its sessions). Trends with weekly bars up to 26 weeks back. A Sessions Ledger with scope chips, per-project stacking, sortable columns and CSV export. Agent (subagent) runs fold into the session that spawned them, so subagent burn counts.
+- **Usage history vault (opt-in).** Claude Code deletes its own session logs after about 30 days. With per-folder consent at first use (changeable any time), Sanduhr summarizes those logs into token totals per day, model and project under `%LOCALAPPDATA%\Sanduhr\vault`. Never conversation content, never uploaded. Pause per folder or erase the whole archive from Settings; the erase dialogs say what each button does. Checkpointed, atomic writes with quarantine for torn files, and a one-shot re-ingest when the walk format changes.
+- **Threshold alerts.** Settings ▸ Alerts: per-tier thresholds (floor lowered from 50% to 1%), Windows toast notifications that focus the widget when clicked (MSIX and GitHub installs alike), Do-Not-Disturb-aware chimes (warn, urgent, and an opt-in snake sting), and a Test alert button. Alerts re-arm on recovery and on account switch.
+- **Sign-in recovery routed by origin.** An expired session shows a recovery card that matches how the account was added: embedded sign-in accounts re-authenticate in place, manual-key accounts get the paste dialog in place. Settings ▸ Accounts gains a per-account "Update sign-in"; Remove deletes everything for that account (credentials and history) and Rename carries the history file along.
+- **Vector identity rebuild.** Same hourglass, sharper glass: a new icon set across the exe, tray and window.
+
+### Changed
+
+- Alert chimes retuned to short chirps; the snake sting is a measured square-wave contour, with user sound drop-ins under `%APPDATA%\Sanduhr\sounds`.
+- Tier-card percentages sit on a backplate chip so they stay readable over the sparkline on every theme.
+- `sanduhr.log` never carries account labels (PRIVACY.md); best-effort cleanup failures are logged by operation and exception type only.
+
+### Fixed
+
+- Vault data paints instantly, with a single Loading state on Today while the first live walk runs; the calendar anchors from today's week and covers the full grid; the day-scope chip stays visible after a section hop.
+- The live fallback says so when the vault is off instead of impersonating the archive; ledger CSV always exports session rows.
+- Recovery-card copy re-renders when switching between accounts that failed for the same reason.
+
 ## v3.1.0-windows — 2026-06-25
 
 **Platform:** Windows (.NET 10 / WPF). The first feature release on the native base — and the .NET app's Microsoft Store debut (the Store was on Python v2.3; v3.0.0 was never submitted).

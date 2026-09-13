@@ -1,6 +1,6 @@
 # Privacy Policy — Sanduhr für Claude
 
-**Last updated:** 2026-07-26
+**Last updated:** 2026-09-13
 **Publisher:** 626Labs LLC
 **Contact:** [GitHub Issues](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/issues)
 
@@ -10,6 +10,8 @@ Sanduhr für Claude is a **local desktop widget**. It does not run a server, doe
 
 The only network destination it contacts is `claude.ai` — and only with the credentials you yourself paste into it — to read your own Claude subscription usage so it can show it to you.
 
+One opt-in exception, off by default: **Publish usage** lets you send a daily per-project token-count summary to an endpoint *you* choose, and only for the Claude Code homes you tick. Nothing about your usage comes back to us; if you want it somewhere, you send it to yourself. The 626 Labs dashboard is offered as a preset destination, one among any. Details in the table and the network section below.
+
 ## What data Sanduhr touches
 
 | Data | Where it lives | Who can see it | What Sanduhr does with it |
@@ -17,11 +19,15 @@ The only network destination it contacts is `claude.ai` — and only with the cr
 | `sessionKey` (claude.ai cookie you paste in) | Windows Credential Manager, service `com.626labs.sanduhr`, slot `sessionKey:{Account}` per registered account | Only applications running as your Windows user account | Sent only to `claude.ai` when fetching that account's usage. Multi-account installs (v2.2.0+) store one slot per named account. |
 | `cf_clearance` (optional Cloudflare cookie you paste in) | Windows Credential Manager, same service, slot `cf_clearance:{Account}` per account | Same as above | Sent only to `claude.ai` when fetching that account's usage |
 | Account registry (the list of named accounts and which one is active) | Windows Credential Manager, slots `accounts:list` (JSON array of labels) and `accounts:active` (label string) | Same as above | Used by Sanduhr to route fetches and history writes to the right account. The labels are the names you choose ("Personal", "Work", etc.) — Sanduhr does nothing else with them. |
-| Your Claude usage percentages (the numbers the widget displays) | `%APPDATA%\Sanduhr\history.{Account}.json` per account on your machine | Only your Windows user account | Stored for up to 30 days (rolling) so the widget can draw a sparkline and the History tab can chart trends. Never transmitted anywhere. |
+| Your Claude usage percentages (the numbers the widget displays) | `%APPDATA%\Sanduhr\history.{Account}.json` per account on your machine | Only your Windows user account | Stored for up to 30 days (rolling) so the widget can draw a sparkline and the History tab can chart trends. When the Claude Code snapshot below is missing or stale, `sanduhr-mcp` reads the latest point per tier from this file instead (percentages and reset times only; the account label in the file name is hashed the same way as in the snapshot, never returned). Never transmitted anywhere. |
 | Your local Claude Code usage history (the "vault": one summary row per session (including its subagent transcripts) — project name, day-bucketed token totals per model, skill totals; full folder paths only if the hidden `vault_store_full_paths` setting — off by default — is enabled; never conversation content, never prompts) | `%LOCALAPPDATA%\Sanduhr\vault\` on your machine, one folder per Claude Code home you opt in | Only your Windows user account | Kept **indefinitely — unlike Claude Code's own logs, which Claude Code deletes after ~30 days**. Per-home opt-in at first run; erase any time via Settings ▸ Claude Usage (Erase archive / per-home purge) or by deleting the folder while Sanduhr is not running. Quarantined `.bad` recovery files in the same folder are part of the archive. Never transmitted anywhere. |
 | Vault bookkeeping (`checkpoints.json`) | Same vault folder | Same | Hashed log-file identifiers only — no readable paths. Rebuilt automatically if deleted. |
 | Usage snapshot for the Claude Code statusline (opt-in; exists only while the integration is installed) | `%APPDATA%\Sanduhr\snapshot.json` | Only your Windows user account — read by the statusline script Claude Code runs as you | Percentages, reset times, plan name, and a short account *hash* — **never the account label itself, never keys**. Rewritten each fetch, deleted on account switch, sign-out, or Remove. One caveat: what the statusline renders appears in your terminal like any other on-screen text. Never transmitted anywhere. |
 | Statusline registration (opt-in, chosen home only) | The statusline script at `%APPDATA%\Sanduhr\bin\`, plus a `statusLine` entry in the **one** Claude Code home's `settings.json` you pick at install (a timestamped backup is saved beside it first) | Your Windows user account | Lets Claude Code render your caps under its prompt. "Remove statusline" in Settings ▸ Claude Usage reverts the entry (only if it still points at Sanduhr's script), deletes the script, and deletes the snapshot. |
+| **Publish usage** (opt-in, off by default; no endpoint until you set one; every Claude Code home is unshared until you tick it) | POSTed to the endpoint URL you enter in Settings ▸ Publish usage (or the 626 Labs dashboard preset, `us-central1-project-626labs.cloudfunctions.net`, if you pick it) once a day at the time you set, or when you click "Publish now" / an agent calls the `publish_usage` MCP tool | Whoever operates the endpoint you chose. With the 626 Labs preset, that is your own dashboard account (the key you paste identifies it); 626 Labs receives nothing from any other destination | One record per day and machine: the date, your machine name, which homes you ticked, one token count per project **name** (folder basename only, never the path) from those homes' local Claude Code logs, a per-tier split, and the widget's current quota percentages (or an explicit stale/no-data marker). Never session content, prompts, account labels, or tokens. Body format is the plain snapshot object, or the same fields wrapped the way the 626 Labs preset expects. Re-publishing a day sends that day's record again. Turn it off in Settings ▸ Publish usage; untick a home to stop sharing it. |
+| Publish destination (`settings.json` `publish` group: endpoint URL, auth scheme, header name, preset, publish time, which homes you ticked) | `%APPDATA%\Sanduhr\settings.json` | Your Windows user account | Read to know where and how to publish. Records only *whether* a token is stored, never the token. |
+| Publish token (the credential you paste for your endpoint) | Windows Credential Manager, service `com.626labs.sanduhr`, slot `publish:token` (a pre-3.5 `626labs:agentKey` entry is moved here on first use) | Only applications running as your Windows user account | Sent only to the endpoint you configured, as `Authorization: Bearer`, as a header you name, or not at all if you set auth to None. Never written to a file. "Clear token" in Settings ▸ Publish usage deletes it. |
+| Publish handoff files (only while the `publish_usage` MCP tool is in use) | `%APPDATA%\Sanduhr\publish-request.json` / `publish-result.json` | Your Windows user account | A request id + date, and the upload's status/message. No usage data, no token. Cleared by the widget after each request; a request expires after 24 hours. |
 | Your theme preference and last window position | `%APPDATA%\Sanduhr\settings.json` | Your Windows user account | Read at startup to restore your setup |
 | Operational logs | `%APPDATA%\Sanduhr\sanduhr.log` (rotating, 1 MB × 3 files) | Your Windows user account | Used for troubleshooting. **Never contains your session keys, account labels, `cf_clearance` values, project paths or names, skill names, or session-log contents** — only presence/absence, HTTP status codes, and stack traces. |
 
@@ -34,7 +40,7 @@ The only network destination it contacts is `claude.ai` — and only with the cr
 
 ## Who Sanduhr talks to over the network
 
-Exactly one destination:
+By default, exactly one destination:
 
 - `https://claude.ai/api/organizations` — to discover which Claude organization your account belongs to
 - `https://claude.ai/api/organizations/{your-org-id}/usage` — to read your subscription usage
@@ -43,12 +49,20 @@ These are the same endpoints your browser hits when you visit the claude.ai usag
 
 Anthropic's privacy policy governs what they do with those requests: <https://www.anthropic.com/legal/privacy>.
 
+**Only if you turn on Publish usage** (Settings ▸ Publish usage, off by default, and nothing is sent until you also set an endpoint and tick at least one home) there is a second destination, and you choose it:
+
+- The endpoint URL you enter — any absolute http(s) URL you control — receives the daily per-project token counts described in the table above, authenticated the way you configured (bearer token, a header you name, or no credential).
+- If you pick the **626 Labs dashboard** preset, that URL is `https://us-central1-project-626labs.cloudfunctions.net/mcp/api/manage_usage`, authenticated with the key you mint in your own dashboard's Agents panel, and the record goes only to *your* dashboard account.
+
+Nothing about your usage comes back to us. The short-version promise above ("does not send your data to 626Labs") holds for every install where this toggle stays off or points anywhere other than the 626 Labs preset, which is every install until you flip it and pick that preset.
+
 ## How you remove your data
 
-- **Clear credentials only:** Windows Start → Credential Manager → delete entries under service `com.626labs.sanduhr`. Or: open Sanduhr → Settings → clear the field and save.
+- **Recommended: Sign Out.** Open Sanduhr → Settings → Credentials → save with an empty `sessionKey` for the account you want cleared. This deletes that account's Windows Credential Manager entries and its local history file.
+- **Clear credentials manually:** Windows Start → Credential Manager → delete entries under service `com.626labs.sanduhr`.
 - **Clear local storage:** delete `%APPDATA%\Sanduhr\` and `%LOCALAPPDATA%\Sanduhr\`.
-- **Full uninstall + data wipe:** Start → Apps & features → Sanduhr für Claude → Uninstall, and check "Also remove my settings and history" on the uninstall dialog. Credential Manager entries are cleared automatically on uninstall regardless of that checkbox.
-- **Note for Microsoft Store installs:** uninstalling from Apps & features does **not** remove `%LOCALAPPDATA%\Sanduhr` (Windows leaves per-user app data behind). If you want the usage vault gone after uninstall, delete that folder manually.
+- **Uninstall does not wipe credentials.** Start → Apps & features → Sanduhr für Claude → Uninstall removes the installed app files only. It does **not** delete your Windows Credential Manager entries under `com.626labs.sanduhr`, on either the GitHub (.exe) or Microsoft Store install — sign out first, or delete the entries yourself afterward.
+- **Note for Microsoft Store installs:** uninstalling from Apps & features also does **not** remove `%LOCALAPPDATA%\Sanduhr` (Windows leaves per-user app data behind). If you want the usage vault gone after uninstall, delete that folder manually.
 
 ## Third-party services Sanduhr does not use
 

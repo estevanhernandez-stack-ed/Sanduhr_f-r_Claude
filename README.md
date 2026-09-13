@@ -45,7 +45,7 @@ brew install --cask sanduhr
 and drag to Applications.
 
 - Developer ID signed + Apple-notarized → no Gatekeeper warnings.
-- NSVisualEffectView vibrancy, Keychain-backed credentials.
+- NSVisualEffectView vibrancy. Credentials are currently stored in a permissions-restricted plaintext file (`~/Library/Application Support/Sanduhr/credentials.json`), not Keychain — see [mac/README.md](mac/README.md#first-run).
 - Auto-updates via [Sparkle](https://sparkle-project.org) (24h check
   interval); `brew upgrade --cask sanduhr` also works.
 - Cask lives in [the personal tap][tap]. Submission to core
@@ -56,22 +56,24 @@ and drag to Applications.
 [releases]: https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases
 [tap]: https://github.com/estevanhernandez-stack-ed/homebrew-tap
 
-### Windows 11 — native PySide6
+### Windows 10/11 — native .NET 10 / WPF
 
-Download **`Sanduhr-Setup-vX.Y.Z.exe`** from [Releases](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases), click through the SmartScreen "unknown publisher" warning (signing deferred per [threat model](docs/generated/threat-model.md)), and run the installer.
+**Via the Microsoft Store** (recommended): search **Sanduhr für Claude** (publisher 626Labs LLC) and install. Store-signed, no SmartScreen prompt, updates arrive through the Store.
 
-- Win11 Mica glass backdrop (Win10 falls back to solid theme color).
-- Windows Credential Manager storage (service `com.626labs.sanduhr`, matching the macOS Keychain).
-- Full source under [`windows/`](windows/).
-- **MSIX submission to Microsoft Store is in review** — Store approval eliminates the SmartScreen prompt and unlocks `winget install sanduhr`.
+**Via GitHub Release**: download **`626Labs.Sanduhr-win-Setup.exe`** from [Releases][releases], click through SmartScreen ("More info → Run anyway"; the installer is unsigned, the Store package is the signed path), and run it. Installs per-user and updates itself from the release feed. A portable zip sits on the same page.
 
-### Cross-platform — Python / tkinter (v1)
+- Win11 Mica glass backdrop (Win10 falls back to solid theme color). Windows 10 1809+ / x64.
+- Windows Credential Manager storage (service `com.626labs.sanduhr`). Uninstall does not clear these entries on either channel — use Sign Out first, or delete them from Credential Manager yourself.
+- Full source under [`windows-dotnet/`](windows-dotnet/). The retired Python apps (tkinter v1 and the PySide6 build) were removed on 2026-09-13; they live at tag `legacy/python-v2.3.0`.
+- Step-by-step sign-in, where your data lives, the `.msix` sideload note, and uninstall behaviour: [INSTALL.md](INSTALL.md).
 
-```bash
-python sanduhr.py
-```
+### Claude Code integration — statusline + `sanduhr-mcp` *(Windows 3.4.0+)*
 
-Single-file tkinter app with auto-installing `cloudscraper` dep. Works on macOS, Windows, and Linux. Preserved at repo root for users who prefer running from source. Requires Python 3.8+.
+Settings ▸ Claude Usage ▸ **Install statusline…** puts your usage percentages and reset times under the Claude Code prompt of the one home you pick. After each fetch the widget writes `%APPDATA%\Sanduhr\snapshot.json`; the statusline script and the `sanduhr-mcp` server (`get_usage`, `get_local_burn_by_project`, `ping`, `publish_usage`) read that file and nothing else that could hold a credential.
+
+- **`sanduhr-mcp` requires widget 3.4.0 or later.** Older widgets (the Store's 3.3.0 included) poll and keep history but have no snapshot writer, so the MCP server would read a missing file, or a dead one left behind by a development build. When that happens `get_usage` and `ping` answer `reason: widget_too_old` with the remedy "update it", and serve the widget's latest history point as `status: degraded` (utilization and reset times only) rather than nothing. `widget_not_polling` now means exactly that: nothing on the machine has polled in 15 minutes.
+- Register the server with Claude Code at user scope, never in a project `.mcp.json`: `claude mcp add --scope user sanduhr -- <path to sanduhr-mcp.exe>` (or to the `%APPDATA%\Sanduhr\bin\sanduhr-mcp.cmd` launcher when the widget has installed one). Remove it with `claude mcp remove sanduhr`. Check the pairing any time with the `ping` tool: it reports the widget version that wrote the snapshot against the 3.4.0 floor.
+- Details: [docs/superpowers/specs/2026-07-12-statusline-mcp-design.md](docs/superpowers/specs/2026-07-12-statusline-mcp-design.md), [docs/PRIVACY.md](docs/PRIVACY.md).
 
 ---
 
@@ -99,7 +101,7 @@ Single-file tkinter app with auto-installing `cloudscraper` dep. Works on macOS,
 
 ### Privacy & control
 
-- **OS-native credential storage** — Windows Credential Manager / macOS Keychain. Cleared on uninstall. Never plaintext.
+- **OS-native credential storage on Windows** — Windows Credential Manager (service `com.626labs.sanduhr`). Uninstall does **not** clear these entries on either channel (GitHub `.exe` or Microsoft Store) — use Sign Out (below) first, or delete the entries from Credential Manager yourself. **macOS stores credentials in a permissions-restricted plaintext file today, not Keychain** — see [mac/README.md](mac/README.md#first-run). Keychain migration is planned.
 - **Multi-account support** *(Windows v2.2.0+)* — track multiple Claude accounts (Personal + Work) in one install. Per-account credentials, per-account history, switch active account from the widget label or Settings → Accounts. Sign-out is account-scoped — the others stay intact.
 - **30-day local history** *(Windows v2.1.0+)* — rolling per-account history file in `%APPDATA%\Sanduhr\history.{Account}.json`. Settings → History shows a stacked per-tier line chart with Week / Month windows + per-account / All-accounts overlay views. Export as CSV to analyze with any agent.
 - **One-click sign-out** — Settings → Credentials → save with an empty sessionKey. Confirmation dialog, then that account's credentials and history are wiped from the OS store. Other accounts left intact.
@@ -145,7 +147,7 @@ Prefer to paste the key by hand, or running the cross-platform Python build?
 4. Copy the value of the `sessionKey` cookie.
 5. Paste it into Sanduhr (Windows native: **Settings → Accounts → Add by sessionKey**).
 
-Sanduhr hits two `claude.ai` endpoints — the same ones the settings page uses — to read your usage, and stores the cookie in your platform's native secure credential store (Keychain / Credential Manager). Nothing else leaves your machine.
+Sanduhr hits two `claude.ai` endpoints — the same ones the settings page uses — to read your usage, and stores the cookie in Windows Credential Manager on Windows or, on macOS today, a permissions-restricted plaintext file (not Keychain; migration planned). Nothing else leaves your machine.
 
 ---
 
@@ -213,7 +215,7 @@ Full keybindings documented in the in-app **Settings → Help** tab.
 
 ### Up next
 
-- [ ] Microsoft Store listing live (in review)
+- [x] Microsoft Store listing live (since v3.1.0 on the .NET build)
 - [x] Homebrew install available via `estevanhernandez-stack-ed/tap` ([repo](https://github.com/estevanhernandez-stack-ed/homebrew-tap))
 - [ ] Homebrew cask submission to core `Homebrew/homebrew-cask` (pending notability bar)
 - [ ] winget manifest (pending MS Store cert)

@@ -11,10 +11,33 @@ The app makes exactly one kind of outbound network request: HTTPS to
 `claude.ai`, using **your own session cookie**, to read **your own** usage
 numbers from the same endpoints the claude.ai settings page already calls.
 
-Your session cookie is stored in your platform's native secure credential
-store (Windows Credential Manager or macOS Keychain). It never touches a
-plaintext file on disk, never goes over the network to anyone except
-`claude.ai`, and is wiped when you uninstall.
+The single exception is opt-in, off by default, and points where *you* say:
+**Publish usage** (Windows, Settings ▸ Publish usage) posts a daily
+per-project token-count summary to an endpoint URL you configure,
+authenticated the way you choose (bearer token, a header you name, or none),
+with the token stored in Windows Credential Manager under
+`com.626labs.sanduhr`, slot `publish:token`. Nothing about your usage comes
+back to us: the 626 Labs dashboard is offered as one preset destination, and
+if you pick it the record goes to your own dashboard account with a key you
+minted there. Nothing is sent unless the toggle is on, an endpoint is set,
+and at least one Claude Code home is ticked; only ticked homes are
+included, and only project folder names, never paths or content. The
+`sanduhr-mcp` server cannot perform that upload itself: it holds no token
+and makes no network calls; it hands the request to the widget. See
+[docs/PRIVACY.md](docs/PRIVACY.md) for the exact payload.
+
+Your session cookie is stored in Windows Credential Manager on Windows
+(service `com.626labs.sanduhr`). On macOS it is currently stored in a
+permissions-restricted plaintext file at `~/Library/Application
+Support/Sanduhr/credentials.json` (mode `0600`, readable only by your user
+account) — not the Keychain; migrating to the Keychain is next now that the
+macOS build ships Developer ID signed and notarized. Either way it never
+goes over the network to anyone except `claude.ai`. **Uninstalling Sanduhr
+does not remove these credentials**, on Windows (either the GitHub `.exe`
+or Microsoft Store install) or on macOS — use Sign Out in the app to clear
+an account's credentials before you uninstall, or delete them manually
+(Windows Credential Manager entries under `com.626labs.sanduhr`; the macOS
+file above).
 
 Multi-account installs (v2.2.0+) store one session cookie per named account
 using slot names like `sessionKey:Personal` and `sessionKey:Work` under the
