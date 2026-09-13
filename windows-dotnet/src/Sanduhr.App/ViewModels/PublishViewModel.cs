@@ -168,10 +168,10 @@ public sealed partial class PublishViewModel : ObservableObject
             return;
         try
         {
-            var w = new AgentKeyWindow { Owner = _owner };
-            if (w.ShowDialog() == true && !string.IsNullOrWhiteSpace(w.Key))
+            var w = new PublishTokenWindow { Owner = _owner };
+            if (w.ShowDialog() == true && !string.IsNullOrWhiteSpace(w.Token))
             {
-                _service.SaveKey(w.Key);
+                _service.SaveToken(w.Token);
                 RefreshKey();
                 RefreshStatus();
             }
@@ -195,7 +195,7 @@ public sealed partial class PublishViewModel : ObservableObject
                 primaryLabel: "Remove key", secondaryLabel: "Keep it");
             if (res != MessageBoxResult.Yes)
                 return;
-            _service.ClearKey();
+            _service.ClearToken();
             RefreshKey();
             RefreshStatus();
         }
@@ -244,7 +244,7 @@ public sealed partial class PublishViewModel : ObservableObject
     {
         if (_service is null)
             return;
-        HasKey = _service.HasKey;
+        HasKey = _service.HasToken;
         KeyStatusText = HasKey
             ? "Agent key stored in Windows Credential Manager."
             : "No agent key stored.";

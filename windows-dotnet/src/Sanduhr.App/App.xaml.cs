@@ -69,7 +69,7 @@ public partial class App : Application
             new SettingsStore(new Sanduhr.Core.Paths()),
             _vm.CcReader,
             new Sanduhr.Core.Paths(),
-            new AgentKeyStore(new WindowsCredentialManager(AccountStore.Service))));
+            new PublishTokenStore(new WindowsCredentialManager(AccountStore.Service))));
 
         // Statusline bridge (WS-E): the script has no update channel of its own —
         // the widget is its updater. Refresh the installed copy on every start
