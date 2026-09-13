@@ -83,13 +83,13 @@ public sealed class UsagePublishService
     public void SaveKey(string key)
     {
         _keys.Save(key);
-        _settings.SavePublishKeyStored(HasKey);
+        _settings.SavePublishTokenStored(HasKey);
     }
 
     public void ClearKey()
     {
         _keys.Clear();
-        _settings.SavePublishKeyStored(false);
+        _settings.SavePublishTokenStored(false);
     }
 
     // -- the tick hook ------------------------------------------------------------
