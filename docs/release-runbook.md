@@ -165,8 +165,7 @@ pick up the delta.
 
 ## Phase 7 — Microsoft Store submission
 
-Two halves, two tools, one submission. **The package goes in by hand in Partner Center; the
-listing text goes in through the Store Listing Console's API writer.** Measured on RoRoRo v1.28
+Two halves, two tools, one submission, **and the API must create it.** The Ingestion API can only update, delete, or commit a submission it created itself; one started by hand in Partner Center is invisible to it (HTTP 409 InvalidState on write, 400 on delete, measured on 3.4.0). So: `apply` first, which creates the submission and writes the listing text; then the package goes in by hand in Partner Center on that same submission. Measured on RoRoRo v1.28
 (submission 1152921505701878932, 2026-09-12): a submission created through the API, with listings
 written through the API and both MSIX packages uploaded by hand, committed and reconciled in about
 two minutes. The old "one-way door" rule (never mix API and Partner Center on one submission) was
@@ -186,19 +185,22 @@ reviewer letters stay here because they never go through the API.
    ```powershell
    python engine/console.py apps/sanduhr --json     # -> out/sanduhr-listing.json; ready + apiReady must hold
    ```
-2. **Package by hand.** Partner Center → Apps → **Sanduhr für Claude** → **Packages**. Drag
+3. **Package by hand, on the submission the API created.** Partner Center → Apps → **Sanduhr für Claude** → **Packages**. Drag
    `windows-dotnet/dist/Sanduhr-Store-v<v>.msix` into the slot and wait for upload + validation.
-   If validation rejects on version (4th component non-zero), bump and re-run Phase 3. Save the
-   package section. The Store Listing Console cannot upload packages; this step is always yours.
-3. **Listing text through the API.** From `Store-Listing-Console` (setup once per machine per
+   If validation rejects on version (4th component non-zero), bump and re-run Phase 3. If it rejects
+   the display name as unreserved with a mangled umlaut, the staged manifest was read as ANSI; see the
+   gotcha log. Save the package section. The Store Listing Console cannot upload packages; this step is
+   always yours. Captions are media fields the API never sends: set them here by hand.
+2. **Listing text through the API, which creates the submission.** From `Store-Listing-Console` (setup once per machine per
    `docs/api-setup.md`; `python engine/submit_api.py apps` must answer):
    ```powershell
    python engine/submit_api.py apps                                                # numeric app id for Sanduhr
    python engine/submit_write.py plan  <appId> --payload out/sanduhr-listing.json   # diff, nothing sent
    python engine/submit_write.py apply <appId> --payload out/sanduhr-listing.json   # writes what's-new, description, features, keywords, copyright, license, developed-by
    ```
-   `apply` creates or reuses the in-progress submission (the one holding your package from step 2)
-   and writes text only. It never touches images, packages, or trailers, and **it never writes
+   `apply` creates the in-progress submission and writes text only (`--i-understand-the-one-way-door` is the
+   flag's historical name; the door is gone, the flag stays). If Partner Center already holds a pending
+   submission you started by hand, delete it there first; the API cannot touch it. It never touches images, packages, or trailers, and **it never writes
    product names** (the title-collapse incident stands; names are set under Manage app names by
    hand). It refuses over-cap text instead of letting the Store truncate silently.
 4. **Notes for certification: browser only.** Partner Center → the submission → Notes for
