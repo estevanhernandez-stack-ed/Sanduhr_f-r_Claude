@@ -138,7 +138,7 @@ git push origin <branch>
 git push origin v<v>
 ```
 
-If CI builds the Velopack release on tag push (a `release.yml` like RORORO's), let it draft the
+`windows-dotnet-release.yml` runs on the `v<v>` tag: it tests the solution, builds the Store MSIX, and drafts the GitHub Release with the MSIX attached. Let it draft the
 GitHub Release. **Draft, not published** — a botched build can't go live silently. Otherwise build
 locally (Phase 4) and draft manually.
 
@@ -165,20 +165,63 @@ pick up the delta.
 
 ## Phase 7 — Microsoft Store submission
 
-1. Partner Center → Apps → **Sanduhr für Claude** → **Packages**.
-2. Drag `windows-dotnet/dist/Sanduhr-Store-v<v>.msix` into the Packages slot. Wait for upload +
-   validation. If validation rejects on version (4th component non-zero), bump and re-run Phase 3.
-3. **Notes for certification** — paste the `---` block from `docs/store/reviewer-letter-<v>.md`
-   (reviewer-only; leads with the disclosure-surface change + the trademark disclaimer).
-4. **Store listing → "What's new in this version"** — paste the public update note.
-   **DO NOT SKIP — this is the public field, separate from Notes for certification (step 3).** Both
-   must be filled every release.
-   Also sync **Store listing → Product features** from
-   [`store/product-features.md`](store/product-features.md) (the tracked source of truth —
-   20-bullet cap, plain text only; update the file first, then paste).
-5. Confirm the 10.1.4.4 surfaces are still clean (the three sub-clauses, below).
-6. **Submit.** Status: *In submission* → *Certification* → *Publishing* (success) or *Failed*.
-   Turnaround: typically 2-3 hours (observed across 3.1-3.3 submissions), occasionally overnight depending on submission time; plan for 24-72h worst case. A pending submission is replaced by the new one (no duplicates).
+Two halves, two tools, one submission. **The package goes in by hand in Partner Center; the
+listing text goes in through the Store Listing Console's API writer.** Measured on RoRoRo v1.28
+(submission 1152921505701878932, 2026-09-12): a submission created through the API, with listings
+written through the API and both MSIX packages uploaded by hand, committed and reconciled in about
+two minutes. The old "one-way door" rule (never mix API and Partner Center on one submission) was
+a blindness, not a door: **neither tool sees the other's edits until the commit.** While the
+submission is PendingCommit, Partner Center shows the listings as "Unchanged" and the API reports
+the previous packages. Both views are incomplete and neither is lying. Verify each half from the
+side that made it, and do not read the API as an oracle for the package half.
+
+Copy source of truth from 3.4.0 on: `Store-Listing-Console/apps/sanduhr/copy/` (listing copy,
+voice profile, `whats-new-<v>.md`). `docs/store/` in this repo is the archive of what shipped; the
+reviewer letters stay here because they never go through the API.
+
+1. **Copy first.** In `Store-Listing-Console`, update `apps/sanduhr/copy/whats-new-<v>.md` (and
+   `listing-copy.md` if the description, features, keywords, or copyright changed) through the
+   voice pipeline: read `voice.md`, draft, copy-review, promote on Este's approval. Rebuild the
+   payload and check the gates:
+   ```powershell
+   python engine/console.py apps/sanduhr --json     # -> out/sanduhr-listing.json; ready + apiReady must hold
+   ```
+2. **Package by hand.** Partner Center → Apps → **Sanduhr für Claude** → **Packages**. Drag
+   `windows-dotnet/dist/Sanduhr-Store-v<v>.msix` into the slot and wait for upload + validation.
+   If validation rejects on version (4th component non-zero), bump and re-run Phase 3. Save the
+   package section. The Store Listing Console cannot upload packages; this step is always yours.
+3. **Listing text through the API.** From `Store-Listing-Console` (setup once per machine per
+   `docs/api-setup.md`; `python engine/submit_api.py apps` must answer):
+   ```powershell
+   python engine/submit_api.py apps                                                # numeric app id for Sanduhr
+   python engine/submit_write.py plan  <appId> --payload out/sanduhr-listing.json   # diff, nothing sent
+   python engine/submit_write.py apply <appId> --payload out/sanduhr-listing.json   # writes what's-new, description, features, keywords, copyright, license, developed-by
+   ```
+   `apply` creates or reuses the in-progress submission (the one holding your package from step 2)
+   and writes text only. It never touches images, packages, or trailers, and **it never writes
+   product names** (the title-collapse incident stands; names are set under Manage app names by
+   hand). It refuses over-cap text instead of letting the Store truncate silently.
+4. **Notes for certification: browser only.** Partner Center → the submission → Notes for
+   certification: paste the `---` block from `docs/store/reviewer-letter-<v>.md` (reviewer-only;
+   leads with the disclosure-surface change + the trademark disclaimer). `notesForCertification`
+   never appears through the API, before or after commit, so this field is confirmed in Partner
+   Center or not at all.
+5. **Check both halves from the side that made them.** Partner Center: package version and
+   architecture on the Packages page. API: `python engine/submit_api.py inspect <appId>` shows the
+   listing text you applied. Expect each side to show the other's work as missing or unchanged
+   until the commit; that is the reconciliation gap, not a failure.
+6. **Confirm the 10.1.4.4 surfaces are still clean** (the three sub-clauses, below).
+7. **Commit from the console, on Este's typed word:**
+   ```powershell
+   python engine/submit_write.py commit <appId> --submission <id> --yes
+   ```
+   A committed submission goes through certification again, text-only change or not. Status:
+   *In submission* → *Certification* → *Publishing* (success) or *Failed*. Turnaround: typically
+   2-3 hours (observed across 3.1-3.3), occasionally overnight; plan for 24-72h worst case. If the
+   commit is refused, `submit_write.py discard <appId> --submission <id> --yes` is the escape
+   hatch; a cancelled-and-recommitted submission is not uncommittable (also measured 2026-09-12).
+8. After certification, copy the shipped `whats-new-<v>.md` and any changed listing text into
+   `docs/store/listing-copy-<v>.md` here, so the archive stays complete.
 
 ### The 10.1.4.4 acceptance tests (from the Python build's two rejections)
 
