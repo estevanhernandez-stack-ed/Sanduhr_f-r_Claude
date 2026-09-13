@@ -10,6 +10,10 @@
   - snapshot older than 15 minutes, no fresh history, written by 3.4.0 or later → `status: stale`, `reason: widget_not_polling`, as before.
 - `ping` gains `required_widget_version`, `snapshot_writer_meets_floor`, `history_found` / `history_age_seconds` / `history_fresh`, and `usage_status` / `usage_reason` / `remedy` (the same diagnosis `get_usage` returns). The `get_usage` and `ping` tool descriptions state the floor.
 
+### Fixed
+
+- **Settings dropdowns showed the option's type name when closed.** The Publish usage Preset and Auth boxes (and the History account selector) rendered `PublishPresetOption { Value = ...` instead of the label once the list was closed; the open list was fine. The themed ComboBox template now honors `DisplayMemberPath` in the closed box the way the stock WPF template does.
+
 ## v3.4.0 — 2026-09-13
 
 **Platform:** Windows (.NET 10 / WPF).
