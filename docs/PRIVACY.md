@@ -1,6 +1,6 @@
 # Privacy Policy — Sanduhr für Claude
 
-**Last updated:** 2026-07-26
+**Last updated:** 2026-09-13
 **Publisher:** 626Labs LLC
 **Contact:** [GitHub Issues](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/issues)
 
@@ -9,6 +9,8 @@
 Sanduhr für Claude is a **local desktop widget**. It does not run a server, does not have a backend, does not collect analytics, does not call home, and does not send your data to 626Labs or any third party.
 
 The only network destination it contacts is `claude.ai` — and only with the credentials you yourself paste into it — to read your own Claude subscription usage so it can show it to you.
+
+One opt-in exception, off by default: **Publish to 626 Labs** sends a daily per-project token-count summary to *your own* 626 Labs dashboard account, and only for the Claude Code homes you tick. Details in the table and the network section below.
 
 ## What data Sanduhr touches
 
@@ -22,6 +24,9 @@ The only network destination it contacts is `claude.ai` — and only with the cr
 | Vault bookkeeping (`checkpoints.json`) | Same vault folder | Same | Hashed log-file identifiers only — no readable paths. Rebuilt automatically if deleted. |
 | Usage snapshot for the Claude Code statusline (opt-in; exists only while the integration is installed) | `%APPDATA%\Sanduhr\snapshot.json` | Only your Windows user account — read by the statusline script Claude Code runs as you | Percentages, reset times, plan name, and a short account *hash* — **never the account label itself, never keys**. Rewritten each fetch, deleted on account switch, sign-out, or Remove. One caveat: what the statusline renders appears in your terminal like any other on-screen text. Never transmitted anywhere. |
 | Statusline registration (opt-in, chosen home only) | The statusline script at `%APPDATA%\Sanduhr\bin\`, plus a `statusLine` entry in the **one** Claude Code home's `settings.json` you pick at install (a timestamped backup is saved beside it first) | Your Windows user account | Lets Claude Code render your caps under its prompt. "Remove statusline" in Settings ▸ Claude Usage reverts the entry (only if it still points at Sanduhr's script), deletes the script, and deletes the snapshot. |
+| **Publish to 626 Labs** (opt-in, off by default; every Claude Code home is unshared until you tick it) | Sent to the 626 Labs dashboard (`us-central1-project-626labs.cloudfunctions.net`) once a day at the time you set, or when you click "Publish now" / an agent calls the `publish_usage` MCP tool | Your 626 Labs dashboard account (the agent key you paste identifies it) | One record per day and machine: the date, your machine name, which homes you ticked, one token count per project **name** (folder basename only, never the path) from those homes' local Claude Code logs, a per-tier split, and the widget's current quota percentages (or an explicit stale/no-data marker). Never session content, prompts, account labels, or keys. Re-publishing a day replaces that day's record. Turn it off in Settings ▸ 626 Labs; untick a home to stop sharing it. |
+| 626 Labs agent key (the key you paste for publishing) | Windows Credential Manager, service `com.626labs.sanduhr`, slot `626labs:agentKey` | Only applications running as your Windows user account | Sent only to the 626 Labs dashboard as a bearer token when publishing. Never written to a file; `settings.json` records only whether a key is present. "Clear key" in Settings ▸ 626 Labs deletes it. |
+| Publish handoff files (only while the `publish_usage` MCP tool is in use) | `%APPDATA%\Sanduhr\publish-request.json` / `publish-result.json` | Your Windows user account | A request id + date, and the upload's status/message. No usage data, no key. Cleared by the widget after each request; a request expires after 24 hours. |
 | Your theme preference and last window position | `%APPDATA%\Sanduhr\settings.json` | Your Windows user account | Read at startup to restore your setup |
 | Operational logs | `%APPDATA%\Sanduhr\sanduhr.log` (rotating, 1 MB × 3 files) | Your Windows user account | Used for troubleshooting. **Never contains your session keys, account labels, `cf_clearance` values, project paths or names, skill names, or session-log contents** — only presence/absence, HTTP status codes, and stack traces. |
 
@@ -34,7 +39,7 @@ The only network destination it contacts is `claude.ai` — and only with the cr
 
 ## Who Sanduhr talks to over the network
 
-Exactly one destination:
+By default, exactly one destination:
 
 - `https://claude.ai/api/organizations` — to discover which Claude organization your account belongs to
 - `https://claude.ai/api/organizations/{your-org-id}/usage` — to read your subscription usage
@@ -42,6 +47,12 @@ Exactly one destination:
 These are the same endpoints your browser hits when you visit the claude.ai usage page. Sanduhr acts on your behalf using the cookie you paste in — it is not a separate account or identity.
 
 Anthropic's privacy policy governs what they do with those requests: <https://www.anthropic.com/legal/privacy>.
+
+**Only if you turn on Publish to 626 Labs** (Settings ▸ 626 Labs, off by default) there is a second destination:
+
+- `https://us-central1-project-626labs.cloudfunctions.net/mcp/api/manage_usage` — to record the daily per-project token counts described in the table above, authenticated with the agent key you paste in.
+
+This is the one case where data goes to 626 Labs, and it goes only to *your* dashboard account. The short-version promise above ("does not send your data to 626Labs") holds for every install where this toggle stays off, which is every install until you flip it.
 
 ## How you remove your data
 

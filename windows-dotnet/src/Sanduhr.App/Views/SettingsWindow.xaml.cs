@@ -56,6 +56,8 @@ internal partial class SettingsWindow : Window
         ViewModel.ClaudeCode.Overview.AttachOwner(this);
         ViewModel.ClaudeCode.Ledger.AttachOwner(this);
         ViewModel.ClaudeCode.Attach();
+        ViewModel.Publish.AttachOwner(this);
+        ViewModel.Publish.Attach();
 
         // Bridge the custom-render controls to their VMs.
         ViewModel.History.Changed += RenderHistory;
@@ -72,6 +74,7 @@ internal partial class SettingsWindow : Window
             ViewModel.ClaudeCode.Trends.Changed -= RenderTrends;
             CalendarStrip.DayClicked -= OnCalendarDayClicked;
             ViewModel.ClaudeCode.Detach();
+            ViewModel.Publish.Detach();
         };
     }
 

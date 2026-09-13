@@ -32,6 +32,10 @@ public sealed class SettingsViewModel
     /// toggles, sound + snake sting, and the test-alert button.</summary>
     public AlertsViewModel Alerts { get; }
 
+    /// <summary>Backs the 626 Labs tab: daily usage publish (opt-in, per-home
+    /// share map, agent key, publish-now, status).</summary>
+    public PublishViewModel Publish { get; }
+
     /// <summary>Assembly version for the General tab footer (e.g. "3.0.0").</summary>
     public string Version { get; }
 
@@ -50,6 +54,7 @@ public sealed class SettingsViewModel
             widget.AlertService?.DeliverTest();
             return Task.CompletedTask;
         });
+        Publish = new PublishViewModel(widget.Publish);
         var v = Assembly.GetExecutingAssembly().GetName().Version;
         Version = v is null ? "3.0.0" : $"{v.Major}.{v.Minor}.{v.Build}";
     }

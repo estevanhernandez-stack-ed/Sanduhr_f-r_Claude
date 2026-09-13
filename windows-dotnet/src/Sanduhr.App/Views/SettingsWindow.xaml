@@ -1242,6 +1242,85 @@
                     </Border>
                 </TabItem>
 
+                <!-- 626 Labs tab: opt-in daily usage publish. Everything defaults OFF —
+                     master toggle, every home — and the one sentence above the controls
+                     says exactly what leaves the machine. -->
+                <TabItem Header="626 Labs" DataContext="{Binding Publish}">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="20">
+                        <StackPanel>
+                            <TextBlock Text="Publish to 626 Labs" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
+                            <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,10"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                       Text="Once a day this sends your 626 Labs dashboard one token count per project name (from the local Claude Code logs of the homes you tick) plus your current quota percentages - and nothing else leaves this machine." />
+
+                            <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                      Content="Publish daily to 626 Labs"
+                                      IsChecked="{Binding Enabled, Mode=TwoWay}" Margin="0,0,0,10" />
+
+                            <TextBlock Text="Homes to share (off until you tick them)" FontSize="9" Margin="0,0,0,4"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            <ItemsControl ItemsSource="{Binding Roots}" Margin="0,0,0,10">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,16,4"
+                                                  Content="{Binding Name}"
+                                                  IsChecked="{Binding IsShared, Mode=TwoWay}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                                <TextBlock Text="Publish at" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                <TextBox Style="{StaticResource Input}" Width="64"
+                                         Text="{Binding PublishTimeText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                                <TextBlock Text="(24-hour, local time; publishes the previous day)" FontSize="10.5"
+                                           VerticalAlignment="Center" Margin="8,0,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                            </StackPanel>
+                            <TextBlock FontSize="10.5" Margin="0,0,0,8"
+                                       Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                       Text="{Binding TimeError}"
+                                       Visibility="{Binding TimeError, Converter={StaticResource StrVis}}" />
+
+                            <TextBlock Text="Agent key" FontSize="9" Margin="0,4,0,4"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            <StackPanel Orientation="Horizontal">
+                                <Button Style="{StaticResource FlatButton}" Content="Set agent key…"
+                                        Command="{Binding SetKeyCommand}"
+                                        ToolTip="Paste the agent API key from your 626 Labs dashboard. Stored in Windows Credential Manager, never in a file." />
+                                <Button Style="{StaticResource FlatButton}" Content="Clear key"
+                                        Command="{Binding ClearKeyCommand}"
+                                        Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                        Visibility="{Binding HasKey, Converter={StaticResource BoolVis}}" />
+                                <TextBlock Text="{Binding KeyStatusText}" FontSize="10.5" VerticalAlignment="Center"
+                                           Margin="8,0,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,14,0,12" />
+
+                            <StackPanel Orientation="Horizontal">
+                                <Button Style="{StaticResource AccentButton}" Content="Publish now"
+                                        Command="{Binding PublishNowCommand}"
+                                        ToolTip="Publish yesterday's totals right now, regardless of the schedule." />
+                            </StackPanel>
+                            <TextBlock TextWrapping="Wrap" FontSize="10.5" Margin="0,8,0,0"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                       Text="{Binding StatusText}" />
+                            <TextBlock TextWrapping="Wrap" FontSize="10" Margin="0,10,0,0"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                       Text="The sanduhr-mcp publish_usage tool queues the same upload through this widget; it never holds the key itself. Re-publishing a day replaces the dashboard's record for it." />
+                        </StackPanel>
+                    </Border>
+                </TabItem>
+
                 <!-- General tab — thin; room for item 10. -->
                 <TabItem Header="General">
                     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="20">

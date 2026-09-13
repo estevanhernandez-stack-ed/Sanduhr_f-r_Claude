@@ -18,6 +18,18 @@ public sealed record UsageEvent(
     string? Cwd,
     string? AttributionSkill);
 
+/// <summary>One Claude Code home's burn for ONE local calendar day: total,
+/// by project basename, by Sanduhr tier. Produced by
+/// <see cref="CcLogReader.BurnForLocalDay"/>; consumed by the 626 Labs
+/// publisher (<c>UsagePublisher.BuildPayload</c>). Lives here, not beside the
+/// publisher, because this file is source-linked into sanduhr-mcp and the
+/// publisher is deliberately not.</summary>
+public sealed record RootDayBurn(
+    string Root,
+    long Total,
+    IReadOnlyDictionary<string, long> ByProject,
+    IReadOnlyDictionary<string, long> ByTier);
+
 /// <summary>Single-pass aggregation for the Local CC tab —
 /// <c>{by_day, by_project, by_skill}</c> plus the per-day sent/received split
 /// (<c>ByDayInput</c>/<c>ByDayOutput</c>, accumulated under the same
@@ -418,6 +430,53 @@ public sealed class CcLogReader
             _todayCacheResult = result;
         }
         return result;
+    }
+
+    /// <summary>Date-bounded, per-root burn for ONE local calendar day — the
+    /// publisher's source (the relative 1/7/30-day windows serve the MCP burn
+    /// tool; a daily upload needs a closed day). Scans only <paramref name="rootPath"/>
+    /// (per-root keying is the tenant wall — the merged <see cref="DiscoverLogFiles"/>
+    /// walk must not be used here). Projects are keyed by basename; events without
+    /// a cwd stay visible as <c>(unknown)</c>; models with no tier mapping count
+    /// toward the total but not <c>ByTier</c>. Uncached — one call per day.</summary>
+    public RootDayBurn BurnForLocalDay(string rootName, string rootPath, DateOnly day)
+    {
+        // mtime prefilter anchored at the DAY's local midnight (offset at
+        // midnight, not now — the AggregateTodayOnly DST lesson).
+        var midnightLocal = day.ToDateTime(TimeOnly.MinValue);
+        var midnightUtc = new DateTimeOffset(
+            midnightLocal, TimeZoneInfo.Local.GetUtcOffset(midnightLocal)).ToUniversalTime();
+
+        long total = 0;
+        var byProject = new Dictionary<string, long>(StringComparer.Ordinal);
+        var byTier = new Dictionary<string, long>(StringComparer.Ordinal);
+
+        string projects = Path.Combine(rootPath, "projects");
+        if (!Directory.Exists(projects))
+            return new RootDayBurn(rootName, 0, byProject, byTier);
+
+        foreach (var projectDir in Directory.GetDirectories(projects))
+        {
+            foreach (var path in Directory.GetFiles(projectDir, "*.jsonl", SearchOption.AllDirectories))
+            {
+                if (!FileMtimeAfter(path, midnightUtc))
+                    continue;
+                foreach (var ev in IterUsageEvents(path))
+                {
+                    if (ev.Timestamp is null || LocalDate(ev.Timestamp.Value) != day)
+                        continue;
+                    var tokens = Tokens(ev);
+                    if (tokens <= 0)
+                        continue;
+                    total += tokens;
+                    string project = ev.Cwd is { Length: > 0 } cwd ? ProjectDisplayName(cwd) : "(unknown)";
+                    byProject[project] = byProject.GetValueOrDefault(project) + tokens;
+                    if (TierForModel(ev.Model) is { } tier)
+                        byTier[tier] = byTier.GetValueOrDefault(tier) + tokens;
+                }
+            }
+        }
+        return new RootDayBurn(rootName, total, byProject, byTier);
     }
 
     /// <summary>Force the next <see cref="AggregateForLocalCcTab"/> to recompute.</summary>

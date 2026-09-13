@@ -21,14 +21,23 @@ public sealed class SnapshotWriter
 {
     private readonly string _path;
     private readonly Action<string>? _logBestEffort;
+    private readonly string _writerVersion;
 
     /// <param name="snapshotPath">Full path of snapshot.json (injected for tests).</param>
     /// <param name="logBestEffort">Optional failure logger — receives one line
     /// per failed operation, never account labels or file contents.</param>
-    public SnapshotWriter(string snapshotPath, Action<string>? logBestEffort = null)
+    /// <param name="writerVersion">The WIDGET's version, stamped as
+    /// <c>writer_version</c> so readers can tell a dev build's file from the
+    /// installed release's. Defaults to this assembly's version — which is Core's
+    /// unversioned "1.0.0", the tell that produced the 2026-09-13 stale-snapshot
+    /// confusion (a dev build wrote the file; the installed 3.3.0 widget predates
+    /// the writer and never touched it). The App passes its own version.</param>
+    public SnapshotWriter(string snapshotPath, Action<string>? logBestEffort = null, string? writerVersion = null)
     {
         _path = snapshotPath;
         _logBestEffort = logBestEffort;
+        _writerVersion = writerVersion
+            ?? typeof(SnapshotWriter).Assembly.GetName().Version?.ToString(3) ?? "unknown";
     }
 
     /// <summary>Write a status=ok snapshot from a successful fetch payload.
@@ -36,7 +45,7 @@ public sealed class SnapshotWriter
     /// null for count-based rows like routines, which carry used/limit).</summary>
     public void WriteOk(JsonObject payload, string? plan, string? accountLabel, DateTimeOffset now)
     {
-        var root = BuildCommon(plan, accountLabel, now);
+        var root = BuildCommon(plan, accountLabel, now, _writerVersion);
         root["status"] = "ok";
         root["error_kind"] = null;
         root["tiers"] = BuildTiers(payload);
@@ -54,7 +63,7 @@ public sealed class SnapshotWriter
         if (existing?["tiers"] is JsonArray tiers)
             lastGoodTiers = (JsonArray)tiers.DeepClone();
 
-        var root = BuildCommon(plan, accountLabel, now);
+        var root = BuildCommon(plan, accountLabel, now, _writerVersion);
         root["status"] = "error";
         root["error_kind"] = errorKind;
         root["tiers"] = lastGoodTiers;
@@ -76,11 +85,11 @@ public sealed class SnapshotWriter
         }
     }
 
-    private static JsonObject BuildCommon(string? plan, string? accountLabel, DateTimeOffset now)
+    private static JsonObject BuildCommon(string? plan, string? accountLabel, DateTimeOffset now, string writerVersion)
         => new()
         {
             ["schema_version"] = SnapshotContract.SchemaVersion,
-            ["writer_version"] = typeof(SnapshotWriter).Assembly.GetName().Version?.ToString(3) ?? "unknown",
+            ["writer_version"] = writerVersion,
             // UsageHistory.NowIso precedent: 6-digit fractional seconds + explicit offset.
             ["captured_at"] = now.ToUniversalTime()
                 .ToString("yyyy-MM-ddTHH:mm:ss.ffffffzzz", CultureInfo.InvariantCulture),

@@ -7,7 +7,8 @@
   "x-contract": {
     "staleness_seconds": { "fresh_below": 450, "dead_above": 900 },
     "status_enum": ["ok", "stale", "no_data"],
-    "reason_enum": ["missing", "malformed", "disabled", "widget_not_polling", "schema_unsupported", "invalid_params"],
+    "reason_enum": ["missing", "malformed", "disabled", "widget_not_polling", "schema_unsupported", "invalid_params", "publishing_off", "no_agent_key", "widget_not_responding", "unavailable", "request_write_failed", "busy"],
+    "publish_status_enum": ["ok", "error", "disabled", "no_key", "queued", "no_data"],
     "fetch_error_enum": ["session_expired", "cloudflare", "network"],
     "reason_vs_fetch_error": "separate channels: reason covers data availability, fetch_error covers widget-fetch failures carried in an otherwise-served snapshot; both can be null",
     "failure_shape": "typed tool results carrying status/reason/remedy - NEVER MCP protocol errors, never isError:true",
@@ -25,7 +26,7 @@
       "kind": "read",
       "transport": { "type": "stdio-mcp", "method": "tools/call", "path": "/get_usage" },
       "input": null,
-      "output": { "shape": "status, reason, remedy, fetch_error, as_of, age_seconds, scope:'active_account_only', account{ref,plan}, data_lag_note, schema_version, tiers[{key,label,utilization_pct,headroom_pct,resets_at,resets_in_seconds,reset_crossed,pace{verdict,delta_pct}|null,projection{expires_before_reset,expires_in_seconds}|null,used,limit}], local_burn_since_snapshot{total_tokens,by_tier,caveat}|null" },
+      "output": { "shape": "status, reason, remedy, fetch_error, as_of, age_seconds, writer_version, scope:'active_account_only', account{ref,plan}, data_lag_note, schema_version, tiers[{key,label,utilization_pct,headroom_pct,resets_at,resets_in_seconds,reset_crossed,pace{verdict,delta_pct}|null,projection{expires_before_reset,expires_in_seconds}|null,used,limit}], local_burn_since_snapshot{total_tokens,by_tier,caveat}|null" },
       "auth": "none",
       "authDetail": "none-local-ambient: stdio child of the user's own CLI; ambient user authority. A token here would be theater - any local process can read snapshot.json directly.",
       "destructive": false,
@@ -65,7 +66,7 @@
       "kind": "read",
       "transport": { "type": "stdio-mcp", "method": "tools/call", "path": "/ping" },
       "input": null,
-      "output": { "shape": "server_version, snapshot_schema_supported, snapshot_path, snapshot_found, snapshot_age_seconds, cc_roots_found[], cc_roots_consented[]" },
+      "output": { "shape": "server_version, snapshot_schema_supported, snapshot_path, snapshot_found, snapshot_age_seconds, snapshot_writer_version, cc_roots_found[], cc_roots_consented[]" },
       "auth": "none",
       "authDetail": "none-local-ambient",
       "destructive": false,
@@ -76,6 +77,26 @@
         "at": "2026-07-27T04:00:00Z",
         "runId": "af4bba22938cc9f2a",
         "detail": "Cold-agent pass: snapshot_found/age/path all matched the env-selected fixture; consented reflected the override while found reported the real machine scan."
+      }
+    },
+    {
+      "id": "mcp.publish-usage",
+      "description": "MCP tool publish_usage: queue a one-day usage upload to the 626 Labs dashboard (manage_usage/record) and return the widget's typed result. HANDOFF, not upload: the server writes %APPDATA%/Sanduhr/publish-request.json and polls publish-result.json; the Sanduhr widget's 30s tick performs the POST with the agent key it alone holds (Credential Manager slot 626labs:agentKey). Refusals are instant and typed: disabled/publishing_off when settings.json publish_626.enabled is false, no_key/no_agent_key when publish_626.key_stored is false; queued/widget_not_responding after the 45s wait (request stays for the widget's next tick, expires after 24h). Payload = per-project BASENAME token counts for the homes the user ticked, tier split, quota status (stale/no_data never carry percentages). Data class: usage-metrics, off-machine (opt-in).",
+      "tier": "prod-safe",
+      "kind": "write",
+      "transport": { "type": "stdio-mcp", "method": "tools/call", "path": "/publish_usage" },
+      "input": { "date": "string YYYY-MM-DD, default yesterday (local)" },
+      "output": { "shape": "status ok|error|disabled|no_key|queued|no_data, reason, remedy, date, request_id, http_status, message, at, homes[], total_tokens, projects, quota_status" },
+      "auth": "none",
+      "authDetail": "none-local-ambient for the request; the upload itself is Bearer-authenticated by the widget with the 626 Labs agent key, which this server cannot read (trust boundary pinned by TrustBoundaryTests).",
+      "destructive": false,
+      "sourceRef": "windows-dotnet/src/Sanduhr.Mcp/ToolLogic.cs:BuildPublish",
+      "origin": "added",
+      "verified": {
+        "status": "unverified",
+        "at": null,
+        "runId": null,
+        "detail": "Added 2026-09-13 with the publish feature; needs a cold-agent pass per the verify plan (disabled / no_key / queued / ok via a fake widget answering the request file)."
       }
     },
     {

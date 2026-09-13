@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Reflection;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Sanduhr.Core;
 
@@ -51,6 +53,10 @@ public sealed class ToolLogic
             ["snapshot_path"] = _config.SnapshotPath,
             ["snapshot_found"] = outcome != SnapshotReadOutcome.Missing,
             ["snapshot_age_seconds"] = age,
+            // Which build wrote the file. "1.0.0" = a dev build (Core's unversioned
+            // assembly); a dead snapshot from a version the installed widget never
+            // shipped is "the installed widget predates the writer", not "not polling".
+            ["snapshot_writer_version"] = outcome == SnapshotReadOutcome.Ok ? (string?)snap!["writer_version"] : null,
             ["cc_roots_found"] = ToArray(_config.RootsFound),
             ["cc_roots_consented"] = ToArray(_config.ConsentedRoots.Select(r => r.Name)),
         };
@@ -87,8 +93,11 @@ public sealed class ToolLogic
 
         string status = band == SnapshotBand.Fresh && fileStatus != "error" ? "ok" : "stale";
         string? reason = band == SnapshotBand.Dead ? "widget_not_polling" : null;
+        string? writerVersion = (string?)snap["writer_version"];
         string? remedy = band == SnapshotBand.Dead
-            ? "The Sanduhr widget has not polled for over 15 minutes - start (or restart) the widget."
+            ? "The Sanduhr widget has not polled for over 15 minutes - start (or restart) the widget. "
+              + $"This snapshot was written by widget build {writerVersion ?? "unknown"}; if the installed "
+              + "widget is older than that, it has no snapshot writer and the file is a dev-build leftover."
             : fileStatus == "error"
                 ? errorKind switch
                 {
@@ -114,6 +123,7 @@ public sealed class ToolLogic
             ["fetch_error"] = fileStatus == "error" ? errorKind : null,
             ["as_of"] = (string?)snap["captured_at"],
             ["age_seconds"] = ageSeconds,
+            ["writer_version"] = writerVersion,
             ["scope"] = "active_account_only",
             ["account"] = new JsonObject
             {
@@ -289,6 +299,124 @@ public sealed class ToolLogic
             ["caveat"] = BurnCaveat,
         };
     }
+
+    // -- publish_usage --------------------------------------------------------
+
+    /// <summary>Queue a publish request for the widget and wait (bounded) for its
+    /// typed result. This server never touches the key or the network — the
+    /// trust boundary (must-fix #11) holds structurally; the widget's tick loop
+    /// (30s) performs the upload. Refusals are typed results, never protocol
+    /// errors: <c>disabled</c> / <c>no_key</c> come straight from settings.json
+    /// (the app mirrors a key-present boolean there — never the key), so a
+    /// refusal answers instantly instead of after a 45s wait.</summary>
+    public JsonObject BuildPublish(string? dateArg)
+    {
+        DateOnly date;
+        if (dateArg is null)
+        {
+            date = DateOnly.FromDateTime(_clock().ToLocalTime().DateTime).AddDays(-1);
+        }
+        else if (!DateOnly.TryParseExact(dateArg, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date))
+        {
+            return Refusal("no_data", "invalid_params", "date must be YYYY-MM-DD");
+        }
+
+        if (_config.SettingsPath is null || _config.PublishRequestPath is null || _config.PublishResultPath is null)
+            return Refusal("no_data", "unavailable", "Publishing is not wired on this server configuration.");
+
+        var (enabled, keyStored) = ReadPublishSettings(_config.SettingsPath);
+        if (!enabled)
+            return Refusal("disabled", "publishing_off",
+                "Publishing is off. Turn on 'Publish to 626 Labs' in the Sanduhr widget (Settings > 626 Labs) and tick the homes to share.");
+        if (!keyStored)
+            return Refusal("no_key", "no_agent_key",
+                "No 626 Labs agent key is stored. Add one in the Sanduhr widget (Settings > 626 Labs > Set agent key).");
+
+        string id = Guid.NewGuid().ToString("N");
+        var request = new JsonObject
+        {
+            ["id"] = id,
+            ["date"] = date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            ["requested_at"] = _clock().ToUniversalTime().ToString("o", CultureInfo.InvariantCulture),
+        };
+        try
+        {
+            File.WriteAllText(_config.PublishRequestPath, request.ToJsonString());
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return Refusal("error", "request_write_failed", $"Could not queue the request ({e.GetType().Name}).");
+        }
+
+        var deadline = DateTimeOffset.UtcNow + _config.PublishWaitTimeout;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (TryReadResult(_config.PublishResultPath, id) is { } result)
+            {
+                result["date"] = request["date"]!.DeepClone();
+                result["request_id"] = id;
+                return result;
+            }
+            Thread.Sleep(_config.PublishPollInterval);
+        }
+
+        // The request file stays: the widget runs it on its next tick or next
+        // launch (requests expire after 24h on the widget side).
+        return new JsonObject
+        {
+            ["status"] = "queued",
+            ["reason"] = "widget_not_responding",
+            ["remedy"] = "The Sanduhr widget did not answer within the wait window - start (or restart) it. "
+                         + "The request stays queued and runs on the widget's next tick; check Settings > 626 Labs for the result.",
+            ["date"] = request["date"]!.DeepClone(),
+            ["request_id"] = id,
+        };
+    }
+
+    private static (bool Enabled, bool KeyStored) ReadPublishSettings(string settingsPath)
+    {
+        try
+        {
+            if (!File.Exists(settingsPath))
+                return (false, false);
+            if (JsonNode.Parse(File.ReadAllText(settingsPath)) is not JsonObject root
+                || root["publish_626"] is not JsonObject group)
+                return (false, false);
+            bool enabled = false, keyStored = false;
+            try { enabled = group["enabled"]?.GetValue<bool>() ?? false; } catch { }
+            try { keyStored = group["key_stored"]?.GetValue<bool>() ?? false; } catch { }
+            return (enabled, keyStored);
+        }
+        catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
+        {
+            return (false, false);   // unreadable settings = off (fail closed)
+        }
+    }
+
+    private static JsonObject? TryReadResult(string resultPath, string id)
+    {
+        try
+        {
+            if (!File.Exists(resultPath))
+                return null;
+            using var fs = new FileStream(resultPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var sr = new StreamReader(fs);
+            if (JsonNode.Parse(sr.ReadToEnd()) is not JsonObject o || (string?)o["id"] != id)
+                return null;
+            return o["result"] as JsonObject;
+        }
+        catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
+        {
+            return null;   // mid-swap or unreadable: poll again
+        }
+    }
+
+    private static JsonObject Refusal(string status, string reason, string remedy) => new()
+    {
+        ["status"] = status,
+        ["reason"] = reason,
+        ["remedy"] = remedy,
+    };
 
     // -- helpers --------------------------------------------------------------
 
