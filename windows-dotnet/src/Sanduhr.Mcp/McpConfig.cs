@@ -27,7 +27,8 @@ public sealed class McpConfig
     public required IReadOnlyList<string> RootsFound { get; init; }
 
     /// <summary>settings.json — read (never written) by publish_usage for the
-    /// publish_626 toggle and key-present mirror. Null = unavailable.</summary>
+    /// publish group's toggle, endpoint URL, auth scheme and token-present
+    /// mirror. Null = unavailable.</summary>
     public string? SettingsPath { get; init; }
 
     /// <summary>The publish handoff files (see Core's PublishHandoff): the tool

@@ -7,8 +7,8 @@
   "x-contract": {
     "staleness_seconds": { "fresh_below": 450, "dead_above": 900 },
     "status_enum": ["ok", "stale", "no_data"],
-    "reason_enum": ["missing", "malformed", "disabled", "widget_not_polling", "schema_unsupported", "invalid_params", "publishing_off", "no_agent_key", "widget_not_responding", "unavailable", "request_write_failed", "busy"],
-    "publish_status_enum": ["ok", "error", "disabled", "no_key", "queued", "no_data"],
+    "reason_enum": ["missing", "malformed", "disabled", "widget_not_polling", "schema_unsupported", "invalid_params", "publishing_off", "no_endpoint_url", "no_publish_token", "widget_not_responding", "unavailable", "request_write_failed", "busy"],
+    "publish_status_enum": ["ok", "error", "disabled", "no_endpoint", "no_token", "queued", "no_data"],
     "fetch_error_enum": ["session_expired", "cloudflare", "network"],
     "reason_vs_fetch_error": "separate channels: reason covers data availability, fetch_error covers widget-fetch failures carried in an otherwise-served snapshot; both can be null",
     "failure_shape": "typed tool results carrying status/reason/remedy - NEVER MCP protocol errors, never isError:true",
@@ -81,14 +81,14 @@
     },
     {
       "id": "mcp.publish-usage",
-      "description": "MCP tool publish_usage: queue a one-day usage upload to the 626 Labs dashboard (manage_usage/record) and return the widget's typed result. HANDOFF, not upload: the server writes %APPDATA%/Sanduhr/publish-request.json and polls publish-result.json; the Sanduhr widget's 30s tick performs the POST with the agent key it alone holds (Credential Manager slot 626labs:agentKey). Refusals are instant and typed: disabled/publishing_off when settings.json publish_626.enabled is false, no_key/no_agent_key when publish_626.key_stored is false; queued/widget_not_responding after the 45s wait (request stays for the widget's next tick, expires after 24h). Payload = per-project BASENAME token counts for the homes the user ticked, tier split, quota status (stale/no_data never carry percentages). Data class: usage-metrics, off-machine (opt-in).",
+      "description": "MCP tool publish_usage: queue a one-day usage upload to the publish endpoint the user configured in Sanduhr (any URL of their own; the 626 Labs dashboard is a preset) and return the widget's typed result. HANDOFF, not upload: the server writes %APPDATA%/Sanduhr/publish-request.json and polls publish-result.json; the Sanduhr widget's 30s tick performs the POST with the token it alone holds (Credential Manager slot publish:token). Refusals are instant and typed: disabled/publishing_off when settings.json publish.enabled is false, no_endpoint/no_endpoint_url when publish.endpoint_url is blank, no_token/no_publish_token when publish.token_stored is false and publish.auth_scheme is not none; queued/widget_not_responding after the 45s wait (request stays for the widget's next tick, expires after 24h). Payload = per-project BASENAME token counts for the homes the user ticked, tier split, quota status (stale/no_data never carry percentages); body format sanduhr (the snapshot object) or 626labs (the same fields under action:record). Data class: usage-metrics, off-machine (opt-in, user-chosen destination).",
       "tier": "prod-safe",
       "kind": "write",
       "transport": { "type": "stdio-mcp", "method": "tools/call", "path": "/publish_usage" },
       "input": { "date": "string YYYY-MM-DD, default yesterday (local)" },
-      "output": { "shape": "status ok|error|disabled|no_key|queued|no_data, reason, remedy, date, request_id, http_status, message, at, homes[], total_tokens, projects, quota_status" },
+      "output": { "shape": "status ok|error|disabled|no_endpoint|no_token|queued|no_data, reason, remedy, date, request_id, http_status, message, at, homes[], total_tokens, projects, quota_status" },
       "auth": "none",
-      "authDetail": "none-local-ambient for the request; the upload itself is Bearer-authenticated by the widget with the 626 Labs agent key, which this server cannot read (trust boundary pinned by TrustBoundaryTests).",
+      "authDetail": "none-local-ambient for the request; the upload itself is authenticated by the widget with the publish token (bearer, a named header, or none per the user's auth scheme), which this server cannot read (trust boundary pinned by TrustBoundaryTests).",
       "destructive": false,
       "sourceRef": "windows-dotnet/src/Sanduhr.Mcp/ToolLogic.cs:BuildPublish",
       "origin": "added",
@@ -96,7 +96,7 @@
         "status": "unverified",
         "at": null,
         "runId": null,
-        "detail": "Added 2026-09-13 with the publish feature; needs a cold-agent pass per the verify plan (disabled / no_key / queued / ok via a fake widget answering the request file)."
+        "detail": "Added 2026-09-13 with the publish feature, generalized the same day to a user-chosen endpoint; needs a cold-agent pass per the verify plan (disabled / no_endpoint / no_token / queued / ok via a fake widget answering the request file)."
       }
     },
     {

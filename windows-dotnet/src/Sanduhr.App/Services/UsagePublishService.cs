@@ -93,7 +93,7 @@ public sealed class UsagePublishService
     }
 
     /// <summary>Store the key in Credential Manager and mirror ONLY its
-    /// presence into settings (for sanduhr-mcp's no_key refusal).</summary>
+    /// presence into settings (for sanduhr-mcp's no_token refusal).</summary>
     public void SaveToken(string token)
     {
         _tokens.Save(token);
@@ -159,12 +159,17 @@ public sealed class UsagePublishService
         if (!s.Enabled)
         {
             payload = Typed("disabled", "publishing_off",
-                "Publishing is off. Turn on 'Publish to 626 Labs' in the Sanduhr widget (Settings > 626 Labs).");
+                "Publishing is off. Turn on 'Publish daily' in the Sanduhr widget (Settings > Publish usage).");
         }
-        else if (!HasToken)
+        else if (!s.HasEndpoint)
         {
-            payload = Typed("no_key", "no_agent_key",
-                "No 626 Labs agent key is stored. Add one in the Sanduhr widget (Settings > 626 Labs > Set agent key).");
+            payload = Typed("no_endpoint", "no_endpoint_url",
+                "No publish endpoint is configured. Set one in the Sanduhr widget (Settings > Publish usage > Endpoint URL, or pick a preset).");
+        }
+        else if (s.AuthScheme != PublishAuthScheme.None && !HasToken)
+        {
+            payload = Typed("no_token", "no_publish_token",
+                "No publish token is stored for the publish endpoint. Add one in the Sanduhr widget (Settings > Publish usage > Set token).");
         }
         else
         {
@@ -252,7 +257,7 @@ public sealed class UsagePublishService
             _settings.SavePublishAttempt(result.At, result.Message, result.Ok ? date : null);
             // PRIVACY.md contract for sanduhr.log: status codes only — never the payload, never the key.
             File.AppendAllText(_paths.LogFile,
-                $"{DateTime.UtcNow:o} publish 626 {date:yyyy-MM-dd} -> http {result.StatusCode} ({(result.Ok ? "ok" : "failed")}){Environment.NewLine}");
+                $"{DateTime.UtcNow:o} publish {date:yyyy-MM-dd} -> http {result.StatusCode} ({(result.Ok ? "ok" : "failed")}){Environment.NewLine}");
         }
         catch
         {

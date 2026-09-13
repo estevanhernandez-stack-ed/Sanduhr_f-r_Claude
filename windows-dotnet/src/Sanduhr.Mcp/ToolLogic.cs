@@ -303,12 +303,14 @@ public sealed class ToolLogic
     // -- publish_usage --------------------------------------------------------
 
     /// <summary>Queue a publish request for the widget and wait (bounded) for its
-    /// typed result. This server never touches the key or the network — the
+    /// typed result. This server never touches the token or the network — the
     /// trust boundary (must-fix #11) holds structurally; the widget's tick loop
-    /// (30s) performs the upload. Refusals are typed results, never protocol
-    /// errors: <c>disabled</c> / <c>no_key</c> come straight from settings.json
-    /// (the app mirrors a key-present boolean there — never the key), so a
-    /// refusal answers instantly instead of after a 45s wait.</summary>
+    /// (30s) performs the upload to the endpoint the user configured. Refusals
+    /// are typed results, never protocol errors: <c>disabled</c> /
+    /// <c>no_endpoint</c> / <c>no_token</c> come straight from settings.json
+    /// (the app mirrors the endpoint URL and a token-present boolean there —
+    /// never the token), so a refusal answers instantly instead of after a
+    /// 45s wait.</summary>
     public JsonObject BuildPublish(string? dateArg)
     {
         DateOnly date;
@@ -324,13 +326,16 @@ public sealed class ToolLogic
         if (_config.SettingsPath is null || _config.PublishRequestPath is null || _config.PublishResultPath is null)
             return Refusal("no_data", "unavailable", "Publishing is not wired on this server configuration.");
 
-        var (enabled, keyStored) = ReadPublishSettings(_config.SettingsPath);
+        var (enabled, hasEndpoint, tokenStored) = ReadPublishSettings(_config.SettingsPath);
         if (!enabled)
             return Refusal("disabled", "publishing_off",
-                "Publishing is off. Turn on 'Publish to 626 Labs' in the Sanduhr widget (Settings > 626 Labs) and tick the homes to share.");
-        if (!keyStored)
-            return Refusal("no_key", "no_agent_key",
-                "No 626 Labs agent key is stored. Add one in the Sanduhr widget (Settings > 626 Labs > Set agent key).");
+                "Publishing is off. Turn on 'Publish daily' in the Sanduhr widget (Settings > Publish usage) and tick the homes to share.");
+        if (!hasEndpoint)
+            return Refusal("no_endpoint", "no_endpoint_url",
+                "No publish endpoint is configured. Set one in the Sanduhr widget (Settings > Publish usage > Endpoint URL, or pick a preset).");
+        if (!tokenStored)
+            return Refusal("no_token", "no_publish_token",
+                "No publish token is stored for the publish endpoint. Add one in the Sanduhr widget (Settings > Publish usage > Set token), or set Auth to None if the endpoint needs no credential.");
 
         string id = Guid.NewGuid().ToString("N");
         var request = new JsonObject
@@ -367,30 +372,55 @@ public sealed class ToolLogic
             ["status"] = "queued",
             ["reason"] = "widget_not_responding",
             ["remedy"] = "The Sanduhr widget did not answer within the wait window - start (or restart) it. "
-                         + "The request stays queued and runs on the widget's next tick; check Settings > 626 Labs for the result.",
+                         + "The request stays queued and runs on the widget's next tick; check Settings > Publish usage for the result.",
             ["date"] = request["date"]!.DeepClone(),
             ["request_id"] = id,
         };
     }
 
-    private static (bool Enabled, bool KeyStored) ReadPublishSettings(string settingsPath)
+    /// <summary>The refusal inputs, read from settings.json's <c>publish</c>
+    /// group (mirrors Core's PublishSettingsJson vocabulary literally — this
+    /// project cannot link that file). <c>CredentialReady</c> is true when a
+    /// token is stored OR the auth scheme is <c>none</c>. The pre-3.5
+    /// <c>publish_626</c> group is honored read-only until the widget migrates
+    /// it (it described the 626 Labs endpoint, so the endpoint counts as set).
+    /// Anything unreadable fails closed.</summary>
+    private static (bool Enabled, bool HasEndpoint, bool CredentialReady) ReadPublishSettings(string settingsPath)
     {
         try
         {
             if (!File.Exists(settingsPath))
-                return (false, false);
-            if (JsonNode.Parse(File.ReadAllText(settingsPath)) is not JsonObject root
-                || root["publish_626"] is not JsonObject group)
-                return (false, false);
-            bool enabled = false, keyStored = false;
-            try { enabled = group["enabled"]?.GetValue<bool>() ?? false; } catch { }
-            try { keyStored = group["key_stored"]?.GetValue<bool>() ?? false; } catch { }
-            return (enabled, keyStored);
+                return (false, false, false);
+            if (JsonNode.Parse(File.ReadAllText(settingsPath)) is not JsonObject root)
+                return (false, false, false);
+            if (root["publish"] is JsonObject group)
+            {
+                bool enabled = ReadBool(group["enabled"]);
+                bool hasEndpoint = !string.IsNullOrWhiteSpace(ReadString(group["endpoint_url"]));
+                bool tokenStored = ReadBool(group["token_stored"]);
+                bool noAuth = string.Equals(ReadString(group["auth_scheme"])?.Trim(), "none", StringComparison.OrdinalIgnoreCase);
+                return (enabled, hasEndpoint, tokenStored || noAuth);
+            }
+            if (root["publish_626"] is JsonObject legacy)
+                return (ReadBool(legacy["enabled"]), true, ReadBool(legacy["key_stored"]));
+            return (false, false, false);
         }
         catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
         {
-            return (false, false);   // unreadable settings = off (fail closed)
+            return (false, false, false);   // unreadable settings = off (fail closed)
         }
+    }
+
+    private static bool ReadBool(JsonNode? node)
+    {
+        try { return node?.GetValue<bool>() ?? false; }
+        catch { return false; }
+    }
+
+    private static string? ReadString(JsonNode? node)
+    {
+        try { return node?.GetValue<string>(); }
+        catch { return null; }
     }
 
     private static JsonObject? TryReadResult(string resultPath, string id)
