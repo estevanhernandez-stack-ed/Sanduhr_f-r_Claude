@@ -32,6 +32,7 @@ public readonly record struct McpRegisterResult(bool Ok, string? PriorCommand);
 public sealed class McpIntegrationInstaller
 {
     private static readonly string[] KnownHomeNames = { ".claude", ".claude-personal" };
+    private const string DefaultHomeName = ".claude";
 
     private readonly string _homeDir;
     private readonly string _sanduhrDir;
@@ -49,8 +50,20 @@ public sealed class McpIntegrationInstaller
     public string VersionsDir => Path.Combine(_sanduhrDir, "mcp");
     public string LauncherPath => Path.Combine(_sanduhrDir, "bin", "sanduhr-mcp.cmd");
 
+    /// <summary>The .claude.json Claude Code reads for a home. Claude Code keeps
+    /// it INSIDE the home only when that home is selected through
+    /// <c>CLAUDE_CONFIG_DIR</c> (the only way a non-default home such as
+    /// <c>.claude-personal</c> is ever a home); for the default <c>.claude</c>
+    /// home it lives beside the home, at <c>%USERPROFILE%\.claude.json</c>.
+    /// An inner file that already exists wins for either name: its presence
+    /// means the config-dir layout is in use for that home.</summary>
     public string ConfigPathFor(string ccHomeName)
-        => Path.Combine(_homeDir, ccHomeName, ".claude.json");
+    {
+        string inner = Path.Combine(_homeDir, ccHomeName, ".claude.json");
+        if (ccHomeName != DefaultHomeName || File.Exists(inner))
+            return inner;
+        return Path.Combine(_homeDir, ".claude.json");
+    }
 
     /// <summary>CC homes that exist under the profile — same closed set as the
     /// statusline installer; the consent dialog picks ONE.</summary>
@@ -80,6 +93,12 @@ public sealed class McpIntegrationInstaller
             string version = FileVersionInfo.GetVersionInfo(exe).FileVersion is { Length: > 0 } v ? v : "0";
             string stamp = File.GetLastWriteTimeUtc(exe).ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
             string target = Path.Combine(VersionsDir, $"v{version}-{stamp}");
+
+            // Same version + same build stamp = the copy that is already there. Leave
+            // it alone: it may be pinned by a running Claude Code session, and the
+            // app-start refresh would otherwise re-copy the server on every launch.
+            if (File.Exists(Path.Combine(target, "sanduhr-mcp.exe")))
+                return target;
 
             Directory.CreateDirectory(target);
             foreach (var file in Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories))

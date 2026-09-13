@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- **One-click MCP install.** Settings ▸ Claude Usage ▸ "Install MCP server…" registers `sanduhr-mcp` with Claude Code after a consent dialog that asks two things and pre-answers neither: which Claude Code home gets the registration (one radio per detected home), and which homes the burn tool may read (one checkbox per home, all off). The install copies the server into a stamped folder under `%APPDATA%\Sanduhr\mcp\`, points the one launcher `%APPDATA%\Sanduhr\bin\sanduhr-mcp.cmd` at it, and writes a `sanduhr` entry under `mcpServers` in that home's `.claude.json` (timestamped backup beside it first; a file that does not parse is never touched; an existing `sanduhr` entry is re-owned and the status line names what it replaced). The widget refreshes the server files and launcher on every start, so an app update reaches new Claude Code sessions while running ones keep the folder they pinned. "Remove MCP server" reverts the entry (only if it still points at Sanduhr's launcher) and deletes the files. The per-home read consents stay editable in the same tab. (#55)
+- The app payload now carries the server as a self-contained single-file `mcp\sanduhr-mcp.exe` on both the Store and Velopack channels, so the install works on a machine with no .NET runtime.
+
 ### Changed
 
 - **`sanduhr-mcp` requires widget 3.4.0 or later**, and now says so instead of "widget not polling" (#63). A widget older than 3.4.0 polls and appends `history.<account>.json` but has no snapshot writer, so `snapshot.json` is missing or a dead leftover from a dev build. `get_usage` and `ping` read the history file beside the snapshot (a local file read only; the account label in the file name is hashed, never returned) and classify:

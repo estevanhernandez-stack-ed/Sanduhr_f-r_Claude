@@ -239,6 +239,73 @@ public class McpIntegrationInstallerTests
     }
 
     [Fact]
+    public void InstallServerFiles_reuses_the_dir_for_an_identical_build()
+    {
+        using var home = new TempDir();
+        using var sanduhr = new TempDir();
+        var installer = Make(home, sanduhr);
+        string src = MakeSource(sanduhr);
+
+        string dir1 = installer.InstallServerFiles(src)!;
+        File.WriteAllText(Path.Combine(dir1, "pinned-marker"), "held by a running session");
+        string dir2 = installer.InstallServerFiles(src)!;
+
+        Assert.Equal(dir1, dir2);
+        Assert.True(File.Exists(Path.Combine(dir1, "pinned-marker")));   // nothing re-copied over it
+    }
+
+    // -- config path: where Claude Code actually reads .claude.json -----------
+
+    [Fact]
+    public void ConfigPathFor_default_home_is_the_profile_root_file()
+    {
+        using var home = new TempDir();
+        using var sanduhr = new TempDir();
+        Directory.CreateDirectory(Path.Combine(home.Path, ".claude"));
+        Assert.Equal(Path.Combine(home.Path, ".claude.json"), Make(home, sanduhr).ConfigPathFor(".claude"));
+    }
+
+    [Fact]
+    public void ConfigPathFor_default_home_prefers_an_existing_inner_file()
+    {
+        using var home = new TempDir();
+        using var sanduhr = new TempDir();
+        Directory.CreateDirectory(Path.Combine(home.Path, ".claude"));
+        File.WriteAllText(Path.Combine(home.Path, ".claude", ".claude.json"), "{}");   // CLAUDE_CONFIG_DIR layout
+        Assert.Equal(Path.Combine(home.Path, ".claude", ".claude.json"), Make(home, sanduhr).ConfigPathFor(".claude"));
+    }
+
+    [Fact]
+    public void ConfigPathFor_a_named_home_is_always_inside_it()
+    {
+        using var home = new TempDir();
+        using var sanduhr = new TempDir();
+        Assert.Equal(Path.Combine(home.Path, ".claude-personal", ".claude.json"),
+            Make(home, sanduhr).ConfigPathFor(".claude-personal"));
+    }
+
+    [Fact]
+    public void Register_default_home_writes_the_profile_root_file_and_deregister_finds_it()
+    {
+        using var home = new TempDir();
+        using var sanduhr = new TempDir();
+        Directory.CreateDirectory(Path.Combine(home.Path, ".claude"));
+        File.WriteAllText(Path.Combine(home.Path, ".claude.json"),
+            """{"numStartups":7,"mcpServers":{"github":{"command":"gh-mcp","args":[]}}}""");
+        var installer = Make(home, sanduhr);
+
+        Assert.True(installer.Register(".claude").Ok);
+
+        Assert.False(File.Exists(Path.Combine(home.Path, ".claude", ".claude.json")));   // never invented the inner file
+        var root = (JsonObject)JsonNode.Parse(File.ReadAllText(Path.Combine(home.Path, ".claude.json")))!;
+        Assert.Equal(installer.LauncherPath, (string?)root["mcpServers"]!["sanduhr"]!["command"]);
+        Assert.NotNull(root["mcpServers"]!["github"]);
+        Assert.True(installer.IsRegistered(".claude"));
+        Assert.True(installer.Deregister(".claude"));
+        Assert.False(installer.IsRegistered(".claude"));
+    }
+
+    [Fact]
     public void DetectCcHomes_finds_the_known_set_in_stable_order()
     {
         using var home = new TempDir();

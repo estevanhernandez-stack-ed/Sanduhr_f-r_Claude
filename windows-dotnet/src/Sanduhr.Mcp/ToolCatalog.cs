@@ -14,8 +14,13 @@ namespace Sanduhr.Mcp;
 /// </summary>
 public static class ToolCatalog
 {
-    public static JsonArray Build() => new()
-    {
+    // Elements go through JsonArray's params ctor, never a collection initializer:
+    // the initializer binds to the generic Add<T>, which asks the serializer for
+    // type metadata that the trimmed single-file publish removes (tools/list then
+    // throws NotSupportedException on the first int). Same rule everywhere a
+    // JsonArray is filled in this project; the server's publish treats linker
+    // warnings as errors so a regression fails the build, not the user.
+    public static JsonArray Build() => new JsonArray(
         Tool(
             "get_usage",
             "Check Claude subscription quota headroom (the Sanduhr widget's live snapshot of " +
@@ -48,7 +53,7 @@ public static class ToolCatalog
                     ["window_days"] = new JsonObject
                     {
                         ["type"] = "integer",
-                        ["enum"] = new JsonArray { 1, 7, 30 },
+                        ["enum"] = new JsonArray(1, 7, 30),
                         ["description"] = "Lookback window. Default 7.",
                     },
                     ["full_paths"] = new JsonObject
@@ -99,8 +104,7 @@ public static class ToolCatalog
                 },
                 ["additionalProperties"] = false,
             },
-            readOnly: false),
-    };
+            readOnly: false));
 
     private static JsonObject Tool(string name, string description, JsonObject inputSchema, bool readOnly = true) => new()
     {

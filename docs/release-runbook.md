@@ -99,6 +99,17 @@ powershell -ExecutionPolicy Bypass -File windows-dotnet/scripts/build-msix.ps1 -
 - Publishes → stages publish output + version-patched manifest + logos → `makeappx pack`.
 - Output: `windows-dotnet/dist/Sanduhr-Store-v3.0.0.0.msix` (**unsigned** — Partner Center signs).
 - Leaves the committed manifest untouched (only the staged copy is version-patched).
+- Publishes the MCP server into the payload as `mcp\sanduhr-mcp.exe` (self-contained, trimmed,
+  single-file; the App's `PublishMcpServer` target). **Run it cold before packing anything else:**
+
+  ```powershell
+  pwsh windows-dotnet/scripts/smoke-mcp.ps1
+  ```
+
+  It feeds the published exe the JSON-RPC lines Claude Code would (initialize, tools/list, ping,
+  get_usage, get_local_burn_by_project) and fails on a crash or a missing tool. Trimming removes
+  what the linker cannot prove is used, so this run is the proof the shipped server works; a
+  linker warning already fails the publish (`ILLinkTreatWarningsAsErrors` in `Sanduhr.Mcp.csproj`).
 
 Optional local install test (sideload): build a self-signed flavor whose cert subject CN matches
 the manifest Publisher, import the cert into Trusted People, then `Add-AppxPackage`:
@@ -118,6 +129,9 @@ pwsh windows-dotnet/scripts/build-velopack-release.ps1 -Version 3.0.0.0
 For release #2 and later, pull the prior release's `*-full.nupkg` into `dist/release/` first
 (`vpk download github --repo <url> --outputDir windows-dotnet/dist/release`) and pass `-NoClean`
 so `vpk` can compute a delta.
+
+Same MCP payload here (`dist/publish-velopack/mcp/sanduhr-mcp.exe`); smoke it too:
+`pwsh windows-dotnet/scripts/smoke-mcp.ps1 -Exe windows-dotnet/dist/publish-velopack/mcp/sanduhr-mcp.exe`.
 
 Output (`windows-dotnet/dist/release/`): `626Labs.Sanduhr-win-Setup.exe`,
 `626Labs.Sanduhr-<v>-full.nupkg`, `626Labs.Sanduhr-<v>-delta.nupkg` (#2+),
@@ -283,6 +297,7 @@ both proven on the .NET build.
 - [`store/reviewer-letter-3.0.0.0.md`](store/reviewer-letter-3.0.0.0.md) — the v3.0.0.0
   Notes-for-certification letter (model new ones after this).
 - [`scripts/build-msix.ps1`](../windows-dotnet/scripts/build-msix.ps1) — Phase 3.
+- [`scripts/smoke-mcp.ps1`](../windows-dotnet/scripts/smoke-mcp.ps1) — Phases 3 and 4, cold-runs the published MCP server.
 - [`scripts/build-velopack-release.ps1`](../windows-dotnet/scripts/build-velopack-release.ps1) —
   Phase 4.
 - [`scripts/generate-store-assets.ps1`](../windows-dotnet/scripts/generate-store-assets.ps1) —

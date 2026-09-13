@@ -141,14 +141,12 @@ public sealed class McpServer
         }
         WriteResult(id, new JsonObject
         {
-            ["content"] = new JsonArray
-            {
+            ["content"] = new JsonArray(
                 new JsonObject
                 {
                     ["type"] = "text",
                     ["text"] = payload.ToJsonString(new JsonSerializerOptions { WriteIndented = false }),
-                },
-            },
+                }),
             ["isError"] = false,
         });
     }
