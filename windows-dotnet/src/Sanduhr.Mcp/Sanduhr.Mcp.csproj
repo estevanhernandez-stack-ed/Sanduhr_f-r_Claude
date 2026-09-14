@@ -10,7 +10,7 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <!-- Rides the app's release train — bump with the widget so ping's
          server_version means something (the writer_version lesson from #53). -->
-    <Version>3.4.1</Version>
+    <Version>3.4.2</Version>
   </PropertyGroup>
 
   <!-- How the server ships. Any publish with a runtime identifier (the App's
