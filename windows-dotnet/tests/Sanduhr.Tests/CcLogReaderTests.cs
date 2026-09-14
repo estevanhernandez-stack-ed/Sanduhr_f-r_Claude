@@ -269,14 +269,27 @@ public class CcLogReaderTests
         Assert.Equal(100, bySkill["vibe-doc:scan"]);
     }
 
+    /// <summary>No directory is a repo — isolates the pure path rules from the
+    /// git-root rule, so these cases answer the same on any machine.</summary>
+    private static readonly Func<string, bool> NoRepos = static _ => false;
+
+    /// <summary>Exactly these directories are repos, separators normalized.</summary>
+    private static Func<string, bool> ReposAt(params string[] dirs)
+    {
+        var set = new HashSet<string>(
+            dirs.Select(d => d.Replace("\\", "/").TrimEnd('/')), StringComparer.OrdinalIgnoreCase);
+        return dir => set.Contains(dir.Replace("\\", "/").TrimEnd('/'));
+    }
+
     [Fact]
     public void Project_display_name_extracts_basename()
     {
-        Assert.Equal("Sanduhr", CcLogReader.ProjectDisplayName("C:\\Users\\estev\\Projects\\Sanduhr"));
-        Assert.Equal("Sanduhr", CcLogReader.ProjectDisplayName("C:/Users/estev/Projects/Sanduhr"));
-        Assert.Equal("foo", CcLogReader.ProjectDisplayName("/home/dev/work/foo"));
-        Assert.Equal("foo", CcLogReader.ProjectDisplayName("/home/dev/work/foo/"));
+        Assert.Equal("Sanduhr", CcLogReader.ProjectDisplayName("C:\\Users\\estev\\Projects\\Sanduhr", NoRepos));
+        Assert.Equal("Sanduhr", CcLogReader.ProjectDisplayName("C:/Users/estev/Projects/Sanduhr", NoRepos));
+        Assert.Equal("foo", CcLogReader.ProjectDisplayName("/home/dev/work/foo", NoRepos));
+        Assert.Equal("foo", CcLogReader.ProjectDisplayName("/home/dev/work/foo/", NoRepos));
         Assert.Equal("", CcLogReader.ProjectDisplayName(""));
+        Assert.Equal("", CcLogReader.ProjectDisplayName("", NoRepos));
     }
 
     [Theory]
@@ -290,7 +303,68 @@ public class CcLogReaderTests
     [InlineData("C:/Users/estev/Projects/worktrees/x", "x")]                                     // not a marker without the dot
     public void ProjectDisplayName_rolls_worktrees_up_to_the_repo(string cwd, string expected)
     {
-        Assert.Equal(expected, CcLogReader.ProjectDisplayName(cwd));
+        Assert.Equal(expected, CcLogReader.ProjectDisplayName(cwd, NoRepos));
+    }
+
+    [Theory]
+    // A session opened in a subfolder of a repo is the repo's burn — the
+    // "functions: 109k tokens" line in the 2026-09-14 bulletin.
+    [InlineData("C:/Users/estev/Projects/Project-626Labs-1/functions", "Project-626Labs-1")]
+    [InlineData("C:\\Users\\estev\\Projects\\Project-626Labs-1\\functions", "Project-626Labs-1")]
+    [InlineData("C:/Users/estev/Projects/Project-626Labs-1/functions/src/domains", "Project-626Labs-1")]
+    // The repo root itself is unchanged.
+    [InlineData("C:/Users/estev/Projects/Project-626Labs-1", "Project-626Labs-1")]
+    [InlineData("C:/Users/estev/Projects/Project-626Labs-1/", "Project-626Labs-1")]
+    public void ProjectDisplayName_rolls_a_subfolder_up_to_its_repo(string cwd, string expected)
+    {
+        var repos = ReposAt("C:/Users/estev/Projects/Project-626Labs-1");
+        Assert.Equal(expected, CcLogReader.ProjectDisplayName(cwd, repos));
+    }
+
+    [Fact]
+    public void ProjectDisplayName_gitRoot_rules_at_the_edges()
+    {
+        // Nearest repo wins, so a submodule keeps its own name.
+        var nested = ReposAt("/w/super", "/w/super/vendor/sub");
+        Assert.Equal("sub", CcLogReader.ProjectDisplayName("/w/super/vendor/sub/src", nested));
+        Assert.Equal("super", CcLogReader.ProjectDisplayName("/w/super/docs", nested));
+
+        // Outside any repo: the basename, exactly as before.
+        Assert.Equal("scratch", CcLogReader.ProjectDisplayName("/w/scratch", nested));
+        Assert.Equal("notes", CcLogReader.ProjectDisplayName("/tmp/notes", nested));
+
+        // The worktree rule still runs first, so a worktree that is itself a repo
+        // (it holds a .git FILE) rolls to the outer repo rather than naming itself.
+        var worktreeIsRepo = ReposAt("/w/foo/.worktrees/feature-x", "/w/foo");
+        Assert.Equal("foo", CcLogReader.ProjectDisplayName("/w/foo/.worktrees/feature-x/src", worktreeIsRepo));
+
+        // The root segment never becomes a name, even if the probe says yes.
+        Assert.Equal("w", CcLogReader.ProjectDisplayName("/w", ReposAt("/w", "/")));
+    }
+
+    [Fact]
+    public void ProjectDisplayName_finds_a_real_git_directory_on_disk()
+    {
+        // Proves the single-argument overload wires the real probe, not just the
+        // injected one: a .git DIRECTORY (normal clone) and a .git FILE (linked
+        // worktree or submodule) both mark a repo.
+        using var temp = new TempDir();
+        var repo = Path.Combine(temp.Path, "my-repo");
+        var deep = Path.Combine(repo, "functions", "src");
+        Directory.CreateDirectory(deep);
+        Directory.CreateDirectory(Path.Combine(repo, ".git"));
+        Assert.Equal("my-repo", CcLogReader.ProjectDisplayName(deep));
+
+        var linked = Path.Combine(temp.Path, "linked-repo");
+        var linkedDeep = Path.Combine(linked, "pkg");
+        Directory.CreateDirectory(linkedDeep);
+        File.WriteAllText(Path.Combine(linked, ".git"), "gitdir: /elsewhere/.git/worktrees/x");
+        Assert.Equal("linked-repo", CcLogReader.ProjectDisplayName(linkedDeep));
+
+        // A plain folder under no repo still answers with its own name.
+        var loose = Path.Combine(temp.Path, "loose", "inner");
+        Directory.CreateDirectory(loose);
+        Assert.Equal("inner", CcLogReader.ProjectDisplayName(loose));
     }
 
     [Fact]
