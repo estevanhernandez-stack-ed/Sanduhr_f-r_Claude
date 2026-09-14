@@ -37,8 +37,14 @@ public class ToolLogicBurnTests
         WriteSessionLog(personal, "c--sanduhr",
             EventLine(Now.AddHours(-1), "claude-fable-5", 100, 200, @"C:\Users\estev\Projects\Sanduhr"),
             EventLine(Now.AddHours(-2), "claude-sonnet-5", 10, 20, @"C:\Users\estev\Projects\Sanduhr"));
+        // The work cwd lives under the test's own temp tree: ProjectDisplayName
+        // names the nearest ENCLOSING git repo, so a fixture path pointing into a
+        // real checkout would answer differently on a developer's disk than on CI.
+        // The temp path still carries the username, which is exactly what the
+        // DoesNotContain("estev") assertion below proves gets stripped.
+        string workCwd = Path.Combine(tmp.Path, "Marcus", "wbp");
         WriteSessionLog(work, "c--wbp",
-            EventLine(Now.AddHours(-1), "claude-opus-4", 500, 500, @"C:\Users\estev\Projects\Marcus\wbp"));
+            EventLine(Now.AddHours(-1), "claude-opus-4", 500, 500, workCwd));
 
         var r = Logic(tmp, (".claude", work), (".claude-personal", personal)).BuildBurn(7, fullPaths: false);
 

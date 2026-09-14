@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -313,18 +314,73 @@ public sealed class CcLogReader
         new[] { ".worktrees" },
     };
 
-    /// <summary>Friendly basename out of a cwd path, e.g.
+    /// <summary>Friendly project name out of a cwd path, e.g.
     /// <c>C:\Users\estev\Projects\Sanduhr</c> → <c>Sanduhr</c>. Handles both
-    /// separators. A cwd under a worktree folder (<c>&lt;repo&gt;/.claude/worktrees/agent-x</c>,
-    /// <c>&lt;repo&gt;/.worktrees/x</c>, or deeper) names the repo, not the worktree;
-    /// callers that want the worktree itself pass the full path through instead.</summary>
+    /// separators. Three rules, in order:
+    /// <list type="number">
+    ///   <item>A cwd under a worktree folder (<c>&lt;repo&gt;/.claude/worktrees/agent-x</c>,
+    ///   <c>&lt;repo&gt;/.worktrees/x</c>, or deeper) names the repo, not the worktree.</item>
+    ///   <item>Otherwise the nearest ancestor holding a <c>.git</c> entry names the
+    ///   project, so a session opened in a SUBFOLDER of a repo
+    ///   (<c>&lt;repo&gt;/functions</c>) is the repo's burn, not its own project.
+    ///   The 2026-09-14 bulletin carried a "functions: 109k tokens" line for exactly
+    ///   that reason.</item>
+    ///   <item>Otherwise the basename, which is every cwd outside a repo.</item>
+    /// </list>
+    /// Callers that want the literal folder pass the full path through instead;
+    /// the vault still keys rows by cwd hash, so this only merges DISPLAY names.</summary>
     public static string ProjectDisplayName(string cwd)
+    {
+        if (string.IsNullOrEmpty(cwd))
+            return "";
+        // Memoized: the ingester calls this once per session and the overview once
+        // per project row, so without a cache one walk per event would hit disk
+        // repeatedly for the same handful of directories.
+        return DisplayNameCache.GetOrAdd(cwd, static c => ProjectDisplayName(c, DirectoryHoldsGit));
+    }
+
+    private static readonly ConcurrentDictionary<string, string> DisplayNameCache = new();
+
+    /// <summary>Does this directory hold a <c>.git</c> entry? A directory in a normal
+    /// clone, a FILE in a linked worktree or a submodule — both count, and both are
+    /// probed because <see cref="Directory.Exists"/> is false for the file form.
+    /// Any IO failure (a path on a disconnected drive, a permission wall) answers
+    /// no, so attribution degrades to the basename instead of throwing.</summary>
+    private static bool DirectoryHoldsGit(string dir)
+    {
+        try
+        {
+            var dot = dir + "/.git";
+            return Directory.Exists(dot) || File.Exists(dot);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>The name rule with the repo probe injected, so tests state which
+    /// directories are repos instead of touching a real disk.</summary>
+    public static string ProjectDisplayName(string cwd, Func<string, bool> dirHoldsGit)
     {
         if (string.IsNullOrEmpty(cwd))
             return "";
         var parts = cwd.Replace("\\", "/").TrimEnd('/').Split('/');
         if (WorktreeParentIndex(parts) is { } repoIndex && !string.IsNullOrEmpty(parts[repoIndex]))
             return parts[repoIndex];
+
+        // Nearest enclosing repo wins, so a submodule keeps its own name rather
+        // than folding into the superproject. Stops before the root segment
+        // ("C:" or ""), which can never be a meaningful project name.
+        for (int depth = parts.Length; depth > 1; depth--)
+        {
+            var name = parts[depth - 1];
+            if (string.IsNullOrEmpty(name))
+                continue;
+            if (dirHoldsGit(string.Join('/', parts, 0, depth)))
+                return name;
+        }
+
         var last = parts.Length > 0 ? parts[^1] : cwd;
         return string.IsNullOrEmpty(last) ? cwd : last;
     }
