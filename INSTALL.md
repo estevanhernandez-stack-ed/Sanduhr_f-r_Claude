@@ -21,6 +21,11 @@ Open the Microsoft Store and search for **Sanduhr für Claude** (publisher 626La
 Install. The Store signs the package, so there is no SmartScreen prompt, and updates arrive through
 the Store like any other app.
 
+**Quit Sanduhr before a Store update.** Windows cannot replace files a running process holds, so an
+update installed while the widget is running fails and leaves the old version in place. Right-click
+the tray icon and choose Exit, then update. From 3.4.2 the widget notices a waiting update and
+offers to quit for it.
+
 ### 2. GitHub Release (Setup.exe)
 
 Download **`626Labs.Sanduhr-win-Setup.exe`** from the

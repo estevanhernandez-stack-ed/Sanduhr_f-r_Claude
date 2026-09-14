@@ -422,6 +422,13 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// request file and also rides the 30-second tick. Null in unit contexts.</summary>
     public void AttachThemeHandoffService(ThemeHandoffService service) => _themeHandoff = service;
 
+    private StoreUpdateService? _storeUpdate;
+
+    /// <summary>Waiting-Store-update notice (packaged build only). Attached by App;
+    /// rides the 30-second tick and acts at most every few hours. Null in unit
+    /// contexts and inert on the Velopack build.</summary>
+    public void AttachStoreUpdateService(StoreUpdateService service) => _storeUpdate = service;
+
     /// <summary>The catalog key of the live palette (what the strip marks active
     /// and settings.json remembers). The theme handoff reports it as
     /// previous_key so an agent can offer the way back.</summary>
@@ -1107,6 +1114,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // since the publisher reads local logs, not the claude.ai session.
         _publish?.Tick(DateTimeOffset.Now);
         _themeHandoff?.Tick();
+        // A waiting Store update cannot install while this process holds its
+        // files, so the widget is what tells the person and offers to quit.
+        _storeUpdate?.Tick(DateTimeOffset.Now);
 
         if (_lastData is null)
             return;

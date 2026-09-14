@@ -82,6 +82,15 @@ public partial class App : Application
             catch { }
         }));
 
+        // A Store update cannot replace files this process holds: the install
+        // fails and leaves the old build running (3.4.1, 2026-09-14). Inert on
+        // the Velopack and dev builds, which have no Store identity.
+        _vm.AttachStoreUpdateService(new StoreUpdateService(_vm, QuitApp, log: msg =>
+        {
+            try { System.IO.File.AppendAllText(themePaths.LogFile, $"{DateTime.UtcNow:o} {msg}{Environment.NewLine}"); }
+            catch { }
+        }));
+
         // Statusline bridge (WS-E): the script has no update channel of its own —
         // the widget is its updater. Refresh the installed copy on every start
         // while the integration is enabled (idempotent single-file write).
