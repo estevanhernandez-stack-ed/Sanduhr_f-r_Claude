@@ -1,5 +1,18 @@
 # Changelog
 
+## v3.4.2 — 2026-09-14
+
+**Platform:** Windows (.NET 10 / WPF).
+
+### Added
+
+- **A waiting Store update is announced instead of failing in silence.** An MSIX cannot replace files the running process holds, so a Store update attempted while the widget runs fails (0x80073D02) and leaves the old build running with nothing said; it installs the moment the app is quit. The Store build now asks the Store at most every six hours (`StoreContext.GetAppAndOptionalStorePackageUpdatesAsync`, off the UI thread, riding the existing 30-second tick), and on a waiting update writes the widget's status slot and raises a toast whose button opens the Store's downloads page and quits cleanly. Mentioned again at most every twelve hours while it still waits. The cadence lives in `StoreUpdate` (Core) away from WinRT so it is testable; a clock that moved backwards counts as due, so a resumed laptop cannot park the check. Every Store call is guarded: no Store identity, no network, or a Store hiccup all mean no notice rather than a broken tick, which also makes the whole service inert on the Velopack and dev builds. `INSTALL.md` says to quit before updating.
+
+### Fixed
+
+- **Burn attribution listed a repository's subfolder as its own project.** A session whose cwd sat in a subfolder of a repository (`<repo>/functions`) counted as a separate project in `get_local_burn_by_project`, the publish record, the vault, and the Claude Usage tab — the 2026-09-14 daily bulletin carried a "functions" line for exactly that reason. `ProjectDisplayName` now walks up to the nearest ancestor holding a `.git` entry (a directory in a clone, a file in a linked worktree or submodule) and names that repository. The worktree rule still runs first, so a worktree rolls up to the outermost repository; the nearest repository wins, so a submodule keeps its own name; a cwd outside any repository still answers with its basename. Only display names merge — the vault still keys rows by cwd hash and `full_paths` is untouched.
+- **The theme editor's Save button could sit below the window.** The Themes tab is a grid and a grid does not scroll, so at the default window height the studio's token list pushed "Save & apply" past the bottom edge and the only way to reach it was to drag the window taller. The paste box and studio editor now scroll inside the tab's flexible row; installed user themes and their buttons stay pinned below.
+
 ## v3.4.1 — 2026-09-13
 
 **Platform:** Windows (.NET 10 / WPF).
