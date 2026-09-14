@@ -707,7 +707,15 @@
 
                             <!-- Editor: Paste (a theme JSON, lint findings before Save) or Studio
                                  (token rows; the widget itself is the live preview). -->
-                            <StackPanel Grid.Row="3" Grid.RowSpan="4">
+                            <!-- The editor scrolls inside the flexible row: at a short window the token
+                                 list would otherwise push "Save & apply" below the frame, and the grid
+                                 itself does not scroll. Installed themes and their buttons stay pinned. -->
+                            <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <ScrollViewer.Resources>
+                                    <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                                </ScrollViewer.Resources>
+                                <StackPanel>
                                 <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,0,8"
                                           Content="Studio: edit the tokens, watch the widget re-tint live"
                                           IsChecked="{Binding IsStudioMode, Mode=TwoWay}" />
@@ -881,7 +889,8 @@
                                                 ToolTip="The draft as a theme file, for an agent or the themes folder." />
                                     </StackPanel>
                                 </StackPanel>
-                            </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
                             <!-- Installed user themes -->
                             <TextBlock Grid.Row="7" Text="Installed user themes" FontSize="11"
                                        FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
