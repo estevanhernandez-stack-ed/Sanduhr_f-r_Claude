@@ -8,6 +8,7 @@
 
 - **Pick the widget's font.** Settings ▸ Font lists every font family installed for the user (handwriting fonts included) and applies the choice live, behind the open sheet. Text set through `Font.app(size:weight:design:)` follows the choice; monospaced readouts (Matrix digits, theme JSON) stay on the system font so columns keep their alignment, and a family that is later removed falls back to SF Pro without an error. Stored under the `fontFamily` default (`defaults write com.626labs.sanduhr fontFamily "<family>"` sets it from a script). The settings and onboarding sheets keep the system font.
 - **Subtle mode.** Right-click ▸ Subtle Mode (or Settings ▸ Look) hides the glass panel, card fills, borders, accent strip and theme strip, leaving the numbers and bars over the desktop with a tight text shadow so they read on any wallpaper. Stored under the `subtleMode` default. The Font tab is now Look and holds both settings.
+- **Pin to desktop in subtle mode.** With subtle mode on, Pin sets the widget on the desktop (below every app window, above the wallpaper, on every Space) instead of floating it on top. Outside subtle mode Pin floats as before.
 
 ## v3.4.2 — 2026-09-14
 

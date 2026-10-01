@@ -240,6 +240,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 /// eliminating the dead-space-below-footer problem while keeping
 /// horizontal drag-resize working.
 final class FloatingPanel: NSPanel, NSWindowDelegate {
+    /// Last Pin state the widget asked for; subtle-mode changes re-apply it.
+    private static var pinned = true
+
+    /// Pin floats the widget above every window, except in subtle mode, where Pin sets it on
+    /// the desktop instead: below every app window, above the wallpaper, on every Space.
+    static func refreshLevel(pinned newValue: Bool? = nil) {
+        if let newValue { pinned = newValue }
+        guard let panel = NSApp.windows.compactMap({ $0 as? FloatingPanel }).first else { return }
+        let subtle = DisplaySettings.shared.subtle
+        if pinned && subtle {
+            panel.isFloatingPanel = false
+            panel.level = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
+            panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+            panel.hasShadow = false
+        } else {
+            panel.isFloatingPanel = pinned
+            panel.level = pinned ? .floating : .normal
+            panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            panel.hasShadow = !subtle
+        }
+    }
+
     func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
         let fit = self.contentView?.fittingSize.height ?? frameSize.height
         return NSSize(width: frameSize.width, height: fit)
@@ -270,6 +292,8 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
         // cards already fit the content; we just want enough vertical room
         // for 4-5 tier cards + footer without overflow).
         self.minSize = NSSize(width: 340, height: 480)
+        // Subtle mode saved from last time: start on the desktop instead of floating.
+        DispatchQueue.main.async { FloatingPanel.refreshLevel() }
         self.standardWindowButton(.closeButton)?.isHidden = true
         self.standardWindowButton(.miniaturizeButton)?.isHidden = true
         self.standardWindowButton(.zoomButton)?.isHidden = true

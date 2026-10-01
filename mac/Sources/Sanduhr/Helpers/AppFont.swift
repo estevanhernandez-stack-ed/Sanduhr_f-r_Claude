@@ -71,7 +71,10 @@ final class DisplaySettings {
     static let defaultsKey = "subtleMode"
 
     var subtle: Bool {
-        didSet { UserDefaults.standard.set(subtle, forKey: Self.defaultsKey) }
+        didSet {
+            UserDefaults.standard.set(subtle, forKey: Self.defaultsKey)
+            DispatchQueue.main.async { FloatingPanel.refreshLevel() }
+        }
     }
 
     private init() {
