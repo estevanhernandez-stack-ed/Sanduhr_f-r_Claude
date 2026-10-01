@@ -31,7 +31,8 @@ struct TitleBarView: View {
         .background(
             LinearGradient(
                 colors: [t.titleBg, t.titleBg.opacity(0.88)],
-                startPoint: .top, endPoint: .bottom))
+                startPoint: .top, endPoint: .bottom)
+            .opacity(Chrome.opacity))
     }
 }
 

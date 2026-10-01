@@ -22,6 +22,7 @@ struct SettingsSheet: View {
     // Font tab state. Bound straight to the shared settings, so the widget
     // behind the sheet re-renders in the new font as you pick.
     @Bindable var fonts = FontSettings.shared
+    @Bindable var display = DisplaySettings.shared
     @State private var fontFamilies: [String] = []
 
     // Themes tab state
@@ -43,7 +44,7 @@ struct SettingsSheet: View {
                     .tabItem { Text("Themes") }
 
                 fontTab(t: t)
-                    .tabItem { Text("Font") }
+                    .tabItem { Text("Look") }
 
                 credentialsTab(t: t)
                     .tabItem { Text("Credentials") }
@@ -287,6 +288,8 @@ struct SettingsSheet: View {
                     Text(fam).tag(fam)
                 }
             }
+
+            Toggle("Subtle mode: no background, just the numbers over your desktop", isOn: $display.subtle)
 
             Text("Sanduhr 0:42 left, 68%")
                 .font(.app(size: 18, weight: .semibold))

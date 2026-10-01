@@ -43,12 +43,14 @@ struct TierCardView: View {
                         .allowsHitTesting(false)
                 }
             }
+            .opacity(Chrome.opacity)
         )
         .overlay(
             RoundedRectangle(cornerRadius: palette.cardCornerRadius, style: .continuous)
                 .strokeBorder(
                     (palette.borderTint ?? palette.border).opacity(palette.borderAlpha),
                     lineWidth: 0.5)
+                .opacity(Chrome.opacity)
         )
         .clipShape(RoundedRectangle(cornerRadius: palette.cardCornerRadius, style: .continuous))
         .shadow(color: .black.opacity(0.18), radius: 4, x: 0, y: 2)
@@ -161,12 +163,14 @@ struct ExtraUsageCard: View {
                 RoundedRectangle(cornerRadius: palette.cardCornerRadius, style: .continuous)
                     .fill(palette.glassOnMica.opacity(palette.glassAlpha * 0.5))
             }
+            .opacity(Chrome.opacity)
         )
         .overlay(
             RoundedRectangle(cornerRadius: palette.cardCornerRadius, style: .continuous)
                 .strokeBorder(
                     (palette.borderTint ?? palette.border).opacity(palette.borderAlpha * 0.6),
-                    lineWidth: 0.5))
+                    lineWidth: 0.5)
+                .opacity(Chrome.opacity))
         .clipShape(RoundedRectangle(cornerRadius: palette.cardCornerRadius, style: .continuous))
     }
 

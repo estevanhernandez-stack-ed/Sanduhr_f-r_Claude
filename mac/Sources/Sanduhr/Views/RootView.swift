@@ -21,6 +21,7 @@ struct RootView: View {
                 .frame(height: 2)
                 .shadow(color: t.accent.opacity(t.accentBloom.alpha),
                         radius: t.accentBloom.blur, x: 0, y: 0)
+                .opacity(Chrome.opacity)
 
             TitleBarView(
                 vm: vm,
@@ -85,7 +86,9 @@ struct RootView: View {
             // longer physically possible. Horizontal drag-resize still
             // works.
             Rectangle().fill(Color.white.opacity(0.07)).frame(height: 0.5)
-            ThemeStripView(vm: vm)
+            if !DisplaySettings.shared.subtle {
+                ThemeStripView(vm: vm)
+            }
             ActionIconRow(
                 vm: vm,
                 onShowSettings: { showSettings = true },
@@ -119,12 +122,14 @@ struct RootView: View {
                     startPoint: .top, endPoint: .center)
             }
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .opacity(Chrome.opacity)
         )
         .overlay(
             // Outer hairline — slightly darker than the inner highlight so
             // the window reads "raised" against whatever's behind it.
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5)
+                .opacity(Chrome.opacity)
         )
         .overlay(
             // Inset inner highlight — the "lit from above" glass rim.
@@ -137,12 +142,19 @@ struct RootView: View {
                     lineWidth: 0.5)
                 .padding(0.5)
                 .allowsHitTesting(false)
+                .opacity(Chrome.opacity)
         )
         // Soft drop shadow for the floating-panel feel.
-        .shadow(color: .black.opacity(0.45), radius: 24, x: 0, y: 10)
+        // In subtle mode the same shadow, small and tight, keeps the text readable on any wallpaper.
+        .shadow(color: .black.opacity(DisplaySettings.shared.subtle ? 0.6 : 0.45),
+                radius: DisplaySettings.shared.subtle ? 3 : 24,
+                x: 0, y: DisplaySettings.shared.subtle ? 1 : 10)
         .contextMenu {
             Button("Refresh") { Task { await vm.refresh() } }
             Button(vm.compact ? "Expand" : "Compact Mode") { vm.compact.toggle() }
+            Button(DisplaySettings.shared.subtle ? "Show Background" : "Subtle Mode") {
+                DisplaySettings.shared.subtle.toggle()
+            }
             Button(isFocusMode ? "Exit Deep Work" : "Enter Deep Work") { 
                 withAnimation { isFocusMode.toggle() } 
             }

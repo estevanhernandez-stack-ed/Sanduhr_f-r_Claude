@@ -27,6 +27,7 @@ struct FooterView: View {
         .background(
             LinearGradient(
                 colors: [t.footerBg.opacity(0.95), t.footerBg],
-                startPoint: .top, endPoint: .bottom))
+                startPoint: .top, endPoint: .bottom)
+            .opacity(Chrome.opacity))
     }
 }

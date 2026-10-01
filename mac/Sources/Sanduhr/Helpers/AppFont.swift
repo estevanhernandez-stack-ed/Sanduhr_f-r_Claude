@@ -61,3 +61,25 @@ extension Font {
         return .system(size: size, weight: weight, design: design)
     }
 }
+
+/// Subtle mode: the panel's glass, card fills, borders and theme strip disappear, leaving the
+/// numbers and bars over the desktop with a soft text shadow. Same Observation trick as
+/// FontSettings: views that read `Chrome.opacity` re-render when it flips.
+@Observable
+final class DisplaySettings {
+    static let shared = DisplaySettings()
+    static let defaultsKey = "subtleMode"
+
+    var subtle: Bool {
+        didSet { UserDefaults.standard.set(subtle, forKey: Self.defaultsKey) }
+    }
+
+    private init() {
+        subtle = UserDefaults.standard.bool(forKey: Self.defaultsKey)
+    }
+}
+
+enum Chrome {
+    /// 1 normally, 0 in subtle mode. Applied to backgrounds and borders only, never to text.
+    static var opacity: Double { DisplaySettings.shared.subtle ? 0 : 1 }
+}
