@@ -30,8 +30,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // content — user horizontal drag works, vertical drag snaps back
         // so the window never gains empty space.
         panel.delegate = panel
-        panel.makeKeyAndOrderFront(nil)
         placeInTopRightCorner(panel)
+        // Hidden stays hidden across launches: Sanduhr keeps fetching, alerting and
+        // writing snapshot.json, so a desktop clock or statusline can show the numbers
+        // while the widget itself stays out of the way.
+        if !UserDefaults.standard.bool(forKey: Self.panelHiddenKey) {
+            panel.makeKeyAndOrderFront(nil)
+        }
         fitPanelToContent()
 
         // Build menu bar status item.
@@ -191,7 +196,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // the frontmost process.
         if panel.isVisible && panel.isKeyWindow {
             panel.orderOut(nil)
+            UserDefaults.standard.set(true, forKey: Self.panelHiddenKey)
         } else {
+            UserDefaults.standard.set(false, forKey: Self.panelHiddenKey)
             NSApp.activate(ignoringOtherApps: true)
             panel.makeKeyAndOrderFront(nil)
             panel.orderFrontRegardless()
@@ -200,6 +207,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func hidePanel() {
         panel?.orderOut(nil)
+        UserDefaults.standard.set(true, forKey: Self.panelHiddenKey)
+    }
+
+    static let panelHiddenKey = "panelHidden"
+
+    /// `open -a Sanduhr` (or a launcher, or clicking it in Applications) while it is
+    /// already running toggles the widget, so a hidden Sanduhr is one command away.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        togglePanel()
+        return false
     }
 
     @objc func refreshNow() {
