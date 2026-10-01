@@ -19,6 +19,11 @@ struct SettingsSheet: View {
     @AppStorage("pacingToolsEnabled") private var pacingToolsEnabled = true
     @AppStorage("remindSessionEnd") private var remindSessionEnd = false
 
+    // Font tab state. Bound straight to the shared settings, so the widget
+    // behind the sheet re-renders in the new font as you pick.
+    @Bindable var fonts = FontSettings.shared
+    @State private var fontFamilies: [String] = []
+
     // Themes tab state
     @State private var themePaste: String = ""
     @State private var themeFilename: String = ""
@@ -36,6 +41,9 @@ struct SettingsSheet: View {
 
                 themesTab(t: t)
                     .tabItem { Text("Themes") }
+
+                fontTab(t: t)
+                    .tabItem { Text("Font") }
 
                 credentialsTab(t: t)
                     .tabItem { Text("Credentials") }
@@ -261,6 +269,45 @@ struct SettingsSheet: View {
         } catch {
             themeError = "Could not delete: \(error.localizedDescription)"
         }
+    }
+
+    // MARK: - Font tab
+
+    private func fontTab(t: Theme.Palette) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Pick any font installed on this Mac, your own handwriting font included. The widget changes as you choose. Monospaced readouts keep the system font so the digits stay aligned.")
+                .font(.caption)
+                .foregroundStyle(t.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Picker("Font", selection: $fonts.family) {
+                Text("System (SF Pro)").tag("")
+                Divider()
+                ForEach(fontFamilies, id: \.self) { fam in
+                    Text(fam).tag(fam)
+                }
+            }
+
+            Text("Sanduhr 0:42 left, 68%")
+                .font(.app(size: 18, weight: .semibold))
+                .foregroundStyle(t.text)
+
+            HStack(spacing: 8) {
+                Button("Use System Font") { fonts.family = "" }
+                    .disabled(fonts.family.isEmpty)
+                Button("Open Font Book") {
+                    if let url = NSWorkspace.shared.urlForApplication(
+                        withBundleIdentifier: "com.apple.FontBook") {
+                        NSWorkspace.shared.openApplication(
+                            at: url, configuration: .init())
+                    }
+                }
+                Spacer()
+            }
+            Spacer()
+        }
+        .padding(.top, 12)
+        .onAppear { fontFamilies = FontSettings.installedFamilies() }
     }
 
     // MARK: - Pacing tab

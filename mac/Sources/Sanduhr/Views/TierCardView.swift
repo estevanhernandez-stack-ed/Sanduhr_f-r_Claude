@@ -59,7 +59,7 @@ struct TierCardView: View {
     private var headerRow: some View {
         HStack(spacing: 6) {
             Text(tier.label)
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(.app(size: 10, weight: .semibold, design: .rounded))
                 .foregroundStyle(palette.textSecondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
@@ -72,7 +72,7 @@ struct TierCardView: View {
             }
 
             Text("\(Int(util))%")
-                .font(.system(size: 13, weight: .bold,
+                .font(.app(size: 13, weight: .bold,
                               design: palette.numericFontDesign))
                 .foregroundStyle(usageColor(util))
                 .monospacedDigit()
@@ -84,7 +84,7 @@ struct TierCardView: View {
     private var infoRow: some View {
         HStack {
             Text("Resets in \(timeUntil(usage.resetsAt))")
-                .font(.system(size: 9, design: palette.numericFontDesign))
+                .font(.app(size: 9, design: palette.numericFontDesign))
                 .foregroundStyle(palette.textDim)
                 .id(tick)
 
@@ -93,20 +93,20 @@ struct TierCardView: View {
             if showDeepMath {
                 if let cooldown = calculateCooldown(util: util, iso: usage.resetsAt, tier: tier) {
                     Text("Cool down: \(cooldown)")
-                        .font(.system(size: 9, weight: .semibold, design: palette.numericFontDesign))
+                        .font(.app(size: 9, weight: .semibold, design: palette.numericFontDesign))
                         .foregroundStyle(palette.textDim)
                 } else if let surplus = calculateSurplus(util: util, iso: usage.resetsAt, tier: tier) {
                     Text("Surplus: \(surplus)%")
-                        .font(.system(size: 9, weight: .semibold, design: palette.numericFontDesign))
+                        .font(.app(size: 9, weight: .semibold, design: palette.numericFontDesign))
                         .foregroundStyle(palette.textDim)
                 } else if let pace = paceInfo(util: util, iso: usage.resetsAt, tier: tier) {
                     Text(pace.text)
-                        .font(.system(size: 9, weight: .semibold, design: palette.numericFontDesign))
+                        .font(.app(size: 9, weight: .semibold, design: palette.numericFontDesign))
                         .foregroundStyle(Color.hex(pace.colorHex))
                 }
             } else if let pace = paceInfo(util: util, iso: usage.resetsAt, tier: tier) {
                 Text(pace.text)
-                    .font(.system(size: 9, weight: .semibold, design: palette.numericFontDesign))
+                    .font(.app(size: 9, weight: .semibold, design: palette.numericFontDesign))
                     .foregroundStyle(Color.hex(pace.colorHex))
             }
         }
@@ -120,14 +120,14 @@ struct TierCardView: View {
     private var reminderRow: some View {
         HStack {
             Text(resetDateTimeStr(usage.resetsAt))
-                .font(.system(size: 8))
+                .font(.app(size: 8))
                 .foregroundStyle(palette.textMuted)
 
             Spacer()
 
             if let burn = burnProjection(util: util, iso: usage.resetsAt, tier: tier) {
                 Text(burn.text)
-                    .font(.system(size: 8))
+                    .font(.app(size: 8))
                     .foregroundStyle(Color.hex(burn.colorHex))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -144,10 +144,10 @@ struct ExtraUsageCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text("Extra Usage")
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(.app(size: 10, weight: .semibold, design: .rounded))
                 .foregroundStyle(palette.textSecondary)
             Text(text)
-                .font(.system(size: 9))
+                .font(.app(size: 9))
                 .foregroundStyle(palette.textDim)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

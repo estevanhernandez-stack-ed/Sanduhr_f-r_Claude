@@ -105,8 +105,8 @@ struct SnakeGameOverlay: View {
                 )
                 
                 // Draw Score
-                let scoreText = Text("Score: \(engine.score)").font(.system(size: 9, weight: .bold)).foregroundColor(t.textDim)
-                let bestText = Text("Best: \(snakeHighScore)").font(.system(size: 9, weight: .bold)).foregroundColor(t.textDim)
+                let scoreText = Text("Score: \(engine.score)").font(.app(size: 9, weight: .bold)).foregroundColor(t.textDim)
+                let bestText = Text("Best: \(snakeHighScore)").font(.app(size: 9, weight: .bold)).foregroundColor(t.textDim)
                 context.draw(scoreText, at: CGPoint(x: offsetX + 20, y: offsetY - 10))
                 context.draw(bestText, at: CGPoint(x: offsetX + boxSize - 20, y: offsetY - 10))
                 
@@ -132,7 +132,7 @@ struct SnakeGameOverlay: View {
                 
                 if engine.isGameOver {
                     let text = Text("GAME OVER\nPress Space to Restart\nEsc or × to Exit")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.app(size: 14, weight: .bold))
                         .foregroundColor(t.textDim)
 
                     context.draw(text, at: CGPoint(x: size.width / 2, y: size.height / 2))
@@ -146,7 +146,7 @@ struct SnakeGameOverlay: View {
                 Image(systemName: "xmark.circle.fill")
                     .symbolRenderingMode(.palette)
                     .foregroundStyle(t.textDim, t.glass.opacity(0.6))
-                    .font(.system(size: 18))
+                    .font(.app(size: 18))
             }
             .buttonStyle(.plain)
             .padding(8)

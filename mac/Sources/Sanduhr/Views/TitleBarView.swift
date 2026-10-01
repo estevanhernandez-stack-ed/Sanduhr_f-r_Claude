@@ -17,7 +17,7 @@ struct TitleBarView: View {
                 .padding(.leading, 10)
 
             Text("Sanduhr")
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .font(.app(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(t.text)
 
             // Draggable spacer — claims the rest of the row so the user can
@@ -55,7 +55,7 @@ private struct TrafficLightCloseButton: View {
                                               lineWidth: 0.5))
                 if hovering {
                     Image(systemName: "xmark")
-                        .font(.system(size: 7, weight: .bold))
+                        .font(.app(size: 7, weight: .bold))
                         .foregroundStyle(.black.opacity(0.55))
                 }
             }

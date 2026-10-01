@@ -52,7 +52,7 @@ struct ActionIconRow: View {
         let t = vm.theme.palette
         Button(action: action) {
             Image(systemName: name)
-                .font(.system(size: 13, weight: .medium))
+                .font(.app(size: 13, weight: .medium))
                 .foregroundStyle(tint ?? t.textSecondary)
                 .frame(width: 24, height: 24)
                 .contentShape(Rectangle())

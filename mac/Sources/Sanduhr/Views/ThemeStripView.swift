@@ -30,13 +30,13 @@ struct ThemeStripView: View {
             } label: {
                 HStack(spacing: 4) {
                     Text("Theme:")
-                        .font(.system(size: 10, design: .rounded))
+                        .font(.app(size: 10, design: .rounded))
                         .foregroundStyle(t.textMuted)
                     Text(vm.theme.displayName)
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .font(.app(size: 10, weight: .semibold, design: .rounded))
                         .foregroundStyle(t.accent)
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 7, weight: .semibold))
+                        .font(.app(size: 7, weight: .semibold))
                         .foregroundStyle(t.textMuted)
                 }
                 .contentShape(Rectangle())

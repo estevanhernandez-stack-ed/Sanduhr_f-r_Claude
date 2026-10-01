@@ -185,7 +185,7 @@ struct RootView: View {
         let t = vm.theme.palette
         let color: Color = vm.status.isError ? .hex("f87171") : t.textDim
         return Text(vm.status.text)
-            .font(.system(size: 11))
+            .font(.app(size: 11))
             .foregroundStyle(color)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
