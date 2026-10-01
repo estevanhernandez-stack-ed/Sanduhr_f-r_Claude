@@ -176,6 +176,7 @@ final class UsageViewModel {
             self.usage = u
             self.lastUpdated = Date()
             Notifier.shared.evaluate(u)
+            SnapshotWriter.writeOk(u)
             for (tier, t) in u.tiers {
                 if let util = t.utilization {
                     HistoryStore.append(tier, utilization: util)
@@ -185,12 +186,16 @@ final class UsageViewModel {
             self.status = u.tiers.isEmpty ? .noTiers : .idle
         } catch ClaudeAPI.APIError.unauthorized {
             self.status = .error("Session expired — click Key", isAuth: true)
+            SnapshotWriter.writeError("auth")
         } catch ClaudeAPI.APIError.cloudflareChallenge {
             self.status = .error("Cloudflare — add cf_clearance", isAuth: true)
+            SnapshotWriter.writeError("cloudflare")
         } catch let ClaudeAPI.APIError.http(c) {
             self.status = .error("HTTP \(c)", isAuth: false)
+            SnapshotWriter.writeError("http")
         } catch {
             self.status = .error(error.localizedDescription, isAuth: false)
+            SnapshotWriter.writeError("network")
         }
     }
 

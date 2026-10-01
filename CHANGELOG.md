@@ -10,6 +10,7 @@
 - **Subtle mode.** Right-click ▸ Subtle Mode (or Settings ▸ Look) hides the glass panel, card fills, borders, accent strip and theme strip, leaving the numbers and bars over the desktop with a tight text shadow so they read on any wallpaper. Stored under the `subtleMode` default. The Font tab is now Look and holds both settings.
 - **Pin to desktop in subtle mode.** With subtle mode on, Pin sets the widget on the desktop (below every app window, above the wallpaper, on every Space) instead of floating it on top. Outside subtle mode Pin floats as before.
 - **Alerts.** Settings ▸ Alerts turns on macOS notifications: the session (5 hr) and weekly meters each warn at a threshold you set (50 to 95%, default 80), optionally again at 100% of the session and when the session resets. Each alert fires once per tier per reset window. Includes a test button and a shortcut to System Settings, Notifications. The old "Show reminder at 100% of session" toggle, which saved a setting nothing read, now drives the 100% alert.
+- **snapshot.json on the Mac.** After every fetch the widget writes `~/Library/Application Support/Sanduhr/snapshot.json` in the Windows schema (version 1: status, error_kind, captured_at, tiers with key, utilization and resets_at), atomically, keeping the last good tiers on a failed fetch. Other tools on the Mac can show the meters from it without a login of their own. It never holds the session key.
 
 ## v3.4.2 — 2026-09-14
 
