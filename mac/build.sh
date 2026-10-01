@@ -31,7 +31,8 @@ else
     echo "→ Building ($CONFIG, native arch)..."
 fi
 
-swift build -c "$CONFIG" "${ARCH_FLAGS[@]}"
+# ${arr[@]+...} keeps an empty array legal under set -u on macOS bash 3.2.
+swift build -c "$CONFIG" ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"}
 
 # Universal builds land in .build/apple/Products/<Config>;
 # single-arch builds land in .build/<triple>/<config>.
