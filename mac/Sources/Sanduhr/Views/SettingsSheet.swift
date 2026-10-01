@@ -18,6 +18,11 @@ struct SettingsSheet: View {
 
     @AppStorage("pacingToolsEnabled") private var pacingToolsEnabled = true
     @AppStorage("remindSessionEnd") private var remindSessionEnd = false
+    @AppStorage("alertsEnabled") private var alertsEnabled = false
+    @AppStorage("alertSessionPct") private var alertSessionPct = 80.0
+    @AppStorage("alertWeeklyPct") private var alertWeeklyPct = 80.0
+    @AppStorage("alertSessionReset") private var alertSessionReset = false
+    @State private var alertsNote: String?
 
     // Font tab state. Bound straight to the shared settings, so the widget
     // behind the sheet re-renders in the new font as you pick.
@@ -45,6 +50,9 @@ struct SettingsSheet: View {
 
                 fontTab(t: t)
                     .tabItem { Text("Look") }
+
+                alertsTab(t: t)
+                    .tabItem { Text("Alerts") }
 
                 credentialsTab(t: t)
                     .tabItem { Text("Credentials") }
@@ -313,6 +321,59 @@ struct SettingsSheet: View {
         .onAppear { fontFamilies = FontSettings.installedFamilies() }
     }
 
+    // MARK: - Alerts tab
+
+    private func alertsTab(t: Theme.Palette) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("A heads-up before you hit a limit. Each alert comes once per reset window. Focus and Do Not Disturb still apply.")
+                .font(.caption)
+                .foregroundStyle(t.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Toggle("Notifications", isOn: $alertsEnabled)
+                .onChange(of: alertsEnabled) { _, on in
+                    guard on else { return }
+                    Notifier.shared.requestPermission { granted in
+                        alertsNote = granted ? nil
+                            : "macOS has notifications off for Sanduhr. Turn them on in System Settings, Notifications."
+                    }
+                }
+
+            Group {
+                HStack {
+                    Text("Session (5 hr) at")
+                    Slider(value: $alertSessionPct, in: 50...95, step: 5)
+                    Text("\(Int(alertSessionPct))%").monospacedDigit().frame(width: 40, alignment: .trailing)
+                }
+                HStack {
+                    Text("Weekly limits at")
+                    Slider(value: $alertWeeklyPct, in: 50...95, step: 5)
+                    Text("\(Int(alertWeeklyPct))%").monospacedDigit().frame(width: 40, alignment: .trailing)
+                }
+                Toggle("Also when the session reaches 100%", isOn: $remindSessionEnd)
+                Toggle("When the session resets", isOn: $alertSessionReset)
+            }
+            .disabled(!alertsEnabled)
+
+            HStack(spacing: 8) {
+                Button("Send a Test") { Notifier.shared.sendTest() }
+                    .disabled(!alertsEnabled)
+                Button("Notification Settings") {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                Spacer()
+            }
+            if let note = alertsNote {
+                Text(note).font(.caption).foregroundStyle(Color.hex("f87171"))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+        }
+        .padding(.top, 12)
+    }
+
     // MARK: - Pacing tab
 
     private func pacingTab(t: Theme.Palette) -> some View {
@@ -323,7 +384,6 @@ struct SettingsSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             Toggle("Enable Pacing Calculators", isOn: $pacingToolsEnabled)
-            Toggle("Show reminder at 100% of session", isOn: $remindSessionEnd)
             Spacer()
         }
         .padding(.top, 12)

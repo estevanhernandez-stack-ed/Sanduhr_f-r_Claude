@@ -175,6 +175,7 @@ final class UsageViewModel {
             let u = try await api.getUsage()
             self.usage = u
             self.lastUpdated = Date()
+            Notifier.shared.evaluate(u)
             for (tier, t) in u.tiers {
                 if let util = t.utilization {
                     HistoryStore.append(tier, utilization: util)
