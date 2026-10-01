@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased (mac)
+- Claude Code integrations (`mac/integrations/`): a statusline segment and the `sanduhr` MCP server (`get_usage`, `ping`), Mac ports of the Windows ones with the same output and tool shapes. Both read only `snapshot.json`. Install with `bash mac/integrations/install.sh`.
+- `snapshot.json` error kinds now use the shared closed set (`session_expired`, `cloudflare`, `network`).
 
 **Platform:** macOS (SwiftUI).
 

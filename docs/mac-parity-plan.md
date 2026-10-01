@@ -14,8 +14,8 @@ Missing underneath: the Mac tier list is a fixed enum (`Models/Tier.swift`), it 
 
 | # | Feature | Mac today | Value | Effort | Depends on |
 |---|---|---|---|---|---|
-| 1 | Claude Code statusline bridge | none | high | S | snapshot.json (done) |
-| 2 | Sanduhr MCP: `get_usage`, `ping` | none | high | S | snapshot.json (done) |
+| 1 | Claude Code statusline bridge | done (`mac/integrations`) | high | S | snapshot.json (done) |
+| 2 | Sanduhr MCP: `get_usage`, `ping` | done (`mac/integrations`) | high | S | snapshot.json (done) |
 | 3 | Model-scoped meters from `limits[]`, dynamic tiers | partial (fixed enum) | high | M | API audit doc |
 | 4 | Local Claude Code burn (per project, worktree aware) | none | high | M | none |
 | 5 | MCP: `get_local_burn_by_project`, `get_model_usage` | none | high | S | 2, 4 |

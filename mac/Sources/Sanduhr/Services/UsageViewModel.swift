@@ -186,13 +186,13 @@ final class UsageViewModel {
             self.status = u.tiers.isEmpty ? .noTiers : .idle
         } catch ClaudeAPI.APIError.unauthorized {
             self.status = .error("Session expired — click Key", isAuth: true)
-            SnapshotWriter.writeError("auth")
+            SnapshotWriter.writeError("session_expired")
         } catch ClaudeAPI.APIError.cloudflareChallenge {
             self.status = .error("Cloudflare — add cf_clearance", isAuth: true)
             SnapshotWriter.writeError("cloudflare")
         } catch let ClaudeAPI.APIError.http(c) {
             self.status = .error("HTTP \(c)", isAuth: false)
-            SnapshotWriter.writeError("http")
+            SnapshotWriter.writeError("network")
         } catch {
             self.status = .error(error.localizedDescription, isAuth: false)
             SnapshotWriter.writeError("network")
