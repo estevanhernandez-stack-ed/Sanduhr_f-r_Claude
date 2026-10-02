@@ -3,6 +3,11 @@
 By hand, on the build from `cd mac && SIGN_IDENTITY=- ./build.sh`. Run before every Mac release;
 M0 is the first pass. Each line is a check: do the action, see the result.
 
+Much of it runs by itself: `mac/smoke/smoke run` drives the app through the automatable checks
+(Settings sections, Surfaces switches, Desk and notch on and off, meters, widget, Tools, the Desk
+pulse, the menu) and snapshots the windows; see [mac/smoke/README.md](../mac/smoke/README.md).
+Fresh-install and migration checks stay manual.
+
 ## 0. Setup
 
 - [ ] Quit any running Sanduhr and Sanduhr Desk (`pkill -x Sanduhr; pkill -f "Sanduhr Desk"`).

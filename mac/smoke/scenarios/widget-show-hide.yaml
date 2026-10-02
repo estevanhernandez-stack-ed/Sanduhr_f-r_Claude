@@ -1,0 +1,11 @@
+# docs/mac-smoke-test.md section 2: the widget hides and shows, and the menu follows.
+name: Widget hides and shows
+steps:
+  - do: hide-widget
+  - expect_state: { widget_visible: false, menu.0.items.0.title: Show Sanduhr }
+  - expect:
+      window: widget
+      missing: { role: "/./" }
+  - do: show-widget
+  - expect_state: { widget_visible: true, menu.0.items.0.title: Hide Sanduhr }
+  - snap: widget

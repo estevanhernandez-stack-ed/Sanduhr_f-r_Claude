@@ -1,0 +1,20 @@
+name: Fixture scenario that passes
+needs: [desk]
+steps:
+  - defaults: { domain: desk, key: notchWings, type: float, value: 50 }
+  - defaults: { key: alertSound, type: string, value: Glass }
+  - do: settings
+    arg: notch
+  - expect:
+      window: settings
+      contains: { role: AXCheckBox, label: /camera notch/i }
+  - expect:
+      window: sheet
+      contains: { label: Later }
+  - expect:
+      window: settings
+      missing: { label: Quit Sanduhr }
+  - expect_state: { settings_section: notch, meters.0.label: Session (5hr), meters.1.pace: null, alerts.enabled: false }
+  - snap: notch settings
+  - do: desk
+    arg: "off"

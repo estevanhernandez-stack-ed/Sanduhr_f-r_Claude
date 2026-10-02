@@ -1,0 +1,12 @@
+# docs/mac-smoke-test.md section 4: the Desk meters carry the widget's numbers.
+name: Meters are on Desk and match the widget
+needs: [desk, credentials]
+steps:
+  - do: show-widget
+  - expect_state: { meters.0.tier: five_hour, meters.0.label: Session (5hr), meters.0.percent: "/^\\d+$/" }
+  - expect:
+      window: widget
+      contains: { text: "/^Session \\(5hr\\)/" }
+  - do: refresh
+  - expect_state: { last_fetch: "/^\\d{4}-/" }
+  - snap: widget-and-desk

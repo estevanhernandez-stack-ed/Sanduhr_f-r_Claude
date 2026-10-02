@@ -41,6 +41,7 @@ mac/dmg-rw.dmg
 mac/icon/Sanduhr.icns
 mac/icon/Sanduhr.iconset/
 mac/icon/master-1024.png
+mac/smoke/out/
 releases/
 
 # Vibe Doc local scan state (has machine-absolute paths, regenerated on each scan)

@@ -78,12 +78,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// estedesk:// and sanduhr:// links (Option+J joins the next meeting, …/settings opens
-    /// Sanduhr Settings).
+    /// Sanduhr Settings). sanduhr://debug/… goes to the smoke tools' hooks, which ignore it
+    /// unless they are switched on (DebugGate).
     func application(_ application: NSApplication, open urls: [URL]) {
-        for url in urls where ["estedesk", "sanduhr"].contains(url.scheme ?? "") {
-            DeskController.shared.handle(url)
+        for url in urls {
+            if DebugLink.isDebug(url) {
+                DebugHooks.handle(url, app: self)
+            } else if ["estedesk", "sanduhr"].contains(url.scheme ?? "") {
+                DeskController.shared.handle(url)
+            }
         }
     }
+
+    /// The widget is on screen.
+    var widgetVisible: Bool { panel?.isVisible ?? false }
 
     /// Shrink or grow the panel so its height equals the SwiftUI
     /// content's fitting size. Called after the model signals a change

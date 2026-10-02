@@ -53,8 +53,15 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 @MainActor
 final class SettingsWindowController {
     static let shared = SettingsWindowController()
-    private var window: NSWindow?
+    private(set) var window: NSWindow?
     private let navigation = SettingsNavigation()
+
+    /// The window is on screen.
+    var isOpen: Bool { window?.isVisible ?? false }
+    /// The section showing, or the one it reopens at.
+    var section: SettingsSection { navigation.selection }
+
+    func close() { window?.close() }
 
     /// Shows the window at `section`, or where it was left (General the first time), and
     /// brings it forward. One window, reused.

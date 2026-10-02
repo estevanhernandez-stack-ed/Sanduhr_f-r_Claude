@@ -16,10 +16,10 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// Option+J and Option+S while Desk runs, on by default.
     static let hotKeysKey = "hotKeys"
     private(set) var running = false
-    private var window: NSWindow?
+    private(set) var window: NSWindow?
     private var statusItem: NSStatusItem?
     private var mouseMonitors: [Any] = []
-    private var wingsWindow: NSWindow?
+    private(set) var wingsWindow: NSWindow?
     private var wingsTimer: Timer?
     let model = DeskModel()
     private let hotKeys = DeskHotKeys()

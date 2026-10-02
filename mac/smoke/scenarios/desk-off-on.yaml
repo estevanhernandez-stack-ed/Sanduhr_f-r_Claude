@@ -1,0 +1,20 @@
+# docs/mac-smoke-test.md section 4: Desk off takes the layer away, on brings it back, twice.
+name: Desk off and on, twice
+needs: [desk]
+steps:
+  - do: desk
+    arg: "off"
+  - expect_state: { desk_enabled: false, desk_running: false }
+  - expect:
+      window: desk
+      missing: { role: "/./" }
+  - do: desk
+    arg: "on"
+  - expect_state: { desk_enabled: true, desk_running: true }
+  - do: desk
+    arg: "off"
+  - expect_state: { desk_running: false }
+  - do: desk
+    arg: "on"
+  - expect_state: { desk_running: true }
+  - snap: desk-back

@@ -1,0 +1,23 @@
+# docs/mac-smoke-test.md section 4: General, Surfaces shows the three switches, matching state.
+name: Surfaces switches follow the app
+steps:
+  - do: settings
+    arg: general
+  - expect:
+      window: settings
+      contains: { label: "/^Desk: clock, meters/" }
+  - expect:
+      window: settings
+      contains: { label: "/^Notch: the island/" }
+  - expect:
+      window: settings
+      contains: { label: "/^Widget: the floating window/" }
+  - do: hide-widget
+  - expect:
+      window: settings
+      contains: { label: "/^Widget: the floating window/", value: 0 }
+  - do: show-widget
+  - expect:
+      window: settings
+      contains: { label: "/^Widget: the floating window/", value: 1 }
+  - snap: general
