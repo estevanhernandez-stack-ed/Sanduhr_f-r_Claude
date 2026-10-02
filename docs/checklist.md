@@ -113,7 +113,7 @@ Cooldown Snake, themes, history once M7 lands). Mac sources only; build and test
   Acceptance: `meters:br` in the layout shows a bar per limit that updates within one refresh of the widget, with the pace marker where the widget puts it; hiding the widget does not stop updates; the existing `claude` line still works for anyone who keeps it.
   Verify: swift-testing for a pure row model (label, fill fraction, pace fraction, reset text) built from fixture usage, including a missing reset time and a tier above 100%; then on screen.
 
-- [ ] **14. Desk is the default for new installs**
+- [x] **14. Desk is the default for new installs**
   Spec ref: New — reverses `docs/mac-merge-plan.md` > Decisions ("desktop layer and notch are off by default") for new installs only
   What to build: on first launch with a fresh defaults domain (no widget settings, no legacy Desk domains), turn Desk on with meters in the layout, meetings off (no Calendar prompt until the user turns meetings on), the notch off, and the widget panel hidden. Anyone with existing widget settings, or migrating from Sanduhr Desk, keeps exactly what they have.
   Acceptance: a fresh domain shows the meters on the desktop at first launch with no window and no permission prompts; a 2.1.0 user who updates sees no change; a Sanduhr Desk migrant gets their imported layout.
