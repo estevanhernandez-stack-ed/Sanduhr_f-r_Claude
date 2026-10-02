@@ -127,7 +127,7 @@ Cooldown Snake, themes, history once M7 lands). Mac sources only; build and test
 
 ## Iteration 2 (Mac): one control surface
 
-- [ ] **16. One Settings window, one menu**
+- [x] **16. One Settings window, one menu**
   Spec ref: `docs/mac-merge-plan.md` > Phase 1, item 4 (one Settings window with a Surfaces list)
   What to build: a standalone Settings window (sidebar) replacing both the widget's settings sheet and Desk Settings: General (surfaces Desk, Notch and Widget; shortcuts; open at login), Desk Layout, Desk Look, Message, Notch, Widget Look (themes, font, subtle mode), Alerts, Credentials. One menu model builds the menu bar item's menu, the widget's two-finger menu and Desk's clock menu: Show/Hide Sanduhr, Tools, Refresh, Settings…, Check for Updates…, Quit. Option+S, `sanduhr://settings`, the notch island and every Settings item open the same window. Defaults keys stay as they are.
   Acceptance: every setting is reachable with the widget hidden and the menu bar icon hidden by Ice; the three menus list the same items in the same order; no saved setting is lost across the update.
