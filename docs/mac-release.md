@@ -1,8 +1,15 @@
 # Mac release
 
 Mac releases are built, signed and notarized on GitHub (`.github/workflows/mac-release.yml`).
-The signing material lives in one place, the repo's `mac-release` environment, put there once
-from the old Mac that signed 2.0.4. No other Mac ever holds it, and no other workflow can read it.
+The signing material lives in two places: the repo's `mac-release` environment, where only this
+workflow can read it, and 1Password, which is the master copy. A Mac's Keychain is a working copy
+at most; a reinstall wipes it.
+
+| 1Password item | Holds |
+|---|---|
+| `Sanduhr Mac / Sparkle Private Key` | Sparkle EdDSA private key (base64), the one that **cannot** be replaced |
+| `Sanduhr Mac / Developer ID p12` | the exported .p12 and its password (same cert as RORORO) |
+| `Sanduhr Mac / Notary app-specific password` | Apple ID email and the `Sanduhr GitHub notarization` app-specific password |
 
 The workflow never publishes. It leaves a **draft** release and a **pull request**; you publish
 the draft, then merge the pull request, and only that merge offers the update to users.
@@ -144,8 +151,20 @@ Same prompts, then it creates the `mac-release` environment and lists the five s
 rm ~/Desktop/DeveloperID.p12
 ```
 
-The script already deleted its own temp copies. The certificate and Sparkle key stay in the old
-Mac's Keychain, untouched; keep that Mac (or a Keychain backup) as the master copy.
+The script already deleted its own temp copies. Make sure all three 1Password items above exist;
+they, not any Mac's Keychain, are the master copy.
+
+### After a reinstall (or on a new Mac)
+
+macOS keeps an old login keychain it can no longer open as
+`~/Library/Keychains/login_renamed_N.keychain-db`. In October 2026 the Sparkle key and the
+Developer ID identity were recovered from one of these. Unlock it with the Mac password from
+before the reset (`security unlock-keychain <path>`), then:
+
+- **Sparkle key:** `security find-generic-password -s "https://sparkle-project.org" -a ed25519 -w <path> > /tmp/sk`,
+  `generate_keys -f /tmp/sk`, check `generate_keys -p` prints the `SUPublicEDKey` above, `rm /tmp/sk`.
+  Or import straight from the 1Password copy the same way.
+- **Certificate:** Keychain Access, File, Add Keychain, pick the renamed file, then export as in A4.
 
 ### A8. Two GitHub settings (from any browser)
 
@@ -193,6 +212,7 @@ that is still a 404.
 - **"build N is not above the feed's highest build":** bump `CFBundleVersion`.
 - **DMG layout warning ("AppleScript layout step failed"):** harmless; the DMG works without
   the icon positions.
-- **Rotating a secret:** run A4 to A7 again; the script overwrites the five secrets.
+- **Rotating a secret:** run A4 to A7 again; the script overwrites the five secrets. Update the
+  matching 1Password item in the same sitting.
 - **Local fallback:** `mac/release.sh <version>` on the old Mac does the same with its Keychain
   (see the script header), then the release and appcast steps by hand.
