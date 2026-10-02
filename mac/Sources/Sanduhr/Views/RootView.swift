@@ -163,6 +163,8 @@ struct RootView: View {
                 withAnimation { isSnakeGameActive.toggle() } 
             }
             Button("Credentials…") { showSettings = true }
+            // Also in the menu bar item's menu, which a notch or a menu bar manager can hide.
+            Button("Desk Settings…") { DeskController.shared.showSettings() }
             Divider()
             Button("Quit Sanduhr") { NSApp.terminate(nil) }
         }
