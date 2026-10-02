@@ -159,10 +159,13 @@ final class UsageViewModel {
         refreshTimer?.invalidate()
         countdownTimer?.invalidate()
 
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval,
-                                            repeats: true) { [weak self] _ in
+        // Common modes, so an open menu or a drag does not hold up a refresh.
+        let refresh = Timer(timeInterval: refreshInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.refresh() }
         }
+        refresh.tolerance = 30
+        RunLoop.main.add(refresh, forMode: .common)
+        refreshTimer = refresh
         countdownTimer = Timer.scheduledTimer(withTimeInterval: countdownInterval,
                                               repeats: true) { [weak self] _ in
             Task { @MainActor in self?.countdownTick &+= 1 }
