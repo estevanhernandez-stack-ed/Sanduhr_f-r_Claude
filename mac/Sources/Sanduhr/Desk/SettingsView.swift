@@ -234,7 +234,7 @@ private struct MessageTab: View {
 // MARK: - Notch
 
 private struct NotchTab: View {
-    @AppStorage("notch", store: .desk) private var enabled = true
+    @AppStorage(DeskController.notchKey, store: .desk) private var enabled = false
     @AppStorage("notchWings", store: .desk) private var wings = 36.0
     @AppStorage("notchChin", store: .desk) private var chin = 26.0
     @AppStorage("notchText", store: .desk) private var wingText = true
@@ -270,12 +270,13 @@ private struct GeneralTab: View {
     @AppStorage("menuIcon", store: .desk) private var menuIcon = false
     @AppStorage("showMeetings", store: .desk) private var showMeetings = true
     @AppStorage("showClaude", store: .desk) private var showClaude = true
+    @AppStorage(DeskController.hotKeysKey, store: .desk) private var hotKeys = true
     @State private var atLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         Form {
             Section {
-                Toggle("Show Desk (the desktop layer and the notch)", isOn: $deskEnabled)
+                Toggle("Show Desk (the desktop layer; the notch has its own switch)", isOn: $deskEnabled)
                     .onChange(of: deskEnabled) { _, _ in DeskController.shared.apply() }
                 Text("Draws on the desktop under your windows and around the camera notch. The widget keeps working either way; hide it from its menu if Desk is all you want.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -292,7 +293,11 @@ private struct GeneralTab: View {
             Section("Calendar and Claude") {
                 Toggle("Read today's meetings", isOn: $showMeetings)
                 Toggle("Show the Claude meters on the desktop", isOn: $showClaude)
-                Text("Option+J joins the next meeting. Option+S opens these settings.")
+            }
+            Section("Shortcuts") {
+                Toggle("Option+J joins the next meeting, Option+S opens these settings", isOn: $hotKeys)
+                    .onChange(of: hotKeys) { _, _ in DeskController.shared.applyHotKeys() }
+                Text("Work in every app while Desk is on. While they are on, Option+J and Option+S no longer type ∆ and ß.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section {

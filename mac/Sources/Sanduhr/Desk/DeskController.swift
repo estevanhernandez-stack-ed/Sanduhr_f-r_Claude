@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import ServiceManagement
+import Carbon.HIToolbox
 
 /// Sanduhr's desk surfaces: a click-through layer on the desktop (clock, Claude meters,
 /// meetings, the message) and the notch island. Off until turned on in Desk settings
@@ -10,6 +11,10 @@ import ServiceManagement
 final class DeskController: NSObject, NSMenuDelegate {
     static let shared = DeskController()
     static let enabledKey = "deskEnabled"
+    /// The notch island, off until switched on in Desk settings, Notch.
+    static let notchKey = "notch"
+    /// Option+J and Option+S while Desk runs, on by default.
+    static let hotKeysKey = "hotKeys"
     private(set) var running = false
     private var window: NSWindow?
     private var statusItem: NSStatusItem?
@@ -18,6 +23,7 @@ final class DeskController: NSObject, NSMenuDelegate {
     private var wingsWindow: NSWindow?
     private var wingsTimer: Timer?
     let model = DeskModel()
+    private let hotKeys = DeskHotKeys()
 
     var enabled: Bool { UserDefaults.desk.bool(forKey: Self.enabledKey) }
 
@@ -39,6 +45,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         if UserDefaults.desk.bool(forKey: "menuIcon") { buildMenu() }
         model.start()
         watchMouse()
+        applyHotKeys()
         NotificationCenter.default.addObserver(
             self, selector: #selector(screensChanged),
             name: NSApplication.didChangeScreenParametersNotification, object: nil)
@@ -56,8 +63,24 @@ final class DeskController: NSObject, NSMenuDelegate {
         mouseMonitors = []
         setMenuIcon(false)
         model.stop()
+        applyHotKeys()
         NotificationCenter.default.removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
+    }
+
+    /// Called when Desk starts or stops and when the shortcuts switch flips.
+    func applyHotKeys() {
+        let wanted = running && (UserDefaults.desk.object(forKey: Self.hotKeysKey) as? Bool ?? true)
+        guard wanted != hotKeys.isRegistered else { return }
+        if wanted {
+            let option = UInt32(optionKey)
+            hotKeys.register([
+                .init(keyCode: UInt32(kVK_ANSI_J), modifiers: option) { [weak self] in self?.joinNext() },
+                .init(keyCode: UInt32(kVK_ANSI_S), modifiers: option) { [weak self] in self?.showSettings() },
+            ])
+        } else {
+            hotKeys.unregister()
+        }
     }
 
     @objc private func screensChanged() { if running { buildWindow() } }
@@ -203,7 +226,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         if w.ignoresMouseEvents == overRows { w.ignoresMouseEvents = !overRows }
     }
 
-    /// estedesk://join-next opens the next meeting's link (skhd binds it to Option+J).
+    /// estedesk://join-next opens the next meeting's link (Option+J does the same, see applyHotKeys).
     /// estedesk://join-next, estedesk://settings (and the same on sanduhr://), forwarded by
     /// the app delegate.
     func handle(_ url: URL) {

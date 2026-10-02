@@ -45,20 +45,20 @@ M0 is the first pass. Each line is a check: do the action, see the result.
 ## 4. Desk on
 
 - [ ] Status menu, Desk Settings. Window titled "Sanduhr Desk" opens with Layout, Look, Message, Notch, General.
-- [ ] General, "Show Desk": clock, date, Claude line and message appear on the desktop at once.
+- [ ] General, "Show Desk": clock, date, Claude line and message appear on the desktop at once. The notch stays plain (it has its own switch, off).
 - [ ] Calendar prompt appears (meetings default on). Allow: today's remaining timed meetings show.
 - [ ] Layout: move Clock to Top right; it moves live. Hide Meetings; they go. Put both back.
 - [ ] Look: ink `9ad7ff, 012089` (space after the comma) on the message draws blue to navy, no gray.
 - [ ] Message: `~/Library/Application Support/Desk/messages.txt` exists with the starter lines; add `10-01: smoke test` (today's MM-DD), and within a minute the desktop shows it.
 - [ ] Meeting rows with a Teams/Zoom/Meet link: pointer turns into a hand; click opens it. Clicking empty desktop still reaches Finder.
-- [ ] Turn "Show Desk" off: desktop layer and notch go. On again: they come back (repeat twice; no doubled refreshes in Console).
+- [ ] Turn "Show Desk" off: desktop layer (and notch, if on) go. On again: they come back (repeat twice; no doubled refreshes in Console).
 
 ## 5. Notch (Mac with a notch only)
 
-- [ ] With Desk on, black wings extend the notch left and right; left wing shows the time or the next meeting within the hour, right wing shows `5h N%  wk N%`.
+- [ ] Notch tab shows "Extend the camera notch" off. Turn it on: black wings extend the notch left and right; left wing shows the time or the next meeting within the hour, right wing shows `5h N%  wk N%`.
 - [ ] Strip under the notch draws when Notch, "Extra height below" is above 0; its text appears with "Under the camera too".
 - [ ] Click the island: Desk Settings opens.
-- [ ] Notch tab, turn "Extend the camera notch" off: wings and strip go, Desk layer stays.
+- [ ] Quit and relaunch: the notch is still on (the switch saved). Turn it off: wings and strip go, Desk layer stays.
 - [ ] Full-screen an app: wings stay above it. Switch Spaces: wings stay.
 - [ ] External display as main: no island drawn.
 
@@ -66,9 +66,10 @@ M0 is the first pass. Each line is a check: do the action, see the result.
 
 - [ ] `open sanduhr://settings` and `open estedesk://settings` both open Desk Settings.
 - [ ] `open estedesk://join-next` opens the next meeting with a link, or beeps when there is none.
-- [ ] Option+J does the same. **Sanduhr does not register Option+J itself**: it comes from an skhd
-  binding (`alt - j : open estedesk://join-next`). Without skhd, Option+J does nothing; that is
-  expected for M0.
+- [ ] Remove or comment out any skhd binding for alt - j and alt - s first (`skhd --reload`), or skhd answers before Sanduhr and this proves nothing.
+- [ ] With Desk on, from any app: Option+J joins the next meeting (or beeps), Option+S opens Desk Settings. No Accessibility prompt.
+- [ ] In a text field, Option+S does not type ß while Desk is on (expected cost). General, Shortcuts off: Option+S types ß again, Option+J types ∆. Back on: shortcuts work again.
+- [ ] Desk off: Option+S types ß; the shortcuts are gone.
 
 ## 7. Migration from Sanduhr Desk, then restore
 
@@ -76,6 +77,7 @@ M0 is the first pass. Each line is a check: do the action, see the result.
   `defaults import com.626labs.sanduhrdesk ~/sanduhr-smoke/com.626labs.sanduhrdesk.plist`.
 - [ ] Launch: Desk comes on by itself with the old layout, colors and font (EsteFont if none was set).
   A running Sanduhr Desk app is quit.
+- [ ] The notch is on (the old apps defaulted it on), unless it was switched off there.
 - [ ] Restore: quit Sanduhr, then
   `for f in ~/sanduhr-smoke/*.plist; do defaults import "$(basename "$f" .plist)" "$f"; done`.
 

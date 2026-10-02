@@ -8,14 +8,14 @@ import AppKit
 /// Nothing in the menu bar lives there (the menu bar never draws behind the notch, and Ice's
 /// split bar leaves the middle clear), so it is free space.
 ///
-///   defaults write com.626labs.sanduhr.desk notch -bool false        (turn it off)
+///   defaults write com.626labs.sanduhr.desk notch -bool true         (turn it on; off by default)
 ///   defaults write com.626labs.sanduhr.desk notchWings -float 36     (extra width on each side)
 ///   defaults write com.626labs.sanduhr.desk notchChin -float 26      (extra height below the notch; 0 = none)
 /// On a screen without a notch (an external display) nothing is drawn.
 struct NotchView: View {
     var model: DeskModel
 
-    @AppStorage("notch", store: .desk) private var enabled = true
+    @AppStorage(DeskController.notchKey, store: .desk) private var enabled = false
     @AppStorage("notchWings", store: .desk) private var wings = 36.0
     @AppStorage("notchChin", store: .desk) private var chin = 26.0
     @AppStorage("font", store: .desk) private var font = ""
@@ -103,7 +103,7 @@ struct NotchWingsView: View {
     var model: DeskModel
     let notchWidth: CGFloat
     let notchHeight: CGFloat
-    @AppStorage("notch", store: .desk) private var enabled = true
+    @AppStorage(DeskController.notchKey, store: .desk) private var enabled = false
     @AppStorage("notchWings", store: .desk) private var wings = 36.0
     @AppStorage("notchText", store: .desk) private var showText = true
     @AppStorage("notchTextColor", store: .desk) private var textColor = "ffffff"

@@ -156,30 +156,26 @@ struct InkSpecTests {
     }
 }
 
-/// A scratch suite and two scratch "legacy" domains per test, removed afterwards.
+/// In-memory stand-in for the Desk suite; nothing reaches ~/Library/Preferences.
+final class MemoryDefaults: DefaultsStore {
+    var values: [String: Any] = [:]
+    func object(forKey key: String) -> Any? { values[key] }
+    func bool(forKey key: String) -> Bool { values[key] as? Bool ?? false }
+    func string(forKey key: String) -> String? { values[key] as? String }
+    func set(_ value: Any?, forKey key: String) { values[key] = value }
+}
+
+/// The Desk suite plus two "legacy" domains, newer first, all in memory.
 final class ScratchDefaults {
-    let name = "com.626labs.sanduhr.tests.\(UUID().uuidString)"
-    let defaults: UserDefaults
-    let newer = "com.626labs.sanduhr.tests.newer.\(UUID().uuidString)"
-    let older = "com.626labs.sanduhr.tests.older.\(UUID().uuidString)"
+    let defaults = MemoryDefaults()
+    let newer = "newer"
+    let older = "older"
+    private var domains: [String: [String: Any]] = [:]
 
-    init() { defaults = UserDefaults(suiteName: name)! }
-
-    func seed(_ domain: String, _ values: [String: Any]) {
-        UserDefaults.standard.setPersistentDomain(values, forName: domain)
-    }
+    func seed(_ domain: String, _ values: [String: Any]) { domains[domain] = values }
 
     func migrate() {
-        DeskMigration.run(into: defaults, from: [newer, older], reading: .standard)
-    }
-
-    deinit {
-        // Emptying a domain leaves an empty plist behind in ~/Library/Preferences; delete it too.
-        let prefs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences")
-        for d in [name, newer, older] {
-            UserDefaults.standard.removePersistentDomain(forName: d)
-            try? FileManager.default.removeItem(at: prefs.appendingPathComponent("\(d).plist"))
-        }
+        DeskMigration.run(into: defaults, from: [newer, older], reading: { self.domains[$0] })
     }
 }
 
@@ -190,6 +186,7 @@ struct DeskMigrationTests {
         s.migrate()
         #expect(s.defaults.bool(forKey: DeskController.enabledKey) == false)
         #expect(s.defaults.object(forKey: "font") == nil)
+        #expect(s.defaults.object(forKey: DeskController.notchKey) == nil)
         #expect(s.defaults.bool(forKey: "migrated"))
     }
 
@@ -203,6 +200,8 @@ struct DeskMigrationTests {
         #expect(s.defaults.object(forKey: "loginItemSet") == nil)
         // The standalone apps drew in EsteFont when no font was set.
         #expect(s.defaults.string(forKey: "font") == "EsteFont 2.1")
+        // Their notch defaulted on, so it stays on.
+        #expect(s.defaults.bool(forKey: DeskController.notchKey))
     }
 
     @Test func newerAppWinsAndAKeptFontStays() {
@@ -214,6 +213,13 @@ struct DeskMigrationTests {
         #expect(s.defaults.string(forKey: "inkColor") == "00ff00")
         #expect(s.defaults.string(forKey: "font") == "Avenir")
         #expect(s.defaults.object(forKey: "migratedFromDeskAndSanduhr") == nil)
+    }
+
+    @Test func aNotchSwitchedOffStaysOff() {
+        let s = ScratchDefaults()
+        s.seed(s.newer, [DeskController.notchKey: false])
+        s.migrate()
+        #expect(s.defaults.object(forKey: DeskController.notchKey) as? Bool == false)
     }
 
     @Test func neverOverwritesWhatIsAlreadySet() {
