@@ -95,6 +95,16 @@ The shipped scenarios cover the automatable parts of `docs/mac-smoke-test.md`. F
 migration checks stay manual: they wipe real defaults. A `settings` or `show-widget` action
 brings Sanduhr forward, as clicking would.
 
+## Several copies on one Mac
+
+A dev build, an installed copy and DMG stages all share the bundle id `com.626labs.sanduhr`.
+
+- The CLI talks to the running copy by path and never starts one: if the copy it targets has
+  quit, the call fails (a `watch` keeps going and says so) instead of launching it.
+- Quit a copy by process id (`kill <pid>`), not `osascript -e 'quit app id "com.626labs.sanduhr"'`:
+  with several copies on disk, that can launch whichever one macOS prefers and quit that one.
+- `watch` stops on Ctrl-C, TERM or HUP, also when started in the background.
+
 ## Privacy
 
 Everything stays local in `mac/smoke/out/` (gitignored). Captures are of Sanduhr's own windows
