@@ -95,7 +95,7 @@ GitHub macOS-runner failure; the rerun passed. Worth a retry loop around `hdiuti
 
 ### Follow-ups
 
-- Put the tap PAT's expiry date on a calendar; its expiry is what broke v0.8.0.
+- The new tap PAT was created without an expiration date, so the v0.8.0 failure mode should not recur.
 - rororo-mac PR #14 documents where each secret lives and the reinstall recovery, and corrects the
   stale README claim that both p12 passphrases must match (true only before `e4fee0a`).
 
