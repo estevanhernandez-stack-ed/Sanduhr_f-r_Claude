@@ -2,6 +2,10 @@
 
 ## Unreleased (mac)
 
+## v2.2.1-mac — 2026-10-02
+
+- **Meters keep updating.** macOS put Sanduhr into App Nap (its windows sit on the desktop, under every app, so macOS counts them as hidden), which stopped the five-minute refresh. After fifteen minutes Desk dropped the meters from the notch as stale. Sanduhr now opts out of App Nap; idle sleep is unaffected. The refresh also keeps running while a menu is open.
+
 ## v2.2.0-mac — 2026-10-02
 
 **Desk becomes home**: the meters live on the desktop, the widget is the toolbox, one Settings window, smarter alerts.

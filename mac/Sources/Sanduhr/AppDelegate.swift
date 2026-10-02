@@ -12,11 +12,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private let updaterController = SPUStandardUpdaterController(
         startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    /// Keeps Sanduhr out of App Nap. Its windows sit on the desktop layer, under every app window,
+    /// so macOS counts them as hidden and naps the app: the five-minute refresh timer then stops
+    /// firing, and after fifteen minutes Desk drops the meters as stale. A fetch every five
+    /// minutes costs next to nothing; idle system sleep is still allowed.
+    private var appNapActivity: NSObjectProtocol?
 
     // MARK: Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        appNapActivity = ProcessInfo.processInfo.beginActivity(
+            options: .userInitiatedAllowingIdleSystemSleep,
+            reason: "Refreshes Claude usage every five minutes for the widget and Desk")
 
         // A brand-new install starts with Desk on and the widget set to tuck away after its first
         // fetch. Decided once, before the panel shows and before DeskMigration marks the suite.
