@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased (mac)
+- **Desk** (off by default): Sanduhr can also draw on the desktop under your windows (clock and date, Claude meters, today's meetings with click-to-join in Teams or Zoom, a handwritten line from a messages file, four corner slots) and around the camera notch (black wings beside the camera with the time or next meeting and the Claude meters, an optional strip below). Turn it on from Desk Settings in the widget's menu (two-finger click) or the menu bar item's; the notch has its own switch there, off until you turn it on. Calendar access is asked only when meetings are on. While Desk is on, Option+J joins the next meeting and Option+S opens Desk Settings from any app, no Accessibility permission needed; Desk Settings, General, Shortcuts turns them off (they take ∆ and ß while on). Merged from Sanduhr Desk; its settings and those of the older Desk app are imported once, notch included.
+- Release builds are universal (Apple silicon and Intel) even without full Xcode: each slice builds on its own and `lipo` joins them, and the build fails if either is missing. v2.0.4 shipped Intel-only and ran under Rosetta on Apple silicon.
+- Copy, paste and undo work in every Sanduhr text field (an Edit menu now exists, unseen).
+- Hiding the widget sticks across launches; Sanduhr keeps fetching, alerting and writing `snapshot.json` while hidden. Opening the app again while it runs toggles the widget.
+- Claude Code integrations (`mac/integrations/`): a statusline segment and the `sanduhr` MCP server (`get_usage`, `ping`), Mac ports of the Windows ones with the same output and tool shapes. Both read only `snapshot.json`. Install with `bash mac/integrations/install.sh`.
+- `snapshot.json` error kinds now use the shared closed set (`session_expired`, `cloudflare`, `network`).
+
+**Platform:** macOS (SwiftUI).
+
+### Added
+
+- **Pick the widget's font.** Settings ▸ Font lists every font family installed for the user (handwriting fonts included) and applies the choice live, behind the open sheet. Text set through `Font.app(size:weight:design:)` follows the choice; monospaced readouts (Matrix digits, theme JSON) stay on the system font so columns keep their alignment, and a family that is later removed falls back to SF Pro without an error. Stored under the `fontFamily` default (`defaults write com.626labs.sanduhr fontFamily "<family>"` sets it from a script). The settings and onboarding sheets keep the system font.
+- **Subtle mode.** Right-click ▸ Subtle Mode (or Settings ▸ Look) hides the glass panel, card fills, borders, accent strip and theme strip, leaving the numbers and bars over the desktop with a tight text shadow so they read on any wallpaper. Stored under the `subtleMode` default. The Font tab is now Look and holds both settings.
+- **Pin to desktop in subtle mode.** With subtle mode on, Pin sets the widget on the desktop (below every app window, above the wallpaper, on every Space) instead of floating it on top. Outside subtle mode Pin floats as before.
+- **Alerts.** Settings ▸ Alerts turns on macOS notifications: the session (5 hr) and weekly meters each warn at a threshold you set (50 to 95%, default 80), optionally again at 100% of the session and when the session resets. Each alert fires once per tier per reset window. Includes a test button and a shortcut to System Settings, Notifications. The old "Show reminder at 100% of session" toggle, which saved a setting nothing read, now drives the 100% alert.
+- **snapshot.json on the Mac.** After every fetch the widget writes `~/Library/Application Support/Sanduhr/snapshot.json` in the Windows schema (version 1: status, error_kind, captured_at, tiers with key, utilization and resets_at), atomically, keeping the last good tiers on a failed fetch. Other tools on the Mac can show the meters from it without a login of their own. It never holds the session key.
+
 ## v3.4.2 — 2026-09-14
 
 **Platform:** Windows (.NET 10 / WPF).

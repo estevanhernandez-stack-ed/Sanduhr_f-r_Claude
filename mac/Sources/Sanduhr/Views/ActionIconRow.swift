@@ -28,9 +28,11 @@ struct ActionIconRow: View {
 
             Spacer()
 
+            let subtle = DisplaySettings.shared.subtle
             iconButton(vm.pinned ? "pin.fill" : "pin.slash",
                        tint: vm.pinned ? t.accent : nil,
-                       help: vm.pinned ? "Unpin" : "Pin") {
+                       help: vm.pinned ? (subtle ? "Unpin from desktop" : "Unpin")
+                                       : (subtle ? "Pin to desktop" : "Pin")) {
                 vm.pinned.toggle()
                 DispatchQueue.main.async { applyPinnedState() }
             }
@@ -52,7 +54,7 @@ struct ActionIconRow: View {
         let t = vm.theme.palette
         Button(action: action) {
             Image(systemName: name)
-                .font(.system(size: 13, weight: .medium))
+                .font(.app(size: 13, weight: .medium))
                 .foregroundStyle(tint ?? t.textSecondary)
                 .frame(width: 24, height: 24)
                 .contentShape(Rectangle())
@@ -66,7 +68,7 @@ struct ActionIconRow: View {
     private func applyPinnedState() {
         guard let panel = NSApp.windows.compactMap({ $0 as? FloatingPanel }).first
         else { return }
-        panel.isFloatingPanel = vm.pinned
-        panel.level = vm.pinned ? .floating : .normal
+        _ = panel
+        FloatingPanel.refreshLevel(pinned: vm.pinned)
     }
 }

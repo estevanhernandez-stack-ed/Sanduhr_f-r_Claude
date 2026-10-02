@@ -1,0 +1,47 @@
+name: Mac CI
+
+on:
+  push:
+    paths:
+      - "mac/**"
+      - ".github/workflows/mac-ci.yml"
+  pull_request:
+    paths:
+      - "mac/**"
+      - ".github/workflows/mac-ci.yml"
+
+defaults:
+  run:
+    working-directory: mac
+
+jobs:
+  build-and-test:
+    # Full Xcode (Swift 6, swift-testing built in), so plain swift build and swift test work.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: swift --version && xcode-select -p
+      - name: Build
+        run: swift build
+      - name: Test
+        run: swift test
+
+  universal-release:
+    # The release build ships to Intel and Apple silicon Macs; v2.0.4 went out Intel-only.
+    # Ad-hoc signed: this proves the build, it is not a distributable artifact.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build universal release
+        env:
+          SIGN_IDENTITY: "-"
+        run: ./build.sh
+      - name: Check architectures
+        run: |
+          for bin in Sanduhr.app/Contents/MacOS/Sanduhr \
+                     Sanduhr.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate; do
+            archs="$(lipo -archs "$bin")"
+            echo "$bin: $archs"
+            [[ "$archs" == *arm64* && "$archs" == *x86_64* ]] || { echo "::error::$bin is '$archs', expected arm64 and x86_64"; exit 1; }
+          done

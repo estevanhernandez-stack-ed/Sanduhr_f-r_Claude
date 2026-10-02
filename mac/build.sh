@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Build Sanduhr.app from the Swift package.
-# Usage: ./build.sh               # release build, auto-detects universal vs native
+# Usage: ./build.sh               # release build, always universal
 #        ./build.sh --debug       # debug build, native arch (fastest iteration)
-#        ./build.sh --universal   # force universal (requires full Xcode)
+#        ./build.sh --universal   # force universal (Apple silicon + Intel)
+# Release builds are always universal. With full Xcode, SwiftPM builds both slices in one
+# go; with only the command line tools, each slice is built on its own and joined with lipo.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -15,29 +17,42 @@ case "${1:-}" in
     *) echo "Unknown flag: $1" >&2; exit 2 ;;
 esac
 
-# Universal builds need full Xcode (provides xcbuild). Auto-detect.
-if [[ "$CONFIG" == "release" ]] && [[ "$UNIVERSAL" == false ]]; then
-    XCODE_PATH="$(xcode-select -p 2>/dev/null || true)"
-    if [[ -n "$XCODE_PATH" && -x "$XCODE_PATH/../SharedFrameworks/XCBuild.framework/Versions/A/Support/xcbuild" ]]; then
-        UNIVERSAL=true
-    fi
+# Release builds ship to other Macs, so they are always universal: v2.0.4 went out Intel-only
+# and ran under Rosetta on Apple silicon.
+[[ "$CONFIG" == "release" ]] && UNIVERSAL=true
+
+XCODE_PATH="$(xcode-select -p 2>/dev/null || true)"
+HAVE_XCBUILD=false
+[[ -n "$XCODE_PATH" && -x "$XCODE_PATH/../SharedFrameworks/XCBuild.framework/Versions/A/Support/xcbuild" ]] && HAVE_XCBUILD=true
+
+# Without full Xcode, the newest SDK lacks the SwiftUI macro plugins; use a 26.x SDK.
+if ! $HAVE_XCBUILD && [[ -z "${SDKROOT:-}" ]]; then
+    for sdk in /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk; do
+        [[ -d "$sdk" ]] && { export SDKROOT="$sdk"; echo "→ Using $(basename "$sdk")"; break; }
+    done
 fi
 
-ARCH_FLAGS=()
-if $UNIVERSAL; then
-    ARCH_FLAGS=(--arch arm64 --arch x86_64)
-    echo "→ Building ($CONFIG, universal)..."
+if $UNIVERSAL && $HAVE_XCBUILD; then
+    echo "→ Building ($CONFIG, universal via Xcode)..."
+    swift build -c "$CONFIG" --arch arm64 --arch x86_64
+    # Ask for the path: it moved from .build/apple to .build/out between SwiftPM versions.
+    BIN="$(swift build -c "$CONFIG" --arch arm64 --arch x86_64 --show-bin-path)/Sanduhr"
+elif $UNIVERSAL; then
+    echo "→ Building ($CONFIG, universal: arm64 then x86_64, joined with lipo)..."
+    # Newer SwiftPM gives both triples the same bin path (.build/out/Products/Release), so the
+    # second build overwrites the first: copy each slice out as soon as it is built.
+    mkdir -p .build/universal
+    for arch in arm64 x86_64; do
+        swift build -c "$CONFIG" --triple "$arch-apple-macosx14.0"
+        SLICE=".build/universal/Sanduhr-$arch"
+        cp "$(swift build -c "$CONFIG" --triple "$arch-apple-macosx14.0" --show-bin-path)/Sanduhr" "$SLICE"
+        [[ "$(lipo -archs "$SLICE")" == "$arch" ]] || { echo "✗ $SLICE is $(lipo -archs "$SLICE"), not $arch" >&2; exit 1; }
+    done
+    BIN=".build/universal/Sanduhr"
+    lipo -create .build/universal/Sanduhr-arm64 .build/universal/Sanduhr-x86_64 -output "$BIN"
 else
     echo "→ Building ($CONFIG, native arch)..."
-fi
-
-swift build -c "$CONFIG" "${ARCH_FLAGS[@]}"
-
-# Universal builds land in .build/apple/Products/<Config>;
-# single-arch builds land in .build/<triple>/<config>.
-if $UNIVERSAL && [[ "$CONFIG" == "release" ]]; then
-    BIN=".build/apple/Products/Release/Sanduhr"
-else
+    swift build -c "$CONFIG"
     BIN="$(swift build -c "$CONFIG" --show-bin-path)/Sanduhr"
 fi
 
@@ -116,6 +131,11 @@ else
 fi
 codesign --verify --strict --verbose=2 "$APP"
 
+if $UNIVERSAL; then
+    ARCHS="$(lipo -archs "$APP/Contents/MacOS/Sanduhr")"
+    [[ "$ARCHS" == *arm64* && "$ARCHS" == *x86_64* ]] || { echo "✗ Expected arm64 and x86_64, got: $ARCHS" >&2; exit 1; }
+    echo "→ Architectures: $ARCHS"
+fi
 echo "✓ Built $APP"
 echo "  Run:      open $APP"
 echo "  Install:  mv $APP /Applications/"

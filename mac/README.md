@@ -8,9 +8,10 @@ plus real vibrancy, SF Pro, and no dock icon.
 Requires macOS 14+ and Xcode 15+ command-line tools (`xcode-select --install`).
 
 ```
-./build.sh                 # release build → Sanduhr.app (universal if full Xcode present)
+./build.sh                 # release build → Sanduhr.app, universal (arm64 + x86_64)
+SIGN_IDENTITY=- ./build.sh # same, ad-hoc signed (no Developer ID needed)
 ./build.sh --debug         # native-arch debug build (faster iteration)
-./build.sh --universal     # force arm64+x86_64 (requires full Xcode)
+./test.sh                  # swift test, with the SDK and plugin paths the command line tools need
 ```
 
 Run the result:
@@ -18,6 +19,11 @@ Run the result:
 ```
 open Sanduhr.app
 ```
+
+## Release
+
+Signed, notarized releases are built by GitHub Actions; setup and steps are in
+[docs/mac-release.md](../docs/mac-release.md).
 
 ## Package as a drag-install DMG
 

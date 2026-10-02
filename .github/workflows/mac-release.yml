@@ -1,0 +1,151 @@
+name: Mac Release
+
+# Builds, signs, notarizes and Sparkle-signs a Mac release, then stops short of publishing:
+# it leaves a DRAFT GitHub Release with the DMG and opens a pull request with the appcast and
+# Homebrew cask. Publish the draft first, then merge the pull request (the appcast going live
+# is what offers the update to users). Setup and the full sequence: docs/mac-release.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, matching CFBundleShortVersionString in mac/Info.plist (e.g. 2.1.0)"
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency: mac-release
+
+jobs:
+  release:
+    runs-on: macos-15
+    # Signing secrets live in this environment, so no other workflow can read them.
+    environment: mac-release
+    defaults:
+      run:
+        working-directory: mac
+    env:
+      VERSION: ${{ inputs.version }}
+      TAG: v${{ inputs.version }}-mac
+      SIGN_IDENTITY: "Developer ID Application: Estevan Hernandez (82BSR56X5J)"
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check branch, version and tag
+        run: |
+          [[ "$GITHUB_REF" == refs/heads/main ]] || { echo "::error::Release from main, not $GITHUB_REF"; exit 1; }
+          PLIST_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)"
+          BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Info.plist)"
+          [[ "$PLIST_VERSION" == "$VERSION" ]] || { echo "::error::Info.plist says $PLIST_VERSION, input says $VERSION"; exit 1; }
+          # Sparkle orders updates by build number: fail now, not after notarizing.
+          FEED_MAX="$(grep -o '<sparkle:version>[0-9]*' ../docs/appcast.xml | grep -o '[0-9]*$' | sort -n | tail -1)"
+          (( BUILD > ${FEED_MAX:-0} )) || { echo "::error::CFBundleVersion $BUILD must be above the appcast's $FEED_MAX"; exit 1; }
+          if gh release view "$TAG" >/dev/null 2>&1; then echo "::error::Release $TAG already exists"; exit 1; fi
+          echo "BUILD=$BUILD" >> "$GITHUB_ENV"
+          echo "Releasing $VERSION (build $BUILD) as $TAG"
+
+      - name: Import Developer ID certificate
+        env:
+          P12: ${{ secrets.MAC_DEVELOPER_ID_P12 }}
+          P12_PASSWORD: ${{ secrets.MAC_DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          KC="$RUNNER_TEMP/release.keychain-db"
+          KC_PASS="$(uuidgen)"
+          security create-keychain -p "$KC_PASS" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KC_PASS" "$KC"
+          printf '%s' "$P12" | base64 --decode > "$RUNNER_TEMP/devid.p12"
+          security import "$RUNNER_TEMP/devid.p12" -k "$KC" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/devid.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PASS" "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          security find-identity -p codesigning "$KC" | grep -qF "$SIGN_IDENTITY" \
+            || { echo "::error::$SIGN_IDENTITY not in the imported certificate"; exit 1; }
+          echo "KEYCHAIN=$KC" >> "$GITHUB_ENV"
+
+      - name: Build universal app (Developer ID, hardened runtime)
+        run: ./build.sh
+
+      - name: Notarize app
+        env:
+          NOTARY_APPLE_ID: ${{ secrets.MAC_NOTARY_APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.MAC_NOTARY_PASSWORD }}
+        run: ./notarize.sh Sanduhr.app
+
+      - name: Build DMG
+        run: ./make-dmg.sh --skip-build
+
+      - name: Notarize DMG
+        env:
+          NOTARY_APPLE_ID: ${{ secrets.MAC_NOTARY_APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.MAC_NOTARY_PASSWORD }}
+        run: ./notarize.sh Sanduhr.dmg
+
+      - name: Verify what ships
+        run: |
+          for bin in Sanduhr.app/Contents/MacOS/Sanduhr \
+                     Sanduhr.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate; do
+            archs="$(lipo -archs "$bin")"
+            echo "$bin: $archs"
+            [[ "$archs" == *arm64* && "$archs" == *x86_64* ]] || { echo "::error::$bin is '$archs'"; exit 1; }
+          done
+          spctl --assess --type execute --verbose=2 Sanduhr.app
+          spctl --assess --type open --context context:primary-signature --verbose=2 Sanduhr.dmg
+          DMG="Sanduhr-$VERSION.dmg"
+          cp Sanduhr.dmg "$DMG"
+          echo "DMG=$DMG" >> "$GITHUB_ENV"
+
+      - name: Sparkle signature
+        env:
+          SPARKLE_KEY: ${{ secrets.MAC_SPARKLE_ED_KEY }}
+        run: |
+          KEY_FILE="$RUNNER_TEMP/sparkle.key"
+          ( umask 077; printf '%s' "$SPARKLE_KEY" > "$KEY_FILE" )
+          SIG="$(.build/artifacts/sparkle/Sparkle/bin/sign_update --ed-key-file "$KEY_FILE" -p "$DMG")"
+          rm -f "$KEY_FILE"
+          [[ -n "$SIG" ]] || { echo "::error::sign_update printed no signature"; exit 1; }
+          echo "SIG=$SIG" >> "$GITHUB_ENV"
+
+      - name: Draft GitHub Release
+        run: |
+          # Release notes: the CHANGELOG's "Unreleased (mac)" section, edited in the draft as needed.
+          awk '/^## Unreleased \(mac\)/{on=1; next} on && /^## /{exit} on' ../CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" "$DMG" --draft --target "$GITHUB_SHA" \
+            --title "Sanduhr for Mac $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+
+      - name: Pull request with appcast and cask
+        run: |
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${DMG}"
+          python3 scripts/appcast_add.py ../docs/appcast.xml --version "$VERSION" --build "$BUILD" \
+            --url "$URL" --length "$(stat -f%z "$DMG")" --signature "$SIG"
+          SHA="$(shasum -a 256 "$DMG" | cut -d' ' -f1)"
+          perl -pi -e "s/^  version \".*\"/  version \"$VERSION\"/; s/^  sha256 \".*\"/  sha256 \"$SHA\"/" ../docs/distribution/sanduhr.rb
+          BRANCH="release/mac-$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add ../docs/appcast.xml ../docs/distribution/sanduhr.rb
+          git commit -m "release(mac): appcast and cask for $VERSION"
+          git push origin "$BRANCH"
+          BODY="Appcast entry and Homebrew cask for Sanduhr for Mac $VERSION (build $BUILD).
+
+          **Merge only after publishing the draft release $TAG.** Merging puts the appcast live, and Sparkle then offers the update; before the release is published its DMG URL is a 404.
+
+          DMG SHA-256: \`$SHA\`"
+          gh pr create --base main --head "$BRANCH" --title "release(mac): $VERSION appcast and cask" --body "$BODY" \
+            || echo "::warning::Could not open the pull request (Settings, Actions, allow GitHub Actions to create pull requests). Branch $BRANCH is pushed; open it by hand."
+
+      - name: Keep the DMG as a run artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sanduhr-${{ inputs.version }}-dmg
+          path: mac/Sanduhr-${{ inputs.version }}.dmg
+
+      - name: Remove the signing keychain
+        if: always()
+        run: |
+          [[ -n "${KEYCHAIN:-}" ]] && security delete-keychain "$KEYCHAIN" || true
+          rm -f "$RUNNER_TEMP/devid.p12" "$RUNNER_TEMP/sparkle.key"

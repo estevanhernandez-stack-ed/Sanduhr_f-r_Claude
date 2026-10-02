@@ -30,8 +30,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // content — user horizontal drag works, vertical drag snaps back
         // so the window never gains empty space.
         panel.delegate = panel
-        panel.makeKeyAndOrderFront(nil)
         placeInTopRightCorner(panel)
+        // Hidden stays hidden across launches: Sanduhr keeps fetching, alerting and
+        // writing snapshot.json, so a desktop clock or statusline can show the numbers
+        // while the widget itself stays out of the way.
+        if !UserDefaults.standard.bool(forKey: Self.panelHiddenKey) {
+            panel.makeKeyAndOrderFront(nil)
+        }
         fitPanelToContent()
 
         // Build menu bar status item.
@@ -41,6 +46,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         viewModel.onUsageUpdate = { [weak self] in
             self?.renderStatusItem()
             self?.fitPanelToContent()
+            // The desk reads snapshot.json, which refresh() has just rewritten.
+            if DeskController.shared.running { DeskController.shared.model.refreshClaude() }
         }
 
         // When the user toggles compact mode, resize the panel to fit the
@@ -51,6 +58,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         viewModel.bootstrap()
         renderStatusItem()
+
+        // Desk: the desktop layer and the notch, when switched on (Desk Settings).
+        DeskMigration.run()
+        DeskController.shared.apply()
+    }
+
+    /// estedesk:// and sanduhr:// links (Option+J joins the next meeting, …/settings opens
+    /// Desk settings).
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls where ["estedesk", "sanduhr"].contains(url.scheme ?? "") {
+            DeskController.shared.handle(url)
+        }
     }
 
     /// Shrink or grow the panel so its height equals the SwiftUI
@@ -153,6 +172,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(item("Refresh Now", action: #selector(refreshNow), key: "r"))
         menu.addItem(.separator())
         menu.addItem(item("Credentials…", action: #selector(openCredentials)))
+        menu.addItem(item("Desk Settings…", action: #selector(DeskController.showSettings),
+                          target: DeskController.shared))
         menu.addItem(.separator())
         let updatesItem = NSMenuItem(
             title: "Check for Updates…",
@@ -191,7 +212,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // the frontmost process.
         if panel.isVisible && panel.isKeyWindow {
             panel.orderOut(nil)
+            UserDefaults.standard.set(true, forKey: Self.panelHiddenKey)
         } else {
+            UserDefaults.standard.set(false, forKey: Self.panelHiddenKey)
             NSApp.activate(ignoringOtherApps: true)
             panel.makeKeyAndOrderFront(nil)
             panel.orderFrontRegardless()
@@ -200,6 +223,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func hidePanel() {
         panel?.orderOut(nil)
+        UserDefaults.standard.set(true, forKey: Self.panelHiddenKey)
+    }
+
+    static let panelHiddenKey = "panelHidden"
+
+    /// `open -a Sanduhr` (or a launcher, or clicking it in Applications) while it is
+    /// already running toggles the widget, so a hidden Sanduhr is one command away.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        togglePanel()
+        return false
     }
 
     @objc func refreshNow() {
@@ -240,6 +273,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 /// eliminating the dead-space-below-footer problem while keeping
 /// horizontal drag-resize working.
 final class FloatingPanel: NSPanel, NSWindowDelegate {
+    /// Last Pin state the widget asked for; subtle-mode changes re-apply it.
+    private static var pinned = true
+
+    /// Pin floats the widget above every window, except in subtle mode, where Pin sets it on
+    /// the desktop instead: below every app window, above the wallpaper, on every Space.
+    static func refreshLevel(pinned newValue: Bool? = nil) {
+        if let newValue { pinned = newValue }
+        guard let panel = NSApp.windows.compactMap({ $0 as? FloatingPanel }).first else { return }
+        let subtle = DisplaySettings.shared.subtle
+        if pinned && subtle {
+            panel.isFloatingPanel = false
+            panel.level = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
+            panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+            panel.hasShadow = false
+        } else {
+            panel.isFloatingPanel = pinned
+            panel.level = pinned ? .floating : .normal
+            panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            panel.hasShadow = !subtle
+        }
+    }
+
     func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
         let fit = self.contentView?.fittingSize.height ?? frameSize.height
         return NSSize(width: frameSize.width, height: fit)
@@ -270,6 +325,8 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
         // cards already fit the content; we just want enough vertical room
         // for 4-5 tier cards + footer without overflow).
         self.minSize = NSSize(width: 340, height: 480)
+        // Subtle mode saved from last time: start on the desktop instead of floating.
+        DispatchQueue.main.async { FloatingPanel.refreshLevel() }
         self.standardWindowButton(.closeButton)?.isHidden = true
         self.standardWindowButton(.miniaturizeButton)?.isHidden = true
         self.standardWindowButton(.zoomButton)?.isHidden = true

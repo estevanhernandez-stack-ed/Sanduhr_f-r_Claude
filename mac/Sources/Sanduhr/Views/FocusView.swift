@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 /// Minimalist Pomodoro-style timer overlay containing a glowing circular
@@ -150,7 +151,7 @@ struct FocusView: View {
 
                 VStack(spacing: 6) {
                     Text(timeString)
-                        .font(.system(size: 32, weight: .bold, design: t.numericFontDesign))
+                        .font(.app(size: 32, weight: .bold, design: t.numericFontDesign))
                         .foregroundStyle(t.text)
                         .monospacedDigit()
                     
@@ -165,7 +166,7 @@ struct FocusView: View {
                 HStack {
                     Spacer()
                     Text("Minutes:")
-                        .font(.system(size: 11))
+                        .font(.app(size: 11))
                         .foregroundStyle(t.text)
                     TextField("", value: $focusMinutes, format: .number)
                         .textFieldStyle(.roundedBorder)
@@ -200,7 +201,7 @@ struct FocusView: View {
                 Image(systemName: "xmark.circle.fill")
                     .symbolRenderingMode(.palette)
                     .foregroundStyle(t.textDim, t.glass.opacity(0.6))
-                    .font(.system(size: 18))
+                    .font(.app(size: 18))
             }
             .buttonStyle(.plain)
             .padding(8)

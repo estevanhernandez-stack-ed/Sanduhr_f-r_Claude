@@ -18,6 +18,17 @@ struct SettingsSheet: View {
 
     @AppStorage("pacingToolsEnabled") private var pacingToolsEnabled = true
     @AppStorage("remindSessionEnd") private var remindSessionEnd = false
+    @AppStorage("alertsEnabled") private var alertsEnabled = false
+    @AppStorage("alertSessionPct") private var alertSessionPct = 80.0
+    @AppStorage("alertWeeklyPct") private var alertWeeklyPct = 80.0
+    @AppStorage("alertSessionReset") private var alertSessionReset = false
+    @State private var alertsNote: String?
+
+    // Font tab state. Bound straight to the shared settings, so the widget
+    // behind the sheet re-renders in the new font as you pick.
+    @Bindable var fonts = FontSettings.shared
+    @Bindable var display = DisplaySettings.shared
+    @State private var fontFamilies: [String] = []
 
     // Themes tab state
     @State private var themePaste: String = ""
@@ -36,6 +47,12 @@ struct SettingsSheet: View {
 
                 themesTab(t: t)
                     .tabItem { Text("Themes") }
+
+                fontTab(t: t)
+                    .tabItem { Text("Look") }
+
+                alertsTab(t: t)
+                    .tabItem { Text("Alerts") }
 
                 credentialsTab(t: t)
                     .tabItem { Text("Credentials") }
@@ -263,6 +280,100 @@ struct SettingsSheet: View {
         }
     }
 
+    // MARK: - Font tab
+
+    private func fontTab(t: Theme.Palette) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Pick any font installed on this Mac, your own handwriting font included. The widget changes as you choose. Monospaced readouts keep the system font so the digits stay aligned.")
+                .font(.caption)
+                .foregroundStyle(t.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Picker("Font", selection: $fonts.family) {
+                Text("System (SF Pro)").tag("")
+                Divider()
+                ForEach(fontFamilies, id: \.self) { fam in
+                    Text(fam).tag(fam)
+                }
+            }
+
+            Toggle("Subtle mode: no background, just the numbers over your desktop", isOn: $display.subtle)
+
+            Text("Sanduhr 0:42 left, 68%")
+                .font(.app(size: 18, weight: .semibold))
+                .foregroundStyle(t.text)
+
+            HStack(spacing: 8) {
+                Button("Use System Font") { fonts.family = "" }
+                    .disabled(fonts.family.isEmpty)
+                Button("Open Font Book") {
+                    if let url = NSWorkspace.shared.urlForApplication(
+                        withBundleIdentifier: "com.apple.FontBook") {
+                        NSWorkspace.shared.openApplication(
+                            at: url, configuration: .init())
+                    }
+                }
+                Spacer()
+            }
+            Spacer()
+        }
+        .padding(.top, 12)
+        .onAppear { fontFamilies = FontSettings.installedFamilies() }
+    }
+
+    // MARK: - Alerts tab
+
+    private func alertsTab(t: Theme.Palette) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("A heads-up before you hit a limit. Each alert comes once per reset window. Focus and Do Not Disturb still apply.")
+                .font(.caption)
+                .foregroundStyle(t.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Toggle("Notifications", isOn: $alertsEnabled)
+                .onChange(of: alertsEnabled) { _, on in
+                    guard on else { return }
+                    Notifier.shared.requestPermission { granted in
+                        alertsNote = granted ? nil
+                            : "macOS has notifications off for Sanduhr. Turn them on in System Settings, Notifications."
+                    }
+                }
+
+            Group {
+                HStack {
+                    Text("Session (5 hr) at")
+                    Slider(value: $alertSessionPct, in: 50...95, step: 5)
+                    Text("\(Int(alertSessionPct))%").monospacedDigit().frame(width: 40, alignment: .trailing)
+                }
+                HStack {
+                    Text("Weekly limits at")
+                    Slider(value: $alertWeeklyPct, in: 50...95, step: 5)
+                    Text("\(Int(alertWeeklyPct))%").monospacedDigit().frame(width: 40, alignment: .trailing)
+                }
+                Toggle("Also when the session reaches 100%", isOn: $remindSessionEnd)
+                Toggle("When the session resets", isOn: $alertSessionReset)
+            }
+            .disabled(!alertsEnabled)
+
+            HStack(spacing: 8) {
+                Button("Send a Test") { Notifier.shared.sendTest() }
+                    .disabled(!alertsEnabled)
+                Button("Notification Settings") {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                Spacer()
+            }
+            if let note = alertsNote {
+                Text(note).font(.caption).foregroundStyle(Color.hex("f87171"))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+        }
+        .padding(.top, 12)
+    }
+
     // MARK: - Pacing tab
 
     private func pacingTab(t: Theme.Palette) -> some View {
@@ -273,20 +384,8 @@ struct SettingsSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             Toggle("Enable Pacing Calculators", isOn: $pacingToolsEnabled)
-            Toggle("Show reminder at 100% of session", isOn: $remindSessionEnd)
             Spacer()
         }
         .padding(.top, 12)
-    }
-}
-
-private struct NumericOnly: ViewModifier {
-    func body(content: Content) -> some View {
-        #if os(macOS)
-        content.onChange(of: "") { _, _ in } // placeholder to silence Swift 5.9 warning if needed
-        #else
-        content.keyboardType(.numberPad)
-        #endif
-        return content
     }
 }
