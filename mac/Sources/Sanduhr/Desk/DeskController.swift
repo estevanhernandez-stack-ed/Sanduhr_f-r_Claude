@@ -1,17 +1,17 @@
 import AppKit
 import SwiftUI
-import ServiceManagement
 import Carbon.HIToolbox
 
 /// Sanduhr's desk surfaces: a click-through layer on the desktop (clock, Claude meters,
-/// meetings, the message) and the notch island. Off until turned on in Desk settings
-/// (status item menu, Desk Settings), so nothing changes for widget-only users. Its settings
+/// meetings, the message) and the notch island. Off until turned on in Settings, General,
+/// Surfaces, so nothing changes for widget-only users; a brand-new
+/// install starts with it on (DeskFirstRun). Its settings
 /// live in their own defaults suite (UserDefaults.desk) so their short names never collide
 /// with the widget's.
 final class DeskController: NSObject, NSMenuDelegate {
     static let shared = DeskController()
     static let enabledKey = "deskEnabled"
-    /// The notch island, off until switched on in Desk settings, Notch.
+    /// The notch island, off until switched on in Settings (General or Notch).
     static let notchKey = "notch"
     /// Option+J and Option+S while Desk runs, on by default.
     static let hotKeysKey = "hotKeys"
@@ -19,7 +19,6 @@ final class DeskController: NSObject, NSMenuDelegate {
     private var window: NSWindow?
     private var statusItem: NSStatusItem?
     private var mouseMonitors: [Any] = []
-    private var settingsWindow: NSWindow?
     private var wingsWindow: NSWindow?
     private var wingsTimer: Timer?
     let model = DeskModel()
@@ -155,8 +154,8 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     @objc private func spaceChanged() { wingsWindow?.orderFrontRegardless() }
 
-    /// The window ignores the mouse, except while the pointer is over the meeting list, so the
-    /// desktop and its icons keep working and the meeting rows can still be clicked.
+    /// The window ignores the mouse, except while the pointer is over the meeting list or the
+    /// meters, so the desktop and its icons keep working and those can still be clicked.
     private func watchMouse() {
         let moved: (NSEvent) -> Void = { [weak self] _ in self?.updateMouseThrough() }
         if let g = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved], handler: moved) {
@@ -168,18 +167,19 @@ final class DeskController: NSObject, NSMenuDelegate {
             mouseMonitors.append(l)
         }
         // Clicks: whichever app macOS gives the click to, if it landed on a meeting row with a
-        // link, open the meeting. A click that reaches Desk itself is consumed.
+        // link, open the meeting; on the meters, show the widget. A click that reaches Desk
+        // itself is consumed.
         if let g = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown], handler: { [weak self] _ in
             // Another app's window over the clock means the click was meant for that app.
             guard let self, !Self.appWindowCoversPointer() else { return }
-            _ = self.joinMeetingUnderPointer()
+            _ = self.clickUnderPointer()
         }) {
             mouseMonitors.append(g)
         }
         if let l = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown], handler: { [weak self] event in
             // Same process as the widget and its settings: only clicks on the desk layer count.
             guard let self, event.window == nil || event.window === self.window else { return event }
-            return self.joinMeetingUnderPointer() ? nil : event
+            return self.clickUnderPointer() ? nil : event
         }) {
             mouseMonitors.append(l)
         }
@@ -222,11 +222,35 @@ final class DeskController: NSObject, NSMenuDelegate {
         return false
     }
 
+    /// A meeting row first, then the meters. True when the click was used.
+    private func clickUnderPointer() -> Bool {
+        joinMeetingUnderPointer() || showWidgetFromMeters()
+    }
+
+    /// True when the pointer is over the meters (with a little slack, as for the meeting list).
+    private func pointerOverMeters(_ point: CGPoint) -> Bool {
+        !model.metersFrame.isEmpty && model.metersFrame.insetBy(dx: -8, dy: -6).contains(point)
+    }
+
+    /// A click on the meters ends the hint and shows the widget beside them.
+    private func showWidgetFromMeters() -> Bool {
+        guard let w = window, let point = pointerInWindow(), pointerOverMeters(point) else { return false }
+        model.meterHintDismissed()
+        let f = model.metersFrame
+        let onScreen = CGRect(x: w.frame.minX + f.minX, y: w.frame.maxY - f.maxY,
+                              width: f.width, height: f.height)
+        let screen = w.screen ?? NSScreen.main
+        // Event monitors run on the main thread.
+        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.showPanel(beside: onScreen, on: screen) }
+        return true
+    }
+
     private func updateMouseThrough() {
         guard let w = window, let point = pointerInWindow() else { return }
         let overRows = model.meetings.contains { $0.link != nil }
             && model.meetingsFrame.insetBy(dx: -8, dy: -6).contains(point)
-        if w.ignoresMouseEvents == overRows { w.ignoresMouseEvents = !overRows }
+        let over = overRows || pointerOverMeters(point)
+        if w.ignoresMouseEvents == over { w.ignoresMouseEvents = !over }
     }
 
     /// estedesk://join-next opens the next meeting's link (Option+J does the same, see applyHotKeys).
@@ -275,21 +299,13 @@ final class DeskController: NSObject, NSMenuDelegate {
         addStandardItems(to: menu)
     }
 
-    @objc func showSettings() {
-        if settingsWindow == nil {
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 540),
-                             styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            w.title = "Sanduhr Desk"
-            w.isReleasedWhenClosed = false
-            w.contentView = NSHostingView(rootView: DeskSettingsView(model: model))
-            w.center()
-            settingsWindow = w
-        }
-        NSApp.activate(ignoringOtherApps: true)
-        settingsWindow?.makeKeyAndOrderFront(nil)
+    /// Option+S, …/settings links and the notch island: the one Settings window.
+    func showSettings() {
+        // Hotkeys, links and taps all arrive on the main thread.
+        MainActor.assumeIsolated { SettingsWindowController.shared.show() }
     }
 
-    /// Settings' "Clock icon in the menu bar" switch.
+    /// Settings' "Desk menu in the menu bar" switch.
     func setMenuIcon(_ on: Bool) {
         if on, statusItem == nil { buildMenu() }
         if !on, let item = statusItem {
@@ -298,19 +314,10 @@ final class DeskController: NSObject, NSMenuDelegate {
         }
     }
 
+    /// The same items as the menu bar item's menu and the widget's menu (SanduhrMenu).
     private func addStandardItems(to menu: NSMenu) {
-        let settings = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
-        settings.target = self
-        menu.addItem(settings)
-        let refresh = NSMenuItem(title: "Refresh meetings", action: #selector(refreshMeetings), keyEquivalent: "r")
-        refresh.target = self
-        menu.addItem(refresh)
-        let login = NSMenuItem(title: "Open at login", action: #selector(toggleLogin(_:)), keyEquivalent: "")
-        login.target = self
-        login.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        menu.addItem(login)
-        menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit Sanduhr", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        // Menus are built on the main thread.
+        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.addMenuItems(to: menu) }
     }
 
     private func buildMenu() {
@@ -321,21 +328,6 @@ final class DeskController: NSObject, NSMenuDelegate {
         menuNeedsUpdate(menu)
         item.menu = menu
         statusItem = item
-    }
-
-    @objc private func refreshMeetings() { model.refreshEvents() }
-
-    @objc private func toggleLogin(_ sender: NSMenuItem) {
-        do {
-            if SMAppService.mainApp.status == .enabled {
-                try SMAppService.mainApp.unregister()
-            } else {
-                try SMAppService.mainApp.register()
-            }
-        } catch {
-            NSLog("Desk login item: \(error)")
-        }
-        sender.state = SMAppService.mainApp.status == .enabled ? .on : .off
     }
 }
 

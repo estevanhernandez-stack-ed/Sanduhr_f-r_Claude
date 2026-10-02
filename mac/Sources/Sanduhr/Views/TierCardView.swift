@@ -9,6 +9,8 @@ struct TierCardView: View {
     let history: [Double]
     let palette: Theme.Palette
     let tick: Int
+    /// The Tools menu's Pacing Calculators: show the deep math without hovering.
+    var pinDeepMath = false
 
     @State private var showDeepMath = false
 
@@ -92,7 +94,7 @@ struct TierCardView: View {
 
             Spacer()
 
-            if showDeepMath {
+            if showDeepMath || pinDeepMath {
                 if let cooldown = calculateCooldown(util: util, iso: usage.resetsAt, tier: tier) {
                     Text("Cool down: \(cooldown)")
                         .font(.app(size: 9, weight: .semibold, design: palette.numericFontDesign))

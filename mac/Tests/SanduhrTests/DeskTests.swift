@@ -124,6 +124,87 @@ struct DeskLayoutTests {
     @Test func placingDropsWordsTheTabDoesNotKnow() {
         #expect(DeskLayout.placing("clock", in: "bl", layout: "weather:tr clock:tl") == "clock:bl")
     }
+
+    @Test func metersIsAPieceAndStacksAfterTheClaudeLine() {
+        #expect(DeskLayout.widgets.contains { $0.key == "meters" })
+        #expect(DeskLayout.placing("meters", in: "br", layout: standard)
+                == "message:tl clock:bl claude:bl meters:br meetings:bl")
+    }
+}
+
+@Suite("Desk meters")
+struct DeskMeterTests {
+    /// Local noon, so "Today" in the reset text does not depend on when the suite runs.
+    let now = Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 6, hour: 12))!
+
+    func iso(_ offset: TimeInterval) -> String {
+        ISO8601DateFormatter().string(from: now.addingTimeInterval(offset))
+    }
+
+    func usage(_ tiers: [Tier: TierUsage]) -> UsageResponse {
+        UsageResponse(tiers: tiers, extraUsage: nil)
+    }
+
+    @Test func normalTierCarriesLabelFillPaceAndReset() {
+        // Two hours left of five: three fifths of the window has gone by.
+        let rows = DeskMeterRow.rows(from: usage([.fiveHour: TierUsage(utilization: 42, resetsAt: iso(2 * 3600))]), now: now)
+        #expect(rows.count == 1)
+        let row = rows[0]
+        #expect(row.label == "Session (5hr)")
+        #expect(row.percent == 42)
+        #expect(abs(row.fill - 0.42) < 1e-9)
+        #expect(abs((row.pace ?? -1) - 0.6) < 1e-6)
+        #expect(row.pace == paceFrac(iso(2 * 3600), tier: .fiveHour, now: now))
+        #expect(row.reset == resetDateTimeStr(iso(2 * 3600), now: now))
+        #expect(row.reset.hasPrefix("Today "))
+    }
+
+    @Test func missingResetTimeHasNoPaceAndNoResetText() {
+        let row = DeskMeterRow.rows(from: usage([.sevenDay: TierUsage(utilization: 63, resetsAt: nil)]), now: now)[0]
+        #expect(row.percent == 63)
+        #expect(row.pace == nil)
+        #expect(row.reset == "")
+    }
+
+    @Test func overOneHundredClampsTheFillButKeepsThePercent() {
+        let row = DeskMeterRow.rows(from: usage([.sevenDayOpus: TierUsage(utilization: 112.4, resetsAt: iso(86400))]), now: now)[0]
+        #expect(row.percent == 112)
+        #expect(row.fill == 1)
+    }
+
+    @Test func rowsFollowTheWidgetOrderAndSkipTiersWithoutUtilization() {
+        let rows = DeskMeterRow.rows(from: usage([
+            .sevenDayOpus: TierUsage(utilization: 5, resetsAt: nil),
+            .sevenDay: TierUsage(utilization: 63, resetsAt: nil),
+            .sevenDaySonnet: TierUsage(utilization: nil, resetsAt: nil),
+            .fiveHour: TierUsage(utilization: 7, resetsAt: nil),
+        ]), now: now)
+        #expect(rows.map(\.tier) == [.fiveHour, .sevenDay, .sevenDayOpus])
+        #expect(rows.map(\.label) == [Tier.fiveHour.label, Tier.sevenDay.label, Tier.sevenDayOpus.label])
+    }
+
+    @Test func noUsageMeansNoRows() {
+        #expect(DeskMeterRow.rows(from: nil, now: now).isEmpty)
+    }
+
+    @Test func textLineAndNotchFollowTheSameNumbers() {
+        let fresh = DeskUsage(usage: usage([.fiveHour: TierUsage(utilization: 7, resetsAt: nil),
+                                            .sevenDay: TierUsage(utilization: 63, resetsAt: nil)]),
+                              fetchedAt: now.addingTimeInterval(-60))
+        #expect(DeskClaudeText.line(fresh) == "claude   7% session   63% week")
+        #expect(DeskClaudeText.compact(fresh, now: now) == "5h 7%  wk 63%")
+        #expect(!fresh.isStale(now: now))
+
+        // Twenty minutes without a successful fetch: the line stays, dimmed; the notch drops it.
+        #expect(fresh.isStale(now: now.addingTimeInterval(20 * 60)))
+        #expect(DeskClaudeText.compact(fresh, now: now.addingTimeInterval(20 * 60)) == nil)
+
+        var refused = fresh
+        refused.signInNeeded = true
+        #expect(DeskClaudeText.line(refused) == "claude   sign in again in Sanduhr")
+        #expect(DeskClaudeText.compact(refused, now: now) == nil)
+        #expect(refused.isStale(now: now))
+    }
 }
 
 @Suite("Ink spec")
@@ -176,6 +257,12 @@ final class ScratchDefaults {
 
     func migrate() {
         DeskMigration.run(into: defaults, from: [newer, older], reading: { self.domains[$0] })
+    }
+
+    /// The first-launch choice over the same in-memory domains, with the widget's defaults beside them.
+    @discardableResult
+    func firstRun(widget: MemoryDefaults) -> DeskFirstRun.Outcome {
+        DeskFirstRun.run(widget: widget, desk: defaults, from: [newer, older], reading: { self.domains[$0] })
     }
 }
 
@@ -256,5 +343,170 @@ struct DeskMigrationTests {
         s.defaults.set(false, forKey: DeskController.enabledKey)
         s.migrate()
         #expect(s.defaults.bool(forKey: DeskController.enabledKey) == false)
+    }
+}
+
+@Suite("Desk first run")
+struct DeskFirstRunTests {
+    /// Launch order in AppDelegate: the first-run choice, then the import.
+    func launch(_ s: ScratchDefaults, _ widget: MemoryDefaults) -> DeskFirstRun.Outcome {
+        let outcome = s.firstRun(widget: widget)
+        s.migrate()
+        return outcome
+    }
+
+    @Test func freshInstallMakesDeskHome() {
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        #expect(launch(s, widget) == .fresh)
+        #expect(s.defaults.bool(forKey: DeskController.enabledKey))
+        #expect(DeskLayout.parse(s.defaults.string(forKey: "layout") ?? "")["meters"] != nil)
+        #expect(s.defaults.object(forKey: "showMeetings") as? Bool == false)
+        #expect(s.defaults.bool(forKey: DeskController.notchKey) == false)
+        #expect(widget.bool(forKey: DeskFirstRun.tuckKey))
+        // The widget shows for sign-in: nothing hides it before the first fetch.
+        #expect(widget.object(forKey: "panelHidden") == nil)
+    }
+
+    @Test func widgetTucksOnceAfterTheFirstSuccessfulFetch() {
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        _ = launch(s, widget)
+        #expect(DeskFirstRun.tuck(afterFetch: false, widget: widget) == false)
+        #expect(widget.bool(forKey: DeskFirstRun.tuckKey))
+        #expect(DeskFirstRun.tuck(afterFetch: true, widget: widget))
+        #expect(widget.object(forKey: DeskFirstRun.tuckKey) == nil)
+        #expect(DeskFirstRun.tuck(afterFetch: true, widget: widget) == false)
+    }
+
+    @Test func existingWidgetUserIsLeftAlone() {
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        widget.set("{{0, 0}, {340, 520}}", forKey: "windowFrame")
+        widget.set("obsidian", forKey: "theme")
+        #expect(s.firstRun(widget: widget) == .existing)
+        #expect(s.defaults.values.isEmpty)
+        #expect(Set(widget.values.keys) == ["windowFrame", "theme", DeskFirstRun.doneKey])
+        #expect(DeskFirstRun.tuck(afterFetch: true, widget: widget) == false)
+    }
+
+    @Test func compactModeUserFrom204IsLeftAlone() {
+        // Never moved the window and never touched a setting, but Sparkle has checked for updates.
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        widget.set(Date(), forKey: "SULastCheckTime")
+        widget.set(true, forKey: "SUHasLaunchedBefore")
+        #expect(s.firstRun(widget: widget) == .existing)
+        #expect(s.defaults.values.isEmpty)
+    }
+
+    @Test func sparklesFirstLaunchKeyAloneIsStillFresh() {
+        // Sparkle writes SUHasLaunchedBefore before the first-run check, even on a fresh install.
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        widget.set(true, forKey: "SUHasLaunchedBefore")
+        #expect(s.firstRun(widget: widget) == .fresh)
+    }
+
+    @Test func userWhoRan210IsLeftAlone() {
+        // 2.1.0 ran DeskMigration on every launch, so its suite is marked even with Desk off.
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        s.migrate()
+        let before = s.defaults.values.keys.sorted()
+        #expect(launch(s, widget) == .existing)
+        #expect(s.defaults.values.keys.sorted() == before)
+        #expect(s.defaults.bool(forKey: DeskController.enabledKey) == false)
+        #expect(widget.bool(forKey: DeskFirstRun.tuckKey) == false)
+    }
+
+    @Test func sanduhrDeskMigrantKeepsTheImportedLayout() {
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        s.seed(s.newer, ["layout": "clock:tr message:bl", "showMeetings": true, "notch": false])
+        #expect(launch(s, widget) == .migrant)
+        #expect(s.defaults.string(forKey: "layout") == "clock:tr message:bl")
+        #expect(s.defaults.object(forKey: "showMeetings") as? Bool == true)
+        #expect(s.defaults.object(forKey: DeskController.notchKey) as? Bool == false)
+        #expect(s.defaults.bool(forKey: DeskController.enabledKey))
+        #expect(widget.bool(forKey: DeskFirstRun.tuckKey) == false)
+    }
+
+    @Test func decidedOnceThenANoOp() {
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        _ = launch(s, widget)
+        // The user then turns Desk off, puts the Claude line back and turns meetings on.
+        s.defaults.set(false, forKey: DeskController.enabledKey)
+        s.defaults.set("clock:bl claude:bl", forKey: "layout")
+        s.defaults.set(true, forKey: "showMeetings")
+        widget.set(nil, forKey: DeskFirstRun.tuckKey)
+        #expect(launch(s, widget) == .alreadyDecided)
+        #expect(s.defaults.bool(forKey: DeskController.enabledKey) == false)
+        #expect(s.defaults.string(forKey: "layout") == "clock:bl claude:bl")
+        #expect(s.defaults.bool(forKey: "showMeetings"))
+        #expect(widget.object(forKey: DeskFirstRun.tuckKey) == nil)
+    }
+}
+
+@Suite("Desk meter hint")
+struct DeskMeterHintTests {
+    let start = Date(timeIntervalSince1970: 1_790_000_000)
+    let day: TimeInterval = 24 * 60 * 60
+
+    @Test func dueBeforeItHasEverShown() {
+        let hint = DeskMeterHint(store: MemoryDefaults())
+        #expect(hint.isVisible(now: start))
+        // Its three days start when it is drawn, not before.
+        #expect(hint.isVisible(now: start.addingTimeInterval(30 * day)))
+    }
+
+    @Test func expiresThreeDaysAfterItFirstShowed() {
+        let store = MemoryDefaults()
+        let hint = DeskMeterHint(store: store)
+        hint.markShown(now: start)
+        // Drawn again later (a new window, a relaunch): the first date stands.
+        hint.markShown(now: start.addingTimeInterval(2 * day))
+        #expect(store.object(forKey: DeskMeterHint.firstShownKey) as? Date == start)
+        #expect(hint.isVisible(now: start.addingTimeInterval(3 * day - 60)))
+        #expect(hint.isVisible(now: start.addingTimeInterval(3 * day)) == false)
+        #expect(hint.isVisible(now: start.addingTimeInterval(10 * day)) == false)
+    }
+
+    @Test func firstMeterClickEndsItForGood() {
+        let store = MemoryDefaults()
+        let hint = DeskMeterHint(store: store)
+        hint.markShown(now: start)
+        hint.dismiss()
+        #expect(hint.isVisible(now: start.addingTimeInterval(60)) == false)
+        // A later launch reads the same store.
+        #expect(DeskMeterHint(store: store).isVisible(now: start.addingTimeInterval(60)) == false)
+    }
+
+    @Test func dismissedBeforeShowingNeverShows() {
+        let hint = DeskMeterHint(store: MemoryDefaults())
+        hint.dismiss()
+        #expect(hint.isVisible(now: start) == false)
+    }
+}
+
+@Suite("Widget beside the meters")
+struct DeskPanelPlacementTests {
+    let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+    let visible = CGRect(x: 0, y: 0, width: 1512, height: 944)   // under a 38-point menu bar
+    let size = CGSize(width: 340, height: 520)
+
+    @Test func rightOfMetersInTheBottomLeftCorner() {
+        let meters = CGRect(x: 52, y: 60, width: 360, height: 120)
+        let f = DeskPanelPlacement.frame(beside: meters, size: size, screen: screen, visible: visible)
+        #expect(f.minX == meters.maxX + DeskPanelPlacement.gap)
+        #expect(f.minY == meters.minY)
+    }
+
+    @Test func leftOfMetersInTheTopRightCorner() {
+        let meters = CGRect(x: 1100, y: 830, width: 360, height: 120)
+        let f = DeskPanelPlacement.frame(beside: meters, size: size, screen: screen, visible: visible)
+        #expect(f.maxX == meters.minX - DeskPanelPlacement.gap)
+        // Level with the meters' top would run past the menu bar, so it is pulled down.
+        #expect(f.maxY == visible.maxY)
+    }
+
+    @Test func staysOnTheVisibleScreen() {
+        // Wide meters in the bottom right leave no room to their left at full width.
+        let meters = CGRect(x: 200, y: 10, width: 1260, height: 80)
+        let f = DeskPanelPlacement.frame(beside: meters, size: size, screen: screen, visible: visible)
+        #expect(visible.contains(f))
     }
 }

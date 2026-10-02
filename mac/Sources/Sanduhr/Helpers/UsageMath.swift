@@ -112,9 +112,10 @@ struct BurnInfo {
     let colorHex: String
 }
 
-/// Burn-rate projection — if current rate sustained, when do we hit 100%?
-/// Returns nil if the period will reset before that. sanduhr.py:199-228.
-func burnProjection(util: Double?, iso: String?, tier: Tier, now: Date = Date()) -> BurnInfo? {
+/// Seconds until a limit reaches 100% if the current rate holds, 0 when it already has, or nil
+/// when it is not projected to get there before it resets. The numeric core of
+/// `burnProjection`, shared with the pace alert (AlertRules).
+func secondsUntilFull(util: Double?, iso: String?, tier: Tier, now: Date = Date()) -> TimeInterval? {
     guard let u = util, u > 0,
           let rd = parseISO(iso),
           let f = paceFrac(iso, tier: tier, now: now), f > 0
@@ -128,11 +129,19 @@ func burnProjection(util: Double?, iso: String?, tier: Tier, now: Date = Date())
     let fracAt100 = 100.0 / ratePerFrac
     let secsUntil100 = max(0, (fracAt100 - f) * tot)
 
-    if secsUntil100 <= 0 {
-        return BurnInfo(text: "Limit reached", colorHex: "f87171")
-    }
+    if secsUntil100 <= 0 { return 0 }             // already there
     if secsUntil100 >= secsUntilReset {
         return nil                                // resets before limit — no warning
+    }
+    return secsUntil100
+}
+
+/// Burn-rate projection — if current rate sustained, when do we hit 100%?
+/// Returns nil if the period will reset before that. sanduhr.py:199-228.
+func burnProjection(util: Double?, iso: String?, tier: Tier, now: Date = Date()) -> BurnInfo? {
+    guard let secsUntil100 = secondsUntilFull(util: util, iso: iso, tier: tier, now: now) else { return nil }
+    if secsUntil100 <= 0 {
+        return BurnInfo(text: "Limit reached", colorHex: "f87171")
     }
 
     let s = Int(secsUntil100)

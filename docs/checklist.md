@@ -96,3 +96,45 @@ Pairs with `docs/scope.md`, `docs/prd.md`, `docs/spec.md`. Parity rewrite of a s
 ### Embedded feedback
 
 ✓ **Sequencing** — dependencies flow correctly: pure Core (1–4) is the testable parity bar before any UI; the widget (5) needs Core; the WebView2 login (6) needs the credential store + a fetch to verify end-to-end; ship (11–12) last. △ **Granularity** — items 5, 8, 10 each bundle several ported modules; acceptable for an experienced builder porting against an exact Python reference, but 10 is the chunkiest *and* cert-load-bearing, so its milestone gate matters most. ✓ **Completeness** — every `spec.md > Module map` row maps to an item; data-compat and cert constraints are threaded into acceptance. △ **Open thread** — item 10's hourglass is provisional pending the deepening round; back-merge before /build reaches it.
+
+---
+
+## Iteration 1 (Mac): Desk becomes home
+
+From /iterate, 2026-10-02, after 2.1.0 shipped. Direction: Desk is the default surface and carries
+the meters; the widget stays as the toolbox for the deep tools (pacing calculators, Deep Work,
+Cooldown Snake, themes, history once M7 lands). Mac sources only; build and test with
+`cd mac && ./build.sh --debug && ./test.sh`; every user-visible change gets a line under
+`## Unreleased (mac)` in `CHANGELOG.md`.
+
+- [x] **13. Meters on Desk**
+  Spec ref: New — not in original spec (`docs/mac-merge-plan.md` > Phase 1, item 2: the desk reads `UsageViewModel` directly)
+  What to build: a `meters` Desk piece, placeable in any corner like the others (`DeskLayout.widgets`, `DeskView`). One row per limit the widget shows (session, weekly, and any other weekly tiers): label, a bar drawn in the Desk ink (single color or gradient) and font with the drop shadow, the pace marker, the percent and the reset time. Desk gets its numbers from the in-process `UsageViewModel` instead of polling `snapshot.json` (the widget keeps writing the snapshot for the statusline and MCP). The notch wings are unchanged.
+  Acceptance: `meters:br` in the layout shows a bar per limit that updates within one refresh of the widget, with the pace marker where the widget puts it; hiding the widget does not stop updates; the existing `claude` line still works for anyone who keeps it.
+  Verify: swift-testing for a pure row model (label, fill fraction, pace fraction, reset text) built from fixture usage, including a missing reset time and a tier above 100%; then on screen.
+
+- [x] **14. Desk is the default for new installs**
+  Spec ref: New — reverses `docs/mac-merge-plan.md` > Decisions ("desktop layer and notch are off by default") for new installs only
+  What to build: on first launch with a fresh defaults domain (no widget settings, no legacy Desk domains), turn Desk on with meters in the layout, meetings off (no Calendar prompt until the user turns meetings on), the notch off, and the widget panel hidden. Anyone with existing widget settings, or migrating from Sanduhr Desk, keeps exactly what they have.
+  Acceptance: a fresh domain shows the meters on the desktop at first launch with no window and no permission prompts; a 2.1.0 user who updates sees no change; a Sanduhr Desk migrant gets their imported layout.
+  Verify: swift-testing for a pure first-run decision with in-memory stores (fresh, existing widget user, Sanduhr Desk migrant); `docs/mac-smoke-test.md` section 1 rewritten for the new default.
+
+- [x] **15. The toolbox is one click away**
+  Spec ref: New — not in original spec
+  What to build: the Desk meter rows take clicks the way meeting rows do (the click-through stays everywhere else); a click shows the widget beside the meters. A **Tools** section in the menus: Show Sanduhr, Deep Work, Pacing Calculators, Cooldown Snake (History when M7 lands). A one-time hint under the meters on first run ("Click the meters for history and tools. Option+S for settings."), gone after the first meter click or three days.
+  Acceptance: with the widget hidden, clicking the meters opens it next to them; every deep tool is reachable from the menu without the widget showing first; the hint appears once and never again after it is dismissed.
+  Verify: swift-testing for the hint's shown/dismissed state; on screen with Ice hiding the menu bar icon.
+
+## Iteration 2 (Mac): one control surface
+
+- [x] **16. One Settings window, one menu**
+  Spec ref: `docs/mac-merge-plan.md` > Phase 1, item 4 (one Settings window with a Surfaces list)
+  What to build: a standalone Settings window (sidebar) replacing both the widget's settings sheet and Desk Settings: General (surfaces Desk, Notch and Widget; shortcuts; open at login), Desk Layout, Desk Look, Message, Notch, Widget Look (themes, font, subtle mode), Alerts, Credentials. One menu model builds the menu bar item's menu, the widget's two-finger menu and Desk's clock menu: Show/Hide Sanduhr, Tools, Refresh, Settings…, Check for Updates…, Quit. Option+S, `sanduhr://settings`, the notch island and every Settings item open the same window. Defaults keys stay as they are.
+  Acceptance: every setting is reachable with the widget hidden and the menu bar icon hidden by Ice; the three menus list the same items in the same order; no saved setting is lost across the update.
+  Verify: swift-testing for the menu model's items; smoke test updated.
+
+- [x] **17. Alerts v2: pace, delivery, quiet and sound**
+  Spec ref: New — extends the 2.1.0 alerts (`Notifier.swift`)
+  What to build: move the alert decisions into a pure rules type and add: a **pace warning** when `burnProjection` says a limit will hit 100% before it resets (once per window, with the projected time and the reset time in the text); **where alerts show**: banner, a pulse on the Desk meters and notch island, or both; **quiet hours** (start and end, may cross midnight; banners held back, Desk pulses still shown); a **sound** picker (system sounds or silent); and a **weekly reset** alert beside the session one. Existing thresholds keep working.
+  Acceptance: fixture usage on pace to run out fires one pace warning naming both times; during quiet hours no banner is posted; Desk-only delivery pulses the meters and posts nothing; each alert still fires once per reset window.
+  Verify: swift-testing for the rules (pace, quiet hours across midnight, once-per-window, session and weekly reset detection); one real banner and one Desk pulse checked by hand.

@@ -43,10 +43,15 @@ final class UsageViewModel {
     /// theme dropdown re-reads `ThemeRegistry.themes`. SwiftUI can't
     /// observe a static registry otherwise.
     var userThemesTick: Int = 0
-    /// Set to `true` externally (e.g. from the menu bar) to pop the
-    /// credentials sheet on the main widget. RootView flips it back to
-    /// false once it consumes the signal.
-    var requestSettingsSheet: Bool = false
+    /// The overlay open on the widget (Deep Work or Cooldown Snake), nil for the cards. The
+    /// Tools items in every menu set it and show it checked.
+    var activeTool: WidgetTool?
+    /// The pacing calculators (cool down, surplus) stay showing on every card instead of only
+    /// under the pointer. Turned on and off from the Tools items and Settings, Pacing & Focus; not saved.
+    var pacingPinned: Bool = false
+
+    /// The widget overlays a menu can ask for.
+    enum WidgetTool { case deepWork, snake }
 
     /// Called after each successful refresh (and whenever `status` flips
     /// meaningfully). The menu bar status item uses this to re-render its

@@ -8,7 +8,8 @@ import AppKit
 ///
 /// Settings live in the com.626labs.sanduhr.desk defaults domain:
 ///   defaults write com.626labs.sanduhr.desk layout "message:tl clock:bl claude:bl meetings:bl"
-///       widgets: clock (time and date), claude (Sanduhr line), meetings, message
+///       widgets: clock (time and date), claude (Sanduhr line), meters (a bar per limit),
+///                meetings, message
 ///       slots:   tl tr bl br; leave a widget out to hide it
 ///   defaults write com.626labs.sanduhr.desk font "EsteFont"       (any installed font family)
 ///   defaults write com.626labs.sanduhr.desk timeSize -float 112    (clock size; the rest scales from it)
@@ -20,7 +21,8 @@ import AppKit
 ///   defaults write com.626labs.sanduhr.desk top -float 40
 ///   defaults write com.626labs.sanduhr.desk bottom -float 60
 ///   defaults write com.626labs.sanduhr.desk menuIcon -bool true    (bring back the clock menu)
-/// The older showMeetings / showClaude switches still hide those widgets.
+/// The older showMeetings / showClaude switches still hide those widgets (showClaude hides
+/// both the line and the meters).
 /// Then quit and reopen Desk. Messages themselves: edit
 /// ~/Library/Application Support/Desk/messages.txt (no restart needed).
 struct DeskView: View {
@@ -38,8 +40,9 @@ struct DeskView: View {
     @AppStorage("messageColor", store: .desk) private var messageColor = "9ad7ff"
     @AppStorage("showMeetings", store: .desk) private var showMeetings = true
     @AppStorage("showClaude", store: .desk) private var showClaude = true
+    @AppStorage("inkColor", store: .desk) private var ink = "ffffff"
 
-    enum Widget: String { case clock, claude, meetings, message }
+    enum Widget: String { case clock, claude, meters, meetings, message }
     enum Slot: String { case tl, tr, bl, br }
 
     private var inset: CGFloat { timeSize * 0.18 }
@@ -52,7 +55,7 @@ struct DeskView: View {
             let bits = item.split(separator: ":").map(String.init)
             guard bits.count == 2, let w = Widget(rawValue: bits[0]), let slot = Slot(rawValue: bits[1]) else { continue }
             if w == .meetings && !showMeetings { continue }
-            if w == .claude && !showClaude { continue }
+            if (w == .claude || w == .meters) && !showClaude { continue }
             out[slot, default: []].append(w)
         }
         return out
@@ -97,6 +100,7 @@ struct DeskView: View {
         switch widget {
         case .clock: clock(alignment: alignment).deskInk()
         case .claude: claude.deskInk()
+        case .meters: meters(alignment: alignment).deskInk()
         case .meetings: meetings(alignment: alignment).deskInk()
         case .message: message(alignment: alignment)
         }
@@ -120,6 +124,47 @@ struct DeskView: View {
             Text(line)
                 .font(.custom(font, size: timeSize * 0.19))
                 .opacity(model.claudeLineIsStale ? 0.45 : 0.75)
+        }
+    }
+
+    /// A bar per Claude limit, in the widget's order: label and percent over a bar in the ink,
+    /// a pace tick where the widget puts its own, and the reset time underneath.
+    @ViewBuilder
+    private func meters(alignment: HorizontalAlignment) -> some View {
+        if !model.meters.isEmpty || model.signInNeeded {
+            let size = timeSize * 0.17
+            VStack(alignment: alignment, spacing: size * 0.6) {
+                ForEach(model.meters) { row in
+                    MeterRow(row: row, ink: ink, font: font, size: size, width: timeSize * 3.2, alignment: alignment)
+                        .deskPulse(model.pulses[row.tier] ?? 0, ink: ink, size: size)
+                }
+                if model.signInNeeded {
+                    Text("sign in again in Sanduhr").opacity(0.75)
+                }
+                if model.meterHintVisible && !model.meters.isEmpty {
+                    Text(DeskMeterHint.text)
+                        .font(.custom(font, size: size * 0.75))
+                        .multilineTextAlignment(alignment == .trailing ? .trailing : .leading)
+                        .frame(maxWidth: timeSize * 3.2, alignment: alignment == .trailing ? .trailing : .leading)
+                        .opacity(0.7)
+                        .onAppear { model.meterHintShown() }
+                }
+            }
+            .font(.custom(font, size: size))
+            .opacity(model.claudeLineIsStale ? 0.5 : 1)
+            // Clickable like a meeting row: the click itself is handled in DeskController, which
+            // shows the widget beside the meters.
+            .contentShape(Rectangle())
+            .onHover { inside in
+                if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
+            .background(GeometryReader { geo in
+                Color.clear.preference(key: MetersFrameKey.self, value: geo.frame(in: .global))
+            })
+            .onPreferenceChange(MetersFrameKey.self) { frame in
+                model.metersFrame = frame
+            }
+            .onDisappear { model.metersFrame = .zero }
         }
     }
 
@@ -181,6 +226,29 @@ private extension View {
     func deskInk() -> some View { modifier(DeskInk()) }
 }
 
+extension View {
+    /// A soft glow in the ink behind the view, three times over about three seconds, each time
+    /// `trigger` goes up: an alert delivered to the Desk.
+    func deskPulse(_ trigger: Int, ink: String, size: CGFloat) -> some View {
+        phaseAnimator(DeskPulse.phases, trigger: trigger) { view, phase in
+            view.background(
+                RoundedRectangle(cornerRadius: size * 0.6)
+                    .fill(LinearGradient.ink(ink))
+                    .padding(-size * 0.5)
+                    .blur(radius: size * 0.6)
+                    .opacity(0.35 * DeskPulse.intensity(phase)))
+        } animation: { _ in DeskPulse.animation }
+    }
+}
+
+/// The pulse's timing, shared by the meters and the notch island: seven steps, lit on the odd
+/// ones, so three glows and back to rest.
+enum DeskPulse {
+    static let phases = Array(0..<7)
+    static func intensity(_ phase: Int) -> Double { phase % 2 == 1 ? 1 : 0 }
+    static let animation = Animation.easeInOut(duration: 0.42)
+}
+
 private struct DeskInk: ViewModifier {
     @AppStorage("inkColor", store: .desk) private var ink = "ffffff"
     @AppStorage("inkShadow", store: .desk) private var shadow = true
@@ -213,6 +281,49 @@ extension Color {
     }
 }
 
+
+/// One Desk meter: "Session (5hr)   42%" over the bar, the reset time under it. The fill is
+/// clamped to the bar; the percent says how far past 100 a limit went.
+private struct MeterRow: View {
+    let row: DeskMeterRow
+    let ink: String
+    let font: String
+    let size: CGFloat
+    let width: CGFloat
+    let alignment: HorizontalAlignment
+
+    var body: some View {
+        let barHeight = max(4, size * 0.38)
+        VStack(alignment: alignment, spacing: size * 0.22) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(row.label).lineLimit(1).opacity(0.85)
+                Spacer(minLength: size)
+                Text("\(row.percent)%")
+            }
+            ZStack(alignment: .leading) {
+                Capsule().fill(LinearGradient.ink(ink)).opacity(0.22)
+                Capsule().fill(LinearGradient.ink(ink))
+                    .frame(width: width * row.fill)
+            }
+            .frame(width: width, height: barHeight)
+            .overlay(alignment: .leading) {
+                // Taller than the bar, so it still reads where it crosses the fill.
+                if let pace = row.pace {
+                    Rectangle()
+                        .fill(LinearGradient.ink(ink))
+                        .frame(width: 2, height: barHeight * 2)
+                        .offset(x: max(0, min(width - 2, pace * width)))
+                }
+            }
+            if !row.reset.isEmpty {
+                Text("resets \(row.reset)")
+                    .font(.custom(font, size: size * 0.8))
+                    .opacity(0.7)
+            }
+        }
+        .frame(width: width)
+    }
+}
 
 /// One meeting line. With a join link it is clickable: the pointer turns into a hand and a
 /// click opens the meeting in Teams, Zoom or the browser.
@@ -248,6 +359,11 @@ private struct RowFramesKey: PreferenceKey {
     static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
         value.merge(nextValue()) { _, new in new }
     }
+}
+
+private struct MetersFrameKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
 }
 
 private struct MeetingsFrameKey: PreferenceKey {

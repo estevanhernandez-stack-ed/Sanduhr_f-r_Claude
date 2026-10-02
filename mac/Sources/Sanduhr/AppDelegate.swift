@@ -18,6 +18,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
+        // A brand-new install starts with Desk on and the widget set to tuck away after its first
+        // fetch. Decided once, before the panel shows and before DeskMigration marks the suite.
+        DeskFirstRun.run()
+
         // Build widget panel.
         let hosting = NSHostingController(rootView: RootView(vm: viewModel))
         hosting.view.wantsLayer = true
@@ -46,8 +50,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         viewModel.onUsageUpdate = { [weak self] in
             self?.renderStatusItem()
             self?.fitPanelToContent()
-            // The desk reads snapshot.json, which refresh() has just rewritten.
-            if DeskController.shared.running { DeskController.shared.model.refreshClaude() }
+            // Desk takes the numbers straight from the view model, so its meters move with
+            // every refresh even while the widget is hidden (or Desk is off, ready for when it starts).
+            guard let vm = self?.viewModel else { return }
+            // A fresh install shows the widget for sign-in, then hides it once the numbers arrive.
+            if DeskFirstRun.tuck(afterFetch: vm.usage != nil && (vm.status == .idle || vm.status == .noTiers)) {
+                self?.hidePanel()
+            }
+            var isAuthError = false
+            if case .error(_, let isAuth) = vm.status { isAuthError = isAuth }
+            DeskController.shared.model.update(DeskUsage(
+                usage: vm.usage, fetchedAt: vm.lastUpdated, signInNeeded: isAuthError))
         }
 
         // When the user toggles compact mode, resize the panel to fit the
@@ -59,13 +72,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         viewModel.bootstrap()
         renderStatusItem()
 
-        // Desk: the desktop layer and the notch, when switched on (Desk Settings).
+        // Desk: the desktop layer and the notch, when switched on (Settings, General, Surfaces).
         DeskMigration.run()
         DeskController.shared.apply()
     }
 
     /// estedesk:// and sanduhr:// links (Option+J joins the next meeting, …/settings opens
-    /// Desk settings).
+    /// Sanduhr Settings).
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls where ["estedesk", "sanduhr"].contains(url.scheme ?? "") {
             DeskController.shared.handle(url)
@@ -166,24 +179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showStatusMenu(from button: NSStatusBarButton) {
         let menu = NSMenu()
-
-        let toggleTitle = (panel?.isVisible ?? false) ? "Hide Sanduhr" : "Show Sanduhr"
-        menu.addItem(item(toggleTitle, action: #selector(togglePanel)))
-        menu.addItem(item("Refresh Now", action: #selector(refreshNow), key: "r"))
-        menu.addItem(.separator())
-        menu.addItem(item("Credentials…", action: #selector(openCredentials)))
-        menu.addItem(item("Desk Settings…", action: #selector(DeskController.showSettings),
-                          target: DeskController.shared))
-        menu.addItem(.separator())
-        let updatesItem = NSMenuItem(
-            title: "Check for Updates…",
-            action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
-            keyEquivalent: "")
-        updatesItem.target = updaterController
-        menu.addItem(updatesItem)
-        menu.addItem(.separator())
-        menu.addItem(item("Quit Sanduhr", action: #selector(NSApplication.terminate(_:)),
-                          key: "q", target: NSApp))
+        addMenuItems(to: menu)
 
         // Briefly attach, pop, detach — so default L-click behavior stays
         // as "toggle panel" rather than "always show menu".
@@ -192,11 +188,64 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.menu = nil
     }
 
-    private func item(_ title: String, action: Selector, key: String = "",
-                      target: AnyObject? = nil) -> NSMenuItem {
-        let m = NSMenuItem(title: title, action: action, keyEquivalent: key)
-        m.target = target ?? self
-        return m
+    /// The shared menu (SanduhrMenu) as AppKit items, for the menu bar item's menu and Desk's
+    /// clock menu. The widget's own two-finger menu (RootView) renders the same groups.
+    func addMenuItems(to menu: NSMenu) {
+        for (i, group) in currentMenu(widgetVisible: panel?.isVisible ?? false).enumerated() {
+            if i > 0 { menu.addItem(.separator()) }
+            if let header = group.header { menu.addItem(.sectionHeader(title: header)) }
+            for entry in group.entries {
+                let m = NSMenuItem(title: entry.title, action: #selector(menuItemChosen(_:)),
+                                   keyEquivalent: entry.key)
+                m.target = self
+                m.tag = entry.command.rawValue
+                m.state = entry.checked ? .on : .off
+                menu.addItem(m)
+            }
+        }
+    }
+
+    /// The shared menu with the tools' current checkmarks.
+    func currentMenu(widgetVisible: Bool) -> [MenuGroup] {
+        SanduhrMenu.groups(widgetVisible: widgetVisible,
+                           deepWork: viewModel.activeTool == .deepWork,
+                           pacing: viewModel.pacingPinned,
+                           snake: viewModel.activeTool == .snake)
+    }
+
+    @objc private func menuItemChosen(_ sender: NSMenuItem) {
+        if let command = MenuCommand(rawValue: sender.tag) { perform(command) }
+    }
+
+    /// What every menu's items do. Each tool works with the widget hidden: it shows the widget
+    /// first. Chosen again while it shows on a visible widget, a tool turns off.
+    func perform(_ command: MenuCommand) {
+        let visible = panel?.isVisible ?? false
+        switch command {
+        case .showHide: showOrHidePanel()
+        case .deepWork: toggleTool(.deepWork, visible: visible)
+        case .snake: toggleTool(.snake, visible: visible)
+        case .pacing:
+            if viewModel.pacingPinned && visible {
+                viewModel.pacingPinned = false
+            } else {
+                viewModel.pacingPinned = true
+                showPanel()
+            }
+        case .refresh: refreshNow()
+        case .settings: SettingsWindowController.shared.show()
+        case .checkForUpdates: updaterController.checkForUpdates(nil)
+        case .quit: NSApp.terminate(nil)
+        }
+    }
+
+    private func toggleTool(_ tool: UsageViewModel.WidgetTool, visible: Bool) {
+        if viewModel.activeTool == tool && visible {
+            viewModel.activeTool = nil
+        } else {
+            showPanel()
+            viewModel.activeTool = tool
+        }
     }
 
     @objc func togglePanel() {
@@ -226,6 +275,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(true, forKey: Self.panelHiddenKey)
     }
 
+    /// Shows the widget where it was and brings it forward. Unlike togglePanel, never hides it.
+    func showPanel() {
+        guard let panel else { return }
+        UserDefaults.standard.set(false, forKey: Self.panelHiddenKey)
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
+        panel.orderFrontRegardless()
+    }
+
+    /// A click on the Desk meters: a hidden widget comes back beside them (`meters` is their
+    /// frame on screen); a widget already showing is only brought forward.
+    func showPanel(beside meters: CGRect, on screen: NSScreen?) {
+        if let panel, !panel.isVisible, let screen {
+            let frame = DeskPanelPlacement.frame(beside: meters, size: panel.frame.size,
+                                                 screen: screen.frame, visible: screen.visibleFrame)
+            panel.setFrame(frame, display: false)
+        }
+        showPanel()
+    }
+
+    /// The menus' first item: "Hide Sanduhr" when the widget shows, "Show Sanduhr" when it doesn't.
+    @objc func showOrHidePanel() {
+        if panel?.isVisible ?? false { hidePanel() } else { showPanel() }
+    }
+
     static let panelHiddenKey = "panelHidden"
 
     /// `open -a Sanduhr` (or a launcher, or clicking it in Applications) while it is
@@ -237,11 +311,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func refreshNow() {
         Task { await viewModel.refresh() }
-    }
-
-    @objc func openCredentials() {
-        panel?.makeKeyAndOrderFront(nil)
-        viewModel.requestSettingsSheet = true
     }
 
     // MARK: Panel placement

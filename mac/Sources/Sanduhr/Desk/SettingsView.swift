@@ -2,28 +2,13 @@ import SwiftUI
 import AppKit
 import ServiceManagement
 
-/// Desk settings (Sanduhr's desktop and notch surfaces). Every control writes the same com.626labs.sanduhr.desk defaults the desktop
-/// reads, so changes show on the desktop as you make them. Open it with `open -a Desk` while Desk
-/// is running, estedesk://settings, or Settings in the clock menu.
-struct DeskSettingsView: View {
-    var model: DeskModel
-
-    var body: some View {
-        TabView {
-            LayoutTab().tabItem { Text("Layout") }
-            LookTab().tabItem { Text("Look") }
-            MessageTab(model: model).tabItem { Text("Message") }
-            NotchTab().tabItem { Text("Notch") }
-            GeneralTab().tabItem { Text("General") }
-        }
-        .padding(20)
-        .frame(width: 500, height: 540)
-    }
-}
+/// The Desk sections of the Settings window (SettingsWindow.swift) and its General section.
+/// Every Desk control writes the same com.626labs.sanduhr.desk defaults the desktop reads, so
+/// changes show on the desktop as you make them.
 
 // MARK: - Layout
 
-private struct LayoutTab: View {
+struct DeskLayoutSection: View {
     @AppStorage("layout", store: .desk) private var layout = "message:tl clock:bl claude:bl meetings:bl"
     @AppStorage("left", store: .desk) private var left = 52.0
     @AppStorage("right", store: .desk) private var right = 52.0
@@ -62,11 +47,12 @@ private struct LayoutTab: View {
     }
 }
 
-/// The layout string the Layout tab edits ("message:tl clock:bl claude:bl meetings:bl"), kept
+/// The layout string the Layout section edits ("message:tl clock:bl claude:bl meetings:bl"), kept
 /// apart from the view so it tests without AppKit. DeskView reads the same string.
 enum DeskLayout {
     static let widgets: [(key: String, name: String)] = [
-        ("message", "Message"), ("clock", "Clock and date"), ("claude", "Claude meters"), ("meetings", "Meetings"),
+        ("message", "Message"), ("clock", "Clock and date"), ("claude", "Claude line"),
+        ("meters", "Claude meters (bars)"), ("meetings", "Meetings"),
     ]
 
     /// Widget to slot. Words without exactly one colon are skipped; a repeated widget keeps its last slot.
@@ -90,7 +76,7 @@ enum DeskLayout {
 
 // MARK: - Look
 
-private struct LookTab: View {
+struct DeskLookSection: View {
     @AppStorage("font", store: .desk) private var font = ""
     @AppStorage("messageFont", store: .desk) private var messageFont = ""
     @AppStorage("timeSize", store: .desk) private var timeSize = 112.0
@@ -154,8 +140,8 @@ private struct ColorRow: View {
                 Text(title)
                 Spacer()
                 Picker("", selection: $value) {
-                    ForEach(LookTab.presets, id: \.value) { Text($0.name).tag($0.value) }
-                    if !LookTab.presets.contains(where: { $0.value == value }) {
+                    ForEach(DeskLookSection.presets, id: \.value) { Text($0.name).tag($0.value) }
+                    if !DeskLookSection.presets.contains(where: { $0.value == value }) {
                         Text("Custom").tag(value)
                     }
                 }
@@ -183,7 +169,7 @@ private struct Swatch: View {
 
 // MARK: - Message
 
-private struct MessageTab: View {
+struct DeskMessageSection: View {
     var model: DeskModel
     @AppStorage("message", store: .desk) private var pinned = ""
     @AppStorage("messageRotate", store: .desk) private var rotate = "daily"
@@ -233,7 +219,7 @@ private struct MessageTab: View {
 
 // MARK: - Notch
 
-private struct NotchTab: View {
+struct DeskNotchSection: View {
     @AppStorage(DeskController.notchKey, store: .desk) private var enabled = false
     @AppStorage("notchWings", store: .desk) private var wings = 36.0
     @AppStorage("notchChin", store: .desk) private var chin = 26.0
@@ -244,7 +230,7 @@ private struct NotchTab: View {
         Form {
             Section {
                 Toggle("Extend the camera notch", isOn: $enabled)
-                Text("Widens the notch into one black island. Click it to open these settings. Screens without a notch are left alone.")
+                Text("Widens the notch into one black island while Desk is on. Click it to open these settings. Screens without a notch are left alone.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Text") {
@@ -265,8 +251,12 @@ private struct NotchTab: View {
 
 // MARK: - General
 
-private struct GeneralTab: View {
+/// Which surfaces show, open at login, the shortcuts. The Widget switch mirrors panelHidden,
+/// which AppDelegate writes whenever the widget shows or hides.
+struct GeneralSection: View {
     @AppStorage(DeskController.enabledKey, store: .desk) private var deskEnabled = false
+    @AppStorage(DeskController.notchKey, store: .desk) private var notch = false
+    @AppStorage(AppDelegate.panelHiddenKey) private var panelHidden = false
     @AppStorage("menuIcon", store: .desk) private var menuIcon = false
     @AppStorage("showMeetings", store: .desk) private var showMeetings = true
     @AppStorage("showClaude", store: .desk) private var showClaude = true
@@ -275,10 +265,17 @@ private struct GeneralTab: View {
 
     var body: some View {
         Form {
-            Section {
-                Toggle("Show Desk (the desktop layer; the notch has its own switch)", isOn: $deskEnabled)
+            Section("Surfaces") {
+                Toggle("Desk: clock, meters, meetings and the message on the desktop", isOn: $deskEnabled)
                     .onChange(of: deskEnabled) { _, _ in DeskController.shared.apply() }
-                Text("Draws on the desktop under your windows and around the camera notch. The widget keeps working either way; hide it from its menu if Desk is all you want.")
+                Toggle("Notch: the island around the camera (needs Desk)", isOn: $notch)
+                Toggle("Widget: the floating window with the tools", isOn: Binding(
+                    get: { !panelHidden },
+                    set: { show in
+                        let app = NSApp.delegate as? AppDelegate
+                        if show { app?.showPanel() } else { app?.hidePanel() }
+                    }))
+                Text("Sanduhr keeps fetching and alerting with every surface off. Every setting stays here, and Option+S opens this window while Desk is on.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section {
@@ -292,6 +289,11 @@ private struct GeneralTab: View {
             }
             Section("Calendar and Claude") {
                 Toggle("Read today's meetings", isOn: $showMeetings)
+                    .onChange(of: showMeetings) { _, on in
+                        let desk = DeskController.shared
+                        if on, desk.running { desk.model.requestCalendar() }
+                        if !on { desk.model.meetings = [] }
+                    }
                 Toggle("Show the Claude meters on the desktop", isOn: $showClaude)
             }
             Section("Shortcuts") {
