@@ -222,6 +222,16 @@ struct DeskMigrationTests {
         #expect(s.defaults.object(forKey: DeskController.notchKey) as? Bool == false)
     }
 
+    @Test func leavesSanduhrDesksAlertSettingsBehind() {
+        let s = ScratchDefaults()
+        s.seed(s.newer, ["layout": "clock:bl", "alertsEnabled": true, "alertSessionPct": 50.0,
+                         "alertWeeklyPct": 75.0, "remindSessionEnd": true, "alertSessionReset": true,
+                         "alertsFired": ["seven_day|x|line"]])
+        s.migrate()
+        #expect(s.defaults.string(forKey: "layout") == "clock:bl")
+        #expect(s.defaults.values.keys.filter { $0.hasPrefix("alert") || $0 == "remindSessionEnd" }.isEmpty)
+    }
+
     @Test func neverOverwritesWhatIsAlreadySet() {
         let s = ScratchDefaults()
         s.defaults.set("message:br", forKey: "layout")

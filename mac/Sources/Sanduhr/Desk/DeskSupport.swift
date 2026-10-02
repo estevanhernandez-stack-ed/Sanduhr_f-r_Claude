@@ -22,6 +22,14 @@ enum DeskMigration {
     /// Newest app first: when both domains hold a key, Sanduhr Desk's value wins.
     static let legacyDomains = ["com.626labs.sanduhrdesk", "com.estevan.desk"]
 
+    /// Not Desk settings: the old apps' own bookkeeping, and the alert settings Sanduhr Desk
+    /// kept from its copy of the widget code. Sanduhr's alerts live in the widget's defaults.
+    static let skipped: Set<String> = [
+        "loginItemSet", "migratedFromDeskAndSanduhr",
+        Notifier.Key.enabled, Notifier.Key.sessionPct, Notifier.Key.weeklyPct,
+        Notifier.Key.sessionFull, Notifier.Key.sessionReset, Notifier.Key.fired,
+    ]
+
     /// Defaults to the real stores; tests pass in-memory ones, since a scratch defaults domain
     /// leaves a plist in ~/Library/Preferences that cfprefsd rewrites even after it is deleted.
     static func run(into d: DefaultsStore = UserDefaults.desk,
@@ -32,8 +40,7 @@ enum DeskMigration {
         for name in domains {
             guard let old = domain(name) else { continue }
             found = true
-            for (k, v) in old where d.object(forKey: k) == nil
-                && !["loginItemSet", "migratedFromDeskAndSanduhr"].contains(k) {
+            for (k, v) in old where d.object(forKey: k) == nil && !skipped.contains(k) {
                 d.set(v, forKey: k)
             }
         }
