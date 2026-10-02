@@ -119,7 +119,7 @@ Cooldown Snake, themes, history once M7 lands). Mac sources only; build and test
   Acceptance: a fresh domain shows the meters on the desktop at first launch with no window and no permission prompts; a 2.1.0 user who updates sees no change; a Sanduhr Desk migrant gets their imported layout.
   Verify: swift-testing for a pure first-run decision with in-memory stores (fresh, existing widget user, Sanduhr Desk migrant); `docs/mac-smoke-test.md` section 1 rewritten for the new default.
 
-- [ ] **15. The toolbox is one click away**
+- [x] **15. The toolbox is one click away**
   Spec ref: New — not in original spec
   What to build: the Desk meter rows take clicks the way meeting rows do (the click-through stays everywhere else); a click shows the widget beside the meters. A **Tools** section in the menus: Show Sanduhr, Deep Work, Pacing Calculators, Cooldown Snake (History when M7 lands). A one-time hint under the meters on first run ("Click the meters for history and tools. Option+S for settings."), gone after the first meter click or three days.
   Acceptance: with the widget hidden, clicking the meters opens it next to them; every deep tool is reachable from the menu without the widget showing first; the hint appears once and never again after it is dismissed.
