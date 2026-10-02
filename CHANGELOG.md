@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **Desk meters**: a new `meters` piece draws a bar per Claude limit (session, weekly and any other weekly limits the widget shows) in any corner, in the Desk ink and font with its shadow: the label, the bar with the pace tick where the widget puts it, the percent (bars stop at full, the percent keeps counting past 100) and the reset time. Place it in Desk Settings, Layout ("Claude meters (bars)") or with `meters:br` in the layout. Desk now takes its numbers straight from Sanduhr instead of rereading `snapshot.json`, so the meters, the `claude` line and the notch move with every refresh, widget hidden or not; `snapshot.json` is still written for the statusline and the MCP server.
+
 ## v2.1.0-mac — 2026-10-02
 
 **Desk**, a second way to see Claude usage: drawn on the desktop under your windows and around the camera notch instead of in a window. Off by default; the widget is unchanged. Turn it on from the widget's menu (two-finger click), Desk Settings, General, Show Desk.

@@ -21,9 +21,15 @@ struct Meeting: Identifiable {
 final class DeskModel {
     var meetings: [Meeting] = []
     var calendarNote: String?
-    /// One line of Claude usage from Sanduhr's snapshot.json, or nil when there is none.
+    /// One row per Claude limit for the meters piece, in the widget's order.
+    var meters: [DeskMeterRow] = []
+    /// One line of Claude usage, or nil when there is none.
     var claudeLine: String?
+    /// The numbers are older than 15 minutes or the sign-in was refused; the meters and the
+    /// line draw dimmed.
     var claudeLineIsStale = false
+    /// The widget's session key or Cloudflare clearance was refused.
+    var signInNeeded = false
     /// Today's line from MessageEngine (messages.txt), or nil when there is none.
     var message: String?
     /// Height of the menu bar strip at the top of the screen, so top slots sit below it.
@@ -37,6 +43,9 @@ final class DeskModel {
     @ObservationIgnored var meetingsFrame: CGRect = .zero
     /// Each meeting row's frame, same coordinates, keyed by meeting id. Clicks are matched here.
     @ObservationIgnored var rowFrames: [String: CGRect] = [:]
+
+    /// The widget's last numbers (see `update`).
+    @ObservationIgnored private var usage = DeskUsage()
 
     @ObservationIgnored private let store = EKEventStore()
     @ObservationIgnored private var timer: Timer?
@@ -104,53 +113,21 @@ final class DeskModel {
         calendarNote = nil
     }
 
-    /// Reads ~/Library/Application Support/Sanduhr/snapshot.json, which the Sanduhr widget
-    /// rewrites after every fetch (about every 5 minutes). Older than 15 minutes counts as stale.
-    func refreshClaude() {
-        let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Sanduhr/snapshot.json")
-        guard let data = try? Data(contentsOf: url),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            claudeLine = nil
-            claudeCompact = nil
-            return
-        }
-        let tiers = (obj["tiers"] as? [[String: Any]]) ?? []
-        func util(_ key: String) -> Int? {
-            tiers.first { ($0["key"] as? String) == key }?["utilization"] as? Int
-        }
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        func date(_ s: Any?) -> Date? {
-            guard let s = s as? String else { return nil }
-            return iso.date(from: s) ?? ISO8601DateFormatter().date(from: s)
-        }
-        let captured = date(obj["captured_at"])
-        let age = captured.map { Date().timeIntervalSince($0) } ?? .infinity
+    /// Takes the widget's latest numbers. AppDelegate calls this after every refresh, whether
+    /// or not Desk or the widget is showing, so Desk has them the moment it starts.
+    func update(_ input: DeskUsage) {
+        usage = input
+        refreshClaude()
+    }
 
-        if (obj["status"] as? String) == "error", ["auth", "session_expired", "cloudflare"].contains(obj["error_kind"] as? String ?? "") {
-            claudeLine = "claude   sign in again in Sanduhr"
-            claudeCompact = nil
-            claudeLineIsStale = true
-            return
-        }
-        var parts: [String] = []
-        if let s = util("five_hour") {
-            var part = "\(s)% session"
-            if let reset = date(tiers.first { ($0["key"] as? String) == "five_hour" }?["resets_at"]) {
-                let f = DateFormatter()
-                f.dateFormat = "h:mm"
-                part += ", resets \(f.string(from: reset))"
-            }
-            parts.append(part)
-        }
-        if let w = util("seven_day") { parts.append("\(w)% week") }
-        claudeCompact = [util("five_hour").map { "5h \($0)%" }, util("seven_day").map { "wk \($0)%" }]
-            .compactMap { $0 }.joined(separator: "  ")
-        if claudeCompact?.isEmpty == true || age > 15 * 60 { claudeCompact = nil }
-        guard !parts.isEmpty else { claudeLine = nil; return }
-        claudeLine = "claude   " + parts.joined(separator: "   ")
-        claudeLineIsStale = age > 15 * 60
+    /// Rebuilds the meters and the text lines from the last numbers the widget handed over.
+    /// Runs on every update and once a minute, so pace ticks and staleness move with the clock.
+    func refreshClaude(now: Date = Date()) {
+        meters = DeskMeterRow.rows(from: usage.usage, now: now)
+        signInNeeded = usage.signInNeeded
+        claudeLine = DeskClaudeText.line(usage)
+        claudeCompact = DeskClaudeText.compact(usage, now: now)
+        claudeLineIsStale = usage.isStale(now: now)
     }
 
     /// The first meeting still to come (or in progress) that has a join link.

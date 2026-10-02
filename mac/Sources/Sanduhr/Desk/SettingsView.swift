@@ -66,7 +66,8 @@ private struct LayoutTab: View {
 /// apart from the view so it tests without AppKit. DeskView reads the same string.
 enum DeskLayout {
     static let widgets: [(key: String, name: String)] = [
-        ("message", "Message"), ("clock", "Clock and date"), ("claude", "Claude meters"), ("meetings", "Meetings"),
+        ("message", "Message"), ("clock", "Clock and date"), ("claude", "Claude line"),
+        ("meters", "Claude meters (bars)"), ("meetings", "Meetings"),
     ]
 
     /// Widget to slot. Words without exactly one colon are skipped; a repeated widget keeps its last slot.

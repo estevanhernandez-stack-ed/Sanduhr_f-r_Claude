@@ -124,6 +124,87 @@ struct DeskLayoutTests {
     @Test func placingDropsWordsTheTabDoesNotKnow() {
         #expect(DeskLayout.placing("clock", in: "bl", layout: "weather:tr clock:tl") == "clock:bl")
     }
+
+    @Test func metersIsAPieceAndStacksAfterTheClaudeLine() {
+        #expect(DeskLayout.widgets.contains { $0.key == "meters" })
+        #expect(DeskLayout.placing("meters", in: "br", layout: standard)
+                == "message:tl clock:bl claude:bl meters:br meetings:bl")
+    }
+}
+
+@Suite("Desk meters")
+struct DeskMeterTests {
+    /// Local noon, so "Today" in the reset text does not depend on when the suite runs.
+    let now = Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 6, hour: 12))!
+
+    func iso(_ offset: TimeInterval) -> String {
+        ISO8601DateFormatter().string(from: now.addingTimeInterval(offset))
+    }
+
+    func usage(_ tiers: [Tier: TierUsage]) -> UsageResponse {
+        UsageResponse(tiers: tiers, extraUsage: nil)
+    }
+
+    @Test func normalTierCarriesLabelFillPaceAndReset() {
+        // Two hours left of five: three fifths of the window has gone by.
+        let rows = DeskMeterRow.rows(from: usage([.fiveHour: TierUsage(utilization: 42, resetsAt: iso(2 * 3600))]), now: now)
+        #expect(rows.count == 1)
+        let row = rows[0]
+        #expect(row.label == "Session (5hr)")
+        #expect(row.percent == 42)
+        #expect(abs(row.fill - 0.42) < 1e-9)
+        #expect(abs((row.pace ?? -1) - 0.6) < 1e-6)
+        #expect(row.pace == paceFrac(iso(2 * 3600), tier: .fiveHour, now: now))
+        #expect(row.reset == resetDateTimeStr(iso(2 * 3600), now: now))
+        #expect(row.reset.hasPrefix("Today "))
+    }
+
+    @Test func missingResetTimeHasNoPaceAndNoResetText() {
+        let row = DeskMeterRow.rows(from: usage([.sevenDay: TierUsage(utilization: 63, resetsAt: nil)]), now: now)[0]
+        #expect(row.percent == 63)
+        #expect(row.pace == nil)
+        #expect(row.reset == "")
+    }
+
+    @Test func overOneHundredClampsTheFillButKeepsThePercent() {
+        let row = DeskMeterRow.rows(from: usage([.sevenDayOpus: TierUsage(utilization: 112.4, resetsAt: iso(86400))]), now: now)[0]
+        #expect(row.percent == 112)
+        #expect(row.fill == 1)
+    }
+
+    @Test func rowsFollowTheWidgetOrderAndSkipTiersWithoutUtilization() {
+        let rows = DeskMeterRow.rows(from: usage([
+            .sevenDayOpus: TierUsage(utilization: 5, resetsAt: nil),
+            .sevenDay: TierUsage(utilization: 63, resetsAt: nil),
+            .sevenDaySonnet: TierUsage(utilization: nil, resetsAt: nil),
+            .fiveHour: TierUsage(utilization: 7, resetsAt: nil),
+        ]), now: now)
+        #expect(rows.map(\.tier) == [.fiveHour, .sevenDay, .sevenDayOpus])
+        #expect(rows.map(\.label) == [Tier.fiveHour.label, Tier.sevenDay.label, Tier.sevenDayOpus.label])
+    }
+
+    @Test func noUsageMeansNoRows() {
+        #expect(DeskMeterRow.rows(from: nil, now: now).isEmpty)
+    }
+
+    @Test func textLineAndNotchFollowTheSameNumbers() {
+        let fresh = DeskUsage(usage: usage([.fiveHour: TierUsage(utilization: 7, resetsAt: nil),
+                                            .sevenDay: TierUsage(utilization: 63, resetsAt: nil)]),
+                              fetchedAt: now.addingTimeInterval(-60))
+        #expect(DeskClaudeText.line(fresh) == "claude   7% session   63% week")
+        #expect(DeskClaudeText.compact(fresh, now: now) == "5h 7%  wk 63%")
+        #expect(!fresh.isStale(now: now))
+
+        // Twenty minutes without a successful fetch: the line stays, dimmed; the notch drops it.
+        #expect(fresh.isStale(now: now.addingTimeInterval(20 * 60)))
+        #expect(DeskClaudeText.compact(fresh, now: now.addingTimeInterval(20 * 60)) == nil)
+
+        var refused = fresh
+        refused.signInNeeded = true
+        #expect(DeskClaudeText.line(refused) == "claude   sign in again in Sanduhr")
+        #expect(DeskClaudeText.compact(refused, now: now) == nil)
+        #expect(refused.isStale(now: now))
+    }
 }
 
 @Suite("Ink spec")

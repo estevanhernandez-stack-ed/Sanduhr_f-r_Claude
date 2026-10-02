@@ -46,8 +46,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         viewModel.onUsageUpdate = { [weak self] in
             self?.renderStatusItem()
             self?.fitPanelToContent()
-            // The desk reads snapshot.json, which refresh() has just rewritten.
-            if DeskController.shared.running { DeskController.shared.model.refreshClaude() }
+            // Desk takes the numbers straight from the view model, so its meters move with
+            // every refresh even while the widget is hidden (or Desk is off, ready for when it starts).
+            guard let vm = self?.viewModel else { return }
+            var isAuthError = false
+            if case .error(_, let isAuth) = vm.status { isAuthError = isAuth }
+            DeskController.shared.model.update(DeskUsage(
+                usage: vm.usage, fetchedAt: vm.lastUpdated, signInNeeded: isAuthError))
         }
 
         // When the user toggles compact mode, resize the panel to fit the
