@@ -57,3 +57,48 @@ Publish usage, Theme Studio and lint, `propose_theme`, Store update notice: Clau
 ## Test plan per phase
 
 Build with `./build.sh` on this Mac (26.x SDK without Xcode). Phase 3 gets Swift unit tests ported from the Windows vault fixtures (torn files, month boundaries, worktree folding) since the vault is the one irreplaceable record.
+
+## Appendix: Windows feature inventory and Mac status (2026-10-02)
+
+Taken from every Windows release in `CHANGELOG.md` (v1.0 to v3.4.2, `origin/main` at 86f2aa7, nothing newer upstream) and checked against `mac/Sources` on `feat/mac-desk`. Phase is where it lands in this plan; "drop" means Claude's own app or Sparkle covers it, or few users need it.
+
+| Windows feature | Since | Mac today | Phase |
+|---|---|---|---|
+| Tier cards, sparklines, pace markers, burn projection | 1.1 | done | |
+| Matrix and other themes, user themes, agent theme prompt | 1.1 | done | |
+| Compact mode | 2.0.4 | done | |
+| Pace ghost, breathing glass | 2.0.4 | done (theme effects) | |
+| Horizon sparkline | 2.0.4 | partial (2 hour history only) | 3 |
+| Advanced pacing tools, focus timer, cooldown snake | 2.0.4 | done | |
+| Tool strip | 2.0.4 | done (ActionIconRow) | |
+| Graph-mode cycling | 2.0.4 / 3.1 | missing | 2 |
+| Edge-drag resize | 2.0.4 | partial (width only) | |
+| Sign out / clear credentials | 2.0.4 | missing | 2 |
+| Keyboard shortcuts, tooltips, first-run tip | 2.0.2 | done | |
+| Help tab | 2.0.2 | missing | later |
+| Extra usage tier ("Capped Extra Usage") | 2.2 | done (ExtraUsageCard) | |
+| Multi-account registry, Accounts tab, active-account label, account-scoped sign-out | 2.2 | missing | 2 |
+| Per-account history, All-accounts chart toggle, CSV export | 2.2 | missing | 3 |
+| Routines tier | 2.3 | missing | 2 |
+| Local Claude Code tab and burn delta on cards | 2.3 | missing | 2 |
+| Cards tab: drag to reorder tiers, hide tiers | 2.3 | missing | 2 |
+| Speculative-tier "future use" tag | 2.3 | missing | 2 (comes with limits[] tiers) |
+| Custom sound chimes | 2.3 | missing (system sound only) | later |
+| Embedded "Sign in to Claude" | 3.0 | missing (paste cookie) | 2 |
+| Subscription-tier badge | 3.0 | missing | 2 |
+| Themed dialogs, theme swatch flyout | 3.1 | partial | later |
+| One-click in-place session recovery, Google SSO and email-code guidance, reconnecting status | 3.1 / 3.3 | missing | 2 (with embedded sign-in) |
+| Claude Usage tab (overview, trends, sessions ledger, CSV) | 3.2 | missing | 3 |
+| Usage history vault (opt-in, per home) | 3.2 | missing | 3 |
+| Threshold alerts | 3.2 | done (branch) | |
+| Model-scoped weekly meters from limits[] | 3.3 | missing (fixed enum) | 2 |
+| Snapshot writer, statusline bridge | 3.4.0 | done (branch, manual install script) | |
+| sanduhr-mcp get_usage, ping | 3.4.0 | done (branch) | |
+| One-click MCP and statusline install from Settings | 3.4.1 | missing (install.sh) | 4 |
+| MCP get_local_burn_by_project, get_model_usage, get_usage_history | 3.4.1 | missing | 4 |
+| Deeper pacing in get_usage (cooldown, surplus, projected final) | 3.4.1 | done (branch) | |
+| Worktree and subfolder burn attribution | 3.4.1 / 3.4.2 | missing (no burn yet) | 2 |
+| Publish usage, publish_usage tool | 3.4.0 | missing | drop |
+| Theme lint, Theme Studio, propose_theme | 3.4.1 | missing | drop |
+| Store update notice | 3.4.2 | n/a (Sparkle) | drop |
+| Mac only: font picker, subtle mode, desktop pin, Desk (desktop layer, notch) | | done (branch) | |
