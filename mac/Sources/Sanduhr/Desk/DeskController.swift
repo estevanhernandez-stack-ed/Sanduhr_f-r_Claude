@@ -340,7 +340,17 @@ final class DeskController: NSObject, NSMenuDelegate {
 }
 
 /// Takes the first click instead of spending it on activating Desk, so one click joins.
+/// Desk sets these windows' frames itself, so the view never sizes its window: by default a
+/// hosting view resizes the window to its content, which shrank the notch wings window to
+/// 0 x 0 when the notch was switched off and regrew it above the screen when switched back on.
 final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
+    required init(rootView: Content) {
+        super.init(rootView: rootView)
+        sizingOptions = []
+    }
+
+    @MainActor @preconcurrency required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
