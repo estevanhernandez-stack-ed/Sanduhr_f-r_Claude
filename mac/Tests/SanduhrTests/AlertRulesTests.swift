@@ -22,6 +22,10 @@ struct AlertRulesTests {
         return f.string(from: now.addingTimeInterval(offset))
     }
 
+    // Typed, so fixture offsets are TimeInterval on every compiler: Swift 6.0 and 6.1 read
+    // `2 * 3600` inside a tuple literal as Int.
+    let minute: TimeInterval = 60, hour: TimeInterval = 3600, day: TimeInterval = 86400
+
     func usage(_ tiers: [Tier: (Double, TimeInterval?)]) -> UsageResponse {
         var u = UsageResponse()
         for (tier, (util, offset)) in tiers {
@@ -47,7 +51,7 @@ struct AlertRulesTests {
 
     /// Session 88% with 2 hours of 5 left: 100% at 1:24 PM, well before the 3:00 PM reset.
     @Test func paceWarningNamesBothTimes() {
-        let out = run(usage([.fiveHour: (88, 2 * 3600)]), settings { $0.pace = true; $0.sessionLine = 95 })
+        let out = run(usage([.fiveHour: (88, 2 * hour)]), settings { $0.pace = true; $0.sessionLine = 95 })
         #expect(out.alerts.count == 1)
         let a = out.alerts[0]
         #expect(a.kind == .pace)
@@ -58,52 +62,52 @@ struct AlertRulesTests {
     }
 
     @Test func paceWarningCoversWeeklyLimits() {
-        let out = run(usage([.sevenDay: (90, 2 * 86400)]), settings { $0.pace = true; $0.weeklyLine = 95 })
+        let out = run(usage([.sevenDay: (90, 2 * day)]), settings { $0.pace = true; $0.weeklyLine = 95 })
         #expect(out.alerts.count == 1)
         #expect(out.alerts[0].title.hasPrefix("Weekly — All Models on pace to run out at Sat "))
         #expect(out.alerts[0].body == "Resets Sun 1:00 PM.")
     }
 
     @Test func paceWarningIsOffByDefault() {
-        let out = run(usage([.fiveHour: (88, 2 * 3600)]), settings { $0.sessionLine = 95 })
+        let out = run(usage([.fiveHour: (88, 2 * hour)]), settings { $0.sessionLine = 95 })
         #expect(out.alerts.isEmpty)
     }
 
     @Test func paceWarningOncePerWindow() {
         let s = settings { $0.pace = true; $0.sessionLine = 95 }
-        let first = run(usage([.fiveHour: (88, 2 * 3600)]), s)
-        let again = run(usage([.fiveHour: (90, 2 * 3600)]), s, fired: Set(first.alerts.map(\.onceKey)))
+        let first = run(usage([.fiveHour: (88, 2 * hour)]), s)
+        let again = run(usage([.fiveHour: (90, 2 * hour)]), s, fired: Set(first.alerts.map(\.onceKey)))
         #expect(first.alerts.count == 1)
         #expect(again.alerts.isEmpty)
         // A new window gets its own warning.
-        let next = run(usage([.fiveHour: (88, 2 * 3600 + 5 * 3600)]), s, fired: Set(first.alerts.map(\.onceKey)),
+        let next = run(usage([.fiveHour: (88, 2 * hour + 5 * hour)]), s, fired: Set(first.alerts.map(\.onceKey)),
                        at: now.addingTimeInterval(5 * 3600))
         #expect(next.alerts.map(\.kind) == [.pace])
     }
 
     @Test func paceWarningWaitsForTenPercentOfTheWindow() {
         // 27 minutes into the 5 hours (9%), already projected to run out.
-        let early = usage([.fiveHour: (25, 5 * 3600 - 27 * 60)])
+        let early = usage([.fiveHour: (25, 5 * hour - 27 * minute)])
         #expect(secondsUntilFull(util: 25, iso: iso(5 * 3600 - 27 * 60), tier: .fiveHour, now: now) != nil)
         #expect(run(early, settings { $0.pace = true }).alerts.isEmpty)
     }
 
     @Test func paceWarningNeedsTwentyPercentUsed() {
         // 45 minutes in (15%) at 19%: projected to run out, but too little used to say so.
-        let light = usage([.fiveHour: (19, 5 * 3600 - 45 * 60)])
+        let light = usage([.fiveHour: (19, 5 * hour - 45 * minute)])
         #expect(secondsUntilFull(util: 19, iso: iso(5 * 3600 - 45 * 60), tier: .fiveHour, now: now) != nil)
         #expect(run(light, settings { $0.pace = true }).alerts.isEmpty)
     }
 
     @Test func noPaceWarningWhenTheResetComesFirst() {
-        let out = run(usage([.fiveHour: (40, 2 * 3600)]), settings { $0.pace = true })
+        let out = run(usage([.fiveHour: (40, 2 * hour)]), settings { $0.pace = true })
         #expect(out.alerts.isEmpty)
     }
 
     // MARK: - Thresholds, as before
 
     @Test func thresholdsFireAsBefore() {
-        let u = usage([.fiveHour: (85, 2 * 3600), .sevenDay: (81, 2 * 86400), .sevenDaySonnet: (40, 2 * 86400)])
+        let u = usage([.fiveHour: (85, 2 * hour), .sevenDay: (81, 2 * day), .sevenDaySonnet: (40, 2 * day)])
         let out = run(u, settings())
         #expect(out.alerts.map(\.title) == ["Session at 85%", "Weekly — All Models at 81%"])
         #expect(out.alerts[0].body == "Resets 3:00 PM.")
@@ -112,7 +116,7 @@ struct AlertRulesTests {
     }
 
     @Test func fullSessionOnlyWhenAsked() {
-        let u = usage([.fiveHour: (100, 3600)])
+        let u = usage([.fiveHour: (100, hour)])
         #expect(run(u, settings()).alerts.map(\.kind) == [.line])
         let out = run(u, settings { $0.sessionFull = true })
         #expect(out.alerts.map(\.kind) == [.line, .full])
@@ -122,11 +126,11 @@ struct AlertRulesTests {
     @Test func nothingWhenAlertsAreOff() {
         var s = settings { $0.pace = true; $0.sessionReset = true }
         s.enabled = false
-        #expect(run(usage([.fiveHour: (99, 3600)]), s) == AlertOutcome())
+        #expect(run(usage([.fiveHour: (99, hour)]), s) == AlertOutcome())
     }
 
     @Test func eachAlertOncePerWindow() {
-        let u = usage([.fiveHour: (100, 3600), .sevenDay: (90, 86400)])
+        let u = usage([.fiveHour: (100, hour), .sevenDay: (90, day)])
         let s = settings { $0.sessionFull = true }
         let first = run(u, s)
         #expect(first.alerts.count == 3)
@@ -136,8 +140,8 @@ struct AlertRulesTests {
     // MARK: - Resets
 
     @Test func sessionResetOnASharpDrop() {
-        let before = usage([.fiveHour: (70, 600)])
-        let after = usage([.fiveHour: (5, 5 * 3600)])
+        let before = usage([.fiveHour: (70, 10 * minute)])
+        let after = usage([.fiveHour: (5, 5 * hour)])
         let out = run(after, previous: before, settings { $0.sessionReset = true })
         #expect(out.alerts.map(\.title) == ["Session reset"])
         #expect(out.alerts[0].onceKey == "five_hour|\(iso(600))|reset")
@@ -147,36 +151,36 @@ struct AlertRulesTests {
 
     @Test func sessionResetWhenTheOldWindowEnded() {
         // 60% to 30% is not a 40-point drop, but the old window's reset time has passed.
-        let before = usage([.fiveHour: (60, -60)])
-        let after = usage([.fiveHour: (30, 5 * 3600)])
+        let before = usage([.fiveHour: (60, -minute)])
+        let after = usage([.fiveHour: (30, 5 * hour)])
         #expect(run(after, previous: before, settings { $0.sessionReset = true }).alerts.map(\.kind) == [.reset])
         // The same numbers inside one window are just a correction, not a reset.
-        let early = usage([.fiveHour: (60, 3600)])
+        let early = usage([.fiveHour: (60, hour)])
         #expect(run(after, previous: early, settings { $0.sessionReset = true }).alerts.isEmpty)
     }
 
     @Test func quietMetersDoNotAnnounceAReset() {
-        let before = usage([.fiveHour: (40, -60)])
+        let before = usage([.fiveHour: (40, -minute)])
         let after = usage([.fiveHour: (0, nil)])
         #expect(run(after, previous: before, settings { $0.sessionReset = true }).alerts.isEmpty)
     }
 
     @Test func weeklyResetPerTier() {
-        let before = usage([.sevenDay: (75, -60), .sevenDaySonnet: (55, 3 * 86400)])
-        let after = usage([.sevenDay: (1, 7 * 86400), .sevenDaySonnet: (10, 3 * 86400)])
+        let before = usage([.sevenDay: (75, -minute), .sevenDaySonnet: (55, 3 * day)])
+        let after = usage([.sevenDay: (1, 7 * day), .sevenDaySonnet: (10, 3 * day)])
         let out = run(after, previous: before, settings { $0.weeklyReset = true })
         #expect(out.alerts.map(\.title) == ["Weekly — All Models reset", "Weekly — Sonnet reset"])
         #expect(out.alerts[0].onceKey == "seven_day|\(iso(-60))|reset")
         // The session switch does not cover weekly limits, and the weekly one not the session.
         #expect(run(after, previous: before, settings { $0.sessionReset = true }).alerts.isEmpty)
-        let session = run(usage([.fiveHour: (2, 5 * 3600)]), previous: usage([.fiveHour: (80, -60)]),
+        let session = run(usage([.fiveHour: (2, 5 * hour)]), previous: usage([.fiveHour: (80, -minute)]),
                           settings { $0.weeklyReset = true })
         #expect(session.alerts.isEmpty)
     }
 
     @Test func resetOncePerWindow() {
-        let before = usage([.sevenDay: (75, -60)])
-        let after = usage([.sevenDay: (1, 7 * 86400)])
+        let before = usage([.sevenDay: (75, -minute)])
+        let after = usage([.sevenDay: (1, 7 * day)])
         let s = settings { $0.weeklyReset = true }
         let first = run(after, previous: before, s)
         #expect(run(after, previous: before, s, fired: Set(first.alerts.map(\.onceKey))).alerts.isEmpty)
@@ -204,21 +208,21 @@ struct AlertRulesTests {
 
     @Test func quietHoursHoldBannersBackButKeepTheAlerts() {
         let s = settings { $0.quietEnabled = true; $0.quietStart = 12 * 60; $0.quietEnd = 14 * 60 }
-        let out = run(usage([.fiveHour: (85, 2 * 3600)]), s)
+        let out = run(usage([.fiveHour: (85, 2 * hour)]), s)
         #expect(out.alerts.count == 1)   // still recorded, so nothing bursts out at the end
         #expect(out.quiet)
         #expect(!out.banner)
         // Desk pulses still show.
         var both = s
         both.delivery = .both
-        let pulsed = run(usage([.fiveHour: (85, 2 * 3600)]), both, desk: true)
+        let pulsed = run(usage([.fiveHour: (85, 2 * hour)]), both, desk: true)
         #expect(!pulsed.banner && pulsed.pulse)
         // Off, or outside the hours: banners as usual.
-        #expect(run(usage([.fiveHour: (85, 2 * 3600)]), settings { $0.quietStart = 12 * 60; $0.quietEnd = 14 * 60 }).banner)
+        #expect(run(usage([.fiveHour: (85, 2 * hour)]), settings { $0.quietStart = 12 * 60; $0.quietEnd = 14 * 60 }).banner)
     }
 
     @Test func deliveryRoutes() {
-        let u = usage([.fiveHour: (85, 2 * 3600)])
+        let u = usage([.fiveHour: (85, 2 * hour)])
         let desk = run(u, settings { $0.delivery = .desk }, desk: true)
         #expect(!desk.banner && desk.pulse)
         let fallback = run(u, settings { $0.delivery = .desk }, desk: false)
