@@ -132,7 +132,7 @@ struct NotchWingsView: View {
                     .offset(x: (wingR - wingL) / 2)
                     .contentShape(Rectangle())
                     .onTapGesture { DeskController.shared.showSettings() }
-                    .help("Desk settings")
+                    .help("Sanduhr Settings")
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
             }

@@ -1,18 +1,17 @@
 import AppKit
 import SwiftUI
-import ServiceManagement
 import Carbon.HIToolbox
 
 /// Sanduhr's desk surfaces: a click-through layer on the desktop (clock, Claude meters,
-/// meetings, the message) and the notch island. Off until turned on in Desk settings
-/// (status item menu, Desk Settings), so nothing changes for widget-only users; a brand-new
+/// meetings, the message) and the notch island. Off until turned on in Settings, General,
+/// Surfaces, so nothing changes for widget-only users; a brand-new
 /// install starts with it on (DeskFirstRun). Its settings
 /// live in their own defaults suite (UserDefaults.desk) so their short names never collide
 /// with the widget's.
 final class DeskController: NSObject, NSMenuDelegate {
     static let shared = DeskController()
     static let enabledKey = "deskEnabled"
-    /// The notch island, off until switched on in Desk settings, Notch.
+    /// The notch island, off until switched on in Settings (General or Notch).
     static let notchKey = "notch"
     /// Option+J and Option+S while Desk runs, on by default.
     static let hotKeysKey = "hotKeys"
@@ -20,7 +19,6 @@ final class DeskController: NSObject, NSMenuDelegate {
     private var window: NSWindow?
     private var statusItem: NSStatusItem?
     private var mouseMonitors: [Any] = []
-    private var settingsWindow: NSWindow?
     private var wingsWindow: NSWindow?
     private var wingsTimer: Timer?
     let model = DeskModel()
@@ -301,21 +299,13 @@ final class DeskController: NSObject, NSMenuDelegate {
         addStandardItems(to: menu)
     }
 
-    @objc func showSettings() {
-        if settingsWindow == nil {
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 540),
-                             styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            w.title = "Sanduhr Desk"
-            w.isReleasedWhenClosed = false
-            w.contentView = NSHostingView(rootView: DeskSettingsView(model: model))
-            w.center()
-            settingsWindow = w
-        }
-        NSApp.activate(ignoringOtherApps: true)
-        settingsWindow?.makeKeyAndOrderFront(nil)
+    /// Option+S, …/settings links and the notch island: the one Settings window.
+    func showSettings() {
+        // Hotkeys, links and taps all arrive on the main thread.
+        MainActor.assumeIsolated { SettingsWindowController.shared.show() }
     }
 
-    /// Settings' "Clock icon in the menu bar" switch.
+    /// Settings' "Desk menu in the menu bar" switch.
     func setMenuIcon(_ on: Bool) {
         if on, statusItem == nil { buildMenu() }
         if !on, let item = statusItem {
@@ -324,22 +314,10 @@ final class DeskController: NSObject, NSMenuDelegate {
         }
     }
 
+    /// The same items as the menu bar item's menu and the widget's menu (SanduhrMenu).
     private func addStandardItems(to menu: NSMenu) {
         // Menus are built on the main thread.
-        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.addToolItems(to: menu) }
-        menu.addItem(.separator())
-        let settings = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
-        settings.target = self
-        menu.addItem(settings)
-        let refresh = NSMenuItem(title: "Refresh meetings", action: #selector(refreshMeetings), keyEquivalent: "r")
-        refresh.target = self
-        menu.addItem(refresh)
-        let login = NSMenuItem(title: "Open at login", action: #selector(toggleLogin(_:)), keyEquivalent: "")
-        login.target = self
-        login.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        menu.addItem(login)
-        menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit Sanduhr", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.addMenuItems(to: menu) }
     }
 
     private func buildMenu() {
@@ -350,21 +328,6 @@ final class DeskController: NSObject, NSMenuDelegate {
         menuNeedsUpdate(menu)
         item.menu = menu
         statusItem = item
-    }
-
-    @objc private func refreshMeetings() { model.refreshEvents() }
-
-    @objc private func toggleLogin(_ sender: NSMenuItem) {
-        do {
-            if SMAppService.mainApp.status == .enabled {
-                try SMAppService.mainApp.unregister()
-            } else {
-                try SMAppService.mainApp.register()
-            }
-        } catch {
-            NSLog("Desk login item: \(error)")
-        }
-        sender.state = SMAppService.mainApp.status == .enabled ? .on : .off
     }
 }
 

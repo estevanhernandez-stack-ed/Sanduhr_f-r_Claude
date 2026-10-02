@@ -58,7 +58,7 @@ first (Settings → Credentials → save with an empty key).
 ### Cloudflare fallback
 
 If the widget shows "Cloudflare — add cf_clearance", copy the `cf_clearance`
-cookie the same way and paste it into the second field in **Credentials…**.
+cookie the same way and paste it into the second field in **Settings, Credentials**.
 Most accounts don't need this.
 
 ## Files
@@ -81,9 +81,9 @@ Most accounts don't need this.
 | **Graph** button            | Cycle sparkline: Classic / Horizon  |
 | **Pin** button              | Toggle always-on-top                |
 | **Refresh** button          | Fetch usage now                     |
-| **Key** button              | Open credentials sheet              |
+| **Gear** button             | Open Sanduhr Settings               |
 | Hover a tier card           | Reveal cooldown / surplus metrics   |
-| Right-click widget          | Refresh / Compact / Quit menu       |
+| Two-finger click widget     | Tools, Refresh, Settings, Quit menu |
 | **×**                       | Quit                                |
 
 ## License

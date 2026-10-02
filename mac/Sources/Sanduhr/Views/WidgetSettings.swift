@@ -1,22 +1,22 @@
 import SwiftUI
 import AppKit
 
-/// Paste sheet for the session key (and optional cf_clearance fallback).
-struct SettingsSheet: View {
+/// The widget's sections of the Settings window (SettingsWindow.swift): Pacing & Focus,
+/// Themes, Widget Look, Alerts and Credentials. They were the tabs of the widget's settings
+/// sheet; SettingsRoot picks one with `section`.
+struct WidgetSettings: View {
     @Bindable var vm: UsageViewModel
-    var onDismiss: () -> Void
+    let section: SettingsSection
 
-    // Write-only sheet: we never read the existing key back from the
+    // Write-only fields: we never read the existing key back from the
     // Keychain (skips a Touch ID prompt just to open settings, and avoids
     // ever displaying the secret on screen). Leave blank to keep the
     // existing value; any non-empty value replaces it.
     @State private var sessionKey: String = ""
     @State private var cfClearance: String = ""
-    private var hasExistingKey: Bool {
-        KeychainStore.exists(account: KeychainAccount.sessionKey)
-    }
+    @State private var credentialsNote: String?
+    @State private var hasExistingKey = KeychainStore.exists(account: KeychainAccount.sessionKey)
 
-    @AppStorage("pacingToolsEnabled") private var pacingToolsEnabled = true
     @AppStorage("remindSessionEnd") private var remindSessionEnd = false
     @AppStorage("alertsEnabled") private var alertsEnabled = false
     @AppStorage("alertSessionPct") private var alertSessionPct = 80.0
@@ -24,13 +24,13 @@ struct SettingsSheet: View {
     @AppStorage("alertSessionReset") private var alertSessionReset = false
     @State private var alertsNote: String?
 
-    // Font tab state. Bound straight to the shared settings, so the widget
-    // behind the sheet re-renders in the new font as you pick.
+    // Font state. Bound straight to the shared settings, so the widget
+    // re-renders in the new font as you pick.
     @Bindable var fonts = FontSettings.shared
     @Bindable var display = DisplaySettings.shared
     @State private var fontFamilies: [String] = []
 
-    // Themes tab state
+    // Themes state
     @State private var themePaste: String = ""
     @State private var themeFilename: String = ""
     @State private var themeError: String?
@@ -40,59 +40,35 @@ struct SettingsSheet: View {
 
     var body: some View {
         let t = vm.theme.palette
-        VStack(spacing: 0) {
-            TabView {
-                pacingTab(t: t)
-                    .tabItem { Text("Pacing & Focus") }
-
-                themesTab(t: t)
-                    .tabItem { Text("Themes") }
-
-                fontTab(t: t)
-                    .tabItem { Text("Look") }
-
-                alertsTab(t: t)
-                    .tabItem { Text("Alerts") }
-
-                credentialsTab(t: t)
-                    .tabItem { Text("Credentials") }
-            }
-            .padding(.bottom, 16)
-
-
-
-            HStack {
-                Spacer()
-                Button("Cancel", action: onDismiss)
-                    .keyboardShortcut(.cancelAction)
-                Button("Save") {
-                    let trimmedKey = sessionKey.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let trimmedCF  = cfClearance.trimmingCharacters(in: .whitespacesAndNewlines)
-                    // Only write fields that were filled in — blank means
-                    // "keep what's there". First-time users are forced to
-                    // provide sessionKey via the `disabled` check below.
-                    if !trimmedKey.isEmpty {
-                        KeychainStore.set(trimmedKey,
-                                          account: KeychainAccount.sessionKey)
-                    }
-                    if !trimmedCF.isEmpty {
-                        KeychainStore.set(trimmedCF,
-                                          account: KeychainAccount.cfClearance)
-                    }
-                    vm.credentialsChanged()
-                    onDismiss()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(
-                    // Require a new key on first setup; otherwise allow
-                    // saving blank (keeps current values).
-                    !hasExistingKey &&
-                    sessionKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                )
+        Group {
+            switch section {
+            case .pacing: pacingTab(t: t)
+            case .themes: themesTab(t: t)
+            case .widgetLook: fontTab(t: t)
+            case .alerts: alertsTab(t: t)
+            default: credentialsTab(t: t)
             }
         }
         .padding(20)
-        .frame(width: 420)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    /// Writes only the fields that were filled in; blank means "keep what's there". A first
+    /// setup needs a session key (the Save button stays off without one).
+    private func saveCredentials() {
+        let trimmedKey = sessionKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedCF  = cfClearance.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedKey.isEmpty {
+            KeychainStore.set(trimmedKey, account: KeychainAccount.sessionKey)
+        }
+        if !trimmedCF.isEmpty {
+            KeychainStore.set(trimmedCF, account: KeychainAccount.cfClearance)
+        }
+        vm.credentialsChanged()
+        sessionKey = ""
+        cfClearance = ""
+        hasExistingKey = KeychainStore.exists(account: KeychainAccount.sessionKey)
+        credentialsNote = "Saved. Sanduhr is fetching with the new values."
     }
 
     private func credentialsTab(t: Theme.Palette) -> some View {
@@ -122,9 +98,23 @@ struct SettingsSheet: View {
                     text: $cfClearance)
                     .textFieldStyle(.roundedBorder)
             }
+
+            HStack {
+                Button("Save") { saveCredentials() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(
+                        // Require a new key on first setup; otherwise blank keeps the current values.
+                        !hasExistingKey &&
+                        sessionKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    )
+                if let note = credentialsNote {
+                    Text(note).font(.caption).foregroundStyle(Color.hex("4ade80"))
+                }
+                Spacer()
+            }
             Spacer()
         }
-        .padding(.top, 12)
+        .onChange(of: sessionKey) { _, _ in credentialsNote = nil }
     }
 
     // MARK: - Themes tab
@@ -194,7 +184,6 @@ struct SettingsSheet: View {
             .frame(minHeight: 80, maxHeight: 140)
             .onAppear { installedThemes = UserThemes.listFiles() }
         }
-        .padding(.top, 12)
         .onChange(of: themePaste) { _, _ in autofillFilename() }
     }
 
@@ -317,7 +306,6 @@ struct SettingsSheet: View {
             }
             Spacer()
         }
-        .padding(.top, 12)
         .onAppear { fontFamilies = FontSettings.installedFamilies() }
     }
 
@@ -371,21 +359,22 @@ struct SettingsSheet: View {
             }
             Spacer()
         }
-        .padding(.top, 12)
     }
 
     // MARK: - Pacing tab
 
     private func pacingTab(t: Theme.Palette) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Configure the advanced pacing and focus tools. These overlays appear directly on top of the widget UI when activated.")
+            Text("The pacing calculators (cool down and surplus) show on a card under the pointer. Pin them to keep them on every card; Tools, Pacing Calculators in any Sanduhr menu does the same. Deep Work and Cooldown Snake open from Tools too.")
                 .font(.caption)
                 .foregroundStyle(t.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Toggle("Enable Pacing Calculators", isOn: $pacingToolsEnabled)
+            Toggle("Pin the pacing calculators on every card", isOn: $vm.pacingPinned)
+            Text("Until Sanduhr quits.")
+                .font(.caption)
+                .foregroundStyle(t.textDim)
             Spacer()
         }
-        .padding(.top, 12)
     }
 }

@@ -72,13 +72,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         viewModel.bootstrap()
         renderStatusItem()
 
-        // Desk: the desktop layer and the notch, when switched on (Desk Settings).
+        // Desk: the desktop layer and the notch, when switched on (Settings, General, Surfaces).
         DeskMigration.run()
         DeskController.shared.apply()
     }
 
     /// estedesk:// and sanduhr:// links (Option+J joins the next meeting, …/settings opens
-    /// Desk settings).
+    /// Sanduhr Settings).
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls where ["estedesk", "sanduhr"].contains(url.scheme ?? "") {
             DeskController.shared.handle(url)
@@ -179,24 +179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showStatusMenu(from button: NSStatusBarButton) {
         let menu = NSMenu()
-
-        addToolItems(to: menu)
-        menu.addItem(.separator())
-        menu.addItem(item("Refresh Now", action: #selector(refreshNow), key: "r"))
-        menu.addItem(.separator())
-        menu.addItem(item("Credentials…", action: #selector(openCredentials)))
-        menu.addItem(item("Desk Settings…", action: #selector(DeskController.showSettings),
-                          target: DeskController.shared))
-        menu.addItem(.separator())
-        let updatesItem = NSMenuItem(
-            title: "Check for Updates…",
-            action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
-            keyEquivalent: "")
-        updatesItem.target = updaterController
-        menu.addItem(updatesItem)
-        menu.addItem(.separator())
-        menu.addItem(item("Quit Sanduhr", action: #selector(NSApplication.terminate(_:)),
-                          key: "q", target: NSApp))
+        addMenuItems(to: menu)
 
         // Briefly attach, pop, detach — so default L-click behavior stays
         // as "toggle panel" rather than "always show menu".
@@ -205,25 +188,64 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.menu = nil
     }
 
-    /// The Tools section, shared by the menu bar item's menu and Desk's clock menu. The widget's
-    /// own two-finger menu (RootView) lists the same items. Each one works with the widget
-    /// hidden: it shows the widget first.
-    func addToolItems(to menu: NSMenu) {
-        menu.addItem(.sectionHeader(title: "Tools"))
-        let showTitle = (panel?.isVisible ?? false) ? "Hide Sanduhr" : "Show Sanduhr"
-        menu.addItem(item(showTitle, action: #selector(showOrHidePanel)))
-        menu.addItem(item("Deep Work", action: #selector(openDeepWork)))
-        let pacing = item("Pacing Calculators", action: #selector(togglePacingCalculators))
-        pacing.state = viewModel.pacingPinned ? .on : .off
-        menu.addItem(pacing)
-        menu.addItem(item("Cooldown Snake", action: #selector(openSnake)))
+    /// The shared menu (SanduhrMenu) as AppKit items, for the menu bar item's menu and Desk's
+    /// clock menu. The widget's own two-finger menu (RootView) renders the same groups.
+    func addMenuItems(to menu: NSMenu) {
+        for (i, group) in currentMenu(widgetVisible: panel?.isVisible ?? false).enumerated() {
+            if i > 0 { menu.addItem(.separator()) }
+            if let header = group.header { menu.addItem(.sectionHeader(title: header)) }
+            for entry in group.entries {
+                let m = NSMenuItem(title: entry.title, action: #selector(menuItemChosen(_:)),
+                                   keyEquivalent: entry.key)
+                m.target = self
+                m.tag = entry.command.rawValue
+                m.state = entry.checked ? .on : .off
+                menu.addItem(m)
+            }
+        }
     }
 
-    private func item(_ title: String, action: Selector, key: String = "",
-                      target: AnyObject? = nil) -> NSMenuItem {
-        let m = NSMenuItem(title: title, action: action, keyEquivalent: key)
-        m.target = target ?? self
-        return m
+    /// The shared menu with the tools' current checkmarks.
+    func currentMenu(widgetVisible: Bool) -> [MenuGroup] {
+        SanduhrMenu.groups(widgetVisible: widgetVisible,
+                           deepWork: viewModel.activeTool == .deepWork,
+                           pacing: viewModel.pacingPinned,
+                           snake: viewModel.activeTool == .snake)
+    }
+
+    @objc private func menuItemChosen(_ sender: NSMenuItem) {
+        if let command = MenuCommand(rawValue: sender.tag) { perform(command) }
+    }
+
+    /// What every menu's items do. Each tool works with the widget hidden: it shows the widget
+    /// first. Chosen again while it shows on a visible widget, a tool turns off.
+    func perform(_ command: MenuCommand) {
+        let visible = panel?.isVisible ?? false
+        switch command {
+        case .showHide: showOrHidePanel()
+        case .deepWork: toggleTool(.deepWork, visible: visible)
+        case .snake: toggleTool(.snake, visible: visible)
+        case .pacing:
+            if viewModel.pacingPinned && visible {
+                viewModel.pacingPinned = false
+            } else {
+                viewModel.pacingPinned = true
+                showPanel()
+            }
+        case .refresh: refreshNow()
+        case .settings: SettingsWindowController.shared.show()
+        case .checkForUpdates: updaterController.checkForUpdates(nil)
+        case .quit: NSApp.terminate(nil)
+        }
+    }
+
+    private func toggleTool(_ tool: UsageViewModel.WidgetTool, visible: Bool) {
+        if viewModel.activeTool == tool && visible {
+            viewModel.activeTool = nil
+        } else {
+            showPanel()
+            viewModel.activeTool = tool
+        }
     }
 
     @objc func togglePanel() {
@@ -273,30 +295,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         showPanel()
     }
 
-    /// The Tools item: "Hide Sanduhr" when the widget shows, "Show Sanduhr" when it doesn't.
+    /// The menus' first item: "Hide Sanduhr" when the widget shows, "Show Sanduhr" when it doesn't.
     @objc func showOrHidePanel() {
         if panel?.isVisible ?? false { hidePanel() } else { showPanel() }
-    }
-
-    @objc func openDeepWork() {
-        showPanel()
-        viewModel.requestTool = .deepWork
-    }
-
-    @objc func openSnake() {
-        showPanel()
-        viewModel.requestTool = .snake
-    }
-
-    /// Shows the widget with the pacing calculators on every card. Chosen again while they
-    /// show, it puts them back under the pointer.
-    @objc func togglePacingCalculators() {
-        if viewModel.pacingPinned && (panel?.isVisible ?? false) {
-            viewModel.pacingPinned = false
-            return
-        }
-        viewModel.pacingPinned = true
-        showPanel()
     }
 
     static let panelHiddenKey = "panelHidden"
@@ -310,11 +311,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func refreshNow() {
         Task { await viewModel.refresh() }
-    }
-
-    @objc func openCredentials() {
-        panel?.makeKeyAndOrderFront(nil)
-        viewModel.requestSettingsSheet = true
     }
 
     // MARK: Panel placement

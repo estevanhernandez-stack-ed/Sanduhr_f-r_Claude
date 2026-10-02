@@ -6,11 +6,8 @@ import AppKit
 struct RootView: View {
     @Bindable var vm: UsageViewModel
 
-    @State private var showSettings = false
     @State private var showOnboarding = false
-    @State private var isFocusMode = false
-    @State private var isSnakeGameActive = false
-    
+
     var body: some View {
         let t = vm.theme.palette
         VStack(spacing: 0) {
@@ -37,14 +34,14 @@ struct RootView: View {
 
             // Main content
             ZStack(alignment: .topLeading) {
-                if isFocusMode {
+                if vm.activeTool == .deepWork {
                     FocusView(vm: vm) {
-                        withAnimation(.easeInOut(duration: 0.3)) { isFocusMode = false }
+                        withAnimation(.easeInOut(duration: 0.3)) { vm.activeTool = nil }
                     }
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                } else if isSnakeGameActive {
+                } else if vm.activeTool == .snake {
                     SnakeGameOverlay(vm: vm) {
-                        withAnimation(.easeInOut(duration: 0.3)) { isSnakeGameActive = false }
+                        withAnimation(.easeInOut(duration: 0.3)) { vm.activeTool = nil }
                     }
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 } else {
@@ -74,8 +71,7 @@ struct RootView: View {
                     .transition(.opacity.combined(with: .scale(scale: 1.05)))
                 }
             }
-            .animation(.easeInOut(duration: 0.3), value: isFocusMode)
-            .animation(.easeInOut(duration: 0.3), value: isSnakeGameActive)
+            .animation(.easeInOut(duration: 0.3), value: vm.activeTool)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -92,9 +88,9 @@ struct RootView: View {
             }
             ActionIconRow(
                 vm: vm,
-                onShowSettings: { showSettings = true },
-                onToggleFocus:  { isFocusMode.toggle() },
-                onToggleSnake:  { isSnakeGameActive.toggle() },
+                onShowSettings: { SettingsWindowController.shared.show() },
+                onToggleFocus:  { toggle(.deepWork) },
+                onToggleSnake:  { toggle(.snake) },
                 onRefresh:      { Task { await vm.refresh() } }
             )
             FooterView(vm: vm)
@@ -151,37 +147,24 @@ struct RootView: View {
                 radius: DisplaySettings.shared.subtle ? 3 : 24,
                 x: 0, y: DisplaySettings.shared.subtle ? 1 : 10)
         .contextMenu {
-            // The same Tools items as the menu bar item's menu (AppDelegate.addToolItems).
-            Section("Tools") {
-                Button("Hide Sanduhr") { (NSApp.delegate as? AppDelegate)?.hidePanel() }
-                Toggle("Deep Work", isOn: Binding(
-                    get: { isFocusMode },
-                    set: { on in withAnimation { open(on ? .deepWork : nil) } }))
-                .keyboardShortcut("p", modifiers: .command)
-                Toggle("Pacing Calculators", isOn: $vm.pacingPinned)
-                Toggle("Cooldown Snake", isOn: Binding(
-                    get: { isSnakeGameActive },
-                    set: { on in withAnimation { open(on ? .snake : nil) } }))
+            // The same items, in the same order, as the menu bar item's menu and Desk's clock
+            // menu (SanduhrMenu). The widget shows while its menu is open.
+            if let app = NSApp.delegate as? AppDelegate {
+                let groups = app.currentMenu(widgetVisible: true)
+                ForEach(groups.indices, id: \.self) { i in
+                    if i > 0 { Divider() }
+                    if let header = groups[i].header {
+                        Section(header) { menuRows(groups[i].entries, app) }
+                    } else {
+                        menuRows(groups[i].entries, app)
+                    }
+                }
             }
-            Divider()
-            Button("Refresh") { Task { await vm.refresh() } }
-            Button(vm.compact ? "Expand" : "Compact Mode") { vm.compact.toggle() }
-            Button(DisplaySettings.shared.subtle ? "Show Background" : "Subtle Mode") {
-                DisplaySettings.shared.subtle.toggle()
-            }
-            Button("Credentials…") { showSettings = true }
-            // Also in the menu bar item's menu, which a notch or a menu bar manager can hide.
-            Button("Desk Settings…") { DeskController.shared.showSettings() }
-            Divider()
-            Button("Quit Sanduhr") { NSApp.terminate(nil) }
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsSheet(vm: vm, onDismiss: { showSettings = false })
         }
         .sheet(isPresented: $showOnboarding) {
             OnboardingSheet(vm: vm, onContinue: {
                 showOnboarding = false
-                showSettings = true
+                SettingsWindowController.shared.show(.credentials)
             })
         }
         .onAppear {
@@ -191,25 +174,32 @@ struct RootView: View {
                 showOnboarding = true
             }
         }
-        // Menu bar can ask the widget to open its credentials sheet.
-        .onChange(of: vm.requestSettingsSheet) { _, newValue in
-            if newValue {
-                showSettings = true
-                vm.requestSettingsSheet = false
+    }
+
+    /// One menu row: a checkmark toggle for a tool, a plain button otherwise.
+    @ViewBuilder
+    private func menuRows(_ entries: [MenuEntry], _ app: AppDelegate) -> some View {
+        ForEach(entries, id: \.command) { entry in
+            let row = Group {
+                if [.deepWork, .pacing, .snake].contains(entry.command) {
+                    Toggle(entry.title, isOn: Binding(
+                        get: { entry.checked },
+                        set: { _ in withAnimation { app.perform(entry.command) } }))
+                } else {
+                    Button(entry.title) { app.perform(entry.command) }
+                }
             }
-        }
-        // The Tools items in the menu bar and Desk menus open an overlay the same way.
-        .onChange(of: vm.requestTool) { _, tool in
-            guard let tool else { return }
-            withAnimation { open(tool) }
-            vm.requestTool = nil
+            if let key = entry.key.first {
+                row.keyboardShortcut(KeyEquivalent(key), modifiers: .command)
+            } else {
+                row
+            }
         }
     }
 
-    /// Opens one overlay (closing the other), or closes both with nil.
-    private func open(_ tool: UsageViewModel.WidgetTool?) {
-        isFocusMode = tool == .deepWork
-        isSnakeGameActive = tool == .snake
+    /// The action row's Deep Work and Snake buttons: open the tool, or close it if it is open.
+    private func toggle(_ tool: UsageViewModel.WidgetTool) {
+        vm.activeTool = vm.activeTool == tool ? nil : tool
     }
 
     // MARK: Status line
