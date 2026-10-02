@@ -46,6 +46,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         viewModel.onUsageUpdate = { [weak self] in
             self?.renderStatusItem()
             self?.fitPanelToContent()
+            // The desk reads snapshot.json, which refresh() has just rewritten.
+            if DeskController.shared.running { DeskController.shared.model.refreshClaude() }
         }
 
         // When the user toggles compact mode, resize the panel to fit the
@@ -56,6 +58,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         viewModel.bootstrap()
         renderStatusItem()
+
+        // Desk: the desktop layer and the notch, when switched on (Desk Settings).
+        DeskMigration.run()
+        DeskController.shared.apply()
+    }
+
+    /// estedesk:// and sanduhr:// links (Option+J joins the next meeting, …/settings opens
+    /// Desk settings).
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls where ["estedesk", "sanduhr"].contains(url.scheme ?? "") {
+            DeskController.shared.handle(url)
+        }
     }
 
     /// Shrink or grow the panel so its height equals the SwiftUI
@@ -158,6 +172,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(item("Refresh Now", action: #selector(refreshNow), key: "r"))
         menu.addItem(.separator())
         menu.addItem(item("Credentials…", action: #selector(openCredentials)))
+        menu.addItem(item("Desk Settings…", action: #selector(DeskController.showSettings),
+                          target: DeskController.shared))
         menu.addItem(.separator())
         let updatesItem = NSMenuItem(
             title: "Check for Updates…",

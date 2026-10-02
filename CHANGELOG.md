@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased (mac)
+- **Desk** (off by default): Sanduhr can also draw on the desktop under your windows (clock and date, Claude meters, today's meetings with click-to-join in Teams or Zoom, a handwritten line from a messages file, four corner slots) and around the camera notch (black wings beside the camera with the time or next meeting and the Claude meters, an optional strip below). Turn it on in the status item menu, Desk Settings. Calendar access is asked only when meetings are on. Merged from Sanduhr Desk; its settings and those of the older Desk app are imported once.
+- Release builds are universal (Apple silicon and Intel) even without full Xcode: each slice builds on its own and `lipo` joins them, and the build fails if either is missing. v2.0.4 shipped Intel-only and ran under Rosetta on Apple silicon.
+- Copy, paste and undo work in every Sanduhr text field (an Edit menu now exists, unseen).
 - Hiding the widget sticks across launches; Sanduhr keeps fetching, alerting and writing `snapshot.json` while hidden. Opening the app again while it runs toggles the widget.
 - Claude Code integrations (`mac/integrations/`): a statusline segment and the `sanduhr` MCP server (`get_usage`, `ping`), Mac ports of the Windows ones with the same output and tool shapes. Both read only `snapshot.json`. Install with `bash mac/integrations/install.sh`.
 - `snapshot.json` error kinds now use the shared closed set (`session_expired`, `cloudflare`, `network`).
