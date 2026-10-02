@@ -41,6 +41,7 @@ final class DeskModel {
     @ObservationIgnored private let store = EKEventStore()
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var claudeTimer: Timer?
+    @ObservationIgnored private var storeObserver: NSObjectProtocol?
 
     func start() {
         // Calendar access is asked only when meetings are on (Desk settings, General).
@@ -56,7 +57,7 @@ final class DeskModel {
             }
         }
         }
-        NotificationCenter.default.addObserver(
+        storeObserver = NotificationCenter.default.addObserver(
             forName: .EKEventStoreChanged, object: store, queue: .main
         ) { [weak self] _ in self?.refreshEvents() }
         timer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
@@ -74,7 +75,10 @@ final class DeskModel {
     func stop() {
         timer?.invalidate(); timer = nil
         claudeTimer?.invalidate(); claudeTimer = nil
-        NotificationCenter.default.removeObserver(self)
+        // A block observer is removed by its token; removeObserver(self) would leave it behind
+        // and every Desk off and on would add another.
+        if let storeObserver { NotificationCenter.default.removeObserver(storeObserver) }
+        storeObserver = nil
     }
 
     func refreshEvents() {

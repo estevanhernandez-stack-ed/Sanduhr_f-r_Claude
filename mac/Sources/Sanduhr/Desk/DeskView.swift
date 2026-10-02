@@ -154,16 +154,14 @@ struct DeskView: View {
     @ViewBuilder
     private func message(alignment: HorizontalAlignment) -> some View {
         if let text = model.message {
-            let inks = messageColor.split(separator: ",").map { Color.hex(String($0)) }
-            let colors = inks.isEmpty ? [Color.hex("9ad7ff")] : inks
-            let glow = colors.count > 1 ? colors[colors.count / 2] : colors[0]
+            let colors = Color.inkStops(messageColor, fallback: "9ad7ff")
+            let glow = colors[colors.count / 2]
             Text(text)
                 .font(.custom(messageFont.isEmpty ? font : messageFont, size: messageSize))
                 .multilineTextAlignment(alignment == .trailing ? .trailing : .leading)
                 .lineLimit(2)
                 .minimumScaleFactor(0.4)
-                .foregroundStyle(LinearGradient(colors: colors.count > 1 ? colors : [colors[0], colors[0]],
-                                                startPoint: .leading, endPoint: .trailing))
+                .foregroundStyle(LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing))
                 .opacity(0.94)
                 .shadow(color: glow.opacity(0.55), radius: messageSize * 0.18)
                 .shadow(color: glow.opacity(0.35), radius: messageSize * 0.18)
@@ -197,10 +195,21 @@ private struct DeskInk: ViewModifier {
 extension LinearGradient {
     /// "ffffff" is one color; "531b93,012089,00fdff" runs left to right.
     static func ink(_ spec: String, fallback: String = "ffffff") -> LinearGradient {
-        var colors = spec.split(separator: ",").map { Color.hex($0.trimmingCharacters(in: .whitespaces)) }
+        LinearGradient(colors: Color.inkStops(spec, fallback: fallback), startPoint: .leading, endPoint: .trailing)
+    }
+}
+
+extension Color {
+    /// The gradient stops for an ink spec, always two or more: one color is doubled, an empty
+    /// spec falls back. Spaces around the commas are fine ("531b93, 012089").
+    static func inkStops(_ spec: String, fallback: String) -> [Color] {
+        var colors = spec.split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .map { Color.hex($0) }
         if colors.isEmpty { colors = [Color.hex(fallback)] }
         if colors.count == 1 { colors.append(colors[0]) }
-        return LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing)
+        return colors
     }
 }
 

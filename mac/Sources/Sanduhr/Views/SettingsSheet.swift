@@ -389,14 +389,3 @@ struct SettingsSheet: View {
         .padding(.top, 12)
     }
 }
-
-private struct NumericOnly: ViewModifier {
-    func body(content: Content) -> some View {
-        #if os(macOS)
-        content.onChange(of: "") { _, _ in } // placeholder to silence Swift 5.9 warning if needed
-        #else
-        content.keyboardType(.numberPad)
-        #endif
-        return content
-    }
-}
