@@ -47,6 +47,13 @@ the caller can wait for it.
       children: [...]
 ```
 
+**As built:** the in-process accessibility walk returns only each window's `AXHostingView`,
+because SwiftUI builds its element tree only for a real assistive client (setting
+`AXEnhancedUserInterface` on the app from inside does not count). So the tree also carries an
+`OCRText` node for every line of text drawn in the window, recognized with Vision from the
+in-process render. Scenarios match on those, and on `state.yaml` for switch values. Live run on
+2026-10-02: 10 of 10 scenarios pass.
+
 `state.yaml`: Desk enabled and running, layout, notch, widget visible, Settings open and its
 section, meter rows (label, percent, fill, pace, reset), meetings count, alert settings, last
 fetch time, app version and build.

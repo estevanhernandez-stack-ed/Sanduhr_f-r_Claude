@@ -42,10 +42,19 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
 - **Screen captures** (`screen-<window>.png`) come from `screencapture -l <window id>`, one per
   Sanduhr window, using the ids in `tree.yaml`. They need Screen Recording permission for the
   terminal; without it the CLI warns and the renders still work.
-- **tree.yaml** is the accessibility tree, read by the app itself (no Accessibility permission
-  needed). Each node: `role`, `subrole`, `label` (label or title), `value` (switches read 1 or 0),
-  `enabled`, `frame` (screen points, top-left origin), `children`. SwiftUI puts a text's string in
-  the label or the value, so scenarios match text with the `text` field, which checks both.
+- **tree.yaml** holds, per window, two kinds of nodes:
+  - **`OCRText`**: every line of text actually drawn in the window, read from its render with
+    Vision (in process, no permission). `label` is the text, `frame` its place on screen. This is
+    what scenarios match on. It also catches text that is clipped or drawn outside its window.
+    Settings, in the system font, reads cleanly; the widget and Desk draw in the user's font,
+    where recognition is loose ("SessioN (5 hr)"), so match those with case-insensitive
+    patterns (`/(?i)^sess?io/`) or check `state.yaml` instead.
+  - **Accessibility nodes** (`role`, `subrole`, `label`, `value`, `enabled`, `frame`,
+    `children`). SwiftUI builds this tree only for a real assistive client (VoiceOver, or a
+    process with Accessibility permission), so in a plain smoke run each window shows just its
+    `AXHostingView`. With VoiceOver on, the full tree appears, switch values included.
+  Switch on/off values are therefore not in the text nodes: check them in `state.yaml`. The
+  `text` match field checks a node's label and value.
 - **state.yaml**: `desk_enabled`, `desk_running`, `layout`, `notch`, `has_notch`,
   `widget_visible`, `settings_open`, `settings_section`, `meters` (tier, label, percent, fill,
   pace, reset), `meetings_count`, `alerts`, `last_fetch`, `active_tool`, `pacing_pinned`,

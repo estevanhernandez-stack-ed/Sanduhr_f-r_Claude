@@ -23,7 +23,10 @@ module Smoke
     SMOKE_TIMEOUT=<seconds> changes how long to wait for the app (default 10).
   TEXT
 
-  # The running app, through `open -g sanduhr://debug/...` and files written into a folder.
+  # The running app, through `open -g -a <its bundle> sanduhr://debug/...` and files written into a
+  # folder. Links go to the running copy by path: Launch Services may know several Sanduhr.app
+  # copies that claim sanduhr:// (the installed one, DMG stages), and a bare `open` can launch the
+  # wrong one.
   class LiveApp
     def initialize(timeout: (ENV['SMOKE_TIMEOUT'] || 10).to_f)
       @timeout = timeout
@@ -34,10 +37,26 @@ module Smoke
       s.to_s.bytes.map { |b| b.chr =~ %r{[A-Za-z0-9\-._~/]} ? b.chr : format('%%%02X', b) }.join
     end
 
+    # The bundle of the running Sanduhr. SANDUHR_APP picks one when several copies run; otherwise a
+    # build from this repo wins over an installed one.
+    def running_bundle
+      out, = Open3.capture2e('pgrep', '-fl', 'Sanduhr.app/Contents/MacOS/Sanduhr')
+      bundles = out.lines.map { |l| l[%r{(/\S.*?\.app)/Contents/MacOS/Sanduhr}, 1] }.compact.uniq
+      raise Failure, "Sanduhr isn't running" if bundles.empty?
+      if (want = ENV['SANDUHR_APP'])
+        want = File.expand_path(want)
+        return want if bundles.include?(want)
+        raise Failure, "SANDUHR_APP=#{want} isn't running (running: #{bundles.join(', ')})"
+      end
+      return bundles.first if bundles.size == 1
+      repo = bundles.find { |b| b.start_with?(File.expand_path('..', __dir__)) }
+      return repo if repo
+      raise Failure, "several Sanduhr copies are running (#{bundles.join(', ')}); set SANDUHR_APP"
+    end
+
     def preflight!
       return if @checked
-      _, status = Open3.capture2e('pgrep', '-x', 'Sanduhr')
-      raise Failure, "Sanduhr isn't running" unless status.success?
+      @bundle = running_bundle
       flag, = Open3.capture2e('defaults', 'read', DOMAIN, 'debugHooks')
       unless flag.strip == '1' || ENV['SANDUHR_DEBUG_HOOKS'] == '1'
         raise Failure, 'hooks are off: run smoke enable'
@@ -50,7 +69,7 @@ module Smoke
       preflight!
       FileUtils.mkdir_p(dir)
       %w[done error].each { |f| FileUtils.rm_f(File.join(dir, f)) }
-      out, status = Open3.capture2e('open', '-g', link)
+      out, status = Open3.capture2e('open', '-g', '-a', @bundle, link)
       raise Failure, "open failed: #{out.strip}" unless status.success?
       deadline = Time.now + @timeout
       loop do
@@ -58,8 +77,8 @@ module Smoke
         raise Failure, "Sanduhr: #{File.read(err)}" if File.exist?(err)
         return dir if File.exist?(File.join(dir, 'done'))
         if Time.now >= deadline
-          raise Failure, "no answer from Sanduhr in #{@timeout.to_i}s (hooks on? is this build the one " \
-                         'registered for sanduhr://? see README)'
+          raise Failure, "no answer from Sanduhr in #{@timeout.to_i}s (hooks on? is #{@bundle} a build " \
+                         'with the debug hooks?)'
         end
         sleep 0.1
       end

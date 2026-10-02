@@ -270,6 +270,16 @@ struct DebugStateTests {
         #expect(yaml.contains("  delivery: banner\n  quiet_enabled: false\n  quiet_start: 1320\n  quiet_end: 420\n  sound: default\n"))
     }
 
+    @Test func recognizedTextLandsOnScreen() {
+        // A box in the top-left quarter of a 400 x 200 window at (100, 50): Vision measures from
+        // the bottom-left, the tree from the top-left.
+        let area = CGRect(x: 100, y: 50, width: 400, height: 200)
+        #expect(DebugTree.screenRect(normalized: CGRect(x: 0, y: 0.5, width: 0.5, height: 0.5), in: area)
+                == CGRect(x: 100, y: 50, width: 200, height: 100))
+        #expect(DebugTree.screenRect(normalized: CGRect(x: 0.25, y: 0, width: 0.5, height: 0.1), in: area)
+                == CGRect(x: 200, y: 230, width: 200, height: 20))
+    }
+
     @Test func topLeftFrames() {
         // A 1000-point-tall primary screen: a window 100 tall at y 50 (bottom-left) sits 850 down.
         #expect(DebugTree.topLeft(CGRect(x: 10, y: 50, width: 200, height: 100), primaryHeight: 1000)

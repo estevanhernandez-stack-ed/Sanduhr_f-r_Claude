@@ -139,6 +139,15 @@ enum DebugTree {
     static let maxNodes = 4000
 
     /// AppKit screen coordinates (bottom-left origin on the primary screen) to top-left ones.
+    /// A Vision bounding box (normalized, bottom-left origin) inside a content area given in
+    /// screen points with a top-left origin, as a screen rect with a top-left origin.
+    static func screenRect(normalized box: CGRect, in area: CGRect) -> CGRect {
+        CGRect(x: area.minX + box.minX * area.width,
+               y: area.minY + (1 - box.maxY) * area.height,
+               width: box.width * area.width,
+               height: box.height * area.height)
+    }
+
     static func topLeft(_ r: CGRect, primaryHeight: CGFloat) -> CGRect {
         CGRect(x: r.minX, y: primaryHeight - r.maxY, width: r.width, height: r.height)
     }

@@ -6,7 +6,7 @@ steps:
   - expect_state: { meters.0.tier: five_hour, meters.0.label: Session (5hr), meters.0.percent: "/^\\d+$/" }
   - expect:
       window: widget
-      contains: { text: "/^Session \\(5hr\\)/" }
+      contains: { text: "/(?i)^sess?io/" }   # the widget draws in the user's font; recognition is loose
   - do: refresh
   - expect_state: { last_fetch: "/^\\d{4}-/" }
   - snap: widget-and-desk

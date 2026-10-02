@@ -1,5 +1,6 @@
 import AppKit
 import os
+import Vision
 
 /// sanduhr://debug/... for the smoke tools in mac/smoke/: window renders, the accessibility tree
 /// and the app's state as YAML, and a few actions that drive the app. Off unless DebugGate says
@@ -39,15 +40,40 @@ enum DebugHooks {
         switch command {
         case .snapshot:
             guard let dir else { return }
-            do {
-                try snapshot(into: dir, app: app)
-                finish(dir)
-            } catch {
-                finish(dir, error: error.localizedDescription)
+            let run = {
+                do {
+                    try snapshot(into: dir, app: app)
+                    finish(dir)
+                } catch {
+                    finish(dir, error: error.localizedDescription)
+                }
+            }
+            if primeAccessibility() {
+                // SwiftUI builds its element tree a moment after it hears a client is listening.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { run() }
+            } else {
+                run()
             }
         case .action(let action, _):
             perform(action, app: app) { finish(dir) }
         }
+    }
+
+    private static var accessibilityPrimed = false
+
+    /// SwiftUI hosting views expose no children until an assistive client says it is listening,
+    /// which VoiceOver does by setting AXEnhancedUserInterface (and Electron-style clients
+    /// AXManualAccessibility) on the app. The app sets them on itself once, the first time the
+    /// hooks need the tree. Returns true on that first call, so the caller can let SwiftUI
+    /// build the tree before walking it.
+    private static func primeAccessibility() -> Bool {
+        guard !accessibilityPrimed else { return false }
+        accessibilityPrimed = true
+        let set = NSSelectorFromString("accessibilitySetValue:forAttribute:")
+        for attribute in ["AXEnhancedUserInterface", "AXManualAccessibility"] where NSApp.responds(to: set) {
+            _ = NSApp.perform(set, with: NSNumber(value: true), with: attribute)
+        }
+        return true
     }
 
     /// `done` (empty) or `error` (the message), written last so the caller can wait on it.
@@ -99,12 +125,18 @@ enum DebugHooks {
         let primaryHeight = NSScreen.screens.first?.frame.maxY ?? 0
         var entries: [DebugWindowEntry] = []
         for (window, name) in zip(windows.map(\.window), names) {
-            if let png = render(window) {
+            let rendered = render(window)
+            if let png = rendered?.png {
                 try png.write(to: dir.appendingPathComponent("\(name).png"), options: .atomic)
             }
             var budget = DebugTree.maxNodes
-            let tree = (window.accessibilityChildren() ?? []).flatMap {
+            var tree = (window.accessibilityChildren() ?? []).flatMap {
                 walk($0, depth: 0, budget: &budget, primaryHeight: primaryHeight)
+            }
+            if let rendered, let view = window.contentView {
+                let area = DebugTree.topLeft(window.convertToScreen(view.convert(view.bounds, to: nil)),
+                                             primaryHeight: primaryHeight)
+                tree += recognizeText(rendered.image, in: area)
             }
             entries.append(DebugWindowEntry(
                 name: name, windowID: window.windowNumber, title: window.title,
@@ -143,11 +175,33 @@ enum DebugHooks {
 
     /// The window's content drawn in process at backing scale, as PNG. Needs no Screen
     /// Recording permission; vibrancy and other compositor effects may draw flat.
-    private static func render(_ window: NSWindow) -> Data? {
+    private static func render(_ window: NSWindow) -> (png: Data, image: CGImage)? {
         guard let view = window.contentView, view.bounds.width > 0, view.bounds.height > 0,
               let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return nil }
         view.cacheDisplay(in: view.bounds, to: rep)
-        return rep.representation(using: .png, properties: [:])
+        guard let png = rep.representation(using: .png, properties: [:]), let image = rep.cgImage else { return nil }
+        return (png, image)
+    }
+
+    /// The text actually drawn in a window, read from its render with Vision: one `OCRText` node
+    /// per line, label = the text, frame on screen. SwiftUI only exposes its accessibility tree to
+    /// a real assistive client, which the smoke tools are not, so this is what they match on.
+    /// It also catches text that is clipped or drawn outside the window, which a tree would not.
+    private static func recognizeText(_ image: CGImage, in area: CGRect) -> [DebugTreeNode] {
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = false
+        do {
+            try VNImageRequestHandler(cgImage: image).perform([request])
+        } catch {
+            log.error("debug: text recognition failed: \(error.localizedDescription, privacy: .public)")
+            return []
+        }
+        return (request.results ?? []).compactMap { observation in
+            guard let text = observation.topCandidates(1).first?.string, !text.isEmpty else { return nil }
+            return DebugTreeNode(role: "OCRText", label: text,
+                                 frame: DebugTree.screenRect(normalized: observation.boundingBox, in: area))
+        }
     }
 
     /// One element and what is under it. Elements that are not accessibility elements of their

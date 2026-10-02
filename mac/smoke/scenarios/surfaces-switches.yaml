@@ -12,12 +12,10 @@ steps:
   - expect:
       window: settings
       contains: { label: "/^Widget: the floating window/" }
+  # Switch values are not visible to text recognition (smoke reads drawn text, see README);
+  # state.yaml holds what the switches show.
   - do: hide-widget
-  - expect:
-      window: settings
-      contains: { label: "/^Widget: the floating window/", value: 0 }
+  - expect_state: { widget_visible: false }
   - do: show-widget
-  - expect:
-      window: settings
-      contains: { label: "/^Widget: the floating window/", value: 1 }
+  - expect_state: { widget_visible: true }
   - snap: general
