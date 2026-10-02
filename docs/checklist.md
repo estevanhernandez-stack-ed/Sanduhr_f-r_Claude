@@ -107,7 +107,7 @@ Cooldown Snake, themes, history once M7 lands). Mac sources only; build and test
 `cd mac && ./build.sh --debug && ./test.sh`; every user-visible change gets a line under
 `## Unreleased (mac)` in `CHANGELOG.md`.
 
-- [ ] **13. Meters on Desk**
+- [x] **13. Meters on Desk**
   Spec ref: New — not in original spec (`docs/mac-merge-plan.md` > Phase 1, item 2: the desk reads `UsageViewModel` directly)
   What to build: a `meters` Desk piece, placeable in any corner like the others (`DeskLayout.widgets`, `DeskView`). One row per limit the widget shows (session, weekly, and any other weekly tiers): label, a bar drawn in the Desk ink (single color or gradient) and font with the drop shadow, the pace marker, the percent and the reset time. Desk gets its numbers from the in-process `UsageViewModel` instead of polling `snapshot.json` (the widget keeps writing the snapshot for the statusline and MCP). The notch wings are unchanged.
   Acceptance: `meters:br` in the layout shows a bar per limit that updates within one refresh of the widget, with the pace marker where the widget puts it; hiding the widget does not stop updates; the existing `claude` line still works for anyone who keeps it.
