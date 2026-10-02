@@ -64,9 +64,13 @@ module Smoke
       @checked = true
     end
 
-    # Opens the link and waits for `done` or `error` in dir.
+    # Opens the link and waits for `done` or `error` in dir. Checks the app is still running
+    # first, every time: `open -a` launches an app that isn't, so a watch left running would
+    # otherwise start Sanduhr again each time someone quits it.
     def call(link, dir)
       preflight!
+      _, running = Open3.capture2e('pgrep', '-f', "#{@bundle}/Contents/MacOS/Sanduhr")
+      raise Failure, "Sanduhr (#{@bundle}) isn't running; not starting it" unless running.success?
       FileUtils.mkdir_p(dir)
       %w[done error].each { |f| FileUtils.rm_f(File.join(dir, f)) }
       out, status = Open3.capture2e('open', '-g', '-a', @bundle, link)
@@ -189,6 +193,9 @@ module Smoke
       app.preflight!
       Html.write(dir, refresh: every, title: 'Sanduhr, live')
       warn "watching: open #{File.join(dir, 'index.html')} (Ctrl-C stops)"
+      # Explicit traps: a watch started in the background inherits SIGINT as ignored, and one that
+      # can't be stopped keeps poking the app forever.
+      %w[INT TERM HUP].each { |sig| Signal.trap(sig) { raise Interrupt } }
       log = Process.spawn('log', 'stream', '--style', 'compact', '--predicate', 'process == "Sanduhr"',
                           out: $stdout, err: $stderr)
       begin
