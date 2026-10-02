@@ -10,12 +10,16 @@ extension UserDefaults {
 /// Sanduhr Desk). Someone who ran either gets Desk switched on with their layout, colors and
 /// fonts as they left them. Their old settings stay where they were.
 enum DeskMigration {
-    static func run() {
-        let d = UserDefaults.desk
+    /// Newest app first: when both domains hold a key, Sanduhr Desk's value wins.
+    static let legacyDomains = ["com.626labs.sanduhrdesk", "com.estevan.desk"]
+
+    /// `into` and `from` default to the real stores; tests pass a scratch suite and domain names.
+    static func run(into d: UserDefaults = .desk, from domains: [String] = legacyDomains,
+                    reading source: UserDefaults = .standard) {
         guard !d.bool(forKey: "migrated") else { return }
         var found = false
-        for domain in ["com.626labs.sanduhrdesk", "com.estevan.desk"] {
-            guard let old = UserDefaults.standard.persistentDomain(forName: domain) else { continue }
+        for domain in domains {
+            guard let old = source.persistentDomain(forName: domain) else { continue }
             found = true
             for (k, v) in old where d.object(forKey: k) == nil
                 && !["loginItemSet", "migratedFromDeskAndSanduhr"].contains(k) {

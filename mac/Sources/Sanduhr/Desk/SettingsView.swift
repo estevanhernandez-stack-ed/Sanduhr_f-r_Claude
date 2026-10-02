@@ -30,9 +30,6 @@ private struct LayoutTab: View {
     @AppStorage("top", store: .desk) private var top = 40.0
     @AppStorage("bottom", store: .desk) private var bottom = 60.0
 
-    static let widgets: [(key: String, name: String)] = [
-        ("message", "Message"), ("clock", "Clock and date"), ("claude", "Claude meters"), ("meetings", "Meetings"),
-    ]
     static let slots: [(key: String, name: String)] = [
         ("tl", "Top left"), ("tr", "Top right"), ("bl", "Bottom left"), ("br", "Bottom right"), ("", "Hidden"),
     ]
@@ -40,7 +37,7 @@ private struct LayoutTab: View {
     var body: some View {
         Form {
             Section("Where each piece sits") {
-                ForEach(Self.widgets, id: \.key) { w in
+                ForEach(DeskLayout.widgets, id: \.key) { w in
                     Picker(w.name, selection: slotBinding(w.key)) {
                         ForEach(Self.slots, id: \.key) { Text($0.name).tag($0.key) }
                     }
@@ -60,14 +57,19 @@ private struct LayoutTab: View {
 
     private func slotBinding(_ widget: String) -> Binding<String> {
         Binding(
-            get: { Self.parse(layout)[widget] ?? "" },
-            set: { slot in
-                var map = Self.parse(layout)
-                map[widget] = slot.isEmpty ? nil : slot
-                layout = Self.widgets.compactMap { w in map[w.key].map { "\(w.key):\($0)" } }.joined(separator: " ")
-            })
+            get: { DeskLayout.parse(layout)[widget] ?? "" },
+            set: { layout = DeskLayout.placing(widget, in: $0, layout: layout) })
     }
+}
 
+/// The layout string the Layout tab edits ("message:tl clock:bl claude:bl meetings:bl"), kept
+/// apart from the view so it tests without AppKit. DeskView reads the same string.
+enum DeskLayout {
+    static let widgets: [(key: String, name: String)] = [
+        ("message", "Message"), ("clock", "Clock and date"), ("claude", "Claude meters"), ("meetings", "Meetings"),
+    ]
+
+    /// Widget to slot. Words without exactly one colon are skipped; a repeated widget keeps its last slot.
     static func parse(_ s: String) -> [String: String] {
         var out: [String: String] = [:]
         for item in s.split(separator: " ") {
@@ -75,6 +77,14 @@ private struct LayoutTab: View {
             if bits.count == 2 { out[bits[0]] = bits[1] }
         }
         return out
+    }
+
+    /// The layout with `widget` moved to `slot` ("" hides it), rewritten in the canonical widget
+    /// order, which is also the stacking order within a corner.
+    static func placing(_ widget: String, in slot: String, layout: String) -> String {
+        var map = parse(layout)
+        map[widget] = slot.isEmpty ? nil : slot
+        return widgets.compactMap { w in map[w.key].map { "\(w.key):\($0)" } }.joined(separator: " ")
     }
 }
 

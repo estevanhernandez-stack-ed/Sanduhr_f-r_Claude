@@ -11,6 +11,7 @@ Requires macOS 14+ and Xcode 15+ command-line tools (`xcode-select --install`).
 ./build.sh                 # release build → Sanduhr.app (universal if full Xcode present)
 ./build.sh --debug         # native-arch debug build (faster iteration)
 ./build.sh --universal     # force arm64+x86_64 (requires full Xcode)
+./test.sh                  # swift test, with the SDK and plugin paths the command line tools need
 ```
 
 Run the result:
