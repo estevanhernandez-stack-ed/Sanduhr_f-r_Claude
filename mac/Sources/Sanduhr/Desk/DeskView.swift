@@ -136,6 +136,7 @@ struct DeskView: View {
             VStack(alignment: alignment, spacing: size * 0.6) {
                 ForEach(model.meters) { row in
                     MeterRow(row: row, ink: ink, font: font, size: size, width: timeSize * 3.2, alignment: alignment)
+                        .deskPulse(model.pulses[row.tier] ?? 0, ink: ink, size: size)
                 }
                 if model.signInNeeded {
                     Text("sign in again in Sanduhr").opacity(0.75)
@@ -223,6 +224,29 @@ private extension View {
     /// The Desk ink: inkColor (one hex, or several for a gradient) with a dark drop shadow,
     /// readable on any wallpaper.
     func deskInk() -> some View { modifier(DeskInk()) }
+}
+
+extension View {
+    /// A soft glow in the ink behind the view, three times over about three seconds, each time
+    /// `trigger` goes up: an alert delivered to the Desk.
+    func deskPulse(_ trigger: Int, ink: String, size: CGFloat) -> some View {
+        phaseAnimator(DeskPulse.phases, trigger: trigger) { view, phase in
+            view.background(
+                RoundedRectangle(cornerRadius: size * 0.6)
+                    .fill(LinearGradient.ink(ink))
+                    .padding(-size * 0.5)
+                    .blur(radius: size * 0.6)
+                    .opacity(0.35 * DeskPulse.intensity(phase)))
+        } animation: { _ in DeskPulse.animation }
+    }
+}
+
+/// The pulse's timing, shared by the meters and the notch island: seven steps, lit on the odd
+/// ones, so three glows and back to rest.
+enum DeskPulse {
+    static let phases = Array(0..<7)
+    static func intensity(_ phase: Int) -> Double { phase % 2 == 1 ? 1 : 0 }
+    static let animation = Animation.easeInOut(duration: 0.42)
 }
 
 private struct DeskInk: ViewModifier {

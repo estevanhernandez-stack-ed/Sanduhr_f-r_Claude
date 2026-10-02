@@ -46,6 +46,11 @@ final class DeskModel {
     /// Where the meters sit in the window, same coordinates, or .zero when they are not drawn.
     /// The meters take clicks here; a click shows the widget beside them.
     @ObservationIgnored var metersFrame: CGRect = .zero
+    /// Alert pulses so far, per limit (Settings, Alerts, Where alerts show). A meter row pulses
+    /// when its count goes up.
+    var pulses: [Tier: Int] = [:]
+    /// Every pulse so far, whatever the limit; the notch island pulses when it goes up.
+    var pulseCount = 0
     /// The one-time hint under the meters (DeskMeterHint) is still due.
     var meterHintVisible = false
     @ObservationIgnored private let meterHint = DeskMeterHint()
@@ -141,6 +146,12 @@ final class DeskModel {
         claudeLineIsStale = usage.isStale(now: now)
         let hint = meterHint.isVisible(now: now)
         if meterHintVisible != hint { meterHintVisible = hint }
+    }
+
+    /// An alert chose the Desk: pulse these limits' meters and the notch island once.
+    func pulse(_ tiers: Set<Tier>) {
+        for tier in tiers { pulses[tier, default: 0] += 1 }
+        pulseCount += 1
     }
 
     /// The hint was drawn under the meters; its three days start now if they have not already.

@@ -22,6 +22,14 @@ struct WidgetSettings: View {
     @AppStorage("alertSessionPct") private var alertSessionPct = 80.0
     @AppStorage("alertWeeklyPct") private var alertWeeklyPct = 80.0
     @AppStorage("alertSessionReset") private var alertSessionReset = false
+    @AppStorage(Notifier.Key.weeklyReset) private var alertWeeklyReset = false
+    @AppStorage(Notifier.Key.pace) private var alertPace = false
+    @AppStorage(Notifier.Key.delivery) private var alertDelivery = AlertDelivery.banner.rawValue
+    @AppStorage(Notifier.Key.sound) private var alertSound = AlertSound.standard
+    @AppStorage(Notifier.Key.quietEnabled) private var alertQuietEnabled = false
+    @AppStorage(Notifier.Key.quietStart) private var alertQuietStart = 22 * 60
+    @AppStorage(Notifier.Key.quietEnd) private var alertQuietEnd = 7 * 60
+    @State private var systemSounds = AlertSound.systemNames()
     @State private var alertsNote: String?
 
     // Font state. Bound straight to the shared settings, so the widget
@@ -45,7 +53,7 @@ struct WidgetSettings: View {
             case .pacing: pacingTab(t: t)
             case .themes: themesTab(t: t)
             case .widgetLook: fontTab(t: t)
-            case .alerts: alertsTab(t: t)
+            case .alerts: ScrollView { alertsTab(t: t) }
             default: credentialsTab(t: t)
             }
         }
@@ -340,6 +348,41 @@ struct WidgetSettings: View {
                 }
                 Toggle("Also when the session reaches 100%", isOn: $remindSessionEnd)
                 Toggle("When the session resets", isOn: $alertSessionReset)
+                Toggle("When a weekly limit resets", isOn: $alertWeeklyReset)
+                Toggle("Warn when I'm on pace to run out before the reset", isOn: $alertPace)
+
+                Divider()
+
+                Picker("Where alerts show", selection: $alertDelivery) {
+                    ForEach(AlertDelivery.allCases) { Text($0.title).tag($0.rawValue) }
+                }
+                Text("A Desk pulse glows the limit's meter on the desktop and the notch island. With Desk off, alerts show as banners.")
+                    .font(.caption)
+                    .foregroundStyle(t.textDim)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack {
+                    Picker("Sound", selection: $alertSound) {
+                        Text("Default").tag(AlertSound.standard)
+                        Text("None").tag(AlertSound.none)
+                        Divider()
+                        ForEach(systemSounds, id: \.self) { Text($0).tag($0) }
+                    }
+                    Button("Preview") { Notifier.preview(sound: alertSound) }
+                        .disabled(alertSound == AlertSound.standard || alertSound == AlertSound.none)
+                }
+
+                Toggle("Quiet hours", isOn: $alertQuietEnabled)
+                HStack {
+                    DatePicker("From", selection: quietTime($alertQuietStart), displayedComponents: .hourAndMinute)
+                    DatePicker("to", selection: quietTime($alertQuietEnd), displayedComponents: .hourAndMinute)
+                    Spacer()
+                }
+                .disabled(!alertQuietEnabled)
+                Text("No banners or sounds in these hours, and they are not saved for later. Desk pulses still show.")
+                    .font(.caption)
+                    .foregroundStyle(t.textDim)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .disabled(!alertsEnabled)
 
@@ -359,6 +402,16 @@ struct WidgetSettings: View {
             }
             Spacer()
         }
+    }
+
+    /// A time picker over minutes since midnight, today's date standing in for the day.
+    private func quietTime(_ minutes: Binding<Int>) -> Binding<Date> {
+        Binding(
+            get: { Calendar.current.startOfDay(for: Date()).addingTimeInterval(TimeInterval(minutes.wrappedValue * 60)) },
+            set: {
+                let c = Calendar.current.dateComponents([.hour, .minute], from: $0)
+                minutes.wrappedValue = (c.hour ?? 0) * 60 + (c.minute ?? 0)
+            })
     }
 
     // MARK: - Pacing tab

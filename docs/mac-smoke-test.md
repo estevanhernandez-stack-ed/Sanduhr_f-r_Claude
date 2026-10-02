@@ -50,6 +50,10 @@ M0 is the first pass. Each line is a check: do the action, see the result.
 - [ ] Set the session line below the current 5-hour percent, Refresh: one banner.
 - [ ] Refresh again: no second banner (once per tier per reset window).
 - [ ] Put the line back where it was.
+- [ ] Turn on "Warn when I'm on pace to run out before the reset". On a busy session (past 10% of the window, 20% or more used, the widget showing "At current pace, expires in …"), Refresh: one banner "Session on pace to run out at <time>", body "Resets <time>." Refresh again: no second one.
+- [ ] Sound: pick Glass, Preview plays it; Send a Test plays Glass with the banner. Pick None: Preview is off and Send a Test is silent. Back to Default.
+- [ ] Where alerts show, Desk pulse (Desk on, meters on the desktop, notch on): Send a Test posts no banner; the session meter glows three times over about three seconds and the notch island's edge glows with it. Banner and Desk pulse: both. Turn Desk off with Desk pulse chosen: Send a Test shows a banner.
+- [ ] Quiet hours on, from a minute ago to an hour from now, Banner: set the session line below the current percent, Refresh: no banner, no sound. With Banner and Desk pulse, the meter still pulses. Turn quiet hours off and Refresh: still no banner (that window's alert was recorded). Put everything back.
 
 ## 4. Desk
 

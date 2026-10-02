@@ -122,6 +122,13 @@ struct NotchWingsView: View {
                     ZStack {
                         IslandShape(flare: 8, radius: min(10, barHeight * 0.3))
                             .fill(Color.black)
+                        // An alert delivered to the Desk: the island's edge glows in the text ink.
+                        IslandShape(flare: 8, radius: min(10, barHeight * 0.3))
+                            .stroke(LinearGradient.ink(textColor), lineWidth: 2)
+                            .phaseAnimator(DeskPulse.phases, trigger: model.pulseCount) { view, phase in
+                                view.opacity(DeskPulse.intensity(phase))
+                                    .shadow(color: .white.opacity(0.6 * DeskPulse.intensity(phase)), radius: 6)
+                            } animation: { _ in DeskPulse.animation }
                         HStack(spacing: 0) {
                             label(left, size).frame(width: max(0, wingL - 10), alignment: .trailing)
                             Color.clear.frame(width: notchWidth + 20)
