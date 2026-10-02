@@ -15,12 +15,13 @@ cask "sanduhr" do
   end
 
   auto_updates true
-  depends_on macos: ">= :big_sur"
+  depends_on macos: ">= :sonoma"
 
   app "Sanduhr.app"
 
   zap trash: [
     "~/Library/Application Support/Sanduhr",
     "~/Library/Preferences/com.626labs.sanduhr.plist",
+    "~/Library/Preferences/com.626labs.sanduhr.desk.plist",
   ]
 end

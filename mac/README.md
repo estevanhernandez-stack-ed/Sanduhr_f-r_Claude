@@ -20,6 +20,11 @@ Run the result:
 open Sanduhr.app
 ```
 
+## Release
+
+Signed, notarized releases are built by GitHub Actions; setup and steps are in
+[docs/mac-release.md](../docs/mac-release.md).
+
 ## Package as a drag-install DMG
 
 For the classic "drag the app onto Applications" experience:

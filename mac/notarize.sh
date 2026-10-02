@@ -11,6 +11,9 @@
 # Generate the app-specific password at https://appleid.apple.com →
 # Sign-In and Security → App-Specific Passwords.
 #
+# In CI, set NOTARY_APPLE_ID, NOTARY_PASSWORD and NOTARY_TEAM_ID instead; the profile is
+# then not used.
+#
 # Usage:
 #   ./notarize.sh              # notarize Sanduhr.app
 #   ./notarize.sh Sanduhr.dmg  # notarize a DMG
@@ -37,9 +40,12 @@ else
 fi
 
 echo "→ Submitting $UPLOAD (typically 1–5 minutes)..."
-xcrun notarytool submit "$UPLOAD" \
-    --keychain-profile "$PROFILE" \
-    --wait
+if [[ -n "${NOTARY_APPLE_ID:-}" ]]; then
+    CREDS=(--apple-id "$NOTARY_APPLE_ID" --team-id "${NOTARY_TEAM_ID:-82BSR56X5J}" --password "$NOTARY_PASSWORD")
+else
+    CREDS=(--keychain-profile "$PROFILE")
+fi
+xcrun notarytool submit "$UPLOAD" "${CREDS[@]}" --wait
 
 echo "→ Stapling ticket to $TARGET..."
 xcrun stapler staple "$TARGET"

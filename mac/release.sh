@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Cut a signed, notarized, stapled Sanduhr release and update the appcast.
 #
-# Usage: ./release.sh <version>     # e.g. ./release.sh 1.1.0
+# Usage: ./release.sh <version>     # e.g. ./release.sh 2.1.0
+#
+# The usual path is CI: .github/workflows/mac-release.yml (docs/mac-release.md). This script is
+# the local fallback for a Mac that has the signing material in its Keychain.
 #
 # Before running:
 #   1. Bump CFBundleShortVersionString + CFBundleVersion in Info.plist.
@@ -37,7 +40,7 @@ fi
 REPO_ROOT="$(cd .. && pwd)"
 RELEASES_DIR="$REPO_ROOT/releases"
 APPCAST_DIR="$REPO_ROOT/docs"
-DOWNLOAD_URL_PREFIX="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/download/v${VERSION}/"
+DOWNLOAD_URL_PREFIX="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/download/v${VERSION}-mac/"
 
 echo "━━━ Release $VERSION ━━━"
 
@@ -87,7 +90,7 @@ Next (do these manually — one-time steps per release):
 
 1. Tag + upload the DMG to GitHub Releases:
      cd "$REPO_ROOT"
-     gh release create "v$VERSION" "$DMG_OUT" --title "Sanduhr v$VERSION" --generate-notes
+     gh release create "v$VERSION-mac" "$DMG_OUT" --title "Sanduhr for Mac $VERSION" --generate-notes
 
 2. Commit + push the updated appcast:
      git add docs/appcast.xml
