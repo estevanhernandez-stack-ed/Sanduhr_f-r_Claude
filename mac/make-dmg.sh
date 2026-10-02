@@ -27,6 +27,18 @@ if [[ ! -d "$APP" ]]; then
     exit 1
 fi
 
+# hdiutil fails now and then with "Resource busy" while something (Spotlight, XProtect, a
+# CI runner's scanners) still holds the image or its folder. Retry a few times before failing.
+retry() {
+    local attempt
+    for attempt in 1 2 3 4 5; do
+        "$@" && return 0
+        echo "  hdiutil busy (attempt $attempt of 5), retrying in $((attempt * 3))s..." >&2
+        sleep $((attempt * 3))
+    done
+    return 1
+}
+
 echo "→ Staging DMG contents..."
 rm -rf "$STAGE" "$TMP_DMG" "$DMG_NAME"
 mkdir -p "$STAGE"
@@ -37,7 +49,7 @@ ln -s /Applications "$STAGE/Applications"
 
 # Size the read-write image with plenty of headroom (app is ~1 MB; 32 MB is safe).
 echo "→ Creating read-write image..."
-hdiutil create -volname "$VOL_NAME" \
+retry hdiutil create -ov -volname "$VOL_NAME" \
     -srcfolder "$STAGE" \
     -fs HFS+ \
     -format UDRW \
@@ -47,7 +59,7 @@ hdiutil create -volname "$VOL_NAME" \
 echo "→ Mounting to arrange icons..."
 # Attach without -nobrowse: Finder needs the volume visible in its world so
 # AppleScript can address `disk "$VOL_NAME"`. We'll unmount cleanly at the end.
-ATTACH_OUTPUT="$(hdiutil attach "$TMP_DMG" -readwrite -noautoopen)"
+ATTACH_OUTPUT="$(retry hdiutil attach "$TMP_DMG" -readwrite -noautoopen)"
 MOUNT_DIR="$(echo "$ATTACH_OUTPUT" | grep -Eo '/Volumes/[^ ]+' | head -1)"
 
 if [[ -z "$MOUNT_DIR" || ! -d "$MOUNT_DIR" ]]; then
@@ -95,7 +107,7 @@ cleanup_mount
 trap - EXIT
 
 echo "→ Compressing final DMG..."
-hdiutil convert "$TMP_DMG" \
+retry hdiutil convert "$TMP_DMG" -ov \
     -format UDZO \
     -imagekey zlib-level=9 \
     -o "$DMG_NAME" >/dev/null
