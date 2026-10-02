@@ -1,0 +1,7 @@
+name: Fixture scenario that fails half way
+steps:
+  - defaults: { key: alertSound, type: string, value: Ping }
+  - do: notch
+    arg: "on"
+  - expect_state: { meters.0.percent: 99 }
+  - do: hide-widget

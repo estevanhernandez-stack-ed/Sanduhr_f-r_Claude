@@ -1,0 +1,14 @@
+# docs/mac-smoke-test.md section 3: with "Desk pulse" chosen, Send a Test pulses the meters
+# instead of posting a banner. The pulse count only ever goes up, so this checks it is above 0;
+# watch the snaps (or `smoke watch`) for the glow itself.
+name: Test alert with Desk delivery pulses
+needs: [desk]
+steps:
+  - defaults: { key: alertDelivery, type: string, value: desk }
+  - wait: 1
+  - do: test-alert
+  - expect_state: { pulse_count: "/^[1-9]/", alerts.delivery: desk }
+  - snap: pulse
+  - do: pulse
+    arg: seven_day
+  - expect_state: { pulse_count: "/^[1-9]/" }

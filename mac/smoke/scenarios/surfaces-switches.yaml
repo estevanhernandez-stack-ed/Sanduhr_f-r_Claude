@@ -1,0 +1,21 @@
+# docs/mac-smoke-test.md section 4: General, Surfaces shows the three switches, matching state.
+name: Surfaces switches follow the app
+steps:
+  - do: settings
+    arg: general
+  - expect:
+      window: settings
+      contains: { label: "/^Desk: clock, meters/" }
+  - expect:
+      window: settings
+      contains: { label: "/^Notch: the island/" }
+  - expect:
+      window: settings
+      contains: { label: "/^Widget: the floating window/" }
+  # Switch values are not visible to text recognition (smoke reads drawn text, see README);
+  # state.yaml holds what the switches show.
+  - do: hide-widget
+  - expect_state: { widget_visible: false }
+  - do: show-widget
+  - expect_state: { widget_visible: true }
+  - snap: general

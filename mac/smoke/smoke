@@ -1,0 +1,265 @@
+#!/usr/bin/env ruby
+# Smoke tools for the Mac app: window shots, the UI tree as YAML, live watching and scenarios.
+# Talks to the running Sanduhr through its sanduhr://debug/... hooks (off until `smoke enable`).
+# Ruby 2.6 stdlib only. See mac/smoke/README.md.
+require_relative 'lib/smoke_core'
+
+module Smoke
+  USAGE = <<~TEXT.freeze
+    usage: smoke <command> [args]
+
+      snap [label]          snapshot into out/<time>-<label>/: in-app renders, tree.yaml,
+                            state.yaml and on-screen captures (screen-<window>.png)
+      tree [window]         snapshot and print the UI tree (widget, desk, notch, settings, sheet)
+      state                 snapshot and print state.yaml
+      do <action> [arg]     run one hook action and wait for it: show-widget, hide-widget,
+                            settings [section], close-settings, refresh, test-alert,
+                            pulse [tier], tool deep-work|pacing|snake, desk on|off, notch on|off
+      watch [seconds]       stream Sanduhr's log and refresh out/watch/ every N seconds (default 5)
+      run [scenario.yaml…]  run scenarios (all in scenarios/ when none given); exits 1 on failure
+      view [folder]         build and open an HTML gallery of a snapshot or run (default: newest)
+      enable | disable      turn the in-app hooks on or off
+
+    SMOKE_TIMEOUT=<seconds> changes how long to wait for the app (default 10).
+  TEXT
+
+  # The running app, through `open -g -a <its bundle> sanduhr://debug/...` and files written into a
+  # folder. Links go to the running copy by path: Launch Services may know several Sanduhr.app
+  # copies that claim sanduhr:// (the installed one, DMG stages), and a bare `open` can launch the
+  # wrong one.
+  class LiveApp
+    def initialize(timeout: (ENV['SMOKE_TIMEOUT'] || 10).to_f)
+      @timeout = timeout
+      @checked = false
+    end
+
+    def self.encode(s)
+      s.to_s.bytes.map { |b| b.chr =~ %r{[A-Za-z0-9\-._~/]} ? b.chr : format('%%%02X', b) }.join
+    end
+
+    # The bundle of the running Sanduhr. SANDUHR_APP picks one when several copies run; otherwise a
+    # build from this repo wins over an installed one.
+    def running_bundle
+      out, = Open3.capture2e('pgrep', '-fl', 'Sanduhr.app/Contents/MacOS/Sanduhr')
+      bundles = out.lines.map { |l| l[%r{(/\S.*?\.app)/Contents/MacOS/Sanduhr}, 1] }.compact.uniq
+      raise Failure, "Sanduhr isn't running" if bundles.empty?
+      if (want = ENV['SANDUHR_APP'])
+        want = File.expand_path(want)
+        return want if bundles.include?(want)
+        raise Failure, "SANDUHR_APP=#{want} isn't running (running: #{bundles.join(', ')})"
+      end
+      return bundles.first if bundles.size == 1
+      repo = bundles.find { |b| b.start_with?(File.expand_path('..', __dir__)) }
+      return repo if repo
+      raise Failure, "several Sanduhr copies are running (#{bundles.join(', ')}); set SANDUHR_APP"
+    end
+
+    def preflight!
+      return if @checked
+      @bundle = running_bundle
+      flag, = Open3.capture2e('defaults', 'read', DOMAIN, 'debugHooks')
+      unless flag.strip == '1' || ENV['SANDUHR_DEBUG_HOOKS'] == '1'
+        raise Failure, 'hooks are off: run smoke enable'
+      end
+      @checked = true
+    end
+
+    # Opens the link and waits for `done` or `error` in dir.
+    def call(link, dir)
+      preflight!
+      FileUtils.mkdir_p(dir)
+      %w[done error].each { |f| FileUtils.rm_f(File.join(dir, f)) }
+      out, status = Open3.capture2e('open', '-g', '-a', @bundle, link)
+      raise Failure, "open failed: #{out.strip}" unless status.success?
+      deadline = Time.now + @timeout
+      loop do
+        err = File.join(dir, 'error')
+        raise Failure, "Sanduhr: #{File.read(err)}" if File.exist?(err)
+        return dir if File.exist?(File.join(dir, 'done'))
+        if Time.now >= deadline
+          raise Failure, "no answer from Sanduhr in #{@timeout.to_i}s (hooks on? is #{@bundle} a build " \
+                         'with the debug hooks?)'
+        end
+        sleep 0.1
+      end
+    end
+
+    def snapshot(dir, screens: true)
+      dir = File.expand_path(dir)
+      FileUtils.mkdir_p(dir)
+      Dir[File.join(dir, '{*.png,tree.yaml,state.yaml}')].each { |f| FileUtils.rm_f(f) }
+      call("sanduhr://debug/snapshot?dir=#{self.class.encode(dir)}", dir)
+      capture_screens(dir) if screens
+      dir
+    end
+
+    # On-screen captures of Sanduhr's own windows only, by the window ids tree.yaml lists.
+    def capture_screens(dir)
+      tree = YAML.safe_load(File.read(File.join(dir, 'tree.yaml'))) || []
+      tree.each do |w|
+        next unless w['window_id']
+        file = File.join(dir, "screen-#{w['window']}.png")
+        out, status = Open3.capture2e('screencapture', '-x', '-o', '-l', w['window_id'].to_s, file)
+        next if status.success? && File.exist?(file)
+        warn "screencapture of #{w['window']} failed (Screen Recording permission?): #{out.strip}"
+      end
+    end
+
+    def action(name, arg = nil, dir = File.join(OUT, '.do'))
+      link = +"sanduhr://debug/action?name=#{self.class.encode(name)}"
+      link << "&arg=#{self.class.encode(arg)}" if arg
+      link << "&dir=#{self.class.encode(File.expand_path(dir))}"
+      call(link, dir)
+    end
+
+    def state(dir)
+      YAML.safe_load(File.read(File.join(snapshot(dir, screens: false), 'state.yaml')))
+    end
+  end
+
+  module CLI
+    module_function
+
+    def stamp
+      Time.now.strftime('%Y%m%d-%H%M%S')
+    end
+
+    def main(argv)
+      cmd = argv.shift
+      case cmd
+      when 'snap' then snap(argv)
+      when 'tree' then tree(argv)
+      when 'state' then state
+      when 'do' then act(argv)
+      when 'watch' then watch(argv)
+      when 'run' then return run(argv)
+      when 'view' then view(argv)
+      when 'enable' then hooks(true)
+      when 'disable' then hooks(false)
+      when nil, 'help', '-h', '--help' then puts USAGE
+      else
+        warn "smoke: unknown command #{cmd}"
+        warn USAGE
+        return 2
+      end
+      0
+    rescue Failure => e
+      warn "smoke: #{e.message}"
+      1
+    rescue Interrupt
+      130
+    end
+
+    def snap(argv)
+      label = argv.first&.gsub(/[^\w.-]+/, '-')
+      dir = File.join(OUT, [stamp, label].compact.join('-'))
+      LiveApp.new.snapshot(dir)
+      puts dir
+    end
+
+    def tree(argv)
+      dir = LiveApp.new.snapshot(File.join(OUT, "#{stamp}-tree"), screens: false)
+      text = File.read(File.join(dir, 'tree.yaml'))
+      if (window = argv.first)
+        picked = Match.windows(YAML.safe_load(text), window)
+        raise Failure, "no #{window} window on screen" if picked.empty?
+        text = YAML.dump(picked).sub(/\A---\n/, '')
+      end
+      puts text
+    end
+
+    def state
+      dir = LiveApp.new.snapshot(File.join(OUT, "#{stamp}-state"), screens: false)
+      puts File.read(File.join(dir, 'state.yaml'))
+    end
+
+    def act(argv)
+      raise Failure, 'usage: smoke do <action> [arg]' if argv.empty?
+      LiveApp.new.action(argv[0], argv[1])
+      puts 'ok'
+    end
+
+    def watch(argv)
+      every = (argv.first || 5).to_f
+      every = 5 if every <= 0
+      dir = File.join(OUT, 'watch')
+      tmp = File.join(dir, '.next')
+      FileUtils.mkdir_p(dir)
+      app = LiveApp.new
+      app.preflight!
+      Html.write(dir, refresh: every, title: 'Sanduhr, live')
+      warn "watching: open #{File.join(dir, 'index.html')} (Ctrl-C stops)"
+      log = Process.spawn('log', 'stream', '--style', 'compact', '--predicate', 'process == "Sanduhr"',
+                          out: $stdout, err: $stderr)
+      begin
+        loop do
+          begin
+            FileUtils.rm_rf(tmp)
+            app.snapshot(tmp)
+            Dir[File.join(dir, '{*.png,tree.yaml,state.yaml}')].each { |f| FileUtils.rm_f(f) }
+            Dir[File.join(tmp, '{*.png,tree.yaml,state.yaml}')].each { |f| FileUtils.mv(f, dir) }
+          rescue Failure => e
+            warn "smoke watch: #{e.message}"
+          end
+          Html.write(dir, refresh: every, title: 'Sanduhr, live')
+          sleep every
+        end
+      rescue Interrupt
+        warn "\nsmoke watch: stopped"
+      ensure
+        begin
+          Process.kill('TERM', log)
+          Process.wait(log)
+        rescue StandardError
+          nil
+        end
+        FileUtils.rm_rf(tmp)
+      end
+    end
+
+    def run(argv)
+      files = argv.empty? ? Dir[File.join(SCENARIOS, '*.yaml')].sort : argv
+      raise Failure, 'no scenarios' if files.empty?
+      out = File.join(OUT, "run-#{stamp}")
+      FileUtils.mkdir_p(out)
+      runner = Runner.new(LiveApp.new, ShellDefaults.new, out)
+      interrupted = false
+      begin
+        files.each do |f|
+          runner.run_file(f)
+          puts
+        end
+      rescue Interrupt
+        interrupted = true
+        warn 'smoke run: interrupted'
+      ensure
+        File.write(File.join(out, 'report.yaml'), YAML.dump(runner.report))
+      end
+      s = runner.report['summary']
+      puts "#{s['pass']} passed, #{s['fail']} failed, #{s['skip']} skipped  →  #{out}"
+      interrupted || s['fail'] > 0 ? 1 : 0
+    end
+
+    def view(argv)
+      dir = argv.first ? File.expand_path(argv.first) : newest
+      raise Failure, "no folder: #{dir}" unless dir && File.directory?(dir)
+      path = Html.write(dir)
+      system('open', path)
+      puts path
+    end
+
+    def newest
+      Dir[File.join(OUT, '*/')].map { |d| d.chomp('/') }
+                               .reject { |d| File.basename(d).start_with?('.') }
+                               .max_by { |d| File.mtime(d) }
+    end
+
+    def hooks(on)
+      ok = system('defaults', 'write', DOMAIN, 'debugHooks', '-bool', on ? 'true' : 'false')
+      raise Failure, 'defaults write failed' unless ok
+      puts "debug hooks #{on ? 'on' : 'off'}"
+    end
+  end
+end
+
+exit Smoke::CLI.main(ARGV.dup) if $PROGRAM_NAME == __FILE__

@@ -1,0 +1,53 @@
+desk_enabled: true
+desk_running: true
+layout: "message:tl clock:bl meters:bl meetings:bl"
+notch: false
+has_notch: true
+widget_visible: true
+settings_open: true
+settings_section: notch
+meters:
+  - tier: five_hour
+    label: Session (5hr)
+    percent: 7
+    fill: 0.07
+    pace: 0.25
+    reset: "Today 5:00 PM"
+  - tier: seven_day
+    label: Weekly — All Models
+    percent: 63
+    fill: 0.63
+    pace: null
+    reset: ""
+meetings_count: 0
+alerts:
+  enabled: false
+  session_line: 80
+  weekly_line: 80
+  session_full: false
+  session_reset: false
+  weekly_reset: false
+  pace: false
+  delivery: banner
+  quiet_enabled: false
+  quiet_start: 1320
+  quiet_end: 420
+  sound: default
+last_fetch: "2026-10-02T15:04:05Z"
+active_tool: null
+pacing_pinned: false
+pulse_count: 0
+menu:
+  - items:
+      - title: Hide Sanduhr
+        checked: false
+  - header: Tools
+    items:
+      - title: Deep Work
+        checked: false
+      - title: Pacing Calculators
+        checked: false
+      - title: Cooldown Snake
+        checked: false
+version: "2.1.0"
+build: "3"

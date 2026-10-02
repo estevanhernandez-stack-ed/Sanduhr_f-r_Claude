@@ -1,0 +1,37 @@
+# docs/mac-smoke-test.md section 4: every Settings section opens in the one window.
+name: Every Settings section opens
+steps:
+  - do: settings
+    arg: general
+  - expect_state: { settings_open: true, settings_section: general }
+  - do: settings
+    arg: alerts
+  - expect_state: { settings_section: alerts }
+  - do: settings
+    arg: credentials
+  - expect_state: { settings_section: credentials }
+  - do: settings
+    arg: deskLayout
+  - expect_state: { settings_section: deskLayout }
+  - do: settings
+    arg: deskLook
+  - expect_state: { settings_section: deskLook }
+  - do: settings
+    arg: message
+  - expect_state: { settings_section: message }
+  - do: settings
+    arg: notch
+  - expect_state: { settings_section: notch }
+  - do: settings
+    arg: widgetLook
+  - expect_state: { settings_section: widgetLook }
+  - do: settings
+    arg: themes
+  - expect_state: { settings_section: themes }
+  - do: settings
+    arg: pacing
+  - expect_state: { settings_section: pacing }
+  - expect:
+      window: settings
+      contains: { text: Pacing & Focus }
+  - snap: last-section

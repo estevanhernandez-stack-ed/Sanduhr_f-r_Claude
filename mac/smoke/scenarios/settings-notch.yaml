@@ -1,0 +1,12 @@
+# The spec's example: Settings opens at Notch with its switch.
+name: Settings opens at Notch
+steps:
+  - do: settings
+    arg: notch
+  - expect:
+      window: settings
+      contains: { label: Extend the camera notch }
+  - expect_state: { settings_section: notch }
+  - snap: notch-settings
+  - do: close-settings
+  - expect_state: { settings_open: false }

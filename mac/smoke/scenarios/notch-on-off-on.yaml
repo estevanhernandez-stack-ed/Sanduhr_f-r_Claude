@@ -1,0 +1,20 @@
+# docs/mac-smoke-test.md section 5, and the wings bug (the island window shrank to nothing when
+# the notch was switched off and came back above the screen when switched on). Compare the snaps.
+name: Notch on, off and back on
+needs: [desk, notch]
+steps:
+  - do: notch
+    arg: "on"
+  - expect_state: { notch: true, has_notch: true, desk_running: true }
+  - wait: 1
+  - snap: notch-on
+  - do: notch
+    arg: "off"
+  - expect_state: { notch: false, desk_running: true }
+  - wait: 1
+  - snap: notch-off
+  - do: notch
+    arg: "on"
+  - expect_state: { notch: true, has_notch: true }
+  - wait: 1
+  - snap: notch-on-again

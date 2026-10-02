@@ -1,0 +1,76 @@
+- window: widget
+  window_id: 101
+  frame: [1100, 60, 340, 520]
+  visible: true
+  tree:
+    - role: AXGroup
+      enabled: true
+      frame: [1100, 60, 340, 520]
+      children:
+        - role: AXStaticText
+          value: Session (5hr)
+          enabled: true
+          frame: [1116, 90, 120, 16]
+        - role: AXStaticText
+          value: "7%"
+          enabled: true
+          frame: [1380, 90, 40, 16]
+        - role: AXButton
+          label: Settings
+          enabled: true
+          frame: [1400, 66, 20, 20]
+- window: settings
+  window_id: 202
+  title: Sanduhr Settings
+  frame: [340, 150, 760, 600]
+  visible: true
+  tree:
+    - role: AXButton
+      subrole: AXCloseButton
+      enabled: true
+      frame: [348, 156, 14, 16]
+    - role: AXOutline
+      label: Sidebar
+      enabled: true
+      frame: [340, 178, 190, 572]
+      children:
+        - role: AXRow
+          label: General
+          value: 0
+          enabled: true
+          frame: [340, 190, 190, 24]
+        - role: AXRow
+          label: Notch
+          value: 1
+          enabled: true
+          frame: [340, 310, 190, 24]
+    - role: AXCheckBox
+      subrole: AXSwitch
+      label: Extend the camera notch
+      value: 0
+      enabled: true
+      frame: [560, 200, 500, 24]
+    - role: AXCheckBox
+      subrole: AXSwitch
+      label: "Beside the camera: next meeting or the time, and the Claude meters"
+      value: 1
+      enabled: false
+      frame: [560, 260, 500, 24]
+- window: sheet
+  window_id: 303
+  frame: [1110, 100, 320, 200]
+  visible: true
+  tree:
+    - role: AXButton
+      label: Continue
+      enabled: true
+      frame: [1300, 260, 100, 24]
+- window: sheet-2
+  window_id: 304
+  frame: [1110, 100, 320, 200]
+  visible: true
+  tree:
+    - role: AXButton
+      label: Later
+      enabled: true
+      frame: [1300, 260, 100, 24]

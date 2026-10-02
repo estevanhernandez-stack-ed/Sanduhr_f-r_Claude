@@ -1,0 +1,25 @@
+# docs/mac-smoke-test.md section 4: each Tools item opens its tool (showing a hidden widget
+# first) and shows checked; chosen again it closes.
+name: Tools menu actions
+steps:
+  - do: hide-widget
+  - do: tool
+    arg: deep-work
+  - expect_state: { widget_visible: true, active_tool: deep-work, menu.1.items.0.checked: true }
+  - snap: deep-work
+  - do: tool
+    arg: deep-work
+  - expect_state: { active_tool: null, menu.1.items.0.checked: false }
+  - do: tool
+    arg: snake
+  - expect_state: { active_tool: snake, menu.1.items.2.checked: true }
+  - snap: snake
+  - do: tool
+    arg: snake
+  - expect_state: { active_tool: null }
+  - do: tool
+    arg: pacing
+  - expect_state: { pacing_pinned: true, menu.1.items.1.checked: true }
+  - do: tool
+    arg: pacing
+  - expect_state: { pacing_pinned: false, menu.1.items.1.checked: false }

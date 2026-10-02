@@ -14,6 +14,9 @@ SIGN_IDENTITY=- ./build.sh # same, ad-hoc signed (no Developer ID needed)
 ./test.sh                  # swift test, with the SDK and plugin paths the command line tools need
 ```
 
+Smoke tools for a running dev build (window shots, the UI tree as YAML, scenarios): see
+[smoke/README.md](smoke/README.md).
+
 Run the result:
 
 ```

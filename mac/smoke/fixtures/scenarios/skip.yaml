@@ -1,0 +1,4 @@
+name: Fixture scenario that needs credentials it lacks
+needs: [credentials]
+steps:
+  - do: refresh

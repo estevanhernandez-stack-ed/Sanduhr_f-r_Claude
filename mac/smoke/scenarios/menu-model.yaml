@@ -1,0 +1,16 @@
+# docs/mac-smoke-test.md section 2: one menu everywhere, in this order.
+name: The menu model
+steps:
+  - do: show-widget
+  - expect_state:
+      menu.0.items.0.title: Hide Sanduhr
+      menu.1.header: Tools
+      menu.1.items.0.title: Deep Work
+      menu.1.items.1.title: Pacing Calculators
+      menu.1.items.2.title: Cooldown Snake
+      menu.2.items.0.title: Refresh
+      menu.2.items.1.title: Settings…
+      menu.2.items.2.title: Check for Updates…
+      menu.3.items.0.title: Quit Sanduhr
+  - do: hide-widget
+  - expect_state: { menu.0.items.0.title: Show Sanduhr }
