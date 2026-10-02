@@ -5,7 +5,8 @@ import Carbon.HIToolbox
 
 /// Sanduhr's desk surfaces: a click-through layer on the desktop (clock, Claude meters,
 /// meetings, the message) and the notch island. Off until turned on in Desk settings
-/// (status item menu, Desk Settings), so nothing changes for widget-only users. Its settings
+/// (status item menu, Desk Settings), so nothing changes for widget-only users; a brand-new
+/// install starts with it on (DeskFirstRun). Its settings
 /// live in their own defaults suite (UserDefaults.desk) so their short names never collide
 /// with the widget's.
 final class DeskController: NSObject, NSMenuDelegate {

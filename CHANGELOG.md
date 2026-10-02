@@ -2,6 +2,7 @@
 
 ## Unreleased (mac)
 
+- **Desk is home on a new install**: the first launch on a Mac that has never run Sanduhr turns Desk on with the meters on the desktop (message top left; clock and meters bottom left). Meetings and the notch start off, so there is no Calendar prompt until you turn meetings on. The widget opens for sign-in and tucks away after the first successful fetch; the menu bar hourglass brings it back. Anyone updating from an earlier Sanduhr, or coming over from Sanduhr Desk, keeps exactly what they had.
 - **Desk meters**: a new `meters` piece draws a bar per Claude limit (session, weekly and any other weekly limits the widget shows) in any corner, in the Desk ink and font with its shadow: the label, the bar with the pace tick where the widget puts it, the percent (bars stop at full, the percent keeps counting past 100) and the reset time. Place it in Desk Settings, Layout ("Claude meters (bars)") or with `meters:br` in the layout. Desk now takes its numbers straight from Sanduhr instead of rereading `snapshot.json`, so the meters, the `claude` line and the notch move with every refresh, widget hidden or not; `snapshot.json` is still written for the statusline and the MCP server.
 
 ## v2.1.0-mac — 2026-10-02

@@ -258,6 +258,12 @@ final class ScratchDefaults {
     func migrate() {
         DeskMigration.run(into: defaults, from: [newer, older], reading: { self.domains[$0] })
     }
+
+    /// The first-launch choice over the same in-memory domains, with the widget's defaults beside them.
+    @discardableResult
+    func firstRun(widget: MemoryDefaults) -> DeskFirstRun.Outcome {
+        DeskFirstRun.run(widget: widget, desk: defaults, from: [newer, older], reading: { self.domains[$0] })
+    }
 }
 
 @Suite("Desk migration")
@@ -337,5 +343,84 @@ struct DeskMigrationTests {
         s.defaults.set(false, forKey: DeskController.enabledKey)
         s.migrate()
         #expect(s.defaults.bool(forKey: DeskController.enabledKey) == false)
+    }
+}
+
+@Suite("Desk first run")
+struct DeskFirstRunTests {
+    /// Launch order in AppDelegate: the first-run choice, then the import.
+    func launch(_ s: ScratchDefaults, _ widget: MemoryDefaults) -> DeskFirstRun.Outcome {
+        let outcome = s.firstRun(widget: widget)
+        s.migrate()
+        return outcome
+    }
+
+    @Test func freshInstallMakesDeskHome() {
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        #expect(launch(s, widget) == .fresh)
+        #expect(s.defaults.bool(forKey: DeskController.enabledKey))
+        #expect(DeskLayout.parse(s.defaults.string(forKey: "layout") ?? "")["meters"] != nil)
+        #expect(s.defaults.object(forKey: "showMeetings") as? Bool == false)
+        #expect(s.defaults.bool(forKey: DeskController.notchKey) == false)
+        #expect(widget.bool(forKey: DeskFirstRun.tuckKey))
+        // The widget shows for sign-in: nothing hides it before the first fetch.
+        #expect(widget.object(forKey: "panelHidden") == nil)
+    }
+
+    @Test func widgetTucksOnceAfterTheFirstSuccessfulFetch() {
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        _ = launch(s, widget)
+        #expect(DeskFirstRun.tuck(afterFetch: false, widget: widget) == false)
+        #expect(widget.bool(forKey: DeskFirstRun.tuckKey))
+        #expect(DeskFirstRun.tuck(afterFetch: true, widget: widget))
+        #expect(widget.object(forKey: DeskFirstRun.tuckKey) == nil)
+        #expect(DeskFirstRun.tuck(afterFetch: true, widget: widget) == false)
+    }
+
+    @Test func existingWidgetUserIsLeftAlone() {
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        widget.set("{{0, 0}, {340, 520}}", forKey: "windowFrame")
+        widget.set("obsidian", forKey: "theme")
+        #expect(s.firstRun(widget: widget) == .existing)
+        #expect(s.defaults.values.isEmpty)
+        #expect(Set(widget.values.keys) == ["windowFrame", "theme", DeskFirstRun.doneKey])
+        #expect(DeskFirstRun.tuck(afterFetch: true, widget: widget) == false)
+    }
+
+    @Test func userWhoRan210IsLeftAlone() {
+        // 2.1.0 ran DeskMigration on every launch, so its suite is marked even with Desk off.
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        s.migrate()
+        let before = s.defaults.values.keys.sorted()
+        #expect(launch(s, widget) == .existing)
+        #expect(s.defaults.values.keys.sorted() == before)
+        #expect(s.defaults.bool(forKey: DeskController.enabledKey) == false)
+        #expect(widget.bool(forKey: DeskFirstRun.tuckKey) == false)
+    }
+
+    @Test func sanduhrDeskMigrantKeepsTheImportedLayout() {
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        s.seed(s.newer, ["layout": "clock:tr message:bl", "showMeetings": true, "notch": false])
+        #expect(launch(s, widget) == .migrant)
+        #expect(s.defaults.string(forKey: "layout") == "clock:tr message:bl")
+        #expect(s.defaults.object(forKey: "showMeetings") as? Bool == true)
+        #expect(s.defaults.object(forKey: DeskController.notchKey) as? Bool == false)
+        #expect(s.defaults.bool(forKey: DeskController.enabledKey))
+        #expect(widget.bool(forKey: DeskFirstRun.tuckKey) == false)
+    }
+
+    @Test func decidedOnceThenANoOp() {
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        _ = launch(s, widget)
+        // The user then turns Desk off, puts the Claude line back and turns meetings on.
+        s.defaults.set(false, forKey: DeskController.enabledKey)
+        s.defaults.set("clock:bl claude:bl", forKey: "layout")
+        s.defaults.set(true, forKey: "showMeetings")
+        widget.set(nil, forKey: DeskFirstRun.tuckKey)
+        #expect(launch(s, widget) == .alreadyDecided)
+        #expect(s.defaults.bool(forKey: DeskController.enabledKey) == false)
+        #expect(s.defaults.string(forKey: "layout") == "clock:bl claude:bl")
+        #expect(s.defaults.bool(forKey: "showMeetings"))
+        #expect(widget.object(forKey: DeskFirstRun.tuckKey) == nil)
     }
 }

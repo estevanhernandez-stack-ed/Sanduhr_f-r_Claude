@@ -54,3 +54,59 @@ enum DeskMigration {
         d.set(true, forKey: "migrated")
     }
 }
+
+/// One-time choice on first launch: a brand-new install starts with Desk as home (meters on the
+/// desktop, meetings and the notch off, so no permission prompt), and the widget tucks away once
+/// it has signed in and fetched. Anyone who already used Sanduhr, or is coming over from Sanduhr
+/// Desk or Desk, keeps exactly what they have. Runs before DeskMigration, which would otherwise
+/// mark every domain as migrated.
+enum DeskFirstRun {
+    /// Widget defaults: set once the choice has been made, whatever it was.
+    static let doneKey = "deskFirstRunDone"
+    /// Widget defaults: set on a fresh install until the first successful fetch hides the widget.
+    static let tuckKey = "tuckAfterFirstFetch"
+    /// The standard layout with the Claude line swapped for the meters.
+    static let layout = "message:tl clock:bl meters:bl meetings:bl"
+
+    /// Widget settings any earlier version writes. windowFrame is saved on the first move or
+    /// resize; the others as soon as the setting is touched. The Keychain session key is not a
+    /// signal: it outlives a wiped defaults domain, and a fresh install that already has one
+    /// takes the same path (widget shows, then tucks after the first fetch).
+    static let widgetKeys = [
+        "windowFrame", "panelHidden", "theme", "fontFamily", "subtleMode",
+        "pacingToolsEnabled", "snakeHighScore",
+        Notifier.Key.enabled, Notifier.Key.sessionPct, Notifier.Key.weeklyPct,
+        Notifier.Key.sessionFull, Notifier.Key.sessionReset, Notifier.Key.fired,
+    ]
+
+    enum Outcome: Equatable { case fresh, existing, migrant, alreadyDecided }
+
+    /// Defaults to the real stores; tests pass in-memory ones. A Desk suite DeskMigration has
+    /// already marked means 2.1.0 or later ran here, so that counts as an existing user too.
+    @discardableResult
+    static func run(widget w: DefaultsStore = UserDefaults.standard,
+                    desk d: DefaultsStore = UserDefaults.desk,
+                    from domains: [String] = DeskMigration.legacyDomains,
+                    reading domain: (String) -> [String: Any]? = { UserDefaults.standard.persistentDomain(forName: $0) }) -> Outcome {
+        guard !w.bool(forKey: doneKey) else { return .alreadyDecided }
+        w.set(true, forKey: doneKey)
+        if domains.contains(where: { domain($0) != nil }) { return .migrant }
+        if d.object(forKey: "migrated") != nil || widgetKeys.contains(where: { w.object(forKey: $0) != nil }) {
+            return .existing
+        }
+        d.set(true, forKey: DeskController.enabledKey)
+        d.set(layout, forKey: "layout")
+        d.set(false, forKey: "showMeetings")
+        d.set(false, forKey: DeskController.notchKey)
+        w.set(true, forKey: tuckKey)
+        return .fresh
+    }
+
+    /// Called after every refresh. True once, on the first successful fetch of a fresh install:
+    /// the caller hides the widget. The flag clears so the widget is never hidden for it again.
+    static func tuck(afterFetch fetched: Bool, widget w: DefaultsStore = UserDefaults.standard) -> Bool {
+        guard fetched, w.bool(forKey: tuckKey) else { return false }
+        w.set(nil, forKey: tuckKey)
+        return true
+    }
+}

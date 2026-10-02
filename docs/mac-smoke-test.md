@@ -18,14 +18,23 @@ M0 is the first pass. Each line is a check: do the action, see the result.
   `/Applications/Sanduhr.app` is the old 2.0.4, `open sanduhr://…` lands there. Register the dev
   build first: `/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f mac/Sanduhr.app`.
 
-## 1. Fresh defaults: Desk stays off
+## 1. Fresh defaults: Desk is home
 
 - [ ] `for d in com.626labs.sanduhr com.626labs.sanduhr.desk com.626labs.sanduhrdesk com.estevan.desk; do defaults delete $d 2>/dev/null; done`
   (credentials and history are files under `~/Library/Application Support/Sanduhr/`, not touched).
-- [ ] `open mac/Sanduhr.app`. Widget appears top right; no clock, meetings or message on the desktop;
-  no black island around the notch; no Calendar permission prompt.
-- [ ] `defaults read com.626labs.sanduhr.desk` shows `migrated = 1` and no `deskEnabled`.
-- [ ] Quit and relaunch: still no Desk.
+- [ ] `open mac/Sanduhr.app`. Desk is on at once: message top left, clock and the Claude meters
+  bottom left on the desktop. No black island around the notch; no Calendar permission prompt.
+- [ ] The widget appears top right for sign-in. With no session key, the onboarding sheet shows;
+  sign in. (A session key left over from before the wipe skips the sheet.)
+- [ ] After the first successful fetch the widget hides by itself and the meters fill in. The menu
+  bar hourglass shows the percent; left-click brings the widget back.
+- [ ] `defaults read com.626labs.sanduhr.desk` shows `deskEnabled = 1`, `layout = "message:tl clock:bl meters:bl meetings:bl"`,
+  `showMeetings = 0`, `notch = 0` and `migrated = 1`. `defaults read com.626labs.sanduhr` shows
+  `deskFirstRunDone = 1`, `panelHidden = 1` and no `tuckAfterFirstFetch`.
+- [ ] Show the widget, quit and relaunch: the widget stays shown (it tucks only once); Desk is unchanged.
+- [ ] Existing user: quit Sanduhr, `defaults import` each backed-up domain from `~/sanduhr-smoke/`
+  (section 0), relaunch: widget and Desk come back exactly as before the wipe (Desk still off if it
+  was off; the widget not tucked). The rest of the run continues from these settings.
 
 ## 2. Widget
 

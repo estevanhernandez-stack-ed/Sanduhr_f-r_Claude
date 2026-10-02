@@ -18,6 +18,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
+        // A brand-new install starts with Desk on and the widget set to tuck away after its first
+        // fetch. Decided once, before the panel shows and before DeskMigration marks the suite.
+        DeskFirstRun.run()
+
         // Build widget panel.
         let hosting = NSHostingController(rootView: RootView(vm: viewModel))
         hosting.view.wantsLayer = true
@@ -49,6 +53,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Desk takes the numbers straight from the view model, so its meters move with
             // every refresh even while the widget is hidden (or Desk is off, ready for when it starts).
             guard let vm = self?.viewModel else { return }
+            // A fresh install shows the widget for sign-in, then hides it once the numbers arrive.
+            if DeskFirstRun.tuck(afterFetch: vm.usage != nil && (vm.status == .idle || vm.status == .noTiers)) {
+                self?.hidePanel()
+            }
             var isAuthError = false
             if case .error(_, let isAuth) = vm.status { isAuthError = isAuth }
             DeskController.shared.model.update(DeskUsage(
