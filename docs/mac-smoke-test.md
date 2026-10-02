@@ -40,7 +40,7 @@ M0 is the first pass. Each line is a check: do the action, see the result.
 
 - [ ] Cards fill in after the first fetch (sign in via Credentials if the file is gone).
 - [ ] Left-click the menu bar hourglass hides the widget; again shows it. Hidden survives a relaunch.
-- [ ] Right-click opens the status menu: Show/Hide, Refresh Now, Credentials, Desk Settings, Check for Updates, Quit.
+- [ ] Right-click opens the status menu: a Tools section (Show/Hide Sanduhr, Deep Work, Pacing Calculators, Cooldown Snake), Refresh Now, Credentials, Desk Settings, Check for Updates, Quit.
 - [ ] Refresh Now updates the footer time; `~/Library/Application Support/Sanduhr/snapshot.json` has a new `captured_at`.
 - [ ] Settings: switch a theme, toggle compact (panel resizes, top edge stays put), open the focus timer and close it.
 
@@ -57,6 +57,13 @@ M0 is the first pass. Each line is a check: do the action, see the result.
 - [ ] After section 1, Desk is already on: clock, date, message and the meters (a bar per limit with a pace tick and reset time). General, "Show Desk" is on. The notch stays plain (its own switch, off).
 - [ ] General, "Read today's meetings" (off on a fresh install): switch it on and the Calendar prompt appears right away, no restart. Allow: today's remaining timed meetings show. Switch it off: they go.
 - [ ] Meters: their pace ticks sit where the widget's do; hide the widget and refresh from the menu, and the meters still update.
+- [ ] Hint: on the first run with meters on the desktop, "Click the meters for history and tools. Option+S for settings." shows under them in the Desk font. `defaults read com.626labs.sanduhr.desk meterHintFirstShown` prints the time it first showed.
+- [ ] Meter click: hide the widget, point at the meters (the pointer turns into a hand), click. The widget appears beside them (to their right in a left corner, to their left in a right corner), fully on screen, in front. The hint is gone and stays gone after a relaunch (`meterHintDismissed = 1`).
+- [ ] Click the meters again with the widget showing: it comes forward and does not move. Drag it elsewhere, hide it with the hourglass and show it again with the hourglass: it comes back where it was dragged, not beside the meters.
+- [ ] Click empty desktop beside the meters: Finder gets it (desktop icons select). Put a Finder window over the meters and click it there: the window takes the click, no widget.
+- [ ] Hint expiry: quit, `defaults write com.626labs.sanduhr.desk meterHintFirstShown -date "2026-01-01 00:00:00 +0000"; defaults delete com.626labs.sanduhr.desk meterHintDismissed`, relaunch: no hint. `defaults delete com.626labs.sanduhr.desk meterHintFirstShown`, relaunch: the hint is back (tidy up by clicking the meters).
+- [ ] Tools with Ice hiding the hourglass and the widget hidden: click the meters, two-finger click the widget, Tools: Deep Work opens the hourglass overlay, Cooldown Snake the game, Pacing Calculators keeps cool-down or surplus showing on every card (checked; choose again to put them back under the pointer), Hide Sanduhr hides it.
+- [ ] Tools from the menu bar hourglass's menu, widget hidden first each time: Show Sanduhr shows it; Deep Work, Cooldown Snake and Pacing Calculators each show the widget with that tool open. With `menuIcon` on, Desk's clock menu has the same Tools section.
 - [ ] Layout: move Clock to Top right; it moves live. Hide Meetings; they go. Put both back.
 - [ ] Look: ink `9ad7ff, 012089` (space after the comma) on the message draws blue to navy, no gray.
 - [ ] Message: `~/Library/Application Support/Desk/messages.txt` exists with the starter lines; add a `MM-DD: smoke test` line for today, and within a minute the desktop shows it.

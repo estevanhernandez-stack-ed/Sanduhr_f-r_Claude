@@ -180,8 +180,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showStatusMenu(from button: NSStatusBarButton) {
         let menu = NSMenu()
 
-        let toggleTitle = (panel?.isVisible ?? false) ? "Hide Sanduhr" : "Show Sanduhr"
-        menu.addItem(item(toggleTitle, action: #selector(togglePanel)))
+        addToolItems(to: menu)
+        menu.addItem(.separator())
         menu.addItem(item("Refresh Now", action: #selector(refreshNow), key: "r"))
         menu.addItem(.separator())
         menu.addItem(item("Credentials…", action: #selector(openCredentials)))
@@ -203,6 +203,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.menu = menu
         button.performClick(nil)
         statusItem?.menu = nil
+    }
+
+    /// The Tools section, shared by the menu bar item's menu and Desk's clock menu. The widget's
+    /// own two-finger menu (RootView) lists the same items. Each one works with the widget
+    /// hidden: it shows the widget first.
+    func addToolItems(to menu: NSMenu) {
+        menu.addItem(.sectionHeader(title: "Tools"))
+        let showTitle = (panel?.isVisible ?? false) ? "Hide Sanduhr" : "Show Sanduhr"
+        menu.addItem(item(showTitle, action: #selector(showOrHidePanel)))
+        menu.addItem(item("Deep Work", action: #selector(openDeepWork)))
+        let pacing = item("Pacing Calculators", action: #selector(togglePacingCalculators))
+        pacing.state = viewModel.pacingPinned ? .on : .off
+        menu.addItem(pacing)
+        menu.addItem(item("Cooldown Snake", action: #selector(openSnake)))
     }
 
     private func item(_ title: String, action: Selector, key: String = "",
@@ -237,6 +251,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func hidePanel() {
         panel?.orderOut(nil)
         UserDefaults.standard.set(true, forKey: Self.panelHiddenKey)
+    }
+
+    /// Shows the widget where it was and brings it forward. Unlike togglePanel, never hides it.
+    func showPanel() {
+        guard let panel else { return }
+        UserDefaults.standard.set(false, forKey: Self.panelHiddenKey)
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
+        panel.orderFrontRegardless()
+    }
+
+    /// A click on the Desk meters: a hidden widget comes back beside them (`meters` is their
+    /// frame on screen); a widget already showing is only brought forward.
+    func showPanel(beside meters: CGRect, on screen: NSScreen?) {
+        if let panel, !panel.isVisible, let screen {
+            let frame = DeskPanelPlacement.frame(beside: meters, size: panel.frame.size,
+                                                 screen: screen.frame, visible: screen.visibleFrame)
+            panel.setFrame(frame, display: false)
+        }
+        showPanel()
+    }
+
+    /// The Tools item: "Hide Sanduhr" when the widget shows, "Show Sanduhr" when it doesn't.
+    @objc func showOrHidePanel() {
+        if panel?.isVisible ?? false { hidePanel() } else { showPanel() }
+    }
+
+    @objc func openDeepWork() {
+        showPanel()
+        viewModel.requestTool = .deepWork
+    }
+
+    @objc func openSnake() {
+        showPanel()
+        viewModel.requestTool = .snake
+    }
+
+    /// Shows the widget with the pacing calculators on every card. Chosen again while they
+    /// show, it puts them back under the pointer.
+    @objc func togglePacingCalculators() {
+        if viewModel.pacingPinned && (panel?.isVisible ?? false) {
+            viewModel.pacingPinned = false
+            return
+        }
+        viewModel.pacingPinned = true
+        showPanel()
     }
 
     static let panelHiddenKey = "panelHidden"

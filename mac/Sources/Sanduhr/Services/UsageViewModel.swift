@@ -47,6 +47,15 @@ final class UsageViewModel {
     /// credentials sheet on the main widget. RootView flips it back to
     /// false once it consumes the signal.
     var requestSettingsSheet: Bool = false
+    /// Set externally (the Tools items in the menu bar and Desk menus) to open one of the
+    /// widget's overlays. RootView opens it and sets this back to nil.
+    var requestTool: WidgetTool?
+    /// The pacing calculators (cool down, surplus) stay showing on every card instead of only
+    /// under the pointer. Turned on and off from the Tools items; not saved.
+    var pacingPinned: Bool = false
+
+    /// The widget overlays a menu can ask for.
+    enum WidgetTool { case deepWork, snake }
 
     /// Called after each successful refresh (and whenever `status` flips
     /// meaningfully). The menu bar status item uses this to re-render its

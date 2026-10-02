@@ -62,7 +62,8 @@ struct RootView: View {
                                     usage: row.usage,
                                     history: vm.history[row.tier.rawValue]?.map(\.v) ?? [],
                                     palette: t,
-                                    tick: vm.countdownTick
+                                    tick: vm.countdownTick,
+                                    pinDeepMath: vm.pacingPinned
                                 )
                             }
                             if let extra = vm.usage?.extraUsage, extra.isEnabled, !vm.compact {
@@ -150,17 +151,23 @@ struct RootView: View {
                 radius: DisplaySettings.shared.subtle ? 3 : 24,
                 x: 0, y: DisplaySettings.shared.subtle ? 1 : 10)
         .contextMenu {
+            // The same Tools items as the menu bar item's menu (AppDelegate.addToolItems).
+            Section("Tools") {
+                Button("Hide Sanduhr") { (NSApp.delegate as? AppDelegate)?.hidePanel() }
+                Toggle("Deep Work", isOn: Binding(
+                    get: { isFocusMode },
+                    set: { on in withAnimation { open(on ? .deepWork : nil) } }))
+                .keyboardShortcut("p", modifiers: .command)
+                Toggle("Pacing Calculators", isOn: $vm.pacingPinned)
+                Toggle("Cooldown Snake", isOn: Binding(
+                    get: { isSnakeGameActive },
+                    set: { on in withAnimation { open(on ? .snake : nil) } }))
+            }
+            Divider()
             Button("Refresh") { Task { await vm.refresh() } }
             Button(vm.compact ? "Expand" : "Compact Mode") { vm.compact.toggle() }
             Button(DisplaySettings.shared.subtle ? "Show Background" : "Subtle Mode") {
                 DisplaySettings.shared.subtle.toggle()
-            }
-            Button(isFocusMode ? "Exit Deep Work" : "Enter Deep Work") { 
-                withAnimation { isFocusMode.toggle() } 
-            }
-            .keyboardShortcut("p", modifiers: .command)
-            Button("Play Cooldown Snake") { 
-                withAnimation { isSnakeGameActive.toggle() } 
             }
             Button("Credentials…") { showSettings = true }
             // Also in the menu bar item's menu, which a notch or a menu bar manager can hide.
@@ -191,6 +198,18 @@ struct RootView: View {
                 vm.requestSettingsSheet = false
             }
         }
+        // The Tools items in the menu bar and Desk menus open an overlay the same way.
+        .onChange(of: vm.requestTool) { _, tool in
+            guard let tool else { return }
+            withAnimation { open(tool) }
+            vm.requestTool = nil
+        }
+    }
+
+    /// Opens one overlay (closing the other), or closes both with nil.
+    private func open(_ tool: UsageViewModel.WidgetTool?) {
+        isFocusMode = tool == .deepWork
+        isSnakeGameActive = tool == .snake
     }
 
     // MARK: Status line

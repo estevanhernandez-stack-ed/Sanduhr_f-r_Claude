@@ -156,8 +156,8 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     @objc private func spaceChanged() { wingsWindow?.orderFrontRegardless() }
 
-    /// The window ignores the mouse, except while the pointer is over the meeting list, so the
-    /// desktop and its icons keep working and the meeting rows can still be clicked.
+    /// The window ignores the mouse, except while the pointer is over the meeting list or the
+    /// meters, so the desktop and its icons keep working and those can still be clicked.
     private func watchMouse() {
         let moved: (NSEvent) -> Void = { [weak self] _ in self?.updateMouseThrough() }
         if let g = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved], handler: moved) {
@@ -169,18 +169,19 @@ final class DeskController: NSObject, NSMenuDelegate {
             mouseMonitors.append(l)
         }
         // Clicks: whichever app macOS gives the click to, if it landed on a meeting row with a
-        // link, open the meeting. A click that reaches Desk itself is consumed.
+        // link, open the meeting; on the meters, show the widget. A click that reaches Desk
+        // itself is consumed.
         if let g = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown], handler: { [weak self] _ in
             // Another app's window over the clock means the click was meant for that app.
             guard let self, !Self.appWindowCoversPointer() else { return }
-            _ = self.joinMeetingUnderPointer()
+            _ = self.clickUnderPointer()
         }) {
             mouseMonitors.append(g)
         }
         if let l = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown], handler: { [weak self] event in
             // Same process as the widget and its settings: only clicks on the desk layer count.
             guard let self, event.window == nil || event.window === self.window else { return event }
-            return self.joinMeetingUnderPointer() ? nil : event
+            return self.clickUnderPointer() ? nil : event
         }) {
             mouseMonitors.append(l)
         }
@@ -223,11 +224,35 @@ final class DeskController: NSObject, NSMenuDelegate {
         return false
     }
 
+    /// A meeting row first, then the meters. True when the click was used.
+    private func clickUnderPointer() -> Bool {
+        joinMeetingUnderPointer() || showWidgetFromMeters()
+    }
+
+    /// True when the pointer is over the meters (with a little slack, as for the meeting list).
+    private func pointerOverMeters(_ point: CGPoint) -> Bool {
+        !model.metersFrame.isEmpty && model.metersFrame.insetBy(dx: -8, dy: -6).contains(point)
+    }
+
+    /// A click on the meters ends the hint and shows the widget beside them.
+    private func showWidgetFromMeters() -> Bool {
+        guard let w = window, let point = pointerInWindow(), pointerOverMeters(point) else { return false }
+        model.meterHintDismissed()
+        let f = model.metersFrame
+        let onScreen = CGRect(x: w.frame.minX + f.minX, y: w.frame.maxY - f.maxY,
+                              width: f.width, height: f.height)
+        let screen = w.screen ?? NSScreen.main
+        // Event monitors run on the main thread.
+        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.showPanel(beside: onScreen, on: screen) }
+        return true
+    }
+
     private func updateMouseThrough() {
         guard let w = window, let point = pointerInWindow() else { return }
         let overRows = model.meetings.contains { $0.link != nil }
             && model.meetingsFrame.insetBy(dx: -8, dy: -6).contains(point)
-        if w.ignoresMouseEvents == overRows { w.ignoresMouseEvents = !overRows }
+        let over = overRows || pointerOverMeters(point)
+        if w.ignoresMouseEvents == over { w.ignoresMouseEvents = !over }
     }
 
     /// estedesk://join-next opens the next meeting's link (Option+J does the same, see applyHotKeys).
@@ -300,6 +325,9 @@ final class DeskController: NSObject, NSMenuDelegate {
     }
 
     private func addStandardItems(to menu: NSMenu) {
+        // Menus are built on the main thread.
+        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.addToolItems(to: menu) }
+        menu.addItem(.separator())
         let settings = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)

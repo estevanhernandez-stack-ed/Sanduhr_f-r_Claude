@@ -140,9 +140,30 @@ struct DeskView: View {
                 if model.signInNeeded {
                     Text("sign in again in Sanduhr").opacity(0.75)
                 }
+                if model.meterHintVisible && !model.meters.isEmpty {
+                    Text(DeskMeterHint.text)
+                        .font(.custom(font, size: size * 0.75))
+                        .multilineTextAlignment(alignment == .trailing ? .trailing : .leading)
+                        .frame(maxWidth: timeSize * 3.2, alignment: alignment == .trailing ? .trailing : .leading)
+                        .opacity(0.7)
+                        .onAppear { model.meterHintShown() }
+                }
             }
             .font(.custom(font, size: size))
             .opacity(model.claudeLineIsStale ? 0.5 : 1)
+            // Clickable like a meeting row: the click itself is handled in DeskController, which
+            // shows the widget beside the meters.
+            .contentShape(Rectangle())
+            .onHover { inside in
+                if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
+            .background(GeometryReader { geo in
+                Color.clear.preference(key: MetersFrameKey.self, value: geo.frame(in: .global))
+            })
+            .onPreferenceChange(MetersFrameKey.self) { frame in
+                model.metersFrame = frame
+            }
+            .onDisappear { model.metersFrame = .zero }
         }
     }
 
@@ -314,6 +335,11 @@ private struct RowFramesKey: PreferenceKey {
     static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
         value.merge(nextValue()) { _, new in new }
     }
+}
+
+private struct MetersFrameKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
 }
 
 private struct MeetingsFrameKey: PreferenceKey {

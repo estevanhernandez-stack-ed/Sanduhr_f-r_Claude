@@ -440,3 +440,73 @@ struct DeskFirstRunTests {
         #expect(widget.object(forKey: DeskFirstRun.tuckKey) == nil)
     }
 }
+
+@Suite("Desk meter hint")
+struct DeskMeterHintTests {
+    let start = Date(timeIntervalSince1970: 1_790_000_000)
+    let day: TimeInterval = 24 * 60 * 60
+
+    @Test func dueBeforeItHasEverShown() {
+        let hint = DeskMeterHint(store: MemoryDefaults())
+        #expect(hint.isVisible(now: start))
+        // Its three days start when it is drawn, not before.
+        #expect(hint.isVisible(now: start.addingTimeInterval(30 * day)))
+    }
+
+    @Test func expiresThreeDaysAfterItFirstShowed() {
+        let store = MemoryDefaults()
+        let hint = DeskMeterHint(store: store)
+        hint.markShown(now: start)
+        // Drawn again later (a new window, a relaunch): the first date stands.
+        hint.markShown(now: start.addingTimeInterval(2 * day))
+        #expect(store.object(forKey: DeskMeterHint.firstShownKey) as? Date == start)
+        #expect(hint.isVisible(now: start.addingTimeInterval(3 * day - 60)))
+        #expect(hint.isVisible(now: start.addingTimeInterval(3 * day)) == false)
+        #expect(hint.isVisible(now: start.addingTimeInterval(10 * day)) == false)
+    }
+
+    @Test func firstMeterClickEndsItForGood() {
+        let store = MemoryDefaults()
+        let hint = DeskMeterHint(store: store)
+        hint.markShown(now: start)
+        hint.dismiss()
+        #expect(hint.isVisible(now: start.addingTimeInterval(60)) == false)
+        // A later launch reads the same store.
+        #expect(DeskMeterHint(store: store).isVisible(now: start.addingTimeInterval(60)) == false)
+    }
+
+    @Test func dismissedBeforeShowingNeverShows() {
+        let hint = DeskMeterHint(store: MemoryDefaults())
+        hint.dismiss()
+        #expect(hint.isVisible(now: start) == false)
+    }
+}
+
+@Suite("Widget beside the meters")
+struct DeskPanelPlacementTests {
+    let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+    let visible = CGRect(x: 0, y: 0, width: 1512, height: 944)   // under a 38-point menu bar
+    let size = CGSize(width: 340, height: 520)
+
+    @Test func rightOfMetersInTheBottomLeftCorner() {
+        let meters = CGRect(x: 52, y: 60, width: 360, height: 120)
+        let f = DeskPanelPlacement.frame(beside: meters, size: size, screen: screen, visible: visible)
+        #expect(f.minX == meters.maxX + DeskPanelPlacement.gap)
+        #expect(f.minY == meters.minY)
+    }
+
+    @Test func leftOfMetersInTheTopRightCorner() {
+        let meters = CGRect(x: 1100, y: 830, width: 360, height: 120)
+        let f = DeskPanelPlacement.frame(beside: meters, size: size, screen: screen, visible: visible)
+        #expect(f.maxX == meters.minX - DeskPanelPlacement.gap)
+        // Level with the meters' top would run past the menu bar, so it is pulled down.
+        #expect(f.maxY == visible.maxY)
+    }
+
+    @Test func staysOnTheVisibleScreen() {
+        // Wide meters in the bottom right leave no room to their left at full width.
+        let meters = CGRect(x: 200, y: 10, width: 1260, height: 80)
+        let f = DeskPanelPlacement.frame(beside: meters, size: size, screen: screen, visible: visible)
+        #expect(visible.contains(f))
+    }
+}

@@ -43,6 +43,12 @@ final class DeskModel {
     @ObservationIgnored var meetingsFrame: CGRect = .zero
     /// Each meeting row's frame, same coordinates, keyed by meeting id. Clicks are matched here.
     @ObservationIgnored var rowFrames: [String: CGRect] = [:]
+    /// Where the meters sit in the window, same coordinates, or .zero when they are not drawn.
+    /// The meters take clicks here; a click shows the widget beside them.
+    @ObservationIgnored var metersFrame: CGRect = .zero
+    /// The one-time hint under the meters (DeskMeterHint) is still due.
+    var meterHintVisible = false
+    @ObservationIgnored private let meterHint = DeskMeterHint()
 
     /// The widget's last numbers (see `update`).
     @ObservationIgnored private var usage = DeskUsage()
@@ -133,6 +139,17 @@ final class DeskModel {
         claudeLine = DeskClaudeText.line(usage)
         claudeCompact = DeskClaudeText.compact(usage, now: now)
         claudeLineIsStale = usage.isStale(now: now)
+        let hint = meterHint.isVisible(now: now)
+        if meterHintVisible != hint { meterHintVisible = hint }
+    }
+
+    /// The hint was drawn under the meters; its three days start now if they have not already.
+    func meterHintShown() { meterHint.markShown(now: Date()) }
+
+    /// The meters were clicked: the hint has done its job.
+    func meterHintDismissed() {
+        meterHint.dismiss()
+        meterHintVisible = false
     }
 
     /// The first meeting still to come (or in progress) that has a join link.
