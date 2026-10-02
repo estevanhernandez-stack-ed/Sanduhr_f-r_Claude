@@ -124,10 +124,13 @@ final class DeskController: NSObject, NSMenuDelegate {
         wingsWindow?.close()
         wingsWindow = nil
         guard let notch = model.notchRect else { return }
+        // The menu bar can be a point taller than the notch (39 vs 38 on a 14-inch MacBook Pro);
+        // wings only as tall as the notch leave its bottom row showing under them.
+        let barHeight = max(notch.height, model.topInset)
         let pad = NotchWingsView.maxWings + 12   // the wing itself plus its flare
         let frame = NSRect(x: screen.frame.minX + notch.minX - pad,
-                           y: screen.frame.maxY - notch.height,
-                           width: notch.width + pad * 2, height: notch.height)
+                           y: screen.frame.maxY - barHeight,
+                           width: notch.width + pad * 2, height: barHeight)
         let w = NSWindow(contentRect: frame, styleMask: [.borderless], backing: .buffered, defer: false)
         w.isReleasedWhenClosed = false
         // Above the menu bar and above menu bar tools that keep their own overlay on top of it
@@ -139,7 +142,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         w.hasShadow = false
         // Clickable (the island opens settings); clicks on its transparent edges fall through.
         w.ignoresMouseEvents = false
-        w.contentView = FirstClickHostingView(rootView: NotchWingsView(model: model, notchWidth: notch.width, notchHeight: notch.height))
+        w.contentView = FirstClickHostingView(rootView: NotchWingsView(model: model, notchWidth: notch.width, notchHeight: notch.height, barHeight: barHeight))
         w.setFrame(frame, display: true)
         w.orderFrontRegardless()
         wingsWindow = w

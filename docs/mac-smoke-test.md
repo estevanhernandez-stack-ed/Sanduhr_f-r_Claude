@@ -44,7 +44,7 @@ M0 is the first pass. Each line is a check: do the action, see the result.
 
 ## 4. Desk on
 
-- [ ] Status menu, Desk Settings. Window titled "Sanduhr Desk" opens with Layout, Look, Message, Notch, General.
+- [ ] Two-finger click the widget, Desk Settings (also in the menu bar hourglass's menu, if it is visible). Window titled "Sanduhr Desk" opens with Layout, Look, Message, Notch, General.
 - [ ] General, "Show Desk": clock, date, Claude line and message appear on the desktop at once. The notch stays plain (it has its own switch, off).
 - [ ] Calendar prompt appears (meetings default on). Allow: today's remaining timed meetings show.
 - [ ] Layout: move Clock to Top right; it moves live. Hide Meetings; they go. Put both back.

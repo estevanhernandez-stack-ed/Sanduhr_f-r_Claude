@@ -103,6 +103,8 @@ struct NotchWingsView: View {
     var model: DeskModel
     let notchWidth: CGFloat
     let notchHeight: CGFloat
+    /// How far down the black reaches: the notch or the menu bar, whichever is taller.
+    let barHeight: CGFloat
     @AppStorage(DeskController.notchKey, store: .desk) private var enabled = false
     @AppStorage("notchWings", store: .desk) private var wings = 36.0
     @AppStorage("notchText", store: .desk) private var showText = true
@@ -118,7 +120,7 @@ struct NotchWingsView: View {
                 let wingL = w.left, wingR = w.right
                 if wingL > 0 || wingR > 0 {
                     ZStack {
-                        IslandShape(flare: 8, radius: min(10, notchHeight * 0.3))
+                        IslandShape(flare: 8, radius: min(10, barHeight * 0.3))
                             .fill(Color.black)
                         HStack(spacing: 0) {
                             label(left, size).frame(width: max(0, wingL - 10), alignment: .trailing)
@@ -126,7 +128,7 @@ struct NotchWingsView: View {
                             label(right, size).frame(width: max(0, wingR - 10), alignment: .leading)
                         }
                     }
-                    .frame(width: notchWidth + wingL + wingR, height: notchHeight)
+                    .frame(width: notchWidth + wingL + wingR, height: barHeight)
                     .offset(x: (wingR - wingL) / 2)
                     .contentShape(Rectangle())
                     .onTapGesture { DeskController.shared.showSettings() }
