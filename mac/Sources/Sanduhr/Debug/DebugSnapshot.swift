@@ -27,47 +27,55 @@ struct DebugStateInput {
     var build = ""
 }
 
-enum DebugState {
-    static func yaml(_ s: DebugStateInput) -> YAMLNode {
+enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
+        // Built in typed steps: one literal holding the whole map is more than Swift 6.0 and 6.1
+        // will type-check in reasonable time.
         let iso = ISO8601DateFormatter()
+        let meters: [YAMLNode] = s.meters.map(meter)
+        let menu: [YAMLNode] = s.menu.map(menuGroup)
+        var pairs: [(String, YAMLNode?)] = []
+        pairs.append(("desk_enabled", .bool(s.deskEnabled)))
+        pairs.append(("desk_running", .bool(s.deskRunning)))
+        pairs.append(("layout", s.layout.map(YAMLNode.string) ?? .null))
+        pairs.append(("notch", .bool(s.notch)))
+        pairs.append(("has_notch", .bool(s.hasNotch)))
+        pairs.append(("widget_visible", .bool(s.widgetVisible)))
+        pairs.append(("settings_open", .bool(s.settingsOpen)))
+        let section: YAMLNode = s.settingsSection.map { .string($0.rawValue) } ?? .null
+        pairs.append(("settings_section", section))
+        pairs.append(("meters", .list(meters)))
+        pairs.append(("meetings_count", .int(s.meetingsCount)))
+        pairs.append(("alerts", alerts(s.alerts)))
+        let fetched: YAMLNode = s.lastFetch.map { .string(iso.string(from: $0)) } ?? .null
+        pairs.append(("last_fetch", fetched))
+        pairs.append(("active_tool", s.activeTool.map(YAMLNode.string) ?? .null))
+        pairs.append(("pacing_pinned", .bool(s.pacingPinned)))
+        pairs.append(("pulse_count", .int(s.pulseCount)))
+        pairs.append(("menu", .list(menu)))
+        pairs.append(("version", .string(s.version)))
+        pairs.append(("build", .string(s.build)))
+        return .object(pairs)
+    }
+    
+    private static func meter(_ m: DeskMeterRow) -> YAMLNode {
+        let pace: YAMLNode = m.pace.map(YAMLNode.double) ?? .null
         return .object([
-            ("desk_enabled", .bool(s.deskEnabled)),
-            ("desk_running", .bool(s.deskRunning)),
-            ("layout", s.layout.map(YAMLNode.string) ?? .null),
-            ("notch", .bool(s.notch)),
-            ("has_notch", .bool(s.hasNotch)),
-            ("widget_visible", .bool(s.widgetVisible)),
-            ("settings_open", .bool(s.settingsOpen)),
-            ("settings_section", s.settingsSection.map { .string($0.rawValue) } ?? .null),
-            ("meters", .list(s.meters.map { m in
-                .object([
-                    ("tier", .string(m.tier.rawValue)),
-                    ("label", .string(m.label)),
-                    ("percent", .int(m.percent)),
-                    ("fill", .double(m.fill)),
-                    ("pace", m.pace.map(YAMLNode.double) ?? .null),
-                    ("reset", .string(m.reset)),
-                ])
-            })),
-            ("meetings_count", .int(s.meetingsCount)),
-            ("alerts", alerts(s.alerts)),
-            ("last_fetch", s.lastFetch.map { .string(iso.string(from: $0)) } ?? .null),
-            ("active_tool", s.activeTool.map(YAMLNode.string) ?? .null),
-            ("pacing_pinned", .bool(s.pacingPinned)),
-            ("pulse_count", .int(s.pulseCount)),
-            ("menu", .list(s.menu.map { group in
-                .object([
-                    ("header", group.header.map(YAMLNode.string)),
-                    ("items", .list(group.entries.map { e in
-                        .object([("title", .string(e.title)), ("checked", .bool(e.checked))])
-                    })),
-                ])
-            })),
-            ("version", .string(s.version)),
-            ("build", .string(s.build)),
+            ("tier", .string(m.tier.rawValue)),
+            ("label", .string(m.label)),
+            ("percent", .int(m.percent)),
+            ("fill", .double(m.fill)),
+            ("pace", pace),
+            ("reset", .string(m.reset)),
         ])
     }
-
+    
+    private static func menuGroup(_ group: MenuGroup) -> YAMLNode {
+        let items: [YAMLNode] = group.entries.map { e in
+            .object([("title", .string(e.title)), ("checked", .bool(e.checked))])
+        }
+        return .object([("header", group.header.map(YAMLNode.string)), ("items", .list(items))])
+    }
+    
     static func alerts(_ a: AlertSettings) -> YAMLNode {
         .object([
             ("enabled", .bool(a.enabled)),
