@@ -133,7 +133,7 @@ Cooldown Snake, themes, history once M7 lands). Mac sources only; build and test
   Acceptance: every setting is reachable with the widget hidden and the menu bar icon hidden by Ice; the three menus list the same items in the same order; no saved setting is lost across the update.
   Verify: swift-testing for the menu model's items; smoke test updated.
 
-- [ ] **17. Alerts v2: pace, delivery, quiet and sound**
+- [x] **17. Alerts v2: pace, delivery, quiet and sound**
   Spec ref: New — extends the 2.1.0 alerts (`Notifier.swift`)
   What to build: move the alert decisions into a pure rules type and add: a **pace warning** when `burnProjection` says a limit will hit 100% before it resets (once per window, with the projected time and the reset time in the text); **where alerts show**: banner, a pulse on the Desk meters and notch island, or both; **quiet hours** (start and end, may cross midnight; banners held back, Desk pulses still shown); a **sound** picker (system sounds or silent); and a **weekly reset** alert beside the session one. Existing thresholds keep working.
   Acceptance: fixture usage on pace to run out fires one pace warning naming both times; during quiet hours no banner is posted; Desk-only delivery pulses the meters and posts nothing; each alert still fires once per reset window.
