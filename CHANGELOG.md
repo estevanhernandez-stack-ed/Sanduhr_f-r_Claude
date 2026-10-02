@@ -1,8 +1,20 @@
 # Changelog
 
 ## Unreleased (mac)
-- **Desk** (off by default): Sanduhr can also draw on the desktop under your windows (clock and date, Claude meters, today's meetings with click-to-join in Teams or Zoom, a handwritten line from a messages file, four corner slots) and around the camera notch (black wings beside the camera with the time or next meeting and the Claude meters, an optional strip below). Turn it on from Desk Settings in the widget's menu (two-finger click) or the menu bar item's; the notch has its own switch there, off until you turn it on. Calendar access is asked only when meetings are on. While Desk is on, Option+J joins the next meeting and Option+S opens Desk Settings from any app, no Accessibility permission needed; Desk Settings, General, Shortcuts turns them off (they take ∆ and ß while on). Merged from Sanduhr Desk; its settings and those of the older Desk app are imported once, notch included.
-- Release builds are universal (Apple silicon and Intel) even without full Xcode: each slice builds on its own and `lipo` joins them, and the build fails if either is missing. v2.0.4 shipped Intel-only and ran under Rosetta on Apple silicon.
+
+## v2.1.0-mac — 2026-10-02
+
+**Desk**, a second way to see Claude usage: drawn on the desktop under your windows and around the camera notch instead of in a window. Off by default; the widget is unchanged. Turn it on from the widget's menu (two-finger click), Desk Settings, General, Show Desk.
+
+- **Desktop layer**: clock and date (font and size), the Claude meters (from `snapshot.json`, so they show with the widget hidden), today's next meetings with Teams, Zoom, Google Meet and Webex links (click to join, in Teams or Zoom when installed), and a line from `~/Library/Application Support/Desk/messages.txt` that rotates daily, with `Mon:` and `MM-DD:` tags for a weekday or a date. Each piece goes in any of four corners; margins, ink color or gradient, and drop shadow are settings. Click-through except on meeting rows.
+- **Notch island** (notched MacBooks, its own switch, off by default): black wings beside the camera with the time or the next meeting within the hour and the Claude meters, above every app and in full screen; an optional strip under the camera on the desktop. Click it for Desk Settings.
+- **Shortcuts**: Option+J joins the next meeting, Option+S opens Desk Settings, from any app, registered by Sanduhr (Carbon hotkeys, no Accessibility permission) while Desk runs. Desk Settings, General, Shortcuts turns them off; while on they take ∆ and ß.
+- **Privacy**: Calendar access is asked only when meetings are on; join links are found on the Mac, and only a meeting's time, title and service are shown.
+- **From Sanduhr Desk**: settings from Sanduhr Desk and the older Desk app are imported once (Desk switched on, notch kept as it was), and a running copy is quit. `sanduhr://` and `estedesk://` (`settings`, `join-next`) open Desk Settings and join the next meeting.
+
+Also:
+
+- **Native on Apple silicon.** Release builds are universal (arm64 and x86_64) and fail without both slices; 2.0.4 went out Intel-only and ran under Rosetta. Built, notarized and Sparkle-signed by `.github/workflows/mac-release.yml` (`docs/mac-release.md`).
 - Copy, paste and undo work in every Sanduhr text field (an Edit menu now exists, unseen).
 - Hiding the widget sticks across launches; Sanduhr keeps fetching, alerting and writing `snapshot.json` while hidden. Opening the app again while it runs toggles the widget.
 - Claude Code integrations (`mac/integrations/`): a statusline segment and the `sanduhr` MCP server (`get_usage`, `ping`), Mac ports of the Windows ones with the same output and tool shapes. Both read only `snapshot.json`. Install with `bash mac/integrations/install.sh`.

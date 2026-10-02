@@ -42,6 +42,25 @@ Goal: the merged app on users' Macs, native on Apple silicon.
   `docs/appcast.xml` entry, GitHub release `v2.1.0-mac`.
 - Accept: a 2.0.4 install offers 2.1.0 through Sparkle; the installed binary is `x86_64 arm64`.
 
+**Done 2026-10-02.** 2.1.0 shipped (`v2.1.0-mac`); a 2.0.4 install updated through Sparkle and
+reports `x86_64 arm64`, Notarized Developer ID. What differed from the plan:
+
+- Releases are built on GitHub, not locally: `mac-release.yml` drafts a notarized, Sparkle-signed
+  release and opens the appcast and cask pull request; signing secrets live in the `mac-release`
+  environment, uploaded once from the Mac holding them (`docs/mac-release.md`).
+- `build.sh`'s command-line-tools universal path kept only x86_64 (SwiftPM 6.4 reuses one bin
+  path for both triples); fixed. `swift test` needs `mac/test.sh` without full Xcode.
+- Build number had to go to 3: 2.0.4 shipped as build 2, and Sparkle orders by it.
+- The hand smoke test (`docs/mac-smoke-test.md`) found four bugs, all fixed before release: Desk
+  Settings unreachable when Ice hides the menu bar item, notch wings 1 pt short of a 39 pt menu
+  bar, the migration copying Sanduhr Desk's alert keys, and the wings window collapsing when the
+  notch was toggled (hosting views now never size their windows).
+- Option+J and Option+S were an skhd binding, not the app's; Desk now registers them. The notch is
+  off by default (the plan said so; the merged code had it on).
+- Still open from the merge plan: one Settings window with a Surfaces list (Desk keeps its own
+  window and its own defaults suite, `com.626labs.sanduhr.desk`), and the Desk reading
+  `UsageViewModel` directly instead of `snapshot.json`.
+
 ## M1. Tiers that keep up (M)
 
 Port: `TierModel.cs`, the limits synthesis in `UsageFetcher.cs`, `PlanLabel.cs`,
