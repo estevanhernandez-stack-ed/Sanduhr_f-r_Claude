@@ -69,12 +69,17 @@ enum DeskFirstRun {
     static let layout = "message:tl clock:bl meters:bl meetings:bl"
 
     /// Widget settings any earlier version writes. windowFrame is saved on the first move or
-    /// resize; the others as soon as the setting is touched. The Keychain session key is not a
-    /// signal: it outlives a wiped defaults domain, and a fresh install that already has one
-    /// takes the same path (widget shows, then tucks after the first fetch).
+    /// resize; the others as soon as the setting is touched. Sparkle's SULastCheckTime and
+    /// SUEnableAutomaticChecks catch the rest: any install that has checked for updates (every
+    /// 2.0.x that reached this version through Sparkle) has them, and a fresh launch never does.
+    /// SUHasLaunchedBefore would not work: Sparkle writes it before this runs. The Keychain
+    /// session key is not a signal either: it outlives a wiped defaults domain, and a fresh
+    /// install that already has one takes the same path (widget shows, then tucks after the
+    /// first fetch).
     static let widgetKeys = [
         "windowFrame", "panelHidden", "theme", "fontFamily", "subtleMode",
         "pacingToolsEnabled", "snakeHighScore",
+        "SULastCheckTime", "SUEnableAutomaticChecks",
         Notifier.Key.enabled, Notifier.Key.sessionPct, Notifier.Key.weeklyPct,
         Notifier.Key.sessionFull, Notifier.Key.sessionReset, Notifier.Key.fired,
     ]

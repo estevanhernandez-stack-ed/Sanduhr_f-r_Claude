@@ -387,6 +387,22 @@ struct DeskFirstRunTests {
         #expect(DeskFirstRun.tuck(afterFetch: true, widget: widget) == false)
     }
 
+    @Test func compactModeUserFrom204IsLeftAlone() {
+        // Never moved the window and never touched a setting, but Sparkle has checked for updates.
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        widget.set(Date(), forKey: "SULastCheckTime")
+        widget.set(true, forKey: "SUHasLaunchedBefore")
+        #expect(s.firstRun(widget: widget) == .existing)
+        #expect(s.defaults.values.isEmpty)
+    }
+
+    @Test func sparklesFirstLaunchKeyAloneIsStillFresh() {
+        // Sparkle writes SUHasLaunchedBefore before the first-run check, even on a fresh install.
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        widget.set(true, forKey: "SUHasLaunchedBefore")
+        #expect(s.firstRun(widget: widget) == .fresh)
+    }
+
     @Test func userWhoRan210IsLeftAlone() {
         // 2.1.0 ran DeskMigration on every launch, so its suite is marked even with Desk off.
         let s = ScratchDefaults(), widget = MemoryDefaults()

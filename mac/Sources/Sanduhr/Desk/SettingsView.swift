@@ -293,6 +293,11 @@ private struct GeneralTab: View {
             }
             Section("Calendar and Claude") {
                 Toggle("Read today's meetings", isOn: $showMeetings)
+                    .onChange(of: showMeetings) { _, on in
+                        let desk = DeskController.shared
+                        if on, desk.running { desk.model.requestCalendar() }
+                        if !on { desk.model.meetings = [] }
+                    }
                 Toggle("Show the Claude meters on the desktop", isOn: $showClaude)
             }
             Section("Shortcuts") {

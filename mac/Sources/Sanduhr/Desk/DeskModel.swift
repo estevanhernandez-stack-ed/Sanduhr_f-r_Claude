@@ -54,18 +54,7 @@ final class DeskModel {
 
     func start() {
         // Calendar access is asked only when meetings are on (Desk settings, General).
-        if UserDefaults.desk.object(forKey: "showMeetings") as? Bool ?? true {
-        store.requestFullAccessToEvents { [weak self] granted, _ in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                if granted {
-                    self.refreshEvents()
-                } else {
-                    self.calendarNote = "Allow Sanduhr in Settings, Privacy, Calendars"
-                }
-            }
-        }
-        }
+        if UserDefaults.desk.object(forKey: "showMeetings") as? Bool ?? true { requestCalendar() }
         storeObserver = NotificationCenter.default.addObserver(
             forName: .EKEventStoreChanged, object: store, queue: .main
         ) { [weak self] _ in self?.refreshEvents() }
@@ -78,6 +67,22 @@ final class DeskModel {
         claudeTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             self?.refreshClaude()
             self?.message = MessageEngine.current()   // picks up messages.txt edits within a minute
+        }
+    }
+
+    /// Asks for Calendar access (macOS shows its prompt only the first time) and loads today's
+    /// meetings. Runs when Desk starts with meetings on, and when meetings are switched on later:
+    /// new installs start with them off.
+    func requestCalendar() {
+        store.requestFullAccessToEvents { [weak self] granted, _ in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if granted {
+                    self.refreshEvents()
+                } else {
+                    self.calendarNote = "Allow Sanduhr in Settings, Privacy, Calendars"
+                }
+            }
         }
     }
 

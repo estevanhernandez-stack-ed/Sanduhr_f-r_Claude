@@ -51,14 +51,15 @@ M0 is the first pass. Each line is a check: do the action, see the result.
 - [ ] Refresh Now again: no second banner (once per tier per reset window).
 - [ ] Put the line back where it was.
 
-## 4. Desk on
+## 4. Desk
 
 - [ ] Two-finger click the widget, Desk Settings (also in the menu bar hourglass's menu, if it is visible). Window titled "Sanduhr Desk" opens with Layout, Look, Message, Notch, General.
-- [ ] General, "Show Desk": clock, date, Claude line and message appear on the desktop at once. The notch stays plain (it has its own switch, off).
-- [ ] Calendar prompt appears (meetings default on). Allow: today's remaining timed meetings show.
+- [ ] After section 1, Desk is already on: clock, date, message and the meters (a bar per limit with a pace tick and reset time). General, "Show Desk" is on. The notch stays plain (its own switch, off).
+- [ ] General, "Read today's meetings" (off on a fresh install): switch it on and the Calendar prompt appears right away, no restart. Allow: today's remaining timed meetings show. Switch it off: they go.
+- [ ] Meters: their pace ticks sit where the widget's do; hide the widget and refresh from the menu, and the meters still update.
 - [ ] Layout: move Clock to Top right; it moves live. Hide Meetings; they go. Put both back.
 - [ ] Look: ink `9ad7ff, 012089` (space after the comma) on the message draws blue to navy, no gray.
-- [ ] Message: `~/Library/Application Support/Desk/messages.txt` exists with the starter lines; add `10-01: smoke test` (today's MM-DD), and within a minute the desktop shows it.
+- [ ] Message: `~/Library/Application Support/Desk/messages.txt` exists with the starter lines; add a `MM-DD: smoke test` line for today, and within a minute the desktop shows it.
 - [ ] Meeting rows with a Teams/Zoom/Meet link: pointer turns into a hand; click opens it. Clicking empty desktop still reaches Finder.
 - [ ] Turn "Show Desk" off: desktop layer (and notch, if on) go. On again: they come back (repeat twice; no doubled refreshes in Console).
 
