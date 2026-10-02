@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build Sanduhr.app from the Swift package.
-# Usage: ./build.sh               # release build, auto-detects universal vs native
+# Usage: ./build.sh               # release build, always universal
 #        ./build.sh --debug       # debug build, native arch (fastest iteration)
 #        ./build.sh --universal   # force universal (Apple silicon + Intel)
 # Release builds are always universal. With full Xcode, SwiftPM builds both slices in one
@@ -35,16 +35,21 @@ fi
 if $UNIVERSAL && $HAVE_XCBUILD; then
     echo "→ Building ($CONFIG, universal via Xcode)..."
     swift build -c "$CONFIG" --arch arm64 --arch x86_64
-    BIN=".build/apple/Products/Release/Sanduhr"
+    # Ask for the path: it moved from .build/apple to .build/out between SwiftPM versions.
+    BIN="$(swift build -c "$CONFIG" --arch arm64 --arch x86_64 --show-bin-path)/Sanduhr"
 elif $UNIVERSAL; then
     echo "→ Building ($CONFIG, universal: arm64 then x86_64, joined with lipo)..."
-    swift build -c "$CONFIG" --triple arm64-apple-macosx14.0
-    swift build -c "$CONFIG" --triple x86_64-apple-macosx14.0
-    ARM="$(swift build -c "$CONFIG" --triple arm64-apple-macosx14.0 --show-bin-path)/Sanduhr"
-    X86="$(swift build -c "$CONFIG" --triple x86_64-apple-macosx14.0 --show-bin-path)/Sanduhr"
+    # Newer SwiftPM gives both triples the same bin path (.build/out/Products/Release), so the
+    # second build overwrites the first: copy each slice out as soon as it is built.
     mkdir -p .build/universal
+    for arch in arm64 x86_64; do
+        swift build -c "$CONFIG" --triple "$arch-apple-macosx14.0"
+        SLICE=".build/universal/Sanduhr-$arch"
+        cp "$(swift build -c "$CONFIG" --triple "$arch-apple-macosx14.0" --show-bin-path)/Sanduhr" "$SLICE"
+        [[ "$(lipo -archs "$SLICE")" == "$arch" ]] || { echo "✗ $SLICE is $(lipo -archs "$SLICE"), not $arch" >&2; exit 1; }
+    done
     BIN=".build/universal/Sanduhr"
-    lipo -create "$ARM" "$X86" -output "$BIN"
+    lipo -create .build/universal/Sanduhr-arm64 .build/universal/Sanduhr-x86_64 -output "$BIN"
 else
     echo "→ Building ($CONFIG, native arch)..."
     swift build -c "$CONFIG"
