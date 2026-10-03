@@ -198,7 +198,7 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: a Desk pulse shows no light above or beside the top of the wings; with the island off, a glow outlines the hardware notch; with the island on, unchanged from item 21 with its fixes.
   Verify: swift-testing for the plain-notch glow layout; smoke: pulse and glow scenarios with the island on and off; an on-screen capture of the notch area during a pulse.
 
-- [ ] **26. Warning bars on the widget too**
+- [x] **26. Warning bars on the widget too**
   Spec ref: New — extends item 25 (`Desk/MeterWarning.swift`, widget bars in `Views/ProgressBarView.swift` / `Views/TierCardView.swift`)
   What to build: the widget's tier bars use the same per-meter warning rule and settings as the Desk meters (item 25): a warning tier's bar turns red with a steady glow in the current theme's accent (in Match Desk, the Desk ink gradient) around the bar. Non-warning bars unchanged. The Meters settings page says it applies to both the Desk and the widget.
   Acceptance: a weekly tier at 92% with days left shows red with a theme-color glow on the widget, and the same on Desk; turning its warning off clears both.
