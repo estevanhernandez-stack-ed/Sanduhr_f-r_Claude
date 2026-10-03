@@ -89,6 +89,7 @@ Fresh-install and migration checks stay manual.
 - [ ] Quit and relaunch: the notch is still on (the switch saved). Turn it off: wings and strip go, Desk layer stays.
 - [ ] Full-screen an app: wings stay above it. Switch Spaces: wings stay.
 - [ ] External display as main: no island drawn.
+- [ ] Camera light: Notch, "Light up for the camera" on. Open Photo Booth: within a second a soft white light glows around the notch (over the island, the menu bar beside it and a band below). Click through it: the click reaches the app underneath. Brightness and "Reach below the menu bar" change it live. Full-screen Photo Booth: the light stays above it. Quit Photo Booth: it fades out. With Desk off, same result. Tools, Camera Light shows it with no camera and shows checked; chosen again it goes. Switch off: a camera no longer lights it.
 
 ## 6. Links and keys
 

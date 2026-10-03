@@ -267,6 +267,10 @@ module Smoke
         steps << [before['widget_visible'] ? 'show-widget' : 'hide-widget', nil]
       end
       steps << ['notch', before['notch'] ? 'on' : 'off'] if !!before['notch'] != !!after['notch']
+      # The camera light by hand, only when no camera was in use (a running camera lights it too).
+      if !before['camera_in_use'] && !after['camera_in_use'] && !!before['camera_light'] != !!after['camera_light']
+        steps << ['camera-light', before['camera_light'] ? 'on' : 'off']
+      end
       if !!before['desk_enabled'] != !!after['desk_enabled']
         steps << ['desk', before['desk_enabled'] ? 'on' : 'off']
       end

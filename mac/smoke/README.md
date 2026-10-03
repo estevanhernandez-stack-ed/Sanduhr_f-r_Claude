@@ -17,7 +17,7 @@ open Sanduhr.app
 
 smoke/smoke enable             # defaults write com.626labs.sanduhr debugHooks -bool true
 smoke/smoke snap               # prints the folder: renders, tree.yaml, state.yaml, screen-*.png
-smoke/smoke tree settings      # the Settings window's UI tree (widget, desk, notch, settings, sheet)
+smoke/smoke tree settings      # the Settings window's UI tree (widget, desk, notch, camera, settings, sheet)
 smoke/smoke state              # Desk, notch, widget, Settings, meters, alerts, menu, version
 smoke/smoke do settings notch  # one action, waits for it
 smoke/smoke watch 5            # live log + out/watch/index.html refreshing every 5 s; Ctrl-C stops
@@ -58,6 +58,8 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
 - **state.yaml**: `desk_enabled`, `desk_running`, `layout`, `notch`, `has_notch`,
   `notch_left`, `notch_right`, `notch_strip` (what each place on the island shows, a
   `NotchContent` raw value such as `meetingOrTime`, `meters` or `nothing`; the default when unset),
+  `camera_in_use` (an app is using a camera; only watched while the camera light switch is on),
+  `camera_light` (the camera light shows, for a camera or by hand),
   `widget_visible`, `settings_open`, `settings_section`, `meters` (tier, label, percent, fill,
   pace, reset), `meetings_count`, `alerts`, `last_fetch`, `active_tool`, `pacing_pinned`,
   `pulse_count`, `theme` (the widget theme's id), `menu` (groups with item titles and checkmarks), `version`, `build`.
@@ -65,7 +67,8 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
 Actions: `show-widget`, `hide-widget`, `settings [section]` (a `SettingsSection` raw value such
 as `notch` or `deskLayout`), `close-settings`, `refresh` (waits for the fetch), `test-alert`,
 `pulse [tier]` (`five_hour` by default), `tool deep-work|pacing|snake` (as the Tools menu: chosen
-again it closes), `desk on|off`, `notch on|off`.
+again it closes), `desk on|off`, `notch on|off`, `camera-light on|off` (the light by hand, as Tools, Camera Light;
+its window is kind `camera` in tree.yaml, one node labeled `Camera light`).
 
 ## Scenarios
 

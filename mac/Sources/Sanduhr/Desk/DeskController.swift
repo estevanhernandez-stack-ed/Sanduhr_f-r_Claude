@@ -113,14 +113,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         w.hasShadow = false
         w.ignoresMouseEvents = true
         model.topInset = screen.frame.maxY - screen.visibleFrame.maxY
-        // The notch sits between the two "auxiliary" top areas macOS reports for notched screens.
-        if let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea,
-           screen.safeAreaInsets.top > 0 {
-            model.notchRect = CGRect(x: left.maxX - screen.frame.minX, y: 0,
-                                     width: right.minX - left.maxX, height: screen.safeAreaInsets.top)
-        } else {
-            model.notchRect = nil
-        }
+        model.notchRect = screen.cameraNotch
         buildWingsWindow(on: screen)
         w.contentView = FirstClickHostingView(rootView: DeskView(model: model))
         w.setFrame(screen.frame, display: true)

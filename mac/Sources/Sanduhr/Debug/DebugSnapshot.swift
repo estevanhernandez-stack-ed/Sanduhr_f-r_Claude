@@ -15,6 +15,10 @@ struct DebugStateInput {
     var notchLeft = NotchContent.Place.left.fallback
     var notchRight = NotchContent.Place.right.fallback
     var notchStrip = NotchContent.Place.strip.fallback
+    /// An app is using a camera (only known while the camera light switch is on).
+    var cameraInUse = false
+    /// The camera light shows (for the camera, or switched on by hand).
+    var cameraLight = false
     var widgetVisible = false
     var settingsOpen = false
     var settingsSection: SettingsSection?
@@ -48,6 +52,8 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("notch_left", .string(s.notchLeft.rawValue)))
         pairs.append(("notch_right", .string(s.notchRight.rawValue)))
         pairs.append(("notch_strip", .string(s.notchStrip.rawValue)))
+        pairs.append(("camera_in_use", .bool(s.cameraInUse)))
+        pairs.append(("camera_light", .bool(s.cameraLight)))
         pairs.append(("widget_visible", .bool(s.widgetVisible)))
         pairs.append(("settings_open", .bool(s.settingsOpen)))
         let section: YAMLNode = s.settingsSection.map { .string($0.rawValue) } ?? .null
@@ -130,7 +136,7 @@ struct DebugTreeNode: Equatable {
 
 /// One window in tree.yaml.
 struct DebugWindowEntry: Equatable {
-    /// widget, desk, notch, settings, sheet or window, made unique ("sheet-2").
+    /// widget, desk, notch, camera, settings, sheet or window, made unique ("sheet-2").
     var name: String
     /// The window number, which is also its CGWindowID: `screencapture -l` takes it.
     var windowID: Int

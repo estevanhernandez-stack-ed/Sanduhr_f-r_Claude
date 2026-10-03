@@ -83,6 +83,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Desk: the desktop layer and the notch, when switched on (Settings, General, Surfaces).
         DeskMigration.run()
         DeskController.shared.apply()
+        // The camera light watches the cameras while its switch is on, with or without Desk.
+        CameraLightController.shared.apply()
     }
 
     /// estedesk:// and sanduhr:// links (Option+J joins the next meeting, …/settings opens
@@ -226,7 +228,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         SanduhrMenu.groups(widgetVisible: widgetVisible,
                            deepWork: viewModel.activeTool == .deepWork,
                            pacing: viewModel.pacingPinned,
-                           snake: viewModel.activeTool == .snake)
+                           snake: viewModel.activeTool == .snake,
+                           cameraLight: CameraLightController.shared.manual)
     }
 
     @objc private func menuItemChosen(_ sender: NSMenuItem) {
@@ -234,13 +237,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// What every menu's items do. Each tool works with the widget hidden: it shows the widget
-    /// first. Chosen again while it shows on a visible widget, a tool turns off.
+    /// first. Chosen again while it shows on a visible widget, a tool turns off. Camera Light
+    /// leaves the widget alone.
     func perform(_ command: MenuCommand) {
         let visible = panel?.isVisible ?? false
         switch command {
         case .showHide: showOrHidePanel()
         case .deepWork: toggleTool(.deepWork, visible: visible)
         case .snake: toggleTool(.snake, visible: visible)
+        case .cameraLight: CameraLightController.shared.toggleManual()
         case .pacing:
             if viewModel.pacingPinned && visible {
                 viewModel.pacingPinned = false

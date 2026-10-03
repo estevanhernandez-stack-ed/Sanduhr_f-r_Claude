@@ -109,6 +109,7 @@ enum DebugHooks {
             DeskController.shared.apply()
         case .notch(let on):
             UserDefaults.desk.set(on, forKey: DeskController.notchKey)
+        case .cameraLight(let on): CameraLightController.shared.setManual(on)
         }
         settle()
     }
@@ -162,6 +163,7 @@ enum DebugHooks {
             if w is FloatingPanel { kind = "widget" }
             else if w === desk.window { kind = "desk" }
             else if w === desk.wingsWindow { kind = "notch" }
+            else if w === CameraLightController.shared.window { kind = "camera" }
             else if w === settings { kind = "settings" }
             else if w.isSheet || w.sheetParent != nil { kind = "sheet" }
             else {
@@ -244,6 +246,8 @@ enum DebugHooks {
         s.notchLeft = NotchContent.saved(.left, in: .desk)
         s.notchRight = NotchContent.saved(.right, in: .desk)
         s.notchStrip = NotchContent.saved(.strip, in: .desk)
+        s.cameraInUse = CameraLightController.shared.cameraInUse
+        s.cameraLight = CameraLightController.shared.showing
         s.widgetVisible = widgetVisible
         s.settingsOpen = settings.isOpen
         s.settingsSection = settings.window == nil ? nil : settings.section

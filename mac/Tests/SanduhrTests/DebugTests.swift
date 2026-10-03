@@ -58,6 +58,8 @@ struct DebugLinkTests {
         #expect(parse("sanduhr://debug/action?name=desk&arg=on").command == .action(.desk(true), dir: nil))
         #expect(parse("sanduhr://debug/action?name=desk&arg=off").command == .action(.desk(false), dir: nil))
         #expect(parse("sanduhr://debug/action?name=notch&arg=on").command == .action(.notch(true), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=camera-light&arg=on").command == .action(.cameraLight(true), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=camera-light&arg=off").command == .action(.cameraLight(false), dir: nil))
     }
 
     @Test func badActionsKeepTheDirForTheError() {
@@ -66,6 +68,7 @@ struct DebugLinkTests {
         #expect(r.dir == "/tmp/d")
         #expect(r.error?.hasPrefix("unknown action: explode") == true)
         #expect(parse("sanduhr://debug/action?name=desk").error == "desk needs arg=on or arg=off")
+        #expect(parse("sanduhr://debug/action?name=camera-light").error == "camera-light needs arg=on or arg=off")
         #expect(parse("sanduhr://debug/action?name=tool&arg=hammer").error == "tool needs arg=deep-work, pacing or snake")
         #expect(parse("sanduhr://debug/action?name=settings&arg=nowhere").error?.hasPrefix("unknown settings section") == true)
         #expect(parse("sanduhr://debug/action?name=pulse&arg=hourly").error == "unknown tier: hourly")
@@ -220,6 +223,7 @@ struct DebugStateTests {
         s.pulseCount = 3
         s.theme = "aurora"
         s.notchRight = .message
+        s.cameraLight = true
         s.menu = SanduhrMenu.groups(widgetVisible: true, deepWork: false, pacing: true, snake: false)
         s.version = "2.1.0"
         s.build = "3"
@@ -227,12 +231,12 @@ struct DebugStateTests {
         let keys = yaml.split(separator: "\n").filter { !$0.hasPrefix(" ") && !$0.hasPrefix("-") }
             .map { String($0.split(separator: ":")[0]) }
         #expect(keys == ["desk_enabled", "desk_running", "layout", "notch", "has_notch",
-                         "notch_left", "notch_right", "notch_strip", "widget_visible",
+                         "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "widget_visible",
                          "settings_open", "settings_section", "meters", "meetings_count", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "theme", "menu",
                          "version", "build"])
         #expect(yaml.contains("settings_section: notch\n"))
-        #expect(yaml.contains("notch_left: meetingOrTime\nnotch_right: message\nnotch_strip: meetingOrMeters\n"))
+        #expect(yaml.contains("notch_left: meetingOrTime\nnotch_right: message\nnotch_strip: meetingOrMeters\ncamera_in_use: false\ncamera_light: true\n"))
         #expect(yaml.contains("pulse_count: 3\ntheme: aurora\nmenu:\n"))
         #expect(yaml.contains("layout: message:tl") == false)   // the colons force quotes
         #expect(yaml.contains("layout: \"message:tl clock:bl meters:bl meetings:bl\"\n"))

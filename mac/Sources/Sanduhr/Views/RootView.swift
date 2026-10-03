@@ -181,7 +181,7 @@ struct RootView: View {
     private func menuRows(_ entries: [MenuEntry], _ app: AppDelegate) -> some View {
         ForEach(entries, id: \.command) { entry in
             let row = Group {
-                if [.deepWork, .pacing, .snake].contains(entry.command) {
+                if [.deepWork, .pacing, .snake, .cameraLight].contains(entry.command) {
                     Toggle(entry.title, isOn: Binding(
                         get: { entry.checked },
                         set: { _ in withAnimation { app.perform(entry.command) } }))

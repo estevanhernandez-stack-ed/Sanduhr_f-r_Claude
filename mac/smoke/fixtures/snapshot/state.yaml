@@ -6,6 +6,8 @@ has_notch: true
 notch_left: meetingOrTime
 notch_right: meters
 notch_strip: meetingOrMeters
+camera_in_use: false
+camera_light: false
 widget_visible: true
 settings_open: true
 settings_section: notch
@@ -52,6 +54,8 @@ menu:
       - title: Pacing Calculators
         checked: false
       - title: Cooldown Snake
+        checked: false
+      - title: Camera Light
         checked: false
 version: "2.1.0"
 build: "3"

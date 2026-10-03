@@ -27,9 +27,11 @@ enum DebugAction: Equatable {
     case tool(MenuCommand)
     case desk(Bool)
     case notch(Bool)
+    /// The camera light shown or hidden by hand, as Tools, Camera Light does.
+    case cameraLight(Bool)
 
     static let names = ["show-widget", "hide-widget", "settings", "close-settings", "refresh",
-                        "test-alert", "pulse", "tool", "desk", "notch"]
+                        "test-alert", "pulse", "tool", "desk", "notch", "camera-light"]
 }
 
 enum DebugCommand: Equatable {
@@ -110,6 +112,7 @@ enum DebugLink {
             }
         case "desk": return onOff(DebugAction.desk)
         case "notch": return onOff(DebugAction.notch)
+        case "camera-light": return onOff(DebugAction.cameraLight)
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }

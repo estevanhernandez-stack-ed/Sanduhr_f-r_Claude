@@ -6,8 +6,10 @@ import Testing
 
 @Suite("Sanduhr menu")
 struct SanduhrMenuTests {
-    func menu(visible: Bool = true, deepWork: Bool = false, pacing: Bool = false, snake: Bool = false) -> [MenuGroup] {
-        SanduhrMenu.groups(widgetVisible: visible, deepWork: deepWork, pacing: pacing, snake: snake)
+    func menu(visible: Bool = true, deepWork: Bool = false, pacing: Bool = false, snake: Bool = false,
+              camera: Bool = false) -> [MenuGroup] {
+        SanduhrMenu.groups(widgetVisible: visible, deepWork: deepWork, pacing: pacing, snake: snake,
+                           cameraLight: camera)
     }
 
     /// Titles in order, "-" for each separator the renderers put between groups.
@@ -18,7 +20,7 @@ struct SanduhrMenuTests {
     @Test func itemsInOrder() {
         #expect(flat(menu()) == [
             "Hide Sanduhr", "-",
-            "Deep Work", "Pacing Calculators", "Cooldown Snake", "-",
+            "Deep Work", "Pacing Calculators", "Cooldown Snake", "Camera Light", "-",
             "Refresh", "Settings…", "Check for Updates…", "-",
             "Quit Sanduhr",
         ])
@@ -35,18 +37,19 @@ struct SanduhrMenuTests {
         func checks(_ g: [MenuGroup]) -> [MenuCommand: Bool] {
             Dictionary(uniqueKeysWithValues: g[1].entries.map { ($0.command, $0.checked) })
         }
-        #expect(checks(menu()) == [.deepWork: false, .pacing: false, .snake: false])
-        #expect(checks(menu(deepWork: true)) == [.deepWork: true, .pacing: false, .snake: false])
-        #expect(checks(menu(pacing: true, snake: true)) == [.deepWork: false, .pacing: true, .snake: true])
+        #expect(checks(menu()) == [.deepWork: false, .pacing: false, .snake: false, .cameraLight: false])
+        #expect(checks(menu(deepWork: true)) == [.deepWork: true, .pacing: false, .snake: false, .cameraLight: false])
+        #expect(checks(menu(pacing: true, snake: true)) == [.deepWork: false, .pacing: true, .snake: true, .cameraLight: false])
+        #expect(checks(menu(camera: true)) == [.deepWork: false, .pacing: false, .snake: false, .cameraLight: true])
         // Only tools carry checkmarks.
-        let rest = menu(deepWork: true, pacing: true, snake: true).enumerated()
+        let rest = menu(deepWork: true, pacing: true, snake: true, camera: true).enumerated()
             .filter { $0.offset != 1 }.flatMap(\.element.entries)
         #expect(rest.allSatisfy { !$0.checked })
     }
 
     @Test func keyEquivalents() {
         let keys = Dictionary(uniqueKeysWithValues: menu().flatMap(\.entries).map { ($0.command, $0.key) })
-        #expect(keys == [.showHide: "", .deepWork: "p", .pacing: "", .snake: "",
+        #expect(keys == [.showHide: "", .deepWork: "p", .pacing: "", .snake: "", .cameraLight: "",
                          .refresh: "r", .settings: ",", .checkForUpdates: "", .quit: "q"])
     }
 

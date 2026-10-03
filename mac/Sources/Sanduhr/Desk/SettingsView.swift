@@ -228,6 +228,9 @@ struct DeskNotchSection: View {
     @AppStorage(NotchContent.Place.left.key, store: .desk) private var left = NotchContent.Place.left.fallback
     @AppStorage(NotchContent.Place.right.key, store: .desk) private var right = NotchContent.Place.right.fallback
     @AppStorage(NotchContent.Place.strip.key, store: .desk) private var strip = NotchContent.Place.strip.fallback
+    @AppStorage(CameraLightController.enabledKey, store: .desk) private var cameraLight = false
+    @AppStorage(CameraLightController.brightnessKey, store: .desk) private var lightBrightness = CameraLightController.defaultBrightness
+    @AppStorage(CameraLightController.sizeKey, store: .desk) private var lightSize = CameraLightController.defaultSize
 
     var body: some View {
         Form {
@@ -252,6 +255,20 @@ struct DeskNotchSection: View {
                 slider("Extra height below (0 = none)", $chin, 0...56)
             }
             .disabled(!enabled)
+            Section("Camera light") {
+                Toggle("Light up for the camera", isOn: $cameraLight)
+                    .onChange(of: cameraLight) { _, _ in CameraLightController.shared.apply() }
+                HStack {
+                    Text("Brightness")
+                    Slider(value: $lightBrightness, in: CameraLightLayout.brightnessRange)
+                    Text("\(Int((lightBrightness * 100).rounded()))%")
+                        .font(.system(.body, design: .monospaced))
+                        .frame(width: 48, alignment: .trailing)
+                }
+                slider("Reach below the menu bar", $lightSize, CameraLightLayout.sizeRange)
+                Text("While any app uses a camera, a soft white light around the notch lights your face, above every app. It ends when the camera stops, with or without Desk or the island. Tools, Camera Light shows it by hand. Screens without a notch get it at the top center.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
     }

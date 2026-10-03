@@ -49,6 +49,7 @@ class FakeApp
     case name
     when 'desk' then s['desk_enabled'] = s['desk_running'] = (arg == 'on')
     when 'notch' then s['notch'] = (arg == 'on')
+    when 'camera-light' then s['camera_light'] = (arg == 'on')
     when 'show-widget' then s['widget_visible'] = true
     when 'hide-widget' then s['widget_visible'] = false
     when 'settings' then s['settings_open'] = true; s['settings_section'] = arg if arg
@@ -161,6 +162,10 @@ eq('tool off, then hide the widget again',
 eq('pacing on a hidden widget shows it first',
    Restore.plan(base, base.merge('pacing_pinned' => true)),
    [['show-widget', nil], %w[tool pacing], ['hide-widget', nil]])
+eq('camera light switched on by hand goes off',
+   Restore.plan(base, base.merge('camera_light' => true)), [%w[camera-light off]])
+eq('camera light from a running camera is left alone',
+   Restore.plan(base, base.merge('camera_light' => true, 'camera_in_use' => true)), [])
 
 # --- Scenario runs against the fake app --------------------------------------------------------
 
@@ -206,7 +211,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch]
+    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end
