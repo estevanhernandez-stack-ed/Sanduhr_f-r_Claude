@@ -10,14 +10,33 @@ struct WidgetVisibilityTests {
         WidgetVisibilityRule.shouldShow(setting: setting, deskOn: deskOn, hasSessionKey: key, event: event)
     }
 
-    @Test func alwaysNeverMovesTheWidget() {
-        for event in events {
+    @Test func alwaysNeverMovesTheWidgetOnceChosen() {
+        for event in events where event != .choiceChanged {
             for deskOn in [false, true] {
                 for key in [false, true] {
                     #expect(rule(.always, deskOn: deskOn, key: key, event) == nil)
                 }
             }
         }
+    }
+
+    @Test func choosingAlwaysShowsAWidgetAnEarlierChoiceHid() {
+        for deskOn in [false, true] {
+            for key in [false, true] {
+                #expect(rule(.always, deskOn: deskOn, key: key, .choiceChanged) == true)
+            }
+        }
+        // Signed in under "Hidden while Desk is on", tucked away, then "Always shown": it comes
+        // back, and a later launch keeps it (panelHidden is now false).
+        var showing = WidgetVisibilityRule.resolve(showing: true, setting: .whileDeskOff, deskOn: true,
+                                                   hasSessionKey: true, event: .signedIn)
+        #expect(showing == false)
+        showing = WidgetVisibilityRule.resolve(showing: showing, setting: .always, deskOn: true,
+                                               hasSessionKey: true, event: .choiceChanged)
+        #expect(showing)
+        showing = WidgetVisibilityRule.resolve(showing: showing, setting: .always, deskOn: true,
+                                               hasSessionKey: true, event: .launch)
+        #expect(showing)
     }
 
     @Test func whileDeskOffFollowsDesk() {

@@ -73,13 +73,14 @@ enum SignInGate {
 }
 
 enum WidgetVisibilityRule {
-    /// Whether the widget should show after `event`, or nil to leave it as it is (`always`
-    /// never moves it; at launch that means `panelHidden` decides, as before). Without a
-    /// session key the new choices always show it, so sign-in can run.
+    /// Whether the widget should show after `event`, or nil to leave it as it is. `always` shows
+    /// it when it is chosen, so a widget an earlier choice hid comes back; after that it never
+    /// moves it (at launch `panelHidden` decides, as before). Without a session key the other
+    /// choices always show it, so sign-in can run.
     static func shouldShow(setting: WidgetVisibility, deskOn: Bool, hasSessionKey: Bool,
                            event: WidgetVisibilityEvent) -> Bool? {
         switch setting {
-        case .always: return nil
+        case .always: return event == .choiceChanged ? true : nil
         case _ where !hasSessionKey: return true
         case .whileDeskOff: return !deskOn
         case .onRequest: return false
