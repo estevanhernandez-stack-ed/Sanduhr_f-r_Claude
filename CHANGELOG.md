@@ -2,6 +2,10 @@
 
 ## Unreleased (mac)
 
+## v2.3.0-mac — 2026-10-02
+
+**The notch does more, and the widget can look like Desk**: choose what the notch shows, a camera light, a glow for Sanduhr's events; a theme gallery and a Match Desk theme; per-meter warnings on the Desk and the widget; and you choose when the widget shows.
+
 - Under the Match Desk theme the widget's sparklines are a thin ink line instead of the horizon chart, which had no card behind it and read as a solid block.
 
 - **The widget warns too.** A limit that is nearly full while its reset is still far off now turns red on the widget as well as on the Desk: its bar and percent go red, with a steady glow in the theme's color around the bar (in Desk's ink with Match Desk). It follows the same per-meter settings in Settings, Desk, Meters, so the two always agree, and a change there shows on both at once.
