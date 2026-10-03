@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **Calendar access explains itself.** Click the Desk calendar note to open System Settings at Privacy & Security, Calendars. "Add Events Only" gets its own line saying Full Access is needed, and a grant made in System Settings shows within a minute, meetings and all, with no relaunch.
+
 ## v2.2.1-mac — 2026-10-02
 
 - **Meters keep updating.** macOS put Sanduhr into App Nap (its windows sit on the desktop, under every app, so macOS counts them as hidden), which stopped the five-minute refresh. After fifteen minutes Desk dropped the meters from the notch as stale. Sanduhr now opts out of App Nap; idle sleep is unaffected. The refresh also keeps running while a menu is open.

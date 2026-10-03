@@ -51,6 +51,17 @@ final class DeskController: NSObject, NSMenuDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(spaceChanged),
             name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
+        // Back from System Settings: a Calendar grant shows without waiting for the minute tick.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(appBecameActive),
+            name: NSApplication.didBecomeActiveNotification, object: nil)
+    }
+
+    @objc private func appBecameActive() { recheckCalendar() }
+
+    /// Reads Calendar access again (Settings opening, Sanduhr becoming active), while Desk runs.
+    func recheckCalendar() {
+        if running { model.recheckCalendar() }
     }
 
     private func stop() {
@@ -154,8 +165,8 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     @objc private func spaceChanged() { wingsWindow?.orderFrontRegardless() }
 
-    /// The window ignores the mouse, except while the pointer is over the meeting list or the
-    /// meters, so the desktop and its icons keep working and those can still be clicked.
+    /// The window ignores the mouse, except while the pointer is over the meeting list, the
+    /// calendar note or the meters, so the desktop and its icons keep working and those can still be clicked.
     private func watchMouse() {
         let moved: (NSEvent) -> Void = { [weak self] _ in self?.updateMouseThrough() }
         if let g = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved], handler: moved) {
@@ -222,9 +233,22 @@ final class DeskController: NSObject, NSMenuDelegate {
         return false
     }
 
-    /// A meeting row first, then the meters. True when the click was used.
+    /// A meeting row first, then the calendar note, then the meters. True when the click was used.
     private func clickUnderPointer() -> Bool {
-        joinMeetingUnderPointer() || showWidgetFromMeters()
+        joinMeetingUnderPointer() || openCalendarSettingsFromNote() || showWidgetFromMeters()
+    }
+
+    /// True when the calendar note is drawn and the pointer is over it.
+    private func pointerOverNote(_ point: CGPoint) -> Bool {
+        model.calendarNote != nil && !model.noteFrame.isEmpty
+            && model.noteFrame.insetBy(dx: -8, dy: -4).contains(point)
+    }
+
+    /// A click on the calendar note opens System Settings at Privacy & Security, Calendars.
+    private func openCalendarSettingsFromNote() -> Bool {
+        guard let point = pointerInWindow(), pointerOverNote(point) else { return false }
+        model.openCalendarSettings()
+        return true
     }
 
     /// True when the pointer is over the meters (with a little slack, as for the meeting list).
@@ -249,7 +273,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         guard let w = window, let point = pointerInWindow() else { return }
         let overRows = model.meetings.contains { $0.link != nil }
             && model.meetingsFrame.insetBy(dx: -8, dy: -6).contains(point)
-        let over = overRows || pointerOverMeters(point)
+        let over = overRows || pointerOverNote(point) || pointerOverMeters(point)
         if w.ignoresMouseEvents == over { w.ignoresMouseEvents = !over }
     }
 

@@ -67,6 +67,8 @@ final class SettingsWindowController {
     /// brings it forward. One window, reused.
     func show(_ section: SettingsSection? = nil) {
         if let section { navigation.selection = section }
+        // A Calendar grant made in System Settings shows here and on the Desk.
+        DeskController.shared.recheckCalendar()
         if window == nil, let app = NSApp.delegate as? AppDelegate {
             let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 600),
                              styleMask: [.titled, .closable, .miniaturizable, .resizable],

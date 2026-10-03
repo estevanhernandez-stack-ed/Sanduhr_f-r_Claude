@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import Testing
+import EventKit
 @testable import Sanduhr
 
 /// Pure Desk logic: the message pick, the layout string, ink specs and the one-time import of
@@ -508,5 +509,39 @@ struct DeskPanelPlacementTests {
         let meters = CGRect(x: 200, y: 10, width: 1260, height: 80)
         let f = DeskPanelPlacement.frame(beside: meters, size: size, screen: screen, visible: visible)
         #expect(visible.contains(f))
+    }
+}
+
+@Suite("Calendar access")
+struct CalendarAccessTests {
+    @Test func notAskedYetAsksAndSaysNothing() {
+        #expect(CalendarAccess.shouldRequest(.notDetermined))
+        #expect(CalendarAccess.note(for: .notDetermined) == nil)
+    }
+
+    @Test func fullAccessClearsTheNote() {
+        #expect(!CalendarAccess.shouldRequest(.fullAccess))
+        #expect(CalendarAccess.note(for: .fullAccess) == nil)
+    }
+
+    @Test func deniedKeepsTheAllowLine() {
+        #expect(!CalendarAccess.shouldRequest(.denied))
+        #expect(CalendarAccess.note(for: .denied) == "Allow Sanduhr in Settings, Privacy, Calendars")
+    }
+
+    @Test func addEventsOnlyAsksForFullAccess() {
+        #expect(!CalendarAccess.shouldRequest(.writeOnly))
+        #expect(CalendarAccess.note(for: .writeOnly) == CalendarAccess.writeOnlyNote)
+        #expect(CalendarAccess.writeOnlyNote.contains("Full Access"))
+    }
+
+    @Test func restrictedIsAPlainLine() {
+        #expect(!CalendarAccess.shouldRequest(.restricted))
+        #expect(CalendarAccess.note(for: .restricted) == CalendarAccess.restrictedNote)
+    }
+
+    @Test func notePointsAtTheCalendarsPrivacyPage() {
+        #expect(CalendarAccess.settingsURL.absoluteString
+                == "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")
     }
 }

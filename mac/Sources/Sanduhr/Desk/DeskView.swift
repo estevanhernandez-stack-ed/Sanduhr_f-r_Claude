@@ -171,7 +171,20 @@ struct DeskView: View {
     private func meetings(alignment: HorizontalAlignment) -> some View {
         VStack(alignment: alignment, spacing: 2) {
             if let note = model.calendarNote {
+                // Clickable like a meeting row: DeskController opens System Settings at
+                // Privacy & Security, Calendars.
                 Text(note).opacity(0.6)
+                    .contentShape(Rectangle())
+                    .onHover { inside in
+                        if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                    }
+                    .background(GeometryReader { geo in
+                        Color.clear.preference(key: NoteFrameKey.self, value: geo.frame(in: .global))
+                    })
+                    .onPreferenceChange(NoteFrameKey.self) { frame in
+                        model.noteFrame = frame
+                    }
+                    .onDisappear { model.noteFrame = .zero }
             } else if model.meetings.isEmpty {
                 Text("Nothing else on the calendar today").opacity(0.6)
             } else {
@@ -367,6 +380,11 @@ private struct MetersFrameKey: PreferenceKey {
 }
 
 private struct MeetingsFrameKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
+}
+
+private struct NoteFrameKey: PreferenceKey {
     static let defaultValue: CGRect = .zero
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
 }
