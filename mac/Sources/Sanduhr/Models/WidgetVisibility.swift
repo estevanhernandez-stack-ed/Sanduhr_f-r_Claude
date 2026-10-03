@@ -46,6 +46,32 @@ enum WidgetVisibilityEvent: Equatable {
     case choiceChanged
 }
 
+/// Whether this Mac is still signing in: the widget shows for sign-in until the saved session
+/// key has fetched once. A key that only exists (expired, mistyped, or no network yet) does not
+/// count, so a relaunch never hides the widget the user needs to fix it.
+enum SignInGate {
+    /// Standard defaults: set by the first successful fetch, cleared by Sign Out or by claude.ai
+    /// refusing the key. Absent on an install updated from 2.3.2 or earlier, so its first launch
+    /// shows the widget until a fetch succeeds, then the choice takes over as usual.
+    static let key = "signedInFetchDone"
+
+    /// True while the widget should show for sign-in: a brand-new install, no session key, or a
+    /// key that has not fetched yet.
+    static func awaitingSignIn(fresh: Bool, hasSessionKey: Bool, in store: DefaultsStore) -> Bool {
+        fresh || !hasSessionKey || !store.bool(forKey: key)
+    }
+
+    /// After every update from the view model: a successful fetch sets the marker; Sign Out or an
+    /// auth error (`needsSignIn`) clears it, so the next launch waits for a good fetch again.
+    static func record(fetched: Bool, needsSignIn: Bool, in store: DefaultsStore) {
+        if fetched {
+            if !store.bool(forKey: key) { store.set(true, forKey: key) }
+        } else if needsSignIn, store.object(forKey: key) != nil {
+            store.set(nil, forKey: key)
+        }
+    }
+}
+
 enum WidgetVisibilityRule {
     /// Whether the widget should show after `event`, or nil to leave it as it is (`always`
     /// never moves it; at launch that means `panelHidden` decides, as before). Without a

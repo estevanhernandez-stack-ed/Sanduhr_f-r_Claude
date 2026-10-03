@@ -3,6 +3,7 @@
 ## Unreleased (mac)
 
 - **Sign out.** Settings, Credentials has a Sign Out button. After you confirm, Sanduhr deletes your session key and `cf_clearance` from both the Keychain and the old credentials file, stops fetching and clears the meters. The widget says "Signed out — sign in" (a click opens Credentials), Desk and the notch show the sign-in line, and the statusline and MCP server stop showing the old numbers. Your usage history and settings stay. Paste a key and Save to sign in again, no relaunch needed. The notch now also shows "sign in to Sanduhr" when claude.ai refuses the session key, instead of going blank.
+- **A session key that doesn't work no longer hides the widget.** Sanduhr used to count any saved key as signed in, so with "Hidden while Desk is on" a relaunch with an expired or mistyped key hid the widget right when you needed it to fix the key. Now the widget shows for sign-in until the key has fetched your usage once, and again after Sign Out or when claude.ai refuses the key. Updating from 2.3.2 shows the widget once, until the first refresh succeeds; after that it follows your choice as before.
 
 ## v2.3.2-mac — 2026-10-03
 
