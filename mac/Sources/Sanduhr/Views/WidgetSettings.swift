@@ -147,7 +147,9 @@ struct WidgetSettings: View {
             }
             Spacer()
         }
-        .onChange(of: sessionKey) { _, _ in credentialsNote = nil }
+        // Typing hides the last note; Save and Sign Out emptying the field must not, or their
+        // own note is wiped as it appears.
+        .onChange(of: sessionKey) { _, new in if !new.isEmpty { credentialsNote = nil } }
         // The onboarding sheet can save a key while this page is closed.
         .onAppear {
             hasExistingKey = KeychainStore.exists(account: KeychainAccount.sessionKey)
