@@ -4,6 +4,7 @@
 # island's sides and along its bottom (none along the top, where the screen edge and the camera
 # housing would break it up), with the island and its text untouched. The run puts the
 # notch switch back.
+# Item 27: a Desk pulse fires the same glow (no stroke along the island's top edge any more).
 name: Notch glow on demand
 needs: [desk, notch]
 steps:
@@ -13,10 +14,20 @@ steps:
   - expect_state: { notch: true, has_notch: true }
   - do: glow
     arg: alert
-  - expect_state: { glow_count: "/^[1-9]/" }
+  - expect_state: { glow_count: "/^[1-9]/", glow_shape: island }
   # Checked straight away: the glow is gone about three seconds after it fires.
   - expect:
       window: glow
       contains: { label: Notch glow }
       within: 2
   - snap: notch-glow
+  # A pulse glows the island the same way: watch this snap for light at the screen edge above
+  # or beside the wings (there should be none).
+  - do: pulse
+    arg: seven_day
+  - expect_state: { pulse_count: "/^[1-9]/", glow_shape: island }
+  - expect:
+      window: glow
+      contains: { label: Notch glow }
+      within: 2
+  - snap: notch-glow-pulse

@@ -121,7 +121,6 @@ enum NotchGlowLayout {
                       width: wings.width + reach * 2, height: height)
     }
 
-    /// The island's corner radius, as the strip or the wings draw it.
     /// The top band the glow leaves clear, in points: the screen edge and the camera housing
     /// show no light, so a glow running into them reads as broken.
     static let topClear: CGFloat = 2
@@ -138,34 +137,59 @@ enum NotchGlowLayout {
         return (start, end)
     }
 
+    /// The island's corner radius, as the strip or the wings draw it.
     static func radius(barHeight: CGFloat, chin: Double) -> CGFloat {
         chin > 0 ? min(16, CGFloat(chin) * 0.7) : min(10, barHeight * 0.3)
     }
+
+    // MARK: The plain notch
+
+    /// What a glow outlines: the extended island while Desk draws it, else the hardware notch
+    /// itself when a screen has one (whether or not Desk runs), else nothing.
+    static func shape(deskRunning: Bool, notchOn: Bool, hasIsland: Bool, hasNotch: Bool) -> NotchGlowShape {
+        if deskRunning, notchOn, hasIsland { return .island }
+        return hasNotch ? .plain : .none
+    }
+
+    /// The plain notch's glow window, flush with the screen's top: the notch (points from the
+    /// screen's top-left corner, as `NSScreen.cameraNotch` gives it) grown by the reach left,
+    /// right and below, in AppKit screen coordinates.
+    static func plainFrame(screen: CGRect, notch: CGRect) -> CGRect {
+        let height = notch.height + reach * 2
+        return CGRect(x: screen.minX + notch.minX - reach, y: screen.maxY - height,
+                      width: notch.width + reach * 2, height: height)
+    }
+
+    /// The part cut out of the plain glow: exactly the hardware notch, so the halo starts at its edge.
+    static func plainCutout(notch: CGRect) -> CGSize { notch.size }
+
+    /// The hardware notch's bottom corner radius, near enough to hug it.
+    static func plainRadius(notchHeight: CGFloat) -> CGFloat { min(8, notchHeight * 0.25) }
 }
 
-/// The glow: the island's outline filled in the notch ink and blurred, with the island itself
-/// cut out, so only the halo outside its edge shows and the island and its text stay as they are.
-struct NotchGlowView: View {
-    var model: DeskModel
-    let notchWidth: CGFloat
-    let notchHeight: CGFloat
-    let barHeight: CGFloat
-    @AppStorage("notchWings", store: .desk) private var wings = 36.0
-    @AppStorage("notchChin", store: .desk) private var chin = 26.0
-    @AppStorage("notchText", store: .desk) private var showText = true
+/// What the last glow outlined (smoke's glow_shape).
+enum NotchGlowShape: String {
+    /// The extended island: wings, and the strip under the camera when there is one.
+    case island
+    /// The hardware notch alone: the island is off, or Desk is not running.
+    case plain
+    /// No notched screen (or no glow yet): nothing drawn.
+    case none
+}
+
+/// The glow's look, whatever it outlines: an outline `width` by `height` hanging from the top,
+/// filled in the notch ink and blurred, with the outline itself cut out, so only the halo outside
+/// its edge shows and whatever is inside (the island and its text, or the camera) stays as it is.
+/// The top few points fade out, so no light runs along the screen edge.
+struct NotchHaloView: View {
+    let width: CGFloat
+    let height: CGFloat
+    let radius: CGFloat
+    /// Horizontal offset of the outline from the window's center (wings of unequal width).
+    var offsetX: CGFloat = 0
     @AppStorage("notchTextColor", store: .desk) private var textColor = "ffffff"
-    @AppStorage("font", store: .desk) private var font = ""
-    @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
-    @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
 
     var body: some View {
-        // The same widths the wings and the strip use, so the halo hugs the island as drawn.
-        let w = NotchWingsView.layout(model: model, now: Date(), wings: wings, showText: showText,
-                                      left: leftContent, right: rightContent,
-                                      font: font, notchHeight: notchHeight)
-        let width = notchWidth + w.left + w.right
-        let height = NotchGlowLayout.islandHeight(notchHeight: notchHeight, barHeight: barHeight, chin: chin)
-        let radius = NotchGlowLayout.radius(barHeight: barHeight, chin: chin)
         let reach = NotchGlowLayout.reach
         ZStack(alignment: .top) {
             // No top flares: blurred, they bled along the screen edge and broke up beside the camera.
@@ -180,16 +204,41 @@ struct NotchGlowView: View {
                 .blendMode(.destinationOut)
         }
         .compositingGroup()
-        .offset(x: (w.right - w.left) / 2)
+        .offset(x: offsetX)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .mask {
-            let fade = NotchGlowLayout.topFade(barHeight: barHeight, islandHeight: height)
+            let fade = NotchGlowLayout.topFade(barHeight: height, islandHeight: height)
             LinearGradient(stops: [.init(color: .clear, location: 0),
                                    .init(color: .clear, location: fade.start),
                                    .init(color: .white, location: fade.end)],
                            startPoint: .top, endPoint: .bottom)
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// The glow around the extended island: the halo at the island's size as drawn.
+struct NotchGlowView: View {
+    var model: DeskModel
+    let notchWidth: CGFloat
+    let notchHeight: CGFloat
+    let barHeight: CGFloat
+    @AppStorage("notchWings", store: .desk) private var wings = 36.0
+    @AppStorage("notchChin", store: .desk) private var chin = 26.0
+    @AppStorage("notchText", store: .desk) private var showText = true
+    @AppStorage("font", store: .desk) private var font = ""
+    @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
+    @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
+
+    var body: some View {
+        // The same widths the wings and the strip use, so the halo hugs the island as drawn.
+        let w = NotchWingsView.layout(model: model, now: Date(), wings: wings, showText: showText,
+                                      left: leftContent, right: rightContent,
+                                      font: font, notchHeight: notchHeight)
+        NotchHaloView(width: notchWidth + w.left + w.right,
+                      height: NotchGlowLayout.islandHeight(notchHeight: notchHeight, barHeight: barHeight, chin: chin),
+                      radius: NotchGlowLayout.radius(barHeight: barHeight, chin: chin),
+                      offsetX: (w.right - w.left) / 2)
     }
 }
 
@@ -202,9 +251,10 @@ private final class NotchGlowContainer: NSView {
 }
 
 /// The notch glows for Sanduhr's events (Settings, Desk, Notch, Glow): an alert, a meeting a
-/// minute out, the camera light coming on. A gentle halo in the notch ink around the island,
-/// about three seconds, in its own click-through window over the wings. Only while Desk runs
-/// with the island on, on a screen with a notch.
+/// minute out, the camera light coming on, and every Desk pulse (forced). A gentle halo in the
+/// notch ink, about three seconds, in its own click-through window: around the island while Desk
+/// runs with the island on, else around the plain hardware notch, whenever Sanduhr runs on a Mac
+/// with a notched screen.
 @MainActor
 final class NotchGlowController {
     static let shared = NotchGlowController()
@@ -215,6 +265,8 @@ final class NotchGlowController {
     private(set) var window: NSWindow?
     /// Glows fired so far, drawn or not (smoke's glow_count).
     private(set) var count = 0
+    /// What the last glow outlined (smoke's glow_shape); `.none` until one is drawn.
+    private(set) var lastShape = NotchGlowShape.none
     private var memory = NotchGlowMemory()
     private var meetingTimer: Timer?
     /// Bumped on every glow, so an older glow's fade-out cannot end a newer one.
@@ -250,21 +302,40 @@ final class NotchGlowController {
         if NotchGlowRules.meetingsDue(meetings, switches: switches, memory: &memory, now: Date()) { fire() }
     }
 
-    /// Glows once, whatever the switches (the debug action calls this directly).
+    /// Glows once, whatever the switches (a Desk pulse and the debug action call this directly).
     func fire() {
         count += 1
         let desk = DeskController.shared
-        guard desk.running, UserDefaults.desk.bool(forKey: DeskController.notchKey),
-              let wings = desk.wingsWindow, let notch = desk.model.notchRect else { return }
-        let barHeight = wings.frame.height
-        let chin = UserDefaults.desk.object(forKey: "notchChin") as? Double ?? 26
-        let island = NotchGlowLayout.islandHeight(notchHeight: notch.height, barHeight: barHeight, chin: chin)
-        let frame = NotchGlowLayout.frame(wings: wings.frame, islandHeight: island)
+        let notchOn = UserDefaults.desk.bool(forKey: DeskController.notchKey)
+        let screen = Self.notchedScreen()
+        let shape = NotchGlowLayout.shape(deskRunning: desk.running, notchOn: notchOn,
+                                          hasIsland: desk.wingsWindow != nil && desk.model.notchRect != nil,
+                                          hasNotch: screen != nil)
+        let frame: CGRect
+        let content: AnyView
+        switch shape {
+        case .island:
+            guard let wings = desk.wingsWindow, let notch = desk.model.notchRect else { return }
+            let barHeight = wings.frame.height
+            let chin = UserDefaults.desk.object(forKey: "notchChin") as? Double ?? 26
+            let island = NotchGlowLayout.islandHeight(notchHeight: notch.height, barHeight: barHeight, chin: chin)
+            frame = NotchGlowLayout.frame(wings: wings.frame, islandHeight: island)
+            content = AnyView(NotchGlowView(model: desk.model, notchWidth: notch.width,
+                                            notchHeight: notch.height, barHeight: barHeight))
+        case .plain:
+            guard let screen, let notch = screen.cameraNotch else { return }
+            frame = NotchGlowLayout.plainFrame(screen: screen.frame, notch: notch)
+            let cut = NotchGlowLayout.plainCutout(notch: notch)
+            content = AnyView(NotchHaloView(width: cut.width, height: cut.height,
+                                            radius: NotchGlowLayout.plainRadius(notchHeight: notch.height)))
+        case .none:
+            return
+        }
+        lastShape = shape
         let w = window ?? makeWindow()
         window = w
         let container = NotchGlowContainer(frame: CGRect(origin: .zero, size: frame.size))
-        let host = FirstClickHostingView(rootView: NotchGlowView(
-            model: desk.model, notchWidth: notch.width, notchHeight: notch.height, barHeight: barHeight))
+        let host = FirstClickHostingView(rootView: content)
         host.frame = container.bounds
         host.autoresizingMask = [.width, .height]
         container.addSubview(host)
@@ -300,6 +371,11 @@ final class NotchGlowController {
                 w.orderOut(nil)
             }
         })
+    }
+
+    /// The screen with the camera notch, nil when none has one (an external display alone).
+    private static func notchedScreen() -> NSScreen? {
+        NSScreen.screens.first { $0.cameraNotch != nil }
     }
 
     private func makeWindow() -> NSWindow {

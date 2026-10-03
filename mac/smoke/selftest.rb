@@ -50,7 +50,10 @@ class FakeApp
     when 'desk' then s['desk_enabled'] = s['desk_running'] = (arg == 'on')
     when 'notch' then s['notch'] = (arg == 'on')
     when 'camera-light' then s['camera_light'] = (arg == 'on')
-    when 'glow' then s['glow_count'] = s['glow_count'].to_i + 1
+    when 'glow', 'pulse'
+      s['glow_count'] = s['glow_count'].to_i + 1
+      s['glow_shape'] = s['desk_running'] && s['notch'] ? 'island' : 'plain'
+      s['pulse_count'] = s['pulse_count'].to_i + 1 if name == 'pulse'
     when 'show-widget' then s['widget_visible'] = true
     when 'hide-widget' then s['widget_visible'] = false
     when 'settings' then s['settings_open'] = true; s['settings_section'] = arg if arg

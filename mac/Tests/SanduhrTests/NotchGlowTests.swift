@@ -183,4 +183,59 @@ struct NotchGlowLayoutTests {
         #expect(NotchGlowLayout.radius(barHeight: 37, chin: 0) == 10)
         #expect(abs(NotchGlowLayout.radius(barHeight: 20, chin: 0) - 6) < 0.0001)
     }
+
+    // MARK: The plain notch (item 27)
+
+    @Test func plainFrameHugsTheHardwareNotch() {
+        // 14-inch MacBook Pro: 1512 x 982 screen, a 185 x 32 notch centered at the top.
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let notch = CGRect(x: 663.5, y: 0, width: 185, height: 32)
+        let f = NotchGlowLayout.plainFrame(screen: screen, notch: notch)
+        let reach = NotchGlowLayout.reach
+        #expect(f.maxY == screen.maxY)
+        #expect(f.midX == screen.minX + notch.midX)
+        #expect(f.width == 185 + reach * 2)
+        #expect(f.height == 32 + reach * 2)
+        // No wings: far narrower than the island's window.
+        #expect(f.width < 185 + NotchWingsView.maxWings)
+    }
+
+    @Test func plainFrameFollowsAScreenThatIsNotPrimary() {
+        let screen = CGRect(x: -1512, y: 200, width: 1512, height: 982)
+        let notch = CGRect(x: 663.5, y: 0, width: 185, height: 32)
+        let f = NotchGlowLayout.plainFrame(screen: screen, notch: notch)
+        #expect(f.minX == -1512 + 663.5 - NotchGlowLayout.reach)
+        #expect(f.maxY == 1182)
+    }
+
+    @Test func plainCutoutIsTheNotch() {
+        let notch = CGRect(x: 663.5, y: 0, width: 185, height: 32)
+        #expect(NotchGlowLayout.plainCutout(notch: notch) == CGSize(width: 185, height: 32))
+    }
+
+    @Test func plainRadiusRoundsTheBottomCorners() {
+        #expect(NotchGlowLayout.plainRadius(notchHeight: 32) == 8)
+        #expect(NotchGlowLayout.plainRadius(notchHeight: 38) == 8)
+        #expect(abs(NotchGlowLayout.plainRadius(notchHeight: 20) - 5) < 0.0001)
+        #expect(NotchGlowLayout.plainRadius(notchHeight: 32) < NotchGlowLayout.radius(barHeight: 37, chin: 26))
+    }
+
+    @Test func plainTopFadeLeavesTheScreenEdgeClear() {
+        // 32 pt notch: window 64 tall, clear for the top 2 pt, full by 6 pt.
+        let fade = NotchGlowLayout.topFade(barHeight: 32, islandHeight: 32)
+        #expect(abs(fade.start - 2.0 / 64) < 0.0001)
+        #expect(abs(fade.end - 6.0 / 64) < 0.0001)
+    }
+
+    @Test func shapePicksIslandOrPlainNotch() {
+        #expect(NotchGlowLayout.shape(deskRunning: true, notchOn: true, hasIsland: true, hasNotch: true) == .island)
+        // The island off, or Desk not running: the hardware notch still glows.
+        #expect(NotchGlowLayout.shape(deskRunning: true, notchOn: false, hasIsland: true, hasNotch: true) == .plain)
+        #expect(NotchGlowLayout.shape(deskRunning: false, notchOn: true, hasIsland: false, hasNotch: true) == .plain)
+        #expect(NotchGlowLayout.shape(deskRunning: false, notchOn: false, hasIsland: false, hasNotch: true) == .plain)
+        // No notched screen: nothing.
+        #expect(NotchGlowLayout.shape(deskRunning: true, notchOn: true, hasIsland: false, hasNotch: false) == .none)
+        #expect(NotchGlowLayout.shape(deskRunning: false, notchOn: false, hasIsland: false, hasNotch: false) == .none)
+        #expect(NotchGlowShape.island.rawValue == "island" && NotchGlowShape.plain.rawValue == "plain")
+    }
 }

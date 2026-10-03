@@ -7,7 +7,8 @@ steps:
   - defaults: { key: alertDelivery, type: string, value: desk }
   - wait: 1
   - do: test-alert
-  - expect_state: { pulse_count: "/^[1-9]/", alerts.delivery: desk }
+  # Item 27: the pulse glows the notch too (counted whether or not a notched screen draws it).
+  - expect_state: { pulse_count: "/^[1-9]/", glow_count: "/^[1-9]/", alerts.delivery: desk }
   - snap: pulse
   - do: pulse
     arg: seven_day

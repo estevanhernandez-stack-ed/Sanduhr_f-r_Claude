@@ -46,6 +46,7 @@ active_tool: null
 pacing_pinned: false
 pulse_count: 0
 glow_count: 0
+glow_shape: none
 glow_alerts: false
 glow_meetings: false
 glow_camera: false

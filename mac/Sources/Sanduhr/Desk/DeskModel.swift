@@ -241,7 +241,8 @@ final class DeskModel {
         if rows != meters { meters = rows }
     }
 
-    /// An alert chose the Desk: pulse these limits' meters and the notch island once.
+    /// An alert chose the Desk: pulse these limits' meters once. `pulseCount` counts every pulse;
+    /// the notch glow that goes with it is fired by `DeskController.pulse`.
     func pulse(_ tiers: Set<Tier>) {
         for tier in tiers { pulses[tier, default: 0] += 1 }
         pulseCount += 1

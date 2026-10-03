@@ -68,6 +68,13 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     @objc private func appBecameActive() { recheckCalendar() }
 
+    /// An alert chose the Desk (or the debug pulse): pulse those meters once and glow the notch,
+    /// whatever the Glow switches, so a pulse has the one notch glow (item 27).
+    @MainActor func pulse(_ tiers: Set<Tier>) {
+        model.pulse(tiers)
+        NotchGlowController.shared.fire()
+    }
+
     /// Reads Calendar access again (Settings opening, Sanduhr becoming active), while Desk runs.
     func recheckCalendar() {
         if running { model.recheckCalendar() }

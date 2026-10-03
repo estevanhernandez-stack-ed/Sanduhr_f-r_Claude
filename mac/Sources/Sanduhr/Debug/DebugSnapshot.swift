@@ -34,6 +34,8 @@ struct DebugStateInput {
     var pulseCount = 0
     /// Notch glows fired so far, and the three Glow switches.
     var glowCount = 0
+    /// What the last glow outlined: island, plain (the hardware notch alone) or none yet.
+    var glowShape = NotchGlowShape.none
     var glowSwitches = NotchGlowSwitches()
     /// The widget theme's id.
     var theme = ""
@@ -73,6 +75,7 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("pacing_pinned", .bool(s.pacingPinned)))
         pairs.append(("pulse_count", .int(s.pulseCount)))
         pairs.append(("glow_count", .int(s.glowCount)))
+        pairs.append(("glow_shape", .string(s.glowShape.rawValue)))
         pairs.append(("glow_alerts", .bool(s.glowSwitches.alerts)))
         pairs.append(("glow_meetings", .bool(s.glowSwitches.meetings)))
         pairs.append(("glow_camera", .bool(s.glowSwitches.camera)))

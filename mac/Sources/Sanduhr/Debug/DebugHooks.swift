@@ -104,7 +104,7 @@ enum DebugHooks {
             }
             return
         case .testAlert: Notifier.shared.sendTest()
-        case .pulse(let tier): DeskController.shared.model.pulse([tier])
+        case .pulse(let tier): DeskController.shared.pulse([tier])
         case .tool(let command): app.perform(command)
         case .desk(let on):
             UserDefaults.desk.set(on, forKey: DeskController.enabledKey)
@@ -272,6 +272,7 @@ enum DebugHooks {
         s.pacingPinned = vm.pacingPinned
         s.pulseCount = desk.model.pulseCount
         s.glowCount = NotchGlowController.shared.count
+        s.glowShape = NotchGlowController.shared.lastShape
         s.glowSwitches = NotchGlowController.shared.switches
         s.theme = vm.theme.id
         s.menu = app.currentMenu(widgetVisible: widgetVisible)
