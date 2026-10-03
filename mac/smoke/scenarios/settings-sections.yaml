@@ -49,5 +49,5 @@ steps:
   - expect_state: { settings_section: about }
   - expect:
       window: settings
-      contains: { text: Not affiliated with Anthropic }
+      contains: { text: "/Not affiliated with Anthropic/" }
   - snap: about

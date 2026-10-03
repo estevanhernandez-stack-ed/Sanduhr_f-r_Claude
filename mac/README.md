@@ -87,7 +87,7 @@ Most accounts don't need this.
 | **Gear** button             | Open Sanduhr Settings               |
 | Hover a tier card           | Reveal cooldown / surplus metrics   |
 | Two-finger click widget     | Tools, Refresh, Settings, Quit menu |
-| **×**                       | Quit                                |
+| **×**                       | Hide the widget (Desk keeps running) |
 
 ## License
 
