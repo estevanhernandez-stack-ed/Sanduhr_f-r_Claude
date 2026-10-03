@@ -239,7 +239,7 @@ Full keybindings documented in the in-app **Settings → Help** tab.
 
 ## License
 
-MIT — do whatever you want with it. Built by [626 Labs LLC](https://626labs.dev) ([@626Labs-LLC on GitHub](https://github.com/626Labs-LLC)).
+MIT — do whatever you want with it. Built by [626Labs LLC](https://626labs.dev) ([@626Labs-LLC on GitHub](https://github.com/626Labs-LLC)).
 
 <p align="center">
   <sub>

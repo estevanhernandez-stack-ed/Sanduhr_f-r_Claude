@@ -49,7 +49,7 @@
     <key>NSSupportsSuddenTermination</key>
     <false/>
     <key>NSHumanReadableCopyright</key>
-    <string>MIT License. 626Labs.</string>
+    <string>MIT License. 626Labs LLC.</string>
     <key>SUFeedURL</key>
     <string>https://estevanhernandez-stack-ed.github.io/Sanduhr_f-r_Claude/appcast.xml</string>
     <key>SUPublicEDKey</key>
