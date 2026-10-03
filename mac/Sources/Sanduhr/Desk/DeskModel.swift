@@ -95,11 +95,13 @@ final class DeskModel {
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var claudeTimer: Timer?
     @ObservationIgnored private var storeObserver: NSObjectProtocol?
+    @ObservationIgnored private var defaultsObserver: NSObjectProtocol?
 
     func start() {
         // Calendar access is asked only when meetings are on (Desk settings, General).
         if Self.meetingsOn { requestCalendar() }
         observeStore()
+        observeMeterSettings()
         timer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
             self?.refreshEvents()
         }
@@ -115,6 +117,16 @@ final class DeskModel {
     }
 
     private static var meetingsOn: Bool { UserDefaults.desk.object(forKey: "showMeetings") as? Bool ?? true }
+
+    /// A Meters setting changed in Settings: restyle the rows now, not at the next minute.
+    /// Any in-process defaults change counts (cheap: unchanged rows are not reassigned). A
+    /// `defaults write` from another process posts nothing; the minute refresh picks that up.
+    private func observeMeterSettings() {
+        guard defaultsObserver == nil else { return }
+        defaultsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in self?.refreshMeterWarnings() }
+    }
 
     private func observeStore() {
         if let storeObserver { NotificationCenter.default.removeObserver(storeObserver) }
@@ -208,13 +220,25 @@ final class DeskModel {
     /// Rebuilds the meters and the text lines from the last numbers the widget handed over.
     /// Runs on every update and once a minute, so pace ticks and staleness move with the clock.
     func refreshClaude(now: Date = Date()) {
-        meters = DeskMeterRow.rows(from: usage.usage, now: now)
+        meters = Self.meterRows(usage.usage, now: now)
         signInNeeded = usage.signInNeeded
         claudeLine = DeskClaudeText.line(usage)
         claudeCompact = DeskClaudeText.compact(usage, now: now)
         claudeLineIsStale = usage.isStale(now: now)
         let hint = meterHint.isVisible(now: now)
         if meterHintVisible != hint { meterHintVisible = hint }
+    }
+
+    /// The meter rows with the saved warning settings (Settings, Desk, Meters).
+    private static func meterRows(_ usage: UsageResponse?, now: Date) -> [DeskMeterRow] {
+        DeskMeterRow.rows(from: usage, now: now) { MeterWarningSettings.saved($0, in: UserDefaults.desk) }
+    }
+
+    /// Re-applies the warning settings at once: a Meters setting changed. Rows that already match
+    /// are left alone, so the Desk only redraws when a row turns red or back.
+    func refreshMeterWarnings(now: Date = Date()) {
+        let rows = Self.meterRows(usage.usage, now: now)
+        if rows != meters { meters = rows }
     }
 
     /// An alert chose the Desk: pulse these limits' meters and the notch island once.

@@ -260,6 +260,7 @@ struct DebugStateTests {
             fill: 0.07
             pace: 0.25
             reset: "Today 5:00 PM"
+            warning: false
           - tier: seven_day
         """))
         #expect(yaml.contains("    pace: null\n"))
@@ -273,6 +274,15 @@ struct DebugStateTests {
               - title: Pacing Calculators
                 checked: true
         """))
+    }
+
+    @Test func warningRowShowsInMeters() {
+        var s = DebugStateInput()
+        var row = meter(.sevenDay, 92, pace: nil)
+        row.warning = true
+        s.meters = [row]
+        let yaml = YAMLEmitter.emit(DebugState.yaml(s))
+        #expect(yaml.contains("    reset: \"Today 5:00 PM\"\n    warning: true\n"))
     }
 
     @Test func emptyState() {

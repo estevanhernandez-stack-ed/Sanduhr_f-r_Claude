@@ -4,7 +4,7 @@ import SwiftUI
 /// The sections of the Settings window, in sidebar order.
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general, alerts, credentials
-    case deskLayout, deskLook, message, notch
+    case deskLayout, deskLook, deskMeters, message, notch
     case widgetLook, themes, pacing
 
     var id: String { rawValue }
@@ -16,6 +16,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .credentials: "Credentials"
         case .deskLayout: "Layout"
         case .deskLook: "Look"
+        case .deskMeters: "Meters"
         case .message: "Message"
         case .notch: "Notch"
         case .widgetLook: "Look"
@@ -31,6 +32,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .credentials: "key"
         case .deskLayout: "rectangle.3.group"
         case .deskLook: "textformat"
+        case .deskMeters: "gauge.with.dots.needle.67percent"
         case .message: "text.quote"
         case .notch: "rectangle.topthird.inset.filled"
         case .widgetLook: "textformat"
@@ -42,7 +44,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     /// Sidebar groups: a header (nil for the first) and its sections.
     static let groups: [(header: String?, sections: [SettingsSection])] = [
         (nil, [.general, .alerts, .credentials]),
-        ("Desk", [.deskLayout, .deskLook, .message, .notch]),
+        ("Desk", [.deskLayout, .deskLook, .deskMeters, .message, .notch]),
         ("Widget", [.widgetLook, .themes, .pacing]),
     ]
 }
@@ -135,6 +137,7 @@ struct SettingsRoot: View {
         case .general: GeneralSection()
         case .deskLayout: DeskLayoutSection()
         case .deskLook: DeskLookSection()
+        case .deskMeters: DeskMetersSection(model: deskModel)
         case .message: DeskMessageSection(model: deskModel).padding(20)
         case .notch: DeskNotchSection()
         case .widgetLook, .themes, .pacing, .alerts, .credentials:

@@ -19,12 +19,14 @@ meters:
     fill: 0.07
     pace: 0.25
     reset: "Today 5:00 PM"
+    warning: false
   - tier: seven_day
     label: Weekly — All Models
     percent: 63
     fill: 0.63
     pace: null
     reset: ""
+    warning: false
 meetings_count: 0
 alerts:
   enabled: false

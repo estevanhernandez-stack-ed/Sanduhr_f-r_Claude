@@ -305,20 +305,37 @@ private struct MeterRow: View {
     let width: CGFloat
     let alignment: HorizontalAlignment
 
+    /// The widget's over-limit red (`usageColor` at 90% and up).
+    static let warningRed = Color.hex("f87171")
+
     var body: some View {
         let barHeight = max(4, size * 0.38)
         VStack(alignment: alignment, spacing: size * 0.22) {
             HStack(alignment: .firstTextBaseline) {
                 Text(row.label).lineLimit(1).opacity(0.85)
                 Spacer(minLength: size)
-                Text("\(row.percent)%")
+                if row.warning {
+                    Text("\(row.percent)%").foregroundStyle(Self.warningRed)
+                } else {
+                    Text("\(row.percent)%")
+                }
             }
             ZStack(alignment: .leading) {
                 Capsule().fill(LinearGradient.ink(ink)).opacity(0.22)
-                Capsule().fill(LinearGradient.ink(ink))
+                Capsule().fill(row.warning ? AnyShapeStyle(Self.warningRed) : AnyShapeStyle(LinearGradient.ink(ink)))
                     .frame(width: width * row.fill)
             }
             .frame(width: width, height: barHeight)
+            .background {
+                // A warning row: a steady glow in the ink wrapping the bar, as the notch glows.
+                if row.warning {
+                    Capsule()
+                        .fill(LinearGradient.ink(ink))
+                        .padding(-barHeight * 0.7)
+                        .blur(radius: barHeight * 0.9)
+                        .opacity(0.6)
+                }
+            }
             .overlay(alignment: .leading) {
                 // Taller than the bar, so it still reads where it crosses the fill.
                 if let pace = row.pace {

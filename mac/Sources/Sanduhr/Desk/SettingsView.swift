@@ -167,6 +167,68 @@ private struct Swatch: View {
     }
 }
 
+// MARK: - Meters
+
+/// Warnings on the Desk meters, set per meter: a group for the session, the all-models weekly
+/// limit, and every other weekly limit the server reports.
+struct DeskMetersSection: View {
+    var model: DeskModel
+
+    /// Session and weekly always; the other weekly limits once the server has reported them.
+    static func tiers(present: [Tier]) -> [Tier] {
+        Tier.allCases.filter { $0 == .fiveHour || $0 == .sevenDay || present.contains($0) }
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                Text("A meter that is nearly full while its reset is still far off draws its bar in red with a soft glow in the Desk ink around it. Each meter has its own setting; changes show on the desktop at once.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(Self.tiers(present: model.meters.map(\.tier)), id: \.self) { tier in
+                MeterWarningGroup(tier: tier)
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+private struct MeterWarningGroup: View {
+    let tier: Tier
+    @AppStorage private var enabled: Bool
+    @AppStorage private var threshold: Double
+    @AppStorage private var minReset: Double
+
+    init(tier: Tier) {
+        self.tier = tier
+        let standard = MeterWarningSettings.standard(for: tier)
+        _enabled = AppStorage(wrappedValue: standard.enabled, MeterWarningSettings.onKey(tier), store: .desk)
+        _threshold = AppStorage(wrappedValue: standard.threshold, MeterWarningSettings.thresholdKey(tier), store: .desk)
+        _minReset = AppStorage(wrappedValue: standard.minReset, MeterWarningSettings.minResetKey(tier), store: .desk)
+    }
+
+    var body: some View {
+        Section(tier.label) {
+            Toggle("Warn when nearly full", isOn: $enabled)
+            HStack {
+                Text("At")
+                Slider(value: $threshold, in: 50...100, step: 5)
+                Text("\(Int(threshold))%")
+                    .font(.system(.body, design: .monospaced))
+                    .frame(width: 48, alignment: .trailing)
+            }
+            .disabled(!enabled)
+            Picker("Only while the reset is more than", selection: $minReset) {
+                ForEach(MeterWarning.minResetChoices, id: \.seconds) { Text($0.name).tag($0.seconds) }
+                if !MeterWarning.minResetChoices.contains(where: { $0.seconds == minReset }) {
+                    Text("Custom").tag(minReset)
+                }
+            }
+            .disabled(!enabled)
+        }
+    }
+}
+
 // MARK: - Message
 
 struct DeskMessageSection: View {

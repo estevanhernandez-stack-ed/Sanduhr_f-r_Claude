@@ -92,6 +92,7 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
             ("fill", .double(m.fill)),
             ("pace", pace),
             ("reset", .string(m.reset)),
+            ("warning", .bool(m.warning)),
         ])
     }
     

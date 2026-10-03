@@ -257,6 +257,9 @@ enum DebugHooks {
         s.widgetVisibility = .saved()
         s.settingsOpen = settings.isOpen
         s.settingsSection = settings.window == nil ? nil : settings.section
+        // A `defaults write` from the smoke runner posts no change notice here: apply the saved
+        // warning settings before reporting, as the next minute refresh would.
+        desk.model.refreshMeterWarnings()
         s.meters = desk.model.meters
         s.meetingsCount = desk.model.meetings.count
         s.alerts = AlertSettings(UserDefaults.standard)
