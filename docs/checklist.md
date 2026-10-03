@@ -186,7 +186,7 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: picking Match Desk makes the widget read like part of the desktop; changing Desk's ink or font restyles it at once; other themes are unaffected.
   Verify: swift-testing for the Desk-to-palette mapping (single color, gradient, empty fallback); smoke scenario picking it and checking `state.yaml` theme.
 
-- [ ] **25. Meter warnings on Desk, set per meter**
+- [x] **25. Meter warnings on Desk, set per meter**
   Spec ref: New — follows review of the 2.3.0 build (Desk meters: `Desk/DeskMeters.swift` `DeskMeterRow`, `MeterRow` in `Desk/DeskView.swift`; glow technique from `Desk/NotchGlow.swift`)
   What to build: a Desk meter row is "warning" when its fill is at or above a threshold and its reset is more than a set time away. A warning row draws its bar red (the standard over-limit red) with a steady glow in the Desk ink gradient around the bar. Each meter is independent: session, weekly, and every other weekly limit get their own switch, threshold and minimum time to reset, on a new Desk, Meters settings page. Defaults: weekly limits on at 90% with more than 1 day to reset; session off (when turned on: 90%, more than 1 hour). A missing reset time counts as "far away".
   Acceptance: a weekly meter at 92% with 3 days left shows red with the ink glow; the same meter with 6 hours left stays normal; the session meter never warns until switched on; changing a setting restyles the row at once.
