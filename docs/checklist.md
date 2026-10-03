@@ -144,7 +144,7 @@ Cooldown Snake, themes, history once M7 lands). Mac sources only; build and test
 From /iterate, 2026-10-02, after 2.2.1. Same build rules as Iterations 1 and 2. Ships as 2.3.0.
 New options keep today's behavior by default; the camera light and the glow start off.
 
-- [ ] **22. Calendar access that explains itself**
+- [x] **22. Calendar access that explains itself**
   Spec ref: New — follows a 2.2.1 report (Calendar allowed in System Settings, Desk still showed "Allow Sanduhr…")
   What to build: the Desk calendar note becomes clickable and opens System Settings at Privacy & Security, Calendars. Distinguish the states: not asked yet (ask), denied (the existing line), "Add Events Only" (its own line saying Full Access is needed). Recheck authorization when Sanduhr becomes active, when Settings opens, and on each Desk minute tick while not fully authorized, so a grant made in System Settings shows up within a minute without a relaunch (use a fresh `EKEventStore` if the old one keeps the stale answer).
   Acceptance: granting Full Access in System Settings clears the note within a minute and loads meetings with no relaunch; Add Only shows the Full Access line; clicking the note opens the right System Settings page.
