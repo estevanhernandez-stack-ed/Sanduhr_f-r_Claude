@@ -1,7 +1,17 @@
 name: Mac CI
 
+# macOS runners bill at roughly 10x Linux against the account's pooled Actions
+# minutes, and this workflow was the account's single largest cost (2026-10-01..03:
+# 56 runs in three days, 22 commits built twice). So it runs once per change:
+# - push only on main. Branch commits are covered by their pull request, and
+#   release tag pushes (v*-mac) re-tested a commit main had already built. Naming
+#   `branches` stops tag pushes from triggering.
+# - a newer push to the same PR or branch cancels the older run.
+# - build/test and the universal release build share one job: one checkout and
+#   one whole-minute rounding instead of two.
 on:
   push:
+    branches: [main]
     paths:
       - "mac/**"
       - ".github/workflows/mac-ci.yml"
@@ -10,29 +20,40 @@ on:
       - "mac/**"
       - ".github/workflows/mac-ci.yml"
 
+concurrency:
+  group: mac-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 defaults:
   run:
     working-directory: mac
 
 jobs:
-  build-and-test:
+  build-test-release:
     # Full Xcode (Swift 6, swift-testing built in), so plain swift build and swift test work.
     runs-on: macos-15
+    # Normal runs take about 3 minutes; a hung macOS job is the expensive kind.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Toolchain
         run: swift --version && xcode-select -p
-      - name: Build
-        run: swift build
+      # Only the package downloads (Sparkle's repository, checkout and binary), keyed on
+      # Package.resolved: small, and the same from run to run. Build products are not
+      # cached; they would be large and could go stale.
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            mac/.build/repositories
+            mac/.build/checkouts
+            mac/.build/artifacts
+          key: mac-spm-${{ runner.os }}-${{ hashFiles('mac/Package.resolved') }}
+      # No separate swift build: swift test builds everything it runs.
       - name: Test
         run: swift test
-
-  universal-release:
-    # The release build ships to Intel and Apple silicon Macs; v2.0.4 went out Intel-only.
-    # Ad-hoc signed: this proves the build, it is not a distributable artifact.
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
+      # The release build ships to Intel and Apple silicon Macs; v2.0.4 went out Intel-only.
+      # Ad-hoc signed: this proves the build, it is not a distributable artifact.
       - name: Build universal release
         env:
           SIGN_IDENTITY: "-"
