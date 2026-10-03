@@ -38,8 +38,18 @@ jobs:
       - uses: actions/checkout@v4
       - name: Toolchain
         run: swift --version && xcode-select -p
-      - name: Build
-        run: swift build
+      # Only the package downloads (Sparkle's repository, checkout and binary), keyed on
+      # Package.resolved: small, and the same from run to run. Build products are not
+      # cached; they would be large and could go stale.
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            mac/.build/repositories
+            mac/.build/checkouts
+            mac/.build/artifacts
+          key: mac-spm-${{ runner.os }}-${{ hashFiles('mac/Package.resolved') }}
+      # No separate swift build: swift test builds everything it runs.
       - name: Test
         run: swift test
       # The release build ships to Intel and Apple silicon Macs; v2.0.4 went out Intel-only.
