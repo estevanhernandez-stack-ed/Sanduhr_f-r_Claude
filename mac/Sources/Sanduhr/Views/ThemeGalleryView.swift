@@ -24,7 +24,8 @@ struct ThemeGalleryView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(item.name)
                 .accessibilityAddTraits(item.isCurrent ? .isSelected : [])
-                .help(item.isUser ? "\(item.name) (your theme)" : item.name)
+                .accessibilityHint(item.summary ?? "")
+                .help(item.tooltip)
             }
         }
     }

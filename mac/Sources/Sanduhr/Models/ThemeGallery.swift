@@ -9,6 +9,34 @@ struct ThemeGalleryItem: Identifiable, Equatable {
 
     var id: String { theme.id }
     var name: String { theme.displayName }
+
+    /// What the theme looks like, in a line: the user file's `description`, or the built-in's
+    /// line below. A user theme that takes a built-in's id doesn't inherit its line.
+    var summary: String? { isUser ? theme.summary : Self.builtInSummaries[theme.id] }
+
+    /// The card's tooltip: the name, "(your theme)" for a user theme, and the summary under it.
+    var tooltip: String {
+        let title = isUser ? "\(name) (your theme)" : name
+        guard let summary else { return title }
+        return "\(title)\n\(summary)"
+    }
+
+    static let builtInSummaries: [String: String] = [
+        "obsidian": "Near-black glass with a violet accent and a coral pace marker. The default.",
+        "aurora": "Deep night blue with a sky-blue accent.",
+        "ember": "Dark ember red with a warm orange accent.",
+        "mint": "Deep forest green with a fresh mint accent.",
+        "626-labs": "Navy and cyan with a magenta pace marker, in 626Labs' colors.",
+        "matrix": "Opaque black and phosphor green with monospaced numbers, like an old terminal.",
+        "blueprint": "Dark violet with a bright seafoam accent.",
+        "match-desk": "No glass: the widget in your Desk font and ink, like part of the desktop. Follows your Desk settings as you change them.",
+    ]
+
+    /// Trims a description and drops a blank one.
+    static func cleaned(_ s: String?) -> String? {
+        guard let t = s?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty else { return nil }
+        return t
+    }
 }
 
 /// The theme list the Settings gallery shows, built the way `ThemeRegistry` merges themes so

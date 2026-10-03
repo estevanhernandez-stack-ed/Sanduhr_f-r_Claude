@@ -216,6 +216,9 @@ private struct ThemeDTO: Decodable {
     let text, textSecondary, textDim, textMuted: String
     let accent, paceMarker, sparkline: String
 
+    // Optional one-line description, shown in the Settings gallery's tooltip.
+    let description: String?
+
     // Optional colors.
     let glassOnMica: String?
 
@@ -270,6 +273,7 @@ private struct ThemeDTO: Decodable {
                 },
                 cardCornerRadius: cardCornerRadius.map { CGFloat($0) } ?? 10,
                 ghostAlpha: ghostAlpha ?? 1.0,
-                breathPeriodMs: breathPeriodMs ?? 2800))
+                breathPeriodMs: breathPeriodMs ?? 2800),
+            summary: ThemeGalleryItem.cleaned(description))
     }
 }
