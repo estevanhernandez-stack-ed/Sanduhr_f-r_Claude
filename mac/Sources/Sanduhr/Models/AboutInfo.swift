@@ -40,8 +40,8 @@ enum AboutLinks {
     static let github = URL(string: repo)!
     static let releases = URL(string: repo + "/releases")!
     static let privacy = URL(string: repo + "/blob/main/docs/PRIVACY.md")!
-    /// No LICENSE file in the repo yet: the README's license section.
-    static let license = URL(string: repo + "#license")!
+    /// The MIT license file at the repo root.
+    static let license = URL(string: repo + "/blob/main/LICENSE")!
     static let sparkle = URL(string: "https://sparkle-project.org")!
 
     /// The release page of a Mac version (tagged `v<version>-mac`); the releases list when the

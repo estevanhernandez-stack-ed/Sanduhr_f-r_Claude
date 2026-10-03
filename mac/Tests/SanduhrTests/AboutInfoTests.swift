@@ -17,7 +17,7 @@ struct AboutLinksTests {
             repo,
             repo + "/releases/tag/v2.3.0-mac",
             repo + "/blob/main/docs/PRIVACY.md",
-            repo + "#license",
+            repo + "/blob/main/LICENSE",
         ])
     }
 
