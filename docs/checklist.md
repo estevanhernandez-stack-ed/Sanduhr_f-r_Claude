@@ -204,7 +204,7 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: a weekly tier at 92% with days left shows red with a theme-color glow on the widget, and the same on Desk; turning its warning off clears both.
   Verify: swift-testing that the widget's warning state per tier matches `MeterWarning` for the same inputs; smoke: state for the widget tiers gains `warning` (or reuse meters state) and a scenario forcing a warning checks it; an on-screen capture of the widget.
 
-- [ ] **28. Quit says what it quits**
+- [x] **28. Quit says what it quits**
   Spec ref: New — review of the 2.3.0 build (the menu model `Models/SanduhrMenu.swift`)
   What to build: the menus' first item reads Show Widget / Hide Widget (it only ever touched the floating widget), and Quit reads "Quit Sanduhr für Claude" so it is clear it closes everything (widget, Desk, notch). Same in all three menus and on Settings, General's Quit button, with a caption there saying it closes the widget, Desk and the notch.
   Acceptance: the three menus and Settings use the new names; nothing else changes.

@@ -13,7 +13,7 @@ steps:
       contains: { label: Later }
   - expect:
       window: settings
-      missing: { label: Quit Sanduhr }
+      missing: { label: Quit Sanduhr für Claude }
   - expect_state: { settings_section: notch, meters.0.label: Session (5hr), meters.1.pace: null, alerts.enabled: false }
   - snap: notch settings
   - do: desk

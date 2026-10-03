@@ -416,11 +416,13 @@ struct GeneralSection: View {
             }
             Section {
                 HStack {
-                    Button("Quit Sanduhr") { NSApp.terminate(nil) }
+                    Button("Quit Sanduhr für Claude") { NSApp.terminate(nil) }
                     Spacer()
                     Text("Sanduhr \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                Text("Quitting closes everything: the widget, Desk and the notch. To put away only the widget, use Hide Widget in any Sanduhr menu or the widget's close button.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

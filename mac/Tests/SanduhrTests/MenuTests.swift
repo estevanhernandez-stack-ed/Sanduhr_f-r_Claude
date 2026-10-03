@@ -19,17 +19,17 @@ struct SanduhrMenuTests {
 
     @Test func itemsInOrder() {
         #expect(flat(menu()) == [
-            "Hide Sanduhr", "-",
+            "Hide Widget", "-",
             "Deep Work", "Pacing Calculators", "Cooldown Snake", "Camera Light", "-",
             "Refresh", "Settings…", "Check for Updates…", "-",
-            "Quit Sanduhr",
+            "Quit Sanduhr für Claude",
         ])
         #expect(menu().map(\.header) == [nil, "Tools", nil, nil])
     }
 
     @Test func showOrHideFollowsTheWidget() {
-        #expect(menu(visible: true)[0].entries[0].title == "Hide Sanduhr")
-        #expect(menu(visible: false)[0].entries[0].title == "Show Sanduhr")
+        #expect(menu(visible: true)[0].entries[0].title == "Hide Widget")
+        #expect(menu(visible: false)[0].entries[0].title == "Show Widget")
         #expect(menu(visible: false)[0].entries[0].command == .showHide)
     }
 

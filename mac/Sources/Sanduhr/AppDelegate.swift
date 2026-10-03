@@ -353,7 +353,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         showPanel()
     }
 
-    /// The menus' first item: "Hide Sanduhr" when the widget shows, "Show Sanduhr" when it doesn't.
+    /// The menus' first item: "Hide Widget" when the widget shows, "Show Widget" when it doesn't.
     @objc func showOrHidePanel() {
         if panel?.isVisible ?? false { hidePanel() } else { showPanel() }
     }

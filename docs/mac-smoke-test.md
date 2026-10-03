@@ -48,7 +48,7 @@ Fresh-install and migration checks stay manual.
 
 - [ ] Cards fill in after the first fetch (sign in via Settings, Credentials if the key is gone).
 - [ ] Left-click the menu bar hourglass hides the widget; again shows it. Hidden survives a relaunch.
-- [ ] Right-click opens the status menu: Hide (or Show) Sanduhr; Tools: Deep Work, Pacing Calculators, Cooldown Snake; Refresh, Settings…, Check for Updates…; Quit Sanduhr. Two-finger click on the widget lists the same items in the same order (always Hide Sanduhr there). Check for Updates… from the widget's menu opens Sparkle's check.
+- [ ] Right-click opens the status menu: Hide (or Show) Widget; Tools: Deep Work, Pacing Calculators, Cooldown Snake; Refresh, Settings…, Check for Updates…; Quit Sanduhr für Claude. Two-finger click on the widget lists the same items in the same order (always Hide Widget there). Check for Updates… from the widget's menu opens Sparkle's check.
 - [ ] Refresh updates the footer time; `~/Library/Application Support/Sanduhr/snapshot.json` has a new `captured_at`.
 - [ ] Gear on the widget opens Sanduhr Settings. Widget, Look: pick a font and subtle mode, the widget changes as you pick. Themes: Reload lists the installed user themes. Switch a theme on the widget's strip, toggle compact (panel resizes, top edge stays put), open the focus timer and close it.
 
@@ -67,7 +67,7 @@ Fresh-install and migration checks stay manual.
 
 - [ ] Hide the widget, with Ice hiding the menu bar hourglass: Option+S opens one window titled "Sanduhr Settings", a sidebar with General, Alerts, Credentials; Desk: Layout, Look, Meters, Message, Notch; Widget: Look, Themes, Pacing & Focus. Every section opens and edits with the widget still hidden. Settings… in the widget's menu and the hourglass's menu bring the same window forward (never a second one); there is no "Sanduhr Desk" window and no settings sheet on the widget.
 - [ ] General, Surfaces: "Show the widget now" off hides the widget and on shows it (the switch follows the hourglass too); Notch flips the island (Desk on).
-- [ ] General, Surfaces, Widget picker: "Hidden while Desk is on" hides it at once with Desk on; turn Desk off, it shows; on, it hides. Show it from the hourglass: it stays until Desk next flips. "Only when I open it": hidden after every Desk flip and after a relaunch until a meter click, Tools or Show Sanduhr brings it. "Always shown": Desk flips leave it where it is. Put back "Always shown" (or what it was). Pacing & Focus, "Pin the pacing calculators" and Tools, Pacing Calculators show the same state: flip one, the other follows.
+- [ ] General, Surfaces, Widget picker: "Hidden while Desk is on" hides it at once with Desk on; turn Desk off, it shows; on, it hides. Show it from the hourglass: it stays until Desk next flips. "Only when I open it": hidden after every Desk flip and after a relaunch until a meter click, Tools or Show Widget brings it. "Always shown": Desk flips leave it where it is. Put back "Always shown" (or what it was). Pacing & Focus, "Pin the pacing calculators" and Tools, Pacing Calculators show the same state: flip one, the other follows.
 - [ ] After section 1, Desk is already on: clock, date, message and the meters (a bar per limit with a pace tick and reset time). General, Surfaces, Desk is on. The notch stays plain (its own switch, off).
 - [ ] General, "Read today's meetings" (off on a fresh install): switch it on and the Calendar prompt appears right away, no restart. Allow: today's remaining timed meetings show. Switch it off: they go.
 - [ ] Meters: their pace ticks sit where the widget's do; hide the widget and refresh from the menu, and the meters still update.
@@ -76,8 +76,8 @@ Fresh-install and migration checks stay manual.
 - [ ] Click the meters again with the widget showing: it comes forward and does not move. Drag it elsewhere, hide it with the hourglass and show it again with the hourglass: it comes back where it was dragged, not beside the meters.
 - [ ] Click empty desktop beside the meters: Finder gets it (desktop icons select). Put a Finder window over the meters and click it there: the window takes the click, no widget.
 - [ ] Hint expiry: quit, `defaults write com.626labs.sanduhr.desk meterHintFirstShown -date "2026-01-01 00:00:00 +0000"; defaults delete com.626labs.sanduhr.desk meterHintDismissed`, relaunch: no hint. `defaults delete com.626labs.sanduhr.desk meterHintFirstShown`, relaunch: the hint is back (tidy up by clicking the meters).
-- [ ] Tools with Ice hiding the hourglass and the widget hidden: click the meters, two-finger click the widget, Tools: Deep Work opens the hourglass overlay, Cooldown Snake the game, Pacing Calculators keeps cool-down or surplus showing on every card (checked; choose again to put them back under the pointer), Hide Sanduhr hides it.
-- [ ] Tools from the menu bar hourglass's menu, widget hidden first each time: Show Sanduhr shows it; Deep Work, Cooldown Snake and Pacing Calculators each show the widget with that tool open. With `menuIcon` on, Desk's clock menu lists today's meetings and Join next meeting, then the same items as the hourglass's menu in the same order. A tool open on the widget shows checked in all three menus.
+- [ ] Tools with Ice hiding the hourglass and the widget hidden: click the meters, two-finger click the widget, Tools: Deep Work opens the hourglass overlay, Cooldown Snake the game, Pacing Calculators keeps cool-down or surplus showing on every card (checked; choose again to put them back under the pointer), Hide Widget hides it.
+- [ ] Tools from the menu bar hourglass's menu, widget hidden first each time: Show Widget shows it; Deep Work, Cooldown Snake and Pacing Calculators each show the widget with that tool open. With `menuIcon` on, Desk's clock menu lists today's meetings and Join next meeting, then the same items as the hourglass's menu in the same order. A tool open on the widget shows checked in all three menus.
 - [ ] Meters: Settings, Desk, Meters lists Session and Weekly — All Models (plus any other weekly limit the account reports), each with "Warn when nearly full", an "At" slider (50 to 100%) and "Only while the reset is more than". Drop the weekly slider below its current percent with a "more than" shorter than its reset: the weekly bar turns red at once with a steady glow in the Desk ink around it, and its percent turns red. Raise the slider back, or pick a "more than" longer than the time to reset: it goes back to the ink. The session bar never turns red until its own switch is on. Put the settings back (weekly: on, 90%, 1 day).
 - [ ] Layout: move Clock to Top right; it moves live. Hide Meetings; they go. Put both back.
 - [ ] Look: ink `9ad7ff, 012089` (space after the comma) on the message draws blue to navy, no gray.
@@ -110,7 +110,7 @@ Fresh-install and migration checks stay manual.
 
 ## 7. Migration from Sanduhr Desk, then restore
 
-- [ ] Quit Sanduhr. `defaults delete com.626labs.sanduhr.desk`, then
+- [ ] Quit Sanduhr für Claude. `defaults delete com.626labs.sanduhr.desk`, then
   `defaults import com.626labs.sanduhrdesk ~/sanduhr-smoke/com.626labs.sanduhrdesk.plist`.
 - [ ] Launch: Desk comes on by itself with the old layout, colors and font (EsteFont if none was set).
   A running Sanduhr Desk app is quit.

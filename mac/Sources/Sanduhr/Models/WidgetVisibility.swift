@@ -10,7 +10,7 @@ enum WidgetVisibility: String, CaseIterable, Identifiable {
     case always
     /// Hidden whenever Desk is on, shown when Desk is off.
     case whileDeskOff
-    /// Only when asked: a meter click, Tools, Show Sanduhr.
+    /// Only when asked: a meter click, Tools, Show Widget.
     case onRequest
 
     static let key = "widgetVisibility"

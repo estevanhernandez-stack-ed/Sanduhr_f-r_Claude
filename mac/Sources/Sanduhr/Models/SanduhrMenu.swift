@@ -32,7 +32,7 @@ enum SanduhrMenu {
                        cameraLight: Bool = false) -> [MenuGroup] {
         [
             MenuGroup(entries: [
-                MenuEntry(command: .showHide, title: widgetVisible ? "Hide Sanduhr" : "Show Sanduhr"),
+                MenuEntry(command: .showHide, title: widgetVisible ? "Hide Widget" : "Show Widget"),
             ]),
             MenuGroup(header: "Tools", entries: [
                 MenuEntry(command: .deepWork, title: "Deep Work", key: "p", checked: deepWork),
@@ -46,7 +46,7 @@ enum SanduhrMenu {
                 MenuEntry(command: .checkForUpdates, title: "Check for Updates…"),
             ]),
             MenuGroup(entries: [
-                MenuEntry(command: .quit, title: "Quit Sanduhr", key: "q"),
+                MenuEntry(command: .quit, title: "Quit Sanduhr für Claude", key: "q"),
             ]),
         ]
     }
