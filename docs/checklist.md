@@ -150,7 +150,7 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: granting Full Access in System Settings clears the note within a minute and loads meetings with no relaunch; Add Only shows the Full Access line; clicking the note opens the right System Settings page.
   Verify: swift-testing for the status-to-message mapping; on screen by toggling the permission.
 
-- [ ] **18. Themes you can see**
+- [x] **18. Themes you can see**
   Spec ref: New — Settings, Widget, Themes (`Views/WidgetSettings.swift`, `Models/Theme.swift`, `Services/UserThemes.swift`)
   What to build: the Themes page opens on a gallery of every theme, built-in and user, each a small preview (background, card, bar colors, accent) with its name; the current one marked; one click applies it live. The existing custom-theme tools (paste JSON, agent prompt, folder, reload, delete) stay below the gallery.
   Acceptance: every built-in and installed user theme appears with a recognizable preview; clicking applies it to the widget at once; the widget's own Theme menu and the gallery agree.
@@ -173,3 +173,15 @@ New options keep today's behavior by default; the camera light and the glow star
   What to build: an outer glow around the notch island (ink colored, a few seconds, gentle) for Sanduhr's own events: an alert (any delivery), a meeting starting in the next minute (once per meeting), the camera light coming on. Each event type has a switch in Settings, Desk, Notch, all off by default. No sound detection (no public API for other apps' sounds; an audio tap needs a recording permission and is out of scope).
   Acceptance: each enabled event glows once; disabled ones do not; the glow never blocks clicks or covers app content beyond the island's edge.
   Verify: swift-testing for the event-to-glow rules (once per meeting, switches); `smoke do pulse` style action to trigger the glow on demand.
+
+- [ ] **23. When the widget shows**
+  Spec ref: New — Settings, General, Surfaces (`Views/SettingsWindow.swift` General section, `AppDelegate` show/hide, `DeskFirstRun`)
+  What to build: a Widget setting with three choices: **Always** (today's behavior; the default for existing users), **While Desk is off** (hidden whenever Desk is on, shown when Desk is off; the default for new installs, replacing the tuck-after-first-fetch flag's one-time hide once sign-in is done), and **Never on its own** (only appears when asked: meter click, Tools, Show Sanduhr). Showing or hiding from a menu still works as a one-off; the choice takes over again when Desk turns on or off and at launch. The existing `panelHidden` key keeps meaning "hidden right now".
+  Acceptance: with "While Desk is off", switching Desk off shows the widget and on hides it; "Never on its own" keeps it hidden across launches until asked; an updated install sees no change.
+  Verify: swift-testing for a pure visibility rule (setting, Desk on/off, manual override, launch); smoke scenario toggling Desk with each setting.
+
+- [ ] **24. A "Match Desk" theme for the widget**
+  Spec ref: New — builds on item 18's gallery (`Models/ThemeGallery.swift`, `Views/ThemeGalleryView.swift`, `Models/Theme.swift`)
+  What to build: a built-in "Match Desk" theme in the gallery that draws the widget in Desk's look: the Desk font, the Desk ink color or gradient for text and bars, the Desk drop shadow, no glass background (like subtle mode). It follows the Desk settings live (font, ink, shadow). Also re-resolve the current theme by id when user themes reload, so an edited theme restyles the widget without being picked again.
+  Acceptance: picking Match Desk makes the widget read like part of the desktop; changing Desk's ink or font restyles it at once; other themes are unaffected.
+  Verify: swift-testing for the Desk-to-palette mapping (single color, gradient, empty fallback); smoke scenario picking it and checking `state.yaml` theme.
