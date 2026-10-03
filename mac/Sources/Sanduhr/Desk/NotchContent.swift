@@ -15,7 +15,8 @@ enum NotchContent: String, CaseIterable, Identifiable {
     /// The next meeting within the hour, otherwise the Claude meters: the strip's own default.
     case meetingOrMeters
     case time
-    /// The compact Claude meters ("5h 7%  wk 63%"), absent while the numbers are stale.
+    /// The compact Claude meters ("5h 7%  wk 63%"), absent while the numbers are stale; "sign in
+    /// to Sanduhr" while signed out or refused.
     case meters
     /// Today's Desk message line.
     case message

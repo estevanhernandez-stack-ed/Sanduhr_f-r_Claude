@@ -78,10 +78,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.awaitingSignIn = false
                 self?.applyWidgetVisibility(.signedIn)
             }
-            var isAuthError = false
-            if case .error(_, let isAuth) = vm.status { isAuthError = isAuth }
+            // Signed out (Settings, Credentials): the widget shows for sign-in again, as at a
+            // launch without a key, until the next successful fetch.
+            if vm.status == .signedOut, self?.awaitingSignIn == false {
+                self?.awaitingSignIn = true
+                self?.applyWidgetVisibility(.signedOut)
+            }
             DeskController.shared.model.update(DeskUsage(
-                usage: vm.usage, fetchedAt: vm.lastUpdated, signInNeeded: isAuthError))
+                usage: vm.usage, fetchedAt: vm.lastUpdated, signInNeeded: vm.status.needsSignIn))
         }
 
         // When the user toggles compact mode, resize the panel to fit the
@@ -118,8 +122,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The widget is on screen.
     var widgetVisible: Bool { panel?.isVisible ?? false }
 
-    /// True from a launch without a session key (or a brand-new install's first launch) until
-    /// the first successful fetch.
+    /// True from a launch without a session key (or a brand-new install's first launch), or from
+    /// a sign-out, until the first successful fetch.
     private var awaitingSignIn = false
 
     /// Desk was switched on or off (DeskController.apply, from the Settings switch or a debug

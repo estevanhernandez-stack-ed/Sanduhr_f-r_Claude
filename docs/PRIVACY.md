@@ -73,7 +73,8 @@ Nothing about your usage comes back to us. The short-version promise above ("doe
 - **Clear local storage:** delete `%APPDATA%\Sanduhr\` and `%LOCALAPPDATA%\Sanduhr\`.
 - **Uninstall does not wipe credentials.** Start → Apps & features → Sanduhr für Claude → Uninstall removes the installed app files only. It does **not** delete your Windows Credential Manager entries under `com.626labs.sanduhr`, on either the GitHub (.exe) or Microsoft Store install — sign out first, or delete the entries yourself afterward.
 - **Note for Microsoft Store installs:** uninstalling from Apps & features also does **not** remove `%LOCALAPPDATA%\Sanduhr` (Windows leaves per-user app data behind). If you want the usage vault gone after uninstall, delete that folder manually.
-- **On the Mac:** delete the `com.626labs.sanduhr` items in Keychain Access (release builds) or the folder `~/Library/Application Support/Sanduhr/` (development builds). Moving the app to the Trash removes neither.
+- **On the Mac, Sign Out:** Sanduhr → Settings → Credentials → Sign Out, then confirm. This deletes `sessionKey` and `cf_clearance` from both the Keychain and the credentials file, stops fetching, and marks `snapshot.json` signed out with no usage figures in it. Your usage history (`history.json`) and settings stay; to remove those too, delete the folder `~/Library/Application Support/Sanduhr/` and run `defaults delete com.626labs.sanduhr` and `defaults delete com.626labs.sanduhr.desk`.
+- **On the Mac, by hand:** delete the `com.626labs.sanduhr` items in Keychain Access (release builds) or the folder `~/Library/Application Support/Sanduhr/` (development builds). Moving the app to the Trash removes neither, so sign out first.
 
 ## Third-party services Sanduhr does not use
 

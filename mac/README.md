@@ -62,10 +62,21 @@ Where the key is stored depends on the build:
   ask for your login password each time. `SANDUHR_KEYCHAIN=1` in the environment forces the
   Keychain on a dev build to test that path; expect that prompt after a rebuild.
 
-`smoke/smoke state` reports which one is in use as `credentials_store`. To remove the key,
-delete the `com.626labs.sanduhr` items in Keychain Access (release builds) or
-`~/Library/Application Support/Sanduhr/` (dev builds). Dragging Sanduhr to the Trash removes
-neither.
+`smoke/smoke state` reports which one is in use as `credentials_store`.
+
+### Signing out
+
+**Settings, Credentials, Sign Out** (after a confirmation) deletes the session key and
+`cf_clearance` from both the Keychain and the file, whichever one the build uses, stops the
+refresh and clears the shown usage. The widget says "Signed out — sign in" (click it for
+Credentials), Desk and the notch show the sign-in line instead of meters, and `snapshot.json`
+says `session_expired` with no tiers so the statusline and MCP server stop showing old numbers.
+Your usage history and settings stay. Paste a key and Save to sign in again; no relaunch needed.
+Signing out only removes the key from this Mac; it does not end the session on claude.ai.
+
+Dragging Sanduhr to the Trash removes neither store: sign out first, or delete the
+`com.626labs.sanduhr` items in Keychain Access (release builds) or
+`~/Library/Application Support/Sanduhr/credentials.json` (dev builds).
 
 ### Cloudflare fallback
 

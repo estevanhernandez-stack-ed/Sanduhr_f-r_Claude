@@ -206,12 +206,27 @@ struct RootView: View {
 
     // MARK: Status line
 
+    @ViewBuilder
     private var statusLine: some View {
         let t = vm.theme.palette
         let color: Color = vm.status.isError ? .hex("f87171") : t.textDim
-        return Text(vm.status.text)
-            .font(.app(size: 11))
-            .foregroundStyle(color)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        if vm.status == .signedOut {
+            // Signed out: the line is the way back, straight to Settings, Credentials.
+            Button { SettingsWindowController.shared.show(.credentials) } label: {
+                Text(vm.status.text)
+                    .font(.app(size: 11))
+                    .underline()
+                    .foregroundStyle(t.accent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens Settings, Credentials")
+        } else {
+            Text(vm.status.text)
+                .font(.app(size: 11))
+                .foregroundStyle(color)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 }

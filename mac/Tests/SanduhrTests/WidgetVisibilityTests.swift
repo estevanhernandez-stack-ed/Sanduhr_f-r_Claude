@@ -3,7 +3,7 @@ import Testing
 
 @Suite("When the widget shows")
 struct WidgetVisibilityTests {
-    let events: [WidgetVisibilityEvent] = [.launch, .deskChanged, .signedIn, .choiceChanged]
+    let events: [WidgetVisibilityEvent] = [.launch, .deskChanged, .signedIn, .signedOut, .choiceChanged]
 
     func rule(_ setting: WidgetVisibility, deskOn: Bool, key: Bool = true,
               _ event: WidgetVisibilityEvent) -> Bool? {

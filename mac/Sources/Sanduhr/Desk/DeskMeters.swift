@@ -77,8 +77,13 @@ enum DeskClaudeText {
         return parts.isEmpty ? nil : "claude   " + parts.joined(separator: "   ")
     }
 
-    /// "5h 7%  wk 63%" for the notch, nil when stale or empty.
+    /// The notch's short sign-in line, for the wings and the strip.
+    static let compactSignIn = "sign in to Sanduhr"
+
+    /// "5h 7%  wk 63%" for the notch, the short sign-in line when only a new sign-in helps,
+    /// nil when stale or empty.
     static func compact(_ input: DeskUsage, now: Date = Date()) -> String? {
+        if input.signInNeeded { return compactSignIn }
         guard !input.isStale(now: now), let tiers = input.usage?.tiers else { return nil }
         let text = [tiers[.fiveHour]?.utilization.map { "5h \(Int($0))%" },
                     tiers[.sevenDay]?.utilization.map { "wk \(Int($0))%" }]

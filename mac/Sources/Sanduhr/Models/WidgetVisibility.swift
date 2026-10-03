@@ -39,6 +39,9 @@ enum WidgetVisibilityEvent: Equatable {
     /// The first successful fetch after a launch without a session key: onboarding is done,
     /// so the widget follows the choice as it would have at launch.
     case signedIn
+    /// Sign Out in Settings, Credentials: like a launch without a session key, the widget shows
+    /// for sign-in.
+    case signedOut
     /// The choice itself was changed in Settings.
     case choiceChanged
 }

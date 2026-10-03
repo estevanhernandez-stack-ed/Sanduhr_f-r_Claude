@@ -15,6 +15,8 @@ struct WidgetSettings: View {
     @State private var sessionKey: String = ""
     @State private var cfClearance: String = ""
     @State private var credentialsNote: String?
+    @State private var credentialsNoteIsError = false
+    @State private var confirmingSignOut = false
     @State private var hasExistingKey = KeychainStore.exists(account: KeychainAccount.sessionKey)
 
     @AppStorage("remindSessionEnd") private var remindSessionEnd = false
@@ -76,7 +78,21 @@ struct WidgetSettings: View {
         sessionKey = ""
         cfClearance = ""
         hasExistingKey = KeychainStore.exists(account: KeychainAccount.sessionKey)
+        credentialsNoteIsError = false
         credentialsNote = "Saved. Sanduhr is fetching with the new values."
+    }
+
+    /// Sign Out, once confirmed: both stores cleared (UsageViewModel.signOut). Offered with or
+    /// without a key, so a value left in the other store can still be removed.
+    private func signOut() {
+        let result = vm.signOut()
+        sessionKey = ""
+        cfClearance = ""
+        hasExistingKey = KeychainStore.exists(account: KeychainAccount.sessionKey)
+        credentialsNoteIsError = !result.succeeded
+        credentialsNote = result.succeeded
+            ? "Signed out. Paste a sessionKey to sign in again."
+            : "Signed out, but \(result.failures.count) item(s) could not be removed. See Console."
     }
 
     private func credentialsTab(t: Theme.Palette) -> some View {
@@ -116,13 +132,22 @@ struct WidgetSettings: View {
                         sessionKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     )
                 if let note = credentialsNote {
-                    Text(note).font(.caption).foregroundStyle(Color.hex("4ade80"))
+                    Text(note).font(.caption)
+                        .foregroundStyle(Color.hex(credentialsNoteIsError ? "f87171" : "4ade80"))
                 }
                 Spacer()
+                Button("Sign Out", role: .destructive) { confirmingSignOut = true }
             }
             Spacer()
         }
         .onChange(of: sessionKey) { _, _ in credentialsNote = nil }
+        .confirmationDialog("Sign out of Sanduhr?", isPresented: $confirmingSignOut,
+                            titleVisibility: .visible) {
+            Button("Sign Out", role: .destructive) { signOut() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your session key is removed from this Mac. Your usage history and settings stay.")
+        }
     }
 
     // MARK: - Themes tab

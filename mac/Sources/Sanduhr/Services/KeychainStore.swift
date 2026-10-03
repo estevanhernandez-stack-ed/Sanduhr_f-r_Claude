@@ -60,6 +60,21 @@ enum KeychainStore {
     /// The store this launch uses (state.yaml's `credentials_store`).
     static var kind: CredentialStoreKind { active.kind }
 
+    /// Deletes the session key and cf_clearance from both stores, whichever this launch uses
+    /// (SignOut.swift). Failures are logged by store and account, never with a value. On a dev
+    /// build the Keychain delete can ask for the login password when a signed build wrote the item.
+    @discardableResult
+    static func signOut() -> SignOutResult {
+        let result = SignOut.run(
+            backends: [(kind: .keychain, backend: KeychainBackend(service: KeychainBackend.service)),
+                       (kind: .file, backend: FileBackend.standard)],
+            accounts: KeychainAccount.all)
+        for f in result.failures {
+            NSLog("Sanduhr: sign out could not remove \(f.account) from the \(f.store.rawValue) store: \(f.error ?? "")")
+        }
+        return result
+    }
+
     // MARK: Choosing the store
 
     private struct Active: Sendable {

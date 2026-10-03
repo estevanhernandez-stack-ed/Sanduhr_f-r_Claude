@@ -54,6 +54,20 @@ Fresh-install and migration checks stay manual.
 - [ ] Warning bars: Settings, Desk, Meters, drop the weekly "At" slider below its percent with a "more than" shorter than its reset. The widget's weekly card turns red at once (bar and percent) with a steady glow in the theme's accent around the bar, and the Desk meter does the same in the Desk ink; the session card stays as it was. Pick Match Desk: the widget's glow takes the Desk ink. Turn the weekly "Warn when nearly full" off: both go back at once. Put the settings back (weekly: on, 90%, 1 day) and the theme you had.
 - [ ] Settings, Sanduhr, Updates: Installed shows the version and build from About; Last checked shows a date (or "Never" on a fresh install). Check Now opens Sparkle's check (the same window as Check for Updates…) and is disabled until it finishes; Last checked moves to now. Turn "Check for updates automatically" off: `defaults read com.626labs.sanduhr SUEnableAutomaticChecks` prints 0, and after a relaunch the switch is still off; turn it back on. "Download and install updates automatically" sets `SUAutomaticallyUpdate` the same way and is greyed out while automatic checks are off. "Release notes for this version" opens the GitHub release `v<version>-mac`. About: the app icon, "Sanduhr für Claude", "Version X (build N)", the one-line description and the independence line; Website, GitHub, Release Notes, Privacy and License each open their page (License goes to the README's license section until a LICENSE file lands), "Updates by Sparkle" opens sparkle-project.org, and the copyright line reads "MIT License. 626Labs.".
 
+- [ ] Sign out (item 32; this deletes the real key, so back it up first). Save the key:
+  release build `(umask 077; security find-generic-password -s com.626labs.sanduhr -a sessionKey -w > ~/sanduhr-smoke/sessionKey)`,
+  dev build `cp -p ~/Library/Application\ Support/Sanduhr/credentials.json ~/sanduhr-smoke/`
+  (owner-only either way; delete the copy after the run). Settings, Credentials, Sign Out: a dialog
+  "Sign out of Sanduhr?" with "Your session key is removed from this Mac. Your usage history and
+  settings stay." Cancel changes nothing. Sign Out: the note says "Signed out."; the widget's cards
+  go and it reads "Signed out — sign in" (click it: Settings opens at Credentials; with "Hidden
+  while Desk is on" the widget shows itself); Desk's meters give way to "sign in again in Sanduhr",
+  the notch's meters to "sign in to Sanduhr"; the hourglass loses its percent.
+  `security find-generic-password -s com.626labs.sanduhr -a sessionKey` finds nothing and
+  `credentials.json` is gone; `snapshot.json` has `"status":"error"`, `"error_kind":"session_expired"`,
+  `"tiers":[]`; `history.json` and the theme are unchanged. Wait past five minutes: no new
+  `captured_at`. Paste the saved key and Save: cards, Desk meters and notch come back without a relaunch.
+
 ## 3. Alerts
 
 - [ ] Settings, Alerts: turn alerts on; macOS asks for notification permission once. Allow.
