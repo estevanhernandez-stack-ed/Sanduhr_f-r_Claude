@@ -1,7 +1,8 @@
 # Iteration 3 item 21: the notch island glows for Sanduhr's events. The glow action fires it
 # whatever the Glow switches say; the count only ever goes up, so this checks it is above 0.
-# The glow lasts about three seconds: watch the snap for a soft halo in the notch ink around
-# the island (wings and strip), with the island and its text untouched. The run puts the
+# The glow lasts about three seconds: watch the snap for a soft halo in the notch ink down the
+# island's sides and along its bottom (none along the top, where the screen edge and the camera
+# housing would break it up), with the island and its text untouched. The run puts the
 # notch switch back.
 name: Notch glow on demand
 needs: [desk, notch]
@@ -13,8 +14,9 @@ steps:
   - do: glow
     arg: alert
   - expect_state: { glow_count: "/^[1-9]/" }
-  - wait: 1
-  - snap: notch-glow
+  # Checked straight away: the glow is gone about three seconds after it fires.
   - expect:
       window: glow
       contains: { label: Notch glow }
+      within: 2
+  - snap: notch-glow

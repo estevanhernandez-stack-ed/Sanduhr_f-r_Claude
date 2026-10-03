@@ -122,6 +122,19 @@ enum NotchGlowLayout {
     }
 
     /// The island's corner radius, as the strip or the wings draw it.
+    /// Where the glow fades in, as fractions of the glow window's height from the top: clear
+    /// until `start`, full from `end`. The top of the island meets the screen edge and the camera
+    /// housing, where no light can show, so a glow there reads as broken; it stays clear across
+    /// the upper part of the menu bar and comes in by its bottom edge, leaving a U around the
+    /// island's sides and bottom.
+    static func topFade(barHeight: CGFloat, islandHeight: CGFloat) -> (start: CGFloat, end: CGFloat) {
+        let total = islandHeight + reach * 2
+        guard total > 0 else { return (0, 0) }
+        let start = min(1, barHeight * 0.45 / total)
+        let end = min(1, max(start, barHeight / total))
+        return (start, end)
+    }
+
     static func radius(barHeight: CGFloat, chin: Double) -> CGFloat {
         chin > 0 ? min(16, CGFloat(chin) * 0.7) : min(10, barHeight * 0.3)
     }
@@ -165,6 +178,13 @@ struct NotchGlowView: View {
         .compositingGroup()
         .offset(x: (w.right - w.left) / 2)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .mask {
+            let fade = NotchGlowLayout.topFade(barHeight: barHeight, islandHeight: height)
+            LinearGradient(stops: [.init(color: .clear, location: 0),
+                                   .init(color: .clear, location: fade.start),
+                                   .init(color: .white, location: fade.end)],
+                           startPoint: .top, endPoint: .bottom)
+        }
         .allowsHitTesting(false)
     }
 }
