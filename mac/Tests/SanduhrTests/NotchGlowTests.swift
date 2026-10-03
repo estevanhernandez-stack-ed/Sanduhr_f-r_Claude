@@ -239,3 +239,88 @@ struct NotchGlowLayoutTests {
         #expect(NotchGlowShape.island.rawValue == "island" && NotchGlowShape.plain.rawValue == "plain")
     }
 }
+
+/// Item 34 (a): the glow traces the strip under the camera only while it shows.
+@Suite("Notch glow strip cover")
+struct NotchGlowStripTests {
+    /// A 14-inch MacBook Pro: 1512 x 982, notch 185 x 32 centered, menu bar 37 tall.
+    let notch = CGRect(x: 663.5, y: 0, width: 185, height: 32)
+
+    var strip: CGRect {
+        NotchGlowLayout.stripRect(notch: notch, barHeight: 37, chin: 26, left: 36, right: 50)!
+    }
+
+    @Test func stripSpansTheIslandBelowTheWings() {
+        // Island-wide (notch plus both wings), from the wings' bottom (37) to the strip's (32 + 26).
+        #expect(strip == CGRect(x: 627.5, y: 37, width: 271, height: 21))
+    }
+
+    @Test func noStripWhenNothingHangsBelowTheWings() {
+        #expect(NotchGlowLayout.stripRect(notch: notch, barHeight: 37, chin: 0, left: 36, right: 36) == nil)
+        // 32 + 5 = 37: level with the wings, nothing below them.
+        #expect(NotchGlowLayout.stripRect(notch: notch, barHeight: 37, chin: 5, left: 36, right: 36) == nil)
+    }
+
+    @Test func glowChinDropsTheHiddenStrip() {
+        #expect(NotchGlowLayout.glowChin(26, stripVisible: true) == 26)
+        #expect(NotchGlowLayout.glowChin(26, stripVisible: false) == 0)
+        // Hidden: the island is the wings alone, with their radius.
+        let hidden = NotchGlowLayout.glowChin(26, stripVisible: false)
+        #expect(NotchGlowLayout.islandHeight(notchHeight: 32, barHeight: 37, chin: hidden) == 37)
+        #expect(NotchGlowLayout.radius(barHeight: 37, chin: hidden) == NotchGlowLayout.radius(barHeight: 37, chin: 0))
+        let shown = NotchGlowLayout.glowChin(26, stripVisible: true)
+        #expect(NotchGlowLayout.islandHeight(notchHeight: 32, barHeight: 37, chin: shown) == 58)
+    }
+
+    @Test func globalFlipsToTheTopLeftOrigin() {
+        let r = CGRect(x: 10, y: 37, width: 100, height: 21)
+        // The primary display: the same rect.
+        #expect(NotchGlowLayout.global(r, screen: CGRect(x: 0, y: 0, width: 1512, height: 982),
+                                       primaryHeight: 982) == r)
+        // A screen above the primary one (AppKit y 982...1964): 982 pt higher in CG terms.
+        #expect(NotchGlowLayout.global(r, screen: CGRect(x: 200, y: 982, width: 1512, height: 982),
+                                       primaryHeight: 982) == CGRect(x: 210, y: -945, width: 100, height: 21))
+    }
+
+    @Test func aWindowOverTheStripCoversIt() {
+        // A maximized window starting at the menu bar's bottom.
+        let app = NotchCoverWindow(layer: 0, bounds: CGRect(x: 0, y: 37, width: 1512, height: 945))
+        #expect(NotchStripCover.isCovered(strip: strip, by: [app]))
+        // A floating panel over part of it.
+        let panel = NotchCoverWindow(layer: 3, bounds: CGRect(x: 850, y: 40, width: 300, height: 200))
+        #expect(NotchStripCover.isCovered(strip: strip, by: [panel]))
+    }
+
+    @Test func windowsBesideOrBelowLeaveItVisible() {
+        let beside = NotchCoverWindow(layer: 0, bounds: CGRect(x: 0, y: 37, width: 600, height: 500))
+        let below = NotchCoverWindow(layer: 0, bounds: CGRect(x: 600, y: 100, width: 400, height: 400))
+        // Touching the strip's bottom edge only.
+        let touching = NotchCoverWindow(layer: 0, bounds: CGRect(x: 600, y: 58, width: 400, height: 400))
+        #expect(!NotchStripCover.isCovered(strip: strip, by: [beside, below, touching]))
+        #expect(!NotchStripCover.isCovered(strip: strip, by: []))
+    }
+
+    @Test func overlaysAndInvisibleWindowsDoNotCount() {
+        let full = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        // The menu bar (24, 25), the wings (popUpMenu, 101) and the glow above them, a screen-wide
+        // overlay (1000): never app windows hiding the strip.
+        for layer in [24, 25, 101, 103, 1000] {
+            #expect(!NotchStripCover.isCovered(strip: strip, by: [NotchCoverWindow(layer: layer, bounds: full)]))
+        }
+        // Desk's own layer, and a fully transparent window.
+        #expect(!NotchStripCover.isCovered(strip: strip, by: [NotchCoverWindow(layer: -1, bounds: full)]))
+        #expect(!NotchStripCover.isCovered(strip: strip, by: [NotchCoverWindow(layer: 0, alpha: 0, bounds: full)]))
+    }
+
+    @Test func windowInfoReadsLayerAlphaAndBounds() {
+        let info: [String: Any] = [
+            kCGWindowLayer as String: 0,
+            kCGWindowAlpha as String: 1.0,
+            kCGWindowBounds as String: ["X": 10.0, "Y": 37.0, "Width": 300.0, "Height": 200.0],
+        ]
+        #expect(NotchCoverWindow(info: info) == NotchCoverWindow(layer: 0, bounds: CGRect(x: 10, y: 37, width: 300, height: 200)))
+        // No bounds, or no layer: skipped.
+        #expect(NotchCoverWindow(info: [kCGWindowLayer as String: 0]) == nil)
+        #expect(NotchCoverWindow(info: [kCGWindowBounds as String: ["X": 0.0, "Y": 0.0, "Width": 1.0, "Height": 1.0]]) == nil)
+    }
+}

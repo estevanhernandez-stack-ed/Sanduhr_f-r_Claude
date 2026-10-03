@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **The notch glow traces only what you can see.** The strip under the camera lives on the desktop layer, so an app window across the top of the screen hides it. The glow used to outline the hidden strip anyway, a halo around nothing. Now, when a window covers the strip as a glow starts, the glow hugs the wings alone; with the strip in view it goes around wings and strip as before.
+
 ## v2.3.3-mac — 2026-10-03
 
 - **Sign out.** Settings, Credentials has a Sign Out button. After you confirm, Sanduhr deletes your session key and `cf_clearance` from both the Keychain and the old credentials file, stops fetching and clears the meters. The button then reads "Signed Out" and stays greyed out until a key is saved again. The widget says "Signed out — sign in" (a click opens Credentials), Desk and the notch show the sign-in line, and the statusline and MCP server stop showing the old numbers. Your usage history and settings stay. Paste a key and Save to sign in again, no relaunch needed. The notch now also shows "sign in to Sanduhr" when claude.ai refuses the session key, instead of going blank.
