@@ -59,7 +59,8 @@ Fresh-install and migration checks stay manual.
   dev build `cp -p ~/Library/Application\ Support/Sanduhr/credentials.json ~/sanduhr-smoke/`
   (owner-only either way; delete the copy after the run). Settings, Credentials, Sign Out: a dialog
   "Sign out of Sanduhr?" with "Your session key is removed from this Mac. Your usage history and
-  settings stay." Cancel changes nothing. Sign Out: the note says "Signed out."; the widget's cards
+  settings stay." Cancel changes nothing. Sign Out: the note says "Signed out." and the button greys out as
+  "Signed Out" (no password prompt on reopening the page); the widget's cards
   go and it reads "Signed out — sign in" (click it: Settings opens at Credentials; with "Hidden
   while Desk is on" the widget shows itself); Desk's meters give way to "sign in again in Sanduhr",
   the notch's meters to "sign in to Sanduhr"; the hourglass loses its percent.

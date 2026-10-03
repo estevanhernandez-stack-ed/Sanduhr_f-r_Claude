@@ -41,4 +41,10 @@ enum SignOut {
         }
         return SignOutResult(outcomes: outcomes)
     }
+
+    /// True while any store holds any of `accounts`: there is something to sign out of.
+    static func anythingStored(backends: [(kind: CredentialStoreKind, backend: any CredentialBackend)],
+                               accounts: [String]) -> Bool {
+        backends.contains { store in accounts.contains { store.backend.holds(account: $0) } }
+    }
 }

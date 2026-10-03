@@ -18,6 +18,7 @@ struct WidgetSettings: View {
     @State private var credentialsNoteIsError = false
     @State private var confirmingSignOut = false
     @State private var hasExistingKey = KeychainStore.exists(account: KeychainAccount.sessionKey)
+    @State private var canSignOut = KeychainStore.anythingToSignOut
 
     @AppStorage("remindSessionEnd") private var remindSessionEnd = false
     @AppStorage("alertsEnabled") private var alertsEnabled = false
@@ -78,17 +79,20 @@ struct WidgetSettings: View {
         sessionKey = ""
         cfClearance = ""
         hasExistingKey = KeychainStore.exists(account: KeychainAccount.sessionKey)
+        canSignOut = KeychainStore.anythingToSignOut
         credentialsNoteIsError = false
         credentialsNote = "Saved. Sanduhr is fetching with the new values."
     }
 
-    /// Sign Out, once confirmed: both stores cleared (UsageViewModel.signOut). Offered with or
-    /// without a key, so a value left in the other store can still be removed.
+    /// Sign Out, once confirmed: both stores cleared (UsageViewModel.signOut). Offered while
+    /// either store holds anything, so a value left in the other store can still be removed;
+    /// once both are empty the button reads Signed Out and is disabled.
     private func signOut() {
         let result = vm.signOut()
         sessionKey = ""
         cfClearance = ""
         hasExistingKey = KeychainStore.exists(account: KeychainAccount.sessionKey)
+        canSignOut = KeychainStore.anythingToSignOut
         credentialsNoteIsError = !result.succeeded
         credentialsNote = result.succeeded
             ? "Signed out. Paste a sessionKey to sign in again."
@@ -136,11 +140,19 @@ struct WidgetSettings: View {
                         .foregroundStyle(Color.hex(credentialsNoteIsError ? "f87171" : "4ade80"))
                 }
                 Spacer()
-                Button("Sign Out", role: .destructive) { confirmingSignOut = true }
+                Button(canSignOut ? "Sign Out" : "Signed Out", role: .destructive) {
+                    confirmingSignOut = true
+                }
+                .disabled(!canSignOut)
             }
             Spacer()
         }
         .onChange(of: sessionKey) { _, _ in credentialsNote = nil }
+        // The onboarding sheet can save a key while this page is closed.
+        .onAppear {
+            hasExistingKey = KeychainStore.exists(account: KeychainAccount.sessionKey)
+            canSignOut = KeychainStore.anythingToSignOut
+        }
         .confirmationDialog("Sign out of Sanduhr?", isPresented: $confirmingSignOut,
                             titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) { signOut() }

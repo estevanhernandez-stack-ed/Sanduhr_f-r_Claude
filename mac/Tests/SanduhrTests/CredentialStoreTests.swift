@@ -266,6 +266,23 @@ struct SignOutTests {
         #expect(result.failures.map(\.store) == [.file])
     }
 
+    @Test func anythingStoredLooksInEveryStoreAndAccount() {
+        func stored(_ keychain: FakeBackend, _ file: FakeBackend) -> Bool {
+            SignOut.anythingStored(backends: [(kind: .keychain, backend: keychain),
+                                              (kind: .file, backend: file)],
+                                   accounts: accounts)
+        }
+        #expect(!stored(FakeBackend(), FakeBackend()))
+        #expect(stored(FakeBackend(["sessionKey": "sk-k"]), FakeBackend()))
+        #expect(stored(FakeBackend(), FakeBackend(["cf_clearance": "cf-f"])))
+
+        let keychain = FakeBackend(["sessionKey": "sk-k"])
+        let file = FakeBackend(["cf_clearance": "cf-f"])
+        #expect(stored(keychain, file))
+        _ = run(keychain, file)
+        #expect(!stored(keychain, file))   // after Sign Out the button reads Signed Out
+    }
+
     @Test func clearsARealFileInATemporaryFolder() throws {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("sanduhr-signout-\(UUID().uuidString)", isDirectory: true)

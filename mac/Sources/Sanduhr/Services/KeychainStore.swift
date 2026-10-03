@@ -65,14 +65,22 @@ enum KeychainStore {
     /// build the Keychain delete can ask for the login password when a signed build wrote the item.
     @discardableResult
     static func signOut() -> SignOutResult {
-        let result = SignOut.run(
-            backends: [(kind: .keychain, backend: KeychainBackend(service: KeychainBackend.service)),
-                       (kind: .file, backend: FileBackend.standard)],
-            accounts: KeychainAccount.all)
+        let result = SignOut.run(backends: bothStores, accounts: KeychainAccount.all)
         for f in result.failures {
             NSLog("Sanduhr: sign out could not remove \(f.account) from the \(f.store.rawValue) store: \(f.error ?? "")")
         }
         return result
+    }
+
+    /// Whether either store still holds a credential: Settings, Credentials offers Sign Out
+    /// only then. Never reads a Keychain value, so it doesn't prompt on a dev build.
+    static var anythingToSignOut: Bool {
+        SignOut.anythingStored(backends: bothStores, accounts: KeychainAccount.all)
+    }
+
+    private static var bothStores: [(kind: CredentialStoreKind, backend: any CredentialBackend)] {
+        [(kind: .keychain, backend: KeychainBackend(service: KeychainBackend.service)),
+         (kind: .file, backend: FileBackend.standard)]
     }
 
     // MARK: Choosing the store
@@ -229,6 +237,16 @@ struct KeychainBackend: CredentialBackend {
         add[kSecAttrLabel as String] = "Sanduhr für Claude (\(account))"
         let added = SecItemAdd(add as CFDictionary, nil)
         guard added == errSecSuccess else { throw Failure(operation: "add", status: added) }
+    }
+
+    /// Attributes only: reading the data of an item another signature wrote asks for the login
+    /// password (a dev build looking at a release build's item); asking whether it exists doesn't.
+    func holds(account: String) -> Bool {
+        var q = query(account)
+        q[kSecReturnAttributes as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: CFTypeRef?
+        return SecItemCopyMatching(q as CFDictionary, &result) == errSecSuccess
     }
 
     func delete(account: String) throws {
