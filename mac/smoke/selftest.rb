@@ -152,7 +152,14 @@ base = { 'desk_enabled' => true, 'notch' => false, 'widget_visible' => false, 's
          'settings_section' => 'general', 'active_tool' => nil, 'pacing_pinned' => false }
 eq('nothing changed', Restore.plan(base, base), [])
 eq('desk and notch back', Restore.plan(base, base.merge('desk_enabled' => false, 'notch' => true)),
-   [%w[notch off], %w[desk on]])
+   [%w[desk on], ['hide-widget', nil], %w[notch off]])
+eq('desk back first, then the widget as it was',
+   Restore.plan(base.merge('widget_visible' => true), base.merge('desk_enabled' => false, 'widget_visible' => true)),
+   [%w[desk on], ['show-widget', nil]])
+eq('a tool closes on a widget shown after the desk switch',
+   Restore.plan(base.merge('widget_visible' => true),
+                base.merge('desk_enabled' => false, 'widget_visible' => true, 'active_tool' => 'snake')),
+   [%w[desk on], ['show-widget', nil], %w[tool snake], ['show-widget', nil]])
 eq('close settings opened by the scenario', Restore.plan(base, base.merge('settings_open' => true)), [['close-settings', nil]])
 eq('reopen settings at its section',
    Restore.plan(base.merge('settings_open' => true, 'settings_section' => 'alerts'),
@@ -182,7 +189,7 @@ eq('pass scenario passes', [r['status'], r['reason']], ['pass', nil])
 eq('pass scenario ran every step', r['steps'].map { |s| s['status'] }.uniq, ['pass'])
 check('snap folder made', Dir.exist?(File.join(out, '01-pass', 'snap-08-notch-settings')))
 eq('pass scenario defaults restored', [mem.read(DOMAIN, 'alertSound'), mem.read(DESK_DOMAIN, 'notchWings')], [%w[string Glass], nil])
-eq('pass scenario actions, then restore', app.actions, ['settings notch', 'desk off', 'desk on', 'close-settings'])
+eq('pass scenario actions, then restore', app.actions, ['settings notch', 'desk off', 'desk on', 'show-widget', 'close-settings'])
 eq('app state back', [app.state_now['desk_enabled'], app.state_now['settings_open']], [true, false])
 
 app2 = FakeApp.new

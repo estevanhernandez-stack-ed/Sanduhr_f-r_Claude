@@ -294,9 +294,11 @@ struct DeskNotchSection: View {
 
 // MARK: - General
 
-/// Which surfaces show, open at login, the shortcuts. The Widget switch mirrors panelHidden,
-/// which AppDelegate writes whenever the widget shows or hides.
+/// Which surfaces show, open at login, the shortcuts. The Widget picker is WidgetVisibility;
+/// the switch under it mirrors panelHidden, which AppDelegate writes whenever the widget shows
+/// or hides.
 struct GeneralSection: View {
+    @AppStorage(WidgetVisibility.key) private var widgetVisibility = WidgetVisibility.always
     @AppStorage(DeskController.enabledKey, store: .desk) private var deskEnabled = false
     @AppStorage(DeskController.notchKey, store: .desk) private var notch = false
     @AppStorage(AppDelegate.panelHiddenKey) private var panelHidden = false
@@ -312,13 +314,19 @@ struct GeneralSection: View {
                 Toggle("Desk: clock, meters, meetings and the message on the desktop", isOn: $deskEnabled)
                     .onChange(of: deskEnabled) { _, _ in DeskController.shared.apply() }
                 Toggle("Notch: the island around the camera (needs Desk)", isOn: $notch)
-                Toggle("Widget: the floating window with the tools", isOn: Binding(
+                Picker("Widget: the floating window with the tools", selection: $widgetVisibility) {
+                    ForEach(WidgetVisibility.allCases) { Text($0.label).tag($0) }
+                }
+                .onChange(of: widgetVisibility) { _, _ in
+                    (NSApp.delegate as? AppDelegate)?.widgetVisibilityDidChange()
+                }
+                Toggle("Show the widget now", isOn: Binding(
                     get: { !panelHidden },
                     set: { show in
                         let app = NSApp.delegate as? AppDelegate
                         if show { app?.showPanel() } else { app?.hidePanel() }
                     }))
-                Text("Sanduhr keeps fetching and alerting with every surface off. Every setting stays here, and Option+S opens this window while Desk is on.")
+                Text("Showing or hiding the widget by hand lasts until Desk turns on or off or Sanduhr starts again; then the choice above takes over. Sanduhr keeps fetching and alerting with every surface off. Every setting stays here, and Option+S opens this window while Desk is on.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section {

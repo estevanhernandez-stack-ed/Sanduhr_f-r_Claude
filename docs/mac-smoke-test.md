@@ -31,15 +31,18 @@ Fresh-install and migration checks stay manual.
   bottom left on the desktop. No black island around the notch; no Calendar permission prompt.
 - [ ] The widget appears top right for sign-in. With no session key, the onboarding sheet shows;
   Continue opens Sanduhr Settings at Credentials; paste the key and Save. (A session key left over from before the wipe skips the sheet.)
-- [ ] After the first successful fetch the widget hides by itself and the meters fill in. The menu
-  bar hourglass shows the percent; left-click brings the widget back.
+- [ ] After the first successful fetch the widget hides by itself (Desk is on, and a new install's
+  General, Surfaces, Widget is "Hidden while Desk is on") and the meters fill in. The menu bar
+  hourglass shows the percent; left-click brings the widget back.
 - [ ] `defaults read com.626labs.sanduhr.desk` shows `deskEnabled = 1`, `layout = "message:tl clock:bl meters:bl meetings:bl"`,
   `showMeetings = 0`, `notch = 0` and `migrated = 1`. `defaults read com.626labs.sanduhr` shows
-  `deskFirstRunDone = 1`, `panelHidden = 1` and no `tuckAfterFirstFetch`.
-- [ ] Show the widget, quit and relaunch: the widget stays shown (it tucks only once); Desk is unchanged.
+  `deskFirstRunDone = 1`, `panelHidden = 1`, `widgetVisibility = whileDeskOff` and no `tuckAfterFirstFetch`.
+- [ ] Show the widget, quit and relaunch: the widget is hidden again (Desk is on); Desk is unchanged.
+  General, Surfaces, turn Desk off: the widget shows; on: it hides.
 - [ ] Existing user: quit Sanduhr, `defaults import` each backed-up domain from `~/sanduhr-smoke/`
   (section 0), relaunch: widget and Desk come back exactly as before the wipe (Desk still off if it
-  was off; the widget not tucked). The rest of the run continues from these settings.
+  was off; the widget not tucked; General, Surfaces, Widget reads "Always shown"). The rest of the
+  run continues from these settings.
 
 ## 2. Widget
 
@@ -63,7 +66,8 @@ Fresh-install and migration checks stay manual.
 ## 4. Desk
 
 - [ ] Hide the widget, with Ice hiding the menu bar hourglass: Option+S opens one window titled "Sanduhr Settings", a sidebar with General, Alerts, Credentials; Desk: Layout, Look, Message, Notch; Widget: Look, Themes, Pacing & Focus. Every section opens and edits with the widget still hidden. Settings… in the widget's menu and the hourglass's menu bring the same window forward (never a second one); there is no "Sanduhr Desk" window and no settings sheet on the widget.
-- [ ] General, Surfaces: Widget off hides the widget and on shows it (the switch follows the hourglass too); Notch flips the island (Desk on). Pacing & Focus, "Pin the pacing calculators" and Tools, Pacing Calculators show the same state: flip one, the other follows.
+- [ ] General, Surfaces: "Show the widget now" off hides the widget and on shows it (the switch follows the hourglass too); Notch flips the island (Desk on).
+- [ ] General, Surfaces, Widget picker: "Hidden while Desk is on" hides it at once with Desk on; turn Desk off, it shows; on, it hides. Show it from the hourglass: it stays until Desk next flips. "Only when I open it": hidden after every Desk flip and after a relaunch until a meter click, Tools or Show Sanduhr brings it. "Always shown": Desk flips leave it where it is. Put back "Always shown" (or what it was). Pacing & Focus, "Pin the pacing calculators" and Tools, Pacing Calculators show the same state: flip one, the other follows.
 - [ ] After section 1, Desk is already on: clock, date, message and the meters (a bar per limit with a pace tick and reset time). General, Surfaces, Desk is on. The notch stays plain (its own switch, off).
 - [ ] General, "Read today's meetings" (off on a fresh install): switch it on and the Calendar prompt appears right away, no restart. Allow: today's remaining timed meetings show. Switch it off: they go.
 - [ ] Meters: their pace ticks sit where the widget's do; hide the widget and refresh from the menu, and the meters still update.

@@ -363,19 +363,35 @@ struct DeskFirstRunTests {
         #expect(DeskLayout.parse(s.defaults.string(forKey: "layout") ?? "")["meters"] != nil)
         #expect(s.defaults.object(forKey: "showMeetings") as? Bool == false)
         #expect(s.defaults.bool(forKey: DeskController.notchKey) == false)
-        #expect(widget.bool(forKey: DeskFirstRun.tuckKey))
+        #expect(WidgetVisibility.saved(in: widget) == .whileDeskOff)
+        #expect(widget.object(forKey: DeskFirstRun.tuckKey) == nil)
         // The widget shows for sign-in: nothing hides it before the first fetch.
         #expect(widget.object(forKey: "panelHidden") == nil)
     }
 
-    @Test func widgetTucksOnceAfterTheFirstSuccessfulFetch() {
+    @Test func freshInstallShowsForSignInThenTucksOnceSignedIn() {
         let s = ScratchDefaults(), widget = MemoryDefaults()
         _ = launch(s, widget)
-        #expect(DeskFirstRun.tuck(afterFetch: false, widget: widget) == false)
-        #expect(widget.bool(forKey: DeskFirstRun.tuckKey))
-        #expect(DeskFirstRun.tuck(afterFetch: true, widget: widget))
+        let setting = WidgetVisibility.saved(in: widget)
+        let deskOn = s.defaults.bool(forKey: DeskController.enabledKey)
+        // AppDelegate treats a fresh install's first launch as not signed in yet.
+        #expect(WidgetVisibilityRule.shouldShow(setting: setting, deskOn: deskOn, hasSessionKey: false, event: .launch) == true)
+        #expect(WidgetVisibilityRule.shouldShow(setting: setting, deskOn: deskOn, hasSessionKey: true, event: .signedIn) == false)
+    }
+
+    @Test func aPendingTuckFrom22IsAdoptedAsHiddenWhileDeskIsOn() {
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        widget.set(true, forKey: DeskFirstRun.doneKey)
+        widget.set(true, forKey: DeskFirstRun.tuckKey)
+        #expect(s.firstRun(widget: widget) == .alreadyDecided)
         #expect(widget.object(forKey: DeskFirstRun.tuckKey) == nil)
-        #expect(DeskFirstRun.tuck(afterFetch: true, widget: widget) == false)
+        #expect(WidgetVisibility.saved(in: widget) == .whileDeskOff)
+        // A choice already made wins.
+        widget.set(true, forKey: DeskFirstRun.tuckKey)
+        widget.set(WidgetVisibility.onRequest.rawValue, forKey: WidgetVisibility.key)
+        s.firstRun(widget: widget)
+        #expect(WidgetVisibility.saved(in: widget) == .onRequest)
+        #expect(widget.object(forKey: DeskFirstRun.tuckKey) == nil)
     }
 
     @Test func existingWidgetUserIsLeftAlone() {
@@ -385,7 +401,8 @@ struct DeskFirstRunTests {
         #expect(s.firstRun(widget: widget) == .existing)
         #expect(s.defaults.values.isEmpty)
         #expect(Set(widget.values.keys) == ["windowFrame", "theme", DeskFirstRun.doneKey])
-        #expect(DeskFirstRun.tuck(afterFetch: true, widget: widget) == false)
+        // No choice saved: Always shown, today's behavior.
+        #expect(WidgetVisibility.saved(in: widget) == .always)
     }
 
     @Test func compactModeUserFrom204IsLeftAlone() {
@@ -412,7 +429,7 @@ struct DeskFirstRunTests {
         #expect(launch(s, widget) == .existing)
         #expect(s.defaults.values.keys.sorted() == before)
         #expect(s.defaults.bool(forKey: DeskController.enabledKey) == false)
-        #expect(widget.bool(forKey: DeskFirstRun.tuckKey) == false)
+        #expect(WidgetVisibility.saved(in: widget) == .always)
     }
 
     @Test func sanduhrDeskMigrantKeepsTheImportedLayout() {
@@ -423,7 +440,7 @@ struct DeskFirstRunTests {
         #expect(s.defaults.object(forKey: "showMeetings") as? Bool == true)
         #expect(s.defaults.object(forKey: DeskController.notchKey) as? Bool == false)
         #expect(s.defaults.bool(forKey: DeskController.enabledKey))
-        #expect(widget.bool(forKey: DeskFirstRun.tuckKey) == false)
+        #expect(WidgetVisibility.saved(in: widget) == .always)
     }
 
     @Test func decidedOnceThenANoOp() {
@@ -433,12 +450,12 @@ struct DeskFirstRunTests {
         s.defaults.set(false, forKey: DeskController.enabledKey)
         s.defaults.set("clock:bl claude:bl", forKey: "layout")
         s.defaults.set(true, forKey: "showMeetings")
-        widget.set(nil, forKey: DeskFirstRun.tuckKey)
+        widget.set(WidgetVisibility.always.rawValue, forKey: WidgetVisibility.key)
         #expect(launch(s, widget) == .alreadyDecided)
         #expect(s.defaults.bool(forKey: DeskController.enabledKey) == false)
         #expect(s.defaults.string(forKey: "layout") == "clock:bl claude:bl")
         #expect(s.defaults.bool(forKey: "showMeetings"))
-        #expect(widget.object(forKey: DeskFirstRun.tuckKey) == nil)
+        #expect(WidgetVisibility.saved(in: widget) == .always)
     }
 }
 

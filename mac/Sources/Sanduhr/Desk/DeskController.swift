@@ -26,10 +26,19 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     var enabled: Bool { UserDefaults.desk.bool(forKey: Self.enabledKey) }
 
-    /// Called at launch and whenever the Desk switch flips.
+    /// Desk's on/off as of the last apply(), nil before the first (at launch).
+    private var appliedEnabled: Bool?
+
+    /// Called at launch and whenever the Desk switch flips. A flip after launch also lets the
+    /// widget follow its When the widget shows choice (AppDelegate.deskDidChange).
     func apply() {
         if enabled, !running { start() }
         if !enabled, running { stop() }
+        let previous = appliedEnabled
+        appliedEnabled = enabled
+        if let previous, previous != enabled {
+            MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.deskDidChange() }
+        }
     }
 
     private func start() {

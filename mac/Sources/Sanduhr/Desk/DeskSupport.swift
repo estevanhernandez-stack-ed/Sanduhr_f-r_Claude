@@ -56,14 +56,15 @@ enum DeskMigration {
 }
 
 /// One-time choice on first launch: a brand-new install starts with Desk as home (meters on the
-/// desktop, meetings and the notch off, so no permission prompt), and the widget tucks away once
-/// it has signed in and fetched. Anyone who already used Sanduhr, or is coming over from Sanduhr
+/// desktop, meetings and the notch off, so no permission prompt), and the widget set to hide
+/// while Desk is on (WidgetVisibility), so it tucks away once it has signed in and fetched. Anyone who already used Sanduhr, or is coming over from Sanduhr
 /// Desk or Desk, keeps exactly what they have. Runs before DeskMigration, which would otherwise
 /// mark every domain as migrated.
 enum DeskFirstRun {
     /// Widget defaults: set once the choice has been made, whatever it was.
     static let doneKey = "deskFirstRunDone"
-    /// Widget defaults: set on a fresh install until the first successful fetch hides the widget.
+    /// Widget defaults, written by 2.2.x: set on a fresh install until the first successful fetch
+    /// hid the widget. WidgetVisibility replaces it; a pending one is adopted as `whileDeskOff`.
     static let tuckKey = "tuckAfterFirstFetch"
     /// The standard layout with the Claude line swapped for the meters.
     static let layout = "message:tl clock:bl meters:bl meetings:bl"
@@ -78,7 +79,7 @@ enum DeskFirstRun {
     /// first fetch).
     static let widgetKeys = [
         "windowFrame", "panelHidden", "theme", "fontFamily", "subtleMode",
-        "pacingToolsEnabled", "snakeHighScore",
+        "pacingToolsEnabled", "snakeHighScore", WidgetVisibility.key,
         "SULastCheckTime", "SUEnableAutomaticChecks",
         Notifier.Key.enabled, Notifier.Key.sessionPct, Notifier.Key.weeklyPct,
         Notifier.Key.sessionFull, Notifier.Key.sessionReset, Notifier.Key.fired,
@@ -93,6 +94,7 @@ enum DeskFirstRun {
                     desk d: DefaultsStore = UserDefaults.desk,
                     from domains: [String] = DeskMigration.legacyDomains,
                     reading domain: (String) -> [String: Any]? = { UserDefaults.standard.persistentDomain(forName: $0) }) -> Outcome {
+        adoptPendingTuck(widget: w)
         guard !w.bool(forKey: doneKey) else { return .alreadyDecided }
         w.set(true, forKey: doneKey)
         if domains.contains(where: { domain($0) != nil }) { return .migrant }
@@ -103,16 +105,19 @@ enum DeskFirstRun {
         d.set(layout, forKey: "layout")
         d.set(false, forKey: "showMeetings")
         d.set(false, forKey: DeskController.notchKey)
-        w.set(true, forKey: tuckKey)
+        w.set(WidgetVisibility.whileDeskOff.rawValue, forKey: WidgetVisibility.key)
         return .fresh
     }
 
-    /// Called after every refresh. True once, on the first successful fetch of a fresh install:
-    /// the caller hides the widget. The flag clears so the widget is never hidden for it again.
-    static func tuck(afterFetch fetched: Bool, widget w: DefaultsStore = UserDefaults.standard) -> Bool {
-        guard fetched, w.bool(forKey: tuckKey) else { return false }
+    /// A 2.2.x fresh install that updated before its first successful fetch still has the tuck
+    /// flag waiting. It gets what a fresh install gets now (hidden while Desk is on), which
+    /// hides the widget at the same moment, once sign-in is done.
+    static func adoptPendingTuck(widget w: DefaultsStore) {
+        guard w.bool(forKey: tuckKey) else { return }
         w.set(nil, forKey: tuckKey)
-        return true
+        if w.object(forKey: WidgetVisibility.key) == nil {
+            w.set(WidgetVisibility.whileDeskOff.rawValue, forKey: WidgetVisibility.key)
+        }
     }
 }
 

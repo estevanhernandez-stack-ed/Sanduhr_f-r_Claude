@@ -20,6 +20,8 @@ struct DebugStateInput {
     /// The camera light shows (for the camera, or switched on by hand).
     var cameraLight = false
     var widgetVisible = false
+    /// When the widget shows on its own (WidgetVisibility raw value).
+    var widgetVisibility = WidgetVisibility.always
     var settingsOpen = false
     var settingsSection: SettingsSection?
     var meters: [DeskMeterRow] = []
@@ -58,6 +60,7 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("camera_in_use", .bool(s.cameraInUse)))
         pairs.append(("camera_light", .bool(s.cameraLight)))
         pairs.append(("widget_visible", .bool(s.widgetVisible)))
+        pairs.append(("widget_visibility", .string(s.widgetVisibility.rawValue)))
         pairs.append(("settings_open", .bool(s.settingsOpen)))
         let section: YAMLNode = s.settingsSection.map { .string($0.rawValue) } ?? .null
         pairs.append(("settings_section", section))

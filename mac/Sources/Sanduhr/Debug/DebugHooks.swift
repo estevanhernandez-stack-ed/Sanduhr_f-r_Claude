@@ -251,6 +251,7 @@ enum DebugHooks {
         s.cameraInUse = CameraLightController.shared.cameraInUse
         s.cameraLight = CameraLightController.shared.showing
         s.widgetVisible = widgetVisible
+        s.widgetVisibility = .saved()
         s.settingsOpen = settings.isOpen
         s.settingsSection = settings.window == nil ? nil : settings.section
         s.meters = desk.model.meters

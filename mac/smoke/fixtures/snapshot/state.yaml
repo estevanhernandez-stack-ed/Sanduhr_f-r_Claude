@@ -9,6 +9,7 @@ notch_strip: meetingOrMeters
 camera_in_use: false
 camera_light: false
 widget_visible: true
+widget_visibility: always
 settings_open: true
 settings_section: notch
 meters:
