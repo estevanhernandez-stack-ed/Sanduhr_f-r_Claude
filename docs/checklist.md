@@ -209,3 +209,8 @@ New options keep today's behavior by default; the camera light and the glow star
   What to build: the menus' first item reads Show Widget / Hide Widget (it only ever touched the floating widget), and Quit reads "Quit Sanduhr für Claude" so it is clear it closes everything (widget, Desk, notch). Same in all three menus and on Settings, General's Quit button, with a caption there saying it closes the widget, Desk and the notch.
   Acceptance: the three menus and Settings use the new names; nothing else changes.
   Verify: menu model tests; smoke scenarios that match menu titles updated.
+
+- [x] **29. Match Desk draws the line sparkline**
+  Spec ref: New — on-screen review of item 24 (`Views/SparklineView.swift`, `Views/TierCardView.swift`)
+  What was built: under Match Desk there is no card behind the sparkline, so the horizon chart of a meter that sat high read as a solid block of the ink. Match Desk now draws the line sparkline; every other theme keeps the horizon chart. `SparklineView.mode(themeID:)` decides, tested.
+  Acceptance: on the widget under Match Desk the sparkline is a thin ink line; other themes unchanged. Verified on screen (window capture) on the dev build.

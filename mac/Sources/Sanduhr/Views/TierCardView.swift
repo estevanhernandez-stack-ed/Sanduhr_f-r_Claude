@@ -14,6 +14,8 @@ struct TierCardView: View {
     /// Nearly full with the reset still far off (`UsageViewModel.warningTiers`): the bar and the
     /// percent turn red, with a glow in the theme's accent around the bar.
     var warning = false
+    /// The sparkline's style for the current theme (`SparklineView.mode(themeID:)`).
+    var sparklineMode: SparklineView.Mode = .horizon
 
     @State private var showDeepMath = false
 
@@ -82,7 +84,7 @@ struct TierCardView: View {
             Spacer(minLength: 4)
 
             if history.count >= 2 {
-                SparklineView(values: history, color: palette.sparkline)
+                SparklineView(values: history, color: palette.sparkline, mode: sparklineMode)
                     .frame(width: 44, height: 14)
             }
 

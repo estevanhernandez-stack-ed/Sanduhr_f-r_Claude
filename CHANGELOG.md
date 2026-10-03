@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- Under the Match Desk theme the widget's sparklines are a thin ink line instead of the horizon chart, which had no card behind it and read as a solid block.
+
 - **The widget warns too.** A limit that is nearly full while its reset is still far off now turns red on the widget as well as on the Desk: its bar and percent go red, with a steady glow in the theme's color around the bar (in Desk's ink with Match Desk). It follows the same per-meter settings in Settings, Desk, Meters, so the two always agree, and a change there shows on both at once.
 - **Quit says what it quits**: the menus now offer Show Widget / Hide Widget (just the floating widget) and **Quit Sanduhr für Claude**, which closes everything: the widget, Desk and the notch. Settings, General says the same under its Quit button.
 

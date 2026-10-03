@@ -14,6 +14,12 @@ struct SparklineView: View {
 
     enum Mode { case line, horizon }
 
+    /// Match Desk draws the line: with no card behind it, a horizon chart of a meter that sat high
+    /// reads as a solid block of the ink. Every other theme keeps the horizon chart.
+    static func mode(themeID: String) -> Mode {
+        themeID == DeskThemeMapping.id ? .line : .horizon
+    }
+
     var body: some View {
         Canvas { ctx, size in
             guard values.count >= 2, size.width > 10, size.height > 4 else { return }

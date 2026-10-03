@@ -62,7 +62,8 @@ struct RootView: View {
                                     palette: t,
                                     tick: vm.countdownTick,
                                     pinDeepMath: vm.pacingPinned,
-                                    warning: vm.warningTiers.contains(row.tier)
+                                    warning: vm.warningTiers.contains(row.tier),
+                                    sparklineMode: SparklineView.mode(themeID: vm.theme.id)
                                 )
                             }
                             if let extra = vm.usage?.extraUsage, extra.isEnabled, !vm.compact {
