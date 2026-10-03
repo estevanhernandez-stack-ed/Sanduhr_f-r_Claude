@@ -10,6 +10,7 @@ struct RootView: View {
 
     var body: some View {
         let t = vm.theme.palette
+        let shadow = WidgetShadow.resolve(subtle: DisplaySettings.shared.drawsSubtle, ink: t.ink)
         VStack(spacing: 0) {
             // Thin accent strip, softened to a gradient pill.
             LinearGradient(
@@ -60,7 +61,9 @@ struct RootView: View {
                                     history: vm.history[row.tier.rawValue]?.map(\.v) ?? [],
                                     palette: t,
                                     tick: vm.countdownTick,
-                                    pinDeepMath: vm.pacingPinned
+                                    pinDeepMath: vm.pacingPinned,
+                                    warning: vm.warningTiers.contains(row.tier),
+                                    sparklineMode: SparklineView.mode(themeID: vm.theme.id)
                                 )
                             }
                             if let extra = vm.usage?.extraUsage, extra.isEnabled, !vm.compact {
@@ -83,7 +86,7 @@ struct RootView: View {
             // longer physically possible. Horizontal drag-resize still
             // works.
             Rectangle().fill(Color.white.opacity(0.07)).frame(height: 0.5)
-            if !DisplaySettings.shared.subtle {
+            if !DisplaySettings.shared.drawsSubtle {
                 ThemeStripView(vm: vm)
             }
             ActionIconRow(
@@ -142,10 +145,9 @@ struct RootView: View {
                 .opacity(Chrome.opacity)
         )
         // Soft drop shadow for the floating-panel feel.
-        // In subtle mode the same shadow, small and tight, keeps the text readable on any wallpaper.
-        .shadow(color: .black.opacity(DisplaySettings.shared.subtle ? 0.6 : 0.45),
-                radius: DisplaySettings.shared.subtle ? 3 : 24,
-                x: 0, y: DisplaySettings.shared.subtle ? 1 : 10)
+        // In subtle mode the same shadow, small and tight, keeps the text readable on any wallpaper;
+        // Match Desk uses Desk's drop shadow, or none when Desk's shadow switch is off.
+        .shadow(color: .black.opacity(shadow.opacity), radius: shadow.radius, x: 0, y: shadow.y)
         .contextMenu {
             // The same items, in the same order, as the menu bar item's menu and Desk's clock
             // menu (SanduhrMenu). The widget shows while its menu is open.
@@ -181,7 +183,7 @@ struct RootView: View {
     private func menuRows(_ entries: [MenuEntry], _ app: AppDelegate) -> some View {
         ForEach(entries, id: \.command) { entry in
             let row = Group {
-                if [.deepWork, .pacing, .snake].contains(entry.command) {
+                if [.deepWork, .pacing, .snake, .cameraLight].contains(entry.command) {
                     Toggle(entry.title, isOn: Binding(
                         get: { entry.checked },
                         set: { _ in withAnimation { app.perform(entry.command) } }))

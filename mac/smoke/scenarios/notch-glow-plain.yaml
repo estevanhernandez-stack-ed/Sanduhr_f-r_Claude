@@ -1,0 +1,27 @@
+# Iteration 3 item 27: with the island off, the glow hugs the plain hardware notch (its width and
+# height, rounded bottom corners, no wings), in the same ink, blur and top fade. Watch the snaps
+# for a halo down the notch's sides and along its bottom, nothing at the screen edge. A Desk pulse
+# glows it the same way. The run puts the notch switch back.
+name: Plain notch glow
+needs: [desk, notch]
+steps:
+  - do: notch
+    arg: "off"
+  - expect_state: { notch: false }
+  - do: glow
+    arg: alert
+  - expect_state: { glow_count: "/^[1-9]/", glow_shape: plain }
+  # Checked straight away: the glow is gone about three seconds after it fires.
+  - expect:
+      window: glow
+      contains: { label: Notch glow }
+      within: 2
+  - snap: notch-glow-plain
+  - do: pulse
+    arg: five_hour
+  - expect_state: { pulse_count: "/^[1-9]/", glow_shape: plain }
+  - expect:
+      window: glow
+      contains: { label: Notch glow }
+      within: 2
+  - snap: notch-glow-plain-pulse

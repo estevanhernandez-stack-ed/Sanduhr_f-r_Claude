@@ -11,10 +11,22 @@ struct DebugStateInput {
     var notch = false
     /// This screen has a camera notch and Desk built the island's window for it.
     var hasNotch = false
+    /// What each place on the notch island shows, as saved or its default.
+    var notchLeft = NotchContent.Place.left.fallback
+    var notchRight = NotchContent.Place.right.fallback
+    var notchStrip = NotchContent.Place.strip.fallback
+    /// An app is using a camera (only known while the camera light switch is on).
+    var cameraInUse = false
+    /// The camera light shows (for the camera, or switched on by hand).
+    var cameraLight = false
     var widgetVisible = false
+    /// When the widget shows on its own (WidgetVisibility raw value).
+    var widgetVisibility = WidgetVisibility.always
     var settingsOpen = false
     var settingsSection: SettingsSection?
     var meters: [DeskMeterRow] = []
+    /// The widget's tiers drawing red with a glow (MeterWarning), in display order.
+    var widgetWarnings: [Tier] = []
     var meetingsCount = 0
     var alerts = AlertSettings()
     var lastFetch: Date?
@@ -22,6 +34,13 @@ struct DebugStateInput {
     var activeTool: String?
     var pacingPinned = false
     var pulseCount = 0
+    /// Notch glows fired so far, and the three Glow switches.
+    var glowCount = 0
+    /// What the last glow outlined: island, plain (the hardware notch alone) or none yet.
+    var glowShape = NotchGlowShape.none
+    var glowSwitches = NotchGlowSwitches()
+    /// The widget theme's id.
+    var theme = ""
     var menu: [MenuGroup] = []
     var version = ""
     var build = ""
@@ -39,11 +58,19 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("layout", s.layout.map(YAMLNode.string) ?? .null))
         pairs.append(("notch", .bool(s.notch)))
         pairs.append(("has_notch", .bool(s.hasNotch)))
+        pairs.append(("notch_left", .string(s.notchLeft.rawValue)))
+        pairs.append(("notch_right", .string(s.notchRight.rawValue)))
+        pairs.append(("notch_strip", .string(s.notchStrip.rawValue)))
+        pairs.append(("camera_in_use", .bool(s.cameraInUse)))
+        pairs.append(("camera_light", .bool(s.cameraLight)))
         pairs.append(("widget_visible", .bool(s.widgetVisible)))
+        pairs.append(("widget_visibility", .string(s.widgetVisibility.rawValue)))
         pairs.append(("settings_open", .bool(s.settingsOpen)))
         let section: YAMLNode = s.settingsSection.map { .string($0.rawValue) } ?? .null
         pairs.append(("settings_section", section))
         pairs.append(("meters", .list(meters)))
+        let widgetWarnings: [YAMLNode] = s.widgetWarnings.map { .string($0.rawValue) }
+        pairs.append(("widget_warnings", .list(widgetWarnings)))
         pairs.append(("meetings_count", .int(s.meetingsCount)))
         pairs.append(("alerts", alerts(s.alerts)))
         let fetched: YAMLNode = s.lastFetch.map { .string(iso.string(from: $0)) } ?? .null
@@ -51,6 +78,12 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("active_tool", s.activeTool.map(YAMLNode.string) ?? .null))
         pairs.append(("pacing_pinned", .bool(s.pacingPinned)))
         pairs.append(("pulse_count", .int(s.pulseCount)))
+        pairs.append(("glow_count", .int(s.glowCount)))
+        pairs.append(("glow_shape", .string(s.glowShape.rawValue)))
+        pairs.append(("glow_alerts", .bool(s.glowSwitches.alerts)))
+        pairs.append(("glow_meetings", .bool(s.glowSwitches.meetings)))
+        pairs.append(("glow_camera", .bool(s.glowSwitches.camera)))
+        pairs.append(("theme", .string(s.theme)))
         pairs.append(("menu", .list(menu)))
         pairs.append(("version", .string(s.version)))
         pairs.append(("build", .string(s.build)))
@@ -66,6 +99,7 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
             ("fill", .double(m.fill)),
             ("pace", pace),
             ("reset", .string(m.reset)),
+            ("warning", .bool(m.warning)),
         ])
     }
     
@@ -120,7 +154,7 @@ struct DebugTreeNode: Equatable {
 
 /// One window in tree.yaml.
 struct DebugWindowEntry: Equatable {
-    /// widget, desk, notch, settings, sheet or window, made unique ("sheet-2").
+    /// widget, desk, notch, camera, settings, sheet or window, made unique ("sheet-2").
     var name: String
     /// The window number, which is also its CGWindowID: `screencapture -l` takes it.
     var windowID: Int

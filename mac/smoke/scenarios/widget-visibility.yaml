@@ -1,0 +1,40 @@
+# Iteration 3 item 23: When the widget shows (Settings, General, Surfaces) takes over each time
+# Desk turns on or off; a show or hide by hand lasts until the next switch. Desk is switched off
+# and on first so every later switch is a real change whatever Desk started as. Signed in, since
+# without a session key the widget always shows for sign-in. The run puts the setting, Desk and
+# the widget back.
+name: When the widget shows follows Desk
+needs: [credentials]
+steps:
+  - defaults: { key: widgetVisibility, type: string, value: whileDeskOff }
+  - expect_state: { widget_visibility: whileDeskOff }
+  - do: desk
+    arg: "off"
+  - do: desk
+    arg: "on"
+  - expect_state: { desk_enabled: true, widget_visible: false }
+  - do: desk
+    arg: "off"
+  - expect_state: { desk_enabled: false, widget_visible: true }
+  - do: desk
+    arg: "on"
+  - expect_state: { desk_enabled: true, widget_visible: false }
+  - defaults: { key: widgetVisibility, type: string, value: onRequest }
+  - do: desk
+    arg: "off"
+  - expect_state: { desk_enabled: false, widget_visibility: onRequest, widget_visible: false }
+  # Shown by hand, it stays until the next switch hides it again.
+  - do: show-widget
+  - expect_state: { widget_visible: true }
+  - do: desk
+    arg: "on"
+  - expect_state: { desk_enabled: true, widget_visible: false }
+  # Always shown never moves it: hidden by hand stays hidden through a switch.
+  - defaults: { key: widgetVisibility, type: string, value: always }
+  - do: desk
+    arg: "off"
+  - expect_state: { desk_enabled: false, widget_visibility: always, widget_visible: false }
+  - do: show-widget
+  - do: desk
+    arg: "on"
+  - expect_state: { desk_enabled: true, widget_visible: true }

@@ -1,0 +1,6 @@
+name: Fixture scenario that picks a theme and then fails
+steps:
+  - do: theme
+    arg: match-desk
+  - expect_state: { theme: match-desk }
+  - expect_state: { theme: aurora }

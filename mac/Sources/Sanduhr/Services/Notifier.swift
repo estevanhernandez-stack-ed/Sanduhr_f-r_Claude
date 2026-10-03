@@ -80,9 +80,13 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     // MARK: - Private
 
     private func deliver(_ outcome: AlertOutcome, sound: String) {
+        // A Desk pulse always glows the notch (DeskController.pulse); a banner alone glows it
+        // when Settings, Desk, Notch, Glow asks. One glow either way, never two.
         if outcome.pulse {
             let tiers = Set(outcome.alerts.map(\.tier))
-            DispatchQueue.main.async { DeskController.shared.model.pulse(tiers) }
+            DispatchQueue.main.async { MainActor.assumeIsolated { DeskController.shared.pulse(tiers) } }
+        } else if outcome.banner {
+            DispatchQueue.main.async { MainActor.assumeIsolated { NotchGlowController.shared.event(.alert) } }
         }
         guard outcome.banner else { return }
         for alert in outcome.alerts {

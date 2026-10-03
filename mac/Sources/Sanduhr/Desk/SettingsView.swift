@@ -167,6 +167,68 @@ private struct Swatch: View {
     }
 }
 
+// MARK: - Meters
+
+/// Warnings on the meters, on Desk and the widget alike, set per meter: a group for the session, the all-models weekly
+/// limit, and every other weekly limit the server reports.
+struct DeskMetersSection: View {
+    var model: DeskModel
+
+    /// Session and weekly always; the other weekly limits once the server has reported them.
+    static func tiers(present: [Tier]) -> [Tier] {
+        Tier.allCases.filter { $0 == .fiveHour || $0 == .sevenDay || present.contains($0) }
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                Text("A meter that is nearly full while its reset is still far off draws its bar in red with a soft glow around it, on the Desk (in the Desk ink) and on the widget (in the theme's color). Each meter has its own setting; changes show at once on both.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(Self.tiers(present: model.meters.map(\.tier)), id: \.self) { tier in
+                MeterWarningGroup(tier: tier)
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+private struct MeterWarningGroup: View {
+    let tier: Tier
+    @AppStorage private var enabled: Bool
+    @AppStorage private var threshold: Double
+    @AppStorage private var minReset: Double
+
+    init(tier: Tier) {
+        self.tier = tier
+        let standard = MeterWarningSettings.standard(for: tier)
+        _enabled = AppStorage(wrappedValue: standard.enabled, MeterWarningSettings.onKey(tier), store: .desk)
+        _threshold = AppStorage(wrappedValue: standard.threshold, MeterWarningSettings.thresholdKey(tier), store: .desk)
+        _minReset = AppStorage(wrappedValue: standard.minReset, MeterWarningSettings.minResetKey(tier), store: .desk)
+    }
+
+    var body: some View {
+        Section(tier.label) {
+            Toggle("Warn when nearly full", isOn: $enabled)
+            HStack {
+                Text("At")
+                Slider(value: $threshold, in: 50...100, step: 5)
+                Text("\(Int(threshold))%")
+                    .font(.system(.body, design: .monospaced))
+                    .frame(width: 48, alignment: .trailing)
+            }
+            .disabled(!enabled)
+            Picker("Only while the reset is more than", selection: $minReset) {
+                ForEach(MeterWarning.minResetChoices, id: \.seconds) { Text($0.name).tag($0.seconds) }
+                if !MeterWarning.minResetChoices.contains(where: { $0.seconds == minReset }) {
+                    Text("Custom").tag(minReset)
+                }
+            }
+            .disabled(!enabled)
+        }
+    }
+}
+
 // MARK: - Message
 
 struct DeskMessageSection: View {
@@ -225,6 +287,15 @@ struct DeskNotchSection: View {
     @AppStorage("notchChin", store: .desk) private var chin = 26.0
     @AppStorage("notchText", store: .desk) private var wingText = true
     @AppStorage("notchChinText", store: .desk) private var chinText = false
+    @AppStorage(NotchContent.Place.left.key, store: .desk) private var left = NotchContent.Place.left.fallback
+    @AppStorage(NotchContent.Place.right.key, store: .desk) private var right = NotchContent.Place.right.fallback
+    @AppStorage(NotchContent.Place.strip.key, store: .desk) private var strip = NotchContent.Place.strip.fallback
+    @AppStorage(CameraLightController.enabledKey, store: .desk) private var cameraLight = false
+    @AppStorage(CameraLightController.brightnessKey, store: .desk) private var lightBrightness = CameraLightController.defaultBrightness
+    @AppStorage(CameraLightController.sizeKey, store: .desk) private var lightSize = CameraLightController.defaultSize
+    @AppStorage(NotchGlowSwitches.alertsKey, store: .desk) private var glowAlerts = false
+    @AppStorage(NotchGlowSwitches.meetingsKey, store: .desk) private var glowMeetings = false
+    @AppStorage(NotchGlowSwitches.cameraKey, store: .desk) private var glowCamera = false
 
     var body: some View {
         Form {
@@ -234,9 +305,14 @@ struct DeskNotchSection: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Text") {
-                Toggle("Beside the camera: next meeting or the time, and the Claude meters", isOn: $wingText)
-                Toggle("Under the camera too (desktop only)", isOn: $chinText)
+                Toggle("Text beside the camera", isOn: $wingText)
+                contentPicker("Left wing", $left).disabled(!wingText)
+                contentPicker("Right wing", $right).disabled(!wingText)
+                Toggle("Text under the camera too (desktop only)", isOn: $chinText)
                     .disabled(chin == 0)
+                contentPicker("Under the camera", $strip).disabled(!chinText || chin == 0)
+                Text("Nothing leaves that part plain black. A wing grows to fit its text.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             .disabled(!enabled)
             Section("Size") {
@@ -244,16 +320,46 @@ struct DeskNotchSection: View {
                 slider("Extra height below (0 = none)", $chin, 0...56)
             }
             .disabled(!enabled)
+            Section("Camera light") {
+                Toggle("Light up for the camera", isOn: $cameraLight)
+                    .onChange(of: cameraLight) { _, _ in CameraLightController.shared.apply() }
+                HStack {
+                    Text("Brightness")
+                    Slider(value: $lightBrightness, in: CameraLightLayout.brightnessRange)
+                    Text("\(Int((lightBrightness * 100).rounded()))%")
+                        .font(.system(.body, design: .monospaced))
+                        .frame(width: 48, alignment: .trailing)
+                }
+                slider("Reach below the menu bar", $lightSize, CameraLightLayout.sizeRange)
+                Text("While any app uses a camera, a soft white light around the notch lights your face, above every app. It ends when the camera stops, with or without Desk or the island. Tools, Camera Light shows it by hand. Screens without a notch get it at the top center.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section("Glow") {
+                Toggle("For Sanduhr alerts", isOn: $glowAlerts)
+                Toggle("A minute before a meeting", isOn: $glowMeetings)
+                    .onChange(of: glowMeetings) { _, _ in NotchGlowController.shared.apply() }
+                Toggle("When the camera light comes on", isOn: $glowCamera)
+                Text("The notch's edge glows softly in the notch text color for a few seconds, once per event: around the island when it is on, around the notch itself when it is off. A Desk pulse always glows it. It never takes a click.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
+    }
+
+    private func contentPicker(_ title: String, _ selection: Binding<NotchContent>) -> some View {
+        Picker(title, selection: selection) {
+            ForEach(NotchContent.allCases) { Text($0.label).tag($0) }
+        }
     }
 }
 
 // MARK: - General
 
-/// Which surfaces show, open at login, the shortcuts. The Widget switch mirrors panelHidden,
-/// which AppDelegate writes whenever the widget shows or hides.
+/// Which surfaces show, open at login, the shortcuts. The Widget picker is WidgetVisibility;
+/// the switch under it mirrors panelHidden, which AppDelegate writes whenever the widget shows
+/// or hides.
 struct GeneralSection: View {
+    @AppStorage(WidgetVisibility.key) private var widgetVisibility = WidgetVisibility.always
     @AppStorage(DeskController.enabledKey, store: .desk) private var deskEnabled = false
     @AppStorage(DeskController.notchKey, store: .desk) private var notch = false
     @AppStorage(AppDelegate.panelHiddenKey) private var panelHidden = false
@@ -269,13 +375,19 @@ struct GeneralSection: View {
                 Toggle("Desk: clock, meters, meetings and the message on the desktop", isOn: $deskEnabled)
                     .onChange(of: deskEnabled) { _, _ in DeskController.shared.apply() }
                 Toggle("Notch: the island around the camera (needs Desk)", isOn: $notch)
-                Toggle("Widget: the floating window with the tools", isOn: Binding(
+                Picker("Widget: the floating window with the tools", selection: $widgetVisibility) {
+                    ForEach(WidgetVisibility.allCases) { Text($0.label).tag($0) }
+                }
+                .onChange(of: widgetVisibility) { _, _ in
+                    (NSApp.delegate as? AppDelegate)?.widgetVisibilityDidChange()
+                }
+                Toggle("Show the widget now", isOn: Binding(
                     get: { !panelHidden },
                     set: { show in
                         let app = NSApp.delegate as? AppDelegate
                         if show { app?.showPanel() } else { app?.hidePanel() }
                     }))
-                Text("Sanduhr keeps fetching and alerting with every surface off. Every setting stays here, and Option+S opens this window while Desk is on.")
+                Text("Showing or hiding the widget by hand lasts until Desk turns on or off or Sanduhr starts again; then the choice above takes over. Sanduhr keeps fetching and alerting with every surface off. Every setting stays here, and Option+S opens this window while Desk is on.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section {
@@ -304,11 +416,13 @@ struct GeneralSection: View {
             }
             Section {
                 HStack {
-                    Button("Quit Sanduhr") { NSApp.terminate(nil) }
+                    Button("Quit Sanduhr für Claude") { NSApp.terminate(nil) }
                     Spacer()
                     Text("Sanduhr \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                Text("Quitting closes everything: the widget, Desk and the notch. To put away only the widget, use Hide Widget in any Sanduhr menu or the widget's close button.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

@@ -16,6 +16,13 @@ final class FontSettings {
         didSet { UserDefaults.standard.set(family, forKey: Self.defaultsKey) }
     }
 
+    /// Desk's font while the Match Desk theme is current ("" for the system font), nil
+    /// otherwise. Not saved: the user's own `family` stays as chosen and returns with any other theme.
+    var deskFamily: String?
+
+    /// The family the widget draws in now.
+    var drawnFamily: String { deskFamily ?? family }
+
     private init() {
         family = UserDefaults.standard.string(forKey: Self.defaultsKey) ?? ""
     }
@@ -34,7 +41,7 @@ final class FontSettings {
     /// The face to hand `Font.custom`, or nil when the family is the system
     /// font or is no longer installed (a removed font falls back quietly).
     func faceName() -> String? {
-        let fam = family
+        let fam = drawnFamily
         guard !fam.isEmpty else { return nil }
         if let hit = faceCache[fam] { return hit }
         var face: String?
@@ -77,12 +84,25 @@ final class DisplaySettings {
         }
     }
 
+    /// The Match Desk theme draws without the glass, as subtle mode does, while it is current.
+    /// Not saved, and the user's own `subtle` switch is left as it is.
+    var themeDrawsSubtle = false {
+        didSet {
+            guard themeDrawsSubtle != oldValue else { return }
+            DispatchQueue.main.async { FloatingPanel.refreshLevel() }
+        }
+    }
+
+    /// Whether the widget draws subtle now: the user's switch, or a theme that asks for it.
+    var drawsSubtle: Bool { subtle || themeDrawsSubtle }
+
     private init() {
         subtle = UserDefaults.standard.bool(forKey: Self.defaultsKey)
     }
 }
 
 enum Chrome {
-    /// 1 normally, 0 in subtle mode. Applied to backgrounds and borders only, never to text.
-    static var opacity: Double { DisplaySettings.shared.subtle ? 0 : 1 }
+    /// 1 normally, 0 in subtle mode or under a theme that draws subtle (Match Desk). Applied to
+    /// backgrounds and borders only, never to text.
+    static var opacity: Double { DisplaySettings.shared.drawsSubtle ? 0 : 1 }
 }

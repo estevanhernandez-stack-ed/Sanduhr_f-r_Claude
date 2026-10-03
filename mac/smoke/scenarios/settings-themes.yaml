@@ -1,0 +1,15 @@
+# Iteration 3, item 18: Settings opens at Themes on the gallery, built-in theme names showing.
+name: Settings opens at the theme gallery
+steps:
+  - do: settings
+    arg: themes
+  - expect_state: { settings_open: true, settings_section: themes }
+  - expect:
+      window: settings
+      contains: { text: "/(?i)^obsid/" }
+  - expect:
+      window: settings
+      contains: { text: "/(?i)^aurora/" }
+  - snap: theme-gallery
+  - do: close-settings
+  - expect_state: { settings_open: false }

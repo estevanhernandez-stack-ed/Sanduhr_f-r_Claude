@@ -15,7 +15,7 @@ struct ThemeStripView: View {
             Menu {
                 ForEach(ThemeRegistry.themes) { theme in
                     Button {
-                        vm.theme = theme
+                        vm.selectTheme(id: theme.id)
                     } label: {
                         // SwiftUI's Label with a conditional systemImage
                         // gives us a native-looking check next to the

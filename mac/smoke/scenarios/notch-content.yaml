@@ -1,0 +1,17 @@
+# Iteration 3 item 19: each place on the notch island takes its content from a desk key, the
+# default when unset. Writing one key changes that place only; the run puts the key back.
+# Watch the snap (with the notch on) for the right wing showing the message.
+name: Notch content follows its settings
+steps:
+  - expect_state: { notch_left: "/^(meetingOrTime|meetingOrMeters|time|meters|message|nothing)$/" }
+  - defaults: { domain: desk, key: notchRight, type: string, value: message }
+  - defaults: { domain: desk, key: notchStrip, type: string, value: nothing }
+  - expect_state: { notch_right: message, notch_strip: nothing }
+  - do: settings
+    arg: notch
+  - expect:
+      window: settings
+      contains: { label: "/^Right wing/" }
+  - snap: notch-content
+  - do: close-settings
+  - expect_state: { settings_open: false }

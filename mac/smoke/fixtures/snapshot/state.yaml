@@ -3,7 +3,13 @@ desk_running: true
 layout: "message:tl clock:bl meters:bl meetings:bl"
 notch: false
 has_notch: true
+notch_left: meetingOrTime
+notch_right: meters
+notch_strip: meetingOrMeters
+camera_in_use: false
+camera_light: false
 widget_visible: true
+widget_visibility: always
 settings_open: true
 settings_section: notch
 meters:
@@ -13,12 +19,15 @@ meters:
     fill: 0.07
     pace: 0.25
     reset: "Today 5:00 PM"
+    warning: false
   - tier: seven_day
     label: Weekly — All Models
     percent: 63
     fill: 0.63
     pace: null
     reset: ""
+    warning: false
+widget_warnings: []
 meetings_count: 0
 alerts:
   enabled: false
@@ -37,9 +46,15 @@ last_fetch: "2026-10-02T15:04:05Z"
 active_tool: null
 pacing_pinned: false
 pulse_count: 0
+glow_count: 0
+glow_shape: none
+glow_alerts: false
+glow_meetings: false
+glow_camera: false
+theme: obsidian
 menu:
   - items:
-      - title: Hide Sanduhr
+      - title: Hide Widget
         checked: false
   - header: Tools
     items:
@@ -48,6 +63,8 @@ menu:
       - title: Pacing Calculators
         checked: false
       - title: Cooldown Snake
+        checked: false
+      - title: Camera Light
         checked: false
 version: "2.1.0"
 build: "3"

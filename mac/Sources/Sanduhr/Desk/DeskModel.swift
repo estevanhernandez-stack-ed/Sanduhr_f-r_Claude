@@ -2,6 +2,7 @@ import Foundation
 import EventKit
 import Observation
 import CoreGraphics
+import AppKit
 
 struct Meeting: Identifiable {
     let id: String
@@ -13,6 +14,32 @@ struct Meeting: Identifiable {
     let link: URL?
     /// Short name for the link's service, shown after the title on the desktop.
     let service: String?
+}
+
+/// What the Desk says about Calendar access, by authorization status. Pure, so each status is
+/// tested; DeskModel reads the status and draws the note.
+enum CalendarAccess {
+    static let deniedNote = "Allow Sanduhr in Settings, Privacy, Calendars"
+    static let writeOnlyNote = "Sanduhr needs Full Access in Settings, Privacy, Calendars"
+    static let restrictedNote = "Calendar access is restricted on this Mac"
+
+    /// Privacy & Security, Calendars in System Settings.
+    static let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")!
+
+    /// The note under the meetings, or nil when there is nothing to explain (full access, or
+    /// not asked yet: the request is on its way).
+    static func note(for status: EKAuthorizationStatus) -> String? {
+        switch status {
+        case .fullAccess, .notDetermined: return nil
+        case .writeOnly: return writeOnlyNote
+        case .restricted: return restrictedNote
+        case .denied: return deniedNote
+        @unknown default: return deniedNote
+        }
+    }
+
+    /// macOS shows its prompt only while the status is not determined; asking later does nothing.
+    static func shouldRequest(_ status: EKAuthorizationStatus) -> Bool { status == .notDetermined }
 }
 
 /// Today's remaining timed meetings, read straight from macOS Calendar (no icalBuddy).
@@ -46,6 +73,9 @@ final class DeskModel {
     /// Where the meters sit in the window, same coordinates, or .zero when they are not drawn.
     /// The meters take clicks here; a click shows the widget beside them.
     @ObservationIgnored var metersFrame: CGRect = .zero
+    /// Where the calendar note sits, same coordinates, or .zero when it is not drawn. A click
+    /// here opens System Settings at Privacy & Security, Calendars.
+    @ObservationIgnored var noteFrame: CGRect = .zero
     /// Alert pulses so far, per limit (Settings, Alerts, Where alerts show). A meter row pulses
     /// when its count goes up.
     var pulses: [Tier: Int] = [:]
@@ -58,17 +88,20 @@ final class DeskModel {
     /// The widget's last numbers (see `update`).
     @ObservationIgnored private var usage = DeskUsage()
 
-    @ObservationIgnored private let store = EKEventStore()
+    /// Replaced when access turns full: a store made before the grant can keep the old answer.
+    @ObservationIgnored private var store = EKEventStore()
+    /// The status seen at the last check, so a change to full access is noticed once.
+    @ObservationIgnored private var calendarStatus: EKAuthorizationStatus?
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var claudeTimer: Timer?
     @ObservationIgnored private var storeObserver: NSObjectProtocol?
+    @ObservationIgnored private var defaultsObserver: NSObjectProtocol?
 
     func start() {
         // Calendar access is asked only when meetings are on (Desk settings, General).
-        if UserDefaults.desk.object(forKey: "showMeetings") as? Bool ?? true { requestCalendar() }
-        storeObserver = NotificationCenter.default.addObserver(
-            forName: .EKEventStoreChanged, object: store, queue: .main
-        ) { [weak self] _ in self?.refreshEvents() }
+        if Self.meetingsOn { requestCalendar() }
+        observeStore()
+        observeMeterSettings()
         timer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
             self?.refreshEvents()
         }
@@ -78,23 +111,71 @@ final class DeskModel {
         claudeTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             self?.refreshClaude()
             self?.message = MessageEngine.current()   // picks up messages.txt edits within a minute
+            // A grant made in System Settings shows within a minute, no relaunch.
+            if self?.calendarStatus != .fullAccess { self?.recheckCalendar() }
         }
+    }
+
+    private static var meetingsOn: Bool { UserDefaults.desk.object(forKey: "showMeetings") as? Bool ?? true }
+
+    /// A Meters setting changed in Settings: restyle the rows now, not at the next minute.
+    /// Any in-process defaults change counts (cheap: unchanged rows are not reassigned). A
+    /// `defaults write` from another process posts nothing; the minute refresh picks that up.
+    private func observeMeterSettings() {
+        guard defaultsObserver == nil else { return }
+        defaultsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in self?.refreshMeterWarnings() }
+    }
+
+    private func observeStore() {
+        if let storeObserver { NotificationCenter.default.removeObserver(storeObserver) }
+        storeObserver = NotificationCenter.default.addObserver(
+            forName: .EKEventStoreChanged, object: store, queue: .main
+        ) { [weak self] _ in self?.refreshEvents() }
     }
 
     /// Asks for Calendar access (macOS shows its prompt only the first time) and loads today's
     /// meetings. Runs when Desk starts with meetings on, and when meetings are switched on later:
     /// new installs start with them off.
     func requestCalendar() {
-        store.requestFullAccessToEvents { [weak self] granted, _ in
+        let status = EKEventStore.authorizationStatus(for: .event)
+        guard CalendarAccess.shouldRequest(status) else { applyCalendar(status); return }
+        store.requestFullAccessToEvents { [weak self] _, _ in
             DispatchQueue.main.async {
-                guard let self else { return }
-                if granted {
-                    self.refreshEvents()
-                } else {
-                    self.calendarNote = "Allow Sanduhr in Settings, Privacy, Calendars"
-                }
+                self?.applyCalendar(EKEventStore.authorizationStatus(for: .event))
             }
         }
+    }
+
+    /// Reads the authorization again: when Sanduhr becomes active, when Settings opens and each
+    /// minute while access is not full. Only while meetings are on. Asks if never asked.
+    func recheckCalendar() {
+        guard Self.meetingsOn else { return }
+        requestCalendar()
+    }
+
+    /// Shows the note for `status`, or, on full access, loads the meetings. A change to full
+    /// access gets a fresh store, so the old one's stale answer cannot hide the meetings.
+    private func applyCalendar(_ status: EKAuthorizationStatus) {
+        let previous = calendarStatus
+        calendarStatus = status
+        if status == .fullAccess {
+            if previous != nil, previous != .fullAccess {
+                store = EKEventStore()
+                if storeObserver != nil { observeStore() }
+            }
+            refreshEvents()
+        } else {
+            meetings = []
+            let note = CalendarAccess.note(for: status)
+            if calendarNote != note { calendarNote = note }
+        }
+    }
+
+    /// The calendar note was clicked: Privacy & Security, Calendars in System Settings.
+    func openCalendarSettings() {
+        NSWorkspace.shared.open(CalendarAccess.settingsURL)
     }
 
     func stop() {
@@ -139,7 +220,7 @@ final class DeskModel {
     /// Rebuilds the meters and the text lines from the last numbers the widget handed over.
     /// Runs on every update and once a minute, so pace ticks and staleness move with the clock.
     func refreshClaude(now: Date = Date()) {
-        meters = DeskMeterRow.rows(from: usage.usage, now: now)
+        meters = Self.meterRows(usage.usage, now: now)
         signInNeeded = usage.signInNeeded
         claudeLine = DeskClaudeText.line(usage)
         claudeCompact = DeskClaudeText.compact(usage, now: now)
@@ -148,7 +229,20 @@ final class DeskModel {
         if meterHintVisible != hint { meterHintVisible = hint }
     }
 
-    /// An alert chose the Desk: pulse these limits' meters and the notch island once.
+    /// The meter rows with the saved warning settings (Settings, Desk, Meters).
+    private static func meterRows(_ usage: UsageResponse?, now: Date) -> [DeskMeterRow] {
+        DeskMeterRow.rows(from: usage, now: now) { MeterWarningSettings.saved($0, in: UserDefaults.desk) }
+    }
+
+    /// Re-applies the warning settings at once: a Meters setting changed. Rows that already match
+    /// are left alone, so the Desk only redraws when a row turns red or back.
+    func refreshMeterWarnings(now: Date = Date()) {
+        let rows = Self.meterRows(usage.usage, now: now)
+        if rows != meters { meters = rows }
+    }
+
+    /// An alert chose the Desk: pulse these limits' meters once. `pulseCount` counts every pulse;
+    /// the notch glow that goes with it is fired by `DeskController.pulse`.
     func pulse(_ tiers: Set<Tier>) {
         for tier in tiers { pulses[tier, default: 0] += 1 }
         pulseCount += 1

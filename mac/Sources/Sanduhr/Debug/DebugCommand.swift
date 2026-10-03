@@ -27,9 +27,16 @@ enum DebugAction: Equatable {
     case tool(MenuCommand)
     case desk(Bool)
     case notch(Bool)
+    /// The camera light shown or hidden by hand, as Tools, Camera Light does.
+    case cameraLight(Bool)
+    /// The notch glow for one kind of event, whatever its switch says.
+    case glow(NotchGlowEvent.Kind)
+    /// The widget's theme by id, picked as the Theme menu and the gallery pick it.
+    case theme(String)
 
     static let names = ["show-widget", "hide-widget", "settings", "close-settings", "refresh",
-                        "test-alert", "pulse", "tool", "desk", "notch"]
+                        "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
+                        "theme"]
 }
 
 enum DebugCommand: Equatable {
@@ -110,6 +117,16 @@ enum DebugLink {
             }
         case "desk": return onOff(DebugAction.desk)
         case "notch": return onOff(DebugAction.notch)
+        case "camera-light": return onOff(DebugAction.cameraLight)
+        case "glow":
+            guard let arg else { return .success(.glow(.alert)) }
+            guard let kind = NotchGlowEvent.Kind(rawValue: arg.lowercased()) else {
+                return bad("glow needs arg=alert, meeting or camera")
+            }
+            return .success(.glow(kind))
+        case "theme":
+            guard let arg else { return bad("theme needs arg=<theme id>") }
+            return .success(.theme(arg.lowercased()))
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }

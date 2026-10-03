@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import Testing
+import EventKit
 @testable import Sanduhr
 
 /// Pure Desk logic: the message pick, the layout string, ink specs and the one-time import of
@@ -362,19 +363,35 @@ struct DeskFirstRunTests {
         #expect(DeskLayout.parse(s.defaults.string(forKey: "layout") ?? "")["meters"] != nil)
         #expect(s.defaults.object(forKey: "showMeetings") as? Bool == false)
         #expect(s.defaults.bool(forKey: DeskController.notchKey) == false)
-        #expect(widget.bool(forKey: DeskFirstRun.tuckKey))
+        #expect(WidgetVisibility.saved(in: widget) == .whileDeskOff)
+        #expect(widget.object(forKey: DeskFirstRun.tuckKey) == nil)
         // The widget shows for sign-in: nothing hides it before the first fetch.
         #expect(widget.object(forKey: "panelHidden") == nil)
     }
 
-    @Test func widgetTucksOnceAfterTheFirstSuccessfulFetch() {
+    @Test func freshInstallShowsForSignInThenTucksOnceSignedIn() {
         let s = ScratchDefaults(), widget = MemoryDefaults()
         _ = launch(s, widget)
-        #expect(DeskFirstRun.tuck(afterFetch: false, widget: widget) == false)
-        #expect(widget.bool(forKey: DeskFirstRun.tuckKey))
-        #expect(DeskFirstRun.tuck(afterFetch: true, widget: widget))
+        let setting = WidgetVisibility.saved(in: widget)
+        let deskOn = s.defaults.bool(forKey: DeskController.enabledKey)
+        // AppDelegate treats a fresh install's first launch as not signed in yet.
+        #expect(WidgetVisibilityRule.shouldShow(setting: setting, deskOn: deskOn, hasSessionKey: false, event: .launch) == true)
+        #expect(WidgetVisibilityRule.shouldShow(setting: setting, deskOn: deskOn, hasSessionKey: true, event: .signedIn) == false)
+    }
+
+    @Test func aPendingTuckFrom22IsAdoptedAsHiddenWhileDeskIsOn() {
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        widget.set(true, forKey: DeskFirstRun.doneKey)
+        widget.set(true, forKey: DeskFirstRun.tuckKey)
+        #expect(s.firstRun(widget: widget) == .alreadyDecided)
         #expect(widget.object(forKey: DeskFirstRun.tuckKey) == nil)
-        #expect(DeskFirstRun.tuck(afterFetch: true, widget: widget) == false)
+        #expect(WidgetVisibility.saved(in: widget) == .whileDeskOff)
+        // A choice already made wins.
+        widget.set(true, forKey: DeskFirstRun.tuckKey)
+        widget.set(WidgetVisibility.onRequest.rawValue, forKey: WidgetVisibility.key)
+        s.firstRun(widget: widget)
+        #expect(WidgetVisibility.saved(in: widget) == .onRequest)
+        #expect(widget.object(forKey: DeskFirstRun.tuckKey) == nil)
     }
 
     @Test func existingWidgetUserIsLeftAlone() {
@@ -384,7 +401,8 @@ struct DeskFirstRunTests {
         #expect(s.firstRun(widget: widget) == .existing)
         #expect(s.defaults.values.isEmpty)
         #expect(Set(widget.values.keys) == ["windowFrame", "theme", DeskFirstRun.doneKey])
-        #expect(DeskFirstRun.tuck(afterFetch: true, widget: widget) == false)
+        // No choice saved: Always shown, today's behavior.
+        #expect(WidgetVisibility.saved(in: widget) == .always)
     }
 
     @Test func compactModeUserFrom204IsLeftAlone() {
@@ -411,7 +429,7 @@ struct DeskFirstRunTests {
         #expect(launch(s, widget) == .existing)
         #expect(s.defaults.values.keys.sorted() == before)
         #expect(s.defaults.bool(forKey: DeskController.enabledKey) == false)
-        #expect(widget.bool(forKey: DeskFirstRun.tuckKey) == false)
+        #expect(WidgetVisibility.saved(in: widget) == .always)
     }
 
     @Test func sanduhrDeskMigrantKeepsTheImportedLayout() {
@@ -422,7 +440,7 @@ struct DeskFirstRunTests {
         #expect(s.defaults.object(forKey: "showMeetings") as? Bool == true)
         #expect(s.defaults.object(forKey: DeskController.notchKey) as? Bool == false)
         #expect(s.defaults.bool(forKey: DeskController.enabledKey))
-        #expect(widget.bool(forKey: DeskFirstRun.tuckKey) == false)
+        #expect(WidgetVisibility.saved(in: widget) == .always)
     }
 
     @Test func decidedOnceThenANoOp() {
@@ -432,12 +450,12 @@ struct DeskFirstRunTests {
         s.defaults.set(false, forKey: DeskController.enabledKey)
         s.defaults.set("clock:bl claude:bl", forKey: "layout")
         s.defaults.set(true, forKey: "showMeetings")
-        widget.set(nil, forKey: DeskFirstRun.tuckKey)
+        widget.set(WidgetVisibility.always.rawValue, forKey: WidgetVisibility.key)
         #expect(launch(s, widget) == .alreadyDecided)
         #expect(s.defaults.bool(forKey: DeskController.enabledKey) == false)
         #expect(s.defaults.string(forKey: "layout") == "clock:bl claude:bl")
         #expect(s.defaults.bool(forKey: "showMeetings"))
-        #expect(widget.object(forKey: DeskFirstRun.tuckKey) == nil)
+        #expect(WidgetVisibility.saved(in: widget) == .always)
     }
 }
 
@@ -508,5 +526,129 @@ struct DeskPanelPlacementTests {
         let meters = CGRect(x: 200, y: 10, width: 1260, height: 80)
         let f = DeskPanelPlacement.frame(beside: meters, size: size, screen: screen, visible: visible)
         #expect(visible.contains(f))
+    }
+}
+
+@Suite("Calendar access")
+struct CalendarAccessTests {
+    @Test func notAskedYetAsksAndSaysNothing() {
+        #expect(CalendarAccess.shouldRequest(.notDetermined))
+        #expect(CalendarAccess.note(for: .notDetermined) == nil)
+    }
+
+    @Test func fullAccessClearsTheNote() {
+        #expect(!CalendarAccess.shouldRequest(.fullAccess))
+        #expect(CalendarAccess.note(for: .fullAccess) == nil)
+    }
+
+    @Test func deniedKeepsTheAllowLine() {
+        #expect(!CalendarAccess.shouldRequest(.denied))
+        #expect(CalendarAccess.note(for: .denied) == "Allow Sanduhr in Settings, Privacy, Calendars")
+    }
+
+    @Test func addEventsOnlyAsksForFullAccess() {
+        #expect(!CalendarAccess.shouldRequest(.writeOnly))
+        #expect(CalendarAccess.note(for: .writeOnly) == CalendarAccess.writeOnlyNote)
+        #expect(CalendarAccess.writeOnlyNote.contains("Full Access"))
+    }
+
+    @Test func restrictedIsAPlainLine() {
+        #expect(!CalendarAccess.shouldRequest(.restricted))
+        #expect(CalendarAccess.note(for: .restricted) == CalendarAccess.restrictedNote)
+    }
+
+    @Test func notePointsAtTheCalendarsPrivacyPage() {
+        #expect(CalendarAccess.settingsURL.absoluteString
+                == "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")
+    }
+}
+
+@Suite("Notch content")
+struct NotchContentTests {
+    let utc = TimeZone(identifier: "UTC")!
+    /// 2026-10-03 14:05 UTC.
+    let now = Date(timeIntervalSince1970: 1_791_036_300)
+    let meters = "5h 7%  wk 63%"
+
+    func meeting(_ title: String, inMinutes mins: Double, length: Double = 30) -> Meeting {
+        let start = now.addingTimeInterval(mins * 60)
+        return Meeting(id: title, time: "", title: title, start: start,
+                       end: start.addingTimeInterval(length * 60), link: nil, service: nil)
+    }
+
+    func text(_ c: NotchContent, _ place: NotchContent.Place, meetings: [Meeting] = [],
+              meters: String? = nil, message: String? = nil) -> String? {
+        c.text(at: place, meetings: meetings, meters: meters, message: message, now: now, timeZone: utc)
+    }
+
+    @Test func defaultsReproduceTheIslandAsItWas() {
+        #expect(NotchContent.Place.left.fallback == .meetingOrTime)
+        #expect(NotchContent.Place.right.fallback == .meters)
+        #expect(NotchContent.Place.strip.fallback == .meetingOrMeters)
+        #expect(NotchContent.Place.left.key == "notchLeft")
+        #expect(NotchContent.Place.right.key == "notchRight")
+        #expect(NotchContent.Place.strip.key == "notchStrip")
+    }
+
+    @Test func unsetOrUnknownKeysMeanTheDefault() {
+        #expect(NotchContent.resolve(.left, raw: nil) == .meetingOrTime)
+        #expect(NotchContent.resolve(.right, raw: nil) == .meters)
+        #expect(NotchContent.resolve(.strip, raw: nil) == .meetingOrMeters)
+        #expect(NotchContent.resolve(.right, raw: "message") == .message)
+        #expect(NotchContent.resolve(.left, raw: "sparkles") == .meetingOrTime)
+        #expect(NotchContent.resolve(.strip, raw: "nothing") == .nothing)
+    }
+
+    @Test func meetingWithinTheHourBeatsTheFallback() {
+        let soon = [meeting("standup", inMinutes: 12)]
+        #expect(text(.meetingOrTime, .left, meetings: soon) == "standup 12m")
+        #expect(text(.meetingOrTime, .right, meetings: soon) == "standup 12m")
+        #expect(text(.meetingOrMeters, .strip, meetings: soon, meters: meters) == "standup in 12m")
+        #expect(text(.meetingOrTime, .strip, meetings: soon) == "standup in 12m")
+        let under = [meeting("standup", inMinutes: -5)]
+        #expect(text(.meetingOrTime, .left, meetings: under) == "now standup")
+        #expect(text(.meetingOrMeters, .strip, meetings: under, meters: meters) == "now  standup")
+        // Under a minute away still reads 1m.
+        #expect(text(.meetingOrTime, .left, meetings: [meeting("x", inMinutes: 0.3)]) == "x 1m")
+    }
+
+    @Test func laterOrEndedMeetingsFallBack() {
+        let later = [meeting("review", inMinutes: 90)]
+        #expect(text(.meetingOrTime, .left, meetings: later) == "2:05")
+        #expect(text(.meetingOrMeters, .strip, meetings: later, meters: meters) == meters)
+        let ended = [meeting("done", inMinutes: -40, length: 30)]
+        #expect(text(.meetingOrTime, .left, meetings: ended) == "2:05")
+        #expect(text(.meetingOrMeters, .strip, meetings: ended) == nil)
+    }
+
+    @Test func wingsClipLongTitlesTheStripKeepsThem() {
+        let long = [meeting("quarterly planning review", inMinutes: 5)]
+        #expect(text(.meetingOrTime, .left, meetings: long) == "quarterly plannin… 5m")
+        #expect(text(.meetingOrMeters, .strip, meetings: long) == "quarterly planning review in 5m")
+    }
+
+    @Test func timeMetersMessageAndNothing() {
+        let soon = [meeting("standup", inMinutes: 12)]
+        #expect(text(.time, .left, meetings: soon) == "2:05")
+        #expect(text(.meters, .right, meetings: soon, meters: meters) == meters)
+        #expect(text(.message, .right, message: "keep building.") == "keep building.")
+        #expect(text(.message, .strip, message: "  ship it \n") == "ship it")
+        for place in [NotchContent.Place.left, .right, .strip] {
+            #expect(text(.nothing, place, meetings: soon, meters: meters, message: "hi") == nil)
+        }
+    }
+
+    @Test func staleMetersAndEmptyMessageLeaveThePlaceBlack() {
+        // Stale numbers reach the notch as nil (DeskClaudeText.compact drops them).
+        #expect(text(.meters, .right, meters: nil) == nil)
+        #expect(text(.meters, .right, meters: "") == nil)
+        #expect(text(.meetingOrMeters, .strip, meters: nil) == nil)
+        #expect(text(.message, .left, message: nil) == nil)
+        #expect(text(.message, .left, message: "   ") == nil)
+    }
+
+    @Test func everyChoiceHasALabel() {
+        #expect(NotchContent.allCases.count == 6)
+        #expect(Set(NotchContent.allCases.map(\.label)).count == 6)
     }
 }

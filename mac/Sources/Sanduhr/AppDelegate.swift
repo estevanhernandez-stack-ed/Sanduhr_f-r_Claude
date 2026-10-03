@@ -26,9 +26,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             options: .userInitiatedAllowingIdleSystemSleep,
             reason: "Refreshes Claude usage every five minutes for the widget and Desk")
 
-        // A brand-new install starts with Desk on and the widget set to tuck away after its first
-        // fetch. Decided once, before the panel shows and before DeskMigration marks the suite.
-        DeskFirstRun.run()
+        // A brand-new install starts with Desk on and the widget hidden while Desk is on, once it
+        // has signed in. Decided once, before the panel shows and before DeskMigration marks the suite.
+        let firstRun = DeskFirstRun.run()
 
         // Build widget panel.
         let hosting = NSHostingController(rootView: RootView(vm: viewModel))
@@ -43,10 +43,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // so the window never gains empty space.
         panel.delegate = panel
         placeInTopRightCorner(panel)
-        // Hidden stays hidden across launches: Sanduhr keeps fetching, alerting and
-        // writing snapshot.json, so a desktop clock or statusline can show the numbers
-        // while the widget itself stays out of the way.
-        if !UserDefaults.standard.bool(forKey: Self.panelHiddenKey) {
+        // When the widget shows (Settings, General, Surfaces) decides at launch; with "Always
+        // shown", hidden stays hidden across launches: Sanduhr keeps fetching, alerting and
+        // writing snapshot.json, so a desktop clock or statusline can show the numbers while
+        // the widget itself stays out of the way. Without a session key (or on a brand-new
+        // install, whose first fetch has not happened) the widget shows for sign-in and the
+        // choice takes over after the first successful fetch.
+        awaitingSignIn = firstRun == .fresh
+            || !KeychainStore.exists(account: KeychainAccount.sessionKey)
+        let wasShowing = !UserDefaults.standard.bool(forKey: Self.panelHiddenKey)
+        let show = WidgetVisibilityRule.resolve(
+            showing: wasShowing, setting: .saved(), deskOn: DeskController.shared.enabled,
+            hasSessionKey: !awaitingSignIn, event: .launch)
+        if show != wasShowing { UserDefaults.standard.set(!show, forKey: Self.panelHiddenKey) }
+        if show {
             panel.makeKeyAndOrderFront(nil)
         }
         fitPanelToContent()
@@ -61,9 +71,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Desk takes the numbers straight from the view model, so its meters move with
             // every refresh even while the widget is hidden (or Desk is off, ready for when it starts).
             guard let vm = self?.viewModel else { return }
-            // A fresh install shows the widget for sign-in, then hides it once the numbers arrive.
-            if DeskFirstRun.tuck(afterFetch: vm.usage != nil && (vm.status == .idle || vm.status == .noTiers)) {
-                self?.hidePanel()
+            // The widget showed for sign-in; once the numbers arrive the choice takes over.
+            if self?.awaitingSignIn == true, vm.usage != nil, vm.status == .idle || vm.status == .noTiers {
+                self?.awaitingSignIn = false
+                self?.applyWidgetVisibility(.signedIn)
             }
             var isAuthError = false
             if case .error(_, let isAuth) = vm.status { isAuthError = isAuth }
@@ -83,6 +94,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Desk: the desktop layer and the notch, when switched on (Settings, General, Surfaces).
         DeskMigration.run()
         DeskController.shared.apply()
+        // The camera light watches the cameras while its switch is on, with or without Desk.
+        CameraLightController.shared.apply()
+        // The notch glow checks for meetings a minute out while its meetings switch is on.
+        NotchGlowController.shared.apply()
     }
 
     /// estedesk:// and sanduhr:// links (Option+J joins the next meeting, …/settings opens
@@ -100,6 +115,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// The widget is on screen.
     var widgetVisible: Bool { panel?.isVisible ?? false }
+
+    /// True from a launch without a session key (or a brand-new install's first launch) until
+    /// the first successful fetch.
+    private var awaitingSignIn = false
+
+    /// Desk was switched on or off (DeskController.apply, from the Settings switch or a debug
+    /// hook): the When the widget shows choice takes over again.
+    func deskDidChange() { applyWidgetVisibility(.deskChanged) }
+
+    /// The When the widget shows picker changed (Settings, General, Surfaces).
+    func widgetVisibilityDidChange() { applyWidgetVisibility(.choiceChanged) }
+
+    /// Shows or hides the widget as WidgetVisibilityRule says for `event`; leaves it alone when
+    /// the rule does ("Always shown"), so a manual show or hide lasts until the next event.
+    private func applyWidgetVisibility(_ event: WidgetVisibilityEvent) {
+        guard let show = WidgetVisibilityRule.shouldShow(
+            setting: .saved(), deskOn: DeskController.shared.enabled,
+            hasSessionKey: !awaitingSignIn, event: event) else { return }
+        if !show { hidePanel(); return }
+        guard let panel, !panel.isVisible else { return }
+        // Comes back without taking focus from whatever flipped Desk (the Settings window).
+        UserDefaults.standard.set(false, forKey: Self.panelHiddenKey)
+        panel.orderFrontRegardless()
+    }
 
     /// Shrink or grow the panel so its height equals the SwiftUI
     /// content's fitting size. Called after the model signals a change
@@ -226,7 +265,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         SanduhrMenu.groups(widgetVisible: widgetVisible,
                            deepWork: viewModel.activeTool == .deepWork,
                            pacing: viewModel.pacingPinned,
-                           snake: viewModel.activeTool == .snake)
+                           snake: viewModel.activeTool == .snake,
+                           cameraLight: CameraLightController.shared.manual)
     }
 
     @objc private func menuItemChosen(_ sender: NSMenuItem) {
@@ -234,13 +274,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// What every menu's items do. Each tool works with the widget hidden: it shows the widget
-    /// first. Chosen again while it shows on a visible widget, a tool turns off.
+    /// first. Chosen again while it shows on a visible widget, a tool turns off. Camera Light
+    /// leaves the widget alone.
     func perform(_ command: MenuCommand) {
         let visible = panel?.isVisible ?? false
         switch command {
         case .showHide: showOrHidePanel()
         case .deepWork: toggleTool(.deepWork, visible: visible)
         case .snake: toggleTool(.snake, visible: visible)
+        case .cameraLight: CameraLightController.shared.toggleManual()
         case .pacing:
             if viewModel.pacingPinned && visible {
                 viewModel.pacingPinned = false
@@ -311,7 +353,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         showPanel()
     }
 
-    /// The menus' first item: "Hide Sanduhr" when the widget shows, "Show Sanduhr" when it doesn't.
+    /// The menus' first item: "Hide Widget" when the widget shows, "Show Widget" when it doesn't.
     @objc func showOrHidePanel() {
         if panel?.isVisible ?? false { hidePanel() } else { showPanel() }
     }
@@ -361,12 +403,12 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
     /// Last Pin state the widget asked for; subtle-mode changes re-apply it.
     private static var pinned = true
 
-    /// Pin floats the widget above every window, except in subtle mode, where Pin sets it on
-    /// the desktop instead: below every app window, above the wallpaper, on every Space.
+    /// Pin floats the widget above every window, except in subtle mode (or Match Desk), where Pin
+    /// sets it on the desktop instead: below every app window, above the wallpaper, on every Space.
     static func refreshLevel(pinned newValue: Bool? = nil) {
         if let newValue { pinned = newValue }
         guard let panel = NSApp.windows.compactMap({ $0 as? FloatingPanel }).first else { return }
-        let subtle = DisplaySettings.shared.subtle
+        let subtle = DisplaySettings.shared.drawsSubtle
         if pinned && subtle {
             panel.isFloatingPanel = false
             panel.level = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)

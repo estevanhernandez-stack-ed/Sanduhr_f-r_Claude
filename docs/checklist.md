@@ -138,3 +138,79 @@ Cooldown Snake, themes, history once M7 lands). Mac sources only; build and test
   What to build: move the alert decisions into a pure rules type and add: a **pace warning** when `burnProjection` says a limit will hit 100% before it resets (once per window, with the projected time and the reset time in the text); **where alerts show**: banner, a pulse on the Desk meters and notch island, or both; **quiet hours** (start and end, may cross midnight; banners held back, Desk pulses still shown); a **sound** picker (system sounds or silent); and a **weekly reset** alert beside the session one. Existing thresholds keep working.
   Acceptance: fixture usage on pace to run out fires one pace warning naming both times; during quiet hours no banner is posted; Desk-only delivery pulses the meters and posts nothing; each alert still fires once per reset window.
   Verify: swift-testing for the rules (pace, quiet hours across midnight, once-per-window, session and weekly reset detection); one real banner and one Desk pulse checked by hand.
+
+## Iteration 3 (Mac): the notch does more, themes you can see
+
+From /iterate, 2026-10-02, after 2.2.1. Same build rules as Iterations 1 and 2. Ships as 2.3.0.
+New options keep today's behavior by default; the camera light and the glow start off.
+
+- [x] **22. Calendar access that explains itself**
+  Spec ref: New — follows a 2.2.1 report (Calendar allowed in System Settings, Desk still showed "Allow Sanduhr…")
+  What to build: the Desk calendar note becomes clickable and opens System Settings at Privacy & Security, Calendars. Distinguish the states: not asked yet (ask), denied (the existing line), "Add Events Only" (its own line saying Full Access is needed). Recheck authorization when Sanduhr becomes active, when Settings opens, and on each Desk minute tick while not fully authorized, so a grant made in System Settings shows up within a minute without a relaunch (use a fresh `EKEventStore` if the old one keeps the stale answer).
+  Acceptance: granting Full Access in System Settings clears the note within a minute and loads meetings with no relaunch; Add Only shows the Full Access line; clicking the note opens the right System Settings page.
+  Verify: swift-testing for the status-to-message mapping; on screen by toggling the permission.
+
+- [x] **18. Themes you can see**
+  Spec ref: New — Settings, Widget, Themes (`Views/WidgetSettings.swift`, `Models/Theme.swift`, `Services/UserThemes.swift`)
+  What to build: the Themes page opens on a gallery of every theme, built-in and user, each a small preview (background, card, bar colors, accent) with its name; the current one marked; one click applies it live. The existing custom-theme tools (paste JSON, agent prompt, folder, reload, delete) stay below the gallery.
+  Acceptance: every built-in and installed user theme appears with a recognizable preview; clicking applies it to the widget at once; the widget's own Theme menu and the gallery agree.
+  Verify: swift-testing for the gallery's theme list (built-ins plus user themes, current flag); smoke scenario opening Settings at Themes and finding theme names.
+
+- [x] **19. You choose what the notch shows**
+  Spec ref: New — `Desk/NotchView.swift` (`NotchWingsView.layout`, `leftText`, `NotchView.line`)
+  What to build: Settings, Desk, Notch gets a picker for the left wing, the right wing and the strip under the camera, each one of: next meeting (or the time when none is due), time, Claude meters, message, nothing. Defaults reproduce today exactly (left: meeting or time; right: meters; strip: meeting or meters). Wing width still grows to fit its text.
+  Acceptance: each choice shows on the right wing within a refresh; "nothing" leaves a plain black wing; an update changes nothing for anyone until they pick.
+  Verify: swift-testing for the pure text-per-slot function across choices, times and stale meters; smoke scenario for `state.yaml` notch slots.
+
+- [x] **20. The notch as a camera light**
+  Spec ref: New
+  What to build: while any app uses the camera (CoreMediaIO `kCMIODevicePropertyDeviceIsRunningSomewhere` on video devices, observed with a property listener; no permission), the notch area glows as a soft white light to light the user's face: a click-through window above every app around the notch (wings plus a band below, rounded, feathered edge), with brightness and size sliders in Settings, Desk, Notch, off by default. Ends when the camera stops. Works with the notch island on or off; on a screen without a notch, the light sits at the top center of the main screen. A Tools menu item turns it on by hand for a test.
+  Acceptance: turning on a FaceTime or Teams camera lights it within a second, turning it off ends it; it never takes clicks; it sits above full-screen apps.
+  Verify: swift-testing for the camera-state reducer (several devices, flapping); by hand with Photo Booth.
+
+- [x] **21. The notch glows for Sanduhr's events**
+  Spec ref: New — extends the item 17 Desk pulse
+  What to build: an outer glow around the notch island (ink colored, a few seconds, gentle) for Sanduhr's own events: an alert (any delivery), a meeting starting in the next minute (once per meeting), the camera light coming on. Each event type has a switch in Settings, Desk, Notch, all off by default. No sound detection (no public API for other apps' sounds; an audio tap needs a recording permission and is out of scope).
+  Acceptance: each enabled event glows once; disabled ones do not; the glow never blocks clicks or covers app content beyond the island's edge.
+  Verify: swift-testing for the event-to-glow rules (once per meeting, switches); `smoke do pulse` style action to trigger the glow on demand.
+
+- [x] **23. When the widget shows**
+  Spec ref: New — Settings, General, Surfaces (`Views/SettingsWindow.swift` General section, `AppDelegate` show/hide, `DeskFirstRun`)
+  What to build: a Widget setting with three choices: **Always** (today's behavior; the default for existing users), **While Desk is off** (hidden whenever Desk is on, shown when Desk is off; the default for new installs, replacing the tuck-after-first-fetch flag's one-time hide once sign-in is done), and **Never on its own** (only appears when asked: meter click, Tools, Show Sanduhr). Showing or hiding from a menu still works as a one-off; the choice takes over again when Desk turns on or off and at launch. The existing `panelHidden` key keeps meaning "hidden right now".
+  Acceptance: with "While Desk is off", switching Desk off shows the widget and on hides it; "Never on its own" keeps it hidden across launches until asked; an updated install sees no change.
+  Verify: swift-testing for a pure visibility rule (setting, Desk on/off, manual override, launch); smoke scenario toggling Desk with each setting.
+
+- [x] **24. A "Match Desk" theme for the widget**
+  Spec ref: New — builds on item 18's gallery (`Models/ThemeGallery.swift`, `Views/ThemeGalleryView.swift`, `Models/Theme.swift`)
+  What to build: a built-in "Match Desk" theme in the gallery that draws the widget in Desk's look: the Desk font, the Desk ink color or gradient for text and bars, the Desk drop shadow, no glass background (like subtle mode). It follows the Desk settings live (font, ink, shadow). Also re-resolve the current theme by id when user themes reload, so an edited theme restyles the widget without being picked again.
+  Acceptance: picking Match Desk makes the widget read like part of the desktop; changing Desk's ink or font restyles it at once; other themes are unaffected.
+  Verify: swift-testing for the Desk-to-palette mapping (single color, gradient, empty fallback); smoke scenario picking it and checking `state.yaml` theme.
+
+- [x] **25. Meter warnings on Desk, set per meter**
+  Spec ref: New — follows review of the 2.3.0 build (Desk meters: `Desk/DeskMeters.swift` `DeskMeterRow`, `MeterRow` in `Desk/DeskView.swift`; glow technique from `Desk/NotchGlow.swift`)
+  What to build: a Desk meter row is "warning" when its fill is at or above a threshold and its reset is more than a set time away. A warning row draws its bar red (the standard over-limit red) with a steady glow in the Desk ink gradient around the bar. Each meter is independent: session, weekly, and every other weekly limit get their own switch, threshold and minimum time to reset, on a new Desk, Meters settings page. Defaults: weekly limits on at 90% with more than 1 day to reset; session off (when turned on: 90%, more than 1 hour). A missing reset time counts as "far away".
+  Acceptance: a weekly meter at 92% with 3 days left shows red with the ink glow; the same meter with 6 hours left stays normal; the session meter never warns until switched on; changing a setting restyles the row at once.
+  Verify: swift-testing for the pure warning rule (per meter settings, threshold edge, time edge, missing reset); `state.yaml` meters gain `warning`; a smoke scenario that sets a low threshold to force a warning and checks the state.
+
+- [x] **27. One notch glow, the plain notch too**
+  Spec ref: New — review of the 2.3.0 build (`Desk/NotchView.swift` wings pulse stroke from item 17; `Desk/NotchGlow.swift`)
+  What to build: the item-17 Desk pulse stroked the island's whole outline (top edge included) with a white shadow, so during a meter pulse light showed in the band between the wings and the screen edge. Remove that stroke; a Desk pulse fires the item-21 outer glow instead (forced, like the debug action), so there is one glow with one look: up the sides to the top of the wings, along the bottom, nothing at the screen edge. When the island is not extended (notch switch off) on a notched screen, the glow hugs the plain hardware notch outline (its width and height, rounded bottom corners) with the same treatment, so users who don't extend the notch can still have it glow.
+  Acceptance: a Desk pulse shows no light above or beside the top of the wings; with the island off, a glow outlines the hardware notch; with the island on, unchanged from item 21 with its fixes.
+  Verify: swift-testing for the plain-notch glow layout; smoke: pulse and glow scenarios with the island on and off; an on-screen capture of the notch area during a pulse.
+
+- [x] **26. Warning bars on the widget too**
+  Spec ref: New — extends item 25 (`Desk/MeterWarning.swift`, widget bars in `Views/ProgressBarView.swift` / `Views/TierCardView.swift`)
+  What to build: the widget's tier bars use the same per-meter warning rule and settings as the Desk meters (item 25): a warning tier's bar turns red with a steady glow in the current theme's accent (in Match Desk, the Desk ink gradient) around the bar. Non-warning bars unchanged. The Meters settings page says it applies to both the Desk and the widget.
+  Acceptance: a weekly tier at 92% with days left shows red with a theme-color glow on the widget, and the same on Desk; turning its warning off clears both.
+  Verify: swift-testing that the widget's warning state per tier matches `MeterWarning` for the same inputs; smoke: state for the widget tiers gains `warning` (or reuse meters state) and a scenario forcing a warning checks it; an on-screen capture of the widget.
+
+- [x] **28. Quit says what it quits**
+  Spec ref: New — review of the 2.3.0 build (the menu model `Models/SanduhrMenu.swift`)
+  What to build: the menus' first item reads Show Widget / Hide Widget (it only ever touched the floating widget), and Quit reads "Quit Sanduhr für Claude" so it is clear it closes everything (widget, Desk, notch). Same in all three menus and on Settings, General's Quit button, with a caption there saying it closes the widget, Desk and the notch.
+  Acceptance: the three menus and Settings use the new names; nothing else changes.
+  Verify: menu model tests; smoke scenarios that match menu titles updated.
+
+- [x] **29. Match Desk draws the line sparkline**
+  Spec ref: New — on-screen review of item 24 (`Views/SparklineView.swift`, `Views/TierCardView.swift`)
+  What was built: under Match Desk there is no card behind the sparkline, so the horizon chart of a meter that sat high read as a solid block of the ink. Match Desk now draws the line sparkline; every other theme keeps the horizon chart. `SparklineView.mode(themeID:)` decides, tested.
+  Acceptance: on the widget under Match Desk the sparkline is a thin ink line; other themes unchanged. Verified on screen (window capture) on the dev build.

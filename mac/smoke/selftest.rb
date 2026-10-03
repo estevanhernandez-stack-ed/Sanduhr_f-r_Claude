@@ -49,10 +49,16 @@ class FakeApp
     case name
     when 'desk' then s['desk_enabled'] = s['desk_running'] = (arg == 'on')
     when 'notch' then s['notch'] = (arg == 'on')
+    when 'camera-light' then s['camera_light'] = (arg == 'on')
+    when 'glow', 'pulse'
+      s['glow_count'] = s['glow_count'].to_i + 1
+      s['glow_shape'] = s['desk_running'] && s['notch'] ? 'island' : 'plain'
+      s['pulse_count'] = s['pulse_count'].to_i + 1 if name == 'pulse'
     when 'show-widget' then s['widget_visible'] = true
     when 'hide-widget' then s['widget_visible'] = false
     when 'settings' then s['settings_open'] = true; s['settings_section'] = arg if arg
     when 'close-settings' then s['settings_open'] = false
+    when 'theme' then s['theme'] = arg
     when 'tool'
       if arg == 'pacing' then s['pacing_pinned'] = !s['pacing_pinned']
       else s['active_tool'] = s['active_tool'] == arg ? nil : arg
@@ -84,7 +90,7 @@ check('regex needs a value', !Match.value?('/x/', nil))
 
 node, why = Match.in_window(tree, 'settings', { 'role' => 'AXCheckBox', 'label' => 'Extend the camera notch' })
 check('finds the notch switch', node && node['value'] == 0 && why.nil?)
-node, = Match.in_window(tree, 'settings', { 'label' => '/^beside the camera/i', 'enabled' => false })
+node, = Match.in_window(tree, 'settings', { 'label' => '/^text beside the camera/i', 'enabled' => false })
 check('regex label and enabled false', !node.nil?)
 node, = Match.in_window(tree, 'settings', { 'label' => 'Notch', 'value' => 1 })
 check('finds a nested row', !node.nil?)
@@ -150,7 +156,14 @@ base = { 'desk_enabled' => true, 'notch' => false, 'widget_visible' => false, 's
          'settings_section' => 'general', 'active_tool' => nil, 'pacing_pinned' => false }
 eq('nothing changed', Restore.plan(base, base), [])
 eq('desk and notch back', Restore.plan(base, base.merge('desk_enabled' => false, 'notch' => true)),
-   [%w[notch off], %w[desk on]])
+   [%w[desk on], ['hide-widget', nil], %w[notch off]])
+eq('desk back first, then the widget as it was',
+   Restore.plan(base.merge('widget_visible' => true), base.merge('desk_enabled' => false, 'widget_visible' => true)),
+   [%w[desk on], ['show-widget', nil]])
+eq('a tool closes on a widget shown after the desk switch',
+   Restore.plan(base.merge('widget_visible' => true),
+                base.merge('desk_enabled' => false, 'widget_visible' => true, 'active_tool' => 'snake')),
+   [%w[desk on], ['show-widget', nil], %w[tool snake], ['show-widget', nil]])
 eq('close settings opened by the scenario', Restore.plan(base, base.merge('settings_open' => true)), [['close-settings', nil]])
 eq('reopen settings at its section',
    Restore.plan(base.merge('settings_open' => true, 'settings_section' => 'alerts'),
@@ -161,6 +174,15 @@ eq('tool off, then hide the widget again',
 eq('pacing on a hidden widget shows it first',
    Restore.plan(base, base.merge('pacing_pinned' => true)),
    [['show-widget', nil], %w[tool pacing], ['hide-widget', nil]])
+eq('camera light switched on by hand goes off',
+   Restore.plan(base, base.merge('camera_light' => true)), [%w[camera-light off]])
+eq('theme picked by the scenario goes back',
+   Restore.plan(base.merge('theme' => 'obsidian'), base.merge('theme' => 'match-desk')), [%w[theme obsidian]])
+eq('theme unchanged or unknown before is left alone',
+   [Restore.plan(base.merge('theme' => 'aurora'), base.merge('theme' => 'aurora')),
+    Restore.plan(base, base.merge('theme' => 'match-desk'))], [[], []])
+eq('camera light from a running camera is left alone',
+   Restore.plan(base, base.merge('camera_light' => true, 'camera_in_use' => true)), [])
 
 # --- Scenario runs against the fake app --------------------------------------------------------
 
@@ -176,7 +198,7 @@ eq('pass scenario passes', [r['status'], r['reason']], ['pass', nil])
 eq('pass scenario ran every step', r['steps'].map { |s| s['status'] }.uniq, ['pass'])
 check('snap folder made', Dir.exist?(File.join(out, '01-pass', 'snap-08-notch-settings')))
 eq('pass scenario defaults restored', [mem.read(DOMAIN, 'alertSound'), mem.read(DESK_DOMAIN, 'notchWings')], [%w[string Glass], nil])
-eq('pass scenario actions, then restore', app.actions, ['settings notch', 'desk off', 'desk on', 'close-settings'])
+eq('pass scenario actions, then restore', app.actions, ['settings notch', 'desk off', 'desk on', 'show-widget', 'close-settings'])
 eq('app state back', [app.state_now['desk_enabled'], app.state_now['settings_open']], [true, false])
 
 app2 = FakeApp.new
@@ -187,6 +209,12 @@ eq('fail scenario stops at the failing step', r['steps'].map { |s| s['status'] }
 check('failure says why', r['steps'][2]['detail'].to_s.include?('meters.0.percent: expected 99, got 7'))
 eq('fail scenario still restores defaults', mem.read(DOMAIN, 'alertSound'), %w[string Glass])
 eq('fail scenario still restores the notch', app2.actions, ['notch on', 'notch off'])
+
+app4 = FakeApp.new('theme' => 'obsidian')
+runner4 = Runner.new(app4, mem, out, io: io, settle: 0, poll: 0.01, within: 0.05)
+r = runner4.run_file(File.join(FIXTURES, 'scenarios', 'theme-fail.yaml'))
+eq('theme scenario fails after picking a theme', [r['status'], app4.actions.first], ['fail', 'theme match-desk'])
+eq('failed theme scenario puts the theme back', [app4.actions.last, app4.state_now['theme']], ['theme obsidian', 'obsidian'])
 
 app3 = FakeApp.new('meters' => [])
 runner3 = Runner.new(app3, mem, out, io: io, settle: 0, poll: 0.01, within: 0.05)
@@ -206,7 +234,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch]
+    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end

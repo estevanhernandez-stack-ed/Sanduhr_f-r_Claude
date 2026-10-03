@@ -33,11 +33,16 @@ struct DeskMeterRow: Identifiable, Equatable {
     let pace: Double?
     /// "Today 5:00 PM", or empty without a reset time.
     let reset: String
+    /// Nearly full with the reset still far away (MeterWarning): the bar draws red with an ink glow.
+    var warning = false
 
     var id: String { tier.rawValue }
 
     /// One row per tier the server reported with a utilization, in the widget's display order.
-    static func rows(from usage: UsageResponse?, now: Date = Date()) -> [DeskMeterRow] {
+    /// `warnings` gives each tier's warning setting; the default is the built-in one, so only the
+    /// app hands over the saved settings (`MeterWarningSettings.saved`).
+    static func rows(from usage: UsageResponse?, now: Date = Date(),
+                     warnings: (Tier) -> MeterWarningSettings = MeterWarningSettings.standard(for:)) -> [DeskMeterRow] {
         guard let usage else { return [] }
         return Tier.allCases.compactMap { tier in
             guard let t = usage.tiers[tier], let util = t.utilization else { return nil }
@@ -46,7 +51,8 @@ struct DeskMeterRow: Identifiable, Equatable {
                                 percent: Int(util),
                                 fill: min(1, max(0, util / 100)),
                                 pace: paceFrac(t.resetsAt, tier: tier, now: now),
-                                reset: resetDateTimeStr(t.resetsAt, now: now))
+                                reset: resetDateTimeStr(t.resetsAt, now: now),
+                                warning: MeterWarning.isWarning(t, settings: warnings(tier), now: now))
         }
     }
 }

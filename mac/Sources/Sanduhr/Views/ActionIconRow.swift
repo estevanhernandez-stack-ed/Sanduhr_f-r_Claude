@@ -28,7 +28,7 @@ struct ActionIconRow: View {
 
             Spacer()
 
-            let subtle = DisplaySettings.shared.subtle
+            let subtle = DisplaySettings.shared.drawsSubtle
             iconButton(vm.pinned ? "pin.fill" : "pin.slash",
                        tint: vm.pinned ? t.accent : nil,
                        help: vm.pinned ? (subtle ? "Unpin from desktop" : "Unpin")

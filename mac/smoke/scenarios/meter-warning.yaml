@@ -1,0 +1,25 @@
+# Iteration 3 items 25 and 26: a meter warns (red bar, steady glow) when it is nearly full with
+# its reset still far off, set per meter in Settings, Desk, Meters, on the Desk and on the widget
+# alike. A threshold of 0 and no minimum time to reset force the weekly meter into a warning
+# whatever the numbers are. The session meter is left at its default (off), so it must not warn.
+# Switching the weekly warning off clears it on both. The run puts the keys back.
+# Watch the snap: the weekly bar red with a soft glow around it, in the Desk ink on the Desk and
+# in the theme's accent on the widget; the session bar unchanged.
+name: Meter warning on Desk and the widget
+needs: [desk, credentials]
+steps:
+  - expect_state: { meters.0.tier: five_hour, meters.1.tier: seven_day, meters.1.warning: "/^(true|false)$/" }
+  - defaults: { domain: desk, key: meterWarn.seven_day.pct, type: float, value: 0 }
+  - defaults: { domain: desk, key: meterWarn.seven_day.minReset, type: float, value: 0 }
+  - defaults: { domain: desk, key: meterWarn.seven_day.on, type: bool, value: true }
+  - expect_state: { meters.1.tier: seven_day, meters.1.warning: true, meters.0.warning: false }
+  - expect_state: { widget_warnings: [seven_day] }
+  - do: settings
+    arg: deskMeters
+  - expect_state: { settings_section: deskMeters }
+  - expect:
+      window: settings
+      contains: { text: Warn when nearly full }
+  - snap: meter-warning
+  - defaults: { domain: desk, key: meterWarn.seven_day.on, type: bool, value: false }
+  - expect_state: { meters.1.warning: false, widget_warnings: [] }

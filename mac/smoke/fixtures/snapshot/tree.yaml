@@ -52,7 +52,7 @@
       frame: [560, 200, 500, 24]
     - role: AXCheckBox
       subrole: AXSwitch
-      label: "Beside the camera: next meeting or the time, and the Claude meters"
+      label: Text beside the camera
       value: 1
       enabled: false
       frame: [560, 260, 500, 24]

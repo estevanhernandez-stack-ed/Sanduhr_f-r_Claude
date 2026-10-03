@@ -10,11 +10,12 @@ module Smoke
 
       snap [label]          snapshot into out/<time>-<label>/: in-app renders, tree.yaml,
                             state.yaml and on-screen captures (screen-<window>.png)
-      tree [window]         snapshot and print the UI tree (widget, desk, notch, settings, sheet)
+      tree [window]         snapshot and print the UI tree (widget, desk, notch, camera, settings, sheet)
       state                 snapshot and print state.yaml
       do <action> [arg]     run one hook action and wait for it: show-widget, hide-widget,
                             settings [section], close-settings, refresh, test-alert,
-                            pulse [tier], tool deep-work|pacing|snake, desk on|off, notch on|off
+                            pulse [tier], tool deep-work|pacing|snake, desk on|off, notch on|off,
+                            camera-light on|off, glow [alert|meeting|camera]
       watch [seconds]       stream Sanduhr's log and refresh out/watch/ every N seconds (default 5)
       run [scenario.yaml…]  run scenarios (all in scenarios/ when none given); exits 1 on failure
       view [folder]         build and open an HTML gallery of a snapshot or run (default: newest)

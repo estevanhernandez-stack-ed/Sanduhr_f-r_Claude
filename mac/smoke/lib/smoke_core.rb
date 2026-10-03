@@ -244,7 +244,12 @@ module Smoke
     def plan(before, after)
       return [] unless before.is_a?(Hash) && after.is_a?(Hash)
       steps = []
-      visible = after['widget_visible']
+      # Desk first: switching it can show or hide the widget (When the widget shows), so the
+      # widget is then put back explicitly.
+      desk_changed = !!before['desk_enabled'] != !!after['desk_enabled']
+      steps << ['desk', before['desk_enabled'] ? 'on' : 'off'] if desk_changed
+      # After a Desk switch the widget may have moved, so a tool closes on a widget shown first.
+      visible = desk_changed ? false : after['widget_visible']
       tool_steps = []
       if before['active_tool'] != after['active_tool']
         # Choosing the open tool again closes it; choosing another switches to it.
@@ -263,12 +268,17 @@ module Smoke
         end
         steps.concat(tool_steps)
       end
-      if !!before['widget_visible'] != !!visible
+      if desk_changed || !!before['widget_visible'] != !!visible
         steps << [before['widget_visible'] ? 'show-widget' : 'hide-widget', nil]
       end
       steps << ['notch', before['notch'] ? 'on' : 'off'] if !!before['notch'] != !!after['notch']
-      if !!before['desk_enabled'] != !!after['desk_enabled']
-        steps << ['desk', before['desk_enabled'] ? 'on' : 'off']
+      # The camera light by hand, only when no camera was in use (a running camera lights it too).
+      if !before['camera_in_use'] && !after['camera_in_use'] && !!before['camera_light'] != !!after['camera_light']
+        steps << ['camera-light', before['camera_light'] ? 'on' : 'off']
+      end
+      # The widget theme a scenario picked goes back to the one in use before.
+      if before['theme'] && before['theme'] != after['theme']
+        steps << ['theme', before['theme']]
       end
       if before['settings_open']
         if !after['settings_open'] || before['settings_section'] != after['settings_section']

@@ -24,7 +24,7 @@ enum Sanduhr {
         let appItem = NSMenuItem()
         appItem.submenu = NSMenu()
         appItem.submenu?.addItem(withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
-        appItem.submenu?.addItem(withTitle: "Quit Sanduhr", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appItem.submenu?.addItem(withTitle: "Quit Sanduhr für Claude", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         main.addItem(appItem)
         let editItem = NSMenuItem()
         let edit = NSMenu(title: "Edit")

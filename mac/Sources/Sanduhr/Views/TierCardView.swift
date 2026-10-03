@@ -11,17 +11,30 @@ struct TierCardView: View {
     let tick: Int
     /// The Tools menu's Pacing Calculators: show the deep math without hovering.
     var pinDeepMath = false
+    /// Nearly full with the reset still far off (`UsageViewModel.warningTiers`): the bar and the
+    /// percent turn red, with a glow in the theme's accent around the bar.
+    var warning = false
+    /// The sparkline's style for the current theme (`SparklineView.mode(themeID:)`).
+    var sparklineMode: SparklineView.Mode = .horizon
 
     @State private var showDeepMath = false
 
     private var util: Double { usage.utilization ?? 0 }
+
+    /// The percentage in the usage color, or under Match Desk in the ink until the warning line;
+    /// red on a warning tier.
+    private var readoutColor: Color {
+        if warning { return meterWarningRed }
+        return palette.ink != nil && DeskThemeMapping.inkCarries(util) ? palette.text : usageColor(util)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             headerRow
             ProgressBarView(utilization: util,
                             paceFraction: paceFrac(usage.resetsAt, tier: tier),
-                            palette: palette)
+                            palette: palette,
+                            warning: warning)
             infoRow
             reminderRow
         }
@@ -71,16 +84,16 @@ struct TierCardView: View {
             Spacer(minLength: 4)
 
             if history.count >= 2 {
-                SparklineView(values: history, color: palette.sparkline)
+                SparklineView(values: history, color: palette.sparkline, mode: sparklineMode)
                     .frame(width: 44, height: 14)
             }
 
             Text("\(Int(util))%")
                 .font(.app(size: 13, weight: .bold,
                               design: palette.numericFontDesign))
-                .foregroundStyle(usageColor(util))
+                .foregroundStyle(readoutColor)
                 .monospacedDigit()
-                .shadow(color: usageColor(util).opacity(palette.accentBloom.alpha),
+                .shadow(color: readoutColor.opacity(palette.accentBloom.alpha),
                         radius: palette.accentBloom.blur)
         }
     }

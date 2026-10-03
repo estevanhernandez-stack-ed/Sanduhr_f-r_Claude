@@ -17,6 +17,9 @@ steps:
     arg: deskLook
   - expect_state: { settings_section: deskLook }
   - do: settings
+    arg: deskMeters
+  - expect_state: { settings_section: deskMeters }
+  - do: settings
     arg: message
   - expect_state: { settings_section: message }
   - do: settings

@@ -17,7 +17,7 @@ open Sanduhr.app
 
 smoke/smoke enable             # defaults write com.626labs.sanduhr debugHooks -bool true
 smoke/smoke snap               # prints the folder: renders, tree.yaml, state.yaml, screen-*.png
-smoke/smoke tree settings      # the Settings window's UI tree (widget, desk, notch, settings, sheet)
+smoke/smoke tree settings      # the Settings window's UI tree (widget, desk, notch, camera, settings, sheet)
 smoke/smoke state              # Desk, notch, widget, Settings, meters, alerts, menu, version
 smoke/smoke do settings notch  # one action, waits for it
 smoke/smoke watch 5            # live log + out/watch/index.html refreshing every 5 s; Ctrl-C stops
@@ -56,14 +56,27 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   Switch on/off values are therefore not in the text nodes: check them in `state.yaml`. The
   `text` match field checks a node's label and value.
 - **state.yaml**: `desk_enabled`, `desk_running`, `layout`, `notch`, `has_notch`,
-  `widget_visible`, `settings_open`, `settings_section`, `meters` (tier, label, percent, fill,
-  pace, reset), `meetings_count`, `alerts`, `last_fetch`, `active_tool`, `pacing_pinned`,
-  `pulse_count`, `menu` (groups with item titles and checkmarks), `version`, `build`.
+  `notch_left`, `notch_right`, `notch_strip` (what each place on the island shows, a
+  `NotchContent` raw value such as `meetingOrTime`, `meters` or `nothing`; the default when unset),
+  `camera_in_use` (an app is using a camera; only watched while the camera light switch is on),
+  `camera_light` (the camera light shows, for a camera or by hand),
+  `widget_visible`, `widget_visibility` (When the widget shows: `always`, `whileDeskOff` or
+  `onRequest`; `always` when unset), `settings_open`, `settings_section`, `meters` (tier, label, percent, fill,
+  pace, reset, `warning`: the row draws red with the ink glow, per Settings, Desk, Meters), `widget_warnings` (the
+  widget's tiers drawing red with a glow, same rule and settings, in display order), `meetings_count`, `alerts`, `last_fetch`, `active_tool`, `pacing_pinned`,
+  `pulse_count`, `glow_count` (notch glows fired so far, drawn or not; a pulse fires one too), `glow_shape` (what the last
+  drawn glow outlined: `island`, `plain` for the hardware notch alone, or `none` yet), `glow_alerts`, `glow_meetings`,
+  `glow_camera` (the three Glow switches in Settings, Desk, Notch), `theme` (the widget theme's id), `menu` (groups with item titles and checkmarks), `version`, `build`.
 
 Actions: `show-widget`, `hide-widget`, `settings [section]` (a `SettingsSection` raw value such
 as `notch` or `deskLayout`), `close-settings`, `refresh` (waits for the fetch), `test-alert`,
-`pulse [tier]` (`five_hour` by default), `tool deep-work|pacing|snake` (as the Tools menu: chosen
-again it closes), `desk on|off`, `notch on|off`.
+`pulse [tier]` (`five_hour` by default; it glows the notch too), `tool deep-work|pacing|snake` (as the Tools menu: chosen
+again it closes), `desk on|off`, `notch on|off`, `camera-light on|off` (the light by hand, as Tools, Camera Light;
+its window is kind `camera` in tree.yaml, one node labeled `Camera light`), `glow [alert|meeting|camera]`
+(the notch glow once, whatever its switches; around the island while Desk runs with it on, else around
+the plain hardware notch on a notched screen, in a click-through window of kind `glow` labeled `Notch glow` that fades out after about three seconds),
+`theme <id>` (the widget theme by id, as the Theme menu and the gallery pick it, such as `obsidian`
+or `match-desk`; an unknown id answers with an error listing the ids).
 
 ## Scenarios
 
@@ -88,7 +101,7 @@ steps:
 `expect` and `expect_state` retry for up to 3 s (`within: <seconds>` on `expect` changes it),
 since the UI settles after an action. A failing step stops the scenario. Either way, at the end
 every default the scenario wrote is put back (deleted if it was not set), and Desk, notch, widget,
-the tools and the Settings window are put back as they were. `run` prints a line per step and a
+the tools, the widget theme and the Settings window are put back as they were. `run` prints a line per step and a
 summary, writes `out/run-<time>/report.yaml` with the snaps beside it, and exits 1 on a failure.
 
 The shipped scenarios cover the automatable parts of `docs/mac-smoke-test.md`. Fresh-install and

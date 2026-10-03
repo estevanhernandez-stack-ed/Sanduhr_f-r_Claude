@@ -171,7 +171,20 @@ struct DeskView: View {
     private func meetings(alignment: HorizontalAlignment) -> some View {
         VStack(alignment: alignment, spacing: 2) {
             if let note = model.calendarNote {
+                // Clickable like a meeting row: DeskController opens System Settings at
+                // Privacy & Security, Calendars.
                 Text(note).opacity(0.6)
+                    .contentShape(Rectangle())
+                    .onHover { inside in
+                        if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                    }
+                    .background(GeometryReader { geo in
+                        Color.clear.preference(key: NoteFrameKey.self, value: geo.frame(in: .global))
+                    })
+                    .onPreferenceChange(NoteFrameKey.self) { frame in
+                        model.noteFrame = frame
+                    }
+                    .onDisappear { model.noteFrame = .zero }
             } else if model.meetings.isEmpty {
                 Text("Nothing else on the calendar today").opacity(0.6)
             } else {
@@ -292,20 +305,37 @@ private struct MeterRow: View {
     let width: CGFloat
     let alignment: HorizontalAlignment
 
+    /// The widget's over-limit red (`usageColor` at 90% and up).
+    static let warningRed = meterWarningRed
+
     var body: some View {
         let barHeight = max(4, size * 0.38)
         VStack(alignment: alignment, spacing: size * 0.22) {
             HStack(alignment: .firstTextBaseline) {
                 Text(row.label).lineLimit(1).opacity(0.85)
                 Spacer(minLength: size)
-                Text("\(row.percent)%")
+                if row.warning {
+                    Text("\(row.percent)%").foregroundStyle(Self.warningRed)
+                } else {
+                    Text("\(row.percent)%")
+                }
             }
             ZStack(alignment: .leading) {
                 Capsule().fill(LinearGradient.ink(ink)).opacity(0.22)
-                Capsule().fill(LinearGradient.ink(ink))
+                Capsule().fill(row.warning ? AnyShapeStyle(Self.warningRed) : AnyShapeStyle(LinearGradient.ink(ink)))
                     .frame(width: width * row.fill)
             }
             .frame(width: width, height: barHeight)
+            .background {
+                // A warning row: a steady glow in the ink wrapping the bar, as the notch glows.
+                if row.warning {
+                    Capsule()
+                        .fill(LinearGradient.ink(ink))
+                        .padding(-barHeight * 0.7)
+                        .blur(radius: barHeight * 0.9)
+                        .opacity(0.6)
+                }
+            }
             .overlay(alignment: .leading) {
                 // Taller than the bar, so it still reads where it crosses the fill.
                 if let pace = row.pace {
@@ -367,6 +397,11 @@ private struct MetersFrameKey: PreferenceKey {
 }
 
 private struct MeetingsFrameKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
+}
+
+private struct NoteFrameKey: PreferenceKey {
     static let defaultValue: CGRect = .zero
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
 }

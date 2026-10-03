@@ -54,6 +54,8 @@ enum DebugHooks {
             } else {
                 run()
             }
+        case .action(.theme(let id), _) where ThemeRegistry.theme(id: id) == nil:
+            finish(dir, error: "unknown theme: \(id) (one of \(ThemeRegistry.themes.map(\.id).joined(separator: ", ")))")
         case .action(let action, _):
             perform(action, app: app) { finish(dir) }
         }
@@ -102,13 +104,16 @@ enum DebugHooks {
             }
             return
         case .testAlert: Notifier.shared.sendTest()
-        case .pulse(let tier): DeskController.shared.model.pulse([tier])
+        case .pulse(let tier): DeskController.shared.pulse([tier])
         case .tool(let command): app.perform(command)
         case .desk(let on):
             UserDefaults.desk.set(on, forKey: DeskController.enabledKey)
             DeskController.shared.apply()
         case .notch(let on):
             UserDefaults.desk.set(on, forKey: DeskController.notchKey)
+        case .cameraLight(let on): CameraLightController.shared.setManual(on)
+        case .glow: NotchGlowController.shared.fire()
+        case .theme(let id): app.viewModel.selectTheme(id: id)
         }
         settle()
     }
@@ -162,6 +167,8 @@ enum DebugHooks {
             if w is FloatingPanel { kind = "widget" }
             else if w === desk.window { kind = "desk" }
             else if w === desk.wingsWindow { kind = "notch" }
+            else if w === CameraLightController.shared.window { kind = "camera" }
+            else if w === NotchGlowController.shared.window { kind = "glow" }
             else if w === settings { kind = "settings" }
             else if w.isSheet || w.sheetParent != nil { kind = "sheet" }
             else {
@@ -241,10 +248,22 @@ enum DebugHooks {
         s.layout = UserDefaults.desk.string(forKey: "layout")
         s.notch = UserDefaults.desk.bool(forKey: DeskController.notchKey)
         s.hasNotch = desk.wingsWindow != nil
+        s.notchLeft = NotchContent.saved(.left, in: .desk)
+        s.notchRight = NotchContent.saved(.right, in: .desk)
+        s.notchStrip = NotchContent.saved(.strip, in: .desk)
+        s.cameraInUse = CameraLightController.shared.cameraInUse
+        s.cameraLight = CameraLightController.shared.showing
         s.widgetVisible = widgetVisible
+        s.widgetVisibility = .saved()
         s.settingsOpen = settings.isOpen
         s.settingsSection = settings.window == nil ? nil : settings.section
+        // A `defaults write` from the smoke runner posts no change notice here: apply the saved
+        // warning settings before reporting, as Desk's minute refresh and the widget's countdown
+        // tick would.
+        desk.model.refreshMeterWarnings()
         s.meters = desk.model.meters
+        vm.refreshMeterWarnings()
+        s.widgetWarnings = Tier.allCases.filter(vm.warningTiers.contains)
         s.meetingsCount = desk.model.meetings.count
         s.alerts = AlertSettings(UserDefaults.standard)
         s.lastFetch = vm.lastUpdated
@@ -255,6 +274,10 @@ enum DebugHooks {
         }
         s.pacingPinned = vm.pacingPinned
         s.pulseCount = desk.model.pulseCount
+        s.glowCount = NotchGlowController.shared.count
+        s.glowShape = NotchGlowController.shared.lastShape
+        s.glowSwitches = NotchGlowController.shared.switches
+        s.theme = vm.theme.id
         s.menu = app.currentMenu(widgetVisible: widgetVisible)
         s.version = info["CFBundleShortVersionString"] as? String ?? ""
         s.build = info["CFBundleVersion"] as? String ?? ""
