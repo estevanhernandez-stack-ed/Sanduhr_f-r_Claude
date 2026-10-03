@@ -66,5 +66,6 @@ menu:
         checked: false
       - title: Camera Light
         checked: false
+credentials_store: file
 version: "2.1.0"
 build: "3"

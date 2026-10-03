@@ -41,6 +41,8 @@ struct DebugStateInput {
     var glowSwitches = NotchGlowSwitches()
     /// The widget theme's id.
     var theme = ""
+    /// Where credentials live this launch (KeychainStore.kind); never a value.
+    var credentialsStore = CredentialStoreKind.file
     var menu: [MenuGroup] = []
     var version = ""
     var build = ""
@@ -85,6 +87,7 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("glow_camera", .bool(s.glowSwitches.camera)))
         pairs.append(("theme", .string(s.theme)))
         pairs.append(("menu", .list(menu)))
+        pairs.append(("credentials_store", .string(s.credentialsStore.rawValue)))
         pairs.append(("version", .string(s.version)))
         pairs.append(("build", .string(s.build)))
         return .object(pairs)

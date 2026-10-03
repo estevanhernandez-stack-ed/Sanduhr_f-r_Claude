@@ -1,6 +1,6 @@
 # Privacy Policy — Sanduhr für Claude
 
-**Last updated:** 2026-09-13
+**Last updated:** 2026-10-03
 **Publisher:** 626Labs LLC
 **Contact:** [GitHub Issues](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/issues)
 
@@ -31,6 +31,15 @@ One opt-in exception, off by default: **Publish usage** lets you send a daily pe
 | Publish handoff files (only while the `publish_usage` MCP tool is in use) | `%APPDATA%\Sanduhr\publish-request.json` / `publish-result.json` | Your Windows user account | A request id + date, and the upload's status/message. No usage data, no token. Cleared by the widget after each request; a request expires after 24 hours. |
 | Your theme preference and last window position | `%APPDATA%\Sanduhr\settings.json` | Your Windows user account | Read at startup to restore your setup |
 | Operational logs | `%APPDATA%\Sanduhr\sanduhr.log` (rotating, 1 MB × 3 files) | Your Windows user account | Used for troubleshooting. **Never contains your session keys, account labels, `cf_clearance` values, project paths or names, skill names, or session-log contents** — only presence/absence, HTTP status codes, and stack traces. |
+
+### On the Mac
+
+The table above describes the Windows app. The macOS app stores the same two credentials, `sessionKey` and the optional `cf_clearance`, which are sent only to `claude.ai`:
+
+- **Release builds** (signed with the publisher's Developer ID): the macOS Keychain, as generic-password items under service `com.626labs.sanduhr`, accounts `sessionKey` and `cf_clearance`, readable after first unlock and trusted only to the signed Sanduhr app. An update from 2.3.1 or earlier moves the values out of the old file once, checks the Keychain holds them, then deletes the file; if that fails, the file stays and is used as before.
+- **Self-built development builds**: `~/Library/Application Support/Sanduhr/credentials.json`, plaintext, mode `0600` (only your macOS user account can read it).
+
+Neither is ever written to a log.
 
 ## What Sanduhr does NOT do
 
@@ -64,6 +73,7 @@ Nothing about your usage comes back to us. The short-version promise above ("doe
 - **Clear local storage:** delete `%APPDATA%\Sanduhr\` and `%LOCALAPPDATA%\Sanduhr\`.
 - **Uninstall does not wipe credentials.** Start → Apps & features → Sanduhr für Claude → Uninstall removes the installed app files only. It does **not** delete your Windows Credential Manager entries under `com.626labs.sanduhr`, on either the GitHub (.exe) or Microsoft Store install — sign out first, or delete the entries yourself afterward.
 - **Note for Microsoft Store installs:** uninstalling from Apps & features also does **not** remove `%LOCALAPPDATA%\Sanduhr` (Windows leaves per-user app data behind). If you want the usage vault gone after uninstall, delete that folder manually.
+- **On the Mac:** delete the `com.626labs.sanduhr` items in Keychain Access (release builds) or the folder `~/Library/Application Support/Sanduhr/` (development builds). Moving the app to the Trash removes neither.
 
 ## Third-party services Sanduhr does not use
 
