@@ -29,6 +29,9 @@ steps:
   - do: settings
     arg: notch
   - expect_state: { settings_section: notch }
+  - expect:
+      window: settings
+      contains: { text: Test Glow }
   - do: settings
     arg: widgetLook
   - expect_state: { settings_section: widgetLook }
