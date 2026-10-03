@@ -168,7 +168,7 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: turning on a FaceTime or Teams camera lights it within a second, turning it off ends it; it never takes clicks; it sits above full-screen apps.
   Verify: swift-testing for the camera-state reducer (several devices, flapping); by hand with Photo Booth.
 
-- [ ] **21. The notch glows for Sanduhr's events**
+- [x] **21. The notch glows for Sanduhr's events**
   Spec ref: New — extends the item 17 Desk pulse
   What to build: an outer glow around the notch island (ink colored, a few seconds, gentle) for Sanduhr's own events: an alert (any delivery), a meeting starting in the next minute (once per meeting), the camera light coming on. Each event type has a switch in Settings, Desk, Notch, all off by default. No sound detection (no public API for other apps' sounds; an audio tap needs a recording permission and is out of scope).
   Acceptance: each enabled event glows once; disabled ones do not; the glow never blocks clicks or covers app content beyond the island's edge.
