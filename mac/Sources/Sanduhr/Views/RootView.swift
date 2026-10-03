@@ -170,8 +170,8 @@ struct RootView: View {
             })
         }
         .onAppear {
-            // `exists()` doesn't trigger Touch ID — safe to call on every
-            // view appearance.
+            // `exists()` never prompts (no access control on the Keychain
+            // items) — safe to call on every view appearance.
             if !KeychainStore.exists(account: KeychainAccount.sessionKey) {
                 showOnboarding = true
             }

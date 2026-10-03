@@ -1,7 +1,6 @@
 import Foundation
 import SwiftUI
 import Combine
-import LocalAuthentication
 
 extension Notification.Name {
     /// Posted by `UsageViewModel` whenever `compact` flips. AppDelegate
@@ -154,15 +153,6 @@ final class UsageViewModel {
     private var api: ClaudeAPI?
     private var refreshTimer: Timer?
     private var countdownTimer: Timer?
-    /// One context for all Keychain reads this launch — .userPresence
-    /// ACL respects `touchIDAuthenticationAllowableReuseDuration`, so
-    /// reusing the same context means one Touch ID tap per session.
-    private let authContext: LAContext = {
-        let c = LAContext()
-        c.touchIDAuthenticationAllowableReuseDuration =
-            LATouchIDAuthenticationMaximumAllowableReuseDuration
-        return c
-    }()
 
     /// 5 min between API calls, mirroring sanduhr.py:37.
     private let refreshInterval: TimeInterval = 5 * 60
@@ -192,19 +182,15 @@ final class UsageViewModel {
     }
 
     /// Called once the app has a window + a session key.
-    /// Uses `exists()` first (no Touch ID) to decide whether to even try
-    /// reading — skips an unnecessary prompt on first launch.
+    /// Checks `exists()` first so a first launch goes straight to onboarding.
     func bootstrap() {
         guard KeychainStore.exists(account: KeychainAccount.sessionKey) else {
             status = .connecting     // onboarding sheet will drive the next step
             return
         }
-        // One Touch ID prompt here unlocks both reads thanks to shared context.
-        if let key = KeychainStore.get(account: KeychainAccount.sessionKey,
-                                       context: authContext),
+        if let key = KeychainStore.get(account: KeychainAccount.sessionKey),
            !key.isEmpty {
-            let cf = KeychainStore.get(account: KeychainAccount.cfClearance,
-                                       context: authContext)
+            let cf = KeychainStore.get(account: KeychainAccount.cfClearance)
             api = ClaudeAPI(sessionKey: key, cfClearance: cf)
             Task { await refresh() }
             startTimers()
@@ -213,15 +199,11 @@ final class UsageViewModel {
         }
     }
 
-    /// Called after the user saves new credentials. Reuses the authContext
-    /// so saving + immediate refresh doesn't require another Touch ID tap
-    /// (the 10-second reuse window covers the round trip).
+    /// Called after the user saves new credentials: rebuilds the API client and refreshes.
     func credentialsChanged() {
-        guard let key = KeychainStore.get(account: KeychainAccount.sessionKey,
-                                          context: authContext),
+        guard let key = KeychainStore.get(account: KeychainAccount.sessionKey),
               !key.isEmpty else { return }
-        let cf = KeychainStore.get(account: KeychainAccount.cfClearance,
-                                   context: authContext)
+        let cf = KeychainStore.get(account: KeychainAccount.cfClearance)
         api = ClaudeAPI(sessionKey: key, cfClearance: cf)
         Task { await refresh() }
         startTimers()

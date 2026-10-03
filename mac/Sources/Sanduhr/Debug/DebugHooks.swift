@@ -280,6 +280,7 @@ enum DebugHooks {
         s.glowSwitches = NotchGlowController.shared.switches
         s.theme = vm.theme.id
         s.menu = app.currentMenu(widgetVisible: widgetVisible)
+        s.credentialsStore = KeychainStore.kind
         s.version = info["CFBundleShortVersionString"] as? String ?? ""
         s.build = info["CFBundleVersion"] as? String ?? ""
         return s

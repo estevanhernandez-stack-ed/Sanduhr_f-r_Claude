@@ -9,9 +9,9 @@ struct WidgetSettings: View {
     let section: SettingsSection
 
     // Write-only fields: we never read the existing key back from the
-    // Keychain (skips a Touch ID prompt just to open settings, and avoids
-    // ever displaying the secret on screen). Leave blank to keep the
-    // existing value; any non-empty value replaces it.
+    // credential store (Keychain or file, KeychainStore.swift), so the
+    // secret never shows on screen. Leave blank to keep the existing
+    // value; any non-empty value replaces it in whichever store is active.
     @State private var sessionKey: String = ""
     @State private var cfClearance: String = ""
     @State private var credentialsNote: String?

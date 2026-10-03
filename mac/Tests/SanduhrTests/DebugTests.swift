@@ -247,7 +247,7 @@ struct DebugStateTests {
                          "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "widget_visible", "widget_visibility",
                          "settings_open", "settings_section", "meters", "widget_warnings", "meetings_count", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
-                         "glow_camera", "theme", "menu",
+                         "glow_camera", "theme", "menu", "credentials_store",
                          "version", "build"])
         #expect(yaml.contains("settings_section: notch\n"))
         #expect(yaml.contains("widget_visible: true\nwidget_visibility: whileDeskOff\nsettings_open: true\n"))
@@ -268,6 +268,7 @@ struct DebugStateTests {
         """))
         #expect(yaml.contains("    pace: null\n"))
         #expect(yaml.contains("last_fetch: \"1970-01-01T00:00:00Z\"\n"))
+        #expect(yaml.contains("credentials_store: file\nversion: \"2.1.0\"\n"))
         #expect(yaml.contains("version: \"2.1.0\"\nbuild: \"3\"\n"))
         #expect(yaml.contains("""
           - header: Tools

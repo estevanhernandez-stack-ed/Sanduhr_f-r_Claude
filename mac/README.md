@@ -48,15 +48,24 @@ alias — drag across to install, eject the DMG, done. Uses only `hdiutil` +
 3. Copy the `sessionKey` value.
 4. In Sanduhr, click **Continue** on the onboarding sheet, then paste the key.
 
-The key is currently stored in a permissions-restricted plaintext file at
-`~/Library/Application Support/Sanduhr/credentials.json` (mode `0600`,
-readable only by your user account) — **not** the macOS Keychain, despite
-the type name `KeychainStore` in the code. Now that the app ships
-Developer ID signed and notarized, migrating to the real Keychain is next;
-see that file's doc comment for why it was deferred. Dragging Sanduhr to
-the Trash does not remove this file — delete
-`~/Library/Application Support/Sanduhr/` manually, or sign out in the app
-first (Settings → Credentials → save with an empty key).
+Where the key is stored depends on the build:
+
+- **Release builds** (signed with the Developer ID, as every published release is): the
+  macOS Keychain, as generic-password items under service `com.626labs.sanduhr` (accounts
+  `sessionKey` and `cf_clearance`), readable after first unlock with no Touch ID prompt. The
+  item trusts Sanduhr's signature, so updates read it without asking. Updating from 2.3.1 or
+  earlier moves the key out of the old file once: Sanduhr writes the Keychain, reads it back,
+  and only then deletes the file; if anything fails it keeps the file and carries on with it.
+- **Dev builds** (`./build.sh --debug`, ad-hoc signed): a permissions-restricted plaintext file
+  at `~/Library/Application Support/Sanduhr/credentials.json` (mode `0600`, readable only by
+  your user account). Every ad-hoc rebuild has a new signature, which would make the Keychain
+  ask for your login password each time. `SANDUHR_KEYCHAIN=1` in the environment forces the
+  Keychain on a dev build to test that path; expect that prompt after a rebuild.
+
+`smoke/smoke state` reports which one is in use as `credentials_store`. To remove the key,
+delete the `com.626labs.sanduhr` items in Keychain Access (release builds) or
+`~/Library/Application Support/Sanduhr/` (dev builds). Dragging Sanduhr to the Trash removes
+neither.
 
 ### Cloudflare fallback
 
@@ -66,7 +75,7 @@ Most accounts don't need this.
 
 ## Files
 
-- `sessionKey` + `cf_clearance` → `~/Library/Application Support/Sanduhr/credentials.json` (plaintext, mode `0600` — not Keychain; see First run above)
+- `sessionKey` + `cf_clearance` → the Keychain, service `com.626labs.sanduhr` (release builds), or `~/Library/Application Support/Sanduhr/credentials.json` (mode `0600`, dev builds); see First run above
 - Selected theme → `UserDefaults` (`theme`)
 - Sparkline history → `~/Library/Application Support/Sanduhr/history.json`
 - Window position → `UserDefaults` (`windowFrame`)

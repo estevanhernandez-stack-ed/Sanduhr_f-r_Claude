@@ -76,6 +76,7 @@ state = YAML.safe_load(File.read(File.join(SNAPSHOT, 'state.yaml')))
 eq('windows in the fixture', tree.map { |w| w['window'] }, %w[widget settings sheet sheet-2])
 eq('quoted percent stays a string', tree[0]['tree'][0]['children'][1]['value'], '7%')
 eq('quoted version stays a string', state['version'], '2.1.0')
+eq('credentials store is a name, never a value', state['credentials_store'], 'file')
 
 # --- Match -------------------------------------------------------------------------------------
 
