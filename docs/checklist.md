@@ -174,7 +174,7 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: each enabled event glows once; disabled ones do not; the glow never blocks clicks or covers app content beyond the island's edge.
   Verify: swift-testing for the event-to-glow rules (once per meeting, switches); `smoke do pulse` style action to trigger the glow on demand.
 
-- [ ] **23. When the widget shows**
+- [x] **23. When the widget shows**
   Spec ref: New — Settings, General, Surfaces (`Views/SettingsWindow.swift` General section, `AppDelegate` show/hide, `DeskFirstRun`)
   What to build: a Widget setting with three choices: **Always** (today's behavior; the default for existing users), **While Desk is off** (hidden whenever Desk is on, shown when Desk is off; the default for new installs, replacing the tuck-after-first-fetch flag's one-time hide once sign-in is done), and **Never on its own** (only appears when asked: meter click, Tools, Show Sanduhr). Showing or hiding from a menu still works as a one-off; the choice takes over again when Desk turns on or off and at launch. The existing `panelHidden` key keeps meaning "hidden right now".
   Acceptance: with "While Desk is off", switching Desk off shows the widget and on hides it; "Never on its own" keeps it hidden across launches until asked; an updated install sees no change.
