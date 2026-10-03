@@ -160,6 +160,13 @@ struct MeterWarningTests {
         #expect(MeterWarning.tiers(nil, now: now).isEmpty)
     }
 
+    @Test func voiceOverSaysNearlyFullOnlyOnAWarningRow() {
+        // Same bar, same red: only the warning row says it.
+        #expect(MeterWarning.spokenValue(percent: 92, warning: true) == "92%, nearly full")
+        #expect(MeterWarning.spokenValue(percent: 92, warning: false) == "92%")
+        #expect(MeterWarning.spokenValue(percent: 0, warning: false) == "0%")
+    }
+
     @Test func minResetChoicesInOrder() {
         #expect(MeterWarning.minResetChoices.map(\.seconds)
                 == [900, 1800, hour, 3 * hour, 6 * hour, 12 * hour, day, 2 * day, 3 * day])

@@ -68,6 +68,15 @@ enum MeterWarning {
         return resetsAt.timeIntervalSince(now) > settings.minReset
     }
 
+    /// The SF Symbol a warning row carries beside its percent, in the theme's ink, so a warning
+    /// reads without the red (at the default threshold the red alone matches any bar at 90%+).
+    static let glyph = "exclamationmark.triangle.fill"
+
+    /// What VoiceOver reads for a meter: "92%", or "92%, nearly full" on a warning row.
+    static func spokenValue(percent: Int, warning: Bool) -> String {
+        warning ? "\(percent)%, nearly full" : "\(percent)%"
+    }
+
     /// The choices for "only while the reset is more than", in seconds, with their names.
     static let minResetChoices: [(seconds: TimeInterval, name: String)] = {
         let minute: TimeInterval = 60
