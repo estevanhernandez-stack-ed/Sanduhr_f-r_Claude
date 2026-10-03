@@ -246,3 +246,18 @@ New options keep today's behavior by default; the camera light and the glow star
   What to build: (a) the notch glow traces only what is visible: when an app window covers the strip under the camera (the strip lives in the Desk window, below app windows), the glow follows the wings/notch outline, not the hidden strip; (b) `CameraMonitor` removes its CoreMediaIO property listeners with the same block it added (store the block; the Core Audio block-bridging trap) and logs a failed add/remove `OSStatus` once, without spamming; (c) when the current user theme is deleted outside the app, Sanduhr falls back to the default theme right away (and says so in the log), instead of keeping it until the next launch.
   Acceptance: no glow traced around an invisible strip; listener add and remove statuses are checked and logged on failure; deleting the active theme's file switches to the default theme without a relaunch.
   Verify: swift-testing for the pure parts (glow outline choice from strip visibility, theme fallback decision); a smoke check or state key where useful; the CMIO statuses by hand (Console) on a Mac with a camera.
+
+- [ ] **35. Pick the organization that has the usage**
+  Spec ref: Windows `ClaudeApiParsing.ParseOrganizations` (2026-07-19: a login can carry a claude_max subscription org and an API individual org; `orgs[0]` is ordering luck)
+  What to build: the Mac tracks the first organization `/api/organizations` lists. Port the Windows rule: the first org whose `capabilities` include `claude_max`, else the first with `chat`, else the first.
+  Acceptance: a login whose first org is an API org fetches the subscription org's usage.
+  Verify: swift-testing on the choice and on decoding real-shaped org JSON (capabilities missing, empty, mixed).
+
+- [ ] **36. Accounts (Windows 2.2 parity)**
+  Spec ref: `docs/mac-merge-plan.md` feature inventory (multi-account registry, Accounts tab, active-account label, account-scoped sign-out; per-account history); Windows `AccountStore`, `UsageHistory`, `SnapshotContract.AccountRef`
+  What to build: named accounts (registry and active label in defaults; each account's key in the Keychain under `sessionKey:{label}` / `cf_clearance:{label}`, the file on dev builds); the existing key promotes to "Personal" on first launch; Settings, Accounts to add, rename, remove and switch; the active account's name on the widget and in the menus; Sign Out removes the active account; history per account (`history.{label}.json`, the current file moving to Personal); `account_ref` in `snapshot.json` hashed as on Windows. Only the active account is fetched (decided 2026-10-03).
+  Acceptance: two accounts switch without a relaunch, each with its own history; signing out one leaves the other; an upgrade lands on Personal with nothing lost.
+  Verify: swift-testing on fakes (registry, migration, switch, scoped sign-out, history paths, account_ref matching Windows); smoke state key for the active account (hashed, never the label); by hand with two keys.
+
+- [ ] **37. All-accounts chart and CSV export** (later; decided 2026-10-03)
+  Spec ref: `docs/mac-merge-plan.md` (Per-account history, All-accounts chart toggle, CSV export)
