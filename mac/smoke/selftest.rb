@@ -84,7 +84,7 @@ check('regex needs a value', !Match.value?('/x/', nil))
 
 node, why = Match.in_window(tree, 'settings', { 'role' => 'AXCheckBox', 'label' => 'Extend the camera notch' })
 check('finds the notch switch', node && node['value'] == 0 && why.nil?)
-node, = Match.in_window(tree, 'settings', { 'label' => '/^beside the camera/i', 'enabled' => false })
+node, = Match.in_window(tree, 'settings', { 'label' => '/^text beside the camera/i', 'enabled' => false })
 check('regex label and enabled false', !node.nil?)
 node, = Match.in_window(tree, 'settings', { 'label' => 'Notch', 'value' => 1 })
 check('finds a nested row', !node.nil?)

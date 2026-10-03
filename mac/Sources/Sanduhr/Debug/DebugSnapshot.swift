@@ -11,6 +11,10 @@ struct DebugStateInput {
     var notch = false
     /// This screen has a camera notch and Desk built the island's window for it.
     var hasNotch = false
+    /// What each place on the notch island shows, as saved or its default.
+    var notchLeft = NotchContent.Place.left.fallback
+    var notchRight = NotchContent.Place.right.fallback
+    var notchStrip = NotchContent.Place.strip.fallback
     var widgetVisible = false
     var settingsOpen = false
     var settingsSection: SettingsSection?
@@ -41,6 +45,9 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("layout", s.layout.map(YAMLNode.string) ?? .null))
         pairs.append(("notch", .bool(s.notch)))
         pairs.append(("has_notch", .bool(s.hasNotch)))
+        pairs.append(("notch_left", .string(s.notchLeft.rawValue)))
+        pairs.append(("notch_right", .string(s.notchRight.rawValue)))
+        pairs.append(("notch_strip", .string(s.notchStrip.rawValue)))
         pairs.append(("widget_visible", .bool(s.widgetVisible)))
         pairs.append(("settings_open", .bool(s.settingsOpen)))
         let section: YAMLNode = s.settingsSection.map { .string($0.rawValue) } ?? .null

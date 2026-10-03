@@ -3,8 +3,9 @@ import AppKit
 
 /// The notch, extended. On a Mac with a camera notch, Desk draws pure black that continues the
 /// cutout a little wider and a little lower, with soft rounded corners, so it reads as one
-/// bigger island. Inside the extra strip under the hardware notch it prints one short line:
-/// the next meeting when one starts within the hour, otherwise the Claude meters.
+/// bigger island. Inside the extra strip under the hardware notch it prints one short line,
+/// by default the next meeting when one starts within the hour, otherwise the Claude meters
+/// (Settings, Desk, Notch picks another; see `NotchContent`).
 /// Nothing in the menu bar lives there (the menu bar never draws behind the notch, and Ice's
 /// split bar leaves the middle clear), so it is free space.
 ///
@@ -22,6 +23,9 @@ struct NotchView: View {
     @AppStorage("notchChinText", store: .desk) private var showChinText = false
     @AppStorage("notchTextColor", store: .desk) private var textColor = "ffffff"
     @AppStorage("notchText", store: .desk) private var wingText = true
+    @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
+    @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
+    @AppStorage(NotchContent.Place.strip.key, store: .desk) private var stripContent = NotchContent.Place.strip.fallback
 
     var body: some View {
         // Extra height 0 means no strip under the camera at all: just the wings.
@@ -31,11 +35,14 @@ struct NotchView: View {
                 // Same widths as the wings above, so the strip and the wings stay one shape
                 // even when a wing grows to fit its text.
                 let w = NotchWingsView.layout(model: model, now: context.date, wings: wings,
-                                              showText: wingText, font: font, notchHeight: notch.height)
+                                              showText: wingText, left: leftContent, right: rightContent,
+                                              font: font, notchHeight: notch.height)
                 ZStack(alignment: .bottom) {
                     IslandShape(flare: 8, radius: min(16, chin * 0.7))
                         .fill(Color.black)
-                    if showChinText, let line = line(now: context.date) {
+                    if showChinText, let line = stripContent.text(
+                        at: .strip, meetings: model.meetings, meters: model.claudeCompact,
+                        message: model.message, now: context.date) {
                         Text(line)
                             .font(.custom(font, size: max(11, chin * 0.55)))
                             .lineLimit(1)
@@ -53,17 +60,6 @@ struct NotchView: View {
             .position(x: notch.midX, y: height / 2)
             .allowsHitTesting(false)
         }
-    }
-
-    /// Next meeting within the hour beats the Claude line; with neither, the island stays empty.
-    private func line(now: Date) -> String? {
-        if let next = model.meetings.first(where: { $0.end > now }) {
-            let mins = Int(next.start.timeIntervalSince(now) / 60)
-            if next.start <= now { return "now  \(next.title)" }
-            if mins < 60 { return "\(next.title) in \(max(1, mins))m" }
-        }
-        if let compact = model.claudeCompact { return compact }
-        return nil
     }
 }
 
@@ -93,7 +89,8 @@ struct IslandShape: Shape {
 /// above the menu bar instead, where it always shows, like the notch itself. It is only
 /// menu-bar tall, so it never covers an app's content.
 ///
-/// Text rides in the wings, since they are visible over every app:
+/// Text rides in the wings, since they are visible over every app. By default (Settings, Desk,
+/// Notch picks each wing's content; see `NotchContent`):
 ///   left wing   the next meeting when one starts within the hour ("standup 12m", "now standup"),
 ///               otherwise the time (so the macOS clock can go analog or hide)
 ///   right wing  the Claude meters ("5h 7%  wk 63%") while Sanduhr's numbers are fresh
@@ -110,12 +107,15 @@ struct NotchWingsView: View {
     @AppStorage("notchText", store: .desk) private var showText = true
     @AppStorage("notchTextColor", store: .desk) private var textColor = "ffffff"
     @AppStorage("font", store: .desk) private var font = ""
+    @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
+    @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
 
     var body: some View {
         if enabled {
             TimelineView(.periodic(from: .now, by: 15)) { context in
-                let w = Self.layout(model: model, now: context.date, wings: wings,
-                                    showText: showText, font: font, notchHeight: notchHeight)
+                let w = Self.layout(model: model, now: context.date, wings: wings, showText: showText,
+                                    left: leftContent, right: rightContent,
+                                    font: font, notchHeight: notchHeight)
                 let left = w.leftText, right = w.rightText, size = w.size
                 let wingL = w.left, wingR = w.right
                 if wingL > 0 || wingR > 0 {
@@ -159,25 +159,20 @@ struct NotchWingsView: View {
     struct Layout { let left: CGFloat; let right: CGFloat; let leftText: String?; let rightText: String?; let size: CGFloat }
 
     static func layout(model: DeskModel, now: Date, wings: Double, showText: Bool,
+                       left leftContent: NotchContent, right rightContent: NotchContent,
                        font: String, notchHeight: CGFloat) -> Layout {
-        let left = showText ? leftText(model: model, now: now) : nil
-        let right = showText ? model.claudeCompact : nil
+        let left = showText ? text(leftContent, at: .left, model: model, now: now) : nil
+        let right = showText ? text(rightContent, at: .right, model: model, now: now) : nil
         let size = max(10, notchHeight * 0.42)
         return Layout(left: min(maxWings, max(wings, width(left, size, font) + 22)),
                       right: min(maxWings, max(wings, width(right, size, font) + 22)),
                       leftText: left, rightText: right, size: size)
     }
 
-    private static func leftText(model: DeskModel, now: Date) -> String {
-        if let next = model.meetings.first(where: { $0.end > now }) {
-            let title = next.title.count > 18 ? String(next.title.prefix(17)) + "…" : next.title
-            if next.start <= now { return "now \(title)" }
-            let mins = Int(next.start.timeIntervalSince(now) / 60)
-            if mins < 60 { return "\(title) \(max(1, mins))m" }
-        }
-        let f = DateFormatter()
-        f.dateFormat = "h:mm"
-        return f.string(from: now)
+    private static func text(_ content: NotchContent, at place: NotchContent.Place,
+                             model: DeskModel, now: Date) -> String? {
+        content.text(at: place, meetings: model.meetings, meters: model.claudeCompact,
+                     message: model.message, now: now)
     }
 
     private static func width(_ text: String?, _ size: CGFloat, _ font: String) -> CGFloat {

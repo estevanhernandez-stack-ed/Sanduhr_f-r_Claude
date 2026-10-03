@@ -219,17 +219,20 @@ struct DebugStateTests {
         s.activeTool = "snake"
         s.pulseCount = 3
         s.theme = "aurora"
+        s.notchRight = .message
         s.menu = SanduhrMenu.groups(widgetVisible: true, deepWork: false, pacing: true, snake: false)
         s.version = "2.1.0"
         s.build = "3"
         let yaml = YAMLEmitter.emit(DebugState.yaml(s))
         let keys = yaml.split(separator: "\n").filter { !$0.hasPrefix(" ") && !$0.hasPrefix("-") }
             .map { String($0.split(separator: ":")[0]) }
-        #expect(keys == ["desk_enabled", "desk_running", "layout", "notch", "has_notch", "widget_visible",
+        #expect(keys == ["desk_enabled", "desk_running", "layout", "notch", "has_notch",
+                         "notch_left", "notch_right", "notch_strip", "widget_visible",
                          "settings_open", "settings_section", "meters", "meetings_count", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "theme", "menu",
                          "version", "build"])
         #expect(yaml.contains("settings_section: notch\n"))
+        #expect(yaml.contains("notch_left: meetingOrTime\nnotch_right: message\nnotch_strip: meetingOrMeters\n"))
         #expect(yaml.contains("pulse_count: 3\ntheme: aurora\nmenu:\n"))
         #expect(yaml.contains("layout: message:tl") == false)   // the colons force quotes
         #expect(yaml.contains("layout: \"message:tl clock:bl meters:bl meetings:bl\"\n"))

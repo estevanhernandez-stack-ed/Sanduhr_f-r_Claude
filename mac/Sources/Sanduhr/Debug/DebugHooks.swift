@@ -241,6 +241,9 @@ enum DebugHooks {
         s.layout = UserDefaults.desk.string(forKey: "layout")
         s.notch = UserDefaults.desk.bool(forKey: DeskController.notchKey)
         s.hasNotch = desk.wingsWindow != nil
+        s.notchLeft = NotchContent.saved(.left, in: .desk)
+        s.notchRight = NotchContent.saved(.right, in: .desk)
+        s.notchStrip = NotchContent.saved(.strip, in: .desk)
         s.widgetVisible = widgetVisible
         s.settingsOpen = settings.isOpen
         s.settingsSection = settings.window == nil ? nil : settings.section

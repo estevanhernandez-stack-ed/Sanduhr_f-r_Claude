@@ -3,6 +3,9 @@ desk_running: true
 layout: "message:tl clock:bl meters:bl meetings:bl"
 notch: false
 has_notch: true
+notch_left: meetingOrTime
+notch_right: meters
+notch_strip: meetingOrMeters
 widget_visible: true
 settings_open: true
 settings_section: notch

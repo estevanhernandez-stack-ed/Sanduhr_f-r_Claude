@@ -225,6 +225,9 @@ struct DeskNotchSection: View {
     @AppStorage("notchChin", store: .desk) private var chin = 26.0
     @AppStorage("notchText", store: .desk) private var wingText = true
     @AppStorage("notchChinText", store: .desk) private var chinText = false
+    @AppStorage(NotchContent.Place.left.key, store: .desk) private var left = NotchContent.Place.left.fallback
+    @AppStorage(NotchContent.Place.right.key, store: .desk) private var right = NotchContent.Place.right.fallback
+    @AppStorage(NotchContent.Place.strip.key, store: .desk) private var strip = NotchContent.Place.strip.fallback
 
     var body: some View {
         Form {
@@ -234,9 +237,14 @@ struct DeskNotchSection: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Text") {
-                Toggle("Beside the camera: next meeting or the time, and the Claude meters", isOn: $wingText)
-                Toggle("Under the camera too (desktop only)", isOn: $chinText)
+                Toggle("Text beside the camera", isOn: $wingText)
+                contentPicker("Left wing", $left).disabled(!wingText)
+                contentPicker("Right wing", $right).disabled(!wingText)
+                Toggle("Text under the camera too (desktop only)", isOn: $chinText)
                     .disabled(chin == 0)
+                contentPicker("Under the camera", $strip).disabled(!chinText || chin == 0)
+                Text("Nothing leaves that part plain black. A wing grows to fit its text.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             .disabled(!enabled)
             Section("Size") {
@@ -246,6 +254,12 @@ struct DeskNotchSection: View {
             .disabled(!enabled)
         }
         .formStyle(.grouped)
+    }
+
+    private func contentPicker(_ title: String, _ selection: Binding<NotchContent>) -> some View {
+        Picker(title, selection: selection) {
+            ForEach(NotchContent.allCases) { Text($0.label).tag($0) }
+        }
     }
 }
 

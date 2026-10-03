@@ -2,6 +2,7 @@
 
 ## Unreleased (mac)
 
+- **You choose what the notch shows.** Settings, Desk, Notch has a picker for the left wing, the right wing and the strip under the camera: the next meeting (or the time, or the Claude meters, when none is due within the hour), the time, the Claude meters, today's message, or nothing for a plain black wing. A wing still grows to fit its text. Until you pick, the notch shows exactly what it did before.
 - **Themes you can see.** Settings, Widget, Themes opens on a gallery of every theme, built-in and your own, each a small preview of its background, card, bars and accent with its name. The one in use is marked; click another and the widget changes at once, and its Theme menu agrees. Pasting JSON, the agent prompt, the themes folder, Reload and Delete sit below the gallery.
 - **Calendar access explains itself.** Click the Desk calendar note to open System Settings at Privacy & Security, Calendars. "Add Events Only" gets its own line saying Full Access is needed, and a grant made in System Settings shows within a minute, meetings and all, with no relaunch.
 

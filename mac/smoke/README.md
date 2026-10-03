@@ -56,6 +56,8 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   Switch on/off values are therefore not in the text nodes: check them in `state.yaml`. The
   `text` match field checks a node's label and value.
 - **state.yaml**: `desk_enabled`, `desk_running`, `layout`, `notch`, `has_notch`,
+  `notch_left`, `notch_right`, `notch_strip` (what each place on the island shows, a
+  `NotchContent` raw value such as `meetingOrTime`, `meters` or `nothing`; the default when unset),
   `widget_visible`, `settings_open`, `settings_section`, `meters` (tier, label, percent, fill,
   pace, reset), `meetings_count`, `alerts`, `last_fetch`, `active_tool`, `pacing_pinned`,
   `pulse_count`, `theme` (the widget theme's id), `menu` (groups with item titles and checkmarks), `version`, `build`.
