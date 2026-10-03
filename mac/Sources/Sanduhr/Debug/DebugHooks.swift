@@ -113,6 +113,7 @@ enum DebugHooks {
             UserDefaults.desk.set(on, forKey: DeskController.notchKey)
         case .cameraLight(let on): CameraLightController.shared.setManual(on)
         case .glow: NotchGlowController.shared.fire()
+        case .demo(let on): DeskController.shared.model.setDemo(on)
         case .theme(let id): app.viewModel.selectTheme(id: id)
         }
         settle()

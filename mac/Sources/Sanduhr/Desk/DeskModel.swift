@@ -110,7 +110,7 @@ final class DeskModel {
         message = MessageEngine.current()
         claudeTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             self?.refreshClaude()
-            self?.message = MessageEngine.current()   // picks up messages.txt edits within a minute
+            if self?.demo != true { self?.message = MessageEngine.current() }   // picks up messages.txt edits within a minute
             // A grant made in System Settings shows within a minute, no relaunch.
             if self?.calendarStatus != .fullAccess { self?.recheckCalendar() }
         }
@@ -187,7 +187,44 @@ final class DeskModel {
         storeObserver = nil
     }
 
+    /// Demo data for screenshots (`smoke do demo on`): while on, the calendar refresh and the
+    /// message timer leave these alone. Nothing is written to the calendar or to defaults.
+    @ObservationIgnored private(set) var demo = false
+
+    func setDemo(_ on: Bool, now: Date = Date()) {
+        demo = on
+        if on {
+            meetings = Self.demoMeetings(now: now)
+            message = "ship small. ship often. sleep anyway."
+            calendarNote = nil
+        } else {
+            meetings = []
+            refreshEvents()
+            message = MessageEngine.current()
+        }
+    }
+
+    /// Three made-up meetings: one in 12 minutes (so the notch counts it down), two later today.
+    static func demoMeetings(now: Date) -> [Meeting] {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "h:mm"
+        let minute: TimeInterval = 60
+        let plan: [(id: String, title: String, inMinutes: Double, length: Double, link: String?)] = [
+            ("demo-1", "Design review", 12, 30, "https://zoom.us/j/1234567890"),
+            ("demo-2", "Pairing: notch glow", 75, 45, "https://meet.google.com/abc-defg-hij"),
+            ("demo-3", "Ship 2.3", 180, 30, nil),
+        ]
+        return plan.map { p in
+            let start = now.addingTimeInterval(p.inMinutes * minute)
+            let link = p.link.flatMap(URL.init(string:))
+            return Meeting(id: p.id, time: fmt.string(from: start), title: p.title, start: start,
+                           end: start.addingTimeInterval(p.length * minute), link: link,
+                           service: link.flatMap(serviceName))
+        }
+    }
+
     func refreshEvents() {
+        guard !demo else { return }
         guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return }
         let now = Date()
         let endOfDay = Calendar.current.startOfDay(for: now).addingTimeInterval(24 * 60 * 60)
