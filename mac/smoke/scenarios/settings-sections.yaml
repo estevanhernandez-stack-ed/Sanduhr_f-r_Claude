@@ -38,3 +38,16 @@ steps:
       window: settings
       contains: { text: Pacing & Focus }
   - snap: last-section
+  - do: settings
+    arg: updates
+  - expect_state: { settings_section: updates }
+  - expect:
+      window: settings
+      contains: { text: Check Now }
+  - do: settings
+    arg: about
+  - expect_state: { settings_section: about }
+  - expect:
+      window: settings
+      contains: { text: Not affiliated with Anthropic }
+  - snap: about

@@ -64,6 +64,8 @@ struct SettingsSidebarTests {
     @Test func everySectionOnceInOrder() {
         let listed = SettingsSection.groups.flatMap(\.sections)
         #expect(listed == SettingsSection.allCases)
-        #expect(SettingsSection.groups.map(\.header) == [nil, "Desk", "Widget"])
+        #expect(SettingsSection.groups.map(\.header) == [nil, "Desk", "Widget", "Sanduhr"])
+        #expect(SettingsSection.groups.last?.sections == [.updates, .about])
+        #expect(SettingsSection.allCases.suffix(2).map(\.title) == ["Updates", "About"])
     }
 }

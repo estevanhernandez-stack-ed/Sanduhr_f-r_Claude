@@ -46,6 +46,8 @@ struct DebugLinkTests {
         #expect(parse("sanduhr://debug/action?name=hide-widget&dir=/tmp/d").command == .action(.hideWidget, dir: "/tmp/d"))
         #expect(parse("sanduhr://debug/action?name=settings&arg=notch").command == .action(.settings(.notch), dir: nil))
         #expect(parse("sanduhr://debug/action?name=settings&arg=desk-layout").command == .action(.settings(.deskLayout), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=settings&arg=updates").command == .action(.settings(.updates), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=settings&arg=about").command == .action(.settings(.about), dir: nil))
         #expect(parse("sanduhr://debug/action?name=settings").command == .action(.settings(nil), dir: nil))
         #expect(parse("sanduhr://debug/action?name=close-settings").command == .action(.closeSettings, dir: nil))
         #expect(parse("sanduhr://debug/action?name=refresh").command == .action(.refresh, dir: nil))

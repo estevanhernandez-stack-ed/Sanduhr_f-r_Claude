@@ -6,6 +6,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case general, alerts, credentials
     case deskLayout, deskLook, deskMeters, message, notch
     case widgetLook, themes, pacing
+    case updates, about
 
     var id: String { rawValue }
 
@@ -22,6 +23,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .widgetLook: "Look"
         case .themes: "Themes"
         case .pacing: "Pacing & Focus"
+        case .updates: "Updates"
+        case .about: "About"
         }
     }
 
@@ -38,6 +41,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .widgetLook: "textformat"
         case .themes: "paintpalette"
         case .pacing: "speedometer"
+        case .updates: "arrow.triangle.2.circlepath"
+        case .about: "info.circle"
         }
     }
 
@@ -46,6 +51,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         (nil, [.general, .alerts, .credentials]),
         ("Desk", [.deskLayout, .deskLook, .deskMeters, .message, .notch]),
         ("Widget", [.widgetLook, .themes, .pacing]),
+        ("Sanduhr", [.updates, .about]),
     ]
 }
 
@@ -79,7 +85,8 @@ final class SettingsWindowController {
             w.isReleasedWhenClosed = false
             w.minSize = NSSize(width: 640, height: 480)
             w.contentView = NSHostingView(rootView: SettingsRoot(
-                vm: app.viewModel, deskModel: DeskController.shared.model, navigation: navigation))
+                vm: app.viewModel, deskModel: DeskController.shared.model, updates: app.updates,
+                navigation: navigation))
             w.center()
             window = w
         }
@@ -98,6 +105,7 @@ final class SettingsNavigation {
 struct SettingsRoot: View {
     @Bindable var vm: UsageViewModel
     var deskModel: DeskModel
+    var updates: UpdaterSettings
     @Bindable var navigation: SettingsNavigation
 
     var body: some View {
@@ -140,6 +148,8 @@ struct SettingsRoot: View {
         case .deskMeters: DeskMetersSection(model: deskModel)
         case .message: DeskMessageSection(model: deskModel).padding(20)
         case .notch: DeskNotchSection()
+        case .updates: UpdatesSection(updates: updates)
+        case .about: AboutSection()
         case .widgetLook, .themes, .pacing, .alerts, .credentials:
             // A fresh view per section, so a section's unsaved fields start empty.
             WidgetSettings(vm: vm, section: navigation.selection).id(navigation.selection)
