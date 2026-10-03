@@ -98,16 +98,19 @@ struct CameraLightLayoutTests {
         let f = CameraLightLayout.frame(screen: screen, notch: notch, barHeight: 37, size: 60)
         let feather = CameraLightLayout.feather
         #expect(f.midX == notch.midX)
-        #expect(f.maxY == screen.maxY)
+        let overhang = CameraLightLayout.overhang
+        #expect(f.maxY == screen.maxY + overhang)   // the blur fades out above the screen
+        #expect(f.minY == screen.maxY - s.height - feather)
         #expect(f.width == s.width + feather * 2)
-        #expect(f.height == s.height + feather)
+        #expect(f.height == s.height + feather + overhang)
+        #expect(overhang >= feather / 2 * 3)   // covers the blur's reach
     }
 
     @Test func topCenterWithoutANotch() {
         let external = CGRect(x: 1512, y: -200, width: 2560, height: 1440)
         let f = CameraLightLayout.frame(screen: external, notch: nil, barHeight: 25, size: 40)
         #expect(f.midX == external.midX)
-        #expect(f.maxY == external.maxY)
+        #expect(f.maxY == external.maxY + CameraLightLayout.overhang)
         let s = CameraLightLayout.shape(notch: nil, barHeight: 25, size: 40)
         #expect(s.width == 280)
         #expect(s.height == 65)
@@ -117,6 +120,19 @@ struct CameraLightLayoutTests {
         let right = CGRect(x: 1920, y: 0, width: 1512, height: 982)
         let f = CameraLightLayout.frame(screen: right, notch: notch, barHeight: 37, size: 60)
         #expect(f.midX == 1920 + notch.midX)
+    }
+
+    @Test func lightShapeIsOneOutlineFromAboveTheEdge() {
+        // 36 pt above the edge, 14 pt flares, 100 x 80 light: a 128 x 116 rect.
+        let r = CGRect(x: 0, y: 0, width: 128, height: 116)
+        let path = CameraLightShape(overhang: 36, flare: 14, radius: 20).path(in: r)
+        #expect(path.boundingRect == r)
+        #expect(path.contains(CGPoint(x: 64, y: 1)))        // the off-screen band, full width
+        #expect(path.contains(CGPoint(x: 2, y: 30)))
+        #expect(path.contains(CGPoint(x: 64, y: 36)))       // the screen edge, no seam
+        #expect(path.contains(CGPoint(x: 64, y: 110)))      // the body
+        #expect(!path.contains(CGPoint(x: 2, y: 60)))       // beside the light, under the flare
+        #expect(!path.contains(CGPoint(x: 15, y: 115)))     // outside the rounded bottom corner
     }
 
     @Test func sizeIsClampedAndSidesKeepAMinimum() {

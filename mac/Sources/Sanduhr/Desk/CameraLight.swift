@@ -8,6 +8,12 @@ import SwiftUI
 enum CameraLightLayout {
     /// How far the soft edge reaches past the light's shape; the window is this much larger.
     static let feather: CGFloat = 22
+    /// How far the light's top corners flare out along the screen edge, like the notch island.
+    static let flare: CGFloat = 14
+    /// How far the window reaches above the screen edge. A blur still dims about three times its
+    /// radius (feather / 2) in from a window edge, so the overhang covers that and the light meets
+    /// the screen edge at full strength.
+    static let overhang: CGFloat = 36
     /// The light's core width on a screen without a notch.
     static let noNotchWidth: CGFloat = 200
     static let sizeRange: ClosedRange<Double> = 20...200
@@ -35,8 +41,10 @@ enum CameraLightLayout {
         let s = shape(notch: notch, barHeight: barHeight, size: size)
         let centerX = notch.map { screen.minX + $0.midX } ?? screen.midX
         let width = s.width + feather * 2
-        let height = s.height + feather
-        return CGRect(x: centerX - width / 2, y: screen.maxY - height, width: width, height: height)
+        // Reaches `overhang` above the screen's top edge: the blur fades out there, off screen, so
+        // the light meets the edge at full strength.
+        let height = s.height + feather + overhang
+        return CGRect(x: centerX - width / 2, y: screen.maxY - s.height - feather, width: width, height: height)
     }
 
     /// The light shows while switched on by hand, or while the setting is on and a camera runs.
@@ -47,6 +55,35 @@ enum CameraLightLayout {
 
 /// The light itself: a white shape with rounded lower corners, blurred at its edge. Its top runs
 /// past the window's top so the blur only softens the sides and the bottom.
+/// The light as one outline: a band `overhang` tall above the screen edge (off screen), then the
+/// notch island's silhouette below it, its top corners flaring `flare` out along the edge and its
+/// bottom corners rounded by `radius`. Drawn in a rect `flare` wider than the light on each side.
+struct CameraLightShape: Shape {
+    let overhang: CGFloat
+    let flare: CGFloat
+    let radius: CGFloat
+
+    func path(in r: CGRect) -> Path {
+        let edge = r.minY + overhang                  // the screen's top edge
+        let left = r.minX + flare, right = r.maxX - flare
+        let bottom = r.maxY
+        let round = min(radius, (right - left) / 2, max(0, bottom - edge - flare))
+        var p = Path()
+        p.move(to: CGPoint(x: r.minX, y: r.minY))
+        p.addLine(to: CGPoint(x: r.maxX, y: r.minY))
+        p.addLine(to: CGPoint(x: r.maxX, y: edge))
+        p.addQuadCurve(to: CGPoint(x: right, y: edge + flare), control: CGPoint(x: right, y: edge))
+        p.addLine(to: CGPoint(x: right, y: bottom - round))
+        p.addQuadCurve(to: CGPoint(x: right - round, y: bottom), control: CGPoint(x: right, y: bottom))
+        p.addLine(to: CGPoint(x: left + round, y: bottom))
+        p.addQuadCurve(to: CGPoint(x: left, y: bottom - round), control: CGPoint(x: left, y: bottom))
+        p.addLine(to: CGPoint(x: left, y: edge + flare))
+        p.addQuadCurve(to: CGPoint(x: r.minX, y: edge), control: CGPoint(x: left, y: edge))
+        p.closeSubpath()
+        return p
+    }
+}
+
 struct CameraLightView: View {
     @AppStorage(CameraLightController.brightnessKey, store: .desk) private var brightness = CameraLightController.defaultBrightness
     let shape: CameraLightLayout.Shape
@@ -55,10 +92,15 @@ struct CameraLightView: View {
         let feather = CameraLightLayout.feather
         let level = min(max(brightness, CameraLightLayout.brightnessRange.lowerBound), CameraLightLayout.brightnessRange.upperBound)
         GeometryReader { geo in
-            UnevenRoundedRectangle(bottomLeadingRadius: shape.radius, bottomTrailingRadius: shape.radius)
+            // One path from the off-screen band above the edge down to the rounded bottom: the blur
+            // fades out above the screen, the top corners flare into the edge like the notch, and
+            // there is no seam where two shapes would meet.
+            CameraLightShape(overhang: CameraLightLayout.overhang, flare: CameraLightLayout.flare,
+                             radius: shape.radius)
                 .fill(Color.white)
-                .frame(width: shape.width, height: shape.height + feather)
-                .position(x: geo.size.width / 2, y: (shape.height + feather) / 2 - feather)
+                .frame(width: shape.width + CameraLightLayout.flare * 2,
+                       height: CameraLightLayout.overhang + shape.height)
+                .position(x: geo.size.width / 2, y: (CameraLightLayout.overhang + shape.height) / 2)
                 .blur(radius: feather / 2)
                 .opacity(level)
         }

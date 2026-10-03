@@ -148,12 +148,13 @@ struct NotchGlowRulesTests {
 @Suite("Notch glow layout")
 struct NotchGlowLayoutTests {
     @Test func noGlowAlongTheTop() {
-        // 39 pt menu bar, no strip: window 39 + 32 tall. Clear down to about half the bar, full by
-        // its bottom, so the light only shows on the sides and below.
+        // 39 pt menu bar, no strip: window 39 + 32 tall. Clear for the top 2 pt, full by 6 pt, so the
+        // sides glow nearly the wings' full height.
         let fade = NotchGlowLayout.topFade(barHeight: 39, islandHeight: 39)
         #expect(fade.start > 0)
-        #expect(abs(fade.start - 39 * 0.45 / 71) < 0.0001)
-        #expect(abs(fade.end - 39.0 / 71) < 0.0001)
+        #expect(abs(fade.start - 2.0 / 71) < 0.0001)
+        #expect(abs(fade.end - 6.0 / 71) < 0.0001)
+        #expect(fade.end * 71 < 39 * 0.25)
         #expect(fade.end > fade.start)
         let degenerate = NotchGlowLayout.topFade(barHeight: 0, islandHeight: 0)
         #expect(degenerate.start <= degenerate.end)

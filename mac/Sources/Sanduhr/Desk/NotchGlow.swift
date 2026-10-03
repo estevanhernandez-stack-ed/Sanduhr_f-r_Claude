@@ -122,16 +122,19 @@ enum NotchGlowLayout {
     }
 
     /// The island's corner radius, as the strip or the wings draw it.
-    /// Where the glow fades in, as fractions of the glow window's height from the top: clear
-    /// until `start`, full from `end`. The top of the island meets the screen edge and the camera
-    /// housing, where no light can show, so a glow there reads as broken; it stays clear across
-    /// the upper part of the menu bar and comes in by its bottom edge, leaving a U around the
-    /// island's sides and bottom.
+    /// The top band the glow leaves clear, in points: the screen edge and the camera housing
+    /// show no light, so a glow running into them reads as broken.
+    static let topClear: CGFloat = 2
+    static let topRamp: CGFloat = 6
+
+    /// Where the glow fades in, as fractions of the glow window's height from the top: clear until
+    /// `start`, full from `end`. Only the last few points at the screen edge, so the sides glow
+    /// the wings' full height.
     static func topFade(barHeight: CGFloat, islandHeight: CGFloat) -> (start: CGFloat, end: CGFloat) {
         let total = islandHeight + reach * 2
         guard total > 0 else { return (0, 0) }
-        let start = min(1, barHeight * 0.45 / total)
-        let end = min(1, max(start, barHeight / total))
+        let start = min(1, topClear / total)
+        let end = min(1, max(start, topRamp / total))
         return (start, end)
     }
 
@@ -165,7 +168,8 @@ struct NotchGlowView: View {
         let radius = NotchGlowLayout.radius(barHeight: barHeight, chin: chin)
         let reach = NotchGlowLayout.reach
         ZStack(alignment: .top) {
-            IslandShape(flare: 8, radius: radius + 4)
+            // No top flares: blurred, they bled along the screen edge and broke up beside the camera.
+            IslandShape(flare: 0, radius: radius + 4)
                 .fill(LinearGradient.ink(textColor))
                 .frame(width: width + 8, height: height + 4)
                 .blur(radius: reach * 0.55)
