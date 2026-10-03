@@ -12,6 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private let updaterController = SPUStandardUpdaterController(
         startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    /// Sparkle's settings and Check Now for Settings, Updates; the same updater the menus use.
+    private(set) lazy var updates = UpdaterSettings(controller: updaterController)
     /// Keeps Sanduhr out of App Nap. Its windows sit on the desktop layer, under every app window,
     /// so macOS counts them as hidden and naps the app: the five-minute refresh timer then stops
     /// firing, and after fifteen minutes Desk drops the meters as stale. A fetch every five
