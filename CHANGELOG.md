@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+## v2.3.1-mac — 2026-10-03
+
 - **Updates and About in Settings.** A new Sanduhr group at the bottom of the Settings sidebar. Updates shows the installed version and build, when Sparkle last checked (or Never), a Check Now button, and switches for checking automatically and for downloading and installing automatically. They are Sparkle's own settings, so Check for Updates… in the menus agrees with them, and a link opens this version's release notes. About shows the app icon, version and build, links to the website, GitHub, the release notes, the privacy policy and the license, credits Sparkle, and carries the copyright and the independence line: Sanduhr is an independent third-party tool, not affiliated with Anthropic.
 
 ## v2.3.0-mac — 2026-10-02
