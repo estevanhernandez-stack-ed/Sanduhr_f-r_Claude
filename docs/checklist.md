@@ -138,3 +138,38 @@ Cooldown Snake, themes, history once M7 lands). Mac sources only; build and test
   What to build: move the alert decisions into a pure rules type and add: a **pace warning** when `burnProjection` says a limit will hit 100% before it resets (once per window, with the projected time and the reset time in the text); **where alerts show**: banner, a pulse on the Desk meters and notch island, or both; **quiet hours** (start and end, may cross midnight; banners held back, Desk pulses still shown); a **sound** picker (system sounds or silent); and a **weekly reset** alert beside the session one. Existing thresholds keep working.
   Acceptance: fixture usage on pace to run out fires one pace warning naming both times; during quiet hours no banner is posted; Desk-only delivery pulses the meters and posts nothing; each alert still fires once per reset window.
   Verify: swift-testing for the rules (pace, quiet hours across midnight, once-per-window, session and weekly reset detection); one real banner and one Desk pulse checked by hand.
+
+## Iteration 3 (Mac): the notch does more, themes you can see
+
+From /iterate, 2026-10-02, after 2.2.1. Same build rules as Iterations 1 and 2. Ships as 2.3.0.
+New options keep today's behavior by default; the camera light and the glow start off.
+
+- [ ] **22. Calendar access that explains itself**
+  Spec ref: New — follows a 2.2.1 report (Calendar allowed in System Settings, Desk still showed "Allow Sanduhr…")
+  What to build: the Desk calendar note becomes clickable and opens System Settings at Privacy & Security, Calendars. Distinguish the states: not asked yet (ask), denied (the existing line), "Add Events Only" (its own line saying Full Access is needed). Recheck authorization when Sanduhr becomes active, when Settings opens, and on each Desk minute tick while not fully authorized, so a grant made in System Settings shows up within a minute without a relaunch (use a fresh `EKEventStore` if the old one keeps the stale answer).
+  Acceptance: granting Full Access in System Settings clears the note within a minute and loads meetings with no relaunch; Add Only shows the Full Access line; clicking the note opens the right System Settings page.
+  Verify: swift-testing for the status-to-message mapping; on screen by toggling the permission.
+
+- [ ] **18. Themes you can see**
+  Spec ref: New — Settings, Widget, Themes (`Views/WidgetSettings.swift`, `Models/Theme.swift`, `Services/UserThemes.swift`)
+  What to build: the Themes page opens on a gallery of every theme, built-in and user, each a small preview (background, card, bar colors, accent) with its name; the current one marked; one click applies it live. The existing custom-theme tools (paste JSON, agent prompt, folder, reload, delete) stay below the gallery.
+  Acceptance: every built-in and installed user theme appears with a recognizable preview; clicking applies it to the widget at once; the widget's own Theme menu and the gallery agree.
+  Verify: swift-testing for the gallery's theme list (built-ins plus user themes, current flag); smoke scenario opening Settings at Themes and finding theme names.
+
+- [ ] **19. You choose what the notch shows**
+  Spec ref: New — `Desk/NotchView.swift` (`NotchWingsView.layout`, `leftText`, `NotchView.line`)
+  What to build: Settings, Desk, Notch gets a picker for the left wing, the right wing and the strip under the camera, each one of: next meeting (or the time when none is due), time, Claude meters, message, nothing. Defaults reproduce today exactly (left: meeting or time; right: meters; strip: meeting or meters). Wing width still grows to fit its text.
+  Acceptance: each choice shows on the right wing within a refresh; "nothing" leaves a plain black wing; an update changes nothing for anyone until they pick.
+  Verify: swift-testing for the pure text-per-slot function across choices, times and stale meters; smoke scenario for `state.yaml` notch slots.
+
+- [ ] **20. The notch as a camera light**
+  Spec ref: New
+  What to build: while any app uses the camera (CoreMediaIO `kCMIODevicePropertyDeviceIsRunningSomewhere` on video devices, observed with a property listener; no permission), the notch area glows as a soft white light to light the user's face: a click-through window above every app around the notch (wings plus a band below, rounded, feathered edge), with brightness and size sliders in Settings, Desk, Notch, off by default. Ends when the camera stops. Works with the notch island on or off; on a screen without a notch, the light sits at the top center of the main screen. A Tools menu item turns it on by hand for a test.
+  Acceptance: turning on a FaceTime or Teams camera lights it within a second, turning it off ends it; it never takes clicks; it sits above full-screen apps.
+  Verify: swift-testing for the camera-state reducer (several devices, flapping); by hand with Photo Booth.
+
+- [ ] **21. The notch glows for Sanduhr's events**
+  Spec ref: New — extends the item 17 Desk pulse
+  What to build: an outer glow around the notch island (ink colored, a few seconds, gentle) for Sanduhr's own events: an alert (any delivery), a meeting starting in the next minute (once per meeting), the camera light coming on. Each event type has a switch in Settings, Desk, Notch, all off by default. No sound detection (no public API for other apps' sounds; an audio tap needs a recording permission and is out of scope).
+  Acceptance: each enabled event glows once; disabled ones do not; the glow never blocks clicks or covers app content beyond the island's edge.
+  Verify: swift-testing for the event-to-glow rules (once per meeting, switches); `smoke do pulse` style action to trigger the glow on demand.
