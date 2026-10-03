@@ -306,7 +306,7 @@ private struct MeterRow: View {
     let alignment: HorizontalAlignment
 
     /// The widget's over-limit red (`usageColor` at 90% and up).
-    static let warningRed = Color.hex("f87171")
+    static let warningRed = meterWarningRed
 
     var body: some View {
         let barHeight = max(4, size * 0.38)

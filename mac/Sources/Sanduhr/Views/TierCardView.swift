@@ -11,14 +11,19 @@ struct TierCardView: View {
     let tick: Int
     /// The Tools menu's Pacing Calculators: show the deep math without hovering.
     var pinDeepMath = false
+    /// Nearly full with the reset still far off (`UsageViewModel.warningTiers`): the bar and the
+    /// percent turn red, with a glow in the theme's accent around the bar.
+    var warning = false
 
     @State private var showDeepMath = false
 
     private var util: Double { usage.utilization ?? 0 }
 
-    /// The percentage in the usage color, or under Match Desk in the ink until the warning line.
+    /// The percentage in the usage color, or under Match Desk in the ink until the warning line;
+    /// red on a warning tier.
     private var readoutColor: Color {
-        palette.ink != nil && DeskThemeMapping.inkCarries(util) ? palette.text : usageColor(util)
+        if warning { return meterWarningRed }
+        return palette.ink != nil && DeskThemeMapping.inkCarries(util) ? palette.text : usageColor(util)
     }
 
     var body: some View {
@@ -26,7 +31,8 @@ struct TierCardView: View {
             headerRow
             ProgressBarView(utilization: util,
                             paceFraction: paceFrac(usage.resetsAt, tier: tier),
-                            palette: palette)
+                            palette: palette,
+                            warning: warning)
             infoRow
             reminderRow
         }

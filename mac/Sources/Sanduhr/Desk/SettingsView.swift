@@ -169,7 +169,7 @@ private struct Swatch: View {
 
 // MARK: - Meters
 
-/// Warnings on the Desk meters, set per meter: a group for the session, the all-models weekly
+/// Warnings on the meters, on Desk and the widget alike, set per meter: a group for the session, the all-models weekly
 /// limit, and every other weekly limit the server reports.
 struct DeskMetersSection: View {
     var model: DeskModel
@@ -182,7 +182,7 @@ struct DeskMetersSection: View {
     var body: some View {
         Form {
             Section {
-                Text("A meter that is nearly full while its reset is still far off draws its bar in red with a soft glow in the Desk ink around it. Each meter has its own setting; changes show on the desktop at once.")
+                Text("A meter that is nearly full while its reset is still far off draws its bar in red with a soft glow around it, on the Desk (in the Desk ink) and on the widget (in the theme's color). Each meter has its own setting; changes show at once on both.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             ForEach(Self.tiers(present: model.meters.map(\.tier)), id: \.self) { tier in

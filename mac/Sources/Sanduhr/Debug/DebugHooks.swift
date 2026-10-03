@@ -258,9 +258,12 @@ enum DebugHooks {
         s.settingsOpen = settings.isOpen
         s.settingsSection = settings.window == nil ? nil : settings.section
         // A `defaults write` from the smoke runner posts no change notice here: apply the saved
-        // warning settings before reporting, as the next minute refresh would.
+        // warning settings before reporting, as Desk's minute refresh and the widget's countdown
+        // tick would.
         desk.model.refreshMeterWarnings()
         s.meters = desk.model.meters
+        vm.refreshMeterWarnings()
+        s.widgetWarnings = Tier.allCases.filter(vm.warningTiers.contains)
         s.meetingsCount = desk.model.meetings.count
         s.alerts = AlertSettings(UserDefaults.standard)
         s.lastFetch = vm.lastUpdated

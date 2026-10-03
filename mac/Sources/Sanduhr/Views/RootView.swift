@@ -61,7 +61,8 @@ struct RootView: View {
                                     history: vm.history[row.tier.rawValue]?.map(\.v) ?? [],
                                     palette: t,
                                     tick: vm.countdownTick,
-                                    pinDeepMath: vm.pacingPinned
+                                    pinDeepMath: vm.pacingPinned,
+                                    warning: vm.warningTiers.contains(row.tier)
                                 )
                             }
                             if let extra = vm.usage?.extraUsage, extra.isEnabled, !vm.compact {

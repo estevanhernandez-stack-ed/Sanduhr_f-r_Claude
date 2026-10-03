@@ -52,8 +52,7 @@ struct DeskMeterRow: Identifiable, Equatable {
                                 fill: min(1, max(0, util / 100)),
                                 pace: paceFrac(t.resetsAt, tier: tier, now: now),
                                 reset: resetDateTimeStr(t.resetsAt, now: now),
-                                warning: MeterWarning.isWarning(percent: util, resetsAt: parseISO(t.resetsAt),
-                                                                settings: warnings(tier), now: now))
+                                warning: MeterWarning.isWarning(t, settings: warnings(tier), now: now))
         }
     }
 }

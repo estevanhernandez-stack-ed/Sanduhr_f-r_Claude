@@ -108,6 +108,58 @@ struct MeterWarningTests {
         #expect(again.first { $0.tier == .fiveHour }?.warning == true)
     }
 
+    /// Item 26: the widget's cards warn exactly where the Desk rows do, for the same numbers and
+    /// settings, across thresholds, resets and switches.
+    @Test func widgetAndDeskAgree() {
+        let iso = ISO8601DateFormatter()
+        let resets: [TimeInterval?] = [nil, -60, 6 * hour, day, day + 1, 3 * day]
+        let percents: [Double] = [0, 50, 89.9, 90, 92, 100]
+        var tiers: [Tier: TierUsage] = [:]
+        for (i, tier) in Tier.allCases.enumerated() {
+            let reset = resets[i % resets.count].map { iso.string(from: now.addingTimeInterval($0)) }
+            tiers[tier] = TierUsage(utilization: percents[(i * 5) % percents.count], resetsAt: reset)
+        }
+        let usage = UsageResponse(tiers: tiers, extraUsage: nil)
+        let stores: [MemoryDefaults] = [MemoryDefaults(), MemoryDefaults(), MemoryDefaults()]
+        stores[1].set(true, forKey: MeterWarningSettings.onKey(.fiveHour))
+        stores[1].set(0.0, forKey: MeterWarningSettings.thresholdKey(.sevenDay))
+        stores[1].set(0.0, forKey: MeterWarningSettings.minResetKey(.sevenDay))
+        for tier in Tier.allCases { stores[2].set(false, forKey: MeterWarningSettings.onKey(tier)) }
+        for d in stores {
+            let rows = DeskMeterRow.rows(from: usage, now: now) { MeterWarningSettings.saved($0, in: d) }
+            let desk = Set(rows.filter(\.warning).map(\.tier))
+            let widget = UsageViewModel.warningTiers(usage, now: now, desk: d)
+            #expect(widget == desk)
+            for (tier, t) in tiers {
+                let rule = MeterWarning.isWarning(percent: t.utilization ?? 0, resetsAt: parseISO(t.resetsAt),
+                                                  settings: MeterWarningSettings.saved(tier, in: d), now: now)
+                #expect(widget.contains(tier) == rule)
+            }
+        }
+    }
+
+    /// The acceptance case: weekly at 92% with days left warns on both; its switch off clears both.
+    @Test func weeklyAt92WarnsOnWidgetUntilSwitchedOff() {
+        let iso = ISO8601DateFormatter()
+        let usage = UsageResponse(tiers: [
+            .fiveHour: TierUsage(utilization: 40, resetsAt: iso.string(from: now.addingTimeInterval(2 * hour))),
+            .sevenDay: TierUsage(utilization: 92, resetsAt: iso.string(from: now.addingTimeInterval(3 * day))),
+        ], extraUsage: nil)
+        let d = MemoryDefaults()
+        #expect(UsageViewModel.warningTiers(usage, now: now, desk: d) == [.sevenDay])
+        d.set(false, forKey: MeterWarningSettings.onKey(.sevenDay))
+        #expect(UsageViewModel.warningTiers(usage, now: now, desk: d).isEmpty)
+        #expect(DeskMeterRow.rows(from: usage, now: now) { MeterWarningSettings.saved($0, in: d) }
+                    .allSatisfy { !$0.warning })
+    }
+
+    @Test func noUtilizationOrNoUsageNeverWarns() {
+        let always = MeterWarningSettings(enabled: true, threshold: 0, minReset: 0)
+        #expect(!MeterWarning.isWarning(TierUsage(utilization: nil, resetsAt: nil), settings: always, now: now))
+        #expect(MeterWarning.isWarning(TierUsage(utilization: 0, resetsAt: nil), settings: always, now: now))
+        #expect(MeterWarning.tiers(nil, now: now).isEmpty)
+    }
+
     @Test func minResetChoicesInOrder() {
         #expect(MeterWarning.minResetChoices.map(\.seconds)
                 == [900, 1800, hour, 3 * hour, 6 * hour, 12 * hour, day, 2 * day, 3 * day])

@@ -243,7 +243,7 @@ struct DebugStateTests {
             .map { String($0.split(separator: ":")[0]) }
         #expect(keys == ["desk_enabled", "desk_running", "layout", "notch", "has_notch",
                          "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "widget_visible", "widget_visibility",
-                         "settings_open", "settings_section", "meters", "meetings_count", "alerts",
+                         "settings_open", "settings_section", "meters", "widget_warnings", "meetings_count", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
                          "glow_camera", "theme", "menu",
                          "version", "build"])
@@ -284,6 +284,14 @@ struct DebugStateTests {
         s.meters = [row]
         let yaml = YAMLEmitter.emit(DebugState.yaml(s))
         #expect(yaml.contains("    reset: \"Today 5:00 PM\"\n    warning: true\n"))
+    }
+
+    @Test func widgetWarningsListTheTiers() {
+        var s = DebugStateInput()
+        s.widgetWarnings = [.sevenDay, .sevenDayOpus]
+        let yaml = YAMLEmitter.emit(DebugState.yaml(s))
+        #expect(yaml.contains("widget_warnings:\n  - seven_day\n  - seven_day_opus\nmeetings_count: 0\n"))
+        #expect(YAMLEmitter.emit(DebugState.yaml(DebugStateInput())).contains("widget_warnings: []\n"))
     }
 
     @Test func emptyState() {

@@ -27,6 +27,7 @@ meters:
     pace: null
     reset: ""
     warning: false
+widget_warnings: []
 meetings_count: 0
 alerts:
   enabled: false

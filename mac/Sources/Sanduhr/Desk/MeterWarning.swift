@@ -39,8 +39,27 @@ struct MeterWarningSettings: Equatable {
     }
 }
 
-/// When a Desk meter row turns red. Pure, so every edge is tested.
+/// When a meter turns red, on Desk and on the widget alike. Pure, so every edge is tested.
 enum MeterWarning {
+    /// One tier's warning from its usage as the server reported it: the one rule both the Desk
+    /// rows and the widget's cards read, so they never disagree. No utilization, no warning.
+    static func isWarning(_ usage: TierUsage, settings: MeterWarningSettings, now: Date) -> Bool {
+        guard let util = usage.utilization else { return false }
+        return isWarning(percent: util, resetsAt: parseISO(usage.resetsAt), settings: settings, now: now)
+    }
+
+    /// The tiers warning now. `settings` gives each tier's setting; the default is the built-in
+    /// one, so only the app hands over the saved settings (`MeterWarningSettings.saved`).
+    static func tiers(_ usage: UsageResponse?, now: Date,
+                      settings: (Tier) -> MeterWarningSettings = MeterWarningSettings.standard(for:)) -> Set<Tier> {
+        guard let usage else { return [] }
+        var out: Set<Tier> = []
+        for (tier, t) in usage.tiers where isWarning(t, settings: settings(tier), now: now) {
+            out.insert(tier)
+        }
+        return out
+    }
+
     /// True when the switch is on, `percent` is at or above the threshold, and the reset is more
     /// than `minReset` away. A missing reset time counts as far away.
     static func isWarning(percent: Double, resetsAt: Date?, settings: MeterWarningSettings, now: Date) -> Bool {

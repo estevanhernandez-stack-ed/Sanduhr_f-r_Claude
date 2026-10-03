@@ -287,3 +287,7 @@ func usageColor(_ pct: Double) -> Color {
     if pct < 90 { return .hex("fb923c") }
     return .hex("f87171")
 }
+
+/// The over-limit red (`usageColor` at 90% and up): a warning meter's bar and percent, on Desk
+/// and the widget alike (MeterWarning).
+let meterWarningRed = Color.hex("f87171")

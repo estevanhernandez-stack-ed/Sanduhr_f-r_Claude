@@ -62,7 +62,8 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   `camera_light` (the camera light shows, for a camera or by hand),
   `widget_visible`, `widget_visibility` (When the widget shows: `always`, `whileDeskOff` or
   `onRequest`; `always` when unset), `settings_open`, `settings_section`, `meters` (tier, label, percent, fill,
-  pace, reset, `warning`: the row draws red with the ink glow, per Settings, Desk, Meters), `meetings_count`, `alerts`, `last_fetch`, `active_tool`, `pacing_pinned`,
+  pace, reset, `warning`: the row draws red with the ink glow, per Settings, Desk, Meters), `widget_warnings` (the
+  widget's tiers drawing red with a glow, same rule and settings, in display order), `meetings_count`, `alerts`, `last_fetch`, `active_tool`, `pacing_pinned`,
   `pulse_count`, `glow_count` (notch glows fired so far, drawn or not; a pulse fires one too), `glow_shape` (what the last
   drawn glow outlined: `island`, `plain` for the hardware notch alone, or `none` yet), `glow_alerts`, `glow_meetings`,
   `glow_camera` (the three Glow switches in Settings, Desk, Notch), `theme` (the widget theme's id), `menu` (groups with item titles and checkmarks), `version`, `build`.

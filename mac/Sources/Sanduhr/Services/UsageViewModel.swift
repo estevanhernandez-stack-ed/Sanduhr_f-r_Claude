@@ -68,6 +68,7 @@ final class UsageViewModel {
 
     /// Follows Desk's font, ink and shadow while Match Desk is current.
     @ObservationIgnored private var deskObserver: DeskLookObserver?
+    @ObservationIgnored private var meterSettingsObserver: NSObjectProtocol?
 
     var compact: Bool = false {            // double-click title to toggle
         didSet {
@@ -81,12 +82,20 @@ final class UsageViewModel {
 
     // MARK: Runtime state
 
-    var usage: UsageResponse?
+    var usage: UsageResponse? {
+        didSet { refreshMeterWarnings() }
+    }
+    /// The tiers whose card bar draws red with a glow: the same rule and settings as the Desk
+    /// meters (MeterWarning, Settings, Desk, Meters). Re-applied when the numbers arrive, on the
+    /// countdown tick (the reset draws nearer) and at once when a Meters setting changes.
+    private(set) var warningTiers: Set<Tier> = []
     var lastUpdated: Date?
     var status: StatusMessage = .connecting
     var history: HistoryStore.History = HistoryStore.load()
     /// Bumped every 30s so countdown labels re-render without refetching.
-    var countdownTick: Int = 0
+    var countdownTick: Int = 0 {
+        didSet { refreshMeterWarnings() }
+    }
     /// Bumped whenever the user installs/reloads/deletes a theme so the
     /// theme dropdown re-reads `ThemeRegistry.themes`. SwiftUI can't
     /// observe a static registry otherwise. The current theme is re-read by id at each bump.
@@ -171,6 +180,14 @@ final class UsageViewModel {
                 guard let self, self.theme.palette.ink != nil else { return }
                 self.reresolveTheme()
             }
+        }
+        // A Meters setting changed in Settings: restyle the cards now. Any in-process defaults
+        // change counts (cheap: an unchanged set is not reassigned). A `defaults write` from
+        // another process posts nothing; the countdown tick picks that up.
+        meterSettingsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshMeterWarnings() }
         }
     }
 
@@ -265,6 +282,19 @@ final class UsageViewModel {
     }
 
     // MARK: UI helpers
+
+    /// Re-applies the saved warning settings to the current numbers. The set is only reassigned
+    /// when a tier turns red or back, so the cards only redraw then.
+    func refreshMeterWarnings(now: Date = Date()) {
+        let fresh = Self.warningTiers(usage, now: now, desk: UserDefaults.desk)
+        if fresh != warningTiers { warningTiers = fresh }
+    }
+
+    /// The widget's warning tiers for these numbers with the Meters settings saved in `desk`:
+    /// `MeterWarning.tiers`, the rule the Desk rows use.
+    nonisolated static func warningTiers(_ usage: UsageResponse?, now: Date, desk: DefaultsStore) -> Set<Tier> {
+        MeterWarning.tiers(usage, now: now) { MeterWarningSettings.saved($0, in: desk) }
+    }
 
     /// Returns tiers the server reported (with a non-nil utilization), in
     /// display order. If compact mode is on, returns only the highest one.

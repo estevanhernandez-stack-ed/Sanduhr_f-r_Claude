@@ -3,13 +3,16 @@ import SwiftUI
 
 /// Progress bar: track, usage-colored fill with top sheen, a breathing-glass
 /// accent-tinted shimmer over the fill, and an always-on 2px pace ghost tick
-/// marking where pace says usage should be right now.
+/// marking where pace says usage should be right now. A warning tier (MeterWarning) fills red
+/// with a steady glow in the theme's accent (Match Desk: the Desk ink) around the bar.
 ///
 /// Parity with windows/src/sanduhr/tiers.py (TierCard paint loop).
 struct ProgressBarView: View {
     let utilization: Double            // 0–100
     let paceFraction: Double?          // 0–1, position of the ghost tick
     let palette: Theme.Palette
+    /// Nearly full with the reset still far off: red fill, glow behind the bar.
+    var warning = false
 
     private let breathAmp: Double = 0.08  // subliminal — any higher reads as flicker
 
@@ -19,9 +22,10 @@ struct ProgressBarView: View {
             ZStack(alignment: .leading) {
                 if let ink = palette.ink {
                     // Match Desk: Desk's meter, the ink faint for the track and full for the
-                    // fill, until the warning line hands the fill back to the usage colors.
+                    // fill, until the warning line (or a meter warning) hands the fill back to
+                    // the usage colors.
                     inkRun(ink).opacity(0.22)
-                    if DeskThemeMapping.inkCarries(utilization) {
+                    if !warning && DeskThemeMapping.inkCarries(utilization) {
                         inkRun(ink).frame(width: fillWidth)
                     } else {
                         usageFill(width: fillWidth)
@@ -65,11 +69,28 @@ struct ProgressBarView: View {
             }
         }
         .frame(height: 10)
+        .background {
+            // A warning bar: a steady glow wrapping it, a few points larger, as Desk's meters.
+            if warning {
+                Capsule()
+                    .fill(glowStyle)
+                    .padding(-4)
+                    .blur(radius: 5)
+                    .opacity(0.6)
+                    .allowsHitTesting(false)
+            }
+        }
     }
 
-    /// The fill with a top-to-bottom sheen in the tier color.
+    /// The glow's color: the theme's accent, or under Match Desk the ink run.
+    private var glowStyle: AnyShapeStyle {
+        if let ink = palette.ink { return AnyShapeStyle(inkRun(ink)) }
+        return AnyShapeStyle(palette.accent)
+    }
+
+    /// The fill with a top-to-bottom sheen in the tier color (the warning red for a warning bar).
     private func usageFill(width fillWidth: CGFloat) -> some View {
-        let base = usageColor(utilization)
+        let base = warning ? meterWarningRed : usageColor(utilization)
         return LinearGradient(
             colors: [base.opacity(0.95), base.opacity(0.72)],
             startPoint: .top, endPoint: .bottom)

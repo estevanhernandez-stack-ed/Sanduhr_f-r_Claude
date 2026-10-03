@@ -2,6 +2,7 @@
 
 ## Unreleased (mac)
 
+- **The widget warns too.** A limit that is nearly full while its reset is still far off now turns red on the widget as well as on the Desk: its bar and percent go red, with a steady glow in the theme's color around the bar (in Desk's ink with Match Desk). It follows the same per-meter settings in Settings, Desk, Meters, so the two always agree, and a change there shows on both at once.
 - **Quit says what it quits**: the menus now offer Show Widget / Hide Widget (just the floating widget) and **Quit Sanduhr für Claude**, which closes everything: the widget, Desk and the notch. Settings, General says the same under its Quit button.
 
 - **One notch glow, and the plain notch glows too.** A Desk pulse no longer outlines the notch island's top edge, which put light along the screen edge beside the camera; it now fires the same soft halo as the Glow switches, down the sides and along the bottom, nothing at the screen edge. With the island off (or Desk off), the glow hugs the notch itself: its width and height, its rounded bottom corners, the same ink and fade. So a Mac that never extends the notch can still have it glow for alerts, meetings and the camera light, and the Glow switches work with the island off.
