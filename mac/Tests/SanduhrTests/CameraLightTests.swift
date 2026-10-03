@@ -151,3 +151,33 @@ struct CameraLightLayoutTests {
         #expect(CameraLightLayout.showing(enabled: false, cameraInUse: false, manual: true))
     }
 }
+
+/// Item 34 (b): a failed listener add or remove is logged once per kind, with its selector and object.
+@Suite("Camera listener failures")
+struct CameraListenerFailuresTests {
+    @Test func successLogsNothing() {
+        var f = CameraListenerFailures()
+        #expect(f.line(.add, .devices, device: 1, status: noErr) == nil)
+        #expect(f.logged.isEmpty)
+    }
+
+    @Test func eachKindLogsOnce() {
+        var f = CameraListenerFailures()
+        let first = f.line(.remove, .running, device: 42, status: -50)
+        #expect(first == "CMIO remove listener failed: running flag (selector 'gone') on object 42, OSStatus -50")
+        // The same kind again, on another camera or with another status: silent.
+        #expect(f.line(.remove, .running, device: 43, status: -50) == nil)
+        #expect(f.line(.remove, .running, device: 42, status: 1) == nil)
+        // Another kind still logs, once.
+        #expect(f.line(.add, .running, device: 42, status: -50) != nil)
+        #expect(f.line(.add, .devices, device: 1, status: -50)?.contains("device list (selector 'dev#') on object 1") == true)
+        #expect(f.line(.remove, .devices, device: 1, status: -50) != nil)
+        #expect(f.line(.add, .devices, device: 1, status: -50) == nil)
+        #expect(f.logged.count == 4)
+    }
+
+    @Test func fourCCFallsBackToTheNumber() {
+        #expect(CameraListenerFailures.fourCC(0x6465_7623) == "'dev#'")
+        #expect(CameraListenerFailures.fourCC(7) == "7")
+    }
+}

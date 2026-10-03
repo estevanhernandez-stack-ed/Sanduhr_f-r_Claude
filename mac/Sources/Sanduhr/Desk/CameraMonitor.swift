@@ -1,5 +1,6 @@
 import Foundation
 import CoreMediaIO
+import os
 
 /// Whether any camera is in use, decided from each device's running flag. Pure, so it tests
 /// without hardware: the monitor feeds it events and schedules a `.settle` when asked to.
@@ -50,10 +51,53 @@ struct CameraActivity: Equatable {
     }
 }
 
+/// Which failed listener calls were already logged: each kind (add or remove, on the device list
+/// or on a device's running flag) is logged the first time it fails, never again, so a camera
+/// that keeps refusing does not fill the log. Pure, so it tests without hardware.
+struct CameraListenerFailures: Equatable {
+    enum Call: String { case add, remove }
+    enum Target: String { case devices = "device list", running = "running flag" }
+
+    struct Kind: Hashable {
+        let call: Call
+        let target: Target
+    }
+
+    private(set) var logged: Set<Kind> = []
+
+    /// The line to log for a call that returned `status`, or nil: success, or a kind already logged.
+    mutating func line(_ call: Call, _ target: Target, device: UInt32, status: OSStatus) -> String? {
+        guard status != noErr, logged.insert(Kind(call: call, target: target)).inserted else { return nil }
+        return "CMIO \(call.rawValue) listener failed: \(target.rawValue) (selector \(Self.fourCC(target.selector))) on object \(device), OSStatus \(status)"
+    }
+
+    /// 'dev#' and 'gone' read better than their numbers.
+    static func fourCC(_ code: UInt32) -> String {
+        let bytes = [24, 16, 8, 0].map { UInt8((code >> UInt32($0)) & 0xff) }
+        guard bytes.allSatisfy({ $0 >= 0x20 && $0 < 0x7f }) else { return String(code) }
+        return "'" + String(decoding: bytes, as: UTF8.self) + "'"
+    }
+}
+
+extension CameraListenerFailures.Target {
+    var selector: UInt32 {
+        switch self {
+        case .devices: UInt32(kCMIOHardwarePropertyDevices)
+        case .running: UInt32(kCMIODevicePropertyDeviceIsRunningSomewhere)
+        }
+    }
+}
+
 /// Watches CoreMediaIO for any app using a camera: `kCMIODevicePropertyDeviceIsRunningSomewhere`
 /// on every video device, with a listener on each and one on the device list for hot-plugged
 /// cameras. Reading that flag needs no camera permission and never turns a camera on.
 /// `onChange` runs on the main queue whenever `inUse` flips.
+///
+/// The listeners are C functions with this monitor's target as client data, not blocks:
+/// a remove must name the very listener the add registered, and a Swift closure handed to
+/// the block API is bridged to a new block on every call (a debug build showed two passes of
+/// one stored closure arriving as two different blocks), so a block remove could miss and
+/// leave the listener behind. A function pointer and a client-data pointer stay the same.
 final class CameraMonitor {
     private(set) var inUse = false
     private(set) var isRunning = false
@@ -62,11 +106,43 @@ final class CameraMonitor {
     private var activity = CameraActivity()
     private var watched: [CMIOObjectID] = []
     private var settleWork: DispatchWorkItem?
-    private lazy var deviceBlock: CMIOObjectPropertyListenerBlock = { [weak self] _, _ in
-        self?.reloadDevices()
+    private var failures = CameraListenerFailures()
+    private static let log = Logger(subsystem: "com.626labs.sanduhr", category: "camera")
+
+    /// What the listeners point at. Retained for the monitor's whole life (released in deinit,
+    /// after every listener is gone), and it holds the monitor weakly.
+    private final class Target {
+        weak var monitor: CameraMonitor?
     }
-    private lazy var runningBlock: CMIOObjectPropertyListenerBlock = { [weak self] _, _ in
-        self?.reloadRunning()
+    private let target = Target()
+    private var clientData: UnsafeMutableRawPointer { Unmanaged.passUnretained(target).toOpaque() }
+
+    /// Called by CoreMediaIO on its own thread; the work happens on the main queue.
+    private static let deviceListener: CMIOObjectPropertyListenerProc = { _, _, _, data in
+        guard let data else { return noErr }
+        let target = Unmanaged<Target>.fromOpaque(data).takeUnretainedValue()
+        DispatchQueue.main.async { target.monitor?.reloadDevices() }
+        return noErr
+    }
+    private static let runningListener: CMIOObjectPropertyListenerProc = { _, _, _, data in
+        guard let data else { return noErr }
+        let target = Unmanaged<Target>.fromOpaque(data).takeUnretainedValue()
+        DispatchQueue.main.async { target.monitor?.reloadRunning() }
+        return noErr
+    }
+
+    init() {
+        target.monitor = self
+        _ = Unmanaged.passRetained(target)
+    }
+
+    deinit {
+        if isRunning {
+            var addr = Self.address(kCMIOHardwarePropertyDevices)
+            _ = CMIOObjectRemovePropertyListener(Self.system, &addr, Self.deviceListener, clientData)
+            unwatchAll()
+        }
+        Unmanaged.passUnretained(target).release()
     }
 
     private static func address(_ selector: Int, scope: Int = kCMIOObjectPropertyScopeGlobal) -> CMIOObjectPropertyAddress {
@@ -81,7 +157,8 @@ final class CameraMonitor {
         guard !isRunning else { return }
         isRunning = true
         var addr = Self.address(kCMIOHardwarePropertyDevices)
-        CMIOObjectAddPropertyListenerBlock(Self.system, &addr, .main, deviceBlock)
+        check(.add, .devices, Self.system,
+              CMIOObjectAddPropertyListener(Self.system, &addr, Self.deviceListener, clientData))
         reloadDevices()
     }
 
@@ -89,7 +166,8 @@ final class CameraMonitor {
         guard isRunning else { return }
         isRunning = false
         var addr = Self.address(kCMIOHardwarePropertyDevices)
-        CMIOObjectRemovePropertyListenerBlock(Self.system, &addr, .main, deviceBlock)
+        check(.remove, .devices, Self.system,
+              CMIOObjectRemovePropertyListener(Self.system, &addr, Self.deviceListener, clientData))
         unwatchAll()
         settleWork?.cancel(); settleWork = nil
         activity = CameraActivity()
@@ -104,7 +182,7 @@ final class CameraMonitor {
         watched = Self.videoDevices()
         var addr = Self.address(kCMIODevicePropertyDeviceIsRunningSomewhere)
         for id in watched {
-            CMIOObjectAddPropertyListenerBlock(id, &addr, .main, runningBlock)
+            check(.add, .running, id, CMIOObjectAddPropertyListener(id, &addr, Self.runningListener, clientData))
         }
         apply(.devices(readAll()))
     }
@@ -119,9 +197,17 @@ final class CameraMonitor {
     private func unwatchAll() {
         var addr = Self.address(kCMIODevicePropertyDeviceIsRunningSomewhere)
         for id in watched {
-            CMIOObjectRemovePropertyListenerBlock(id, &addr, .main, runningBlock)
+            // A camera unplugged a moment ago can refuse with a bad-object status; logged once.
+            check(.remove, .running, id, CMIOObjectRemovePropertyListener(id, &addr, Self.runningListener, clientData))
         }
         watched = []
+    }
+
+    /// Logs a failed add or remove, once per kind (see `CameraListenerFailures`).
+    private func check(_ call: CameraListenerFailures.Call, _ target: CameraListenerFailures.Target,
+                       _ object: CMIOObjectID, _ status: OSStatus) {
+        guard let line = failures.line(call, target, device: object, status: status) else { return }
+        Self.log.error("\(line, privacy: .public)")
     }
 
     private func readAll() -> [UInt32: Bool] {
