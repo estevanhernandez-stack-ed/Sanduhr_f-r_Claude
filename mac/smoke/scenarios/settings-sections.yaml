@@ -10,6 +10,10 @@ steps:
   - do: settings
     arg: credentials
   - expect_state: { settings_section: credentials }
+  # Item 32: the button is only looked at. No smoke or debug action signs out.
+  - expect:
+      window: settings
+      contains: { text: Sign Out }
   - do: settings
     arg: deskLayout
   - expect_state: { settings_section: deskLayout }

@@ -133,6 +133,8 @@ final class UsageViewModel {
         case idle
         case noTiers
         case error(String, isAuth: Bool)
+        /// After Sign Out: no credentials, nothing fetched until a new key is saved.
+        case signedOut
 
         var text: String {
             switch self {
@@ -140,11 +142,20 @@ final class UsageViewModel {
             case .refreshing:           return "Refreshing…"
             case .idle, .noTiers:       return ""
             case .error(let m, _):      return m
+            case .signedOut:            return "Signed out — sign in"
             }
         }
         var isError: Bool {
             if case .error = self { return true }
             return false
+        }
+        /// Only a new sign-in helps: Desk and the notch show the sign-in line.
+        var needsSignIn: Bool {
+            switch self {
+            case .signedOut:            return true
+            case .error(_, let isAuth): return isAuth
+            default:                    return false
+            }
         }
     }
 
@@ -209,6 +220,25 @@ final class UsageViewModel {
         startTimers()
     }
 
+    /// Settings, Credentials, Sign Out (after its confirmation). Deletes the credentials from
+    /// both stores, stops fetching, drops the shown numbers and writes snapshot.json signed out;
+    /// history and settings stay. Saving a key again goes through `credentialsChanged()`.
+    @discardableResult
+    func signOut() -> SignOutResult {
+        let result = KeychainStore.signOut()
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+        api = nil
+        usage = nil
+        lastUpdated = nil
+        status = .signedOut
+        SnapshotWriter.writeSignedOut()
+        onUsageUpdate?()
+        return result
+    }
+
     // MARK: Timers
 
     private func startTimers() {
@@ -235,30 +265,43 @@ final class UsageViewModel {
         status = .refreshing
         onUsageUpdate?()
         defer { onUsageUpdate?() }
+        let u: UsageResponse
         do {
-            let u = try await api.getUsage()
-            self.usage = u
-            self.lastUpdated = Date()
-            Notifier.shared.evaluate(u)
-            SnapshotWriter.writeOk(u)
-            for (tier, t) in u.tiers {
-                if let util = t.utilization {
-                    HistoryStore.append(tier, utilization: util)
-                }
-            }
-            self.history = HistoryStore.load()
-            self.status = u.tiers.isEmpty ? .noTiers : .idle
-        } catch ClaudeAPI.APIError.unauthorized {
-            self.status = .error("Session expired — click Key", isAuth: true)
-            SnapshotWriter.writeError("session_expired")
-        } catch ClaudeAPI.APIError.cloudflareChallenge {
-            self.status = .error("Cloudflare — add cf_clearance", isAuth: true)
-            SnapshotWriter.writeError("cloudflare")
-        } catch let ClaudeAPI.APIError.http(c) {
-            self.status = .error("HTTP \(c)", isAuth: false)
-            SnapshotWriter.writeError("network")
+            u = try await api.getUsage()
         } catch {
-            self.status = .error(error.localizedDescription, isAuth: false)
+            // Signed out (or a new key saved) while this fetch ran: its answer is stale.
+            guard self.api === api else { return }
+            showFailure(error)
+            return
+        }
+        guard self.api === api else { return }
+        self.usage = u
+        self.lastUpdated = Date()
+        Notifier.shared.evaluate(u)
+        SnapshotWriter.writeOk(u)
+        for (tier, t) in u.tiers {
+            if let util = t.utilization {
+                HistoryStore.append(tier, utilization: util)
+            }
+        }
+        self.history = HistoryStore.load()
+        self.status = u.tiers.isEmpty ? .noTiers : .idle
+    }
+
+    /// A failed fetch: the status line and snapshot.json's error kind.
+    private func showFailure(_ error: Error) {
+        switch error as? ClaudeAPI.APIError {
+        case .unauthorized?:
+            status = .error("Session expired — click Key", isAuth: true)
+            SnapshotWriter.writeError("session_expired")
+        case .cloudflareChallenge?:
+            status = .error("Cloudflare — add cf_clearance", isAuth: true)
+            SnapshotWriter.writeError("cloudflare")
+        case .http(let c)?:
+            status = .error("HTTP \(c)", isAuth: false)
+            SnapshotWriter.writeError("network")
+        default:
+            status = .error(error.localizedDescription, isAuth: false)
             SnapshotWriter.writeError("network")
         }
     }

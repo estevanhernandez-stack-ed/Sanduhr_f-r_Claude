@@ -12,7 +12,8 @@ struct TierCardView: View {
     /// The Tools menu's Pacing Calculators: show the deep math without hovering.
     var pinDeepMath = false
     /// Nearly full with the reset still far off (`UsageViewModel.warningTiers`): the bar and the
-    /// percent turn red, with a glow in the theme's accent around the bar.
+    /// percent turn red, with a glow in the theme's accent around the bar, and a warning
+    /// triangle before the percent says so without the red.
     var warning = false
     /// The sparkline's style for the current theme (`SparklineView.mode(themeID:)`).
     var sparklineMode: SparklineView.Mode = .horizon
@@ -35,6 +36,9 @@ struct TierCardView: View {
                             paceFraction: paceFrac(usage.resetsAt, tier: tier),
                             palette: palette,
                             warning: warning)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(tier.label)
+                .accessibilityValue(spokenValue)
             infoRow
             reminderRow
         }
@@ -88,15 +92,28 @@ struct TierCardView: View {
                     .frame(width: 44, height: 14)
             }
 
-            Text("\(Int(util))%")
-                .font(.app(size: 13, weight: .bold,
-                              design: palette.numericFontDesign))
-                .foregroundStyle(readoutColor)
-                .monospacedDigit()
-                .shadow(color: readoutColor.opacity(palette.accentBloom.alpha),
-                        radius: palette.accentBloom.blur)
+            HStack(spacing: 3) {
+                // A warning row says so without the red: the glyph in the theme's text color.
+                if warning {
+                    Image(systemName: MeterWarning.glyph)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(palette.text)
+                }
+                Text("\(Int(util))%")
+                    .font(.app(size: 13, weight: .bold,
+                                  design: palette.numericFontDesign))
+                    .foregroundStyle(readoutColor)
+                    .monospacedDigit()
+                    .shadow(color: readoutColor.opacity(palette.accentBloom.alpha),
+                            radius: palette.accentBloom.blur)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(spokenValue)
         }
     }
+
+    /// "92%", or "92%, nearly full" on a warning tier, for VoiceOver.
+    private var spokenValue: String { MeterWarning.spokenValue(percent: Int(util), warning: warning) }
 
     private var infoRow: some View {
         HStack {

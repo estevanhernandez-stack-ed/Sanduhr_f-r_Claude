@@ -48,11 +48,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // When the widget shows (Settings, General, Surfaces) decides at launch; with "Always
         // shown", hidden stays hidden across launches: Sanduhr keeps fetching, alerting and
         // writing snapshot.json, so a desktop clock or statusline can show the numbers while
-        // the widget itself stays out of the way. Without a session key (or on a brand-new
-        // install, whose first fetch has not happened) the widget shows for sign-in and the
-        // choice takes over after the first successful fetch.
-        awaitingSignIn = firstRun == .fresh
-            || !KeychainStore.exists(account: KeychainAccount.sessionKey)
+        // the widget itself stays out of the way. Until a saved session key has fetched once
+        // (SignInGate; a brand-new install, no key, or a key that never worked) the widget
+        // shows for sign-in and the choice takes over after the first successful fetch.
+        awaitingSignIn = SignInGate.awaitingSignIn(
+            fresh: firstRun == .fresh,
+            hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey),
+            in: UserDefaults.standard)
         let wasShowing = !UserDefaults.standard.bool(forKey: Self.panelHiddenKey)
         let show = WidgetVisibilityRule.resolve(
             showing: wasShowing, setting: .saved(), deskOn: DeskController.shared.enabled,
@@ -73,15 +75,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Desk takes the numbers straight from the view model, so its meters move with
             // every refresh even while the widget is hidden (or Desk is off, ready for when it starts).
             guard let vm = self?.viewModel else { return }
+            let fetched = vm.usage != nil && (vm.status == .idle || vm.status == .noTiers)
+            // Remembered for the next launch: has this key fetched (SignInGate)?
+            SignInGate.record(fetched: fetched, needsSignIn: vm.status.needsSignIn,
+                              in: UserDefaults.standard)
             // The widget showed for sign-in; once the numbers arrive the choice takes over.
-            if self?.awaitingSignIn == true, vm.usage != nil, vm.status == .idle || vm.status == .noTiers {
+            if self?.awaitingSignIn == true, fetched {
                 self?.awaitingSignIn = false
                 self?.applyWidgetVisibility(.signedIn)
             }
-            var isAuthError = false
-            if case .error(_, let isAuth) = vm.status { isAuthError = isAuth }
+            // Signed out (Settings, Credentials): the widget shows for sign-in again, as at a
+            // launch without a key, until the next successful fetch.
+            if vm.status == .signedOut, self?.awaitingSignIn == false {
+                self?.awaitingSignIn = true
+                self?.applyWidgetVisibility(.signedOut)
+            }
             DeskController.shared.model.update(DeskUsage(
-                usage: vm.usage, fetchedAt: vm.lastUpdated, signInNeeded: isAuthError))
+                usage: vm.usage, fetchedAt: vm.lastUpdated, signInNeeded: vm.status.needsSignIn))
         }
 
         // When the user toggles compact mode, resize the panel to fit the
@@ -118,8 +128,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The widget is on screen.
     var widgetVisible: Bool { panel?.isVisible ?? false }
 
-    /// True from a launch without a session key (or a brand-new install's first launch) until
-    /// the first successful fetch.
+    /// True from a launch whose session key has not fetched yet (SignInGate: none saved, never
+    /// worked, or a brand-new install's first launch), or from a sign-out, until the first
+    /// successful fetch.
     private var awaitingSignIn = false
 
     /// Desk was switched on or off (DeskController.apply, from the Settings switch or a debug

@@ -210,3 +210,119 @@ struct FileBackendTests {
         #expect(keychain.items == ["sessionKey": "sk-1"])
     }
 }
+
+@Suite("Sign out")
+struct SignOutTests {
+    let accounts = KeychainAccount.all
+
+    func run(_ keychain: FakeBackend, _ file: any CredentialBackend) -> SignOutResult {
+        SignOut.run(backends: [(kind: .keychain, backend: keychain), (kind: .file, backend: file)],
+                    accounts: accounts)
+    }
+
+    @Test func clearsBothStores() {
+        let keychain = FakeBackend(["sessionKey": "sk-k", "cf_clearance": "cf-k"])
+        let file = FakeBackend(["sessionKey": "sk-f", "cf_clearance": "cf-f"])
+        let result = run(keychain, file)
+        #expect(result.succeeded)
+        #expect(keychain.items.isEmpty)
+        #expect(file.items.isEmpty)
+        #expect(result.outcomes.map(\.store) == [.keychain, .keychain, .file, .file])
+        #expect(result.outcomes.map(\.account) == accounts + accounts)
+    }
+
+    @Test func eitherStoreEmptyIsStillASuccess() {
+        let keychainOnly = FakeBackend(["sessionKey": "sk-k"])
+        let emptyFile = FakeBackend()
+        #expect(run(keychainOnly, emptyFile).succeeded)
+        #expect(keychainOnly.items.isEmpty)
+
+        let emptyKeychain = FakeBackend()
+        let fileOnly = FakeBackend(["sessionKey": "sk-f", "cf_clearance": "cf-f"])
+        #expect(run(emptyKeychain, fileOnly).succeeded)
+        #expect(fileOnly.items.isEmpty)
+    }
+
+    @Test func aFailedDeleteIsReportedWithoutValuesAndTheRestStillRun() {
+        let keychain = FakeBackend(["sessionKey": "sk-secret", "cf_clearance": "cf-secret"])
+        keychain.failDelete = ["sessionKey"]
+        let file = FakeBackend(["sessionKey": "sk-file"])
+        let result = run(keychain, file)
+        #expect(!result.succeeded)
+        #expect(result.failures.map(\.account) == ["sessionKey"])
+        #expect(result.failures.map(\.store) == [.keychain])
+        #expect(keychain.items == ["sessionKey": "sk-secret"])   // only the failed one is left
+        #expect(file.items.isEmpty)
+        for f in result.failures {
+            #expect(!(f.error ?? "").contains("secret"))
+        }
+    }
+
+    @Test func aDeleteThatLeavesTheValueIsAFailure() {
+        let keychain = FakeBackend()
+        let sticky = StickyBackend(["sessionKey": "sk-1"])
+        let result = run(keychain, sticky)
+        #expect(result.failures.map(\.account) == ["sessionKey"])
+        #expect(result.failures.map(\.store) == [.file])
+    }
+
+    @Test func anythingStoredLooksInEveryStoreAndAccount() {
+        func stored(_ keychain: FakeBackend, _ file: FakeBackend) -> Bool {
+            SignOut.anythingStored(backends: [(kind: .keychain, backend: keychain),
+                                              (kind: .file, backend: file)],
+                                   accounts: accounts)
+        }
+        #expect(!stored(FakeBackend(), FakeBackend()))
+        #expect(stored(FakeBackend(["sessionKey": "sk-k"]), FakeBackend()))
+        #expect(stored(FakeBackend(), FakeBackend(["cf_clearance": "cf-f"])))
+
+        let keychain = FakeBackend(["sessionKey": "sk-k"])
+        let file = FakeBackend(["cf_clearance": "cf-f"])
+        #expect(stored(keychain, file))
+        _ = run(keychain, file)
+        #expect(!stored(keychain, file))   // after Sign Out the button reads Signed Out
+    }
+
+    @Test func clearsARealFileInATemporaryFolder() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sanduhr-signout-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = FileBackend(url: dir.appendingPathComponent("credentials.json"))
+        try file.set("sk-1", account: "sessionKey")
+        try file.set("cf-1", account: "cf_clearance")
+        #expect(run(FakeBackend(), file).succeeded)
+        #expect(FileManager.default.fileExists(atPath: file.url.path) == false)
+    }
+
+    @Test func snapshotIsWrittenSignedOutWithNoTiers() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sanduhr-snapshot-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("snapshot.json")
+        SnapshotWriter.writeSignedOut(now: Date(timeIntervalSince1970: 0), to: url)
+        let data = try Data(contentsOf: url)
+        let obj = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(obj["status"] as? String == "error")
+        #expect(obj["error_kind"] as? String == "session_expired")
+        #expect((obj["tiers"] as? [Any])?.isEmpty == true)
+        #expect(obj["schema_version"] as? Int == SnapshotWriter.schemaVersion)
+    }
+
+    @Test func signedOutNeedsSignIn() {
+        #expect(UsageViewModel.StatusMessage.signedOut.needsSignIn)
+        #expect(UsageViewModel.StatusMessage.error("x", isAuth: true).needsSignIn)
+        #expect(!UsageViewModel.StatusMessage.error("x", isAuth: false).needsSignIn)
+        #expect(!UsageViewModel.StatusMessage.idle.needsSignIn)
+        #expect(!UsageViewModel.StatusMessage.signedOut.isError)
+    }
+}
+
+/// A backend whose deletes return without removing anything.
+final class StickyBackend: CredentialBackend, @unchecked Sendable {
+    var items: [String: String]
+    init(_ items: [String: String]) { self.items = items }
+    func get(account: String) -> String? { items[account] }
+    func set(_ value: String, account: String) throws { items[account] = value }
+    func delete(account: String) throws {}
+}

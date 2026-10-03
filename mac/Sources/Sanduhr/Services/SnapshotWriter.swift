@@ -41,7 +41,16 @@ enum SnapshotWriter {
         write(status: "error", errorKind: kind, tiers: tiers, now: now)
     }
 
-    private static func write(status: String, errorKind: String?, tiers: [[String: Any]], now: Date) {
+    /// After Sign Out: an auth error with no tiers, so readers say "sign in again" and drop the
+    /// meters instead of showing the signed-out account's last numbers. `session_expired` is the
+    /// shared set's auth kind (the statusline shows "reauth needed", the MCP server points to
+    /// Settings, Credentials); the set is closed, so sign-out adds no kind of its own.
+    static func writeSignedOut(now: Date = Date(), to target: URL = url) {
+        write(status: "error", errorKind: "session_expired", tiers: [], now: now, to: target)
+    }
+
+    private static func write(status: String, errorKind: String?, tiers: [[String: Any]], now: Date,
+                              to target: URL = url) {
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let root: [String: Any] = [
@@ -55,10 +64,10 @@ enum SnapshotWriter {
             "tiers": tiers,
         ]
         do {
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+            try FileManager.default.createDirectory(at: target.deletingLastPathComponent(),
                                                     withIntermediateDirectories: true)
             let data = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])
-            try data.write(to: url, options: .atomic)
+            try data.write(to: target, options: .atomic)
         } catch {
             NSLog("Sanduhr snapshot write failed (\(type(of: error)))")
         }

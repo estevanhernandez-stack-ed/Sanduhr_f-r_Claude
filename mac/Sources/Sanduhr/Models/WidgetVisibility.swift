@@ -39,18 +39,48 @@ enum WidgetVisibilityEvent: Equatable {
     /// The first successful fetch after a launch without a session key: onboarding is done,
     /// so the widget follows the choice as it would have at launch.
     case signedIn
+    /// Sign Out in Settings, Credentials: like a launch without a session key, the widget shows
+    /// for sign-in.
+    case signedOut
     /// The choice itself was changed in Settings.
     case choiceChanged
 }
 
+/// Whether this Mac is still signing in: the widget shows for sign-in until the saved session
+/// key has fetched once. A key that only exists (expired, mistyped, or no network yet) does not
+/// count, so a relaunch never hides the widget the user needs to fix it.
+enum SignInGate {
+    /// Standard defaults: set by the first successful fetch, cleared by Sign Out or by claude.ai
+    /// refusing the key. Absent on an install updated from 2.3.2 or earlier, so its first launch
+    /// shows the widget until a fetch succeeds, then the choice takes over as usual.
+    static let key = "signedInFetchDone"
+
+    /// True while the widget should show for sign-in: a brand-new install, no session key, or a
+    /// key that has not fetched yet.
+    static func awaitingSignIn(fresh: Bool, hasSessionKey: Bool, in store: DefaultsStore) -> Bool {
+        fresh || !hasSessionKey || !store.bool(forKey: key)
+    }
+
+    /// After every update from the view model: a successful fetch sets the marker; Sign Out or an
+    /// auth error (`needsSignIn`) clears it, so the next launch waits for a good fetch again.
+    static func record(fetched: Bool, needsSignIn: Bool, in store: DefaultsStore) {
+        if fetched {
+            if !store.bool(forKey: key) { store.set(true, forKey: key) }
+        } else if needsSignIn, store.object(forKey: key) != nil {
+            store.set(nil, forKey: key)
+        }
+    }
+}
+
 enum WidgetVisibilityRule {
-    /// Whether the widget should show after `event`, or nil to leave it as it is (`always`
-    /// never moves it; at launch that means `panelHidden` decides, as before). Without a
-    /// session key the new choices always show it, so sign-in can run.
+    /// Whether the widget should show after `event`, or nil to leave it as it is. `always` shows
+    /// it when it is chosen, so a widget an earlier choice hid comes back; after that it never
+    /// moves it (at launch `panelHidden` decides, as before). Without a session key the other
+    /// choices always show it, so sign-in can run.
     static func shouldShow(setting: WidgetVisibility, deskOn: Bool, hasSessionKey: Bool,
                            event: WidgetVisibilityEvent) -> Bool? {
         switch setting {
-        case .always: return nil
+        case .always: return event == .choiceChanged ? true : nil
         case _ where !hasSessionKey: return true
         case .whileDeskOff: return !deskOn
         case .onRequest: return false

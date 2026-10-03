@@ -308,17 +308,28 @@ private struct MeterRow: View {
     /// The widget's over-limit red (`usageColor` at 90% and up).
     static let warningRed = meterWarningRed
 
+    /// "92%", or "92%, nearly full" on a warning row, for VoiceOver.
+    private var spokenValue: String { MeterWarning.spokenValue(percent: row.percent, warning: row.warning) }
+
     var body: some View {
         let barHeight = max(4, size * 0.38)
         VStack(alignment: alignment, spacing: size * 0.22) {
             HStack(alignment: .firstTextBaseline) {
                 Text(row.label).lineLimit(1).opacity(0.85)
                 Spacer(minLength: size)
-                if row.warning {
-                    Text("\(row.percent)%").foregroundStyle(Self.warningRed)
-                } else {
-                    Text("\(row.percent)%")
+                HStack(alignment: .firstTextBaseline, spacing: size * 0.25) {
+                    if row.warning {
+                        // Says so without the red: the glyph in the ink, sized to the row.
+                        Image(systemName: MeterWarning.glyph)
+                            .font(.system(size: size * 0.75, weight: .semibold))
+                            .foregroundStyle(LinearGradient.ink(ink))
+                        Text("\(row.percent)%").foregroundStyle(Self.warningRed)
+                    } else {
+                        Text("\(row.percent)%")
+                    }
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(spokenValue)
             }
             ZStack(alignment: .leading) {
                 Capsule().fill(LinearGradient.ink(ink)).opacity(0.22)
@@ -326,6 +337,9 @@ private struct MeterRow: View {
                     .frame(width: width * row.fill)
             }
             .frame(width: width, height: barHeight)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(row.label)
+            .accessibilityValue(spokenValue)
             .background {
                 // A warning row: a steady glow in the ink wrapping the bar, as the notch glows.
                 if row.warning {

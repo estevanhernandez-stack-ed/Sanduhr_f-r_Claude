@@ -45,7 +45,7 @@ brew install --cask sanduhr
 and drag to Applications.
 
 - Developer ID signed + Apple-notarized → no Gatekeeper warnings.
-- NSVisualEffectView vibrancy. Credentials are currently stored in a permissions-restricted plaintext file (`~/Library/Application Support/Sanduhr/credentials.json`), not Keychain — see [mac/README.md](mac/README.md#first-run).
+- NSVisualEffectView vibrancy. Credentials live in the macOS Keychain (service `com.626labs.sanduhr`) on release builds, and in a permissions-restricted file (`~/Library/Application Support/Sanduhr/credentials.json`, mode `0600`) on dev builds — see [mac/README.md](mac/README.md#first-run).
 - Auto-updates via [Sparkle](https://sparkle-project.org) (24h check
   interval); `brew upgrade --cask sanduhr` also works.
 - Cask lives in [the personal tap][tap]. Submission to core
@@ -104,7 +104,7 @@ Settings ▸ Claude Usage ▸ **Install statusline…** puts your usage percenta
 
 ### Privacy & control
 
-- **OS-native credential storage on Windows** — Windows Credential Manager (service `com.626labs.sanduhr`). Uninstall does **not** clear these entries on either channel (GitHub `.exe` or Microsoft Store) — use Sign Out (below) first, or delete the entries from Credential Manager yourself. **macOS stores credentials in a permissions-restricted plaintext file today, not Keychain** — see [mac/README.md](mac/README.md#first-run). Keychain migration is planned.
+- **OS-native credential storage on Windows** — Windows Credential Manager (service `com.626labs.sanduhr`). Uninstall does **not** clear these entries on either channel (GitHub `.exe` or Microsoft Store) — use Sign Out (below) first, or delete the entries from Credential Manager yourself. **On macOS, release builds use the Keychain** (service `com.626labs.sanduhr`; dev builds use a `0600` file) — see [mac/README.md](mac/README.md#first-run). Dragging the Mac app to the Trash removes neither: use Settings → Credentials → Sign Out first.
 - **Multi-account support** *(Windows v2.2.0+)* — track multiple Claude accounts (Personal + Work) in one install. Per-account credentials, per-account history, switch active account from the widget label or Settings → Accounts. Sign-out is account-scoped — the others stay intact.
 - **30-day local history** *(Windows v2.1.0+)* — rolling per-account history file in `%APPDATA%\Sanduhr\history.{Account}.json`. Settings → History shows a stacked per-tier line chart with Week / Month windows + per-account / All-accounts overlay views. Export as CSV to analyze with any agent.
 - **One-click sign-out** — Settings → Credentials → save with an empty sessionKey. Confirmation dialog, then that account's credentials and history are wiped from the OS store. Other accounts left intact.
@@ -150,7 +150,7 @@ Prefer to paste the key by hand, or running the cross-platform Python build?
 4. Copy the value of the `sessionKey` cookie.
 5. Paste it into Sanduhr (Windows native: **Settings → Accounts → Add by sessionKey**).
 
-Sanduhr hits two `claude.ai` endpoints — the same ones the settings page uses — to read your usage, and stores the cookie in Windows Credential Manager on Windows or, on macOS today, a permissions-restricted plaintext file (not Keychain; migration planned). Nothing else leaves your machine.
+Sanduhr hits two `claude.ai` endpoints — the same ones the settings page uses — to read your usage, and stores the cookie in Windows Credential Manager on Windows or, on macOS, the Keychain (release builds; a permissions-restricted `0600` file on dev builds). Nothing else leaves your machine.
 
 ---
 

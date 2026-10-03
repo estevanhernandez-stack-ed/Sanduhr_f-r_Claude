@@ -239,6 +239,8 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end
+# Item 32: a smoke run must never wipe real credentials, so no step may sign out.
+check('no scenario signs out', Dir[File.join(Smoke::SCENARIOS, '*.yaml')].none? { |f| File.read(f) =~ /do:\s*sign[-_ ]?out/i })
 check('scenarios exist', Dir[File.join(Smoke::SCENARIOS, '*.yaml')].length >= 8)
 
 # --- Gallery -----------------------------------------------------------------------------------

@@ -8,10 +8,14 @@ protocol CredentialBackend: Sendable {
     func set(_ value: String, account: String) throws
     /// Deleting a missing account is not an error.
     func delete(account: String) throws
+    /// Whether the account is there, without reading its value where that could prompt.
+    func holds(account: String) -> Bool
 }
 
 extension CredentialBackend {
     func exists(account: String) -> Bool { get(account: account) != nil }
+
+    func holds(account: String) -> Bool { exists(account: account) }
 
     /// True when any of `accounts` holds a value.
     func hasAny(_ accounts: [String]) -> Bool { accounts.contains { exists(account: $0) } }

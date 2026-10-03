@@ -203,7 +203,7 @@ struct DeskMeterTests {
         var refused = fresh
         refused.signInNeeded = true
         #expect(DeskClaudeText.line(refused) == "claude   sign in again in Sanduhr")
-        #expect(DeskClaudeText.compact(refused, now: now) == nil)
+        #expect(DeskClaudeText.compact(refused, now: now) == "sign in to Sanduhr")
         #expect(refused.isStale(now: now))
     }
 }
