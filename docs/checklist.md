@@ -223,7 +223,7 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: both sections open from the sidebar and from `sanduhr://settings` style section links; Check Now starts Sparkle's check; the switches change Sparkle's behavior and survive a relaunch; every link opens the right page.
   Verify: swift-testing for the section list and the About link set; smoke `settings-sections` covers both new sections and finds "Check Now" and the independence line by text.
 
-- [ ] **31. Credentials in the Keychain for signed builds**
+- [x] **31. Credentials in the Keychain for signed builds**
   Spec ref: `docs/mac-merge-plan.md` > Phase 2 ("Real Keychain once signed with a Developer ID"); `mac/Sources/Sanduhr/Services/KeychainStore.swift` (today a 0600 JSON file, with the reasons in its header)
   What to build: when the running app is signed with the team's Developer ID (team 82BSR56X5J, read from its own code signature), store the session key and cf_clearance as generic-password Keychain items (service `com.626labs.sanduhr`, accessible after first unlock, no biometric ACL; the default ACL ties them to the app's signed identity, so updates never prompt). Move existing credentials once: read the file, write the Keychain, read back and compare, then delete the file; on any failure keep the file and carry on with it. Ad-hoc and unsigned builds keep the file. Sign-out and credential changes go to whichever store is active. Never log a value.
   Acceptance: a 2.3.1 user updating to 2.3.2 keeps working with no sign-in and no Keychain prompt, the file is gone and the Keychain holds the key; a dev build still uses the file; a failed Keychain write leaves the file and the app working.
