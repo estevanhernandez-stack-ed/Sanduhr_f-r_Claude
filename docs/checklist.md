@@ -180,7 +180,7 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: with "While Desk is off", switching Desk off shows the widget and on hides it; "Never on its own" keeps it hidden across launches until asked; an updated install sees no change.
   Verify: swift-testing for a pure visibility rule (setting, Desk on/off, manual override, launch); smoke scenario toggling Desk with each setting.
 
-- [ ] **24. A "Match Desk" theme for the widget**
+- [x] **24. A "Match Desk" theme for the widget**
   Spec ref: New — builds on item 18's gallery (`Models/ThemeGallery.swift`, `Views/ThemeGalleryView.swift`, `Models/Theme.swift`)
   What to build: a built-in "Match Desk" theme in the gallery that draws the widget in Desk's look: the Desk font, the Desk ink color or gradient for text and bars, the Desk drop shadow, no glass background (like subtle mode). It follows the Desk settings live (font, ink, shadow). Also re-resolve the current theme by id when user themes reload, so an edited theme restyles the widget without being picked again.
   Acceptance: picking Match Desk makes the widget read like part of the desktop; changing Desk's ink or font restyles it at once; other themes are unaffected.
