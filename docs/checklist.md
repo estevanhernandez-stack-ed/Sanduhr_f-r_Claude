@@ -156,7 +156,7 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: every built-in and installed user theme appears with a recognizable preview; clicking applies it to the widget at once; the widget's own Theme menu and the gallery agree.
   Verify: swift-testing for the gallery's theme list (built-ins plus user themes, current flag); smoke scenario opening Settings at Themes and finding theme names.
 
-- [ ] **19. You choose what the notch shows**
+- [x] **19. You choose what the notch shows**
   Spec ref: New — `Desk/NotchView.swift` (`NotchWingsView.layout`, `leftText`, `NotchView.line`)
   What to build: Settings, Desk, Notch gets a picker for the left wing, the right wing and the strip under the camera, each one of: next meeting (or the time when none is due), time, Claude meters, message, nothing. Defaults reproduce today exactly (left: meeting or time; right: meters; strip: meeting or meters). Wing width still grows to fit its text.
   Acceptance: each choice shows on the right wing within a refresh; "nothing" leaves a plain black wing; an update changes nothing for anyone until they pick.
