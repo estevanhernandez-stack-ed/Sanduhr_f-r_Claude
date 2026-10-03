@@ -33,6 +33,9 @@ enum DebugAction: Equatable {
     case glow(NotchGlowEvent.Kind)
     /// The widget's theme by id, picked as the Theme menu and the gallery pick it.
     case theme(String)
+    /// Demo data on the Desk for screenshots: made-up meetings and a pinned message, held in
+    /// memory only (the calendar is never touched). Off puts the real ones back.
+    case demo(Bool)
 
     static let names = ["show-widget", "hide-widget", "settings", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
@@ -118,6 +121,7 @@ enum DebugLink {
         case "desk": return onOff(DebugAction.desk)
         case "notch": return onOff(DebugAction.notch)
         case "camera-light": return onOff(DebugAction.cameraLight)
+        case "demo": return onOff(DebugAction.demo)
         case "glow":
             guard let arg else { return .success(.glow(.alert)) }
             guard let kind = NotchGlowEvent.Kind(rawValue: arg.lowercased()) else {

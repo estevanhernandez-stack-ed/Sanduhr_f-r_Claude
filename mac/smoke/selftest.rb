@@ -234,7 +234,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme]
+    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end
