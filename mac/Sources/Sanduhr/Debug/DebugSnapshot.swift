@@ -30,6 +30,9 @@ struct DebugStateInput {
     var activeTool: String?
     var pacingPinned = false
     var pulseCount = 0
+    /// Notch glows fired so far, and the three Glow switches.
+    var glowCount = 0
+    var glowSwitches = NotchGlowSwitches()
     /// The widget theme's id.
     var theme = ""
     var menu: [MenuGroup] = []
@@ -66,6 +69,10 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("active_tool", s.activeTool.map(YAMLNode.string) ?? .null))
         pairs.append(("pacing_pinned", .bool(s.pacingPinned)))
         pairs.append(("pulse_count", .int(s.pulseCount)))
+        pairs.append(("glow_count", .int(s.glowCount)))
+        pairs.append(("glow_alerts", .bool(s.glowSwitches.alerts)))
+        pairs.append(("glow_meetings", .bool(s.glowSwitches.meetings)))
+        pairs.append(("glow_camera", .bool(s.glowSwitches.camera)))
         pairs.append(("theme", .string(s.theme)))
         pairs.append(("menu", .list(menu)))
         pairs.append(("version", .string(s.version)))

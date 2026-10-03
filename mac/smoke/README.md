@@ -62,13 +62,16 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   `camera_light` (the camera light shows, for a camera or by hand),
   `widget_visible`, `settings_open`, `settings_section`, `meters` (tier, label, percent, fill,
   pace, reset), `meetings_count`, `alerts`, `last_fetch`, `active_tool`, `pacing_pinned`,
-  `pulse_count`, `theme` (the widget theme's id), `menu` (groups with item titles and checkmarks), `version`, `build`.
+  `pulse_count`, `glow_count` (notch glows fired so far, drawn or not), `glow_alerts`, `glow_meetings`,
+  `glow_camera` (the three Glow switches in Settings, Desk, Notch), `theme` (the widget theme's id), `menu` (groups with item titles and checkmarks), `version`, `build`.
 
 Actions: `show-widget`, `hide-widget`, `settings [section]` (a `SettingsSection` raw value such
 as `notch` or `deskLayout`), `close-settings`, `refresh` (waits for the fetch), `test-alert`,
 `pulse [tier]` (`five_hour` by default), `tool deep-work|pacing|snake` (as the Tools menu: chosen
 again it closes), `desk on|off`, `notch on|off`, `camera-light on|off` (the light by hand, as Tools, Camera Light;
-its window is kind `camera` in tree.yaml, one node labeled `Camera light`).
+its window is kind `camera` in tree.yaml, one node labeled `Camera light`), `glow [alert|meeting|camera]`
+(the notch glow once, whatever its switches; drawn only while Desk runs with the island on, in a
+click-through window of kind `glow` labeled `Notch glow` that fades out after about three seconds).
 
 ## Scenarios
 

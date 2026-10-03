@@ -42,6 +42,10 @@ last_fetch: "2026-10-02T15:04:05Z"
 active_tool: null
 pacing_pinned: false
 pulse_count: 0
+glow_count: 0
+glow_alerts: false
+glow_meetings: false
+glow_camera: false
 theme: obsidian
 menu:
   - items:

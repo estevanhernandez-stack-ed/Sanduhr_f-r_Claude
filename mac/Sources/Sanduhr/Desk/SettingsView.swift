@@ -231,6 +231,9 @@ struct DeskNotchSection: View {
     @AppStorage(CameraLightController.enabledKey, store: .desk) private var cameraLight = false
     @AppStorage(CameraLightController.brightnessKey, store: .desk) private var lightBrightness = CameraLightController.defaultBrightness
     @AppStorage(CameraLightController.sizeKey, store: .desk) private var lightSize = CameraLightController.defaultSize
+    @AppStorage(NotchGlowSwitches.alertsKey, store: .desk) private var glowAlerts = false
+    @AppStorage(NotchGlowSwitches.meetingsKey, store: .desk) private var glowMeetings = false
+    @AppStorage(NotchGlowSwitches.cameraKey, store: .desk) private var glowCamera = false
 
     var body: some View {
         Form {
@@ -269,6 +272,15 @@ struct DeskNotchSection: View {
                 Text("While any app uses a camera, a soft white light around the notch lights your face, above every app. It ends when the camera stops, with or without Desk or the island. Tools, Camera Light shows it by hand. Screens without a notch get it at the top center.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            Section("Glow") {
+                Toggle("For Sanduhr alerts", isOn: $glowAlerts)
+                Toggle("A minute before a meeting", isOn: $glowMeetings)
+                    .onChange(of: glowMeetings) { _, _ in NotchGlowController.shared.apply() }
+                Toggle("When the camera light comes on", isOn: $glowCamera)
+                Text("The island's edge glows softly in its text color for a few seconds, once per event. It never takes a click.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .disabled(!enabled)
         }
         .formStyle(.grouped)
     }

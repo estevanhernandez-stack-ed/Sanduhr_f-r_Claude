@@ -85,6 +85,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DeskController.shared.apply()
         // The camera light watches the cameras while its switch is on, with or without Desk.
         CameraLightController.shared.apply()
+        // The notch glow checks for meetings a minute out while its meetings switch is on.
+        NotchGlowController.shared.apply()
     }
 
     /// estedesk:// and sanduhr:// links (Option+J joins the next meeting, …/settings opens

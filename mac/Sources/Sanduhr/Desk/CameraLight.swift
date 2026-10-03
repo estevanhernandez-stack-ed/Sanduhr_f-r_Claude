@@ -206,6 +206,7 @@ final class CameraLightController {
         visible = true
         generation += 1
         place()
+        NotchGlowController.shared.event(.cameraLightOn)
         guard let w = window else { return }
         w.orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { ctx in

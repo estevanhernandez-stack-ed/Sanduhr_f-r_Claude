@@ -80,6 +80,10 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     // MARK: - Private
 
     private func deliver(_ outcome: AlertOutcome, sound: String) {
+        // Any delivery glows the notch island too, when Settings, Desk, Notch, Glow asks.
+        if outcome.banner || outcome.pulse {
+            DispatchQueue.main.async { MainActor.assumeIsolated { NotchGlowController.shared.event(.alert) } }
+        }
         if outcome.pulse {
             let tiers = Set(outcome.alerts.map(\.tier))
             DispatchQueue.main.async { DeskController.shared.model.pulse(tiers) }

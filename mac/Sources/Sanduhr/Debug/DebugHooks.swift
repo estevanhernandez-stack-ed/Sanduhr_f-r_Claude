@@ -110,6 +110,7 @@ enum DebugHooks {
         case .notch(let on):
             UserDefaults.desk.set(on, forKey: DeskController.notchKey)
         case .cameraLight(let on): CameraLightController.shared.setManual(on)
+        case .glow: NotchGlowController.shared.fire()
         }
         settle()
     }
@@ -164,6 +165,7 @@ enum DebugHooks {
             else if w === desk.window { kind = "desk" }
             else if w === desk.wingsWindow { kind = "notch" }
             else if w === CameraLightController.shared.window { kind = "camera" }
+            else if w === NotchGlowController.shared.window { kind = "glow" }
             else if w === settings { kind = "settings" }
             else if w.isSheet || w.sheetParent != nil { kind = "sheet" }
             else {
@@ -262,6 +264,8 @@ enum DebugHooks {
         }
         s.pacingPinned = vm.pacingPinned
         s.pulseCount = desk.model.pulseCount
+        s.glowCount = NotchGlowController.shared.count
+        s.glowSwitches = NotchGlowController.shared.switches
         s.theme = vm.theme.id
         s.menu = app.currentMenu(widgetVisible: widgetVisible)
         s.version = info["CFBundleShortVersionString"] as? String ?? ""

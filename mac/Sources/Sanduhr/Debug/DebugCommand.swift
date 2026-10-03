@@ -29,9 +29,11 @@ enum DebugAction: Equatable {
     case notch(Bool)
     /// The camera light shown or hidden by hand, as Tools, Camera Light does.
     case cameraLight(Bool)
+    /// The notch glow for one kind of event, whatever its switch says.
+    case glow(NotchGlowEvent.Kind)
 
     static let names = ["show-widget", "hide-widget", "settings", "close-settings", "refresh",
-                        "test-alert", "pulse", "tool", "desk", "notch", "camera-light"]
+                        "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow"]
 }
 
 enum DebugCommand: Equatable {
@@ -113,6 +115,12 @@ enum DebugLink {
         case "desk": return onOff(DebugAction.desk)
         case "notch": return onOff(DebugAction.notch)
         case "camera-light": return onOff(DebugAction.cameraLight)
+        case "glow":
+            guard let arg else { return .success(.glow(.alert)) }
+            guard let kind = NotchGlowEvent.Kind(rawValue: arg.lowercased()) else {
+                return bad("glow needs arg=alert, meeting or camera")
+            }
+            return .success(.glow(kind))
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }

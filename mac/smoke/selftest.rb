@@ -50,6 +50,7 @@ class FakeApp
     when 'desk' then s['desk_enabled'] = s['desk_running'] = (arg == 'on')
     when 'notch' then s['notch'] = (arg == 'on')
     when 'camera-light' then s['camera_light'] = (arg == 'on')
+    when 'glow' then s['glow_count'] = s['glow_count'].to_i + 1
     when 'show-widget' then s['widget_visible'] = true
     when 'hide-widget' then s['widget_visible'] = false
     when 'settings' then s['settings_open'] = true; s['settings_section'] = arg if arg
@@ -211,7 +212,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light]
+    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end
