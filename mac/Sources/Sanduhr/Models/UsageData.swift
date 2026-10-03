@@ -57,7 +57,18 @@ extension UsageResponse: Decodable {
     }
 }
 
-/// Minimal shape of `GET /api/organizations` — we only need the first uuid.
+/// Minimal shape of `GET /api/organizations`: the uuid, and the capabilities that say which
+/// org carries the subscription usage.
 struct Organization: Decodable {
     let uuid: String
+    var capabilities: [String]? = nil
+
+    /// A login can carry several orgs (a claude_max subscription org and an API individual org,
+    /// seen on Windows 2026-07-19), so the first one is ordering luck. Same rule as Windows'
+    /// ParseOrganizations: the first with `claude_max`, else the first with `chat`, else the first.
+    static func tracked(in orgs: [Organization]) -> Organization? {
+        orgs.first { $0.capabilities?.contains("claude_max") == true }
+            ?? orgs.first { $0.capabilities?.contains("chat") == true }
+            ?? orgs.first
+    }
 }
