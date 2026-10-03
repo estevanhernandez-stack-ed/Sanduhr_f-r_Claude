@@ -218,6 +218,7 @@ struct DebugStateTests {
         s.lastFetch = Date(timeIntervalSince1970: 0)
         s.activeTool = "snake"
         s.pulseCount = 3
+        s.theme = "aurora"
         s.menu = SanduhrMenu.groups(widgetVisible: true, deepWork: false, pacing: true, snake: false)
         s.version = "2.1.0"
         s.build = "3"
@@ -226,9 +227,10 @@ struct DebugStateTests {
             .map { String($0.split(separator: ":")[0]) }
         #expect(keys == ["desk_enabled", "desk_running", "layout", "notch", "has_notch", "widget_visible",
                          "settings_open", "settings_section", "meters", "meetings_count", "alerts",
-                         "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "menu",
+                         "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "theme", "menu",
                          "version", "build"])
         #expect(yaml.contains("settings_section: notch\n"))
+        #expect(yaml.contains("pulse_count: 3\ntheme: aurora\nmenu:\n"))
         #expect(yaml.contains("layout: message:tl") == false)   // the colons force quotes
         #expect(yaml.contains("layout: \"message:tl clock:bl meters:bl meetings:bl\"\n"))
         #expect(yaml.contains("""

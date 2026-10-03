@@ -2,6 +2,7 @@
 
 ## Unreleased (mac)
 
+- **Themes you can see.** Settings, Widget, Themes opens on a gallery of every theme, built-in and your own, each a small preview of its background, card, bars and accent with its name. The one in use is marked; click another and the widget changes at once, and its Theme menu agrees. Pasting JSON, the agent prompt, the themes folder, Reload and Delete sit below the gallery.
 - **Calendar access explains itself.** Click the Desk calendar note to open System Settings at Privacy & Security, Calendars. "Add Events Only" gets its own line saying Full Access is needed, and a grant made in System Settings shows within a minute, meetings and all, with no relaunch.
 
 ## v2.2.1-mac — 2026-10-02

@@ -22,6 +22,8 @@ struct DebugStateInput {
     var activeTool: String?
     var pacingPinned = false
     var pulseCount = 0
+    /// The widget theme's id.
+    var theme = ""
     var menu: [MenuGroup] = []
     var version = ""
     var build = ""
@@ -51,6 +53,7 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("active_tool", s.activeTool.map(YAMLNode.string) ?? .null))
         pairs.append(("pacing_pinned", .bool(s.pacingPinned)))
         pairs.append(("pulse_count", .int(s.pulseCount)))
+        pairs.append(("theme", .string(s.theme)))
         pairs.append(("menu", .list(menu)))
         pairs.append(("version", .string(s.version)))
         pairs.append(("build", .string(s.build)))

@@ -104,7 +104,8 @@ enum ThemeRegistry {
 
     // MARK: Built-ins (port of sanduhr.py:54-90 + windows themes.py dials)
 
-    private static let builtIn: [Theme] = [
+    /// The compiled-in themes, in the order the Theme menu and the Settings gallery list them.
+    static let builtIn: [Theme] = [
         Theme(
             id: "obsidian", displayName: "Obsidian",
             palette: .init(

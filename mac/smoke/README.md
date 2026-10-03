@@ -58,7 +58,7 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
 - **state.yaml**: `desk_enabled`, `desk_running`, `layout`, `notch`, `has_notch`,
   `widget_visible`, `settings_open`, `settings_section`, `meters` (tier, label, percent, fill,
   pace, reset), `meetings_count`, `alerts`, `last_fetch`, `active_tool`, `pacing_pinned`,
-  `pulse_count`, `menu` (groups with item titles and checkmarks), `version`, `build`.
+  `pulse_count`, `theme` (the widget theme's id), `menu` (groups with item titles and checkmarks), `version`, `build`.
 
 Actions: `show-widget`, `hide-widget`, `settings [section]` (a `SettingsSection` raw value such
 as `notch` or `deskLayout`), `close-settings`, `refresh` (waits for the fetch), `test-alert`,

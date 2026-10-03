@@ -21,6 +21,12 @@ final class UsageViewModel {
         didSet { UserDefaults.standard.set(theme.id, forKey: "theme") }
     }
 
+    /// The one way a theme is picked: the widget's Theme menu and the Settings gallery both
+    /// call it, so they always agree. Takes the registry's current copy of the theme.
+    func selectTheme(id: String) {
+        if let picked = ThemeRegistry.theme(id: id) { theme = picked }
+    }
+
     var compact: Bool = false {            // double-click title to toggle
         didSet {
             if oldValue != compact {

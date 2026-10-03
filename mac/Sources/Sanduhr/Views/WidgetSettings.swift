@@ -129,6 +129,23 @@ struct WidgetSettings: View {
 
     @ViewBuilder
     private func themesTab(t: Theme.Palette) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Click a theme to use it on the widget.")
+                    .font(.caption)
+                    .foregroundStyle(t.textSecondary)
+                ThemeGalleryView(vm: vm)
+                Divider().padding(.vertical, 6)
+                Text("Your own themes")
+                    .font(.headline)
+                themeTools(t: t)
+            }
+            .padding(.trailing, 4)
+        }
+    }
+
+    @ViewBuilder
+    private func themeTools(t: Theme.Palette) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Drop a theme JSON below — or paste what an AI agent returned.")
                 .font(.caption)
@@ -137,7 +154,7 @@ struct WidgetSettings: View {
 
             TextEditor(text: $themePaste)
                 .font(.system(size: 11, design: .monospaced))
-                .frame(minHeight: 120, maxHeight: 160)
+                .frame(height: 140)
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
                         .strokeBorder(t.border.opacity(0.4), lineWidth: 0.5))
@@ -189,7 +206,8 @@ struct WidgetSettings: View {
                     .font(.system(size: 11, design: .monospaced))
                     .tag(url)
             }
-            .frame(minHeight: 80, maxHeight: 140)
+            // A fixed height: inside the scroll view a min/max range collapses to the minimum.
+            .frame(height: 110)
             .onAppear { installedThemes = UserThemes.listFiles() }
         }
         .onChange(of: themePaste) { _, _ in autofillFilename() }
@@ -227,9 +245,7 @@ struct WidgetSettings: View {
             themeStatus = "Saved: \(url.lastPathComponent)"
             // Auto-apply the newly-saved theme if it parsed cleanly.
             let id = url.deletingPathExtension().lastPathComponent.lowercased()
-            if let saved = ThemeRegistry.theme(id: id) {
-                vm.theme = saved
-            }
+            vm.selectTheme(id: id)
         } catch {
             themeError = "Could not save theme: \(error.localizedDescription)"
         }
