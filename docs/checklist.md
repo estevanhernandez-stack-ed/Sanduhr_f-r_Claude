@@ -214,3 +214,11 @@ New options keep today's behavior by default; the camera light and the glow star
   Spec ref: New — on-screen review of item 24 (`Views/SparklineView.swift`, `Views/TierCardView.swift`)
   What was built: under Match Desk there is no card behind the sparkline, so the horizon chart of a meter that sat high read as a solid block of the ink. Match Desk now draws the line sparkline; every other theme keeps the horizon chart. `SparklineView.mode(themeID:)` decides, tested.
   Acceptance: on the widget under Match Desk the sparkline is a thin ink line; other themes unchanged. Verified on screen (window capture) on the dev build.
+
+## Iteration 4 (Mac): settings you'd expect
+
+- [ ] **30. Updates and About in Settings**
+  Spec ref: New — after 2.3.0 (`Views/SettingsWindow.swift` sidebar; Sparkle `SPUStandardUpdaterController` in `AppDelegate`)
+  What to build: a "Sanduhr" group at the bottom of the Settings sidebar with two sections. **Updates**: installed version and build, last check time, a Check Now button, switches for checking automatically and for downloading and installing automatically (Sparkle's own settings, so the menus' Check for Updates… and these agree), and a link to the release notes. **About**: icon, "Sanduhr für Claude", version and build, a one-line description, links (website, GitHub, release notes, privacy policy, license), credits (Sparkle), and the independence line ("Independent third-party tool. Not affiliated with Anthropic. Requires an active Claude Pro / Team / Enterprise subscription.").
+  Acceptance: both sections open from the sidebar and from `sanduhr://settings` style section links; Check Now starts Sparkle's check; the switches change Sparkle's behavior and survive a relaunch; every link opens the right page.
+  Verify: swift-testing for the section list and the About link set; smoke `settings-sections` covers both new sections and finds "Check Now" and the independence line by text.
