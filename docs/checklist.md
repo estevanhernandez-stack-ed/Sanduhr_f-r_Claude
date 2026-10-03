@@ -192,7 +192,7 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: a weekly meter at 92% with 3 days left shows red with the ink glow; the same meter with 6 hours left stays normal; the session meter never warns until switched on; changing a setting restyles the row at once.
   Verify: swift-testing for the pure warning rule (per meter settings, threshold edge, time edge, missing reset); `state.yaml` meters gain `warning`; a smoke scenario that sets a low threshold to force a warning and checks the state.
 
-- [ ] **27. One notch glow, the plain notch too**
+- [x] **27. One notch glow, the plain notch too**
   Spec ref: New — review of the 2.3.0 build (`Desk/NotchView.swift` wings pulse stroke from item 17; `Desk/NotchGlow.swift`)
   What to build: the item-17 Desk pulse stroked the island's whole outline (top edge included) with a white shadow, so during a meter pulse light showed in the band between the wings and the screen edge. Remove that stroke; a Desk pulse fires the item-21 outer glow instead (forced, like the debug action), so there is one glow with one look: up the sides to the top of the wings, along the bottom, nothing at the screen edge. When the island is not extended (notch switch off) on a notched screen, the glow hugs the plain hardware notch outline (its width and height, rounded bottom corners) with the same treatment, so users who don't extend the notch can still have it glow.
   Acceptance: a Desk pulse shows no light above or beside the top of the wings; with the island off, a glow outlines the hardware notch; with the island on, unchanged from item 21 with its fixes.
@@ -203,3 +203,9 @@ New options keep today's behavior by default; the camera light and the glow star
   What to build: the widget's tier bars use the same per-meter warning rule and settings as the Desk meters (item 25): a warning tier's bar turns red with a steady glow in the current theme's accent (in Match Desk, the Desk ink gradient) around the bar. Non-warning bars unchanged. The Meters settings page says it applies to both the Desk and the widget.
   Acceptance: a weekly tier at 92% with days left shows red with a theme-color glow on the widget, and the same on Desk; turning its warning off clears both.
   Verify: swift-testing that the widget's warning state per tier matches `MeterWarning` for the same inputs; smoke: state for the widget tiers gains `warning` (or reuse meters state) and a scenario forcing a warning checks it; an on-screen capture of the widget.
+
+- [ ] **28. Quit says what it quits**
+  Spec ref: New — review of the 2.3.0 build (the menu model `Models/SanduhrMenu.swift`)
+  What to build: the menus' first item reads Show Widget / Hide Widget (it only ever touched the floating widget), and Quit reads "Quit Sanduhr für Claude" so it is clear it closes everything (widget, Desk, notch). Same in all three menus and on Settings, General's Quit button, with a caption there saying it closes the widget, Desk and the notch.
+  Acceptance: the three menus and Settings use the new names; nothing else changes.
+  Verify: menu model tests; smoke scenarios that match menu titles updated.
