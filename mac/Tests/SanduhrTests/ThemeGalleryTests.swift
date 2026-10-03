@@ -13,7 +13,8 @@ struct ThemeGalleryTests {
 
     @Test func builtInsInOrder() {
         let items = ThemeGallery.items(builtIns: ThemeRegistry.builtIn, user: [], current: "aurora")
-        #expect(items.map(\.id) == ["obsidian", "aurora", "ember", "mint", "626-labs", "matrix", "blueprint"])
+        #expect(items.map(\.id) == ["obsidian", "aurora", "ember", "mint", "626-labs", "matrix", "blueprint",
+                                  "match-desk"])
         #expect(items.map(\.name).contains("Obsidian"))
         #expect(items.allSatisfy { !$0.isUser })
     }

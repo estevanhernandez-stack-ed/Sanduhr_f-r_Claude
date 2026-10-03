@@ -49,6 +49,16 @@ enum ThemeGallery {
         return items(builtIns: builtIns, user: user, current: current)
     }
 
+    /// The gallery with the built-in Match Desk card drawn in Desk's ink as it is now, so its
+    /// preview follows Desk's settings. A user theme that took Match Desk's id is left as it is.
+    static func withLiveDesk(_ items: [ThemeGalleryItem], ink: String, shadow: Bool) -> [ThemeGalleryItem] {
+        items.map { item in
+            guard item.id == DeskThemeMapping.id, !item.isUser else { return item }
+            return ThemeGalleryItem(theme: DeskThemeMapping.theme(ink: ink, shadow: shadow),
+                                    isCurrent: item.isCurrent, isUser: false)
+        }
+    }
+
     private static func isValid(_ theme: Theme) -> Bool {
         !theme.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !theme.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

@@ -17,23 +17,23 @@ struct ProgressBarView: View {
         GeometryReader { g in
             let fillWidth = max(utilization / 100, 0.008) * g.size.width
             ZStack(alignment: .leading) {
-                // Track — subtle linear gradient instead of flat, for depth.
-                LinearGradient(
-                    colors: [palette.barBg.opacity(0.9), palette.barBg.opacity(0.6)],
-                    startPoint: .top, endPoint: .bottom)
+                if let ink = palette.ink {
+                    // Match Desk: Desk's meter, the ink faint for the track and full for the
+                    // fill, until the warning line hands the fill back to the usage colors.
+                    inkRun(ink).opacity(0.22)
+                    if DeskThemeMapping.inkCarries(utilization) {
+                        inkRun(ink).frame(width: fillWidth)
+                    } else {
+                        usageFill(width: fillWidth)
+                    }
+                } else {
+                    // Track — subtle linear gradient instead of flat, for depth.
+                    LinearGradient(
+                        colors: [palette.barBg.opacity(0.9), palette.barBg.opacity(0.6)],
+                        startPoint: .top, endPoint: .bottom)
 
-                // Fill with a top-to-bottom sheen in the tier color.
-                let base = usageColor(utilization)
-                LinearGradient(
-                    colors: [base.opacity(0.95), base.opacity(0.72)],
-                    startPoint: .top, endPoint: .bottom)
-                    .frame(width: fillWidth)
-                    .overlay(
-                        Rectangle()
-                            .fill(Color.white.opacity(0.18))
-                            .frame(width: fillWidth, height: 1)
-                            .frame(maxHeight: .infinity, alignment: .top)
-                    )
+                    usageFill(width: fillWidth)
+                }
 
                 // Breathing glass — subliminal accent-tinted pulse over the
                 // fill only, scoped inside the clipShape so empty tracks
@@ -55,14 +55,36 @@ struct ProgressBarView: View {
                 // with windows/src/sanduhr/tiers.py::_update_pace_tick.
                 if let f = paceFraction {
                     let tickX = max(0, min(g.size.width - 2, f * g.size.width))
+                    // Under Match Desk the tick is ink on ink, so it stands taller than the
+                    // bar, as on Desk's meters, to read where it crosses the fill.
                     palette.paceMarker
                         .opacity(palette.ghostAlpha)
-                        .frame(width: 2)
+                        .frame(width: 2, height: palette.ink == nil ? nil : g.size.height * 1.6)
                         .offset(x: tickX)
                 }
             }
         }
         .frame(height: 10)
+    }
+
+    /// The fill with a top-to-bottom sheen in the tier color.
+    private func usageFill(width fillWidth: CGFloat) -> some View {
+        let base = usageColor(utilization)
+        return LinearGradient(
+            colors: [base.opacity(0.95), base.opacity(0.72)],
+            startPoint: .top, endPoint: .bottom)
+            .frame(width: fillWidth)
+            .overlay(
+                Rectangle()
+                    .fill(Color.white.opacity(0.18))
+                    .frame(width: fillWidth, height: 1)
+                    .frame(maxHeight: .infinity, alignment: .top)
+            )
+    }
+
+    /// The Desk ink run left to right, as Desk's meters draw it.
+    private func inkRun(_ ink: Theme.Palette.Ink) -> LinearGradient {
+        LinearGradient(colors: ink.stops, startPoint: .leading, endPoint: .trailing)
     }
 
     /// One frame of the breathing-glass shimmer. Alpha oscillates via

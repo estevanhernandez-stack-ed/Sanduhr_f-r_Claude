@@ -276,6 +276,10 @@ module Smoke
       if !before['camera_in_use'] && !after['camera_in_use'] && !!before['camera_light'] != !!after['camera_light']
         steps << ['camera-light', before['camera_light'] ? 'on' : 'off']
       end
+      # The widget theme a scenario picked goes back to the one in use before.
+      if before['theme'] && before['theme'] != after['theme']
+        steps << ['theme', before['theme']]
+      end
       if before['settings_open']
         if !after['settings_open'] || before['settings_section'] != after['settings_section']
           steps << ['settings', before['settings_section']]

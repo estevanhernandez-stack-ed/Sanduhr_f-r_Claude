@@ -63,6 +63,8 @@ struct DebugLinkTests {
         #expect(parse("sanduhr://debug/action?name=glow").command == .action(.glow(.alert), dir: nil))
         #expect(parse("sanduhr://debug/action?name=glow&arg=meeting").command == .action(.glow(.meeting), dir: nil))
         #expect(parse("sanduhr://debug/action?name=glow&arg=CAMERA").command == .action(.glow(.camera), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=theme&arg=match-desk").command == .action(.theme("match-desk"), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=theme&arg=Obsidian").command == .action(.theme("obsidian"), dir: nil))
     }
 
     @Test func badActionsKeepTheDirForTheError() {
@@ -73,6 +75,7 @@ struct DebugLinkTests {
         #expect(parse("sanduhr://debug/action?name=desk").error == "desk needs arg=on or arg=off")
         #expect(parse("sanduhr://debug/action?name=camera-light").error == "camera-light needs arg=on or arg=off")
         #expect(parse("sanduhr://debug/action?name=glow&arg=sound").error == "glow needs arg=alert, meeting or camera")
+        #expect(parse("sanduhr://debug/action?name=theme").error == "theme needs arg=<theme id>")
         #expect(parse("sanduhr://debug/action?name=tool&arg=hammer").error == "tool needs arg=deep-work, pacing or snake")
         #expect(parse("sanduhr://debug/action?name=settings&arg=nowhere").error?.hasPrefix("unknown settings section") == true)
         #expect(parse("sanduhr://debug/action?name=pulse&arg=hourly").error == "unknown tier: hourly")

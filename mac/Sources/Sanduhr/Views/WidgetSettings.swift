@@ -312,6 +312,13 @@ struct WidgetSettings: View {
 
             Toggle("Subtle mode: no background, just the numbers over your desktop", isOn: $display.subtle)
 
+            if vm.theme.palette.ink != nil {
+                Text("The Match Desk theme is in use: the widget draws in Desk's font, without the glass. Your font and subtle mode come back with any other theme.")
+                    .font(.caption)
+                    .foregroundStyle(t.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Text("Sanduhr 0:42 left, 68%")
                 .font(.app(size: 18, weight: .semibold))
                 .foregroundStyle(t.text)

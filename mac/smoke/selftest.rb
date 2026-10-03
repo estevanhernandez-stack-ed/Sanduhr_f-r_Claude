@@ -55,6 +55,7 @@ class FakeApp
     when 'hide-widget' then s['widget_visible'] = false
     when 'settings' then s['settings_open'] = true; s['settings_section'] = arg if arg
     when 'close-settings' then s['settings_open'] = false
+    when 'theme' then s['theme'] = arg
     when 'tool'
       if arg == 'pacing' then s['pacing_pinned'] = !s['pacing_pinned']
       else s['active_tool'] = s['active_tool'] == arg ? nil : arg
@@ -172,6 +173,11 @@ eq('pacing on a hidden widget shows it first',
    [['show-widget', nil], %w[tool pacing], ['hide-widget', nil]])
 eq('camera light switched on by hand goes off',
    Restore.plan(base, base.merge('camera_light' => true)), [%w[camera-light off]])
+eq('theme picked by the scenario goes back',
+   Restore.plan(base.merge('theme' => 'obsidian'), base.merge('theme' => 'match-desk')), [%w[theme obsidian]])
+eq('theme unchanged or unknown before is left alone',
+   [Restore.plan(base.merge('theme' => 'aurora'), base.merge('theme' => 'aurora')),
+    Restore.plan(base, base.merge('theme' => 'match-desk'))], [[], []])
 eq('camera light from a running camera is left alone',
    Restore.plan(base, base.merge('camera_light' => true, 'camera_in_use' => true)), [])
 
@@ -201,6 +207,12 @@ check('failure says why', r['steps'][2]['detail'].to_s.include?('meters.0.percen
 eq('fail scenario still restores defaults', mem.read(DOMAIN, 'alertSound'), %w[string Glass])
 eq('fail scenario still restores the notch', app2.actions, ['notch on', 'notch off'])
 
+app4 = FakeApp.new('theme' => 'obsidian')
+runner4 = Runner.new(app4, mem, out, io: io, settle: 0, poll: 0.01, within: 0.05)
+r = runner4.run_file(File.join(FIXTURES, 'scenarios', 'theme-fail.yaml'))
+eq('theme scenario fails after picking a theme', [r['status'], app4.actions.first], ['fail', 'theme match-desk'])
+eq('failed theme scenario puts the theme back', [app4.actions.last, app4.state_now['theme']], ['theme obsidian', 'obsidian'])
+
 app3 = FakeApp.new('meters' => [])
 runner3 = Runner.new(app3, mem, out, io: io, settle: 0, poll: 0.01, within: 0.05)
 r = runner3.run_file(File.join(FIXTURES, 'scenarios', 'skip.yaml'))
@@ -219,7 +231,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow]
+    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end

@@ -72,7 +72,9 @@ as `notch` or `deskLayout`), `close-settings`, `refresh` (waits for the fetch), 
 again it closes), `desk on|off`, `notch on|off`, `camera-light on|off` (the light by hand, as Tools, Camera Light;
 its window is kind `camera` in tree.yaml, one node labeled `Camera light`), `glow [alert|meeting|camera]`
 (the notch glow once, whatever its switches; drawn only while Desk runs with the island on, in a
-click-through window of kind `glow` labeled `Notch glow` that fades out after about three seconds).
+click-through window of kind `glow` labeled `Notch glow` that fades out after about three seconds),
+`theme <id>` (the widget theme by id, as the Theme menu and the gallery pick it, such as `obsidian`
+or `match-desk`; an unknown id answers with an error listing the ids).
 
 ## Scenarios
 
@@ -97,7 +99,7 @@ steps:
 `expect` and `expect_state` retry for up to 3 s (`within: <seconds>` on `expect` changes it),
 since the UI settles after an action. A failing step stops the scenario. Either way, at the end
 every default the scenario wrote is put back (deleted if it was not set), and Desk, notch, widget,
-the tools and the Settings window are put back as they were. `run` prints a line per step and a
+the tools, the widget theme and the Settings window are put back as they were. `run` prints a line per step and a
 summary, writes `out/run-<time>/report.yaml` with the snaps beside it, and exits 1 on a failure.
 
 The shipped scenarios cover the automatable parts of `docs/mac-smoke-test.md`. Fresh-install and

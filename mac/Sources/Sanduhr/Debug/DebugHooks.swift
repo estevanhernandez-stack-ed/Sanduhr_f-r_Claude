@@ -54,6 +54,8 @@ enum DebugHooks {
             } else {
                 run()
             }
+        case .action(.theme(let id), _) where ThemeRegistry.theme(id: id) == nil:
+            finish(dir, error: "unknown theme: \(id) (one of \(ThemeRegistry.themes.map(\.id).joined(separator: ", ")))")
         case .action(let action, _):
             perform(action, app: app) { finish(dir) }
         }
@@ -111,6 +113,7 @@ enum DebugHooks {
             UserDefaults.desk.set(on, forKey: DeskController.notchKey)
         case .cameraLight(let on): CameraLightController.shared.setManual(on)
         case .glow: NotchGlowController.shared.fire()
+        case .theme(let id): app.viewModel.selectTheme(id: id)
         }
         settle()
     }

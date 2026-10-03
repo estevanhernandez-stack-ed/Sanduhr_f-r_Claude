@@ -16,6 +16,11 @@ struct TierCardView: View {
 
     private var util: Double { usage.utilization ?? 0 }
 
+    /// The percentage in the usage color, or under Match Desk in the ink until the warning line.
+    private var readoutColor: Color {
+        palette.ink != nil && DeskThemeMapping.inkCarries(util) ? palette.text : usageColor(util)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             headerRow
@@ -78,9 +83,9 @@ struct TierCardView: View {
             Text("\(Int(util))%")
                 .font(.app(size: 13, weight: .bold,
                               design: palette.numericFontDesign))
-                .foregroundStyle(usageColor(util))
+                .foregroundStyle(readoutColor)
                 .monospacedDigit()
-                .shadow(color: usageColor(util).opacity(palette.accentBloom.alpha),
+                .shadow(color: readoutColor.opacity(palette.accentBloom.alpha),
                         radius: palette.accentBloom.blur)
         }
     }

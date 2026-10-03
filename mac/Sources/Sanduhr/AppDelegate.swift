@@ -403,12 +403,12 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
     /// Last Pin state the widget asked for; subtle-mode changes re-apply it.
     private static var pinned = true
 
-    /// Pin floats the widget above every window, except in subtle mode, where Pin sets it on
-    /// the desktop instead: below every app window, above the wallpaper, on every Space.
+    /// Pin floats the widget above every window, except in subtle mode (or Match Desk), where Pin
+    /// sets it on the desktop instead: below every app window, above the wallpaper, on every Space.
     static func refreshLevel(pinned newValue: Bool? = nil) {
         if let newValue { pinned = newValue }
         guard let panel = NSApp.windows.compactMap({ $0 as? FloatingPanel }).first else { return }
-        let subtle = DisplaySettings.shared.subtle
+        let subtle = DisplaySettings.shared.drawsSubtle
         if pinned && subtle {
             panel.isFloatingPanel = false
             panel.level = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)

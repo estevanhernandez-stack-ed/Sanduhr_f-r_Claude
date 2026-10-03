@@ -55,6 +55,11 @@ struct Theme: Identifiable, Hashable {
         /// CRT phosphor pulse feels more alive.
         let breathPeriodMs: Int
 
+        // Match Desk.
+        /// Desk ink drawing: the ink stops for the bars and Desk's drop-shadow switch. Set only
+        /// by the Match Desk theme; nil for every other theme, which draws as before.
+        var ink: Ink? = nil
+
         struct AccentBloom: Hashable {
             let blur: CGFloat
             let alpha: Double
@@ -63,6 +68,12 @@ struct Theme: Identifiable, Hashable {
         struct InnerHighlight: Hashable {
             let color: Color
             let alpha: Double
+        }
+
+        struct Ink: Hashable {
+            /// Two or more colors, left to right.
+            let stops: [Color]
+            let shadow: Bool
         }
     }
 }
@@ -251,6 +262,8 @@ enum ThemeRegistry {
                 innerHighlight: .init(color: .hex("4dffc4"), alpha: 0.15),
                 cardCornerRadius: 10,
                 ghostAlpha: 1.0, breathPeriodMs: 2800)),
+        // Desk's ink over the desktop; follows the Desk settings live (DeskThemeMapping).
+        DeskThemeMapping.builtIn,
     ]
 }
 

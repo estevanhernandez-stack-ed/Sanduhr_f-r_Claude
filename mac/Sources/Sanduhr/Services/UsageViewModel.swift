@@ -18,14 +18,56 @@ final class UsageViewModel {
     // MARK: Config (persisted)
 
     var theme: Theme {
-        didSet { UserDefaults.standard.set(theme.id, forKey: "theme") }
+        didSet {
+            UserDefaults.standard.set(theme.id, forKey: "theme")
+            applyDeskLook()
+        }
     }
 
     /// The one way a theme is picked: the widget's Theme menu and the Settings gallery both
-    /// call it, so they always agree. Takes the registry's current copy of the theme.
+    /// call it, so they always agree. Takes the registry's current copy of the theme; Match
+    /// Desk is built from Desk's settings as they are now.
     func selectTheme(id: String) {
-        if let picked = ThemeRegistry.theme(id: id) { theme = picked }
+        if let picked = Self.resolve(id) { theme = picked }
     }
+
+    /// A theme by id as the widget draws it: the registry's copy, or for the built-in Match
+    /// Desk, the theme drawn in Desk's current ink.
+    nonisolated static func resolve(_ id: String, desk: DefaultsStore = UserDefaults.desk) -> Theme? {
+        guard let registered = ThemeRegistry.theme(id: id) else { return nil }
+        guard registered.palette.ink != nil else { return registered }
+        let look = DeskLook.read(desk)
+        return DeskThemeMapping.theme(ink: look.ink, shadow: look.shadow)
+    }
+
+    /// Re-reads the current theme by id, so a user theme edited and reloaded, or Desk's ink
+    /// changed under Match Desk, restyles the widget without being picked again. A theme that
+    /// no longer resolves stays as it is.
+    func reresolveTheme() {
+        if let fresh = Self.reresolved(theme) { theme = fresh }
+        applyDeskLook()
+    }
+
+    /// The current theme as the registry (or Desk, for Match Desk) has it now, or nil when it
+    /// is unchanged or no longer resolves.
+    nonisolated static func reresolved(_ current: Theme, desk: DefaultsStore = UserDefaults.desk) -> Theme? {
+        guard let fresh = resolve(current.id, desk: desk), fresh != current else { return nil }
+        return fresh
+    }
+
+    /// Match Desk's font and glass-free drawing while it is current; the user's own font and
+    /// subtle switch otherwise. Neither saved setting is touched.
+    private func applyDeskLook() {
+        let matching = theme.palette.ink != nil
+        let font: String? = matching ? DeskLook.read(UserDefaults.desk).font : nil
+        if FontSettings.shared.deskFamily != font { FontSettings.shared.deskFamily = font }
+        if DisplaySettings.shared.themeDrawsSubtle != matching {
+            DisplaySettings.shared.themeDrawsSubtle = matching
+        }
+    }
+
+    /// Follows Desk's font, ink and shadow while Match Desk is current.
+    @ObservationIgnored private var deskObserver: DeskLookObserver?
 
     var compact: Bool = false {            // double-click title to toggle
         didSet {
@@ -47,8 +89,10 @@ final class UsageViewModel {
     var countdownTick: Int = 0
     /// Bumped whenever the user installs/reloads/deletes a theme so the
     /// theme dropdown re-reads `ThemeRegistry.themes`. SwiftUI can't
-    /// observe a static registry otherwise.
-    var userThemesTick: Int = 0
+    /// observe a static registry otherwise. The current theme is re-read by id at each bump.
+    var userThemesTick: Int = 0 {
+        didSet { reresolveTheme() }
+    }
     /// The overlay open on the widget (Deep Work or Cooldown Snake), nil for the cards. The
     /// Tools items in every menu set it and show it checked.
     var activeTool: WidgetTool?
@@ -120,7 +164,14 @@ final class UsageViewModel {
 
     init() {
         let stored = UserDefaults.standard.string(forKey: "theme") ?? ""
-        self.theme = ThemeRegistry.theme(id: stored) ?? ThemeRegistry.default
+        self.theme = Self.resolve(stored) ?? ThemeRegistry.default
+        applyDeskLook()
+        deskObserver = DeskLookObserver { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.theme.palette.ink != nil else { return }
+                self.reresolveTheme()
+            }
+        }
     }
 
     /// Called once the app has a window + a session key.

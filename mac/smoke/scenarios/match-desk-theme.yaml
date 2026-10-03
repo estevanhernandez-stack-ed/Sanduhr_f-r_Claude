@@ -1,0 +1,15 @@
+# Iteration 3 item 24: the Match Desk theme draws the widget in Desk's ink, font and shadow,
+# without the glass. Picked as the gallery and the Theme menu pick it; a gradient ink written to
+# Desk's settings restyles it at once (check the two snaps). The run puts the theme, the ink and
+# the widget back, also when a step fails.
+name: Match Desk theme on the widget
+steps:
+  - do: show-widget
+  - do: theme
+    arg: match-desk
+  - expect_state: { theme: match-desk, widget_visible: true }
+  - snap: match-desk-widget
+  - defaults: { domain: desk, key: inkColor, type: string, value: "531b93,012089,00fdff" }
+  - wait: 1
+  - expect_state: { theme: match-desk }
+  - snap: match-desk-gradient
