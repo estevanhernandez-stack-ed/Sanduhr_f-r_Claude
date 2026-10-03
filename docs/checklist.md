@@ -162,7 +162,7 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: each choice shows on the right wing within a refresh; "nothing" leaves a plain black wing; an update changes nothing for anyone until they pick.
   Verify: swift-testing for the pure text-per-slot function across choices, times and stale meters; smoke scenario for `state.yaml` notch slots.
 
-- [ ] **20. The notch as a camera light**
+- [x] **20. The notch as a camera light**
   Spec ref: New
   What to build: while any app uses the camera (CoreMediaIO `kCMIODevicePropertyDeviceIsRunningSomewhere` on video devices, observed with a property listener; no permission), the notch area glows as a soft white light to light the user's face: a click-through window above every app around the notch (wings plus a band below, rounded, feathered edge), with brightness and size sliders in Settings, Desk, Notch, off by default. Ends when the camera stops. Works with the notch island on or off; on a screen without a notch, the light sits at the top center of the main screen. A Tools menu item turns it on by hand for a test.
   Acceptance: turning on a FaceTime or Teams camera lights it within a second, turning it off ends it; it never takes clicks; it sits above full-screen apps.
