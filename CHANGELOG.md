@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+## v2.3.2-mac — 2026-10-03
+
 - **Your session key moves to the Keychain.** Sanduhr now keeps your `sessionKey` and `cf_clearance` in the macOS Keychain instead of a file in Application Support. Nothing to do: on the first launch after updating, Sanduhr moves them over, checks the Keychain holds them, and only then deletes the old file, with no sign-in and no password prompt. If the move fails for any reason, the file stays and Sanduhr keeps working with it, and tries again next launch.
 
 ## v2.3.1-mac — 2026-10-03
