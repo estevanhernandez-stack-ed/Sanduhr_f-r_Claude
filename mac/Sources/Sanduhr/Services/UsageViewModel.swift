@@ -40,11 +40,39 @@ final class UsageViewModel {
     }
 
     /// Re-reads the current theme by id, so a user theme edited and reloaded, or Desk's ink
-    /// changed under Match Desk, restyles the widget without being picked again. A theme that
-    /// no longer resolves stays as it is.
+    /// changed under Match Desk, restyles the widget without being picked again. A user theme
+    /// whose file is gone falls back to the default at once (and says so in the log); one whose
+    /// file is still there but no longer loads (half-saved in an editor) stays as it is.
     func reresolveTheme() {
-        if let fresh = Self.reresolved(theme) { theme = fresh }
+        switch Self.afterReload(theme, fileExists: { UserThemes.fileIDs().contains($0) }) {
+        case .keep: break
+        case .update(let fresh): theme = fresh
+        case .fallBack(let fallback):
+            NSLog("[Sanduhr] Theme \(theme.id) was removed from the themes folder; using \(fallback.displayName)")
+            theme = fallback
+        }
         applyDeskLook()
+    }
+
+    /// What a reload means for the current theme.
+    enum ThemeAfterReload: Equatable {
+        /// Unchanged, or no longer loading while its file is still there.
+        case keep
+        /// The registry (or Desk, for Match Desk) has a newer copy.
+        case update(Theme)
+        /// Its file is gone: the default theme.
+        case fallBack(Theme)
+    }
+
+    /// The current theme after the themes folder was read again. `fileExists` says whether the
+    /// folder has a file for an id; it is asked only when the theme no longer resolves.
+    nonisolated static func afterReload(_ current: Theme, fileExists: (String) -> Bool,
+                                        desk: DefaultsStore = UserDefaults.desk) -> ThemeAfterReload {
+        if ThemeRegistry.theme(id: current.id) != nil {
+            return reresolved(current, desk: desk).map { .update($0) } ?? .keep
+        }
+        if fileExists(current.id) { return .keep }
+        return .fallBack(resolve(ThemeRegistry.default.id, desk: desk) ?? ThemeRegistry.default)
     }
 
     /// The current theme as the registry (or Desk, for Match Desk) has it now, or nil when it
@@ -68,6 +96,8 @@ final class UsageViewModel {
     /// Follows Desk's font, ink and shadow while Match Desk is current.
     @ObservationIgnored private var deskObserver: DeskLookObserver?
     @ObservationIgnored private var meterSettingsObserver: NSObjectProtocol?
+    /// Reloads the user themes when a file in the themes folder changes outside the app.
+    @ObservationIgnored private var themeWatcher: ThemeFolderWatcher?
 
     var compact: Bool = false {            // double-click title to toggle
         didSet {
@@ -189,6 +219,14 @@ final class UsageViewModel {
             forName: UserDefaults.didChangeNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshMeterWarnings() }
+        }
+        // A theme file added, edited or deleted in Finder or an editor: reload, and the tick
+        // re-lists the gallery and the Theme menu and re-reads (or drops) the current theme.
+        themeWatcher = ThemeFolderWatcher { [weak self] in
+            MainActor.assumeIsolated {
+                UserThemes.reload()
+                self?.userThemesTick &+= 1
+            }
         }
     }
 

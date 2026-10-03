@@ -4,6 +4,7 @@
 
 - **The notch glow traces only what you can see.** The strip under the camera lives on the desktop layer, so an app window across the top of the screen hides it. The glow used to outline the hidden strip anyway, a halo around nothing. Now, when a window covers the strip as a glow starts, the glow hugs the wings alone; with the strip in view it goes around wings and strip as before.
 - **The camera light lets go of the cameras cleanly.** Turning "Light up for the camera" off now removes every camera listener it added, and a listener macOS refuses is noted once in the log instead of going unnoticed.
+- **Deleting your current theme's file switches to Obsidian right away.** Sanduhr now watches its themes folder. Delete the file of the theme you're using in Finder (or move it out) and the widget goes back to Obsidian at once, instead of keeping the deleted theme until the next launch; the log says so. Themes you add, edit or delete there also show up in the Theme menu and the Settings gallery without pressing Reload. A file that is still there but fails to load, say half-saved in an editor, keeps its theme until it loads again.
 
 ## v2.3.3-mac — 2026-10-03
 
