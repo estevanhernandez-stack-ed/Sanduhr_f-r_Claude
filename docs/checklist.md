@@ -241,13 +241,13 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: a relaunch with a bad saved key and "Hidden while Desk is on" shows the widget; picking Always shown brings a tucked widget back; a warning bar is told apart from a plain 90%+ bar without color and by VoiceOver.
   Verify: swift-testing for `SignInGate` (never-fetched key, marker cleared by sign-out or a refused key, the 2.3.2 upgrader path), Always shown on `.choiceChanged`, and `MeterWarning.spokenValue`; on screen: the triangle on a forced warning on the widget and Desk (smoke-test "Warning bars" step), and VoiceOver on one warning and one plain row.
 
-- [ ] **34. Issue #105 follow-ups**
+- [x] **34. Issue #105 follow-ups**
   Spec ref: issue #105, "Follow-ups from the same review" (closed with 2.3.3)
   What to build: (a) the notch glow traces only what is visible: when an app window covers the strip under the camera (the strip lives in the Desk window, below app windows), the glow follows the wings/notch outline, not the hidden strip; (b) `CameraMonitor` removes its CoreMediaIO property listeners with the same block it added (store the block; the Core Audio block-bridging trap) and logs a failed add/remove `OSStatus` once, without spamming; (c) when the current user theme is deleted outside the app, Sanduhr falls back to the default theme right away (and says so in the log), instead of keeping it until the next launch.
   Acceptance: no glow traced around an invisible strip; listener add and remove statuses are checked and logged on failure; deleting the active theme's file switches to the default theme without a relaunch.
   Verify: swift-testing for the pure parts (glow outline choice from strip visibility, theme fallback decision); a smoke check or state key where useful; the CMIO statuses by hand (Console) on a Mac with a camera.
 
-- [ ] **35. Pick the organization that has the usage**
+- [x] **35. Pick the organization that has the usage**
   Spec ref: Windows `ClaudeApiParsing.ParseOrganizations` (2026-07-19: a login can carry a claude_max subscription org and an API individual org; `orgs[0]` is ordering luck)
   What to build: the Mac tracks the first organization `/api/organizations` lists. Port the Windows rule: the first org whose `capabilities` include `claude_max`, else the first with `chat`, else the first.
   Acceptance: a login whose first org is an API org fetches the subscription org's usage.
