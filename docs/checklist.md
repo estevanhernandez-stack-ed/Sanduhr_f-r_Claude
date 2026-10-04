@@ -254,6 +254,7 @@ New options keep today's behavior by default; the camera light and the glow star
   Verify: swift-testing on the choice and on decoding real-shaped org JSON (capabilities missing, empty, mixed).
 
 - [ ] **36. Accounts (Windows 2.2 parity)**
+  Spec: `docs/mac-accounts-spec.md`.
   Spec ref: `docs/mac-merge-plan.md` feature inventory (multi-account registry, Accounts tab, active-account label, account-scoped sign-out; per-account history); Windows `AccountStore`, `UsageHistory`, `SnapshotContract.AccountRef`
   What to build: named accounts (registry and active label in defaults; each account's key in the Keychain under `sessionKey:{label}` / `cf_clearance:{label}`, the file on dev builds); the existing key promotes to "Personal" on first launch; Settings, Accounts to add, rename, remove and switch; the active account's name on the widget and in the menus; Sign Out removes the active account; history per account (`history.{label}.json`, the current file moving to Personal); `account_ref` in `snapshot.json` hashed as on Windows. Only the active account is fetched (decided 2026-10-03).
   Acceptance: two accounts switch without a relaunch, each with its own history; signing out one leaves the other; an upgrade lands on Personal with nothing lost.
