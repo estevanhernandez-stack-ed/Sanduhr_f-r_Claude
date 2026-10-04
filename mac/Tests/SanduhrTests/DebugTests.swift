@@ -239,6 +239,7 @@ struct DebugStateTests {
         s.glowShape = .plain
         s.glowSwitches = NotchGlowSwitches(alerts: true, meetings: false, camera: true)
         s.theme = "aurora"
+        s.menuBar = .rotate
         s.notchRight = .message
         s.cameraLight = true
         s.menu = SanduhrMenu.groups(widgetVisible: true, deepWork: false, pacing: true, snake: false)
@@ -249,12 +250,12 @@ struct DebugStateTests {
             .map { String($0.split(separator: ":")[0]) }
         #expect(keys == ["desk_enabled", "desk_running", "layout", "notch", "has_notch",
                          "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "widget_visible", "widget_visibility",
-                         "settings_open", "settings_section", "meters", "widget_warnings", "meetings_count", "alerts",
+                         "menu_bar", "settings_open", "settings_section", "meters", "widget_warnings", "meetings_count", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
                          "glow_camera", "theme", "menu", "credentials_store", "account_ref", "accounts_count",
                          "follow", "follow_paused", "version", "build"])
         #expect(yaml.contains("settings_section: notch\n"))
-        #expect(yaml.contains("widget_visible: true\nwidget_visibility: whileDeskOff\nsettings_open: true\n"))
+        #expect(yaml.contains("widget_visible: true\nwidget_visibility: whileDeskOff\nmenu_bar: rotate\nsettings_open: true\n"))
         #expect(yaml.contains("notch_left: meetingOrTime\nnotch_right: message\nnotch_strip: meetingOrMeters\ncamera_in_use: false\ncamera_light: true\n"))
         #expect(yaml.contains("pulse_count: 3\nglow_count: 2\nglow_shape: plain\nglow_alerts: true\nglow_meetings: false\nglow_camera: true\ntheme: aurora\nmenu:\n"))
         #expect(yaml.contains("layout: message:tl") == false)   // the colons force quotes

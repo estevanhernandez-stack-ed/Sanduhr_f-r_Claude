@@ -10,6 +10,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let viewModel = UsageViewModel()
     private var panel: FloatingPanel?
     private var statusItem: NSStatusItem?
+    /// Rotate's timer (Settings, General, Menu bar), nil in every other mode; the step counts its turns.
+    private var menuBarRotateTimer: Timer?
+    private var menuBarStep = 0
     private let updaterController = SPUStandardUpdaterController(
         startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
     /// Sparkle's settings and Check Now for Settings, Updates; the same updater the menus use.
@@ -105,6 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: .sanduhrCompactDidChange, object: nil)
 
         viewModel.bootstrap()
+        applyMenuBarRotation()
         renderStatusItem()
 
         // Desk: the desktop layer and the notch, when switched on (Settings, General, Surfaces).
@@ -209,13 +213,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Re-renders the status item title based on the current usage data.
+    /// Settings, General, Menu bar changed: start or stop Rotate's timer and redraw at once.
+    func menuBarModeDidChange() {
+        applyMenuBarRotation()
+        renderStatusItem()
+    }
+
+    /// Rotate's timer runs only while Rotate is chosen. Added in the common modes so the text
+    /// keeps turning while a menu is open; only the shown text changes, nothing is fetched.
+    private func applyMenuBarRotation() {
+        let rotating = MenuBarMode.saved() == .rotate
+        if rotating, menuBarRotateTimer == nil {
+            let timer = Timer(timeInterval: MenuBarMode.rotateInterval, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.menuBarStep &+= 1
+                    self.renderStatusItem()
+                }
+            }
+            timer.tolerance = 1
+            RunLoop.main.add(timer, forMode: .common)
+            menuBarRotateTimer = timer
+        } else if !rotating, let timer = menuBarRotateTimer {
+            timer.invalidate()
+            menuBarRotateTimer = nil
+            menuBarStep = 0
+        }
+    }
+
+    /// Re-renders the status item title from the current usage and the Menu bar choice
+    /// (MenuBarText: the session, the weekly limit, the higher of the two, or both in turn).
     func renderStatusItem() {
         guard let button = statusItem?.button else { return }
-        let pct = viewModel.highestTier()?.usage.utilization
+        let reading = MenuBarText.reading(viewModel.usage, mode: .saved(), step: menuBarStep)
 
-        if let pct {
-            let intPct = Int(pct)
+        if let reading {
+            let intPct = reading.percent
             // Color the number only when urgency is high — keeps the menu
             // bar neutral the rest of the time (HIG preference).
             let color: NSColor
@@ -227,7 +260,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let font = NSFont.monospacedDigitSystemFont(
                 ofSize: NSFont.systemFontSize(for: .small), weight: .medium)
             button.attributedTitle = NSAttributedString(
-                string: " \(intPct)%",
+                string: " \(reading.text)",
                 attributes: [.foregroundColor: color, .font: font])
         } else {
             // No data yet — just the icon.

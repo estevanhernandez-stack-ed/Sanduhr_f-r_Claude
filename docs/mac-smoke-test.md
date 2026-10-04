@@ -193,3 +193,13 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   Delete the run's `history.*.json` files and copy the backed-up ones and `credentials.json` back.
   A release build moves the file's keys into the Keychain on its next launch (the file wins).
   Delete `~/sanduhr-smoke/accounts/credentials.json` afterwards.
+
+## 10. Menu bar, hidden limits, duplicate names (item 38)
+
+- [ ] Menu bar: Settings, General, Menu bar shows "Percent beside the hourglass" set to Whichever
+  is higher (`smoke/smoke state` reads `menu_bar: higher`). With a model-specific or promo limit
+  (say Weekly — Special) above both the session and the weekly limit, the hourglass shows the
+  higher of those two, never the special one. Session: the session percent; Weekly: the weekly
+  percent (`menu_bar: session` / `weekly`). Rotate: "S 12%", then 8 seconds later "W 96%", and
+  so on, also while a menu is open; nothing else in the menu bar moves. Back to Whichever is
+  higher: the letters go and the text stops changing.

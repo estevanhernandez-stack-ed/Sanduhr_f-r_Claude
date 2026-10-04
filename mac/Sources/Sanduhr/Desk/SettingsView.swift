@@ -370,6 +370,7 @@ struct GeneralSection: View {
     @AppStorage(DeskController.notchKey, store: .desk) private var notch = false
     @AppStorage(AppDelegate.panelHiddenKey) private var panelHidden = false
     @AppStorage("menuIcon", store: .desk) private var menuIcon = false
+    @AppStorage(MenuBarMode.key) private var menuBarMode = MenuBarMode.higher
     @AppStorage("showMeetings", store: .desk) private var showMeetings = true
     @AppStorage("showClaude", store: .desk) private var showClaude = true
     @AppStorage(DeskController.hotKeysKey, store: .desk) private var hotKeys = true
@@ -402,9 +403,8 @@ struct GeneralSection: View {
                         do { if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() } }
                         catch { atLogin = SMAppService.mainApp.status == .enabled }
                     }
-                Toggle("Desk menu in the menu bar (meetings, join, settings)", isOn: $menuIcon)
-                    .onChange(of: menuIcon) { _, on in DeskController.shared.setMenuIcon(on) }
             }
+            menuBarSection
             Section("Calendar and Claude") {
                 Toggle("Read today's meetings", isOn: $showMeetings)
                     .onChange(of: showMeetings) { _, on in
@@ -432,6 +432,22 @@ struct GeneralSection: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// The percent beside the hourglass and the Desk menu's icon.
+    private var menuBarSection: some View {
+        Section("Menu bar") {
+            Picker("Percent beside the hourglass", selection: $menuBarMode) {
+                ForEach(MenuBarMode.allCases) { Text($0.label).tag($0) }
+            }
+            .onChange(of: menuBarMode) { _, _ in
+                (NSApp.delegate as? AppDelegate)?.menuBarModeDidChange()
+            }
+            Text("Only the session and the weekly all-models limit show here; Rotate switches between them every 8 seconds (S for session, W for weekly).")
+                .font(.caption).foregroundStyle(.secondary)
+            Toggle("Desk menu in the menu bar (meetings, join, settings)", isOn: $menuIcon)
+                .onChange(of: menuIcon) { _, on in DeskController.shared.setMenuIcon(on) }
+        }
     }
 }
 

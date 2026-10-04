@@ -10,6 +10,7 @@ camera_in_use: false
 camera_light: false
 widget_visible: true
 widget_visibility: always
+menu_bar: higher
 settings_open: true
 settings_section: notch
 meters:

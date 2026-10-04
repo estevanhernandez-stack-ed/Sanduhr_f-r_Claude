@@ -171,16 +171,6 @@ final class UsageViewModel {
     /// view model's import list.
     var onUsageUpdate: (() -> Void)?
 
-    /// The tier with the highest utilization, or nil if we have nothing.
-    /// Used by the menu bar status item to show a single at-a-glance %.
-    func highestTier() -> (tier: Tier, usage: TierUsage)? {
-        guard let u = usage else { return nil }
-        return Tier.allCases.compactMap { t -> (Tier, TierUsage)? in
-            guard let tu = u.tiers[t], tu.utilization != nil else { return nil }
-            return (t, tu)
-        }.max { ($0.1.utilization ?? 0) < ($1.1.utilization ?? 0) }
-    }
-
     enum StatusMessage: Equatable {
         case connecting
         case refreshing

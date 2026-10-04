@@ -257,6 +257,7 @@ enum DebugHooks {
         s.cameraLight = CameraLightController.shared.showing
         s.widgetVisible = widgetVisible
         s.widgetVisibility = .saved()
+        s.menuBar = .saved()
         s.settingsOpen = settings.isOpen
         s.settingsSection = settings.window == nil ? nil : settings.section
         // A `defaults write` from the smoke runner posts no change notice here: apply the saved
