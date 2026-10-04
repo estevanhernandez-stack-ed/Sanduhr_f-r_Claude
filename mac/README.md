@@ -153,7 +153,7 @@ Most accounts don't need this.
 | **Gear** button             | Open Sanduhr Settings               |
 | Hover a tier card           | Reveal cooldown / surplus metrics   |
 | Two-finger click widget     | Tools, Refresh, Settings, Quit menu |
-| Two-finger click a tier card | Accounts, Hide, Stop warnings, Meter Settings, then the widget menu |
+| Two-finger click a tier card | Accounts, Hide (temporary limits), Stop warnings, Hidden Limits, Meter Settings, then the widget menu |
 | Click a Desk meter          | Nothing: the meters are passive, clicks there do nothing |
 | Two-finger click a Desk meter | Show or Hide Widget, then the same limit menu |
 | Right-click the hourglass   | The widget menu plus Menu Bar Shows (Session, Weekly, Whichever is higher, Rotate) |

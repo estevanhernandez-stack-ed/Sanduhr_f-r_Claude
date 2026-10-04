@@ -203,9 +203,9 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   percent (`menu_bar: session` / `weekly`). Rotate: "S 12%", then 8 seconds later "W 96%", and
   so on, also while a menu is open; nothing else in the menu bar moves. Back to Whichever is
   higher: the letters go and the text stops changing.
-- [ ] Hidden limits: with a limit other than Session and Weekly reported (Weekly — Opus, Weekly —
-  Special…), Settings, Desk, Meters shows "Show this limit" on in its group (none on Session or
-  Weekly — All Models). Switch it off: its card leaves the widget and its row the Desk meters at
+- [ ] Hidden limits: with a temporary limit reported (Weekly — Special, or another limit listed
+  under `temporary_limits` since item 42), Settings, Desk, Meters shows "Show this limit" on in
+  its group (none on Session, Weekly — All Models or a model limit with a weekly reset). Switch it off: its card leaves the widget and its row the Desk meters at
   once (the widget shrinks to fit), its warning controls grey out, and `smoke/smoke state` lists
   it under `hidden_limits`. Settings, Alerts, a line low enough to cross it: no alert for it on
   the next refresh. Compact mode shows the fullest limit still shown. Switch it on: it comes back
@@ -228,8 +228,9 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   Accounts submenu (two accounts, the active one checked), then "Stop warnings for this limit"
   (no Hide), then "Meter Settings…", then the widget's usual items (Tools, Refresh, Settings…,
   Quit) with no second Accounts submenu. On the Session meter the warnings item reads
-  "Warn again for this limit" (off by default). On a limit beyond those two (Weekly — Opus,
-  Weekly — Special…) "Hide Weekly — …" shows too. With one account there is no Accounts submenu.
+  "Warn again for this limit" (off by default). On a temporary limit (under `temporary_limits`,
+  say Weekly — Special) "Hide Weekly — …" shows too; never on a model limit with a weekly reset
+  (item 42). With one account there is no Accounts submenu.
   The Desk menu starts with Show Widget (Hide Widget when it shows) since item 41, and the widget's
   usual items below it have no second one. A plain click on a meter does nothing; the Finder's own
   desktop menu never opens over the meters.
@@ -286,3 +287,37 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   meters and the name with no fade; the widget still keeps its height while it waits.
 - [ ] Switching to an account with no key: the old cards fade out and "Signed out — sign in"
   shows; the Desk shows the sign-in line.
+
+## 13. Temporary limits and their return (item 42)
+
+- [ ] Which limits can hide: `smoke/smoke state` lists `temporary_limits` (raw values only). With
+  Weekly — Special reported it is there; Session, Weekly — All Models and the model limits
+  (Sonnet, Opus, Cowork, Design, OAuth Apps) with a reset within 8 days are not. Settings, Desk,
+  Meters shows "Show this limit" only in the groups of `temporary_limits`; the other groups keep
+  just their warning controls. The two-finger menus (a Desk meter, a widget card) offer "Hide …"
+  only on those limits.
+- [ ] Hide records the numbers: hide Weekly — Special from its menu. `defaults read
+  com.626labs.sanduhr.desk meterHidden.iguana_necktie` shows `resetsAt` and `utilization` as it
+  read at that moment, and `limitFirstSeen` lists each reported limit with the date it first
+  showed (re-hiding never changes those dates).
+- [ ] Hidden Limits submenu: with Weekly — Special hidden, two-finger click any Desk meter, beside
+  the rows, or a widget card: "Hidden Limits ▸" sits above Meter Settings… and lists Weekly —
+  Special. Pick it: it is back on the widget and the Desk at once, Settings shows its switch on,
+  `hidden_limits` is empty and the `meterHidden.iguana_necktie` key is gone. With nothing hidden
+  the submenu is not there.
+- [ ] Return on a refill or a new window: hide it, then `defaults write com.626labs.sanduhr.desk
+  meterHidden.iguana_necktie -dict utilization 100` (a record 10+ points above what it
+  reads now) and Refresh: it shows again, and Console (subsystem `com.626labs.sanduhr`, category
+  `limits`) logs `hidden limit iguana_necktie shows again: refill`, no label. Same with
+  `-dict resetsAt "2020-01-01T00:00:00Z"`: `new_window`.
+- [ ] No longer temporary: `defaults write com.626labs.sanduhr.desk meterShow.seven_day_opus -bool
+  false` with Opus on a weekly reset, then Refresh: Opus stays shown, the key is cleared, and the
+  log reads `not_temporary`.
+- [ ] Old hides: a `meterShow.<tier> -bool false` written by hand (no record) on a temporary limit
+  stays hidden; after the next refresh `meterHidden.<tier>` holds that refresh's numbers.
+- [ ] The Desk takes the mouse at once: with another app in front, move the pointer quickly onto a
+  Desk meter and two-finger click without stopping: the limit menu opens, never the Finder's.
+  Launch (or switch Desk off and on) with the pointer resting on where the meters appear, wait
+  for them, then two-finger click without moving: the limit menu. Hide a limit so the meters move
+  under a still pointer, then two-finger click: the limit menu. With the pointer far from the
+  Desk blocks, Activity Monitor shows Sanduhr idle (no timer runs there).
