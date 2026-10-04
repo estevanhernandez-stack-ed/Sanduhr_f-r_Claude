@@ -79,6 +79,11 @@ final class DeskModel {
     var notchRect: CGRect?
     /// The Claude meters, short enough for the notch: "5h 7%  wk 63%".
     var claudeCompact: String?
+    /// What plays, after Now Playing's hide rules (NowPlayingController), nil for nothing to show.
+    /// In memory only.
+    var nowPlaying: NowPlayingInfo?
+    /// The Desk's now playing line is switched on and has a track to show.
+    var nowPlayingDeskLine = false
     /// Where the meeting list sits in the window (SwiftUI global coordinates, top-left origin).
     /// The app delegate lets clicks through everywhere except here, so the rows can be clicked.
     @ObservationIgnored var meetingsFrame: CGRect = .zero { didSet { if meetingsFrame != oldValue { onHitAreasChange?() } } }
@@ -95,6 +100,11 @@ final class DeskModel {
     /// Where the account label at the start of the claude line sits, same coordinates, or .zero
     /// with one account or no line. A click here switches to the next account.
     @ObservationIgnored var accountFrame: CGRect = .zero { didSet { if accountFrame != oldValue { onHitAreasChange?() } } }
+    /// Where the Desk's now playing line sits, same coordinates. A click plays or pauses.
+    @ObservationIgnored var nowPlayingFrame: CGRect = .zero { didSet { if nowPlayingFrame != oldValue { onHitAreasChange?() } } }
+    /// Where the text in the strip under the camera sits, same coordinates (clickable while it
+    /// shows now playing).
+    @ObservationIgnored var stripFrame: CGRect = .zero { didSet { if stripFrame != oldValue { onHitAreasChange?() } } }
     /// Called when a clickable piece moves or comes and goes (DeskController takes the mouse there).
     @ObservationIgnored var onHitAreasChange: (() -> Void)?
     /// Alert pulses so far, per limit (Settings, Alerts, Where alerts show). A meter row pulses
@@ -343,6 +353,14 @@ final class DeskModel {
         input.noteFrame = noteFrame
         input.meetingsFrame = meetingsFrame
         input.rowFrames = rowFrames
+        input.nowPlayingLine = nowPlayingDeskLine && DeskNowPlaying.host(placed: input.placed) != nil
+        input.nowPlayingFrame = nowPlayingFrame
+        input.nowPlayingStrip = DeskNowPlaying.stripShows(
+            notch: desk.bool(forKey: DeskController.notchKey), hasNotch: notchRect != nil,
+            chin: desk.object(forKey: "notchChin") as? Double ?? 26,
+            chinText: desk.bool(forKey: "notchChinText"),
+            strip: NotchContent.saved(.strip, in: desk), hasTrack: nowPlaying != nil)
+        input.stripFrame = stripFrame
         return DeskElements.build(input)
     }
 

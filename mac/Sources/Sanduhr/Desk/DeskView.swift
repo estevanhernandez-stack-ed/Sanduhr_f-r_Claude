@@ -99,10 +99,27 @@ struct DeskView: View {
     private func view(for widget: Widget, alignment: HorizontalAlignment) -> some View {
         switch widget {
         case .clock: clock(alignment: alignment).deskInk()
-        case .claude: claude.deskInk()
-        case .meters: meters(alignment: alignment).deskInk()
+        case .claude: withNowPlaying(under: .claude, claude, alignment: alignment).deskInk()
+        case .meters: withNowPlaying(under: .meters, meters(alignment: alignment), alignment: alignment).deskInk()
         case .meetings: meetings(alignment: alignment).deskInk()
         case .message: message(alignment: alignment)
+        }
+    }
+
+    /// `content`, with the now playing line under it when this widget carries the line
+    /// (DeskNowPlaying.host) and a track shows.
+    @ViewBuilder
+    private func withNowPlaying(under widget: Widget, _ content: some View, alignment: HorizontalAlignment) -> some View {
+        let placed = Set(placement.values.joined().map(\.rawValue))
+        if model.nowPlayingDeskLine, let info = model.nowPlaying,
+           DeskNowPlaying.host(placed: placed) == widget.rawValue {
+            VStack(alignment: alignment, spacing: DeskNowPlaying.gap) {
+                content
+                DeskNowPlayingLine(info: info, model: model, ink: ink, font: font, size: timeSize * 0.17,
+                                   width: timeSize * 3.2, alignment: alignment)
+            }
+        } else {
+            content
         }
     }
 
@@ -435,7 +452,7 @@ private struct MeetingRow: View {
     }
 }
 
-private extension View {
+extension View {
     /// Reports this view's frame in global (window) coordinates when it appears and whenever it
     /// moves or resizes, for the clicks DeskController routes by position. Reported straight to
     /// the model, not through a PreferenceKey: on the Desk window the meters' preference reached

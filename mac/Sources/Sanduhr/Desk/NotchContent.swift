@@ -20,6 +20,9 @@ enum NotchContent: String, CaseIterable, Identifiable {
     case meters
     /// Today's Desk message line.
     case message
+    /// What plays on the Mac ("▶ Title · Artist", item 53), absent when nothing plays or, with
+    /// Hide while paused, while paused. Needs Settings, Desk, Now Playing switched on.
+    case nowPlaying
     case nothing
 
     var id: String { rawValue }
@@ -31,6 +34,7 @@ enum NotchContent: String, CaseIterable, Identifiable {
         case .time: "Time"
         case .meters: "Claude meters"
         case .message: "Message"
+        case .nowPlaying: "Now playing"
         case .nothing: "Nothing"
         }
     }
@@ -70,7 +74,7 @@ enum NotchContent: String, CaseIterable, Identifiable {
     /// The wings are short of room, so their meeting line clips long titles; the strip has the
     /// width under the camera and keeps them whole.
     func text(at place: Place, meetings: [Meeting], meters: String?, message: String?,
-              now: Date, timeZone: TimeZone = .current) -> String? {
+              nowPlaying: NowPlayingInfo? = nil, now: Date, timeZone: TimeZone = .current) -> String? {
         switch self {
         case .meetingOrTime:
             return Self.meeting(meetings, place: place, now: now) ?? Self.time(now, timeZone)
@@ -82,6 +86,8 @@ enum NotchContent: String, CaseIterable, Identifiable {
             return Self.nonEmpty(meters)
         case .message:
             return Self.nonEmpty(message?.trimmingCharacters(in: .whitespacesAndNewlines))
+        case .nowPlaying:
+            return NowPlayingText.line(nowPlaying, at: place)
         case .nothing:
             return nil
         }

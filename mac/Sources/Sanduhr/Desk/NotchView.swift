@@ -31,6 +31,8 @@ struct NotchView: View {
         // Extra height 0 means no strip under the camera at all: just the wings.
         if enabled, chin > 0, let notch = model.notchRect {
             let height = notch.height + chin
+            // Read here so a track change redraws at once, not at the next 15-second tick.
+            let _ = model.nowPlaying
             TimelineView(.periodic(from: .now, by: 15)) { context in
                 // Same widths as the wings above, so the strip and the wings stay one shape
                 // even when a wing grows to fit its text.
@@ -42,7 +44,7 @@ struct NotchView: View {
                         .fill(Color.black)
                     if showChinText, let line = stripContent.text(
                         at: .strip, meetings: model.meetings, meters: model.claudeCompact,
-                        message: model.message, now: context.date) {
+                        message: model.message, nowPlaying: model.nowPlaying, now: context.date) {
                         Text(line)
                             .font(.custom(font, size: max(11, chin * 0.55)))
                             .lineLimit(1)
@@ -52,6 +54,9 @@ struct NotchView: View {
                             .opacity(0.85)
                             .padding(.horizontal, 18)
                             .frame(height: chin)
+                            // Now playing under the camera takes clicks like the Desk line
+                            // (DeskController: click play/pause, two-finger click its menu).
+                            .onGlobalFrame { model.stripFrame = $0 }
                     }
                 }
                 .frame(width: notch.width + w.left + w.right, height: height)
@@ -112,6 +117,8 @@ struct NotchWingsView: View {
 
     var body: some View {
         if enabled {
+            // Read here so a track change redraws at once, not at the next 15-second tick.
+            let _ = model.nowPlaying
             TimelineView(.periodic(from: .now, by: 15)) { context in
                 let w = Self.layout(model: model, now: context.date, wings: wings, showText: showText,
                                     left: leftContent, right: rightContent,
@@ -123,9 +130,9 @@ struct NotchWingsView: View {
                         IslandShape(flare: 8, radius: min(10, barHeight * 0.3))
                             .fill(Color.black)
                         HStack(spacing: 0) {
-                            label(left, size).frame(width: max(0, wingL - 10), alignment: .trailing)
+                            wing(left, size, leftContent).frame(width: max(0, wingL - 10), alignment: .trailing)
                             Color.clear.frame(width: notchWidth + 20)
-                            label(right, size).frame(width: max(0, wingR - 10), alignment: .leading)
+                            wing(right, size, rightContent).frame(width: max(0, wingR - 10), alignment: .leading)
                         }
                     }
                     .frame(width: notchWidth + wingL + wingR, height: barHeight)
@@ -136,6 +143,23 @@ struct NotchWingsView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
             }
+        }
+    }
+
+    /// One wing's text. Now playing takes its own clicks: a click plays or pauses, a two-finger
+    /// click opens Previous, Play/Pause, Next and Now Playing Settings…; the rest of the island
+    /// still opens Settings.
+    @ViewBuilder
+    private func wing(_ text: String?, _ size: CGFloat, _ content: NotchContent) -> some View {
+        if content == .nowPlaying, text != nil {
+            label(text, size)
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .onTapGesture { NowPlayingController.shared.togglePlayPause() }
+                .contextMenu { NowPlayingMenuItems() }
+                .help("Play or pause. Two-finger click for more.")
+        } else {
+            label(text, size)
         }
     }
 
@@ -165,7 +189,7 @@ struct NotchWingsView: View {
     private static func text(_ content: NotchContent, at place: NotchContent.Place,
                              model: DeskModel, now: Date) -> String? {
         content.text(at: place, meetings: model.meetings, meters: model.claudeCompact,
-                     message: model.message, now: now)
+                     message: model.message, nowPlaying: model.nowPlaying, now: now)
     }
 
     private static func width(_ text: String?, _ size: CGFloat, _ font: String) -> CGFloat {
@@ -178,4 +202,17 @@ struct NotchWingsView: View {
 
     /// Widest a wing can get, so the window never needs resizing.
     static let maxWings: CGFloat = 180
+}
+
+/// The now playing menu as SwiftUI items, for the notch wings' context menu (the Desk uses
+/// NowPlayingController.menu(), an NSMenu, from its event monitors).
+struct NowPlayingMenuItems: View {
+    var body: some View {
+        let controller = NowPlayingController.shared
+        Button("Previous") { controller.previous() }
+        Button(controller.state == .playing ? "Pause" : "Play") { controller.togglePlayPause() }
+        Button("Next") { controller.next() }
+        Divider()
+        Button("Now Playing Settings…") { DeskController.shared.showSettings(.nowPlaying) }
+    }
 }

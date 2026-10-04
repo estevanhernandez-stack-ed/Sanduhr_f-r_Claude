@@ -38,6 +38,8 @@ final class DeskController: NSObject, NSMenuDelegate {
     func apply() {
         if enabled, !running { start() }
         if !enabled, running { stop() }
+        // Now playing runs only while Desk does (and its own switch is on).
+        NowPlayingController.shared.apply()
         let previous = appliedEnabled
         appliedEnabled = enabled
         if let previous, previous != enabled {
@@ -254,16 +256,16 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// window covers the meters or that app opened its own menu (DeskPointerMenu.fallbackOpens).
     /// The window then takes the mouse, so the next click reaches Desk directly.
     private func limitMenuAfterMissedClick() {
-        guard DeskHitTest.isMeters(elementUnderPointer()), !Self.appWindowCoversPointer() else { return }
+        guard DeskHitTest.hasMenu(elementUnderPointer()), !Self.appWindowCoversPointer() else { return }
         updateMouseThrough()
         DispatchQueue.main.asyncAfter(deadline: .now() + DeskPointerMenu.fallbackDelay) { [weak self] in
             guard let self, let w = self.window, let view = w.contentView else { return }
             let hit = self.elementUnderPointer()
-            guard DeskPointerMenu.fallbackOpens(overMeters: DeskHitTest.isMeters(hit),
+            guard DeskPointerMenu.fallbackOpens(overMeters: DeskHitTest.hasMenu(hit),
                                                 appWindowCovers: Self.appWindowCoversPointer(),
                                                 otherMenuOpen: Self.otherAppMenuOpen()) else { return }
             let at = view.convert(w.mouseLocationOutsideOfEventStream, from: nil)
-            self.limitMenu(for: hit).popUp(positioning: nil, at: at, in: view)
+            self.menu(for: hit).popUp(positioning: nil, at: at, in: view)
         }
     }
 
@@ -286,11 +288,17 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     /// A two-finger click on the meters opens the limit menu for the row under the pointer
     /// (LimitMenu): Accounts, Hide, the warnings item, Meter Settings…, then the shared menu.
+    /// On now playing (the Desk line or the strip under the camera), its menu instead.
     private func limitMenuUnderPointer(_ event: NSEvent) -> Bool {
         let hit = elementUnderPointer()
-        guard let view = window?.contentView, DeskHitTest.isMeters(hit) else { return false }
-        NSMenu.popUpContextMenu(limitMenu(for: hit), with: event, for: view)
+        guard let view = window?.contentView, DeskHitTest.hasMenu(hit) else { return false }
+        NSMenu.popUpContextMenu(menu(for: hit), with: event, for: view)
         return true
+    }
+
+    /// The two-finger menu for a hit: now playing's, or the limit menu on the meters.
+    private func menu(for hit: DeskElement?) -> NSMenu {
+        hit?.kind == .nowPlaying ? NowPlayingController.shared.menu() : limitMenu(for: hit)
     }
 
     /// The limit menu for a hit on the meters: that row's limit, or none beside the rows.
@@ -347,6 +355,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         case .account:
             // Event monitors run on the main thread.
             MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.viewModel.cycleAccount() }
+        case .nowPlaying:
+            NowPlayingController.shared.togglePlayPause()
         case .meters, .meterRow:
             // The window holds the mouse over the meters so a two-finger click reaches the limit
             // menu; a plain click is swallowed there, so nothing reacts to it.
@@ -383,7 +393,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         }
         let over = DeskHitTest.element(at: point, in: model.elements()) != nil
         if w.ignoresMouseEvents == over { w.ignoresMouseEvents = !over }
-        let blocks = [model.metersFrame, model.accountFrame, model.noteFrame, model.meetingsFrame]
+        let blocks = [model.metersFrame, model.accountFrame, model.noteFrame, model.meetingsFrame,
+                      model.nowPlayingFrame, model.stripFrame]
         watchApproach(DeskPointerWatch.near(point, frames: blocks))
     }
 
@@ -460,10 +471,11 @@ final class DeskController: NSObject, NSMenuDelegate {
         addStandardItems(to: menu)
     }
 
-    /// Option+S, …/settings links and the notch island: the one Settings window.
-    func showSettings() {
+    /// Option+S, …/settings links and the notch island: the one Settings window, at `section`
+    /// when given.
+    func showSettings(_ section: SettingsSection? = nil) {
         // Hotkeys, links and taps all arrive on the main thread.
-        MainActor.assumeIsolated { SettingsWindowController.shared.show() }
+        MainActor.assumeIsolated { SettingsWindowController.shared.show(section) }
     }
 
     /// Settings' "Desk menu in the menu bar" switch.
