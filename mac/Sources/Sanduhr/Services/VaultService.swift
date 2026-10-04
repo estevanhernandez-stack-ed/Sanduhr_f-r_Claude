@@ -50,6 +50,7 @@ final class VaultService: @unchecked Sendable {
     private let lock = NSLock()
     private var running = false
     private var lastOK: [String: Bool] = [:]
+    private var _onCycleEnd: (@Sendable () -> Void)?
 
     init(vaultDir: String, defaults: @escaping () -> DefaultsStore, writerVersion: String,
          timeZone: TimeZone = .current, log: VaultLogSink? = VaultLog.system,
@@ -108,8 +109,16 @@ final class VaultService: @unchecked Sendable {
             _ = ingestNow(roots)
             lock.lock()
             running = false
+            let done = onCycleEnd
             lock.unlock()
+            done?()
         }
+    }
+
+    /// Called after each triggered cycle, on the vault's queue (the Claude Usage page reloads).
+    var onCycleEnd: (@Sendable () -> Void)? {
+        get { lock.lock(); defer { lock.unlock() }; return _onCycleEnd }
+        set { lock.lock(); _onCycleEnd = newValue; lock.unlock() }
     }
 
     /// One cycle, on the caller's thread: each folder in turn, every write rechecked against
@@ -152,7 +161,23 @@ final class VaultService: @unchecked Sendable {
     /// `erase` on the caller's thread.
     @discardableResult
     func eraseNow(folder: String, wait: TimeInterval = VaultService.eraseWait) -> Bool {
-        let id = VaultFolderID.of(folder)
+        eraseNow(id: VaultFolderID.of(folder), wait: wait)
+    }
+
+    /// Deletes the record with this vault id: the stewardship list's Erase (item 48), which also
+    /// reaches records whose folder no account links any more. The same sequence as `erase`:
+    /// nothing while an account still records it.
+    func erase(id: String, done: (@Sendable (Bool) -> Void)? = nil) {
+        eraseQueue.async { [self] in
+            let ok = eraseNow(id: id)
+            done?(ok)
+        }
+    }
+
+    /// `erase(id:)` on the caller's thread.
+    @discardableResult
+    func eraseNow(id: String, wait: TimeInterval = VaultService.eraseWait) -> Bool {
+        guard VaultStewardship.isRecordID(id) else { return false }
         guard !Self.isRecording(id, in: defaults()) else { return false }
         let held = VaultWriterLock.acquire(lockPath, timeout: wait)
         guard !Self.isRecording(id, in: defaults()) else {
@@ -178,6 +203,11 @@ final class VaultService: @unchecked Sendable {
     }
 
     // MARK: State
+
+    /// Every record on this Mac, linked or not (item 48's stewardship list).
+    func records(_ choices: [String: AccountDataChoices]) -> [VaultRecordInfo] {
+        VaultStewardship.records(in: store, choices: choices)
+    }
 
     /// Session-shard months kept for the folder.
     func months(folder: String) -> Int {

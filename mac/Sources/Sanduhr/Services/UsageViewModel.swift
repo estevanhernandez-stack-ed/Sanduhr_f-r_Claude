@@ -172,6 +172,9 @@ final class UsageViewModel {
     /// The vault (item 46): records Claude Code activity for every account that keeps one, off
     /// the main thread, at launch, after each refresh and when a choice changes.
     @ObservationIgnored let vault = VaultService.standard
+    /// Bumped after each ingest cycle and each erase from the Claude Usage page, so the page
+    /// reloads what the record now holds.
+    private(set) var vaultCycles = 0
     /// The accounts in list order and the active one, as the Accounts page, the menus and the
     /// widget chip show them. Read from the registry's defaults (never the Keychain) and kept
     /// current by every account change here (`reloadAccounts`).
@@ -302,6 +305,9 @@ final class UsageViewModel {
         follower.onSwitch = { [weak self] label in self?.switchAccount(to: label, automatic: true) }
         follower.onReadings = { [weak self] in self?.refreshInUse() }
         follower.apply(enabled: followEnabled)
+        vault.onCycleEnd = { [weak self] in
+            Task { @MainActor in self?.vaultCycles += 1 }
+        }
     }
 
     /// Called once the app has a window + a session key.
@@ -448,6 +454,27 @@ final class UsageViewModel {
     /// record off or unlinked it first: the choice is the tombstone). Off the main thread.
     func eraseRecord(folder: String) {
         vault.erase(folder: folder)
+    }
+
+    /// Erase from the Claude Usage page's list of records (item 48), by vault id, so a record
+    /// whose folder no account links any more can go too. An account still keeping this record
+    /// switches to Live only first (item 46's order: the choice is the tombstone), then the
+    /// record is deleted off the main thread; `done` gets whether it is gone.
+    func eraseRecord(id: String, done: (@MainActor (Bool) -> Void)? = nil) {
+        let defaults = KeychainStore.accounts.defaults
+        var changed = false
+        for (label, c) in AccountData.allChoices(in: defaults) where c.activity == .record {
+            guard let folder = c.folder, VaultFolderID.of(folder) == id else { continue }
+            AccountData.setActivity(.live, for: label, in: defaults)
+            changed = true
+        }
+        if changed { reloadAccounts() }
+        vault.erase(id: id) { [weak self] ok in
+            Task { @MainActor in
+                self?.vaultCycles += 1
+                done?(ok)
+            }
+        }
     }
 
     /// Erase this account's data: its meter history and its Claude Code record. Keep a record
