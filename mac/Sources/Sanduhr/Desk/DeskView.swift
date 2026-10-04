@@ -174,9 +174,8 @@ struct DeskView: View {
             VStack(alignment: alignment, spacing: size * 0.6) {
                 ForEach(model.meters) { row in
                     MeterRow(row: row, ink: ink, font: font, size: size, width: timeSize * 3.2, alignment: alignment)
-                        .background(GeometryReader { geo in
-                            Color.clear.preference(key: MeterRowFramesKey.self, value: [row.tier: geo.frame(in: .global)])
-                        })
+                        .onGlobalFrame { model.meterRowFrames[row.tier] = $0 }
+                        .onDisappear { model.meterRowFrames[row.tier] = nil }
                         .deskPulse(model.pulses[row.tier] ?? 0, ink: ink, size: size)
                 }
                 if model.signInNeeded {
@@ -208,15 +207,7 @@ struct DeskView: View {
             .onHover { inside in
                 if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
             }
-            .background(GeometryReader { geo in
-                Color.clear.preference(key: MetersFrameKey.self, value: geo.frame(in: .global))
-            })
-            .onPreferenceChange(MetersFrameKey.self) { frame in
-                model.metersFrame = frame
-            }
-            .onPreferenceChange(MeterRowFramesKey.self) { frames in
-                model.meterRowFrames = frames
-            }
+            .onGlobalFrame { model.metersFrame = $0 }
             .onDisappear {
                 model.metersFrame = .zero
                 model.meterRowFrames = [:]
@@ -234,31 +225,20 @@ struct DeskView: View {
                     .onHover { inside in
                         if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
                     }
-                    .background(GeometryReader { geo in
-                        Color.clear.preference(key: NoteFrameKey.self, value: geo.frame(in: .global))
-                    })
-                    .onPreferenceChange(NoteFrameKey.self) { frame in
-                        model.noteFrame = frame
-                    }
+                    .onGlobalFrame { model.noteFrame = $0 }
                     .onDisappear { model.noteFrame = .zero }
             } else if model.meetings.isEmpty {
                 Text("Nothing else on the calendar today").opacity(0.6)
             } else {
                 ForEach(model.meetings) { meeting in
                     MeetingRow(meeting: meeting)
+                        .onGlobalFrame { model.rowFrames[meeting.id] = $0 }
+                        .onDisappear { model.rowFrames[meeting.id] = nil }
                 }
             }
         }
         .font(.custom(font, size: timeSize * 0.21))
-        .background(GeometryReader { geo in
-            Color.clear.preference(key: MeetingsFrameKey.self, value: geo.frame(in: .global))
-        })
-        .onPreferenceChange(MeetingsFrameKey.self) { frame in
-            model.meetingsFrame = frame
-        }
-        .onPreferenceChange(RowFramesKey.self) { frames in
-            model.rowFrames = frames
-        }
+        .onGlobalFrame { model.meetingsFrame = $0 }
     }
 
     /// The handwritten line, drawn the way handwritten.py baked it: colored ink with a soft
@@ -437,12 +417,7 @@ private struct AccountLead: View {
         Text(label)
             .underline(hovering)
             .contentShape(Rectangle())
-            .background(GeometryReader { geo in
-                Color.clear.preference(key: AccountFrameKey.self, value: geo.frame(in: .global))
-            })
-            .onPreferenceChange(AccountFrameKey.self) { frame in
-                model.accountFrame = frame
-            }
+            .onGlobalFrame { model.accountFrame = $0 }
             .onDisappear { model.accountFrame = .zero }
             .onHover { inside in
                 hovering = inside
@@ -469,9 +444,6 @@ private struct MeetingRow: View {
             }
         }
         .contentShape(Rectangle())
-        .background(GeometryReader { geo in
-            Color.clear.preference(key: RowFramesKey.self, value: [meeting.id: geo.frame(in: .global)])
-        })
         // The click itself is handled in AppDelegate, which sees it even when macOS hands
         // the first click to the desktop instead of this window.
         .onHover { inside in
@@ -482,36 +454,17 @@ private struct MeetingRow: View {
     }
 }
 
-private struct RowFramesKey: PreferenceKey {
-    static let defaultValue: [String: CGRect] = [:]
-    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
-        value.merge(nextValue()) { _, new in new }
+private extension View {
+    /// Reports this view's frame in global (window) coordinates when it appears and whenever it
+    /// moves or resizes, for the clicks DeskController routes by position. Reported straight to
+    /// the model, not through a PreferenceKey: on the Desk window the meters' preference reached
+    /// onPreferenceChange once, as .zero, and never again, so the meters took no clicks (found
+    /// 2026-10-04 with a click probe). The other click areas used the same pattern.
+    func onGlobalFrame(_ report: @escaping (CGRect) -> Void) -> some View {
+        background(GeometryReader { geo in
+            Color.clear
+                .onAppear { report(geo.frame(in: .global)) }
+                .onChange(of: geo.frame(in: .global)) { _, frame in report(frame) }
+        })
     }
-}
-
-private struct MetersFrameKey: PreferenceKey {
-    static let defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
-}
-
-private struct MeetingsFrameKey: PreferenceKey {
-    static let defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
-}
-
-private struct MeterRowFramesKey: PreferenceKey {
-    static let defaultValue: [Tier: CGRect] = [:]
-    static func reduce(value: inout [Tier: CGRect], nextValue: () -> [Tier: CGRect]) {
-        value.merge(nextValue()) { _, new in new }
-    }
-}
-
-private struct AccountFrameKey: PreferenceKey {
-    static let defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
-}
-
-private struct NoteFrameKey: PreferenceKey {
-    static let defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
 }
