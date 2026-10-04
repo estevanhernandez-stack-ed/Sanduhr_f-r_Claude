@@ -535,6 +535,18 @@ struct IntegrationInstaller {
         try? atomicWrite(data, to: receiptsURL.path, newFilePermissions: 0o600)
     }
 
+    /// state.yaml's `integrations:`: how many of `folders` (plus the ones installed into) hold
+    /// Sanduhr's entry, current or outdated. Counts only, never a path.
+    func installedCounts(folders: [String]) -> (mcp: Int, statusline: Int) {
+        var all: [String] = []
+        for f in folders + installedFolders() {
+            let n = AccountData.normalized(f)
+            if !all.contains(n) { all.append(n) }
+        }
+        return (all.filter { status(.mcp, folder: $0).isOurs }.count,
+                all.filter { status(.statusline, folder: $0).isOurs }.count)
+    }
+
     /// The folders Sanduhr installed into (Settings lists them even when discovery doesn't).
     func installedFolders() -> [String] {
         var seen: [String] = []

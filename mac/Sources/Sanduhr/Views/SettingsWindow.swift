@@ -7,7 +7,7 @@ import SwiftUI
 /// and its raw value stay, so `sanduhr://debug/action?name=settings&arg=credentials`, the smoke
 /// scenarios and state.yaml's `settings_section` keep working unchanged.
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case general, alerts, credentials, usage
+    case general, alerts, credentials, usage, integrations
     case deskLayout, deskLook, deskMeters, message, notch
     case widgetLook, themes, pacing
     case updates, about
@@ -20,6 +20,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .alerts: "Alerts"
         case .credentials: "Accounts"
         case .usage: "Claude Usage"
+        case .integrations: "Integrations"
         case .deskLayout: "Layout"
         case .deskLook: "Look"
         case .deskMeters: "Meters"
@@ -39,6 +40,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .alerts: "bell"
         case .credentials: "person.2"
         case .usage: "chart.bar.xaxis"
+        case .integrations: "puzzlepiece.extension"
         case .deskLayout: "rectangle.3.group"
         case .deskLook: "textformat"
         case .deskMeters: "gauge.with.dots.needle.67percent"
@@ -54,8 +56,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     /// Sidebar groups: a header (nil for the first) and its sections. Claude Usage (item 48)
     /// sits under Accounts: it is per account, and its setup lives in each account's Data.
+    /// Integrations (item 49) follows: installing the MCP server is the other half of Share with
+    /// Claude, and its consent points back at Accounts.
     static let groups: [(header: String?, sections: [SettingsSection])] = [
-        (nil, [.general, .alerts, .credentials, .usage]),
+        (nil, [.general, .alerts, .credentials, .usage, .integrations]),
         ("Desk", [.deskLayout, .deskLook, .deskMeters, .message, .notch]),
         ("Widget", [.widgetLook, .themes, .pacing]),
         ("Sanduhr", [.updates, .about]),
@@ -169,6 +173,7 @@ struct SettingsRoot: View {
         case .about: AboutSection()
         case .credentials: AccountsSettings(vm: vm, navigation: navigation)
         case .usage: UsageSettings(vm: vm, navigation: navigation, theme: vm.theme.palette)
+        case .integrations: IntegrationsSettings(vm: vm, navigation: navigation)
         case .widgetLook, .themes, .pacing, .alerts:
             // A fresh view per section, so a section's unsaved fields start empty.
             WidgetSettings(vm: vm, section: navigation.selection).id(navigation.selection)

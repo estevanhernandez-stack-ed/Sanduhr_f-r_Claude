@@ -107,6 +107,9 @@ vault:
   recording: false
   months: 0
   last_ingest_ok: false
+integrations:
+  mcp_installed: 0
+  statusline_installed: 0
 follow: false
 follow_paused: false
 version: "2.1.0"

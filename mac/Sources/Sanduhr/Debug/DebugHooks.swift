@@ -321,6 +321,9 @@ enum DebugHooks {
         s.localActivityReading = vm.localActivityReading
         s.localActivityEvents = vm.localBurn.events
         s.vault = vm.vault.state(for: s.accountData)
+        let folders = ClaudeCodeFolders.discover(home: NSHomeDirectory(), environment: ProcessInfo.processInfo.environment).map(\.path)
+            + vm.accountLabels.compactMap { vm.dataChoices(for: $0).folder }
+        (s.mcpInstalled, s.statuslineInstalled) = IntegrationInstaller.standard.installedCounts(folders: folders)
         s.follow = vm.followEnabled
         s.followPaused = vm.followPaused
         s.version = info["CFBundleShortVersionString"] as? String ?? ""

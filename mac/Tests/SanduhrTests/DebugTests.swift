@@ -103,6 +103,11 @@ struct UsagePageStateTests {
         #expect(yaml == "usage_page:\n  open: true\n  tab: sessions\n")
         #expect(UsageTab.allCases.map(\.rawValue) == ["overview", "trends", "sessions"])
     }
+
+    @Test func stateYAMLCountsIntegrationsWithoutPaths() {
+        let yaml = YAMLEmitter.emit(.object([("integrations", DebugState.integrationsYAML(mcp: 2, statusline: 1))]))
+        #expect(yaml == "integrations:\n  mcp_installed: 2\n  statusline_installed: 1\n")
+    }
 }
 
 @Suite("YAML emitter")
@@ -268,7 +273,7 @@ struct DebugStateTests {
                          "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
                          "glow_camera", "theme", "menu", "credentials_store", "account_ref", "accounts_count", "history_days", "data",
-                         "local_activity", "vault", "follow", "follow_paused", "version", "build"])
+                         "local_activity", "vault", "integrations", "follow", "follow_paused", "version", "build"])
         #expect(yaml.contains("settings_section: notch\nusage_page:\n  open: false\n  tab: overview\nmeters:"))
         #expect(yaml.contains("widget_visible: true\nwidget_visibility: whileDeskOff\nmenu_bar: rotate\nsettings_open: true\n"))
         #expect(yaml.contains("notch_left: meetingOrTime\nnotch_right: message\nnotch_strip: meetingOrMeters\ncamera_in_use: false\ncamera_light: true\n"))
@@ -288,7 +293,7 @@ struct DebugStateTests {
         """))
         #expect(yaml.contains("    pace: null\n"))
         #expect(yaml.contains("last_fetch: \"1970-01-01T00:00:00Z\"\n"))
-        #expect(yaml.contains("credentials_store: file\naccount_ref: null\naccounts_count: 0\nhistory_days: 30\ndata:\n  activity: \"off\"\n  names: names\n  share: \"off\"\n  folder_linked: false\nlocal_activity:\n  reading: false\n  events: 0\nvault:\n  recording: false\n  months: 0\n  last_ingest_ok: false\nfollow: false\nfollow_paused: false\nversion: \"2.1.0\"\n"))
+        #expect(yaml.contains("credentials_store: file\naccount_ref: null\naccounts_count: 0\nhistory_days: 30\ndata:\n  activity: \"off\"\n  names: names\n  share: \"off\"\n  folder_linked: false\nlocal_activity:\n  reading: false\n  events: 0\nvault:\n  recording: false\n  months: 0\n  last_ingest_ok: false\nintegrations:\n  mcp_installed: 0\n  statusline_installed: 0\nfollow: false\nfollow_paused: false\nversion: \"2.1.0\"\n"))
         #expect(yaml.contains("version: \"2.1.0\"\nbuild: \"3\"\n"))
         #expect(yaml.contains("""
           - header: Tools

@@ -21,6 +21,14 @@ steps:
   # Item 48: Claude Usage sits under Accounts.
   - expect_state: { settings_section: usage, usage_page.open: true }
   - do: settings
+    arg: integrations
+  # Item 49: install and remove happen only by hand on a test folder (docs/mac-smoke-test.md);
+  # the page opening installs nothing.
+  - expect_state: { settings_section: integrations }
+  - expect:
+      window: settings
+      contains: { text: "/MCP server/" }
+  - do: settings
     arg: deskLayout
   - expect_state: { settings_section: deskLayout }
   - do: settings

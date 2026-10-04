@@ -74,6 +74,10 @@ struct DebugStateInput {
     /// The vault (item 46) for the active account: recording, months kept, whether the last
     /// cycle completed. Never a path, a project, an id or the label.
     var vault = VaultState()
+    /// Claude Code folders holding Sanduhr's MCP server and statusline entries (item 49).
+    /// Counts only, never a path.
+    var mcpInstalled = 0
+    var statuslineInstalled = 0
     /// Follow the account I'm using, and whether a manual switch is pausing it. Never labels.
     var follow = false
     var followPaused = false
@@ -99,6 +103,11 @@ enum DebugState {
     /// `usage_page:` (item 48): open and the tab, nothing it shows.
     static func usagePageYAML(open: Bool, tab: UsageTab) -> YAMLNode {
         .map([YAMLPair("open", .bool(open)), YAMLPair("tab", .string(tab.rawValue))])
+    }
+
+    /// `integrations:` (item 49): counts of folders, never a path.
+    static func integrationsYAML(mcp: Int, statusline: Int) -> YAMLNode {
+        .map([YAMLPair("mcp_installed", .int(mcp)), YAMLPair("statusline_installed", .int(statusline))])
     }
 
     /// `vault:` (item 46): flags and a count only.
@@ -166,6 +175,7 @@ enum DebugState {
         pairs.append(("local_activity", localActivityYAML(reading: s.localActivityReading,
                                                           events: s.localActivityEvents)))
         pairs.append(("vault", vaultYAML(s.vault)))
+        pairs.append(("integrations", integrationsYAML(mcp: s.mcpInstalled, statusline: s.statuslineInstalled)))
         pairs.append(("follow", .bool(s.follow)))
         pairs.append(("follow_paused", .bool(s.followPaused)))
         pairs.append(("version", .string(s.version)))
