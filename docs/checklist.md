@@ -305,31 +305,31 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: each account's choices persist and follow rename; a folder can't be linked twice; the matching folder is suggested, never auto-linked.
   Verify: swift-testing on temp homes (discovery, the `.claude.json` placement rule, the org match with no other field read, link rules, rename/remove); state.yaml keys without labels or paths; by hand.
 
-- [ ] **45. Live Claude Code activity**
+- [x] **45. Live Claude Code activity**
   Spec ref: `docs/mac-usage-data-spec.md` > What an account can have (Claude Code activity: Live only); Windows `CcLogReader`, `LocalCcViewModel`, `TierCardViewModel` local delta
   What to build: a Swift port of the Windows log reader (session JSONL under the linked folder's `projects/`, usage events, per-model and per-project sums, worktree/subfolder folding, the double-lag rule), run for the active account when its activity is Live only or Keep a record; the "+Nk" local burn badge on the widget's cards (local Claude Code tokens since the last meter refresh, as Windows shows); nothing stored. Activity Not tracked or no linked folder reads nothing.
   Acceptance: with a linked folder and Live, cards show local burn that matches the Windows reader on the same fixtures; with Not tracked, no file under the folder is opened.
   Verify: swift-testing on the Windows fixtures (ported) and temp folders; never real Claude Code folders in tests; by hand with a test folder.
 
-- [ ] **46. The vault: keep a record per account**
+- [x] **46. The vault: keep a record per account**
   Spec ref: `docs/mac-usage-data-spec.md` (Keep a record, Project names, Erase); `docs/superpowers/specs/2026-07-12-usage-vault-design.md`; Windows `VaultIngester`, `VaultStore`, `VaultReader`, `VaultModels`, `VaultService`
   What to build: a Swift port of the vault for a linked folder whose account keeps a record: monthly session shards, rollups (a rebuildable cache), path-hash checkpoints written last, quarantine of unreadable shards as `.bad`, a single writer (a lock file in place of the Windows mutex), ingest at launch and every refresh off the main thread, the Windows file formats under `~/Library/Application Support/Sanduhr/vault/<folder id>/`. Project names per the account's choice: Names, Hidden (a stable short hash in place of the name, still grouping by project), Full paths (cwd kept). Erase (the account's vault, with the record choice turned off first as the tombstone, and a recheck so an in-flight ingest can't recreate it). Turning Keep a record off asks whether to erase.
   Acceptance: the vault matches the Windows vault's outputs on the same inputs; Hidden never stores a project name; erase is complete and stays erased; Live only and Not tracked never write.
   Verify: swift-testing ported from the Windows vault tests (torn files, month boundaries, worktree folding, checkpoints, quarantine, erase race); temp folders only; by hand with a test folder.
 
-- [ ] **47. Sharing with Claude: the MCP tools and the access file**
+- [x] **47. Sharing with Claude: the MCP tools and the access file**
   Spec ref: `docs/mac-usage-data-spec.md` > Share with Claude; How the MCP server learns the choices; Windows `Sanduhr.Mcp` (`ToolCatalog`, `ToolLogic`, `HistoryReader`, `SnapshotReader`)
   What to build: the app writes `~/Library/Application Support/Sanduhr/mcp-access.json` (per account: `account_ref`, sharing level off|meters|activity, the vault folder id and history file it may read; no labels or paths beyond what the server must open); `mac/integrations/sanduhr_mcp.py` gains `get_local_burn_by_project`, `get_model_usage`, `get_usage_history` with the Windows tool names and result shapes, reading the vault and history only as the access file allows (Hidden names stay hidden), `get_usage` honoring sharing (off = nothing for that account), `ping` updated; no network, no free-form paths. `publish_usage` stays dropped; `propose_theme` decided separately.
   Acceptance: each sharing level returns exactly what the spec allows; with no access file nothing is shared; results match the Windows tools on the same vault.
   Verify: Python tests over a temp app-support folder with synthetic vault files (the item 46 fixtures); the Swift side tested for the access file; by hand with Claude Code calling the tools on a test folder.
 
-- [ ] **48. The Claude Usage page**
+- [x] **48. The Claude Usage page**
   Spec ref: `docs/mac-usage-data-spec.md` > Build order 6; `docs/superpowers/specs/2026-07-12-usage-vault-design.md` (Overview, Trends, Sessions, stewardship); Windows `ClaudeCodeTabViewModel`, `CcTrendsViewModel`, `CcLedgerViewModel`, `CcCalendarControl`, `CcTrendsControl`, `VaultLedgerCsv`
   What to build: a Claude Usage page per account (its own Settings section or a window opened from the widget's tools; decide and say why): Overview (today live, closed days from the vault, the hot-day rule, a 30-day strip), Trends (weekly bars and top projects over 4/12/26 weeks, "no record" texture before the vault began or in gaps, never zero bars), Sessions (ledger with Today/Yesterday/7d/All chips, scoped tokens, row expansion, CSV export via the ledger port); the account's Live only mode shows Overview from the live reader only. Stewardship: every record on this Mac listed (including records whose folder is no longer linked) with its size, oldest day and an erase button; Open vault folder.
   Acceptance: numbers match the vault reader and the live reader per the design's rules; an unlinked record can be erased from the app; nothing shows project names the record doesn't hold.
   Verify: swift-testing for the view models (scoping, hot-day rule, gaps, CSV) on synthetic vaults; screenshots from a test folder only; by hand.
 
-- [ ] **49. One-click MCP and statusline install**
+- [x] **49. One-click MCP and statusline install**
   Spec ref: `docs/mac-usage-data-spec.md` > Build order 7; Windows `McpIntegrationInstaller`, `StatuslineInstaller`, `McpConsentDialog`, `StatuslineConsentDialog`; `mac/integrations/install.sh`
   What to build: Settings gains an Integrations section: install or remove the MCP server and the statusline for a chosen Claude Code folder, with a consent sheet saying what each one shares (per the accounts' Share with Claude choices); the scripts are copied into `~/Library/Application Support/Sanduhr/integrations/` from the app bundle (versioned, so an update refreshes them); registration writes `mcpServers.sanduhr` / `statusLine` into that folder's settings the way Windows does (backup, atomic write, the `.claude.json` placement rule) without needing the `claude` CLI; remove undoes exactly what install did.
   Acceptance: install and remove round-trip byte-for-byte on a test folder's config; nothing is written to a folder the user didn't pick.
