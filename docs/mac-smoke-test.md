@@ -521,3 +521,56 @@ cc_line_at "$(date -u -v-10d +%Y-%m-%dT10:00:00.000Z)" claude-opus-4-1 20000 0 w
 - [ ] Console (`log stream --predicate 'subsystem == "com.626labs.sanduhr"'`) shows no label,
   path, project or number from the page. Then `rm -rf ~/.claude-smoketest ~/Desktop/sanduhr-sessions-*.csv`
   and unlink it.
+
+## 20. One-click MCP and statusline install (item 49)
+
+Use test Claude Code folders, never your real `~/.claude`, `~/.claude-*` or `~/.claude.json`:
+two folders cover both placements of `.claude.json` without touching the default home. Make
+them, with configs that have keys of their own, and keep copies to compare with:
+
+```sh
+mkdir -p ~/.claude-smoketest/projects ~/.claude-smoketest2/projects
+printf '{\n  "numStartups": 3,\n  "mcpServers": {\n    "other": {"type": "stdio", "command": "true"}\n  }\n}\n' > ~/.claude-smoketest/.claude.json
+printf '{\n  "model": "opus",\n  "statusLine": {"type": "command", "command": "echo mine"}\n}\n' > ~/.claude-smoketest/settings.json
+cp ~/.claude-smoketest/.claude.json /tmp/st-claude.json; cp ~/.claude-smoketest/settings.json /tmp/st-settings.json
+S=~/Library/Application\ Support/Sanduhr/integrations
+```
+
+- [ ] `smoke/smoke run settings-sections` passes; Settings shows Integrations under Claude
+  Usage. The page lists `~/.claude-smoketest` and `~/.claude-smoketest2` (and any real folders:
+  leave those alone) with MCP server and Statusline rows, and a "Runs with Python 3.x at …"
+  line. On a Mac without Command Line Tools (or with `/usr/bin/python3` only), the page says
+  what is needed instead, Install buttons are off, and nothing asks to install until Install
+  Command Line Tools… is clicked.
+- [ ] MCP server, Install… on `~/.claude-smoketest`: the sheet lists every account with its
+  Share with Claude choice ("Off: nothing" and so on), Change in Accounts… goes to Accounts,
+  and it names `~/.claude-smoketest/.claude.json`. Install: the row reads Installed; `jq
+  .mcpServers ~/.claude-smoketest/.claude.json` shows `other` unchanged and `sanduhr` as
+  `{"type": "stdio", "command": "<python3>", "args": [".../integrations/current/sanduhr_mcp.py"]}`;
+  `diff /tmp/st-claude.json ~/.claude-smoketest/.claude.json.sanduhr-backup` is empty; `ls -l
+  "$S"` shows `current -> <12 hex>` and that folder holds both scripts.
+- [ ] `CLAUDE_CONFIG_DIR=~/.claude-smoketest claude` then `/mcp`: sanduhr is connected; "call
+  the sanduhr ping tool" answers with `0.2.0-mac`.
+- [ ] Statusline, Install…: the sheet shows `echo mine` as the statusline it would replace;
+  Not Now changes nothing (`diff /tmp/st-settings.json ~/.claude-smoketest/settings.json`
+  is empty). Replace and Install: Installed; `"model"` is still there; the Claude Code session
+  above shows the meters under the prompt after its next refresh.
+- [ ] Remove both: `diff /tmp/st-claude.json ~/.claude-smoketest/.claude.json` and `diff
+  /tmp/st-settings.json ~/.claude-smoketest/settings.json` are empty (the `echo mine` statusline
+  is back), the `.sanduhr-backup` files are gone, and with nothing installed anywhere `"$S"`
+  holds no `current` and no stamped folder (install.sh's own copies, if any, stay).
+- [ ] `~/.claude-smoketest2` has no `.claude.json` or `settings.json`: install both, then remove
+  both: the folder holds only `projects` again.
+- [ ] Break `~/.claude-smoketest/settings.json` (add a trailing comma): the row says it isn't
+  valid JSON and offers no button; the file is unchanged. Fix it.
+- [ ] Update path: install the MCP server, then `ls "$S"`, quit, build and launch a copy whose
+  `sanduhr_mcp.py` differs (any edit in `mac/integrations/`, `./build.sh --debug`): after launch
+  `current` points at a new stamp, the old stamp folder is still there, and
+  `.claude-smoketest/.claude.json` is unchanged; the row reads Installed. Launch again: the old
+  stamp folder is gone.
+- [ ] `state.yaml` shows `integrations: {mcp_installed: N, statusline_installed: N}` with the
+  counts, and no path. `log stream --predicate 'subsystem == "com.626labs.sanduhr"'` while
+  installing shows no path or label.
+- [ ] Clean up: Remove everything installed above, then `rm -rf ~/.claude-smoketest2
+  /tmp/st-claude.json /tmp/st-settings.json` (and `~/.claude-smoketest` once sections 16 to 19
+  are done).

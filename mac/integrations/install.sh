@@ -7,6 +7,10 @@
 # writes after every fetch. The MCP server reads only what each account shares with Claude
 # (Settings, Accounts, Data), as Sanduhr lists it in mcp-access.json beside the snapshot.
 # Neither touches claude.ai, the network or the session key.
+# Sanduhr can do this itself: Settings, Integrations installs either one per Claude Code folder,
+# with no claude CLI needed, and keeps its scripts updated with the app. This script stays for
+# those who prefer it; the Integrations page shows what it registered as Outdated, and Update
+# there moves it to the app's copy.
 #   bash mac/integrations/install.sh            install or update
 #   bash mac/integrations/install.sh --remove   unregister the MCP server, delete the copies
 set -eu

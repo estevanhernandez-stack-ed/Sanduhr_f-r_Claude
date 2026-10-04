@@ -161,6 +161,10 @@ with the label. The notch stays as it is. A switch never needs a relaunch: the m
   (`UsagePage.swift`, `UsagePageLoader.swift`) are pure and tested on synthetic vaults; a 6,000-session
   record reads, sorts, rescopes and exports in well under a second. Reloads follow each ingest
   cycle (`VaultService.onCycleEnd`), each refresh, and every minute on Overview.
+- **One-click install (item 49).** `SettingsSection.integrations`, under Claude Usage: installing the
+  MCP server is the other half of Share with Claude, and its consent sheet points back at Accounts.
+  `IntegrationScripts`, `IntegrationInstaller`, `JSONEdit` and `PythonFinder` are pure or work on
+  injected folders, and are tested on temp homes (see Claude Code integrations).
 - **Readers.** `snapshot.json` names the active account by `account_ref` (first 4 bytes of the
   SHA-256 of the label, as on Windows) and is deleted at once on a switch; `state.yaml` has
   `account_ref`, `accounts_count`, `history_days`, `data` (the active account's choices and
@@ -209,11 +213,61 @@ Most accounts don't need this.
 
 ## Claude Code integrations
 
-`mac/integrations/` holds a statusline segment and the `sanduhr` MCP server, Python 3 standard
-library only. `bash mac/integrations/install.sh` copies both to
-`~/Library/Application Support/Sanduhr/integrations/` and registers the server with Claude Code
-(`claude mcp add sanduhr --scope user`); `--remove` undoes it. The statusline reads only
-`snapshot.json`.
+`mac/integrations/` holds a statusline segment and the `sanduhr` MCP server, Python 3.9+ standard
+library only. The statusline reads only `snapshot.json`.
+
+**Installing from Settings (item 49).** Settings, Integrations lists the Claude Code folders
+(`ClaudeCodeFolders.discover`, the accounts' linked folders, folders installed into, and Add
+Folder…) with Install, Update or Remove for each integration, behind a consent sheet. No `claude`
+CLI: `IntegrationInstaller` writes the entries itself, the way Windows' `McpIntegrationInstaller`
+and `StatuslineInstaller` do:
+
+```jsonc
+// <folder>/.claude.json, or ~/.claude.json for ~/.claude (the placement rule)
+"mcpServers": { "sanduhr": { "type": "stdio", "command": "/usr/bin/python3",
+  "args": ["~/Library/Application Support/Sanduhr/integrations/current/sanduhr_mcp.py"] } }
+// <folder>/settings.json
+"statusLine": { "type": "command",
+  "command": "/usr/bin/python3 '~/Library/Application Support/Sanduhr/integrations/current/sanduhr_statusline.py'" }
+```
+
+(paths absolute in the files). The file is checked as strict JSON first (a malformed file is never
+written; the row and the error say so); `JSONEdit` splices the one member into the text, copying
+the file's indentation, so every other byte stays; the result is parsed and compared with the
+original minus that member before writing; `<file>.sanduhr-backup` is kept before the first
+change; the write is a temporary sibling renamed over the file (a symlinked file is written
+where it points, permissions kept), retried up to three times if the file changed meanwhile.
+`integrations/installs.json` records what each install did (file created, `mcpServers` created,
+the inside of an object it filled from empty, the value it replaced), so Remove undoes exactly
+that: byte for byte when nothing else changed, someone else's statusline put back. An entry is
+Sanduhr's when it runs `sanduhr_mcp.py` (or Windows' `sanduhr-mcp`), or when the statusline
+command is only `<python> <…/sanduhr_statusline.py>`; a statusline of your own that calls the
+script among other commands is never touched. Status: Installed (names the current link and an
+existing python3, scripts current), Outdated (Sanduhr's entry naming other scripts, such as
+install.sh's copies, or a missing python3: Update rewrites it), Not installed, someone else's
+entry, or not valid JSON.
+
+**Scripts.** `build.sh` copies both into `Sanduhr.app/Contents/Resources/integrations/`.
+`IntegrationScripts` copies them to `integrations/<stamp>/` (12 hex of a SHA-256 over the
+scripts' names and bytes) and points the symlink `integrations/current` at it with one
+`rename(2)`; the settings name `current/…`, so an app update never rewrites Claude Code's files.
+It is Windows' stamped-folder design: there a running session pins the exe; here nothing is
+locked, but a session starting mid-update must read the old set or the new one whole. The
+refresh runs on install and at launch when `current` exists; the folder swapped out is kept one
+refresh, older stamps are deleted, and Remove of the last install deletes them all. install.sh's
+flat copies beside them are never touched.
+
+**Python.** `PythonFinder` prefers `/usr/bin/python3` (stable across Homebrew changes), but only
+when the developer folder it forwards to (`/var/db/xcode_select_link`, else the Command Line
+Tools or Xcode) holds a python3, checked by file, because running the stub without them opens
+macOS's install dialog. Then `/opt/homebrew/bin/python3`, `/usr/local/bin/python3` and
+python.org's. Each candidate is run once with `-I -c` for its version (3.9+). With none, the page
+explains and offers Install Command Line Tools… (`xcode-select --install`) only on a click.
+
+**Scripts by hand.** `bash mac/integrations/install.sh` still copies both to
+`~/Library/Application Support/Sanduhr/integrations/` and registers the server with
+`claude mcp add sanduhr --scope user`; `--remove` undoes it. The page shows such an entry as
+Outdated, and Update moves it to the app's copy.
 
 The server (`sanduhr_mcp.py`) speaks the Windows `sanduhr-mcp` protocol with the same tool names
 and result shapes: `get_usage`, `get_local_burn_by_project`, `get_model_usage`,
@@ -256,6 +310,7 @@ folders: each sharing level, no access file, hidden names, and the Windows MCP t
 - Meter history → `~/Library/Application Support/Sanduhr/history.{label}.json`, one per account, the Windows format. Each reading is kept 30 days (and at most 8640 points per limit, Windows' cap), trimmed when the next one is written; the sparklines draw the last 24 points (about 2 hours). Settings, Accounts, Meter history: Off stops recording an account (`UserDefaults` `meterHistoryOff`, the labels switched off) and offers to erase its file; Remove Account deletes it. `state.yaml` shows the active account's `history_days` (30, or 0 when off)
 - Data choices per account (Claude Code folder, activity, project names, Share with Claude) → `UserDefaults` (`accountData`); the linked folder's path stays there, never in `state.yaml`
 - What the MCP server may read → `~/Library/Application Support/Sanduhr/mcp-access.json` (mode 0600; see Claude Code integrations)
+- Claude Code integrations (item 49) → scripts in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json`, with `<file>.sanduhr-backup` beside each. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed}`
 - Window position → `UserDefaults` (`windowFrame`)
 
 ## Controls
