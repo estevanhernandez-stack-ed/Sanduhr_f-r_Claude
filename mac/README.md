@@ -214,7 +214,8 @@ Most accounts don't need this.
 ## Claude Code integrations
 
 `mac/integrations/` holds a statusline segment and the `sanduhr` MCP server, Python 3.9+ standard
-library only. The statusline reads only `snapshot.json`.
+library only, and the `sanduhr-meters` Claude Code mod. The statusline and the mod read only
+`snapshot.json`.
 
 **Installing from Settings (item 49).** Settings, Integrations lists the Claude Code folders
 (`ClaudeCodeFolders.discover`, the accounts' linked folders, folders installed into, and Add
@@ -256,6 +257,46 @@ locked, but a session starting mid-update must read the old set or the new one w
 refresh runs on install and at launch when `current` exists; the folder swapped out is kept one
 refresh, older stamps are deleted, and Remove of the last install deletes them all. install.sh's
 flat copies beside them are never touched.
+
+**The meters mod (item 50).** `mac/integrations/mods/sanduhr-meters/` is a Claude Code mod (a
+plugin of function hooks: `.claude-plugin/plugin.json`, `hooks/hooks.json`, `hooks/register.tsx`,
+the pure logic in `hooks/meters.ts`, its state contract in `types/index.d.ts`). It needs a Claude
+Code version that loads mods (`claude plugin test` exists). It draws a band above the prompt
+from `snapshot.json`, read with `$.fs.read` on session start and every 30 seconds:
+
+```
+Session ▕█████│▏░░░▏ 61% resets 2h 14m   Weekly ▕███████│█▎▏ 93% ⚠ resets Tue
+```
+
+The bars are the widget's colors (green, yellow, orange, red from 90%) with eighth-cell fill, the
+pink `│` is where pace says usage should be now, and ⚠ is the widget's meter warning (weekly 90%
+with more than a day left; the session at 90% with more than an hour left, the widget's rule for
+it when switched on). Stale (7.5 to 15 minutes) dims the band and adds `(9m ago)`; older is one
+line, `Sanduhr: no update for 22m. Is the widget running?`; signed out is `Sanduhr: sign in to see
+your meters.`; a failed fetch keeps the last numbers dimmed with `last known, offline`; a limit
+whose reset passed shows `reset` instead of its stale percent; a newer schema asks for an update;
+no snapshot draws nothing. Options (`userConfig`, Claude Code's config menu): `bars` (both,
+session, weekly), `style` (compact, one line; full, a line per meter with the pace words and the
+reset time, folding to compact when the band is short or narrow) and `label` (a name of your own
+shown first; the snapshot only carries `account_ref`). Toasts, at most once per limit and reset
+window across sessions (keys kept in `$.store`): when a limit starts warning, and when the
+session limit resets (within ten minutes of it). Redraws come from a changed file or the minute
+tick, and the tick redraws only when a countdown or age it shows changed. Windows reads
+`%APPDATA%\Sanduhr\snapshot.json`; `SANDUHR_SNAPSHOT` names another file for testing. Tests:
+`claude plugin test mac/integrations/mods/sanduhr-meters` (the engine's own test kit; the band is
+mounted on the terminal surface with the file system, clock, env and store beneath mocked).
+
+Install adds the mod's folder, `~/Library/Application Support/Sanduhr/integrations/current/mods/sanduhr-meters`,
+to `env.CLAUDE_CODE_PLUGIN_DIRS` in the chosen folder's `settings.json` (the user settings, where
+Claude Code reads that variable), joined with `:`, the path-list separator Claude Code splits it on
+here (`;` on Windows): the `env` object and the key are made when missing, an existing list keeps
+every entry and gets the mod last, an older Sanduhr entry is replaced where it stands. Remove takes
+out only entries that are Sanduhr's mod (a folder ending in `mods/sanduhr-meters` inside
+`Sanduhr/integrations/`; a copy elsewhere is yours), deletes the key or `env` only when Sanduhr made
+them and nothing else is left, and puts the original bytes back when the list is otherwise what it
+was. The mod needs no python3. The mod's files ride in the stamped folder (`build.sh` bundles it
+without its tests); Claude Code writes its type declarations into `.claude-plugin/types/` of a mod
+folder it loads, and the stamp covers only the shipped files, so that never reads as altered.
 
 **Python.** `PythonFinder` prefers `/usr/bin/python3` (stable across Homebrew changes), but only
 when the developer folder it forwards to (`/var/db/xcode_select_link`, else the Command Line
@@ -310,7 +351,7 @@ folders: each sharing level, no access file, hidden names, and the Windows MCP t
 - Meter history → `~/Library/Application Support/Sanduhr/history.{label}.json`, one per account, the Windows format. Each reading is kept 30 days (and at most 8640 points per limit, Windows' cap), trimmed when the next one is written; the sparklines draw the last 24 points (about 2 hours). Settings, Accounts, Meter history: Off stops recording an account (`UserDefaults` `meterHistoryOff`, the labels switched off) and offers to erase its file; Remove Account deletes it. `state.yaml` shows the active account's `history_days` (30, or 0 when off)
 - Data choices per account (Claude Code folder, activity, project names, Share with Claude) → `UserDefaults` (`accountData`); the linked folder's path stays there, never in `state.yaml`
 - What the MCP server may read → `~/Library/Application Support/Sanduhr/mcp-access.json` (mode 0600; see Claude Code integrations)
-- Claude Code integrations (item 49) → scripts in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json`, with `<file>.sanduhr-backup` beside each. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed}`
+- Claude Code integrations (items 49 and 50) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json`, with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed}`
 - Window position → `UserDefaults` (`windowFrame`)
 
 ## Controls

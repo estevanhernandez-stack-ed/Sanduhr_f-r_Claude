@@ -574,3 +574,50 @@ S=~/Library/Application\ Support/Sanduhr/integrations
 - [ ] Clean up: Remove everything installed above, then `rm -rf ~/.claude-smoketest2
   /tmp/st-claude.json /tmp/st-settings.json` (and `~/.claude-smoketest` once sections 16 to 19
   are done).
+
+## 21. Meters above Claude Code's prompt (item 50)
+
+A Claude Code with mods (`claude plugin test --help` works). Use a test folder, never your real
+`~/.claude*`. The `/tmp/other-mod` entry stands for a mod of your own already in the list:
+
+```sh
+mkdir -p ~/.claude-smoketest/projects /tmp/other-mod
+printf '{\n  "model": "opus",\n  "env": {\n    "CLAUDE_CODE_PLUGIN_DIRS": "/tmp/other-mod"\n  }\n}\n' > ~/.claude-smoketest/settings.json
+cp ~/.claude-smoketest/settings.json /tmp/st-meters.json
+S=~/Library/Application\ Support/Sanduhr/integrations
+```
+
+- [ ] `claude plugin test mac/integrations/mods/sanduhr-meters` and `claude plugin validate
+  mac/integrations/mods/sanduhr-meters` pass.
+- [ ] Settings, Integrations: `~/.claude-smoketest` has a third row, Meters above the prompt, Not
+  installed. Its Install… works even where the page says Python is missing.
+- [ ] Install…: the sheet says the band shows the session and weekly bars, reads only
+  `snapshot.json`, and that Sanduhr adds its folder to `env.CLAUDE_CODE_PLUGIN_DIRS` in
+  `~/.claude-smoketest/settings.json`, keeping the folders already listed. Install: Installed;
+  `jq -r '.env.CLAUDE_CODE_PLUGIN_DIRS' ~/.claude-smoketest/settings.json` prints
+  `/tmp/other-mod:<…>/integrations/current/mods/sanduhr-meters`, `"model"` is still there, and
+  `ls "$S/current/mods/sanduhr-meters"` shows `.claude-plugin`, `hooks`, `types` and no tests.
+- [ ] `CLAUDE_CONFIG_DIR=~/.claude-smoketest claude`: above the prompt, `Session ▕…▏ N% resets
+  …   Weekly ▕…▏ N% resets …` with the widget's percentages and countdowns (compare with the
+  cards), the pink pace mark where the card's pace marker is, colors as on the cards. After a
+  widget refresh the band changes within 30 seconds; a countdown moves each minute.
+- [ ] States, each in a fresh session with `SANDUHR_SNAPSHOT=/tmp/snap.json` in front of the
+  command above, writing `/tmp/snap.json` first:
+  `W=$(date -u -v+2d +%FT%TZ); A=$(date -u -v-9M +%FT%TZ)` and
+  `printf '{"schema_version":1,"captured_at":"%s","status":"ok","error_kind":null,"tiers":[{"key":"seven_day","utilization":93,"resets_at":"%s"}]}' "$A" "$W" > /tmp/snap.json`:
+  the band is dimmed with a red ⚠ after 93% and `(9m ago)`, and a notice says the weekly limit
+  is at 93%; a second session shows no notice. With `captured_at` 20 minutes back: one dim line,
+  `Sanduhr: no update for 20m. Is the widget running?`. With `"status":"error",
+  "error_kind":"session_expired","tiers":[]`: `Sanduhr: sign in to see your meters.`. With
+  `SANDUHR_SNAPSHOT=/tmp/none.json`: no band at all.
+- [ ] Session reset: write a session tier whose `resets_at` is a minute ahead
+  (`date -u -v+1M +%FT%TZ`); within the next minute the bar becomes `Session reset` and a notice
+  says the session limit has reset, once.
+- [ ] `/config`: the mod's Meters (both, session, weekly), Style (compact, full) and Label rows;
+  full shows a line per meter with `on pace` or `N% ahead` and `resets Mon 9:00 AM`; a short
+  terminal folds it to one line; the label shows first.
+- [ ] Remove: `diff /tmp/st-meters.json ~/.claude-smoketest/settings.json` is empty and the
+  `.sanduhr-backup` is gone. Install again, add `:/tmp/mine` after Sanduhr's entry by hand,
+  Remove: the list reads `/tmp/other-mod:/tmp/mine`.
+- [ ] `state.yaml` shows `meters_installed` with the count and no path. Clean up: Remove, then
+  `rm -rf /tmp/other-mod /tmp/st-meters.json /tmp/snap.json`.
