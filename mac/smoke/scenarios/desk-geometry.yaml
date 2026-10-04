@@ -13,3 +13,12 @@ steps:
       desk_frames[kind=meter_row].key: five_hour
       desk_frames[kind=meter_row].frame.3: "/^[1-9]\\d*$/"
   - snap: desk-geometry
+  # Desk off and on rebuilds every view: the frames must come back, not be wiped by the old
+  # views' onDisappear running after the new views' onAppear (found 2026-10-04).
+  - do: desk
+    arg: "off"
+  - do: desk
+    arg: "on"
+  - expect_state: { desk_frames_ok: true, desk_frames_problem: null }
+  - expect_state:
+      desk_frames[kind=meters].frame.2: "/^[1-9]\\d*$/"

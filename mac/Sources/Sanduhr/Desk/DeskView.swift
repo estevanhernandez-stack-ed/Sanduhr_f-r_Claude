@@ -175,7 +175,6 @@ struct DeskView: View {
                 ForEach(model.meters) { row in
                     MeterRow(row: row, ink: ink, font: font, size: size, width: timeSize * 3.2, alignment: alignment)
                         .onGlobalFrame { model.meterRowFrames[row.tier] = $0 }
-                        .onDisappear { model.meterRowFrames[row.tier] = nil }
                         .deskPulse(model.pulses[row.tier] ?? 0, ink: ink, size: size)
                 }
                 if model.signInNeeded {
@@ -196,10 +195,6 @@ struct DeskView: View {
                 .padding(EdgeInsets(top: -6, leading: -8, bottom: -6, trailing: -8)))
             .contentShape(Rectangle())
             .onGlobalFrame { model.metersFrame = $0 }
-            .onDisappear {
-                model.metersFrame = .zero
-                model.meterRowFrames = [:]
-            }
         }
     }
 
@@ -214,14 +209,12 @@ struct DeskView: View {
                         if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
                     }
                     .onGlobalFrame { model.noteFrame = $0 }
-                    .onDisappear { model.noteFrame = .zero }
             } else if model.meetings.isEmpty {
                 Text("Nothing else on the calendar today").opacity(0.6)
             } else {
                 ForEach(model.meetings) { meeting in
                     MeetingRow(meeting: meeting)
                         .onGlobalFrame { model.rowFrames[meeting.id] = $0 }
-                        .onDisappear { model.rowFrames[meeting.id] = nil }
                 }
             }
         }
@@ -407,7 +400,6 @@ private struct AccountLead: View {
             .contentTransition(.opacity)
             .contentShape(Rectangle())
             .onGlobalFrame { model.accountFrame = $0 }
-            .onDisappear { model.accountFrame = .zero }
             .onHover { inside in
                 hovering = inside
                 if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
@@ -449,6 +441,9 @@ private extension View {
     /// the model, not through a PreferenceKey: on the Desk window the meters' preference reached
     /// onPreferenceChange once, as .zero, and never again, so the meters took no clicks (found
     /// 2026-10-04 with a click probe). The other click areas used the same pattern.
+    /// Nothing clears a frame on disappear: when Desk comes back (off and on, a layout change) the
+    /// old views' onDisappear ran after the new views' onAppear and wiped the fresh frames. A
+    /// stale frame is harmless, because DeskElements lists only what is drawn now.
     func onGlobalFrame(_ report: @escaping (CGRect) -> Void) -> some View {
         background(GeometryReader { geo in
             Color.clear
