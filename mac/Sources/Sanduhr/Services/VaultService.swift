@@ -109,7 +109,10 @@ final class VaultService: @unchecked Sendable {
             _ = ingestNow(roots)
             lock.lock()
             running = false
-            let done = onCycleEnd
+            // The stored value, not `onCycleEnd`: its getter takes this same lock, which is not
+            // recursive, so reading it here blocked this queue for good, and the next trigger()
+            // on the main thread with it (2026-10-04, a Data choice froze the app).
+            let done = _onCycleEnd
             lock.unlock()
             done?()
         }

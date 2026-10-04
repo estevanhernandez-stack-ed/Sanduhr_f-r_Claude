@@ -96,6 +96,24 @@ struct VaultServiceTests {
         #expect(!VaultService.isRecording(VaultFolderID.of("/h/.claude"), in: d))
     }
 
+    /// A triggered cycle calls onCycleEnd and lets the next trigger run. Reading onCycleEnd while
+    /// holding the service's lock deadlocked the vault queue on the first finished cycle, and the
+    /// main thread with it on the next trigger (2026-10-04). Waits with a timeout so a regression
+    /// fails instead of hanging the run.
+    @Test func cyclesEndAndTheNextTriggerRuns() {
+        let b = VaultBed()
+        defer { b.cleanUp() }
+        let d = MemoryDefaults()
+        _ = Self.recordingWork(b, d)
+        let s = Self.service(b, d)
+        let ended = DispatchSemaphore(value: 0)
+        s.onCycleEnd = { ended.signal() }
+        s.trigger()
+        #expect(ended.wait(timeout: .now() + 10) == .success)
+        s.trigger()
+        #expect(ended.wait(timeout: .now() + 10) == .success)
+    }
+
     @Test func liveOnlyAndNotTrackedNeverWrite() {
         let b = VaultBed()
         defer { b.cleanUp() }
