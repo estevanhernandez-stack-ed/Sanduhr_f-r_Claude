@@ -158,8 +158,22 @@ struct SettingsRoot: View {
 
     private func rows(_ sections: [SettingsSection]) -> some View {
         ForEach(sections) { s in
-            Label(s.title, systemImage: s.symbol).tag(s)
-                .badge(Self.badge(s))
+            // A drawn dot rather than List's .badge: with a badge showing, the sidebar stopped
+            // taking clicks (2026-10-04). The row stays a plain Label, tagged for selection.
+            HStack(spacing: 6) {
+                Label(s.title, systemImage: s.symbol)
+                Spacer(minLength: 0)
+                if Self.badge(s) > 0 {
+                    Text("\(Self.badge(s))")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(Color.accentColor))
+                        .accessibilityLabel("Suggestion waiting")
+                }
+            }
+            .tag(s)
         }
     }
 
