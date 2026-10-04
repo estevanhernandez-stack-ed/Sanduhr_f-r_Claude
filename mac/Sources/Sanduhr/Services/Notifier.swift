@@ -124,6 +124,38 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
+    // MARK: - Claude's Desk message suggestions (item 54)
+
+    /// A gentle banner for a suggestion, only when MessageSuggestionNotice allows (alerts on, the
+    /// delivery and quiet hours as an alert's), never with a sound. Clicking it opens Settings,
+    /// Message. Without it, the badge on Message is the sign.
+    func suggestDeskMessages(_ p: MessageProposal) {
+        guard MessageSuggestionNotice.banner(AlertSettings(defaults), deskRunning: DeskController.shared.running,
+                                             now: Date()) else { return }
+        let content = UNMutableNotificationContent()
+        content.title = MessageSuggestionNotice.title(p)
+        content.body = p.note ?? "Add, review or dismiss them in Sanduhr Settings, Message."
+        content.sound = nil
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: Self.deskSuggestionPrefix + p.id, content: content, trigger: nil))
+    }
+
+    /// The suggestion was decided: its banner leaves Notification Center.
+    func clearDeskSuggestion(_ p: MessageProposal) {
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [Self.deskSuggestionPrefix + p.id])
+    }
+
+    static let deskSuggestionPrefix = "desk-messages-"
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        if response.notification.request.identifier.hasPrefix(Self.deskSuggestionPrefix) {
+            DispatchQueue.main.async { MainActor.assumeIsolated { SettingsWindowController.shared.show(.message) } }
+        }
+        completionHandler()
+    }
+
     // Show banners even while the widget is the active app.
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification,

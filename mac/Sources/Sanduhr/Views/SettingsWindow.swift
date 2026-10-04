@@ -159,6 +159,8 @@ struct SettingsRoot: View {
     private func rows(_ sections: [SettingsSection]) -> some View {
         ForEach(sections) { s in
             Label(s.title, systemImage: s.symbol).tag(s)
+                // A suggestion from Claude waits on Message (item 54).
+                .badge(s == .message && DeskMessageHandoff.shared.pending != nil ? 1 : 0)
         }
     }
 
