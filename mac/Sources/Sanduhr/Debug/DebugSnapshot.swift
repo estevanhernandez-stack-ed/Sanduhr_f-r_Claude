@@ -31,6 +31,9 @@ struct DebugStateInput {
     var widgetWarnings: [Tier] = []
     /// The limits switched off in Settings, Desk, Meters (MeterVisibility), in display order.
     var hiddenLimits: [Tier] = []
+    /// The reported limits believed temporary (LimitLifetime), the ones that can be hidden, in
+    /// display order.
+    var temporaryLimits: [Tier] = []
     /// The limits whose "Warn when nearly full" is off (LimitMenu.silenced), in display order.
     var silencedLimits: [Tier] = []
     var meetingsCount = 0
@@ -92,6 +95,8 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("widget_warnings", .list(widgetWarnings)))
         let hiddenLimits: [YAMLNode] = s.hiddenLimits.map { .string($0.rawValue) }
         pairs.append(("hidden_limits", .list(hiddenLimits)))
+        let temporaryLimits: [YAMLNode] = s.temporaryLimits.map { .string($0.rawValue) }
+        pairs.append(("temporary_limits", .list(temporaryLimits)))
         let silencedLimits: [YAMLNode] = s.silencedLimits.map { .string($0.rawValue) }
         pairs.append(("silenced_limits", .list(silencedLimits)))
         pairs.append(("meetings_count", .int(s.meetingsCount)))

@@ -292,7 +292,8 @@ struct SanduhrMenuItems: View {
 }
 
 /// A tier card's two-finger menu (LimitMenu), in place of the widget's own menu on the card:
-/// Accounts, Hide and the warnings item for the card's limit, Meter Settings…, then the widget's
+/// Accounts, Hide (temporary limits only) and the warnings item for the card's limit,
+/// Meter Settings…, then the widget's
 /// shared items under a separator, so nothing the widget menu offers is lost on a card. The
 /// warning switch is read through @AppStorage on the same key as Settings, Desk, Meters, so the
 /// menu reads the current setting whichever side changed it.
@@ -312,7 +313,8 @@ struct LimitContextMenu: ViewModifier {
         content.contextMenu {
             if let app = NSApp.delegate as? AppDelegate {
                 let groups = LimitMenu.groups(tier: tier, accounts: app.currentAccountsMenu(),
-                                              hidden: vm.hiddenTiers, warningsOn: warningsOn)
+                                              hidden: vm.hiddenTiers, temporary: vm.temporaryTiers,
+                                              warningsOn: warningsOn)
                 ForEach(groups.indices, id: \.self) { i in
                     if i > 0 { Divider() }
                     ForEach(groups[i].indices, id: \.self) { j in

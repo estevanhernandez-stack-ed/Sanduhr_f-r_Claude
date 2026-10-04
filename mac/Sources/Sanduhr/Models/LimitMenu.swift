@@ -7,7 +7,8 @@ enum LimitMenuEntry: Equatable {
     case widget(visible: Bool)
     /// The Accounts submenu, with two or more accounts. Its titles are labels: never in state.yaml.
     case accounts(AccountsMenu)
-    /// Hide this limit (MeterVisibility, the Settings "Show this limit" switch turned off).
+    /// Hide this limit (MeterVisibility, the Settings "Show this limit" switch turned off). Only
+    /// for a limit believed temporary (LimitLifetime).
     case hide(Tier)
     /// Turn this limit's "Warn when nearly full" off (`on` true) or back on (`on` false).
     case warnings(Tier, on: Bool)
@@ -38,17 +39,18 @@ enum LimitMenu {
 
     /// The items in runs between separators: Show or Hide Widget (Desk only: `widgetVisible` is
     /// nil on a widget card), the Accounts submenu (two or more accounts), then the limit's own
-    /// items, then Meter Settings…. `tier` is the row or card the menu opened on; nil (a click
-    /// beside the rows) leaves the limit's own items out. Hide shows only for a limit that can be
-    /// hidden and still shows; `warningsOn` is the limit's "Warn when nearly full".
-    static func groups(tier: Tier?, accounts: AccountsMenu?, hidden: Set<Tier>,
+    /// items, then Meter Settings….
+    /// `tier` is the row or card the menu opened on; nil (a click beside the rows) leaves the
+    /// limit's own items out. Hide shows only for a limit in `temporary` that still shows;
+    /// `warningsOn` is the limit's "Warn when nearly full".
+    static func groups(tier: Tier?, accounts: AccountsMenu?, hidden: Set<Tier>, temporary: Set<Tier>,
                        warningsOn: Bool, widgetVisible: Bool? = nil) -> [[LimitMenuEntry]] {
         var groups: [[LimitMenuEntry]] = []
         if let widgetVisible { groups.append([.widget(visible: widgetVisible)]) }
         if let accounts { groups.append([.accounts(accounts)]) }
         if let tier {
             var own: [LimitMenuEntry] = []
-            if MeterVisibility.canHide(tier) && !hidden.contains(tier) { own.append(.hide(tier)) }
+            if temporary.contains(tier) && !hidden.contains(tier) { own.append(.hide(tier)) }
             own.append(.warnings(tier, on: warningsOn))
             groups.append(own)
         }
@@ -56,20 +58,25 @@ enum LimitMenu {
         return groups
     }
 
-    /// The same, with the hidden limits and the warning switch read from `store` (the desk suite).
+    /// The same, with the hidden limits, the temporary ones (for these numbers) and the warning
+    /// switch read from `store` (the desk suite).
     static func groups(tier: Tier?, accounts: AccountsMenu?, store: DefaultsStore,
-                       widgetVisible: Bool? = nil) -> [[LimitMenuEntry]] {
+                       usage: UsageResponse?, now: Date, widgetVisible: Bool? = nil) -> [[LimitMenuEntry]] {
         groups(tier: tier, accounts: accounts, hidden: MeterVisibility.hidden(in: store),
+               temporary: MeterVisibility.temporary(usage, now: now, store: store),
                warningsOn: tier.map { MeterWarningSettings.saved($0, in: store).enabled } ?? false,
                widgetVisible: widgetVisible)
     }
 
-    /// Does what Hide and the warnings item say, in `store`. The widget item, the Accounts
-    /// submenu and Meter Settings… are the caller's (a window, a switch), so they change nothing here.
-    static func apply(_ entry: LimitMenuEntry, to store: DefaultsStore) {
+    /// Does what Hide and the warnings item say, in `store`. Hide records
+    /// what the limit reads in `usage`, and does nothing for a limit that is not temporary. The
+    /// widget item, the Accounts submenu and Meter Settings… are the caller's (a window, a
+    /// switch), so they change nothing here.
+    static func apply(_ entry: LimitMenuEntry, to store: DefaultsStore,
+                      usage: UsageResponse? = nil, now: Date = Date()) {
         switch entry {
-        case .hide(let tier) where MeterVisibility.canHide(tier):
-            store.set(false, forKey: MeterVisibility.showKey(tier))
+        case .hide(let tier):
+            MeterVisibility.hide(tier, usage: usage, now: now, store: store)
         case .warnings(let tier, let on):
             store.set(!on, forKey: MeterWarningSettings.onKey(tier))
         default:

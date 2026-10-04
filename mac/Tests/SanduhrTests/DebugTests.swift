@@ -251,7 +251,7 @@ struct DebugStateTests {
         #expect(keys == ["desk_enabled", "desk_running", "layout", "notch", "has_notch",
                          "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "widget_visible", "widget_visibility",
                          "menu_bar", "settings_open", "settings_section", "meters", "widget_warnings", "hidden_limits",
-                         "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "alerts",
+                         "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
                          "glow_camera", "theme", "menu", "credentials_store", "account_ref", "accounts_count",
                          "follow", "follow_paused", "version", "build"])
@@ -299,11 +299,15 @@ struct DebugStateTests {
         var s = DebugStateInput()
         s.widgetWarnings = [.sevenDay, .sevenDayOpus]
         let yaml = YAMLEmitter.emit(DebugState.yaml(s))
-        #expect(yaml.contains("widget_warnings:\n  - seven_day\n  - seven_day_opus\nhidden_limits: []\nsilenced_limits: []\nmeetings_count: 0\n"))
+        #expect(yaml.contains("widget_warnings:\n  - seven_day\n  - seven_day_opus\nhidden_limits: []\ntemporary_limits: []\nsilenced_limits: []\nmeetings_count: 0\n"))
         #expect(YAMLEmitter.emit(DebugState.yaml(DebugStateInput())).contains("widget_warnings: []\n"))
         var hidden = DebugStateInput()
         hidden.hiddenLimits = [.iguanaNecktie]
-        #expect(YAMLEmitter.emit(DebugState.yaml(hidden)).contains("hidden_limits:\n  - iguana_necktie\nsilenced_limits: []\n"))
+        #expect(YAMLEmitter.emit(DebugState.yaml(hidden)).contains("hidden_limits:\n  - iguana_necktie\ntemporary_limits: []\n"))
+        var temporary = DebugStateInput()
+        temporary.temporaryLimits = [.sevenDayOpus, .iguanaNecktie]
+        #expect(YAMLEmitter.emit(DebugState.yaml(temporary))
+            .contains("temporary_limits:\n  - seven_day_opus\n  - iguana_necktie\nsilenced_limits: []\n"))
         var silenced = DebugStateInput()
         silenced.silencedLimits = [.fiveHour, .sevenDay]
         #expect(YAMLEmitter.emit(DebugState.yaml(silenced)).contains("silenced_limits:\n  - five_hour\n  - seven_day\nmeetings_count: 0\n"))

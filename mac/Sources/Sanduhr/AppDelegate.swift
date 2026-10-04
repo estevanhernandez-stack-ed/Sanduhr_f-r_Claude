@@ -359,7 +359,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// own Show or Hide Widget. `tier` nil, a click beside the rows, leaves the limit's own items out.
     func addLimitMenuItems(to menu: NSMenu, tier: Tier?) {
         let groups = LimitMenu.groups(tier: tier, accounts: currentAccountsMenu(), store: UserDefaults.desk,
-                                      widgetVisible: widgetVisible)
+                                      usage: viewModel.usage, now: Date(), widgetVisible: widgetVisible)
         for (i, group) in groups.enumerated() {
             if i > 0 { menu.addItem(.separator()) }
             for entry in group { menu.addItem(limitMenuItem(entry)) }
@@ -381,15 +381,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// What a limit menu's items do, from Desk and the widget alike: Hide and the warnings item
-    /// write the desk-suite keys Settings, Desk, Meters reads (both refresh on the change notice),
-    /// Meter Settings… opens that page.
+    /// write the desk-suite keys Settings, Desk, Meters reads (both refresh on the change notice;
+    /// Hide records the limit's current numbers), Meter Settings… opens that page.
     func performLimit(_ entry: LimitMenuEntry) {
         switch entry {
         case .widget(let visible):
             if visible { hidePanel() } else { DeskController.shared.showWidgetBesideMeters() }
         case .accounts: break
         case .meterSettings: SettingsWindowController.shared.show(.deskMeters)
-        case .hide, .warnings: LimitMenu.apply(entry, to: UserDefaults.desk)
+        case .hide, .warnings: LimitMenu.apply(entry, to: UserDefaults.desk, usage: viewModel.usage)
         }
     }
 

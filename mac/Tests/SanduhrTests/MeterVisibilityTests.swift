@@ -8,10 +8,11 @@ import Testing
 struct MeterVisibilityTests {
     let now = Date(timeIntervalSince1970: 1_800_000_000)
 
-    func usage(_ tiers: [Tier: Double]) -> UsageResponse {
+    func usage(_ tiers: [Tier: Double], resetIn: TimeInterval = 3 * 86400) -> UsageResponse {
         var u = UsageResponse()
+        let reset = ISO8601DateFormatter().string(from: now.addingTimeInterval(resetIn))
         for (tier, util) in tiers {
-            u.tiers[tier] = TierUsage(utilization: util, resetsAt: ISO8601DateFormatter().string(from: now.addingTimeInterval(3 * 86400)))
+            u.tiers[tier] = TierUsage(utilization: util, resetsAt: reset)
         }
         return u
     }
@@ -28,10 +29,10 @@ struct MeterVisibilityTests {
         d.set(false, forKey: MeterVisibility.showKey(.iguanaNecktie))
         d.set(true, forKey: MeterVisibility.showKey(.sevenDayOpus))
         #expect(MeterVisibility.hidden(in: d) == [.iguanaNecktie])
-        #expect(!MeterVisibility.canHide(.fiveHour) && !MeterVisibility.canHide(.sevenDay))
-        for tier in Tier.allCases where tier != .fiveHour && tier != .sevenDay {
-            #expect(MeterVisibility.canHide(tier))
-        }
+        // Not even with a reset far off.
+        let far = usage([.fiveHour: 10, .sevenDay: 20], resetIn: 30 * 86400)
+        #expect(!MeterVisibility.canHide(.fiveHour, usage: far, now: now, store: d))
+        #expect(!MeterVisibility.canHide(.sevenDay, usage: far, now: now, store: d))
         let all = usage([.fiveHour: 10, .sevenDay: 20])
         #expect(MeterVisibility.visible(all, hidden: [.fiveHour, .sevenDay])?.tiers.count == 2)
     }

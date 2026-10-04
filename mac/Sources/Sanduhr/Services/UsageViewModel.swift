@@ -1,6 +1,10 @@
 import Foundation
 import SwiftUI
 import Combine
+import os
+
+/// Hidden limits showing again (item 42): tier raw values and reasons only, never labels.
+private let limitsLog = Logger(subsystem: "com.626labs.sanduhr", category: "limits")
 
 extension Notification.Name {
     /// Posted by `UsageViewModel` whenever `compact` flips. AppDelegate
@@ -121,6 +125,9 @@ final class UsageViewModel {
     /// The limits switched off in Settings, Desk, Meters (MeterVisibility): left off the cards
     /// and out of `warningTiers`. Re-read with the warnings; a change resizes the panel.
     private(set) var hiddenTiers: Set<Tier> = MeterVisibility.hidden(in: UserDefaults.desk)
+    /// The limits believed temporary with the current numbers (LimitLifetime): the only ones a
+    /// card's menu offers to hide. Re-read with the warnings.
+    private(set) var temporaryTiers: Set<Tier> = []
     var lastUpdated: Date?
     var status: StatusMessage = .connecting
     /// An account switch's crossfade (AccountSwitchFade): the old account's cards and Desk meters
@@ -655,6 +662,9 @@ final class UsageViewModel {
         }
         await waitOutSwitchFade()
         guard self.api === api else { return }
+        // Hidden limits that reset, refilled or are no longer temporary show again before the
+        // numbers do (item 42).
+        Self.reconcileHidden(u, now: Date())
         self.usage = u
         self.lastUpdated = Date()
         Notifier.shared.evaluate(u)
@@ -702,6 +712,18 @@ final class UsageViewModel {
         }
         let fresh = Self.warningTiers(usage, now: now, desk: UserDefaults.desk)
         if fresh != warningTiers { warningTiers = fresh }
+        let temporary = MeterVisibility.temporary(usage, now: now, store: UserDefaults.desk)
+        if temporary != temporaryTiers { temporaryTiers = temporary }
+    }
+
+    /// MeterVisibility.reconcile over fresh numbers, with each limit that shows again logged by
+    /// its raw value and the reason, never its label.
+    private static func reconcileHidden(_ usage: UsageResponse, now: Date) {
+        let shown = MeterVisibility.reconcile(usage, now: now, store: UserDefaults.desk)
+        for tier in Tier.allCases {
+            guard let why = shown[tier] else { continue }
+            limitsLog.info("hidden limit \(tier.rawValue, privacy: .public) shows again: \(why.rawValue, privacy: .public)")
+        }
     }
 
     /// The widget's warning tiers for these numbers with the Meters settings saved in `desk`:

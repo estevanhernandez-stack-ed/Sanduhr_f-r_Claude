@@ -53,6 +53,9 @@ final class DeskModel {
     /// Every limit the server reported with a utilization, hidden or not, in the widget's order:
     /// Settings, Desk, Meters lists these, so a hidden limit can be shown again.
     var reportedTiers: [Tier] = []
+    /// The reported limits believed temporary (LimitLifetime): only these get Settings' "Show
+    /// this limit" switch.
+    var temporaryTiers: Set<Tier> = []
     /// One line of Claude usage, or nil when there is none.
     var claudeLine: String?
     /// The line in two pieces (DeskClaudeText.parts): with two or more accounts the Desk draws the
@@ -276,6 +279,8 @@ final class DeskModel {
         // Settings' list of limits waits for the new account's numbers.
         let reported = Tier.allCases.filter { usage.usage?.tiers[$0]?.utilization != nil }
         if !usage.veiled, reported != reportedTiers { reportedTiers = reported }
+        let temporary = MeterVisibility.temporary(usage.usage, now: now, store: UserDefaults.desk)
+        if !usage.veiled, temporary != temporaryTiers { temporaryTiers = temporary }
         signInNeeded = usage.signInNeeded
         if veiled != usage.veiled { veiled = usage.veiled }
         if switchNote != usage.switchNote { switchNote = usage.switchNote }
@@ -284,6 +289,16 @@ final class DeskModel {
         if parts != claudeParts { claudeParts = parts }
         claudeCompact = DeskClaudeText.compact(usage, now: now)
         claudeLineIsStale = usage.isStale(now: now)
+    }
+
+    /// Settings' "Show this limit" switch: hiding records what the limit reads now
+    /// (MeterVisibility.hide), showing clears the hide.
+    func setShown(_ tier: Tier, _ shown: Bool) {
+        if shown {
+            MeterVisibility.show(tier, store: UserDefaults.desk)
+        } else {
+            MeterVisibility.hide(tier, usage: usage.usage, now: Date(), store: UserDefaults.desk)
+        }
     }
 
     /// The meter rows for the limits that show, with the saved warning settings (Settings, Desk, Meters).

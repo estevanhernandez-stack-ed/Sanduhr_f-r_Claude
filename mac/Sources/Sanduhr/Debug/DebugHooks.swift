@@ -289,6 +289,7 @@ enum DebugHooks {
         vm.refreshMeterWarnings()
         s.widgetWarnings = Tier.allCases.filter(vm.warningTiers.contains)
         s.hiddenLimits = Tier.allCases.filter(vm.hiddenTiers.contains)
+        s.temporaryLimits = Tier.allCases.filter(vm.temporaryTiers.contains)
         s.silencedLimits = LimitMenu.silenced(in: UserDefaults.desk)
         s.meetingsCount = desk.model.meetings.count
         if desk.running, let size = desk.windowSize {

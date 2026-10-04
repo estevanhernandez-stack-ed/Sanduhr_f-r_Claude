@@ -206,11 +206,11 @@ struct DeskMetersSection: View {
             Section {
                 Text("A meter that is nearly full while its reset is still far off draws its bar in red with a soft glow around it, on the Desk (in the Desk ink) and on the widget (in the theme's color). Each meter has its own setting; changes show at once on both.")
                     .font(.caption).foregroundStyle(.secondary)
-                Text("Limits other than the session and the weekly all-models limit can be hidden: a hidden limit leaves the widget, the Desk meters and the alerts. A new limit shows until you hide it.")
+                Text("A limit that looks temporary (a promotion, or a new limit whose reset is far off) can be hidden: it leaves the widget, the Desk meters and the alerts, and comes back on its own when it resets or refills. Session, Weekly and the model limits always show.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             ForEach(Self.tiers(present: model.reportedTiers), id: \.self) { tier in
-                MeterWarningGroup(tier: tier)
+                MeterWarningGroup(tier: tier, model: model)
             }
         }
         .formStyle(.grouped)
@@ -219,13 +219,15 @@ struct DeskMetersSection: View {
 
 private struct MeterWarningGroup: View {
     let tier: Tier
+    var model: DeskModel
     @AppStorage private var enabled: Bool
     @AppStorage private var threshold: Double
     @AppStorage private var minReset: Double
     @AppStorage private var shown: Bool
 
-    init(tier: Tier) {
+    init(tier: Tier, model: DeskModel) {
         self.tier = tier
+        self.model = model
         _shown = AppStorage(wrappedValue: true, MeterVisibility.showKey(tier), store: .desk)
         let standard = MeterWarningSettings.standard(for: tier)
         _enabled = AppStorage(wrappedValue: standard.enabled, MeterWarningSettings.onKey(tier), store: .desk)
@@ -235,12 +237,21 @@ private struct MeterWarningGroup: View {
 
     var body: some View {
         Section(tier.label) {
-            if MeterVisibility.canHide(tier) {
-                Toggle("Show this limit", isOn: $shown)
+            // Only a temporary limit can be hidden (item 42); a permanent one keeps just its
+            // warning settings.
+            if temporary {
+                Toggle("Show this limit", isOn: showBinding)
             }
             warningControls
-                .disabled(!shown && MeterVisibility.canHide(tier))
+                .disabled(!shown && temporary)
         }
+    }
+
+    private var temporary: Bool { model.temporaryTiers.contains(tier) }
+
+    /// Reads the saved switch; writes through MeterVisibility, so a hide records the limit's numbers.
+    private var showBinding: Binding<Bool> {
+        Binding(get: { shown }, set: { model.setShown(tier, $0) })
     }
 
     @ViewBuilder private var warningControls: some View {

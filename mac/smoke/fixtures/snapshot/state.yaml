@@ -30,6 +30,7 @@ meters:
     warning: false
 widget_warnings: []
 hidden_limits: []
+temporary_limits: []
 silenced_limits:
   - five_hour
 meetings_count: 0
