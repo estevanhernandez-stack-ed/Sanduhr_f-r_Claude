@@ -621,3 +621,55 @@ S=~/Library/Application\ Support/Sanduhr/integrations
   Remove: the list reads `/tmp/other-mod:/tmp/mine`.
 - [ ] `state.yaml` shows `meters_installed` with the count and no path. Clean up: Remove, then
   `rm -rf /tmp/other-mod /tmp/st-meters.json /tmp/snap.json`.
+
+## 22. The notch glows when Claude Code needs you (item 51)
+
+Use a test folder, never your real `~/.claude*`. The `say` hook stands for a hook of your own:
+
+```sh
+mkdir -p ~/.claude-smoketest/projects
+printf '{\n  "hooks": {\n    "Stop": [\n      {\n        "hooks": [\n          { "type": "command", "command": "say done" }\n        ]\n      }\n    ]\n  }\n}\n' > ~/.claude-smoketest/settings.json
+cp ~/.claude-smoketest/settings.json /tmp/st-hooks.json
+```
+
+- [ ] The link alone, before any install: Settings, Notch, Glow for Claude Code, both switches
+  off. Bring Finder to the front and run `open -g 'sanduhr://claude-code?event=waiting'` from a
+  script or another Mac app (or with "Not while a terminal is in front" off): nothing glows.
+  Turn "When Claude Code is waiting on you" on: the same command glows the notch once within a
+  second (around the island with the notch on, around the hardware notch with it off). Again
+  within 20 seconds: no glow; after 20 seconds: one glow.
+- [ ] `event=done` with "When Claude Code finishes" on glows once, but not within 5 seconds of a
+  waiting glow. `open -g 'sanduhr://claude-code?event=other'`,
+  `open -g 'sanduhr://claude-code?event=waiting&x=1'` and `open -g 'sanduhr://claude-code'`: no
+  glow, no window, no error.
+- [ ] "Not while a terminal is in front" on: run the waiting command in Terminal (Terminal stays
+  in front): no glow. Switch it off: it glows from Terminal too. Put it back on.
+- [ ] Settings, Integrations: `~/.claude-smoketest` has a fourth row, Notch glow when Claude needs
+  you, Not installed, and Install… works even where the page says Python is missing. Under the
+  folders, a line says the glow is off until turned on in Notch, Glow, and Glow Settings… opens
+  the Notch page.
+- [ ] Install…: the sheet says Claude Code tells Sanduhr only that it is waiting or finished,
+  nothing about the conversation, and that Sanduhr adds one entry to each of
+  `hooks.Notification and hooks.Stop` in `~/.claude-smoketest/settings.json`; Glow Settings…
+  there opens the Notch page. Install: Installed;
+  `jq '.hooks.Stop | length, .[0].hooks[0].command' ~/.claude-smoketest/settings.json` prints 2
+  and `"say done"`, and `jq '.hooks.Notification[0]' ~/.claude-smoketest/settings.json` shows the
+  matcher `permission_prompt|idle_prompt|elicitation_dialog` and the `open -g
+  'sanduhr://claude-code?event=waiting'` command with `"async": true`.
+- [ ] With Claude Code: both switches on, "Not while a terminal is in front" on.
+  `CLAUDE_CONFIG_DIR=~/.claude-smoketest claude` in a scratch folder, ask for something that needs
+  a permission (`create a file x.txt`), and switch to Finder before it asks: the notch glows
+  within a second of the prompt. Answer it; when the turn finishes with Finder in front, a
+  second glow (unless within 5 seconds of the first). With the terminal in front: no glow, and
+  you hear "done" from your own hook every turn. Claude Code never waits on the hooks and shows
+  no hook error.
+- [ ] Quit Sanduhr and finish a turn: Sanduhr is not launched. Open it again.
+- [ ] No notch (an external display alone, or a Mac without one): the waiting command glows a
+  soft halo around a notch-wide spot at the top center of the main screen; `state.yaml` shows
+  `glow_shape: top`.
+- [ ] Remove: `diff /tmp/st-hooks.json ~/.claude-smoketest/settings.json` is empty and the
+  `.sanduhr-backup` is gone; a waiting prompt no longer glows. Install with no `settings.json`
+  (`rm ~/.claude-smoketest/settings.json`): it is created; Remove deletes it again.
+- [ ] `state.yaml` shows `hooks_installed` with the count, `glow_claude_waiting` and
+  `glow_claude_done`, and no path. Clean up: Remove, then `rm -f /tmp/st-hooks.json` (and
+  `rm -rf ~/.claude-smoketest` once the other sections are done).

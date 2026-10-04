@@ -298,6 +298,42 @@ was. The mod needs no python3. The mod's files ride in the stamped folder (`buil
 without its tests); Claude Code writes its type declarations into `.claude-plugin/types/` of a mod
 folder it loads, and the stamp covers only the shipped files, so that never reads as altered.
 
+**The notch glow hooks (item 51).** The fourth kind needs no scripts and no python3: Install adds
+one matcher group to each of `hooks.Notification` and `hooks.Stop` in the chosen folder's
+`settings.json`, in the shape of Claude Code's settings schema (`{matcher?, hooks: [{type:
+"command", command, async, timeout}]}`):
+
+```json
+"Notification": [{ "matcher": "permission_prompt|idle_prompt|elicitation_dialog",
+                   "hooks": [{ "type": "command", "async": true, "timeout": 5,
+                               "command": "/usr/bin/pgrep -xq Sanduhr && /usr/bin/open -g 'sanduhr://claude-code?event=waiting' || true" }] }],
+"Stop":         [{ "hooks": [{ "type": "command", "async": true, "timeout": 5,
+                               "command": "/usr/bin/pgrep -xq Sanduhr && /usr/bin/open -g 'sanduhr://claude-code?event=done' || true" }] }]
+```
+
+`async` runs it in the background, so Claude Code never waits on it; `open -g` hands the link to
+Sanduhr without bringing it forward; `pgrep` keeps a quit Sanduhr from being launched by every
+turn; `|| true` keeps Claude Code from reporting a hook error. The matcher keeps sign-in and other
+notices out of "waiting". `hooks` and the two lists are made when missing; an existing list keeps
+every entry and gets Sanduhr's last; an older entry of Sanduhr's is rewritten where it stands. A
+group is Sanduhr's when every hook in it is a command opening `sanduhr://claude-code?`; a group of
+yours that also runs it is yours and stays. Remove takes Sanduhr's groups out in the reverse
+order, deletes a list or `hooks` only when Sanduhr made it and nothing else is in it, and gives an
+emptied list or object back what it held, so the file is byte for byte what it was (the receipt's
+`hooks` field records what was made). `JSONEdit` gained array appends, replacements and removals
+for this.
+
+The app side: `ClaudeCodeLink` accepts `sanduhr://claude-code?event=waiting|done` only (the host,
+no path, exactly one `event` item with a known value; anything else on that host is dropped) and
+needs no debug gate. `NotchGlowController.claudeCode` glows when the event's switch is on
+(`notchGlowClaudeWaiting`, `notchGlowClaudeDone` in the Desk defaults, off by default), the front
+app isn't a terminal or editor in `ClaudeCodeGlowRules.terminalBundleIDs` while
+`notchGlowClaudeSkipTerminal` is on (the default), and `ClaudeCodeGlowLimiter` allows it (one glow
+per kind per 20 seconds; `done` within 5 seconds of a `waiting` glow is dropped; only glows that
+happen count). The glow is `fire(topFallback: true)`: around the island or the plain notch as
+usual, the covered-strip rule included; with no notched screen, around a 200-point spot at the top
+center of the main screen, the camera light's no-notch width (`glow_shape: top`).
+
 **Python.** `PythonFinder` prefers `/usr/bin/python3` (stable across Homebrew changes), but only
 when the developer folder it forwards to (`/var/db/xcode_select_link`, else the Command Line
 Tools or Xcode) holds a python3, checked by file, because running the stub without them opens
@@ -351,7 +387,7 @@ folders: each sharing level, no access file, hidden names, and the Windows MCP t
 - Meter history → `~/Library/Application Support/Sanduhr/history.{label}.json`, one per account, the Windows format. Each reading is kept 30 days (and at most 8640 points per limit, Windows' cap), trimmed when the next one is written; the sparklines draw the last 24 points (about 2 hours). Settings, Accounts, Meter history: Off stops recording an account (`UserDefaults` `meterHistoryOff`, the labels switched off) and offers to erase its file; Remove Account deletes it. `state.yaml` shows the active account's `history_days` (30, or 0 when off)
 - Data choices per account (Claude Code folder, activity, project names, Share with Claude) → `UserDefaults` (`accountData`); the linked folder's path stays there, never in `state.yaml`
 - What the MCP server may read → `~/Library/Application Support/Sanduhr/mcp-access.json` (mode 0600; see Claude Code integrations)
-- Claude Code integrations (items 49 and 50) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json`, with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed}`
+- Claude Code integrations (items 49 to 51) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json` (the notch glow hooks in its `hooks`), with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed, hooks_installed}`
 - Window position → `UserDefaults` (`windowFrame`)
 
 ## Controls
