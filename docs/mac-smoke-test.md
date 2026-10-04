@@ -440,8 +440,8 @@ Support/Sanduhr/mcp-access.json`.
 
 - [ ] Share Off on every account: `jq . "$F"` shows `"accounts": []`. `get_usage` answers
   `no_data` / `not_shared` with a remedy naming Settings > Accounts > Data; `ping` shows
-  `sharing.access_file: "ok"`, `accounts_shared: 0`, `tools_available` with seven tools and
-  `tools_not_on_mac` naming `publish_usage` and `propose_theme`.
+  `sharing.access_file: "ok"`, `accounts_shared: 0`, `tools_available` with eight tools and
+  `tools_not_on_mac` naming `publish_usage`.
 - [ ] Meters on the active account: the file lists it with `share: "meters"`, its
   `account_ref` (as in `snapshot.json`), `history_file`, and no `names`, `vault_id` or
   `live_folder`; `ls -l "$F"` shows `-rw-------`. `get_usage` shows the widget's percentages
@@ -801,3 +801,45 @@ mcp() { printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\
   seconds; open Sanduhr within ten minutes and the suggestion appears. One older than ten minutes
   is dropped. `log show --last 5m --predicate 'subsystem == "com.626labs.sanduhr"'` holds no
   message text. Put the list back: `cp /tmp/messages.txt.mine "$M"`.
+
+## 25. Claude proposes themes (item 55)
+
+The `mcp` probe from section 24. Alerts on (Banner). Note the theme in use, and keep a copy of the
+themes folder: `T=~/Library/Application\ Support/Sanduhr/themes; cp -R "$T" /tmp/themes.mine`.
+`G='"glass":"#14262e","glass_on_mica":"#10222a","title_bg":"#0c1c22","border":"#1f3a44","footer_bg":"#081418","bar_bg":"#12303a","text":"#e6f4f1","text_secondary":"#a9cfc8","text_dim":"#6f9a93","text_muted":"#4f7a73","accent":"#2dd4bf","pace_marker":"#fb7185","sparkline":"#2dd4bf"'`.
+
+- [ ] A broken theme is refused at once and writes nothing:
+  `mcp propose_theme '{"theme":{"name":"Broken","bg":"#fff"}}'` answers `rejected` /
+  `invalid_theme` with `findings` naming `bg` (`#rrggbb`) and every missing color; no
+  `theme-request.json` appears. `{"theme":{"name":"Obsidian",'"$G"',"bg":"#0b1418"}}` answers
+  `reserved_name`.
+- [ ] Approve: `mcp propose_theme '{"theme":{"name":"Tidepool","description":"Deep teal glass with a coral pace tick.","bg":"#0b1418",'"$G"'}}'`
+  answers `pending_approval` within a second with `key: "tidepool"`. A quiet banner "Claude
+  suggested a theme: Tidepool" shows (body: the description); clicking it opens Settings, Themes.
+  The sidebar's Themes has a badge; the page's banner shows a teal card like the gallery's, the name,
+  the description, Dismiss, Save and Save and Apply. Save and Apply: the widget turns teal, the card
+  appears in the gallery marked as yours with the description in its tooltip, the badge goes, and
+  `jq .result ~/Library/Application\ Support/Sanduhr/theme-result.json` reads `applied`,
+  `previous_key` the theme you had and `saved_path` ending `tidepool.json`. Pick your old theme
+  again in the gallery.
+- [ ] Save only: propose it again with `"save_as":"tidepool-calm","apply":false` and click Save: the
+  file appears, the widget keeps its theme, the result reads `saved`.
+- [ ] Collision: `tidepool.json` from the step above is now one of your themes. Propose Tidepool
+  with a changed `accent` (`"accent":"#38bdf8","sparkline":"#38bdf8"`): the banner says it
+  is saved as `tidepool-2.json`; after Save, `tidepool.json` is unchanged and the result names
+  `renamed_from: "tidepool"`. Proposing the very same theme as `tidepool` again says "You already
+  have this theme" and adds no file.
+- [ ] Warnings ride along: propose with `"text":"#5a5a5a"`: `pending_approval` with a `text`
+  warning in `findings`; the banner shows "1 design note" with the message on hover. Dismiss: the
+  result reads `rejected` / `dismissed`, no file is written.
+- [ ] Apply directly: Settings, Widget, Themes, "Let Claude change themes directly" on. Propose a
+  new theme: the answer is `applied` at once, no banner, no badge, the widget changes. With
+  `"apply":false`: `saved` and the widget stays.
+- [ ] Match Desk: with Match Desk in use, a proposal with `apply` true moves the widget off Match
+  Desk to the new theme; `previous_key` reads `match-desk`, and clicking Match Desk in the gallery
+  brings the Desk's ink back.
+- [ ] Quit Sanduhr and propose: `queued` / `app_not_responding` after about ten seconds; open
+  Sanduhr within ten minutes and the suggestion appears. `log show --last 5m --predicate
+  'subsystem == "com.626labs.sanduhr"'` holds no theme name. `state.yaml` shows
+  `pending_suggestions: {messages: false, theme: true}` while one waits. Put the folder back:
+  `rm -rf "$T" && cp -R /tmp/themes.mine "$T"`.

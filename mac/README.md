@@ -348,8 +348,8 @@ Outdated, and Update moves it to the app's copy.
 
 The server (`sanduhr_mcp.py`) speaks the Windows `sanduhr-mcp` protocol with the same tool names
 and result shapes: `get_usage`, `get_local_burn_by_project`, `get_model_usage`,
-`get_usage_history`, `ping`, plus two Mac tools for Desk messages (below). `publish_usage` is
-dropped on the Mac and `propose_theme` is not ported. What it may read comes from
+`get_usage_history`, `ping`, `propose_theme` (below), plus two Mac tools for Desk messages (below).
+`publish_usage` is dropped on the Mac. What it may read comes from
 `mcp-access.json`, which the app writes:
 
 ```json
@@ -375,7 +375,7 @@ that is read (Live only or Keep a record), `vault_id` with `activity` and Keep a
 No access file, an unreadable one or another `schema_version` shares nothing (`not_shared`, and
 `ping.sharing.access_file` says why). Hidden returns the record's `p-` code for every project,
 full paths only for Full paths. The server never takes a path argument, never logs and makes no
-network request; the one file it writes is a Desk message request (below). `SANDUHR_SUPPORT_DIR`
+network request; the files it writes are a Desk message request and a theme request (below). `SANDUHR_SUPPORT_DIR`
 points it at a test folder (and Desk's folder beside it).
 
 **Desk messages from Claude (item 54).** `get_desk_messages` returns `{status, file_found, lines,
@@ -423,8 +423,47 @@ task); `{write}` is one animation; `{shimmer}` is a task that sleeps between swe
 the Desk is covered (window occlusion), the screens sleep, the screen saver runs or the session is
 switched away (`MessageMotion.paused`).
 
+**Themes from Claude (item 55).** `propose_theme {theme, save_as?, apply?}` is the Windows tool:
+same name, inputs and result shape. `theme` is the theme JSON in `docs/themes/template.json`'s
+snake_case fields (`name`, the fourteen `#rrggbb` colors, optional `description` and the glass
+dials); `save_as` a file key (`^[a-z0-9][a-z0-9-]{0,39}$`, default the name slugged); `apply`
+default true. The description teaches the fields, the dials' ranges, what the lint measures and
+Match Desk. The server lints first (`lint_theme`, a Python copy of the Windows `ThemeLint`, the same
+rules and wording) and refuses a broken theme or a built-in's key at once (`rejected`, `reason`
+`invalid_params` / `invalid_theme` / `reserved_name`, `findings: [{level, field, message}]`),
+writing nothing. A clean theme becomes `theme-request.json` (atomic, mode 0600) and the server
+waits up to 10 seconds for `theme-result.json`:
+
+```jsonc
+// request (server → app)
+{ "schema_version": 1, "id": "<32 hex>", "requested_at": "…", "theme": { "name": "Tidepool", … },
+  "save_as": null, "apply": true }
+// result (app → server), rewritten when the user decides
+{ "id": "<same>", "completed_at": "…", "result": {
+  "status": "applied" | "saved" | "pending_approval" | "rejected" | "error",
+  "reason": "invalid_theme" | "reserved_name" | "dismissed" | "name_taken" | "save_failed" | …,
+  "remedy": "…", "key": "tidepool-2", "name": "Tidepool", "previous_key": "obsidian",
+  "saved_path": "…/themes/tidepool-2.json", "renamed_from": "tidepool", "findings": [ … ] } }
+```
+
+No answer is `queued` / `app_not_responding`; the app takes a request up to ten minutes old. The
+app (`ThemeProposalHandoff`, on the same folder watch as the Desk messages, `HandoffWatch`) lints
+again with `ThemeLint` (the Swift port; errors refuse, warnings ride along) and refuses a built-in's
+key (`ThemeRegistry.builtIn`, Match Desk included). With Settings, Widget, Themes, "Let Claude
+change themes directly" on (`themeClaudeDirect`, off by default) it saves and applies as asked;
+otherwise the Themes page shows "Claude suggested a theme" with the theme's gallery card, its name
+and description, the lint's notes (hover), and Dismiss, Save, Save and Apply; Themes in the sidebar
+gets a badge and a notification posts as for Desk messages. **A user theme is never overwritten:**
+when the key's file holds a different theme the next free key is used (`tidepool-2`, up to `-99`)
+and the result names `renamed_from`; a file already holding the same theme is reused. A partial
+`accent_bloom` or `inner_highlight` gets the Windows defaults and `breath_period_ms` a whole number,
+so the Mac's loader reads what Windows reads. `glass_on_mica` is required here as on Windows, though
+a hand-written Mac theme may leave it out. The theme's name and description are never logged.
+
 Tests: `python3 -m unittest discover -s mac/integrations/tests` (also a Mac CI step), over temp
-folders: each sharing level, no access file, hidden names, and the Windows MCP tests' cases.
+folders: each sharing level, no access file, hidden names, and the Windows MCP tests' cases. The
+two lints share `mac/Tests/SanduhrTests/Fixtures/theme-builtins.json`, the built-ins they must pass
+clean.
 
 ## Now playing
 
@@ -481,6 +520,7 @@ switch and "Arrange on the Notch…" / "Arrange on the Desk…").
 - Meter history → `~/Library/Application Support/Sanduhr/history.{label}.json`, one per account, the Windows format. Each reading is kept 30 days (and at most 8640 points per limit, Windows' cap), trimmed when the next one is written; the sparklines draw the last 24 points (about 2 hours). Settings, Accounts, Meter history: Off stops recording an account (`UserDefaults` `meterHistoryOff`, the labels switched off) and offers to erase its file; Remove Account deletes it. `state.yaml` shows the active account's `history_days` (30, or 0 when off)
 - Data choices per account (Claude Code folder, activity, project names, Share with Claude) → `UserDefaults` (`accountData`); the linked folder's path stays there, never in `state.yaml`
 - What the MCP server may read → `~/Library/Application Support/Sanduhr/mcp-access.json` (mode 0600; see Claude Code integrations)
+- Themes from Claude (item 55) → `theme-request.json` (server) and `theme-result.json` (app), mode 0600 in `~/Library/Application Support/Sanduhr/`; a saved theme in `themes/<key>.json`; the opt-in in `UserDefaults` (`themeClaudeDirect`)
 - Desk messages from Claude (item 54) → `desk-messages-request.json` (server), `desk-messages-result.json` and `desk-messages-state.json` (app), all mode 0600 in `~/Library/Application Support/Sanduhr/`; the previous list in `~/Library/Application Support/Desk/messages.txt.previous`; the opt-in in the desk preference `messageClaudeDirect`, the glow in `messageGlow`
 - Claude Code integrations (items 49 to 51) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json` (the notch glow hooks in its `hooks`), with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed, hooks_installed}`
 - Window position → `UserDefaults` (`windowFrame`)
