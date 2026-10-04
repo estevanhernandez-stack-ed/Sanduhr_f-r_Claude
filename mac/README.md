@@ -381,13 +381,27 @@ folders: each sharing level, no access file, hidden names, and the Windows MCP t
 
 ## Now playing
 
-Settings, Desk, Now Playing (off by default; item 53) shows what plays on the Mac, in any app that
-publishes now playing (Music, Spotify, Pandora, browser players such as YouTube Music): "▶ Title ·
-Artist" in a notch wing or the strip under the camera (pick Now playing in Settings, Notch) and a
-line with a position bar under the Desk meters (under the Claude line when the meters are off the
-desktop). Click it to play or pause; two-finger click for Previous, Play/Pause, Next and Now Playing
-Settings…. It hides when nothing plays, optionally while paused, and for apps switched off on the
-page. It runs only while Desk does.
+Now playing (items 53, 53b) shows what plays on the Mac, in any app that publishes now playing
+(Music, Spotify, Pandora, browser players such as YouTube Music): "▶ Title · Artist" wherever it is
+placed, like the rest of Desk: a notch wing or the strip under the camera (pick Now playing in
+Settings, Notch) and the `nowPlaying` element in Settings, Desk, Layout (a line with a position bar,
+in a corner like the other elements; off by default). There is no switch: it runs while it is placed
+somewhere and Desk is on (`NowPlayingPlacement`). Click it to play or pause; two-finger click for
+Previous, Play/Pause, Next and Now Playing Settings…. It hides when nothing plays, optionally while
+paused, and for apps switched off on the Now Playing page (which also has the source, the AppleScript
+switch and "Arrange on the Notch…" / "Arrange on the Desk…").
+
+- **Long titles.** A title that doesn't fit its wing (or the strip) scrolls through once when a new
+  track starts or the place first shows it: 1.2 s at the beginning, 30 pt/s with ease in and out
+  until its end clears the 12 pt fade, 1.0 s at the end, 0.6 s back, then it rests at the beginning.
+  It never loops, and never moves with Reduce Motion (`NowPlayingScroll`).
+- **While paused** a wing shows a Next button at its outer edge (away from the camera) and the strip
+  at its end; the title keeps its beginning visible. The title plays, the button skips
+  (`NowPlayingWingLayout`; the strip's button is the `now_playing_next` Desk element).
+- **Upgrading from item 53's switch.** Once at launch, a saved `nowPlaying` on with `nowPlayingDesk`
+  on (its default) and no now playing in the layout puts `nowPlaying` right after the meters' word in
+  the layout (the Claude line's when the meters are off the desktop), where the line used to sit.
+  The old keys are ignored after that (`nowPlayingPlacementUpgraded` marks it done).
 
 - **Source.** macOS 15.4 and later answer the MediaRemote "now playing" calls only for Apple-signed
   processes, so Sanduhr bundles [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter)
@@ -410,7 +424,7 @@ page. It runs only while Desk does.
   hardened runtime, timestamp); CI checks their architectures and the release workflow their
   signatures.
 - **Privacy.** Titles and artists stay in memory: never on disk, in a log or in `state.yaml`
-  (`now_playing: {enabled, source, state}` only). No network.
+  (`now_playing: {enabled, placed, source, state}` only). No network.
 
 ## Files
 
@@ -422,7 +436,7 @@ page. It runs only while Desk does.
 - What the MCP server may read → `~/Library/Application Support/Sanduhr/mcp-access.json` (mode 0600; see Claude Code integrations)
 - Claude Code integrations (items 49 to 51) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json` (the notch glow hooks in its `hooks`), with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed, hooks_installed}`
 - Window position → `UserDefaults` (`windowFrame`)
-- Now playing (item 53) → the desk preferences `nowPlaying`, `nowPlayingDesk`, `nowPlayingHidePaused`, `nowPlayingAskApps` and `nowPlayingExcluded` (bundle ids switched off); what plays stays in memory
+- Now playing (items 53, 53b) → where it shows is the desk preferences `notchLeft`, `notchRight`, `notchStrip` and the `nowPlaying` word in `layout`; the rest is `nowPlayingHidePaused`, `nowPlayingAskApps` and `nowPlayingExcluded` (bundle ids switched off). Item 53's `nowPlaying` and `nowPlayingDesk` are read once by the upgrade (`nowPlayingPlacementUpgraded`); what plays stays in memory
 - Third-party notices (Sparkle, mediaremote-adapter) → `Sanduhr.app/Contents/Resources/THIRD-PARTY-NOTICES.txt`, from `mac/THIRD-PARTY-NOTICES.txt`; Settings, About opens it
 
 ## Controls
@@ -447,6 +461,7 @@ page. It runs only while Desk does.
 | Click a Desk meter          | Nothing: the meters are passive, clicks there do nothing |
 | Two-finger click a Desk meter | Show or Hide Widget, then the same limit menu |
 | Click now playing (notch or Desk) | Play or pause (item 53) |
+| Click Next on a paused wing or strip | Next track (item 53b) |
 | Two-finger click now playing | Previous, Play/Pause, Next, Now Playing Settings… |
 | Right-click the hourglass   | The widget menu plus Menu Bar Shows (Session, Weekly, Whichever is higher, Rotate) |
 | **×**                       | Hide the widget (Desk keeps running) |

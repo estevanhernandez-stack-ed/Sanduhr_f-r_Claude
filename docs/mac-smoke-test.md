@@ -676,7 +676,7 @@ cp ~/.claude-smoketest/settings.json /tmp/st-hooks.json
   `glow_claude_done`, and no path. Clean up: Remove, then `rm -f /tmp/st-hooks.json` (and
   `rm -rf ~/.claude-smoketest` once the other sections are done).
 
-## 23. Now playing (item 53)
+## 23. Now playing (items 53, 53b)
 
 Desk on. Have YouTube Music open in Chrome (or Safari) and Music with a song queued; start and stop
 playback yourself. Never put titles in a bug report: `state.yaml` carries only flags.
@@ -684,18 +684,34 @@ playback yourself. Never put titles in a bug report: `state.yaml` carries only f
 - [ ] `lipo -archs mac/Sanduhr.app/Contents/Frameworks/MediaRemoteAdapter.framework/Versions/A/MediaRemoteAdapter`
   and `lipo -archs mac/Sanduhr.app/Contents/Helpers/MediaRemoteAdapterTestClient` print
   `x86_64 arm64`; `codesign --verify --strict mac/Sanduhr.app` passes.
-- [ ] Off by default: Settings, Desk, Now Playing shows the switch off and Source: Off;
-  `pgrep -fl mediaremote-adapter` finds nothing; `state.yaml` shows
-  `now_playing: {enabled: false, source: off, state: none}`. Settings, Notch lists Now playing as
-  a choice for both wings and the strip.
-- [ ] Switch it on: Source reads Checking… for a moment, then Adapter working; one `perl …
-  mediaremote-adapter.pl … stream` process runs (`pgrep -fl mediaremote-adapter`). Pick Now playing
-  for the right wing.
-- [ ] Play in YouTube Music: within two seconds the right wing shows "▶ Title · Artist" (long
-  titles clipped with …) and a line with a position bar sits under the Desk meters, the bar moving
-  about once a second. `state.yaml`: `source: adapter`, `state: playing`, no title anywhere in it.
-- [ ] Pause in the browser: the glyph turns to a pause sign and the bar stops within two seconds.
-  Skip twice: each new title shows without the wing blinking empty in between.
+- [ ] Placed nowhere by default: Settings, Desk, Now Playing has no on/off switch and reads Source:
+  Not placed anywhere, with "Arrange on the Notch…" and "Arrange on the Desk…" (each opens that
+  page); `pgrep -fl mediaremote-adapter` finds nothing; `state.yaml` shows
+  `now_playing: {enabled: false, placed: [], source: off, state: none}`. Settings, Notch lists Now
+  playing as a choice for both wings and the strip; Settings, Layout lists Now playing as Hidden.
+- [ ] Pick Now playing for the right wing (island on): that alone starts it. Source reads Checking…
+  for a moment, then Adapter working; one `perl … mediaremote-adapter.pl … stream` process runs
+  (`pgrep -fl mediaremote-adapter`); `state.yaml` `placed: [wing_right]`, `enabled: true`. Put Now
+  playing in Layout at Bottom left too: `placed: [wing_right, desk]`.
+- [ ] Play in YouTube Music: within two seconds the right wing shows "▶ Title · Artist" and the Desk
+  shows the line with a position bar in its corner (under the meters when they share it), the bar
+  moving about once a second. `state.yaml`: `source: adapter`, `state: playing`, no title anywhere.
+- [ ] A long title (longer than the wing's 180 points): the wing grows to its limit and the text
+  rests at its beginning with a soft fade at the clipped end, then after about a second scrolls
+  through once, slowly (about 30 points a second, easing in and out), rests at the end, glides back
+  and stays at the beginning. It never starts again for the same track; the next track (or picking
+  the wing again) scrolls once more. A short title never moves. With System Settings,
+  Accessibility, Display, Reduce motion on, nothing scrolls: the beginning shows, faded at the end.
+  The strip (Notch, Text under the camera, Now playing) does the same when the line is too long for
+  it.
+- [ ] Pause in the browser: the glyph turns to a pause sign and the bar stops within two seconds; a
+  Next button (⏭) appears at the wing's outer edge (the right wing's right end, the left wing's left
+  end), the title still starting at its beginning. Pausing does not scroll the title. Click the
+  button: the next track plays and the button goes. Pause again and click the title: it plays and
+  the button goes. Skip twice: each new title shows without the wing blinking empty in between.
+- [ ] With the strip on Now playing and paused, the strip shows ⏭ at its end; `state.yaml` lists a
+  `now_playing_next` `strip` frame beside the `now_playing` `strip` one and `desk_frames_ok: true`;
+  a click on ⏭ skips, a click on the title plays.
 - [ ] Click the wing: playback pauses; click again: it plays. Two-finger click the wing: Previous,
   Pause, Next, Now Playing Settings…; Next and Previous skip; the last item opens this page.
   The rest of the island still opens Settings on a click.
@@ -708,11 +724,15 @@ playback yourself. Never put titles in a bug report: `state.yaml` carries only f
   (the wing goes back to plain black); switch it back on.
 - [ ] Hide while paused on: pausing hides the wing and the line; playing brings them back. With
   nothing playing at all, neither shows and no timer ticks (the line is gone).
-- [ ] Line under the Desk meters off: the line goes, the notch stays. Move the meters to Hidden in
-  Layout: the line sits under the Claude line instead.
-- [ ] Switch Now Playing off: the wing and line go and `pgrep -fl mediaremote-adapter` finds
-  nothing within a second. Switch Desk off with Now Playing on: the same. Quit Sanduhr with it on:
-  no `perl` process is left behind.
+- [ ] Move Now playing to Hidden in Layout: the line goes, the wing stays and it keeps running. Then
+  set the right wing back to Claude meters: `placed: []`, the Source reads Not placed anywhere and
+  `pgrep -fl mediaremote-adapter` finds nothing within a second. Place it again, then switch Desk off:
+  the same. Quit Sanduhr while it runs: no `perl` process is left behind.
+- [ ] Upgrade from item 53's switch: quit, `defaults write com.626labs.sanduhr.desk nowPlaying -bool
+  true`, `defaults write com.626labs.sanduhr.desk layout "message:tl clock:bl meters:bl meetings:bl"`
+  and `defaults delete com.626labs.sanduhr.desk nowPlayingPlacementUpgraded`, then open Sanduhr:
+  `layout` reads `message:tl clock:bl meters:bl nowPlaying:bl meetings:bl` and the line sits under
+  the meters. Move it to Hidden and relaunch: it stays hidden.
 - [ ] Fallback: quit, then `open -n --env SANDUHR_NOWPLAYING_TEST=fail mac/Sanduhr.app`. Source
   reads "Fallback (Music and Spotify only): the system now playing isn't available on this macOS";
   no adapter process runs; no prompt appears. Play, pause or skip in Music: the wing follows from the
@@ -721,7 +741,7 @@ playback yourself. Never put titles in a bug report: `state.yaml` carries only f
   once whether Sanduhr may control Music; Allow, and the current track shows without waiting for a
   change. With Music quit the switch launches nothing. Switch it off again and reset the grant with
   `tccutil reset AppleEvents com.626labs.sanduhr` if you want the prompt back.
-- [ ] Sleep the Mac with Now Playing on and wake it: Source settles on Adapter working again and
+- [ ] Sleep the Mac while now playing runs and wake it: Source settles on Adapter working again and
   the wing follows the next change.
 - [ ] Settings, About: "Now playing uses mediaremote-adapter by Jonas van den Berg (BSD-3-Clause)"
   links to its GitHub page; Third-Party Notices opens the text with the adapter's and Sparkle's
