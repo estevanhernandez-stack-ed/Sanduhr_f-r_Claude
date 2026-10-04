@@ -348,8 +348,9 @@ Outdated, and Update moves it to the app's copy.
 
 The server (`sanduhr_mcp.py`) speaks the Windows `sanduhr-mcp` protocol with the same tool names
 and result shapes: `get_usage`, `get_local_burn_by_project`, `get_model_usage`,
-`get_usage_history`, `ping`. `publish_usage` is dropped on the Mac and `propose_theme` is not
-ported. What it may read comes from `mcp-access.json`, which the app writes:
+`get_usage_history`, `ping`, plus two Mac tools for Desk messages (below). `publish_usage` is
+dropped on the Mac and `propose_theme` is not ported. What it may read comes from
+`mcp-access.json`, which the app writes:
 
 ```json
 { "schema_version": 1,
@@ -373,8 +374,54 @@ that is read (Live only or Keep a record), `vault_id` with `activity` and Keep a
 
 No access file, an unreadable one or another `schema_version` shares nothing (`not_shared`, and
 `ping.sharing.access_file` says why). Hidden returns the record's `p-` code for every project,
-full paths only for Full paths. The server never takes a path argument, never writes, never
-logs and makes no network request. `SANDUHR_SUPPORT_DIR` points it at a test folder.
+full paths only for Full paths. The server never takes a path argument, never logs and makes no
+network request; the one file it writes is a Desk message request (below). `SANDUHR_SUPPORT_DIR`
+points it at a test folder (and Desk's folder beside it).
+
+**Desk messages from Claude (item 54).** `get_desk_messages` returns `{status, file_found, lines,
+pinned, rotate, today, limits}`: every raw line of Desk's `messages.txt`, whether a line is pinned,
+the rotation and the raw line the Desk shows now. Its description teaches the syntax (plain, `Mon:`,
+`MM-DD:`, `#`, the most specific pool, rotation, pinning) and the effects, with taste tips.
+`propose_desk_messages {lines, mode: add|replace, note?}` checks the lines (1 to 60, 120 characters
+each, no control characters, at least one message line, prefixes and effects must parse; refusals
+come back at once with `reasons` and write nothing), then writes `desk-messages-request.json`
+atomically (mode 0600) and waits up to 10 seconds for the app's `desk-messages-result.json`:
+
+```jsonc
+// request (server → app)
+{ "schema_version": 1, "id": "<32 hex>", "requested_at": "2026-10-04T10:00:00.1234560+00:00",
+  "lines": ["{ink:#ff2a6d,#05d9e8} {glow} hello there."], "mode": "add", "note": "for the week" }
+// result (app → server), rewritten when the user decides
+{ "id": "<same>", "completed_at": "…", "result": { "status": "pending_approval" | "applied" | "rejected",
+  "mode": "add", "reasons": ["…"], "lines_added": 1, "lines_skipped": 0 } }
+```
+
+No answer within the wait is `queued` / `app_not_responding`; the app takes a request up to ten
+minutes old. Neither tool is gated by Share with Claude: the messages are on the desktop already,
+and a proposal only asks. The server never writes `messages.txt`. The app (`DeskMessageHandoff`,
+watching Sanduhr's folder with the themes watcher) checks the request again (`MessageProposal`,
+the server's rules and wording, pinned by a test reading the server's constants), then either
+applies it, with Settings, Message, "Let Claude change the messages directly" on
+(`messageClaudeDirect`, off by default), or holds it as a suggestion: a banner on Settings, Message
+("Claude suggested N lines", the note, Dismiss, Review…, Add or Replace), a badge on Message in the
+sidebar, and a notification without sound only while alerts are on (their delivery and quiet hours;
+`MessageSuggestionNotice`). Add appends and skips lines already in the list; Replace keeps the
+comment block at the top of the file and replaces the rest. Either way the previous file is kept as
+`messages.txt.previous`. A suggestion waits in memory (quitting drops it); a newer one replaces it.
+The app writes `desk-messages-state.json` (`{schema_version, pinned, pinned_line, rotate}`) when
+the pin or rotation changes, for `get_desk_messages`.
+
+**Message effects.** Tags at the start of a line's text, after any prefix, in any order:
+`{ink:#hex,…}` (1 to 4 colors, a gradient from two), `{glow}` / `{noglow}` (over Settings, Desk,
+Look's new "Glow around the message", `messageGlow`), `{size:0.5…2}` (times the message size),
+`{write}` (the line draws itself in, left to right, over 1.5 s when it first appears, once) and
+`{shimmer}` (a light band sweeps across it in 1.6 s every 8 s). `MessageMarkup` parses strictly for
+proposals and leniently on the Desk: an unknown or malformed tag ends the tags and draws, with the
+rest, as plain text; a line of tags alone draws as written. Reduce Motion shows `{write}` at once and
+turns `{shimmer}` off. Cost: a line without `{write}` or `{shimmer}` draws as before (no mask, no
+task); `{write}` is one animation; `{shimmer}` is a task that sleeps between sweeps and stops while
+the Desk is covered (window occlusion), the screens sleep, the screen saver runs or the session is
+switched away (`MessageMotion.paused`).
 
 Tests: `python3 -m unittest discover -s mac/integrations/tests` (also a Mac CI step), over temp
 folders: each sharing level, no access file, hidden names, and the Windows MCP tests' cases.
@@ -434,6 +481,7 @@ switch and "Arrange on the Notch…" / "Arrange on the Desk…").
 - Meter history → `~/Library/Application Support/Sanduhr/history.{label}.json`, one per account, the Windows format. Each reading is kept 30 days (and at most 8640 points per limit, Windows' cap), trimmed when the next one is written; the sparklines draw the last 24 points (about 2 hours). Settings, Accounts, Meter history: Off stops recording an account (`UserDefaults` `meterHistoryOff`, the labels switched off) and offers to erase its file; Remove Account deletes it. `state.yaml` shows the active account's `history_days` (30, or 0 when off)
 - Data choices per account (Claude Code folder, activity, project names, Share with Claude) → `UserDefaults` (`accountData`); the linked folder's path stays there, never in `state.yaml`
 - What the MCP server may read → `~/Library/Application Support/Sanduhr/mcp-access.json` (mode 0600; see Claude Code integrations)
+- Desk messages from Claude (item 54) → `desk-messages-request.json` (server), `desk-messages-result.json` and `desk-messages-state.json` (app), all mode 0600 in `~/Library/Application Support/Sanduhr/`; the previous list in `~/Library/Application Support/Desk/messages.txt.previous`; the opt-in in the desk preference `messageClaudeDirect`, the glow in `messageGlow`
 - Claude Code integrations (items 49 to 51) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json` (the notch glow hooks in its `hooks`), with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed, hooks_installed}`
 - Window position → `UserDefaults` (`windowFrame`)
 - Now playing (items 53, 53b) → where it shows is the desk preferences `notchLeft`, `notchRight`, `notchStrip` and the `nowPlaying` word in `layout`; the rest is `nowPlayingHidePaused`, `nowPlayingAskApps` and `nowPlayingExcluded` (bundle ids switched off). Item 53's `nowPlaying` and `nowPlayingDesk` are read once by the upgrade (`nowPlayingPlacementUpgraded`); what plays stays in memory

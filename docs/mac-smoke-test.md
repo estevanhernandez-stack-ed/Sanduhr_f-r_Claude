@@ -440,7 +440,7 @@ Support/Sanduhr/mcp-access.json`.
 
 - [ ] Share Off on every account: `jq . "$F"` shows `"accounts": []`. `get_usage` answers
   `no_data` / `not_shared` with a remedy naming Settings > Accounts > Data; `ping` shows
-  `sharing.access_file: "ok"`, `accounts_shared: 0`, `tools_available` with five tools and
+  `sharing.access_file: "ok"`, `accounts_shared: 0`, `tools_available` with seven tools and
   `tools_not_on_mac` naming `publish_usage` and `propose_theme`.
 - [ ] Meters on the active account: the file lists it with `share: "meters"`, its
   `account_ref` (as in `snapshot.json`), `history_file`, and no `names`, `vault_id` or
@@ -550,7 +550,7 @@ S=~/Library/Application\ Support/Sanduhr/integrations
   `diff /tmp/st-claude.json ~/.claude-smoketest/.claude.json.sanduhr-backup` is empty; `ls -l
   "$S"` shows `current -> <12 hex>` and that folder holds both scripts.
 - [ ] `CLAUDE_CONFIG_DIR=~/.claude-smoketest claude` then `/mcp`: sanduhr is connected; "call
-  the sanduhr ping tool" answers with `0.2.0-mac`.
+  the sanduhr ping tool" answers with `0.3.0-mac`.
 - [ ] Statusline, Install…: the sheet shows `echo mine` as the statusline it would replace;
   Not Now changes nothing (`diff /tmp/st-settings.json ~/.claude-smoketest/settings.json`
   is empty). Replace and Install: Installed; `"model"` is still there; the Claude Code session
@@ -747,3 +747,57 @@ playback yourself. Never put titles in a bug report: `state.yaml` carries only f
   links to its GitHub page; Third-Party Notices opens the text with the adapter's and Sparkle's
   licenses. Console (`log stream --predicate 'subsystem == "com.626labs.sanduhr" AND category ==
   "nowplaying"'`) shows only on/off, test and stream lines, never a title.
+
+## 24. Claude writes your Desk messages (item 54)
+
+Desk on with the message in a corner. Back up the list first and put it back at the end:
+`M=~/Library/Application\ Support/Desk/messages.txt; cp "$M" /tmp/messages.txt.mine`. Settings,
+Alerts on (Banner) for the notification step. The probe below calls the installed server the way
+Claude Code does, one stdio round trip per call (`S=~/Library/Application\
+Support/Sanduhr/integrations/current/sanduhr_mcp.py`, or `mac/integrations/sanduhr_mcp.py`):
+
+```sh
+mcp() { printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"$1\",\"arguments\":${2:-{\}}}}" \
+  | python3 "$S" | python3 -c 'import json,sys; print(json.dumps(json.loads(json.loads(sys.stdin.read())["result"]["content"][0]["text"]), indent=1, ensure_ascii=False))'; }
+```
+
+- [ ] `mcp get_desk_messages`: `lines` match `cat "$M"` (comments included), `today` is the line
+  the Desk shows, `pinned: false`, `rotate: "daily"`. Pin a line in Settings, Message: within a
+  second `jq . ~/Library/Application\ Support/Sanduhr/desk-messages-state.json` shows
+  `pinned: true` with the line, and `get_desk_messages` returns it as `today`. Unpin; Every hour
+  makes `rotate: "hourly"`; back to Once a day.
+- [ ] A bad proposal is refused at once and writes nothing:
+  `mcp propose_desk_messages '{"lines":["{blink} hi","Monday: x","13-40: y"]}'` lists three reasons
+  (line 1 unknown effect, line 2 write the day as Mon, line 3 not a date); no
+  `desk-messages-request.json` appears in the Sanduhr folder.
+- [ ] Approve: `mcp propose_desk_messages '{"lines":["{ink:#ff2a6d,#05d9e8} {glow} {write} hello there.","{shimmer} {size:0.8} keep going."],"note":"two for the week"}'`
+  answers `pending_approval` within a second. A quiet banner "Claude suggested 2 Desk messages"
+  (body "two for the week", no sound) shows; clicking it opens Settings, Message. The sidebar's
+  Message has a badge; the page shows the banner with the note, Dismiss, Review… and Add. Review…
+  draws both lines on a dark card: the first writes itself in, left to right, in a pink-to-cyan
+  gradient with a glow; the second, smaller, gets a light sweep every 8 seconds. Add: the badge
+  and banner go, the editor shows the two lines at the end of the list, `messages.txt.previous`
+  holds the list as it was, and `jq .result ~/Library/Application\ Support/Sanduhr/desk-messages-result.json`
+  reads `applied` with `lines_added: 2`. Propose the same lines again and Add: `lines_skipped: 2`.
+- [ ] Dismiss: propose one line, Dismiss: the list is unchanged and the result reads `rejected`
+  with `dismissed by the user`. With unsaved edits in the editor, Add is disabled ("Save or reload
+  your edits first").
+- [ ] Replace: propose with `"mode":"replace"`: the banner and Review say "to replace your list";
+  after Replace the comment block at the top of the file is still there, every old line is gone
+  and `messages.txt.previous` has them.
+- [ ] Apply directly: Settings, Message, "Let Claude change the messages directly" on. Propose a
+  line: the answer is `applied`, no banner, no badge; the editor reloads with it.
+- [ ] Alerts off (Settings, Alerts): a proposal shows only the badge and the page's banner, no
+  notification.
+- [ ] The effects on the Desk: pin each of these in turn (Pin one line): `{write} hello.` draws in
+  over about a second and a half, once; `{shimmer} hi.` sweeps every 8 seconds; `{ink:#ffd08a}
+  {noglow} {size:1.5} big.` is gold, larger, without glow; `{blink} {glow} odd.` shows the text
+  `{blink} {glow} odd.` as written. Settings, Desk, Look, "Glow around the message" off: lines
+  lose the glow except a `{glow}` line. With Reduce motion on, `{write}` shows at once and nothing
+  shimmers. With a `{shimmer}` line showing and Activity Monitor on Sanduhr: CPU is 0.0 between
+  sweeps and with the Desk covered by a full-screen window (the sweep pauses); a plain line costs
+  nothing at any time.
+- [ ] Quit Sanduhr and propose: the answer is `queued` / `app_not_responding` after about ten
+  seconds; open Sanduhr within ten minutes and the suggestion appears. One older than ten minutes
+  is dropped. `log show --last 5m --predicate 'subsystem == "com.626labs.sanduhr"'` holds no
+  message text. Put the list back: `cp /tmp/messages.txt.mine "$M"`.
