@@ -36,6 +36,8 @@ struct WidgetSettings: View {
     @State private var themeStatus: String?
     @State private var installedThemes: [URL] = []
     @State private var selectedInstalled: URL?
+    @AppStorage(ThemeProposalHandoff.directKey) private var themeClaudeDirect = false
+    var themeHandoff = ThemeProposalHandoff.shared
 
     var body: some View {
         let t = vm.theme.palette
@@ -58,6 +60,12 @@ struct WidgetSettings: View {
     private func themesTab(t: Theme.Palette) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
+                if let proposal = themeHandoff.pending {
+                    ThemeSuggestionBanner(proposal: proposal, placement: themeHandoff.placement(proposal),
+                                          save: { themeHandoff.approve(apply: false) },
+                                          saveAndApply: { themeHandoff.approve(apply: true) },
+                                          dismiss: { themeHandoff.dismiss() })
+                }
                 Text("Click a theme to use it on the widget.")
                     .font(.caption)
                     .foregroundStyle(t.textSecondary)
@@ -66,6 +74,7 @@ struct WidgetSettings: View {
                 Text("Your own themes")
                     .font(.headline)
                 themeTools(t: t)
+                claudeThemeSwitch(t: t)
             }
             .padding(.trailing, 4)
         }
@@ -140,6 +149,20 @@ struct WidgetSettings: View {
             .onChange(of: vm.userThemesTick) { _, _ in installedThemes = UserThemes.listFiles() }
         }
         .onChange(of: themePaste) { _, _ in autofillFilename() }
+    }
+
+    /// Item 55: whether a theme Claude proposes (propose_theme) waits for Save or lands at once.
+    private func claudeThemeSwitch(t: Theme.Palette) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle("Let Claude change themes directly", isOn: $themeClaudeDirect)
+            Text(themeClaudeDirect
+                 ? "Themes Claude proposes with the Sanduhr MCP server are saved to your themes at once, and applied when Claude asks. Your own themes are never overwritten."
+                 : "Themes Claude proposes with the Sanduhr MCP server wait at the top of this page for you to save, apply or dismiss.")
+                .font(.caption)
+                .foregroundStyle(t.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.top, 6)
     }
 
     private func autofillFilename() {

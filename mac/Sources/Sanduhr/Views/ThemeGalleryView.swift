@@ -34,8 +34,8 @@ struct ThemeGalleryView: View {
 /// A preview drawn from the palette: the background, a card with two usage bars on their
 /// track and a pace tick, the accent strip along the top, the name underneath. Match Desk has
 /// no background, card or strip of its own, so its preview draws the ink over a stand-in
-/// desktop.
-private struct ThemeCard: View {
+/// desktop. Claude's theme suggestion (item 55) previews with it too.
+struct ThemeCard: View {
     let item: ThemeGalleryItem
 
     var body: some View {

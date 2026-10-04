@@ -329,6 +329,8 @@ enum DebugHooks {
             + vm.accountLabels.compactMap { vm.dataChoices(for: $0).folder }
         (s.mcpInstalled, s.statuslineInstalled, s.metersInstalled, s.hooksInstalled)
             = IntegrationInstaller.standard.installedCounts(folders: folders)
+        s.pendingMessages = DeskMessageHandoff.shared.pending != nil
+        s.pendingTheme = ThemeProposalHandoff.shared.pending != nil
         s.follow = vm.followEnabled
         s.followPaused = vm.followPaused
         s.version = info["CFBundleShortVersionString"] as? String ?? ""

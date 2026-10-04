@@ -87,6 +87,9 @@ struct DebugStateInput {
     /// Follow the account I'm using, and whether a manual switch is pausing it. Never labels.
     var follow = false
     var followPaused = false
+    /// Claude's suggestions waiting for the user (items 54, 55): flags only, never their content.
+    var pendingMessages = false
+    var pendingTheme = false
     var menu: [MenuGroup] = []
     var version = ""
     var build = ""
@@ -133,6 +136,11 @@ enum DebugState {
     static func integrationsYAML(mcp: Int, statusline: Int, meters: Int = 0, hooks: Int = 0) -> YAMLNode {
         .map([YAMLPair("mcp_installed", .int(mcp)), YAMLPair("statusline_installed", .int(statusline)),
               YAMLPair("meters_installed", .int(meters)), YAMLPair("hooks_installed", .int(hooks))])
+    }
+
+    /// `pending_suggestions:` (items 54, 55): whether a suggestion from Claude waits, no content.
+    static func pendingSuggestionsYAML(messages: Bool, theme: Bool) -> YAMLNode {
+        .map([YAMLPair("messages", .bool(messages)), YAMLPair("theme", .bool(theme))])
     }
 
     /// `vault:` (item 46): flags and a count only.
@@ -205,6 +213,7 @@ enum DebugState {
         pairs.append(("vault", vaultYAML(s.vault)))
         pairs.append(("integrations", integrationsYAML(mcp: s.mcpInstalled, statusline: s.statuslineInstalled,
                                                                 meters: s.metersInstalled, hooks: s.hooksInstalled)))
+        pairs.append(("pending_suggestions", pendingSuggestionsYAML(messages: s.pendingMessages, theme: s.pendingTheme)))
         pairs.append(("follow", .bool(s.follow)))
         pairs.append(("follow_paused", .bool(s.followPaused)))
         pairs.append(("version", .string(s.version)))

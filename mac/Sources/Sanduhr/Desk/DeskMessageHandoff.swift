@@ -3,7 +3,8 @@ import Observation
 
 /// Claude's suggested Desk messages (item 54), the file half. The MCP server's
 /// `propose_desk_messages` drops desk-messages-request.json into Sanduhr's Application Support
-/// folder; this picks it up (a kernel event on the folder, no polling), checks it again
+/// folder; this picks it up (HandoffWatch: one kernel watch on the folder, shared with the theme
+/// handoff, no polling), checks it again
 /// (MessageProposal) and either applies it, when Settings, Message's "Let Claude change the
 /// messages directly" is on, or holds it as the suggestion Settings, Message shows with Add,
 /// Review and Dismiss. Each step answers in desk-messages-result.json, which the server reads:
@@ -28,9 +29,7 @@ final class DeskMessageHandoff {
         var messages: URL
 
         static var standard: Paths {
-            Paths(support: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                    .appendingPathComponent("Sanduhr", isDirectory: true),
-                  messages: MessageEngine.fileURL)
+            Paths(support: HandoffFiles.support, messages: MessageEngine.fileURL)
         }
 
         var request: URL { support.appendingPathComponent(MessageProposal.requestFile) }
@@ -55,7 +54,7 @@ final class DeskMessageHandoff {
     @ObservationIgnored var onDecided: ((MessageProposal) -> Void)?
     /// Any change in Sanduhr's folder, after the request check (the app re-reports its settings).
     @ObservationIgnored var onFolderEvent: (() -> Void)?
-    @ObservationIgnored private var watcher: ThemeFolderWatcher?
+    @ObservationIgnored private var watching = false
     @ObservationIgnored private var lastState: Data?
     @ObservationIgnored fileprivate var settingsObserver: NSObjectProtocol?
 
@@ -67,26 +66,21 @@ final class DeskMessageHandoff {
         self.now = now
     }
 
-    /// Watches the folder for requests (the themes folder's watcher, on Sanduhr's own folder) and
-    /// takes one already waiting from before launch.
-    func start() {
-        guard watcher == nil else { return }
-        watcher = ThemeFolderWatcher(dir: paths.support) { [weak self] in
-            MainActor.assumeIsolated {
-                self?.check()
-                self?.onFolderEvent?()
-            }
+    /// Watches Sanduhr's folder for requests (the shared HandoffWatch) and takes one already
+    /// waiting from before launch.
+    func start(watch: HandoffWatch? = nil) {
+        guard !watching else { return }
+        watching = true
+        (watch ?? .shared).add { [weak self] in
+            self?.check()
+            self?.onFolderEvent?()
         }
         check()
     }
 
     /// Reads and removes a waiting request, if there is one.
     func check() {
-        let url = paths.request
-        guard FileManager.default.fileExists(atPath: url.path) else { return }
-        let data = try? Data(contentsOf: url)
-        try? FileManager.default.removeItem(at: url)
-        guard let data else { return }
+        guard let data = HandoffFiles.take(paths.request) else { return }
         receive(data)
     }
 
@@ -161,7 +155,7 @@ final class DeskMessageHandoff {
                              reasons: [String] = [], applied: MessageProposal.Applied? = nil) {
         let data = MessageProposal.resultJSON(id: id, status: status, mode: mode, reasons: reasons,
                                               applied: applied, now: now())
-        writeOwnerOnly(data, to: paths.result)
+        HandoffFiles.writeOwnerOnly(data, to: paths.result)
     }
 
     /// desk-messages-state.json, for get_desk_messages: rewritten only when the pin or the
@@ -170,14 +164,7 @@ final class DeskMessageHandoff {
         let data = MessageProposal.stateJSON(pinned: pinned, rotate: rotate)
         guard data != lastState else { return }
         lastState = data
-        writeOwnerOnly(data, to: paths.state)
-    }
-
-    /// Atomic, readable by this user only.
-    private func writeOwnerOnly(_ data: Data, to url: URL) {
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        guard (try? data.write(to: url, options: .atomic)) != nil else { return }
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        HandoffFiles.writeOwnerOnly(data, to: paths.state)
     }
 }
 

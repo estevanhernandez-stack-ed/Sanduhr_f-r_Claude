@@ -125,6 +125,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotchGlowController.shared.apply()
         // Claude's suggested Desk messages (item 54): watches for propose_desk_messages' requests.
         DeskMessageHandoff.shared.startForApp()
+        // Claude's suggested themes (item 55): propose_theme's requests, on the same folder watch.
+        ThemeProposalHandoff.shared.startForApp(vm: viewModel)
         // Claude Code integrations (item 49): where they are installed, this version's scripts
         // replace the last one's (a new stamped folder, the link swapped). No install, no write.
         Task.detached(priority: .utility) { IntegrationScripts.standard.refreshIfInstalled() }

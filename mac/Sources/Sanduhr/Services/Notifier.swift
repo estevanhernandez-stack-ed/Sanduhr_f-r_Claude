@@ -147,11 +147,36 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     static let deskSuggestionPrefix = "desk-messages-"
 
+    // MARK: - Claude's theme suggestions (item 55)
+
+    /// The same gentle banner for a suggested theme (MessageSuggestionNotice's rule: alerts on,
+    /// the delivery and quiet hours as an alert's, no sound). Clicking it opens Settings, Themes.
+    func suggestTheme(_ p: ThemeProposal) {
+        guard MessageSuggestionNotice.banner(AlertSettings(defaults), deskRunning: DeskController.shared.running,
+                                             now: Date()) else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Claude suggested a theme: \(p.name)"
+        content.body = p.summary ?? "Save, apply or dismiss it in Sanduhr Settings, Themes."
+        content.sound = nil
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: Self.themeSuggestionPrefix + p.id, content: content, trigger: nil))
+    }
+
+    /// The suggestion was decided: its banner leaves Notification Center.
+    func clearThemeSuggestion(_ p: ThemeProposal) {
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [Self.themeSuggestionPrefix + p.id])
+    }
+
+    static let themeSuggestionPrefix = "theme-suggestion-"
+
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
-        if response.notification.request.identifier.hasPrefix(Self.deskSuggestionPrefix) {
-            DispatchQueue.main.async { MainActor.assumeIsolated { SettingsWindowController.shared.show(.message) } }
+        let id = response.notification.request.identifier
+        let section: SettingsSection? = id.hasPrefix(Self.deskSuggestionPrefix) ? .message
+            : id.hasPrefix(Self.themeSuggestionPrefix) ? .themes : nil
+        if let section {
+            DispatchQueue.main.async { MainActor.assumeIsolated { SettingsWindowController.shared.show(section) } }
         }
         completionHandler()
     }

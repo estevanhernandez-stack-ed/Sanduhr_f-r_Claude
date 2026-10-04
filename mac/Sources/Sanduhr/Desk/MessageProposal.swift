@@ -80,7 +80,8 @@ struct MessageProposal: Equatable, Identifiable {
         return .proposal(MessageProposal(id: id, requestedAt: at, lines: lines, mode: mode, note: note))
     }
 
-    private static func parseDate(_ s: String) -> Date? {
+    /// The request stamp: ISO 8601 with or without a fraction (also .NET's seven digits).
+    static func parseDate(_ s: String) -> Date? {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let d = f.date(from: s) { return d }
