@@ -79,10 +79,11 @@ struct DeskView: View {
             // shadows draw inside those boxes, clipping them. Inner breathing room fixes that;
             // the outer padding gives it back so the margins still mean the visible edge.
             .padding(inset)
-            .padding(.leading, max(0, left - inset))
-            .padding(.trailing, max(0, right - inset))
+            // The Dock's side moves in by its reach (item 56), so nothing sits under it.
+            .padding(.leading, max(0, left + model.dockInsets.left - inset))
+            .padding(.trailing, max(0, right + model.dockInsets.right - inset))
             .padding(.top, max(0, model.topInset + top - inset))
-            .padding(.bottom, max(0, bottom - inset))
+            .padding(.bottom, max(0, bottom + model.dockInsets.bottom - inset))
         }
         NotchView(model: model)
         }

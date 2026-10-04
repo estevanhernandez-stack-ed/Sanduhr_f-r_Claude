@@ -78,6 +78,10 @@ final class DeskModel {
     var motionPaused = false
     /// Height of the menu bar strip at the top of the screen, so top slots sit below it.
     var topInset: CGFloat = 0
+    /// How far the Dock reaches into the screen on each side (item 56, DockFollower): the Desk's
+    /// corners on that side sit this much further in. Changes with an animation while an
+    /// auto-hiding Dock comes and goes.
+    var dockInsets = DockInsets()
     /// The camera notch in window coordinates (top-left origin), or nil on screens without one.
     var notchRect: CGRect?
     /// The Claude meters, short enough for the notch: "5h 7%  wk 63%".

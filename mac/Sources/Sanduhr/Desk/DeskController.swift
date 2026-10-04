@@ -26,6 +26,10 @@ final class DeskController: NSObject, NSMenuDelegate {
     private(set) var wingsWindow: NSWindow?
     private var wingsTimer: Timer?
     let model = DeskModel()
+    /// Keeps the corners clear of the Dock (item 56).
+    let dock = DockFollower()
+    /// The pointer was near a Desk block at the last mouse-through check.
+    private var nearBlocks = false
     private let hotKeys = DeskHotKeys()
 
     var enabled: Bool { UserDefaults.desk.bool(forKey: Self.enabledKey) }
@@ -53,6 +57,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         for id in ["com.estevan.desk", "com.626labs.sanduhrdesk"] {
             NSRunningApplication.runningApplications(withBundleIdentifier: id).forEach { $0.terminate() }
         }
+        dock.apply = { [weak self] insets, animated in self?.applyDock(insets, animated: animated) }
+        dock.start()
         buildWindow()
         // The clock menu is off by default: Sanduhr owns the menu bar, meetings join from the
         // desktop or Option+J. `defaults write com.626labs.sanduhr.desk menuIcon -bool true` brings it back.
@@ -77,7 +83,22 @@ final class DeskController: NSObject, NSMenuDelegate {
         watchVisibility()
     }
 
-    @objc private func otherAppActivated() { updateMouseThrough() }
+    @objc private func otherAppActivated() {
+        // Back from System Settings, Desktop & Dock: the Dock may have moved or stopped hiding.
+        dock.refreshPrefs()
+        updateMouseThrough()
+    }
+
+    /// The Dock's reach changed (DockFollower): the corners move, sliding with the auto-hiding
+    /// Dock (no slide with Reduce Motion, which DockFollower passes as not animated).
+    private func applyDock(_ insets: DockInsets, animated: Bool) {
+        guard model.dockInsets != insets else { return }
+        if animated {
+            withAnimation(DockFollower.animation) { model.dockInsets = insets }
+        } else {
+            model.dockInsets = insets
+        }
+    }
 
     // MARK: Out of sight (item 54: the message's {shimmer} rests)
 
@@ -146,6 +167,9 @@ final class DeskController: NSObject, NSMenuDelegate {
         mouseMonitors = []
         watchApproach(false)
         model.onHitAreasChange = nil
+        dock.stop()
+        dock.apply = nil
+        model.dockInsets = DockInsets()
         setMenuIcon(false)
         model.stop()
         applyHotKeys()
@@ -194,6 +218,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         w.ignoresMouseEvents = true
         model.topInset = screen.frame.maxY - screen.visibleFrame.maxY
         model.notchRect = screen.cameraNotch
+        dock.screenChanged(screen)
         buildWingsWindow(on: screen)
         w.contentView = FirstClickHostingView(rootView: DeskView(model: model))
         w.setFrame(screen.frame, display: true)
@@ -245,6 +270,7 @@ final class DeskController: NSObject, NSMenuDelegate {
     }
 
     @objc private func spaceChanged() {
+        dock.refreshPrefs()
         wingsWindow?.orderFrontRegardless()
         updateMouseThrough()
     }
@@ -448,16 +474,26 @@ final class DeskController: NSObject, NSMenuDelegate {
         if w.ignoresMouseEvents == over { w.ignoresMouseEvents = !over }
         let blocks = [model.metersFrame, model.accountFrame, model.noteFrame, model.meetingsFrame,
                       model.nowPlayingFrame, model.stripFrame, model.stripNextFrame]
-        watchApproach(DeskPointerWatch.near(point, frames: blocks))
+        nearBlocks = DeskPointerWatch.near(point, frames: blocks)
+        // The auto-hiding Dock's edge (item 56) runs the same watch, which reads the window list.
+        watchApproach(nearBlocks || dock.wantsWatch(pointer: point, size: w.frame.size))
     }
 
     /// The close watch's tick: a pointer that has not moved since the last tick needs nothing
-    /// (layout changes arrive through onHitAreasChange), so a resting pointer costs one read.
+    /// for the click areas (layout changes arrive through onHitAreasChange), so a resting pointer
+    /// costs one read. Near the auto-hiding Dock's edge the tick also looks for the Dock
+    /// (DockFollower, DockWatch), and the watch stops once neither needs it.
     private func watchTick() {
         let p = NSEvent.mouseLocation
-        guard p != lastWatchedPointer else { return }
-        lastWatchedPointer = p
-        updateMouseThrough()
+        let moved = p != lastWatchedPointer
+        if moved {
+            lastWatchedPointer = p
+            updateMouseThrough()
+        }
+        guard approachTimer != nil, let w = window else { return }
+        let point = pointerInWindow()
+        dock.tick(pointer: point, size: w.frame.size, moved: moved)
+        if !nearBlocks, !dock.wantsWatch(pointer: point, size: w.frame.size) { watchApproach(false) }
     }
 
     /// Starts the close watch when `on` and none runs, stops it when off. Common run loop modes,
