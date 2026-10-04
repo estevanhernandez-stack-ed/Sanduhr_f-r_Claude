@@ -87,10 +87,18 @@ jobs:
       - name: Verify what ships
         run: |
           for bin in Sanduhr.app/Contents/MacOS/Sanduhr \
-                     Sanduhr.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate; do
+                     Sanduhr.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate \
+                     Sanduhr.app/Contents/Frameworks/MediaRemoteAdapter.framework/Versions/A/MediaRemoteAdapter \
+                     Sanduhr.app/Contents/Helpers/MediaRemoteAdapterTestClient; do
             archs="$(lipo -archs "$bin")"
             echo "$bin: $archs"
             [[ "$archs" == *arm64* && "$archs" == *x86_64* ]] || { echo "::error::$bin is '$archs'"; exit 1; }
+          done
+          # The now playing adapter is signed with the app's identity (build.sh, inside-out).
+          for nested in Sanduhr.app/Contents/Frameworks/MediaRemoteAdapter.framework \
+                        Sanduhr.app/Contents/Helpers/MediaRemoteAdapterTestClient; do
+            codesign --verify --strict --verbose=2 "$nested"
+            codesign -dv "$nested" 2>&1 | grep -q "TeamIdentifier=82BSR56X5J" || { echo "::error::$nested is not signed by the team"; exit 1; }
           done
           spctl --assess --type execute --verbose=2 Sanduhr.app
           spctl --assess --type open --context context:primary-signature --verbose=2 Sanduhr.dmg

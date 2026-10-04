@@ -104,6 +104,21 @@ mkdir -p "$APP/Contents/Frameworks"
 rm -rf "$APP/Contents/Frameworks/Sparkle.framework"
 cp -R "$SPARKLE_FRAMEWORK" "$APP/Contents/Frameworks/"
 
+# Now playing (item 53): the vendored mediaremote-adapter (BSD-3). Sanduhr runs its Perl script
+# with /usr/bin/perl, which loads the framework: MediaRemote answers Apple's own binaries only.
+# Framework in Frameworks/, the test client (a tiny executable the adapter's `test` starts) in
+# Helpers/, the script as a sealed resource. Always universal: it is small and builds in seconds.
+echo "→ Building the now playing adapter..."
+ADAPTER_OUT=".build/mediaremote-adapter"
+./scripts/build-mediaremote-adapter.sh "$ADAPTER_OUT"
+rm -rf "$APP/Contents/Frameworks/MediaRemoteAdapter.framework"
+cp -R "$ADAPTER_OUT/MediaRemoteAdapter.framework" "$APP/Contents/Frameworks/"
+mkdir -p "$APP/Contents/Helpers" "$APP/Contents/Resources/NowPlaying"
+install -m 0755 "$ADAPTER_OUT/MediaRemoteAdapterTestClient" "$APP/Contents/Helpers/MediaRemoteAdapterTestClient"
+install -m 0644 Vendor/mediaremote-adapter/bin/mediaremote-adapter.pl "$APP/Contents/Resources/NowPlaying/mediaremote-adapter.pl"
+# The third-party notices (Sparkle, mediaremote-adapter), opened from Settings, About.
+install -m 0644 THIRD-PARTY-NOTICES.txt "$APP/Contents/Resources/THIRD-PARTY-NOTICES.txt"
+
 # Release builds get a Developer ID signature + hardened runtime so they can
 # be notarized and run anywhere. Debug builds get an ad-hoc signature for
 # local iteration only. Override with SIGN_IDENTITY=<id> or SIGN_IDENTITY=-
@@ -140,11 +155,26 @@ else
         --timestamp \
         "$APP/Contents/Frameworks/Sparkle.framework"
 
+    # The now playing adapter, inside-out like Sparkle: the helper, then the framework.
+    echo "→ Signing the now playing adapter..."
+    for nested in \
+        "$APP/Contents/Helpers/MediaRemoteAdapterTestClient" \
+        "$APP/Contents/Frameworks/MediaRemoteAdapter.framework"; do
+        codesign --force \
+            --sign "$SIGN_IDENTITY" \
+            --options runtime \
+            --timestamp \
+            "$nested"
+    done
+
+    # The one entitlement: Apple Events, for Settings, Desk, Now Playing's "Ask Music and Spotify
+    # directly" (hardened runtime refuses them without it; macOS still asks the user first).
     echo "→ Signing main app: $SIGN_IDENTITY"
     codesign --force \
         --sign "$SIGN_IDENTITY" \
         --options runtime \
         --timestamp \
+        --entitlements Sanduhr.entitlements \
         "$APP"
 fi
 codesign --verify --strict --verbose=2 "$APP"
@@ -154,6 +184,12 @@ if $UNIVERSAL; then
     [[ "$ARCHS" == *arm64* && "$ARCHS" == *x86_64* ]] || { echo "✗ Expected arm64 and x86_64, got: $ARCHS" >&2; exit 1; }
     echo "→ Architectures: $ARCHS"
 fi
+# The adapter is universal in every build (the script checks it too); check what got bundled.
+for bin in "$APP/Contents/Frameworks/MediaRemoteAdapter.framework/Versions/A/MediaRemoteAdapter" \
+           "$APP/Contents/Helpers/MediaRemoteAdapterTestClient"; do
+    ARCHS="$(lipo -archs "$bin")"
+    [[ "$ARCHS" == *arm64* && "$ARCHS" == *x86_64* ]] || { echo "✗ $bin is $ARCHS, expected arm64 and x86_64" >&2; exit 1; }
+done
 echo "✓ Built $APP"
 echo "  Run:      open $APP"
 echo "  Install:  mv $APP /Applications/"

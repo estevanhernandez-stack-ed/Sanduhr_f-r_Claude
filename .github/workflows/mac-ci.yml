@@ -64,7 +64,9 @@ jobs:
       - name: Check architectures
         run: |
           for bin in Sanduhr.app/Contents/MacOS/Sanduhr \
-                     Sanduhr.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate; do
+                     Sanduhr.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate \
+                     Sanduhr.app/Contents/Frameworks/MediaRemoteAdapter.framework/Versions/A/MediaRemoteAdapter \
+                     Sanduhr.app/Contents/Helpers/MediaRemoteAdapterTestClient; do
             archs="$(lipo -archs "$bin")"
             echo "$bin: $archs"
             [[ "$archs" == *arm64* && "$archs" == *x86_64* ]] || { echo "::error::$bin is '$archs', expected arm64 and x86_64"; exit 1; }

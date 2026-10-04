@@ -36,6 +36,8 @@
             </array>
         </dict>
     </array>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Only if you turn on "Ask Music and Spotify directly" in Settings, Desk, Now Playing: Sanduhr asks Music and Spotify what is playing when the system now playing is unavailable. Nothing leaves your Mac.</string>
     <key>NSCalendarsFullAccessUsageDescription</key>
     <string>Desk shows the rest of today's meetings on the desktop and by the notch. Only the time and title are shown.</string>
     <key>NSCalendarsUsageDescription</key>
