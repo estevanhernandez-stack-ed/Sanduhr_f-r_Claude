@@ -123,6 +123,25 @@ final class UsageViewModel {
     private(set) var hiddenTiers: Set<Tier> = MeterVisibility.hidden(in: UserDefaults.desk)
     var lastUpdated: Date?
     var status: StatusMessage = .connecting
+    /// An account switch's crossfade (AccountSwitchFade): the old account's cards and Desk meters
+    /// have faded out and stay in the layout unseen, so nothing jumps, until the new numbers land.
+    private(set) var switchVeil = false
+    /// The faint "Switching account…" while a switch's fetch outlasts the fade.
+    private(set) var switchNote = false
+    /// The old account's numbers and history, held only as the veiled layout; nil outside a switch.
+    @ObservationIgnored private var departingUsage: UsageResponse?
+    @ObservationIgnored private var departingHistory: HistoryStore.History?
+    @ObservationIgnored private var switchStartedAt: Date?
+    @ObservationIgnored private var switchNoteTask: Task<Void, Never>?
+
+    /// What the cards and the Desk meters lay out: the numbers, or during a switch the old
+    /// account's, drawn unseen (`switchVeil`). Everything else (the menu bar, alerts,
+    /// snapshot.json) reads `usage`, which a switch clears at once.
+    var shownUsage: UsageResponse? { usage ?? (switchVeil ? departingUsage : nil) }
+    /// The sparklines that go with `shownUsage`.
+    var shownHistory: HistoryStore.History {
+        switchVeil && usage == nil ? departingHistory ?? history : history
+    }
     /// The active account's sparkline history.
     var history: HistoryStore.History = HistoryStore.load(account: KeychainStore.accounts.active)
     /// The accounts in list order and the active one, as the Accounts page, the menus and the
@@ -480,23 +499,80 @@ final class UsageViewModel {
 
     /// After the active account changed: nothing of the old account stays on screen or in
     /// snapshot.json, then the new one is fetched, or shown signed out when it has no key.
+    /// The old account's meters fade out (AccountSwitchFade) while the numbers themselves go at once.
     private func showActiveAccount() {
-        SnapshotWriter.delete()
-        stopFetching()
-        Notifier.shared.resetForSwitch()
-        reloadAccounts()
-        let active = KeychainStore.accounts.active
-        history = active.map { HistoryStore.load(account: $0) } ?? [:]
-        if connect() {
-            status = .switching
-            onUsageUpdate?()
-            Task { await refresh() }
-            startTimers()
-        } else {
-            status = .signedOut
-            if active != nil { SnapshotWriter.writeSignedOut(accountRef: AccountRef.of(active)) }
+        let reduceMotion = AccountSwitchFade.reduceMotion
+        withAnimation(AccountSwitchFade.outAnimation(reduceMotion: reduceMotion)) {
+            beginSwitchVeil()
+            SnapshotWriter.delete()
+            stopFetching()
+            Notifier.shared.resetForSwitch()
+            reloadAccounts()
+            let active = KeychainStore.accounts.active
+            history = active.map { HistoryStore.load(account: $0) } ?? [:]
+            if connect() {
+                status = .switching
+                onUsageUpdate?()
+                Task { await refresh() }
+                startTimers()
+            } else {
+                status = .signedOut
+                if active != nil { SnapshotWriter.writeSignedOut(accountRef: AccountRef.of(active)) }
+                onUsageUpdate?()
+            }
+        }
+    }
+
+    /// Starts a switch's crossfade: the shown numbers are kept as the veiled layout. A second
+    /// switch during the first keeps the first one's layout and clock.
+    private func beginSwitchVeil() {
+        if !switchVeil {
+            departingUsage = usage
+            departingHistory = history
+            switchStartedAt = Date()
+            switchVeil = true
+        }
+        switchNote = false
+        switchNoteTask?.cancel()
+        switchNoteTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(AccountSwitchFade.noteDelay * 1_000_000_000))
+            guard let self, !Task.isCancelled, self.switchVeil else { return }
+            if self.status == .switching {
+                // The fetch outlasts the fade: the faint note.
+                withAnimation(AccountSwitchFade.inAnimation(reduceMotion: AccountSwitchFade.reduceMotion)) {
+                    self.switchNote = true
+                    self.onUsageUpdate?()
+                }
+            } else {
+                // Signed out, or the fetch already failed: nothing new is coming.
+                self.endSwitchVeil()
+            }
+        }
+    }
+
+    /// Ends the crossfade: the new numbers (or the sign-in or error line) fade in.
+    private func endSwitchVeil() {
+        guard switchVeil else { return }
+        switchNoteTask?.cancel()
+        switchNoteTask = nil
+        withAnimation(AccountSwitchFade.inAnimation(reduceMotion: AccountSwitchFade.reduceMotion)) {
+            switchVeil = false
+            switchNote = false
+            departingUsage = nil
+            departingHistory = nil
+            switchStartedAt = nil
             onUsageUpdate?()
         }
+    }
+
+    /// A switch's first answer waits out the rest of the fade out, so the new numbers never land
+    /// while the old ones are still fading.
+    private func waitOutSwitchFade() async {
+        guard switchVeil else { return }
+        let wait = AccountSwitchFade.holdBack(since: switchStartedAt, now: Date(),
+                                              reduceMotion: AccountSwitchFade.reduceMotion)
+        guard wait > 0 else { return }
+        try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
     }
 
     /// Stops the timers, drops the client (an answer still on its way is ignored) and the shown
@@ -545,11 +621,14 @@ final class UsageViewModel {
         do {
             u = try await api.getUsage()
         } catch {
+            await waitOutSwitchFade()
             // Signed out, switched, or a new key saved while this fetch ran: its answer is stale.
             guard self.api === api else { return }
             showFailure(error, accountRef: ref)
+            endSwitchVeil()
             return
         }
+        await waitOutSwitchFade()
         guard self.api === api else { return }
         self.usage = u
         self.lastUpdated = Date()
@@ -563,6 +642,8 @@ final class UsageViewModel {
         }
         self.history = HistoryStore.load(account: account)
         self.status = u.tiers.isEmpty ? .noTiers : .idle
+        // A switch's new numbers: they fade in.
+        endSwitchVeil()
     }
 
     /// A failed fetch: the status line and snapshot.json's error kind.
@@ -607,10 +688,11 @@ final class UsageViewModel {
 
     /// Returns the tiers the server reported (with a non-nil utilization) that are not hidden
     /// (MeterVisibility), in display order. If compact mode is on, returns only the highest of
-    /// those, so a hidden limit never takes compact mode's one card.
+    /// those, so a hidden limit never takes compact mode's one card. Read from `shownUsage`, so
+    /// during a switch these are the old account's veiled cards.
     /// Mirrors sanduhr.py:468-478.
     func visibleTiers() -> [(tier: Tier, usage: TierUsage)] {
-        guard let u = MeterVisibility.visible(usage, hidden: hiddenTiers) else { return [] }
+        guard let u = MeterVisibility.visible(shownUsage, hidden: hiddenTiers) else { return [] }
         let active = Tier.allCases.compactMap { t -> (Tier, TierUsage)? in
             guard let tu = u.tiers[t], tu.utilization != nil else { return nil }
             return (t, tu)

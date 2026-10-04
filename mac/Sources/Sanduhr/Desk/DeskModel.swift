@@ -63,6 +63,11 @@ final class DeskModel {
     var claudeLineIsStale = false
     /// The widget's session key or Cloudflare clearance was refused.
     var signInNeeded = false
+    /// An account switch is under way (AccountSwitchFade): the meters and the line keep the old
+    /// account's layout, drawn unseen, until the new numbers fade in.
+    var veiled = false
+    /// The switch's fetch outlasts the fade: the faint "switching account…".
+    var switchNote = false
     /// Today's line from MessageEngine (messages.txt), or nil when there is none.
     var message: String?
     /// Height of the menu bar strip at the top of the screen, so top slots sit below it.
@@ -271,9 +276,12 @@ final class DeskModel {
     /// Runs on every update and once a minute, so pace ticks and staleness move with the clock.
     func refreshClaude(now: Date = Date()) {
         meters = Self.meterRows(usage.usage, now: now)
+        // Settings' list of limits waits for the new account's numbers.
         let reported = Tier.allCases.filter { usage.usage?.tiers[$0]?.utilization != nil }
-        if reported != reportedTiers { reportedTiers = reported }
+        if !usage.veiled, reported != reportedTiers { reportedTiers = reported }
         signInNeeded = usage.signInNeeded
+        if veiled != usage.veiled { veiled = usage.veiled }
+        if switchNote != usage.switchNote { switchNote = usage.switchNote }
         claudeLine = DeskClaudeText.line(usage)
         let parts = DeskClaudeText.parts(usage)
         if parts != claudeParts { claudeParts = parts }

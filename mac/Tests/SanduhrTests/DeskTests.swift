@@ -706,3 +706,42 @@ struct DeskPointerMenuTests {
         #expect(DeskPointerMenu.fallbackDelay > 0 && DeskPointerMenu.fallbackDelay <= 0.25)
     }
 }
+
+@Suite("Account switch fade")
+struct AccountSwitchFadeTests {
+    let start = Date(timeIntervalSince1970: 1_800_000_000)
+
+    @Test func timings() {
+        #expect(AccountSwitchFade.fadeOut == 0.25)
+        #expect(AccountSwitchFade.fadeIn == 0.35)
+        // The note comes up only once the old meters are gone.
+        #expect(AccountSwitchFade.noteDelay >= AccountSwitchFade.fadeOut)
+        #expect(AccountSwitchFade.noteOpacity > 0 && AccountSwitchFade.noteOpacity < 1)
+    }
+
+    @Test func reduceMotionIsAPlainSwap() {
+        #expect(AccountSwitchFade.outAnimation(reduceMotion: true) == nil)
+        #expect(AccountSwitchFade.inAnimation(reduceMotion: true) == nil)
+        #expect(AccountSwitchFade.outAnimation(reduceMotion: false) != nil)
+        #expect(AccountSwitchFade.inAnimation(reduceMotion: false) != nil)
+        #expect(AccountSwitchFade.holdBack(since: start, now: start, reduceMotion: true) == 0)
+    }
+
+    @Test func newNumbersWaitOutTheFadeOut() {
+        // An answer 0.1 s after the switch waits the other 0.15 s; one after the fade shows at once.
+        let early = AccountSwitchFade.holdBack(since: start, now: start.addingTimeInterval(0.1), reduceMotion: false)
+        #expect(abs(early - 0.15) < 1e-6)
+        #expect(AccountSwitchFade.holdBack(since: start, now: start.addingTimeInterval(0.25), reduceMotion: false) == 0)
+        #expect(AccountSwitchFade.holdBack(since: start, now: start.addingTimeInterval(3), reduceMotion: false) == 0)
+        // Outside a switch nothing waits.
+        #expect(AccountSwitchFade.holdBack(since: nil, now: start, reduceMotion: false) == 0)
+    }
+
+    @Test func theNotchNeverShowsTheOldAccountsNumbers() {
+        let u = UsageResponse(tiers: [.fiveHour: TierUsage(utilization: 7, resetsAt: nil)], extraUsage: nil)
+        var input = DeskUsage(usage: u, fetchedAt: start)
+        #expect(DeskClaudeText.compact(input, now: start) == "5h 7%")
+        input.veiled = true
+        #expect(DeskClaudeText.compact(input, now: start) == nil)
+    }
+}

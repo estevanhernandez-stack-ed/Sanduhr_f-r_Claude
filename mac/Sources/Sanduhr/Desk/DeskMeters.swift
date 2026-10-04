@@ -13,6 +13,11 @@ struct DeskUsage {
     /// The active account as the claude line names it, with two or more accounts ("Work", or
     /// "Work (in use)" just after an automatic switch); nil with one. The notch never shows it.
     var account: String?
+    /// An account switch is under way: `usage` is the old account's, laid out but drawn unseen
+    /// (AccountSwitchFade), so the notch drops it and the meters and the line keep their place.
+    var veiled = false
+    /// The switch's fetch outlasts the fade: the faint "switching account…".
+    var switchNote = false
 
     /// Numbers older than this are drawn dimmed, and the notch drops them.
     static let staleAfter: TimeInterval = 15 * 60
@@ -98,10 +103,10 @@ enum DeskClaudeText {
     static let compactSignIn = "sign in to Sanduhr"
 
     /// "5h 7%  wk 63%" for the notch, the short sign-in line when only a new sign-in helps,
-    /// nil when stale or empty.
+    /// nil when stale, empty or veiled by a switch (the old account's numbers).
     static func compact(_ input: DeskUsage, now: Date = Date()) -> String? {
         if input.signInNeeded { return compactSignIn }
-        guard !input.isStale(now: now), let tiers = input.usage?.tiers else { return nil }
+        guard !input.veiled, !input.isStale(now: now), let tiers = input.usage?.tiers else { return nil }
         let text = [tiers[.fiveHour]?.utilization.map { "5h \(Int($0))%" },
                     tiers[.sevenDay]?.utilization.map { "wk \(Int($0))%" }]
             .compactMap { $0 }.joined(separator: "  ")

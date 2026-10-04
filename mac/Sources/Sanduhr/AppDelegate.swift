@@ -96,9 +96,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.awaitingSignIn = true
                 self?.applyWidgetVisibility(.signedOut)
             }
+            // During a switch the Desk lays out the old account's meters unseen (veiled), as the
+            // widget's cards do, and fades in the new ones with the view model's animation.
             DeskController.shared.model.update(DeskUsage(
-                usage: vm.usage, fetchedAt: vm.lastUpdated, signInNeeded: vm.status.needsSignIn,
-                account: vm.accountLabel))
+                usage: vm.shownUsage, fetchedAt: vm.lastUpdated, signInNeeded: vm.status.needsSignIn,
+                account: vm.accountLabel, veiled: vm.switchVeil, switchNote: vm.switchNote))
         }
 
         // When the user toggles compact mode, resize the panel to fit the

@@ -118,8 +118,33 @@ struct DeskView: View {
         }
     }
 
-    @ViewBuilder
+    /// The claude line in the layout: a switch's note shows there, else on the meters.
+    private var lineInLayout: Bool { placement.values.contains { $0.contains(.claude) } }
+
+    /// The claude line. During an account switch the old account's line keeps its place unseen
+    /// (AccountSwitchFade) and the faint note shows over it once the fetch outlasts the fade.
     private var claude: some View {
+        claudeText
+            .opacity(model.veiled ? 0 : 1)
+            .accessibilityHidden(model.veiled)
+            .overlay(alignment: .leading) {
+                if model.switchNote && model.claudeLine != nil {
+                    switchingNote(size: timeSize * 0.19).opacity(0.75)
+                }
+            }
+    }
+
+    /// The Desk's faint "switching account…".
+    private func switchingNote(size: CGFloat) -> some View {
+        Text(AccountSwitchFade.deskNote)
+            .font(.custom(font, size: size))
+            .fixedSize()
+            .opacity(AccountSwitchFade.noteOpacity)
+            .transition(.opacity)
+    }
+
+    @ViewBuilder
+    private var claudeText: some View {
         if let parts = model.claudeParts, let account = parts.account {
             // Two or more accounts: the label is its own element, clickable like a meeting row
             // (DeskController cycles to the next account); the rest of the line lets clicks through.
@@ -133,6 +158,9 @@ struct DeskView: View {
             Text(line)
                 .font(.custom(font, size: timeSize * 0.19))
                 .opacity(model.claudeLineIsStale ? 0.45 : 0.75)
+        } else if model.switchNote {
+            // Nothing to fade out (the old account showed no line): the note on its own.
+            switchingNote(size: timeSize * 0.19).opacity(0.75)
         }
     }
 
@@ -140,7 +168,8 @@ struct DeskView: View {
     /// a pace tick where the widget puts its own, and the reset time underneath.
     @ViewBuilder
     private func meters(alignment: HorizontalAlignment) -> some View {
-        if !model.meters.isEmpty || model.signInNeeded {
+        let noteHere = model.switchNote && !lineInLayout
+        if !model.meters.isEmpty || model.signInNeeded || noteHere {
             let size = timeSize * 0.17
             VStack(alignment: alignment, spacing: size * 0.6) {
                 ForEach(model.meters) { row in
@@ -163,7 +192,12 @@ struct DeskView: View {
                 }
             }
             .font(.custom(font, size: size))
-            .opacity(model.claudeLineIsStale ? 0.5 : 1)
+            .opacity(model.veiled ? 0 : (model.claudeLineIsStale ? 0.5 : 1))
+            .accessibilityHidden(model.veiled)
+            // A switch's note, when the claude line is not on the desktop to carry it.
+            .overlay(alignment: alignment == .trailing ? .topTrailing : .topLeading) {
+                if noteHere { switchingNote(size: size) }
+            }
             // Clickable like a meeting row: the click itself is handled in DeskController, which
             // shows the widget beside the meters; a two-finger click opens the row's limit menu.
             // The faint plate, as wide as the click slack, is what lets those clicks reach this

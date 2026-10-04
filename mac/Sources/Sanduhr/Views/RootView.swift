@@ -46,30 +46,15 @@ struct RootView: View {
                     }
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 } else {
+                    let rows = vm.visibleTiers()
                     VStack(alignment: .leading, spacing: 6) {
-                        if vm.status != .idle && !vm.visibleTiers().isEmpty {
-                            statusLine
-                        } else if vm.status != .idle {
-                            statusLine.padding(.bottom, 2)
+                        // A switch fading the old cards says so over them (switchNote), not here.
+                        if vm.status != .idle && !(vm.status == .switching && !rows.isEmpty) {
+                            if rows.isEmpty { statusLine.padding(.bottom, 2) } else { statusLine }
                         }
 
-                        if !vm.visibleTiers().isEmpty {
-                            ForEach(vm.visibleTiers(), id: \.tier) { row in
-                                TierCardView(
-                                    tier: row.tier,
-                                    usage: row.usage,
-                                    history: vm.history[row.tier.rawValue]?.map(\.v) ?? [],
-                                    palette: t,
-                                    tick: vm.countdownTick,
-                                    pinDeepMath: vm.pacingPinned,
-                                    warning: vm.warningTiers.contains(row.tier),
-                                    sparklineMode: SparklineView.mode(themeID: vm.theme.id)
-                                )
-                                .modifier(LimitContextMenu(tier: row.tier, vm: vm))
-                            }
-                            if let extra = vm.usage?.extraUsage, extra.isEnabled, !vm.compact {
-                                ExtraUsageCard(extra: extra, palette: t)
-                            }
+                        if !rows.isEmpty {
+                            cards(rows, palette: t)
                         }
                     }
                     .transition(.opacity.combined(with: .scale(scale: 1.05)))
@@ -167,6 +152,43 @@ struct RootView: View {
             // items) — safe to call on every view appearance.
             if !KeychainStore.exists(account: KeychainAccount.sessionKey) {
                 showOnboarding = true
+            }
+        }
+    }
+
+    /// The tier cards and the extra-usage card. During an account switch these are the old
+    /// account's, faded out and kept in the layout unseen so the widget keeps its height, with
+    /// the faint "Switching account…" over them once the fetch outlasts the fade; the new
+    /// account's fade in when they arrive (AccountSwitchFade).
+    private func cards(_ rows: [(tier: Tier, usage: TierUsage)], palette t: Theme.Palette) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(rows, id: \.tier) { row in
+                TierCardView(
+                    tier: row.tier,
+                    usage: row.usage,
+                    history: vm.shownHistory[row.tier.rawValue]?.map(\.v) ?? [],
+                    palette: t,
+                    tick: vm.countdownTick,
+                    pinDeepMath: vm.pacingPinned,
+                    warning: vm.warningTiers.contains(row.tier),
+                    sparklineMode: SparklineView.mode(themeID: vm.theme.id)
+                )
+                .modifier(LimitContextMenu(tier: row.tier, vm: vm))
+            }
+            if let extra = vm.shownUsage?.extraUsage, extra.isEnabled, !vm.compact {
+                ExtraUsageCard(extra: extra, palette: t)
+            }
+        }
+        .opacity(vm.switchVeil ? 0 : 1)
+        .accessibilityHidden(vm.switchVeil)
+        .allowsHitTesting(!vm.switchVeil)
+        .overlay(alignment: .topLeading) {
+            if vm.switchNote {
+                Text(AccountSwitchFade.note)
+                    .font(.app(size: 11))
+                    .foregroundStyle(t.textDim)
+                    .opacity(AccountSwitchFade.noteOpacity)
+                    .transition(.opacity)
             }
         }
     }
