@@ -291,6 +291,10 @@ enum DebugHooks {
         s.hiddenLimits = Tier.allCases.filter(vm.hiddenTiers.contains)
         s.silencedLimits = LimitMenu.silenced(in: UserDefaults.desk)
         s.meetingsCount = desk.model.meetings.count
+        if desk.running, let size = desk.windowSize {
+            s.deskFrames = desk.model.elements()
+            s.deskFramesProblem = DeskFrameCheck.problem(s.deskFrames, window: size)
+        }
         s.alerts = AlertSettings(UserDefaults.standard)
         s.lastFetch = vm.lastUpdated
         switch vm.activeTool {

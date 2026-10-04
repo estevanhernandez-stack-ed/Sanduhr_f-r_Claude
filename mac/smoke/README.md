@@ -63,7 +63,7 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   `widget_visible`, `widget_visibility` (When the widget shows: `always`, `whileDeskOff` or
   `onRequest`; `always` when unset), `settings_open`, `settings_section`, `meters` (tier, label, percent, fill,
   pace, reset, `warning`: the row draws red with the ink glow, per Settings, Desk, Meters), `widget_warnings` (the
-  widget's tiers drawing red with a glow, same rule and settings, in display order), `meetings_count`, `alerts`, `last_fetch`, `active_tool`, `pacing_pinned`,
+  widget's tiers drawing red with a glow, same rule and settings, in display order), `meetings_count`, `desk_frames` (every interactive Desk element while Desk runs: `kind` is `meters`, `meter_row`, `account`, `note`, `meeting_row` or `meetings`; `key` is the limit's tier for a meter row and the row's index for a meeting row, never a title or a label; `clickable`; `frame` as `[x, y, w, h]` in whole points from the Desk window's top left), `desk_frames_ok` (the app's own check of those frames: each drawn element has a non-empty frame inside the Desk window, rows lie within their block, and no two click areas of different kinds overlap, slack included) and `desk_frames_problem` (why not, such as `meters frame empty`; null when ok), `alerts`, `last_fetch`, `active_tool`, `pacing_pinned`,
   `pulse_count`, `glow_count` (notch glows fired so far, drawn or not; a pulse fires one too), `glow_shape` (what the last
   drawn glow outlined: `island`, `plain` for the hardware notch alone, or `none` yet), `glow_alerts`, `glow_meetings`,
   `glow_camera` (the three Glow switches in Settings, Desk, Notch), `theme` (the widget theme's id), `menu` (groups with item titles and checkmarks), `credentials_store` (`keychain` or `file`: where the session key lives this launch, never the value), `account_ref` (the active account as snapshot.json names it: 8 hex digits of a hash of its label, never the label; null with no accounts), `accounts_count`, `follow` (Follow the account I'm using), `follow_paused` (a manual switch is holding following back), `version`, `build`. The Accounts submenu is not in `menu`: its items are labels.
@@ -84,7 +84,7 @@ signs out or removes an account, and no scenario switches one: a smoke run works
 
 ```yaml
 name: Settings opens at Notch
-needs: [desk]                     # desk, notch, credentials, widget; unmet skips with a reason
+needs: [desk]                     # desk, notch, credentials, widget, meters; unmet skips with a reason
 steps:
   - do: settings
     arg: notch
@@ -99,6 +99,11 @@ steps:
   - wait: 1
   - snap: notch-settings
 ```
+
+`expect_state` keys are dotted paths: `meters.0.label` indexes a list, and a part such as
+`desk_frames[kind=meter_row]` picks the first list item whose field reads as that text
+(`desk_frames[kind=meter_row].frame.3` is that row's height). The `meters` need skips a scenario
+when the Desk layout has no meters.
 
 `expect` and `expect_state` retry for up to 3 s (`within: <seconds>` on `expect` changes it),
 since the UI settles after an action. A failing step stops the scenario. Either way, at the end

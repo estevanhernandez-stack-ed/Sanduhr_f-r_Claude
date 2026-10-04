@@ -50,6 +50,9 @@ struct DeskLayoutSection: View {
 /// The layout string the Layout section edits ("message:tl clock:bl claude:bl meetings:bl"), kept
 /// apart from the view so it tests without AppKit. DeskView reads the same string.
 enum DeskLayout {
+    /// The layout DeskView draws when none is saved.
+    static let standard = "message:tl clock:bl claude:bl meetings:bl"
+
     static let widgets: [(key: String, name: String)] = [
         ("message", "Message"), ("clock", "Clock and date"), ("claude", "Claude line"),
         ("meters", "Claude meters (bars)"), ("meetings", "Meetings"),
@@ -61,6 +64,25 @@ enum DeskLayout {
         for item in s.split(separator: " ") {
             let bits = item.split(separator: ":").map(String.init)
             if bits.count == 2 { out[bits[0]] = bits[1] }
+        }
+        return out
+    }
+
+    /// The corners DeskView knows.
+    static let slots: Set<String> = ["tl", "tr", "bl", "br"]
+
+    /// The widgets DeskView draws for `layout`: known widgets in a known corner, less the
+    /// meetings with the older showMeetings switch off and the claude line and meters with
+    /// showClaude off (DeskView.placement).
+    static func placed(_ layout: String, showMeetings: Bool = true, showClaude: Bool = true) -> Set<String> {
+        let known = Set(widgets.map(\.key))
+        var out: Set<String> = []
+        for item in layout.split(separator: " ") {
+            let bits = item.split(separator: ":").map(String.init)
+            guard bits.count == 2, known.contains(bits[0]), slots.contains(bits[1]) else { continue }
+            if bits[0] == "meetings" && !showMeetings { continue }
+            if (bits[0] == "claude" || bits[0] == "meters") && !showClaude { continue }
+            out.insert(bits[0])
         }
         return out
     }

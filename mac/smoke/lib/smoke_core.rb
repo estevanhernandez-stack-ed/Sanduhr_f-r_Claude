@@ -96,11 +96,23 @@ module Smoke
   module State
     module_function
 
+    # A path part that picks from a list by a field: `desk_frames[kind=meters]` is the first item
+    # of `desk_frames` whose `kind` is `meters` (compared as text; no dots in the value).
+    SELECT = /\A([^\[\]]*)\[([^=\]]+)=([^\]]*)\]\z/.freeze
+
     # [found, value].
     def dig(state, dotted)
       cur = state
       dotted.to_s.split('.').each do |part|
-        if cur.is_a?(Array) && part =~ /\A-?\d+\z/
+        if (m = SELECT.match(part))
+          unless m[1].empty?
+            return [false, nil] unless cur.is_a?(Hash) && cur.key?(m[1])
+            cur = cur[m[1]]
+          end
+          return [false, nil] unless cur.is_a?(Array)
+          cur = cur.find { |item| item.is_a?(Hash) && item[m[2]].to_s == m[3] }
+          return [false, nil] if cur.nil?
+        elsif cur.is_a?(Array) && part =~ /\A-?\d+\z/
           i = part.to_i
           return [false, nil] unless i < cur.length && i >= -cur.length
           cur = cur[i]
@@ -305,8 +317,11 @@ module Smoke
         Array(state['meters']).empty? ? 'no usage numbers yet (sign in first)' : nil
       when 'widget'
         state['widget_visible'] ? nil : 'the widget is hidden'
+      when 'meters'
+        found, = State.dig(state, 'desk_frames[kind=meters]')
+        found ? nil : 'no meters on the Desk (not in the layout, or Desk is off)'
       else
-        raise Failure, "unknown need: #{need} (desk, notch, credentials, widget)"
+        raise Failure, "unknown need: #{need} (desk, notch, credentials, widget, meters)"
       end
     end
   end

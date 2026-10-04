@@ -175,8 +175,8 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     @objc private func spaceChanged() { wingsWindow?.orderFrontRegardless() }
 
-    /// The window ignores the mouse, except while the pointer is over the meeting list, the
-    /// calendar note, the account label or the meters, so the desktop and its icons keep working and those can still be clicked.
+    /// The window ignores the mouse, except while the pointer is over a Desk element that takes
+    /// clicks (DeskHitTest), so the desktop and its icons keep working and those can be clicked.
     private func watchMouse() {
         let moved: (NSEvent) -> Void = { [weak self] _ in self?.updateMouseThrough() }
         if let g = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved], handler: moved) {
@@ -233,15 +233,16 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// window covers the meters or that app opened its own menu (DeskPointerMenu.fallbackOpens).
     /// The window then takes the mouse, so the next click reaches Desk directly.
     private func limitMenuAfterMissedClick() {
-        guard let point = pointerInWindow(), pointerOverMeters(point), !Self.appWindowCoversPointer() else { return }
+        guard DeskHitTest.isMeters(elementUnderPointer()), !Self.appWindowCoversPointer() else { return }
         updateMouseThrough()
         DispatchQueue.main.asyncAfter(deadline: .now() + DeskPointerMenu.fallbackDelay) { [weak self] in
-            guard let self, let w = self.window, let view = w.contentView, let now = self.pointerInWindow() else { return }
-            guard DeskPointerMenu.fallbackOpens(overMeters: self.pointerOverMeters(now),
+            guard let self, let w = self.window, let view = w.contentView else { return }
+            let hit = self.elementUnderPointer()
+            guard DeskPointerMenu.fallbackOpens(overMeters: DeskHitTest.isMeters(hit),
                                                 appWindowCovers: Self.appWindowCoversPointer(),
                                                 otherMenuOpen: Self.otherAppMenuOpen()) else { return }
             let at = view.convert(w.mouseLocationOutsideOfEventStream, from: nil)
-            self.limitMenu(at: now).popUp(positioning: nil, at: at, in: view)
+            self.limitMenu(for: hit).popUp(positioning: nil, at: at, in: view)
         }
     }
 
@@ -256,22 +257,24 @@ final class DeskController: NSObject, NSMenuDelegate {
         }
     }
 
-    /// The meter row under the pointer, with the same slack as the rows' clicks; nil beside them.
-    private func meterRowUnderPointer(_ point: CGPoint) -> Tier? {
-        model.meters.first { model.meterRowFrames[$0.tier]?.insetBy(dx: -8, dy: -4).contains(point) ?? false }?.tier
+    /// The Desk element under the pointer (DeskHitTest), nil where Desk lets the mouse through.
+    private func elementUnderPointer() -> DeskElement? {
+        guard let point = pointerInWindow() else { return nil }
+        return DeskHitTest.element(at: point, in: model.elements())
     }
 
     /// A two-finger click on the meters opens the limit menu for the row under the pointer
     /// (LimitMenu): Accounts, Hide, the warnings item, Meter Settings…, then the shared menu.
     private func limitMenuUnderPointer(_ event: NSEvent) -> Bool {
-        guard let view = window?.contentView, let point = pointerInWindow(), pointerOverMeters(point) else { return false }
-        NSMenu.popUpContextMenu(limitMenu(at: point), with: event, for: view)
+        let hit = elementUnderPointer()
+        guard let view = window?.contentView, DeskHitTest.isMeters(hit) else { return false }
+        NSMenu.popUpContextMenu(limitMenu(for: hit), with: event, for: view)
         return true
     }
 
-    /// The limit menu for the meter row at `point` (window coordinates, top-left origin).
-    private func limitMenu(at point: CGPoint) -> NSMenu {
-        let tier = meterRowUnderPointer(point)
+    /// The limit menu for a hit on the meters: that row's limit, or none beside the rows.
+    private func limitMenu(for hit: DeskElement?) -> NSMenu {
+        let tier = hit?.kind == .meterRow ? hit?.key.flatMap(Tier.init(rawValue:)) : nil
         let menu = NSMenu()
         // Event monitors and their follow-ups run on the main thread.
         MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.addLimitMenuItems(to: menu, tier: tier) }
@@ -284,6 +287,9 @@ final class DeskController: NSObject, NSMenuDelegate {
         let p = w.convertPoint(fromScreen: NSEvent.mouseLocation)
         return CGPoint(x: p.x, y: w.frame.height - p.y)
     }
+
+    /// The Desk window's size, for checking the frames (DeskFrameCheck); nil while Desk is off.
+    var windowSize: CGSize? { window?.frame.size }
 
     /// True when a normal app window (layer 0) is under the pointer. Desk sits at layer -1.
     private static func appWindowCoversPointer() -> Bool {
@@ -303,61 +309,33 @@ final class DeskController: NSObject, NSMenuDelegate {
         return false
     }
 
-    private func joinMeetingUnderPointer() -> Bool {
-        guard let point = pointerInWindow() else { return false }
-        for meeting in model.meetings {
-            guard let link = meeting.link,
-                  let frame = model.rowFrames[meeting.id],
-                  frame.insetBy(dx: -8, dy: -4).contains(point) else { continue }
-            MeetingOpener.open(link)
-            return true
-        }
-        return false
-    }
-
-    /// A meeting row first, then the calendar note, the account label, then the meters. True when
-    /// the click was used.
+    /// A left click on whatever DeskHitTest finds under the pointer: a meeting row opens its
+    /// link, the calendar note opens System Settings, the account label switches to the next
+    /// account (as the widget chip does; a manual switch, so following pauses), and the meters
+    /// show the widget. True when the click was used.
     private func clickUnderPointer() -> Bool {
-        joinMeetingUnderPointer() || openCalendarSettingsFromNote() || cycleAccountFromLine()
-            || showWidgetFromMeters()
-    }
-
-    /// True when the claude line's account label is drawn (two or more accounts) and the pointer
-    /// is over it. Only the label: the rest of the line lets clicks through to the desktop.
-    private func pointerOverAccount(_ point: CGPoint) -> Bool {
-        !model.accountFrame.isEmpty && model.accountFrame.insetBy(dx: -4, dy: -2).contains(point)
-    }
-
-    /// A click on the account label switches to the next account, as the widget chip does (a
-    /// manual switch, so following pauses).
-    private func cycleAccountFromLine() -> Bool {
-        guard let point = pointerInWindow(), pointerOverAccount(point) else { return false }
-        // Event monitors run on the main thread.
-        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.viewModel.cycleAccount() }
+        guard let hit = elementUnderPointer() else { return false }
+        switch hit.kind {
+        case .meetingRow:
+            guard let i = hit.key.flatMap(Int.init), model.meetings.indices.contains(i),
+                  let link = model.meetings[i].link else { return false }
+            MeetingOpener.open(link)
+        case .note:
+            model.openCalendarSettings()
+        case .account:
+            // Event monitors run on the main thread.
+            MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.viewModel.cycleAccount() }
+        case .meters, .meterRow:
+            showWidgetFromMeters()
+        case .meetings:
+            return false
+        }
         return true
-    }
-
-    /// True when the calendar note is drawn and the pointer is over it.
-    private func pointerOverNote(_ point: CGPoint) -> Bool {
-        model.calendarNote != nil && !model.noteFrame.isEmpty
-            && model.noteFrame.insetBy(dx: -8, dy: -4).contains(point)
-    }
-
-    /// A click on the calendar note opens System Settings at Privacy & Security, Calendars.
-    private func openCalendarSettingsFromNote() -> Bool {
-        guard let point = pointerInWindow(), pointerOverNote(point) else { return false }
-        model.openCalendarSettings()
-        return true
-    }
-
-    /// True when the pointer is over the meters (with a little slack, as for the meeting list).
-    private func pointerOverMeters(_ point: CGPoint) -> Bool {
-        !model.metersFrame.isEmpty && model.metersFrame.insetBy(dx: -8, dy: -6).contains(point)
     }
 
     /// A click on the meters ends the hint and shows the widget beside them.
-    private func showWidgetFromMeters() -> Bool {
-        guard let w = window, let point = pointerInWindow(), pointerOverMeters(point) else { return false }
+    private func showWidgetFromMeters() {
+        guard let w = window else { return }
         model.meterHintDismissed()
         let f = model.metersFrame
         let onScreen = CGRect(x: w.frame.minX + f.minX, y: w.frame.maxY - f.maxY,
@@ -365,16 +343,13 @@ final class DeskController: NSObject, NSMenuDelegate {
         let screen = w.screen ?? NSScreen.main
         // Event monitors run on the main thread.
         MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.showPanel(beside: onScreen, on: screen) }
-        return true
     }
 
-    /// Takes the mouse over the clickable pieces (meeting rows, the calendar note, the account
-    /// label, the meters) and lets it through everywhere else.
+    /// Takes the mouse over the clickable pieces (DeskHitTest: meeting rows with a link, the
+    /// calendar note, the account label, the meters) and lets it through everywhere else.
     private func updateMouseThrough() {
-        guard let w = window, let point = pointerInWindow() else { return }
-        let overRows = model.meetings.contains { $0.link != nil }
-            && model.meetingsFrame.insetBy(dx: -8, dy: -6).contains(point)
-        let over = overRows || pointerOverNote(point) || pointerOverAccount(point) || pointerOverMeters(point)
+        guard let w = window else { return }
+        let over = elementUnderPointer() != nil
         if w.ignoresMouseEvents == over { w.ignoresMouseEvents = !over }
     }
 

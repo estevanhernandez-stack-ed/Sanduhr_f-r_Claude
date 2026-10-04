@@ -33,6 +33,23 @@ hidden_limits: []
 silenced_limits:
   - five_hour
 meetings_count: 0
+desk_frames:
+  - kind: meters
+    clickable: true
+    frame: [52, 742, 358, 136]
+  - kind: meter_row
+    key: five_hour
+    clickable: true
+    frame: [52, 742, 358, 58]
+  - kind: meter_row
+    key: seven_day
+    clickable: true
+    frame: [52, 820, 358, 58]
+  - kind: meetings
+    clickable: false
+    frame: [52, 898, 260, 22]
+desk_frames_ok: true
+desk_frames_problem: null
 alerts:
   enabled: false
   session_line: 80

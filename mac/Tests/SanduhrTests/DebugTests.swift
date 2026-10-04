@@ -251,7 +251,7 @@ struct DebugStateTests {
         #expect(keys == ["desk_enabled", "desk_running", "layout", "notch", "has_notch",
                          "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "widget_visible", "widget_visibility",
                          "menu_bar", "settings_open", "settings_section", "meters", "widget_warnings", "hidden_limits",
-                         "silenced_limits", "meetings_count", "alerts",
+                         "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
                          "glow_camera", "theme", "menu", "credentials_store", "account_ref", "accounts_count",
                          "follow", "follow_paused", "version", "build"])
@@ -307,6 +307,35 @@ struct DebugStateTests {
         var silenced = DebugStateInput()
         silenced.silencedLimits = [.fiveHour, .sevenDay]
         #expect(YAMLEmitter.emit(DebugState.yaml(silenced)).contains("silenced_limits:\n  - five_hour\n  - seven_day\nmeetings_count: 0\n"))
+    }
+
+    @Test func deskFramesListKindsKeysAndRoundedFrames() {
+        var s = DebugStateInput()
+        s.deskFrames = [
+            DeskElement(kind: .meters, frame: CGRect(x: 52.4, y: 880.6, width: 358.5, height: 120)),
+            DeskElement(kind: .meterRow, key: "five_hour", frame: CGRect(x: 52, y: 881, width: 358, height: 50)),
+            DeskElement(kind: .meetingRow, key: "0", frame: CGRect(x: 52, y: 1010, width: 300, height: 25), clickable: false),
+        ]
+        s.deskFramesProblem = "meters frame empty"
+        let yaml = YAMLEmitter.emit(DebugState.yaml(s))
+        #expect(yaml.contains("""
+        desk_frames:
+          - kind: meters
+            clickable: true
+            frame: [52, 881, 359, 120]
+          - kind: meter_row
+            key: five_hour
+            clickable: true
+            frame: [52, 881, 358, 50]
+          - kind: meeting_row
+            key: "0"
+            clickable: false
+            frame: [52, 1010, 300, 25]
+        desk_frames_ok: false
+        desk_frames_problem: meters frame empty
+        """))
+        let empty = YAMLEmitter.emit(DebugState.yaml(DebugStateInput()))
+        #expect(empty.contains("desk_frames: []\ndesk_frames_ok: true\ndesk_frames_problem: null\n"))
     }
 
     @Test func emptyState() {

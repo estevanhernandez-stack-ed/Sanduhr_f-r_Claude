@@ -1,0 +1,15 @@
+# Item 41: every Desk element that takes a click has a frame Desk can trust. state.yaml lists them
+# under desk_frames (kind, key, frame) and the app checks them itself (DeskFrameCheck): a drawn
+# element with an empty frame (a dead click area, as when the meters' frame never arrived), a frame
+# off the Desk window, a row outside its block, or two click areas of different kinds overlapping
+# makes desk_frames_ok false and desk_frames_problem says which. Needs the meters in the layout.
+name: Desk click areas have sound frames
+needs: [desk, credentials, meters]
+steps:
+  - expect_state: { desk_frames_ok: true, desk_frames_problem: null }
+  - expect_state:
+      desk_frames[kind=meters].clickable: true
+      desk_frames[kind=meters].frame.2: "/^[1-9]\\d*$/"
+      desk_frames[kind=meter_row].key: five_hour
+      desk_frames[kind=meter_row].frame.3: "/^[1-9]\\d*$/"
+  - snap: desk-geometry

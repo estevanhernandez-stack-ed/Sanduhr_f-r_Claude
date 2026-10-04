@@ -321,6 +321,30 @@ final class DeskModel {
         meterHintVisible = false
     }
 
+    /// Every interactive element DeskView draws, with the frame it reported (.zero when none
+    /// arrived): what DeskHitTest picks from and state.yaml's `desk_frames` lists. Reads the same
+    /// layout settings as DeskView.
+    func elements() -> [DeskElement] {
+        let desk = UserDefaults.desk
+        var input = DeskElements.Input()
+        input.placed = DeskLayout.placed(desk.string(forKey: "layout") ?? DeskLayout.standard,
+                                         showMeetings: desk.object(forKey: "showMeetings") as? Bool ?? true,
+                                         showClaude: desk.object(forKey: "showClaude") as? Bool ?? true)
+        input.meterTiers = meters.map(\.tier)
+        input.signInNeeded = signInNeeded
+        input.switchNote = switchNote
+        input.hasAccount = claudeParts?.account != nil
+        input.calendarNote = calendarNote != nil
+        input.rows = meetings.map { DeskElements.Row(id: $0.id, hasLink: $0.link != nil) }
+        input.metersFrame = metersFrame
+        input.meterRowFrames = meterRowFrames
+        input.accountFrame = accountFrame
+        input.noteFrame = noteFrame
+        input.meetingsFrame = meetingsFrame
+        input.rowFrames = rowFrames
+        return DeskElements.build(input)
+    }
+
     /// The first meeting still to come (or in progress) that has a join link.
     var nextJoinable: Meeting? { meetings.first { $0.link != nil } }
 

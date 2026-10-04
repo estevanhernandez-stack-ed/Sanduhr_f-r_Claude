@@ -34,6 +34,10 @@ struct DebugStateInput {
     /// The limits whose "Warn when nearly full" is off (LimitMenu.silenced), in display order.
     var silencedLimits: [Tier] = []
     var meetingsCount = 0
+    /// Every interactive Desk element with its frame (DeskElements), empty while Desk is off.
+    var deskFrames: [DeskElement] = []
+    /// DeskFrameCheck's answer for `deskFrames`: nil when the geometry holds.
+    var deskFramesProblem: String?
     var alerts = AlertSettings()
     var lastFetch: Date?
     /// "deep-work", "snake" or nil.
@@ -91,6 +95,10 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         let silencedLimits: [YAMLNode] = s.silencedLimits.map { .string($0.rawValue) }
         pairs.append(("silenced_limits", .list(silencedLimits)))
         pairs.append(("meetings_count", .int(s.meetingsCount)))
+        let frames: [YAMLNode] = s.deskFrames.map(deskFrame)
+        pairs.append(("desk_frames", .list(frames)))
+        pairs.append(("desk_frames_ok", .bool(s.deskFramesProblem == nil)))
+        pairs.append(("desk_frames_problem", s.deskFramesProblem.map(YAMLNode.string) ?? .null))
         pairs.append(("alerts", alerts(s.alerts)))
         let fetched: YAMLNode = s.lastFetch.map { .string(iso.string(from: $0)) } ?? .null
         pairs.append(("last_fetch", fetched))
@@ -127,6 +135,19 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         ])
     }
     
+    /// One Desk element: kind, key (a tier or a row index, never a title or a label), whether it
+    /// takes clicks, and its frame in whole points, `[x, y, w, h]` from the Desk window's top left.
+    private static func deskFrame(_ e: DeskElement) -> YAMLNode {
+        let f = e.frame
+        let rounded: [YAMLNode] = [f.minX, f.minY, f.width, f.height].map { .int(Int($0.rounded())) }
+        return .object([
+            ("kind", .string(e.kind.rawValue)),
+            ("key", e.key.map(YAMLNode.string)),
+            ("clickable", .bool(e.clickable)),
+            ("frame", .list(rounded)),
+        ])
+    }
+
     private static func menuGroup(_ group: MenuGroup) -> YAMLNode {
         let items: [YAMLNode] = group.entries.map { e in
             .object([("title", .string(e.title)), ("checked", .bool(e.checked))])
