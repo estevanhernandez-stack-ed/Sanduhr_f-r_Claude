@@ -258,14 +258,22 @@ private struct AccountDetail: View {
         }
     }
 
+    /// The label rule or a clash with another account (case-insensitive), as you type.
+    private var renameProblem: String? {
+        AccountRegistry.labelProblem(newLabel.trimmed, existing: vm.accountLabels, except: label).map(refusal)
+    }
+
     private var renameRow: some View {
-        HStack {
-            TextField("Label", text: $newLabel)
-                .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 220)
-            Button("Rename") { rename() }
-                .disabled(newLabel.trimmed == label || newLabel.trimmed.isEmpty)
-            Spacer()
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                TextField("Label", text: $newLabel)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 220)
+                Button("Rename") { rename() }
+                    .disabled(newLabel.trimmed == label || newLabel.trimmed.isEmpty || renameProblem != nil)
+                Spacer()
+            }
+            if let renameProblem { FormNote(text: renameProblem, isError: true) }
         }
     }
 
@@ -335,10 +343,9 @@ private struct AddAccountForm: View {
     @State private var makeActive = true
     @State private var error: String?
 
+    /// The label rule or a duplicate (case-insensitive, as the registry checks), as you type.
     private var labelProblem: String? {
-        let l = label.trimmed
-        guard !l.isEmpty else { return nil }
-        return AccountRegistry.isValid(l) ? nil : refusal(AccountError.invalidLabel)
+        AccountRegistry.labelProblem(label.trimmed, existing: vm.accountLabels).map(refusal)
     }
 
     var body: some View {

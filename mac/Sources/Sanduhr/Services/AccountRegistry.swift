@@ -136,7 +136,21 @@ final class AccountRegistry: @unchecked Sendable {
     /// Whether `label` would clash with an account other than `except`. Case-insensitive: the
     /// history files are named by label, and the Mac's file system ignores case.
     private func clashes(_ label: String, except: String? = nil) -> Bool {
+        Self.clashes(label, in: labels, except: except)
+    }
+
+    /// The same rule over a given list, for the Add Account and Rename fields.
+    static func clashes(_ label: String, in labels: [String], except: String? = nil) -> Bool {
         labels.contains { $0 != except && $0.lowercased() == label.lowercased() }
+    }
+
+    /// What is wrong with a label as it is typed, checked the way `add` and `rename` will: the
+    /// character rule first, then a clash with another account (`except` is the account being
+    /// renamed). Nil for an empty field, which is not an error yet, and for a good label.
+    static func labelProblem(_ label: String, existing: [String], except: String? = nil) -> AccountError? {
+        guard !label.isEmpty else { return nil }
+        guard isValid(label) else { return .invalidLabel }
+        return clashes(label, in: existing, except: except) ? .duplicateLabel : nil
     }
 
     private func writeList(_ list: [String]) {

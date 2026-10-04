@@ -163,7 +163,8 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   is no chip, no Accounts submenu, and Desk's line still starts with "claude".
 - [ ] Settings, Accounts: Personal is listed, marked Active. Add Account…, label `Work!`: "Label
   must be 1 to 32 letters, digits, spaces, underscores or hyphens." and Add Account stays off.
-  Label `personal`: "An account with that label already exists." Label `Work` with a second
+  Label `personal`: "An account with that label already exists." under the field as you type,
+  before Add, and Add Account stays off. Label `Work` with a second
   claude.ai login's session key, "Make it the active account" on: the widget clears, says
   "Switching account…", then shows Work's numbers. `credentials.json` has `sessionKey:Work`.
 - [ ] Two accounts: the widget's title shows a `Work` chip; click it: Personal's numbers come
@@ -210,3 +211,8 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   it under `hidden_limits`. Settings, Alerts, a line low enough to cross it: no alert for it on
   the next refresh. Compact mode shows the fullest limit still shown. Switch it on: it comes back
   everywhere. `smoke/smoke run smoke/scenarios/hide-limit.yaml` (from `mac/`) does the switch and puts it back.
+- [ ] Duplicate names: with Personal and Work, Add Account…, type `WORK`: "An account with that
+  label already exists." shows under the field as you type (where `Work!` shows the character
+  rule) and Add Account stays off; change it to `Team` and the line goes. On Work's page, type
+  `personal` in the Rename field: the same line under it and Rename off; `work` (its own name in
+  another case) is accepted.

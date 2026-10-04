@@ -32,6 +32,22 @@ struct AccountLabelTests {
         }
     }
 
+    /// Item 38: the Add Account and Rename fields flag a duplicate as you type, by the rule
+    /// `add` and `rename` throw on.
+    @Test func labelProblemAsYouType() {
+        let existing = ["Personal", "Work"]
+        #expect(AccountRegistry.labelProblem("", existing: existing) == nil)
+        #expect(AccountRegistry.labelProblem("Team", existing: existing) == nil)
+        #expect(AccountRegistry.labelProblem("Work!", existing: existing) == .invalidLabel)
+        #expect(AccountRegistry.labelProblem("personal", existing: existing) == .duplicateLabel)
+        #expect(AccountRegistry.labelProblem("WORK", existing: existing) == .duplicateLabel)
+        // Renaming Work: its own name in another case is fine, another account's is not.
+        #expect(AccountRegistry.labelProblem("work", existing: existing, except: "Work") == nil)
+        #expect(AccountRegistry.labelProblem("Work", existing: existing, except: "Work") == nil)
+        #expect(AccountRegistry.labelProblem("PERSONAL", existing: existing, except: "Work") == .duplicateLabel)
+        #expect(AccountError.duplicateLabel.description == "an account with that label already exists")
+    }
+
     @Test func slotsUseTheWindowsNames() {
         #expect(AccountRegistry.slot(KeychainAccount.sessionKey, for: "Work") == "sessionKey:Work")
         #expect(AccountRegistry.slot(KeychainAccount.cfClearance, for: "Work") == "cf_clearance:Work")
