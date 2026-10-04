@@ -268,7 +268,7 @@ struct DebugStateTests {
         let keys = yaml.split(separator: "\n").filter { !$0.hasPrefix(" ") && !$0.hasPrefix("-") }
             .map { String($0.split(separator: ":")[0]) }
         #expect(keys == ["desk_enabled", "desk_running", "layout", "notch", "has_notch",
-                         "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "widget_visible", "widget_visibility",
+                         "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "now_playing", "widget_visible", "widget_visibility",
                          "menu_bar", "settings_open", "settings_section", "usage_page", "meters", "widget_warnings", "hidden_limits",
                          "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
@@ -276,7 +276,7 @@ struct DebugStateTests {
                          "local_activity", "vault", "integrations", "follow", "follow_paused", "version", "build"])
         #expect(yaml.contains("settings_section: notch\nusage_page:\n  open: false\n  tab: overview\nmeters:"))
         #expect(yaml.contains("widget_visible: true\nwidget_visibility: whileDeskOff\nmenu_bar: rotate\nsettings_open: true\n"))
-        #expect(yaml.contains("notch_left: meetingOrTime\nnotch_right: message\nnotch_strip: meetingOrMeters\ncamera_in_use: false\ncamera_light: true\n"))
+        #expect(yaml.contains("notch_left: meetingOrTime\nnotch_right: message\nnotch_strip: meetingOrMeters\ncamera_in_use: false\ncamera_light: true\nnow_playing:\n"))
         #expect(yaml.contains("pulse_count: 3\nglow_count: 2\nglow_shape: plain\nglow_alerts: true\nglow_meetings: false\nglow_camera: true\nglow_claude_waiting: false\nglow_claude_done: false\ntheme: aurora\nmenu:\n"))
         #expect(yaml.contains("layout: message:tl") == false)   // the colons force quotes
         #expect(yaml.contains("layout: \"message:tl clock:bl meters:bl meetings:bl\"\n"))

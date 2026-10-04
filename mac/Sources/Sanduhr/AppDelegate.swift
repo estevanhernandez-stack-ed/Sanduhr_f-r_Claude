@@ -198,6 +198,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Now playing's adapter runs as a child process (item 53): it goes when Sanduhr quits.
+    func applicationWillTerminate(_ notification: Notification) {
+        NowPlayingController.shared.shutdown()
+    }
+
     // LSUIElement apps never get this called, but set it false anyway.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false

@@ -277,6 +277,9 @@ enum DebugHooks {
         s.notchStrip = NotchContent.saved(.strip, in: .desk)
         s.cameraInUse = CameraLightController.shared.cameraInUse
         s.cameraLight = CameraLightController.shared.showing
+        let np = NowPlayingController.shared
+        s.nowPlaying = NowPlayingDebug(enabled: UserDefaults.desk.bool(forKey: NowPlayingPrefs.enabledKey),
+                                       source: np.source, state: np.state)
         s.widgetVisible = widgetVisible
         s.widgetVisibility = .saved()
         s.menuBar = .saved()

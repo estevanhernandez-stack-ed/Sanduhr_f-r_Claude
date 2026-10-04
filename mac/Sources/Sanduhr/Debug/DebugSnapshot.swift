@@ -19,6 +19,9 @@ struct DebugStateInput {
     var cameraInUse = false
     /// The camera light shows (for the camera, or switched on by hand).
     var cameraLight = false
+    /// Now playing (item 53): the switch, the source the self-test chose, and whether something
+    /// plays. Never a title, an artist or an app.
+    var nowPlaying = NowPlayingDebug()
     var widgetVisible = false
     /// When the widget shows on its own (WidgetVisibility raw value).
     var widgetVisibility = WidgetVisibility.always
@@ -89,7 +92,20 @@ struct DebugStateInput {
     var build = ""
 }
 
+/// state.yaml's `now_playing:`.
+struct NowPlayingDebug: Equatable {
+    var enabled = false
+    var source = NowPlayingSource.off
+    var state = NowPlayingState.none
+}
+
 enum DebugState {
+    /// `now_playing:` (item 53): flags only, never what plays.
+    static func nowPlayingYAML(_ n: NowPlayingDebug) -> YAMLNode {
+        .map([YAMLPair("enabled", .bool(n.enabled)), YAMLPair("source", .string(n.source.rawValue)),
+              YAMLPair("state", .string(n.state.rawValue))])
+    }
+
     /// `data:` (item 44): the active account's choices, and `folder_linked` instead of the path.
     static func accountDataYAML(_ c: AccountDataChoices) -> YAMLNode {
         .map([YAMLPair("activity", .string(c.activity.rawValue)),
@@ -137,6 +153,7 @@ enum DebugState {
         pairs.append(("notch_strip", .string(s.notchStrip.rawValue)))
         pairs.append(("camera_in_use", .bool(s.cameraInUse)))
         pairs.append(("camera_light", .bool(s.cameraLight)))
+        pairs.append(("now_playing", nowPlayingYAML(s.nowPlaying)))
         pairs.append(("widget_visible", .bool(s.widgetVisible)))
         pairs.append(("widget_visibility", .string(s.widgetVisibility.rawValue)))
         pairs.append(("menu_bar", .string(s.menuBar.rawValue)))
