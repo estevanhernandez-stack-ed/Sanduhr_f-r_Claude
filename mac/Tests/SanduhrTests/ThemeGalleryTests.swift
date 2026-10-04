@@ -19,6 +19,27 @@ struct ThemeGalleryTests {
         #expect(items.allSatisfy { !$0.isUser })
     }
 
+    @Test func everyBuiltInHasATooltipLine() {
+        let items = ThemeGallery.items(builtIns: ThemeRegistry.builtIn, user: [], current: "obsidian")
+        for item in items {
+            #expect(item.summary?.isEmpty == false, "no summary for \(item.id)")
+            #expect(item.tooltip == "\(item.name)\n\(item.summary ?? "")")
+        }
+        #expect(Set(ThemeGalleryItem.builtInSummaries.keys) == Set(items.map(\.id)))
+    }
+
+    @Test func userThemeTooltipUsesItsOwnDescription() {
+        var described = user("sunset", "Sunset")
+        described.summary = ThemeGalleryItem.cleaned("  Warm dusk.  ")
+        var takeover = user("obsidian", "My Obsidian")
+        takeover.summary = ThemeGalleryItem.cleaned("   ")
+        let items = ThemeGallery.items(builtIns: ThemeRegistry.builtIn,
+                                       user: [described, takeover], current: "obsidian")
+        #expect(items.first { $0.id == "sunset" }?.tooltip == "Sunset (your theme)\nWarm dusk.")
+        // A user file over a built-in id has no line of its own and doesn't inherit the built-in's.
+        #expect(items.first { $0.id == "obsidian" }?.tooltip == "My Obsidian (your theme)")
+    }
+
     @Test func userThemesAppended() {
         let items = ThemeGallery.items(
             builtIns: ThemeRegistry.builtIn,

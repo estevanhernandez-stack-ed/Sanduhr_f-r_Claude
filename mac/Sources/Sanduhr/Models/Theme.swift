@@ -7,6 +7,8 @@ struct Theme: Identifiable, Hashable {
     let id: String           // "obsidian", "626-labs", "my-custom"
     let displayName: String  // shown in the theme strip
     let palette: Palette
+    /// A user theme's `description` from its JSON; built-ins' lines are in ThemeGallery.
+    var summary: String? = nil
 
     struct Palette: Hashable {
         // Base colors.

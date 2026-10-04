@@ -24,6 +24,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        // Tooltips (the theme gallery's descriptions, the widget's buttons) come up a little
+        // sooner than AppKit's default of about a second. Registered, so a defaults write wins.
+        UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 600])
         appNapActivity = ProcessInfo.processInfo.beginActivity(
             options: .userInitiatedAllowingIdleSystemSleep,
             reason: "Refreshes Claude usage every five minutes for the widget and Desk")

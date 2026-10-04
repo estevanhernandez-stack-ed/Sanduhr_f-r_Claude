@@ -248,6 +248,8 @@ struct WidgetSettings: View {
             // A fixed height: inside the scroll view a min/max range collapses to the minimum.
             .frame(height: 110)
             .onAppear { installedThemes = UserThemes.listFiles() }
+            // A file added or deleted outside the app (the folder watch bumps the tick).
+            .onChange(of: vm.userThemesTick) { _, _ in installedThemes = UserThemes.listFiles() }
         }
         .onChange(of: themePaste) { _, _ in autofillFilename() }
     }

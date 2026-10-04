@@ -54,8 +54,8 @@ actor ClaudeAPI {
         if orgID == nil {
             let url = Self.base.appendingPathComponent("organizations")
             let orgs: [Organization] = try await getJSON(url)
-            guard let first = orgs.first else { throw APIError.noOrganizations }
-            orgID = first.uuid
+            guard let org = Organization.tracked(in: orgs) else { throw APIError.noOrganizations }
+            orgID = org.uuid
         }
         let url = Self.base
             .appendingPathComponent("organizations")

@@ -339,8 +339,14 @@ struct DeskNotchSection: View {
                 Toggle("A minute before a meeting", isOn: $glowMeetings)
                     .onChange(of: glowMeetings) { _, _ in NotchGlowController.shared.apply() }
                 Toggle("When the camera light comes on", isOn: $glowCamera)
-                Text("The notch's edge glows softly in the notch text color for a few seconds, once per event: around the island when it is on, around the notch itself when it is off. A Desk pulse always glows it. It never takes a click.")
-                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Text("The notch's edge glows softly in the notch text color for a few seconds, once per event: around the island when it is on, around the notch itself when it is off. A Desk pulse always glows it. It never takes a click.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    // Glows once whatever the switches say, so the look can be checked before
+                    // turning any of them on.
+                    Button("Test Glow") { NotchGlowController.shared.fire() }
+                }
             }
         }
         .formStyle(.grouped)

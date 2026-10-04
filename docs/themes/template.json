@@ -1,5 +1,6 @@
 {
   "name": "Your Theme Name",
+  "description": "One line on the look, shown when you hover the theme in Settings (Mac).",
 
   "bg": "#0d0d0d",
   "glass": "#1c1c1c",

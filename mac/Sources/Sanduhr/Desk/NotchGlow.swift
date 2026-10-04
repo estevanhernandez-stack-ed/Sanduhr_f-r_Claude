@@ -137,6 +137,32 @@ enum NotchGlowLayout {
         return (start, end)
     }
 
+    /// The strip's height as the glow outlines it: the strip only while it shows. An app window
+    /// over it hides it (it lives in the Desk window, below app windows), and a glow traced
+    /// around a strip nobody can see reads as a glow around nothing; then the glow follows the
+    /// wings alone.
+    static func glowChin(_ chin: Double, stripVisible: Bool) -> Double { stripVisible ? chin : 0 }
+
+    /// The strip under the camera, in points from the screen's top-left corner: the island's
+    /// width (the notch and both wings), from the wings' bottom to the strip's. Nil when nothing
+    /// of the strip hangs below the wings.
+    static func stripRect(notch: CGRect, barHeight: CGFloat, chin: Double,
+                          left: CGFloat, right: CGFloat) -> CGRect? {
+        guard chin > 0 else { return nil }
+        let bottom = notch.minY + notch.height + CGFloat(chin)
+        guard bottom > barHeight else { return nil }
+        return CGRect(x: notch.minX - left, y: barHeight,
+                      width: notch.width + left + right, height: bottom - barHeight)
+    }
+
+    /// A rect in points from `screen`'s top-left corner, in CoreGraphics global coordinates (top-left
+    /// origin at the primary display, which is `primaryHeight` tall), the ones window bounds use.
+    /// `screen` is the AppKit frame (bottom-left origin).
+    static func global(_ local: CGRect, screen: CGRect, primaryHeight: CGFloat) -> CGRect {
+        CGRect(x: screen.minX + local.minX, y: primaryHeight - screen.maxY + local.minY,
+               width: local.width, height: local.height)
+    }
+
     /// The island's corner radius, as the strip or the wings draw it.
     static func radius(barHeight: CGFloat, chin: Double) -> CGFloat {
         chin > 0 ? min(16, CGFloat(chin) * 0.7) : min(10, barHeight * 0.3)
@@ -165,6 +191,50 @@ enum NotchGlowLayout {
 
     /// The hardware notch's bottom corner radius, near enough to hug it.
     static func plainRadius(notchHeight: CGFloat) -> CGFloat { min(8, notchHeight * 0.25) }
+}
+
+/// One on-screen window as `CGWindowListCopyWindowInfo` reports it: only what is readable without
+/// Screen Recording permission (layer, alpha, bounds; never the name).
+struct NotchCoverWindow: Equatable {
+    let layer: Int
+    let alpha: Double
+    let bounds: CGRect
+
+    init(layer: Int, alpha: Double = 1, bounds: CGRect) {
+        self.layer = layer
+        self.alpha = alpha
+        self.bounds = bounds
+    }
+
+    /// From one entry of the window list; nil when its layer or bounds are missing.
+    init?(info: [String: Any]) {
+        guard let layer = info[kCGWindowLayer as String] as? Int,
+              let b = info[kCGWindowBounds as String] as? [String: Any],
+              let bounds = CGRect(dictionaryRepresentation: b as CFDictionary) else { return nil }
+        self.layer = layer
+        self.alpha = (info[kCGWindowAlpha as String] as? Double) ?? 1
+        self.bounds = bounds
+    }
+}
+
+/// Whether an app window hides the strip under the camera. Pure: the controller hands it the
+/// window list.
+enum NotchStripCover {
+    /// The layers that count: normal windows (0) up to, not including, the menu bar's (24), so
+    /// floating panels and modal dialogs count. Desk sits at -1, so all of them are above it.
+    /// The menu bar, the wings, the glow and the camera light sit higher and never count, nor do
+    /// overlays that float over everything.
+    static let layers = 0..<24
+
+    /// True when a visible window in `layers` overlaps the strip (`strip` and the bounds both in
+    /// CoreGraphics global coordinates). A window that only touches its edge does not count.
+    static func isCovered(strip: CGRect, by windows: [NotchCoverWindow]) -> Bool {
+        let inner = strip.insetBy(dx: 1, dy: 1)
+        guard !inner.isEmpty else { return false }
+        return windows.contains { w in
+            layers.contains(w.layer) && w.alpha > 0 && w.bounds.intersects(inner)
+        }
+    }
 }
 
 /// What the last glow outlined (smoke's glow_shape).
@@ -223,8 +293,10 @@ struct NotchGlowView: View {
     let notchWidth: CGFloat
     let notchHeight: CGFloat
     let barHeight: CGFloat
+    /// False when an app window hides the strip under the camera: the halo hugs the wings alone.
+    var stripVisible = true
     @AppStorage("notchWings", store: .desk) private var wings = 36.0
-    @AppStorage("notchChin", store: .desk) private var chin = 26.0
+    @AppStorage("notchChin", store: .desk) private var savedChin = 26.0
     @AppStorage("notchText", store: .desk) private var showText = true
     @AppStorage("font", store: .desk) private var font = ""
     @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
@@ -235,6 +307,7 @@ struct NotchGlowView: View {
         let w = NotchWingsView.layout(model: model, now: Date(), wings: wings, showText: showText,
                                       left: leftContent, right: rightContent,
                                       font: font, notchHeight: notchHeight)
+        let chin = NotchGlowLayout.glowChin(savedChin, stripVisible: stripVisible)
         NotchHaloView(width: notchWidth + w.left + w.right,
                       height: NotchGlowLayout.islandHeight(notchHeight: notchHeight, barHeight: barHeight, chin: chin),
                       radius: NotchGlowLayout.radius(barHeight: barHeight, chin: chin),
@@ -317,11 +390,15 @@ final class NotchGlowController {
         case .island:
             guard let wings = desk.wingsWindow, let notch = desk.model.notchRect else { return }
             let barHeight = wings.frame.height
-            let chin = UserDefaults.desk.object(forKey: "notchChin") as? Double ?? 26
+            let savedChin = UserDefaults.desk.object(forKey: "notchChin") as? Double ?? 26
+            let visible = Self.stripVisible(notch: notch, barHeight: barHeight, chin: savedChin,
+                                            model: desk.model, screen: wings.screen)
+            let chin = NotchGlowLayout.glowChin(savedChin, stripVisible: visible)
             let island = NotchGlowLayout.islandHeight(notchHeight: notch.height, barHeight: barHeight, chin: chin)
             frame = NotchGlowLayout.frame(wings: wings.frame, islandHeight: island)
             content = AnyView(NotchGlowView(model: desk.model, notchWidth: notch.width,
-                                            notchHeight: notch.height, barHeight: barHeight))
+                                            notchHeight: notch.height, barHeight: barHeight,
+                                            stripVisible: visible))
         case .plain:
             guard let screen, let notch = screen.cameraNotch else { return }
             frame = NotchGlowLayout.plainFrame(screen: screen.frame, notch: notch)
@@ -371,6 +448,30 @@ final class NotchGlowController {
                 w.orderOut(nil)
             }
         })
+    }
+
+    /// Whether the strip under the camera shows, checked as the glow starts (a glow lasts three
+    /// seconds; a window moved during it keeps the outline it started with). The on-screen window
+    /// list's layers and bounds need no Screen Recording permission; names are never read. When
+    /// the list cannot be read the strip counts as visible, as before.
+    private static func stripVisible(notch: CGRect, barHeight: CGFloat, chin: Double,
+                                     model: DeskModel, screen: NSScreen?) -> Bool {
+        let d = UserDefaults.desk
+        let w = NotchWingsView.layout(
+            model: model, now: Date(), wings: d.object(forKey: "notchWings") as? Double ?? 36,
+            showText: d.object(forKey: "notchText") as? Bool ?? true,
+            left: d.string(forKey: NotchContent.Place.left.key).flatMap(NotchContent.init(rawValue:))
+                ?? NotchContent.Place.left.fallback,
+            right: d.string(forKey: NotchContent.Place.right.key).flatMap(NotchContent.init(rawValue:))
+                ?? NotchContent.Place.right.fallback,
+            font: d.string(forKey: "font") ?? "", notchHeight: notch.height)
+        guard let screen, let primary = NSScreen.screens.first,
+              let local = NotchGlowLayout.stripRect(notch: notch, barHeight: barHeight, chin: chin,
+                                                    left: w.left, right: w.right),
+              let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
+                                                    kCGNullWindowID) as? [[String: Any]] else { return true }
+        let strip = NotchGlowLayout.global(local, screen: screen.frame, primaryHeight: primary.frame.height)
+        return !NotchStripCover.isCovered(strip: strip, by: list.compactMap(NotchCoverWindow.init(info:)))
     }
 
     /// The screen with the camera notch, nil when none has one (an external display alone).

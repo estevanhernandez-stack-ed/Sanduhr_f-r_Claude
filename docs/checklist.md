@@ -240,3 +240,24 @@ New options keep today's behavior by default; the camera light and the glow star
   What was built: (1) a saved session key counts as signed in only after it has fetched once: `SignInGate` keeps `signedInFetchDone` in the standard defaults, set by a successful fetch, cleared by Sign Out or an auth error, and the launch shows the widget for sign-in until it is set (an update from 2.3.2 shows it once, until the first good fetch). (2) Choosing "Always shown" shows a widget an earlier choice hid; at every other event Always shown still leaves it as it is. (3) A warning meter carries `exclamationmark.triangle.fill` before its percent on the widget (theme text color) and Desk (Desk ink), and VoiceOver reads "92%, nearly full" on a warning row, the plain percent otherwise. (4) The root README says the Mac keeps credentials in the Keychain (release) or the `0600` file (dev), and points at Sign Out before trashing the app.
   Acceptance: a relaunch with a bad saved key and "Hidden while Desk is on" shows the widget; picking Always shown brings a tucked widget back; a warning bar is told apart from a plain 90%+ bar without color and by VoiceOver.
   Verify: swift-testing for `SignInGate` (never-fetched key, marker cleared by sign-out or a refused key, the 2.3.2 upgrader path), Always shown on `.choiceChanged`, and `MeterWarning.spokenValue`; on screen: the triangle on a forced warning on the widget and Desk (smoke-test "Warning bars" step), and VoiceOver on one warning and one plain row.
+
+- [x] **34. Issue #105 follow-ups**
+  Spec ref: issue #105, "Follow-ups from the same review" (closed with 2.3.3)
+  What to build: (a) the notch glow traces only what is visible: when an app window covers the strip under the camera (the strip lives in the Desk window, below app windows), the glow follows the wings/notch outline, not the hidden strip; (b) `CameraMonitor` removes its CoreMediaIO property listeners with the same block it added (store the block; the Core Audio block-bridging trap) and logs a failed add/remove `OSStatus` once, without spamming; (c) when the current user theme is deleted outside the app, Sanduhr falls back to the default theme right away (and says so in the log), instead of keeping it until the next launch.
+  Acceptance: no glow traced around an invisible strip; listener add and remove statuses are checked and logged on failure; deleting the active theme's file switches to the default theme without a relaunch.
+  Verify: swift-testing for the pure parts (glow outline choice from strip visibility, theme fallback decision); a smoke check or state key where useful; the CMIO statuses by hand (Console) on a Mac with a camera.
+
+- [x] **35. Pick the organization that has the usage**
+  Spec ref: Windows `ClaudeApiParsing.ParseOrganizations` (2026-07-19: a login can carry a claude_max subscription org and an API individual org; `orgs[0]` is ordering luck)
+  What to build: the Mac tracks the first organization `/api/organizations` lists. Port the Windows rule: the first org whose `capabilities` include `claude_max`, else the first with `chat`, else the first.
+  Acceptance: a login whose first org is an API org fetches the subscription org's usage.
+  Verify: swift-testing on the choice and on decoding real-shaped org JSON (capabilities missing, empty, mixed).
+
+- [ ] **36. Accounts (Windows 2.2 parity)**
+  Spec ref: `docs/mac-merge-plan.md` feature inventory (multi-account registry, Accounts tab, active-account label, account-scoped sign-out; per-account history); Windows `AccountStore`, `UsageHistory`, `SnapshotContract.AccountRef`
+  What to build: named accounts (registry and active label in defaults; each account's key in the Keychain under `sessionKey:{label}` / `cf_clearance:{label}`, the file on dev builds); the existing key promotes to "Personal" on first launch; Settings, Accounts to add, rename, remove and switch; the active account's name on the widget and in the menus; Sign Out removes the active account; history per account (`history.{label}.json`, the current file moving to Personal); `account_ref` in `snapshot.json` hashed as on Windows. Only the active account is fetched (decided 2026-10-03).
+  Acceptance: two accounts switch without a relaunch, each with its own history; signing out one leaves the other; an upgrade lands on Personal with nothing lost.
+  Verify: swift-testing on fakes (registry, migration, switch, scoped sign-out, history paths, account_ref matching Windows); smoke state key for the active account (hashed, never the label); by hand with two keys.
+
+- [ ] **37. All-accounts chart and CSV export** (later; decided 2026-10-03)
+  Spec ref: `docs/mac-merge-plan.md` (Per-account history, All-accounts chart toggle, CSV export)

@@ -58,14 +58,18 @@ enum UserThemes {
     }
 
     /// List installed user theme files, sorted by filename.
-    static func listFiles() -> [URL] {
-        let dir = appSupportThemesDir()
+    static func listFiles(in dir: URL = appSupportThemesDir()) -> [URL] {
         guard let files = try? FileManager.default.contentsOfDirectory(
             at: dir, includingPropertiesForKeys: nil)
         else { return [] }
         return files
             .filter { $0.pathExtension.lowercased() == "json" }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+
+    /// The theme ids the folder has a file for, valid or not (`sunset.json` → "sunset").
+    static func fileIDs(in dir: URL = appSupportThemesDir()) -> Set<String> {
+        Set(listFiles(in: dir).map { $0.deletingPathExtension().lastPathComponent.lowercased() })
     }
 
     /// Validate the given JSON, write it to `<filename>.json` in the themes
@@ -128,6 +132,69 @@ enum UserThemes {
     }
 }
 
+/// Watches the themes folder, so a theme file added, edited or deleted outside the app (Finder,
+/// an editor, a script) reaches the widget at once. One kernel event source on the folder (no
+/// polling); a burst of events, as an editor's save makes, is folded into one `onChange` a
+/// moment later. If the folder itself is deleted or moved, the watch moves to the folder at the
+/// same path once `onChange` has run (`UserThemes.reload` recreates it).
+final class ThemeFolderWatcher {
+    static let settle: TimeInterval = 0.3
+
+    let dir: URL
+    private let queue: DispatchQueue
+    private let onChange: () -> Void
+    private var source: DispatchSourceFileSystemObject?
+    private var pending: DispatchWorkItem?
+
+    init(dir: URL = UserThemes.appSupportThemesDir(), queue: DispatchQueue = .main,
+         onChange: @escaping () -> Void) {
+        self.dir = dir
+        self.queue = queue
+        self.onChange = onChange
+        queue.async { [weak self] in self?.arm() }
+    }
+
+    deinit {
+        pending?.cancel()
+        source?.cancel()
+    }
+
+    /// Opens the folder for events only. False when it cannot be opened (missing).
+    @discardableResult
+    private func arm() -> Bool {
+        source?.cancel()
+        source = nil
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let fd = open(dir.path, O_EVTONLY)
+        guard fd >= 0 else {
+            NSLog("[Sanduhr] Could not watch the themes folder (errno \(errno))")
+            return false
+        }
+        let src = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd, eventMask: [.write, .delete, .rename], queue: queue)
+        src.setEventHandler { [weak self, weak src] in
+            guard let self, let src else { return }
+            self.changed(folderGone: !src.data.isDisjoint(with: [.delete, .rename]))
+        }
+        src.setCancelHandler { close(fd) }
+        src.resume()
+        source = src
+        return true
+    }
+
+    private func changed(folderGone: Bool) {
+        if folderGone { source?.cancel(); source = nil }
+        pending?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.onChange()
+            if self.source == nil { self.arm() }
+        }
+        pending = work
+        queue.asyncAfter(deadline: .now() + Self.settle, execute: work)
+    }
+}
+
 enum UserThemeError: LocalizedError {
     case invalidText
     var errorDescription: String? {
@@ -148,6 +215,9 @@ private struct ThemeDTO: Decodable {
     let bg, glass, titleBg, border, footerBg, barBg: String
     let text, textSecondary, textDim, textMuted: String
     let accent, paceMarker, sparkline: String
+
+    // Optional one-line description, shown in the Settings gallery's tooltip.
+    let description: String?
 
     // Optional colors.
     let glassOnMica: String?
@@ -203,6 +273,7 @@ private struct ThemeDTO: Decodable {
                 },
                 cardCornerRadius: cardCornerRadius.map { CGFloat($0) } ?? 10,
                 ghostAlpha: ghostAlpha ?? 1.0,
-                breathPeriodMs: breathPeriodMs ?? 2800))
+                breathPeriodMs: breathPeriodMs ?? 2800),
+            summary: ThemeGalleryItem.cleaned(description))
     }
 }
