@@ -94,7 +94,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.applyWidgetVisibility(.signedOut)
             }
             DeskController.shared.model.update(DeskUsage(
-                usage: vm.usage, fetchedAt: vm.lastUpdated, signInNeeded: vm.status.needsSignIn))
+                usage: vm.usage, fetchedAt: vm.lastUpdated, signInNeeded: vm.status.needsSignIn,
+                account: vm.accountLabel))
         }
 
         // When the user toggles compact mode, resize the panel to fit the

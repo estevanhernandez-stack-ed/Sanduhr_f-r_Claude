@@ -67,5 +67,9 @@ menu:
       - title: Camera Light
         checked: false
 credentials_store: file
+account_ref: "104ab921"
+accounts_count: 2
+follow: false
+follow_paused: false
 version: "2.1.0"
 build: "3"

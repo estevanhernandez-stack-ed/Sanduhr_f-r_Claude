@@ -66,7 +66,7 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   widget's tiers drawing red with a glow, same rule and settings, in display order), `meetings_count`, `alerts`, `last_fetch`, `active_tool`, `pacing_pinned`,
   `pulse_count`, `glow_count` (notch glows fired so far, drawn or not; a pulse fires one too), `glow_shape` (what the last
   drawn glow outlined: `island`, `plain` for the hardware notch alone, or `none` yet), `glow_alerts`, `glow_meetings`,
-  `glow_camera` (the three Glow switches in Settings, Desk, Notch), `theme` (the widget theme's id), `menu` (groups with item titles and checkmarks), `credentials_store` (`keychain` or `file`: where the session key lives this launch, never the value), `version`, `build`.
+  `glow_camera` (the three Glow switches in Settings, Desk, Notch), `theme` (the widget theme's id), `menu` (groups with item titles and checkmarks), `credentials_store` (`keychain` or `file`: where the session key lives this launch, never the value), `account_ref` (the active account as snapshot.json names it: 8 hex digits of a hash of its label, never the label; null with no accounts), `accounts_count`, `follow` (Follow the account I'm using), `follow_paused` (a manual switch is holding following back), `version`, `build`. The Accounts submenu is not in `menu`: its items are labels.
 
 Actions: `show-widget`, `hide-widget`, `settings [section]` (a `SettingsSection` raw value such
 as `notch` or `deskLayout`), `close-settings`, `refresh` (waits for the fetch), `test-alert`,
@@ -76,7 +76,9 @@ its window is kind `camera` in tree.yaml, one node labeled `Camera light`), `glo
 (the notch glow once, whatever its switches; around the island while Desk runs with it on, else around
 the plain hardware notch on a notched screen, in a click-through window of kind `glow` labeled `Notch glow` that fades out after about three seconds),
 `theme <id>` (the widget theme by id, as the Theme menu and the gallery pick it, such as `obsidian`
-or `match-desk`; an unknown id answers with an error listing the ids).
+or `match-desk`; an unknown id answers with an error listing the ids), `account next` (switches to the next
+account, as a click on the widget's chip; a manual switch, so it pauses following. No action adds, renames,
+signs out or removes an account, and no scenario switches one: a smoke run works on your real accounts).
 
 ## Scenarios
 

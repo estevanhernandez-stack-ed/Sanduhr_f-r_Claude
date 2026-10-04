@@ -30,7 +30,7 @@ Fresh-install and migration checks stay manual.
 - [ ] `open mac/Sanduhr.app`. Desk is on at once: message top left, clock and the Claude meters
   bottom left on the desktop. No black island around the notch; no Calendar permission prompt.
 - [ ] The widget appears top right for sign-in. With no session key, the onboarding sheet shows;
-  Continue opens Sanduhr Settings at Credentials; paste the key and Save. (A session key left over from before the wipe skips the sheet.)
+  Continue opens Sanduhr Settings at Accounts; paste the key and Save (it becomes the Personal account). (A session key left over from before the wipe skips the sheet.)
 - [ ] After the first successful fetch the widget hides by itself (Desk is on, and a new install's
   General, Surfaces, Widget is "Hidden while Desk is on") and the meters fill in. The menu bar
   hourglass shows the percent; left-click brings the widget back.
@@ -46,7 +46,7 @@ Fresh-install and migration checks stay manual.
 
 ## 2. Widget
 
-- [ ] Cards fill in after the first fetch (sign in via Settings, Credentials if the key is gone).
+- [ ] Cards fill in after the first fetch (sign in via Settings, Accounts if the key is gone).
 - [ ] Left-click the menu bar hourglass hides the widget; again shows it. Hidden survives a relaunch.
 - [ ] Right-click opens the status menu: Hide (or Show) Widget; Tools: Deep Work, Pacing Calculators, Cooldown Snake; Refresh, Settings…, Check for Updates…; Quit Sanduhr für Claude. Two-finger click on the widget lists the same items in the same order (always Hide Widget there). Check for Updates… from the widget's menu opens Sparkle's check.
 - [ ] Refresh updates the footer time; `~/Library/Application Support/Sanduhr/snapshot.json` has a new `captured_at`.
@@ -56,18 +56,19 @@ Fresh-install and migration checks stay manual.
 - [ ] Settings, Sanduhr, Updates: Installed shows the version and build from About; Last checked shows a date (or "Never" on a fresh install). Check Now opens Sparkle's check (the same window as Check for Updates…) and is disabled until it finishes; Last checked moves to now. Turn "Check for updates automatically" off: `defaults read com.626labs.sanduhr SUEnableAutomaticChecks` prints 0, and after a relaunch the switch is still off; turn it back on. "Download and install updates automatically" sets `SUAutomaticallyUpdate` the same way and is greyed out while automatic checks are off. "Release notes for this version" opens the GitHub release `v<version>-mac`. About: the app icon, "Sanduhr für Claude", "Version X (build N)", the one-line description and the independence line; Website, GitHub, Release Notes, Privacy and License each open their page (License goes to the README's license section until a LICENSE file lands), "Updates by Sparkle" opens sparkle-project.org, and the copyright line reads "MIT License. 626Labs.".
 
 - [ ] Sign out (item 32; this deletes the real key, so back it up first). Save the key:
-  release build `(umask 077; security find-generic-password -s com.626labs.sanduhr -a sessionKey -w > ~/sanduhr-smoke/sessionKey)`,
+  release build `(umask 077; security find-generic-password -s com.626labs.sanduhr -a sessionKey:Personal -w > ~/sanduhr-smoke/sessionKey)`,
   dev build `cp -p ~/Library/Application\ Support/Sanduhr/credentials.json ~/sanduhr-smoke/`
-  (owner-only either way; delete the copy after the run). Settings, Credentials, Sign Out: a dialog
-  "Sign out of Sanduhr?" with "Your session key is removed from this Mac. Your usage history and
-  settings stay." Cancel changes nothing. Sign Out: the note says "Signed out." and the button greys out as
-  "Signed Out" (no password prompt on reopening the page); the widget's cards
-  go and it reads "Signed out — sign in" (click it: Settings opens at Credentials; with "Hidden
+  (owner-only either way; delete the copy after the run). Settings, Accounts, select the active
+  account, Sign Out: a dialog "Sign out of this account?" with "Its session key is removed from
+  this Mac. The account stays in the list with its usage history and settings; paste a key into it
+  to sign in again." Cancel changes nothing. Sign Out: the note says "Signed out." and the button greys out as
+  "Signed Out" (no password prompt on reopening the page); the list marks the account "Signed out"; the widget's cards
+  go and it reads "Signed out — sign in" (click it: Settings opens at Accounts; with "Hidden
   while Desk is on" the widget shows itself); Desk's meters give way to "sign in again in Sanduhr",
   the notch's meters to "sign in to Sanduhr"; the hourglass loses its percent.
-  `security find-generic-password -s com.626labs.sanduhr -a sessionKey` finds nothing and
+  `security find-generic-password -s com.626labs.sanduhr -a sessionKey:Personal` finds nothing and
   `credentials.json` is gone; `snapshot.json` has `"status":"error"`, `"error_kind":"session_expired"`,
-  `"tiers":[]`; `history.json` and the theme are unchanged. Wait past five minutes: no new
+  `"tiers":[]`; `history.Personal.json` and the theme are unchanged. Wait past five minutes: no new
   `captured_at`. Paste the saved key and Save: cards, Desk meters and notch come back without a relaunch.
 
 ## 3. Alerts
@@ -83,7 +84,7 @@ Fresh-install and migration checks stay manual.
 
 ## 4. Desk
 
-- [ ] Hide the widget, with Ice hiding the menu bar hourglass: Option+S opens one window titled "Sanduhr Settings", a sidebar with General, Alerts, Credentials; Desk: Layout, Look, Meters, Message, Notch; Widget: Look, Themes, Pacing & Focus; Sanduhr: Updates, About. Every section opens and edits with the widget still hidden. Settings… in the widget's menu and the hourglass's menu bring the same window forward (never a second one); there is no "Sanduhr Desk" window and no settings sheet on the widget.
+- [ ] Hide the widget, with Ice hiding the menu bar hourglass: Option+S opens one window titled "Sanduhr Settings", a sidebar with General, Alerts, Accounts; Desk: Layout, Look, Meters, Message, Notch; Widget: Look, Themes, Pacing & Focus; Sanduhr: Updates, About. Every section opens and edits with the widget still hidden. Settings… in the widget's menu and the hourglass's menu bring the same window forward (never a second one); there is no "Sanduhr Desk" window and no settings sheet on the widget.
 - [ ] General, Surfaces: "Show the widget now" off hides the widget and on shows it (the switch follows the hourglass too); Notch flips the island (Desk on).
 - [ ] General, Surfaces, Widget picker: "Hidden while Desk is on" hides it at once with Desk on; turn Desk off, it shows; on, it hides. Show it from the hourglass: it stays until Desk next flips. "Only when I open it": hidden after every Desk flip and after a relaunch until a meter click, Tools or Show Widget brings it. "Always shown": choosing it brings a hidden widget back; Desk flips leave it where it is. Put back "Always shown" (or what it was). Pacing & Focus, "Pin the pacing calculators" and Tools, Pacing Calculators show the same state: flip one, the other follows.
 - [ ] After section 1, Desk is already on: clock, date, message and the meters (a bar per limit with a pace tick and reset time). General, Surfaces, Desk is on. The notch stays plain (its own switch, off).
@@ -141,3 +142,54 @@ Fresh-install and migration checks stay manual.
 
 - [ ] On an Intel Mac, or `arch -x86_64 mac/Sanduhr.app/Contents/MacOS/Sanduhr` under Rosetta:
   launches, widget fetches. Quit.
+
+## 9. Accounts (item 36)
+
+Dev and release builds share the app's defaults (`com.626labs.sanduhr`) and
+`~/Library/Application Support/Sanduhr/`, so this section changes what the installed app sees.
+Run it on the dev build, which keeps keys in `credentials.json`, and back up first:
+
+- [ ] Quit Sanduhr. Back up the defaults, the history files and the credentials file:
+  ```
+  mkdir -p ~/sanduhr-smoke/accounts
+  defaults export com.626labs.sanduhr ~/sanduhr-smoke/accounts/com.626labs.sanduhr.plist
+  cp -p ~/Library/Application\ Support/Sanduhr/history*.json ~/sanduhr-smoke/accounts/ 2>/dev/null
+  cp -p ~/Library/Application\ Support/Sanduhr/credentials.json ~/sanduhr-smoke/accounts/ 2>/dev/null
+  ```
+  (`history.json` from before 2.4.0 becomes `history.Personal.json` on the first 2.4.0 launch.)
+- [ ] Upgrade: on a 2.3.x setup, launch the dev build. `defaults read com.626labs.sanduhr accounts`
+  lists `Personal`, `activeAccount` is `Personal`; `credentials.json` holds `sessionKey:Personal`
+  and no bare `sessionKey`; `history.json` is now `history.Personal.json`. With one account there
+  is no chip, no Accounts submenu, and Desk's line still starts with "claude".
+- [ ] Settings, Accounts: Personal is listed, marked Active. Add Account…, label `Work!`: "Label
+  must be 1 to 32 letters, digits, spaces, underscores or hyphens." and Add Account stays off.
+  Label `personal`: "An account with that label already exists." Label `Work` with a second
+  claude.ai login's session key, "Make it the active account" on: the widget clears, says
+  "Switching account…", then shows Work's numbers. `credentials.json` has `sessionKey:Work`.
+- [ ] Two accounts: the widget's title shows a `Work` chip; click it: Personal's numbers come
+  back (no relaunch), click again: Work. The hourglass's menu and the widget's two-finger menu
+  have Accounts ▸ Personal, Work (the active one checked), Manage Accounts… (opens Settings,
+  Accounts). Desk's claude line reads "Work   N% session …". `smoke/smoke state` shows
+  `accounts_count: 2`, an 8-digit `account_ref` that changes with each switch, `follow: false`,
+  and no label anywhere; `snapshot.json` has the same `account_ref` and no label.
+  `smoke/smoke do account next` switches like a chip click.
+- [ ] Rename Work to `Office`: the chip, menu and list follow; `history.Office.json` replaces
+  `history.Work.json`; `credentials.json` holds `sessionKey:Office`.
+- [ ] Sign Out an inactive account: it stays listed, marked "Signed out"; its history file stays;
+  the active account keeps fetching. Paste its key and Save: "Signed out" goes.
+- [ ] Following: Follow the account I'm using is off; turn it on (`follow: true`). Make Personal
+  active by hand (`follow_paused: true`), then use the other account in claude.ai for a while:
+  no switch during the pause. Wait out the pause (3 hours, or 30 minutes with Personal idle),
+  keep using the other account and leave Personal idle: within 15 minutes or so Sanduhr switches,
+  the chip and Desk's line read "Office (in use)" for a minute, no notification. Use both: no
+  switch, the menu shows "Office · in use" and the chip a dot. Turn following off.
+- [ ] Remove Account… on Office: the dialog names its key and its usage history. Remove: it leaves
+  the list, `history.Office.json` and its slots are gone, Personal is active, and with one account
+  the chip, the submenu and Desk's label go.
+- [ ] Restore. Quit Sanduhr. `defaults import` merges, so first delete what the run added:
+  `defaults delete com.626labs.sanduhr accounts; defaults delete com.626labs.sanduhr activeAccount;
+  defaults delete com.626labs.sanduhr followAccount; defaults delete com.626labs.sanduhr signedInAccounts`
+  (ignore "does not exist"), then `defaults import com.626labs.sanduhr ~/sanduhr-smoke/accounts/com.626labs.sanduhr.plist`.
+  Delete the run's `history.*.json` files and copy the backed-up ones and `credentials.json` back.
+  A release build moves the file's keys into the Keychain on its next launch (the file wins).
+  Delete `~/sanduhr-smoke/accounts/credentials.json` afterwards.

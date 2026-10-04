@@ -10,6 +10,9 @@ struct DeskUsage {
     var fetchedAt: Date?
     /// The session key or Cloudflare clearance was refused, so only a new sign-in helps.
     var signInNeeded = false
+    /// The active account as the claude line names it, with two or more accounts ("Work", or
+    /// "Work (in use)" just after an automatic switch); nil with one. The notch never shows it.
+    var account: String?
 
     /// Numbers older than this are drawn dimmed, and the notch drops them.
     static let staleAfter: TimeInterval = 15 * 60
@@ -60,8 +63,11 @@ struct DeskMeterRow: Identifiable, Equatable {
 /// The text forms of the same numbers: the one-line `claude` piece and the notch's short meters.
 enum DeskClaudeText {
     /// "claude   7% session, resets 3:00   63% week", or the sign-in line, or nil with no numbers.
+    /// With two or more accounts the line starts with the active label in place of "claude"
+    /// ("Work   7% session …").
     static func line(_ input: DeskUsage) -> String? {
-        if input.signInNeeded { return "claude   sign in again in Sanduhr" }
+        let lead = input.account ?? "claude"
+        if input.signInNeeded { return "\(lead)   sign in again in Sanduhr" }
         guard let tiers = input.usage?.tiers else { return nil }
         var parts: [String] = []
         if let s = tiers[.fiveHour], let util = s.utilization {
@@ -74,7 +80,7 @@ enum DeskClaudeText {
             parts.append(part)
         }
         if let w = tiers[.sevenDay]?.utilization { parts.append("\(Int(w))% week") }
-        return parts.isEmpty ? nil : "claude   " + parts.joined(separator: "   ")
+        return parts.isEmpty ? nil : "\(lead)   " + parts.joined(separator: "   ")
     }
 
     /// The notch's short sign-in line, for the wings and the strip.

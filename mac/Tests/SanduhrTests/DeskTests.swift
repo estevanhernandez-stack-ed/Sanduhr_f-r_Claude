@@ -206,6 +206,21 @@ struct DeskMeterTests {
         #expect(DeskClaudeText.compact(refused, now: now) == "sign in to Sanduhr")
         #expect(refused.isStale(now: now))
     }
+
+    @Test func withTwoOrMoreAccountsTheLineStartsWithTheLabel() {
+        var input = DeskUsage(usage: usage([.fiveHour: TierUsage(utilization: 7, resetsAt: nil),
+                                            .sevenDay: TierUsage(utilization: 63, resetsAt: nil)]),
+                              fetchedAt: now.addingTimeInterval(-60), account: "Work")
+        #expect(DeskClaudeText.line(input) == "Work   7% session   63% week")
+        input.account = "Work (in use)"
+        #expect(DeskClaudeText.line(input) == "Work (in use)   7% session   63% week")
+        input.signInNeeded = true
+        #expect(DeskClaudeText.line(input) == "Work (in use)   sign in again in Sanduhr")
+        // The notch has no room: it never shows the label.
+        #expect(DeskClaudeText.compact(input, now: now) == "sign in to Sanduhr")
+        input.signInNeeded = false
+        #expect(DeskClaudeText.compact(input, now: now) == "5h 7%  wk 63%")
+    }
 }
 
 @Suite("Ink spec")

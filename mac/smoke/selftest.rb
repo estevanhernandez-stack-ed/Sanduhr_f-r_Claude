@@ -59,6 +59,7 @@ class FakeApp
     when 'settings' then s['settings_open'] = true; s['settings_section'] = arg if arg
     when 'close-settings' then s['settings_open'] = false
     when 'theme' then s['theme'] = arg
+    when 'account' then s['account_ref'] = s['account_ref'] == '104ab921' ? '0f1e2d3c' : '104ab921'
     when 'tool'
       if arg == 'pacing' then s['pacing_pinned'] = !s['pacing_pinned']
       else s['active_tool'] = s['active_tool'] == arg ? nil : arg
@@ -77,6 +78,13 @@ eq('windows in the fixture', tree.map { |w| w['window'] }, %w[widget settings sh
 eq('quoted percent stays a string', tree[0]['tree'][0]['children'][1]['value'], '7%')
 eq('quoted version stays a string', state['version'], '2.1.0')
 eq('credentials store is a name, never a value', state['credentials_store'], 'file')
+# Item 36: the account is a hash, never a label; following is two switches.
+check('account_ref is 8 hex digits', state['account_ref'].to_s =~ /\A[0-9a-f]{8}\z/)
+eq('accounts count', state['accounts_count'], 2)
+eq('follow off by default', [state['follow'], state['follow_paused']], [false, false])
+app_acct = FakeApp.new
+app_acct.action('account', 'next')
+check('account next changes account_ref', app_acct.state_now['account_ref'] != state['account_ref'])
 
 # --- Match -------------------------------------------------------------------------------------
 
@@ -235,12 +243,15 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo]
+    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end
 # Item 32: a smoke run must never wipe real credentials, so no step may sign out.
 check('no scenario signs out', Dir[File.join(Smoke::SCENARIOS, '*.yaml')].none? { |f| File.read(f) =~ /do:\s*sign[-_ ]?out/i })
+# Item 36: a smoke run works on the real accounts, so no scenario adds, removes, renames, signs
+# out or even switches one.
+check('no scenario touches accounts', Dir[File.join(Smoke::SCENARIOS, '*.yaml')].none? { |f| File.read(f) =~ /do:\s*(account|add|remove|rename)/i })
 check('scenarios exist', Dir[File.join(Smoke::SCENARIOS, '*.yaml')].length >= 8)
 
 # --- Gallery -----------------------------------------------------------------------------------
