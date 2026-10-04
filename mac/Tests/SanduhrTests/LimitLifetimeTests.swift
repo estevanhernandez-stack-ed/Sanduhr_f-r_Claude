@@ -168,6 +168,13 @@ struct LimitLifetimeTests {
             == [.iguanaNecktie: .refill])
     }
 
+    @Test func aHandWrittenRecordReadsItsNumbers() {
+        let d = MemoryDefaults()
+        d.set(["utilization": "100", "resetsAt": "2020-01-01T00:00:00Z"], forKey: MeterVisibility.recordKey(.iguanaNecktie))
+        #expect(MeterVisibility.record(.iguanaNecktie, in: d)
+            == LimitLifetime.HideRecord(resetsAt: "2020-01-01T00:00:00Z", utilization: 100))
+    }
+
     @Test func aLimitTheNumbersLeaveOutStaysHidden() {
         let d = MemoryDefaults()
         MeterVisibility.hide(.iguanaNecktie, usage: usage([.iguanaNecktie: tier(95, resetIn: day)]), now: now, store: d)

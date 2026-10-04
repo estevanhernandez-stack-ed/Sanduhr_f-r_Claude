@@ -99,11 +99,13 @@ enum MeterVisibility {
         store.set(nil, forKey: recordKey(tier))
     }
 
-    /// What `tier` read when it was hidden, nil when no record was saved.
+    /// What `tier` read when it was hidden, nil when no record was saved. A utilization written
+    /// by hand as text (`defaults write … -dict utilization 100`) reads as its number.
     static func record(_ tier: Tier, in store: DefaultsStore) -> LimitLifetime.HideRecord? {
         guard let d = store.object(forKey: recordKey(tier)) as? [String: Any] else { return nil }
-        return LimitLifetime.HideRecord(resetsAt: d["resetsAt"] as? String,
-                                        utilization: (d["utilization"] as? NSNumber)?.doubleValue)
+        let utilization = (d["utilization"] as? NSNumber)?.doubleValue
+            ?? (d["utilization"] as? String).flatMap(Double.init)
+        return LimitLifetime.HideRecord(resetsAt: d["resetsAt"] as? String, utilization: utilization)
     }
 
     private static func encode(_ record: LimitLifetime.HideRecord) -> [String: Any] {
