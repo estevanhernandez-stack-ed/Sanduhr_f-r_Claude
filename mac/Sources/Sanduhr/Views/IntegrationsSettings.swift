@@ -6,9 +6,16 @@ struct IntegrationFolderState: Identifiable, Equatable {
     let path: String
     var mcp: IntegrationStatus
     var statusline: IntegrationStatus
+    var meters: IntegrationStatus
     var id: String { path }
 
-    func status(_ kind: IntegrationKind) -> IntegrationStatus { kind == .mcp ? mcp : statusline }
+    func status(_ kind: IntegrationKind) -> IntegrationStatus {
+        switch kind {
+        case .mcp: mcp
+        case .statusline: statusline
+        case .meters: meters
+        }
+    }
 }
 
 /// The Integrations page's state (item 49): the folders, what each has, the python3 found.
@@ -40,7 +47,8 @@ final class IntegrationsModel {
             }
             let states = paths.map {
                 IntegrationFolderState(path: $0, mcp: installer.status(.mcp, folder: $0),
-                                       statusline: installer.status(.statusline, folder: $0))
+                                       statusline: installer.status(.statusline, folder: $0),
+                                       meters: installer.status(.meters, folder: $0))
             }
             return (states, PythonFinder.find())
         }.value
@@ -55,6 +63,9 @@ final class IntegrationsModel {
     }
 
     func display(_ path: String) -> String { ClaudeCodeFolders.Folder(path: path).display(home: home) }
+
+    /// A row's buttons work: nothing in progress, and python3 found where the kind runs on it.
+    func canRun(_ kind: IntegrationKind) -> Bool { busy == nil && (pythonPath != nil || !kind.needsPython) }
 
     func configDisplay(_ kind: IntegrationKind, folder: String) -> String {
         display(IntegrationInstaller.standard.configFile(kind, folder: folder))
@@ -86,7 +97,8 @@ final class IntegrationsModel {
     /// Installs (or updates) `kind` in `folder`. With `replaceOther`, someone else's entry is
     /// replaced (the consent sheet asked). Returns the other entry when one turned up unasked.
     func install(_ kind: IntegrationKind, folder: String, replaceOther: Bool, linked: [String]) async -> String? {
-        guard let python = pythonPath else { return nil }
+        // The mod runs inside Claude Code: no python3 needed.
+        guard let python = kind.needsPython ? pythonPath : (pythonPath ?? "") else { return nil }
         busy = folder
         defer { busy = nil }
         let outcome = await Task.detached(priority: .userInitiated) { () -> Result<IntegrationInstaller.Outcome, IntegrationInstaller.Failure> in
@@ -226,7 +238,7 @@ private struct IntegrationsIntro: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Claude Code").font(.headline)
-            Text("The MCP server lets Claude Code ask Sanduhr about your usage, as each account's Share with Claude choice allows. The statusline shows the active account's meters under Claude Code's prompt. Each is installed per Claude Code folder: Sanduhr adds one entry to that folder's settings, keeps a backup of the file beside it, and Remove takes the entry out again. Nothing leaves this Mac.")
+            Text("The MCP server lets Claude Code ask Sanduhr about your usage, as each account's Share with Claude choice allows. The statusline shows the active account's meters under Claude Code's prompt; the meters mod draws them as bars above it. Each is installed per Claude Code folder: Sanduhr adds one entry to that folder's settings, keeps a backup of the file beside it, and Remove takes the entry out again. Nothing leaves this Mac.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -286,7 +298,7 @@ private struct IntegrationFolderBox: View {
                 ForEach(IntegrationKind.allCases, id: \.self) { kind in
                     IntegrationRow(kind: kind, status: folder.status(kind),
                                    file: model.configDisplay(kind, folder: folder.path),
-                                   enabled: model.busy == nil && model.pythonPath != nil,
+                                   enabled: model.canRun(kind),
                                    install: { install(kind) }, update: { update(kind) },
                                    remove: { remove(kind) })
                 }
@@ -314,7 +326,7 @@ private struct IntegrationRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text(kind.title).frame(width: 90, alignment: .leading)
+            Text(kind.title).frame(width: 150, alignment: .leading)
             statusText
             Spacer(minLength: 8)
             buttons
@@ -370,10 +382,12 @@ private struct IntegrationConsentSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(consent.kind == .mcp ? "Let Claude Code ask Sanduhr about your usage?" : "Show the meters in Claude Code?")
+            Text(Self.headline(consent.kind))
                 .font(.headline)
             if consent.kind == .mcp {
                 MCPConsentBody(vm: vm, folder: model.display(consent.folder), openAccounts: openAccounts)
+            } else if consent.kind == .meters {
+                MetersConsentBody(folder: model.display(consent.folder))
             } else {
                 Text("Claude Code sessions using \(model.display(consent.folder)) show the active account's session and weekly meters under the prompt, read from the numbers Sanduhr saves on this Mac. Claude Code shows the line to you; it isn't added to the conversation.")
                     .fixedSize(horizontal: false, vertical: true)
@@ -390,7 +404,7 @@ private struct IntegrationConsentSheet: View {
                 Text("Installing replaces it. Sanduhr keeps it and puts it back when you remove Sanduhr's.")
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Text("Sanduhr sets \(consent.kind.keyPath) in \(model.configDisplay(consent.kind, folder: consent.folder)) and keeps a copy of the file as it was, with .sanduhr-backup added to its name. Remove takes the entry out again.")
+            Text(writes)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -403,6 +417,39 @@ private struct IntegrationConsentSheet: View {
         }
         .padding(20)
         .frame(width: 460)
+    }
+
+    static func headline(_ kind: IntegrationKind) -> String {
+        switch kind {
+        case .mcp: "Let Claude Code ask Sanduhr about your usage?"
+        case .statusline: "Show the meters in Claude Code?"
+        case .meters: "Show the meters above Claude Code's prompt?"
+        }
+    }
+
+    /// What Install writes, where.
+    private var writes: String {
+        let file = model.configDisplay(consent.kind, folder: consent.folder)
+        if consent.kind == .meters {
+            return "Sanduhr adds its mod's folder to \(consent.kind.keyPath) in \(file), keeping any folders already listed, and keeps a copy of the file as it was, with .sanduhr-backup added to its name. Remove takes out only that folder."
+        }
+        return "Sanduhr sets \(consent.kind.keyPath) in \(file) and keeps a copy of the file as it was, with .sanduhr-backup added to its name. Remove takes the entry out again."
+    }
+}
+
+/// What the meters mod shows and reads (item 50).
+private struct MetersConsentBody: View {
+    let folder: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Claude Code sessions using \(folder) draw the active account's session and weekly bars above the prompt, with the pace mark and reset countdowns, and show a short notice when a limit nearly fills or the session resets. It is a Claude Code mod, so it needs a Claude Code version that loads mods.")
+                .fixedSize(horizontal: false, vertical: true)
+            Text("The mod reads only the numbers Sanduhr saves on this Mac (snapshot.json). It never uses the network, never calls a model and adds nothing to the conversation.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
