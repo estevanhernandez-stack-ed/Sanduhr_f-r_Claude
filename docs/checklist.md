@@ -262,3 +262,9 @@ New options keep today's behavior by default; the camera light and the glow star
 
 - [ ] **37. All-accounts chart and CSV export** (later; decided 2026-10-03)
   Spec ref: `docs/mac-merge-plan.md` (Per-account history, All-accounts chart toggle, CSV export)
+
+- [ ] **38. Menu bar limit choice, hide special limits, inline duplicate-name error**
+  Spec ref: on-screen check of item 36 (2026-10-03): a used-up promo limit ("Weekly — Special", `iguana_necktie`) pinned the menu bar at 100% because it shows the highest of every limit; Add Account's duplicate-name error showed only after Add, while the label-rule error shows under the field as you type.
+  What to build: (a) Settings, Menu bar choice: Session, Weekly, Whichever is higher (default), Rotate (alternates the two every 8 s, "S 12%" / "W 96%"); limits other than Session and Weekly never drive the menu bar. (b) A Show switch per limit other than Session and Weekly in Settings, Desk, Meters (on by default, so a new limit appears once and the user decides); off hides it on the widget, Desk and from alerts. (c) Add Account (and Rename) show the duplicate-name error inline under the field as you type, like the label-rule error.
+  Acceptance: a 100% special limit no longer shows in the menu bar; hiding it removes it everywhere; Rotate alternates; a duplicate name is flagged before Add.
+  Verify: swift-testing for the menu bar choice (each mode, missing tiers, rotation step) and the visible-tier filter; state.yaml key for the menu bar mode; by hand.
