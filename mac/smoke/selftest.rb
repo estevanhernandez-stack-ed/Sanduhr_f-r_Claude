@@ -97,7 +97,7 @@ eq('local activity not read by default', state['local_activity'], { 'reading' =>
 # Item 46: the vault, flags and a count only: nothing recorded by default.
 eq('nothing recorded by default', state['vault'], { 'recording' => false, 'months' => 0, 'last_ingest_ok' => false })
 # Item 49: Claude Code folders holding Sanduhr's entries, counts only: none by default.
-eq('no integration installed by default', state['integrations'], { 'mcp_installed' => 0, 'statusline_installed' => 0 })
+eq('no integration installed by default', state['integrations'], { 'mcp_installed' => 0, 'statusline_installed' => 0, 'meters_installed' => 0 })
 check('integrations block holds no path', !state['integrations'].to_s.include?('/'))
 # Item 48: the Claude Usage page, open and its tab only: never a label, a project or a number.
 eq('usage page closed on its first tab', state['usage_page'], { 'open' => false, 'tab' => 'overview' })

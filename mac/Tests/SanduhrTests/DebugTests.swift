@@ -105,8 +105,8 @@ struct UsagePageStateTests {
     }
 
     @Test func stateYAMLCountsIntegrationsWithoutPaths() {
-        let yaml = YAMLEmitter.emit(.object([("integrations", DebugState.integrationsYAML(mcp: 2, statusline: 1))]))
-        #expect(yaml == "integrations:\n  mcp_installed: 2\n  statusline_installed: 1\n")
+        let yaml = YAMLEmitter.emit(.object([("integrations", DebugState.integrationsYAML(mcp: 2, statusline: 1, meters: 3))]))
+        #expect(yaml == "integrations:\n  mcp_installed: 2\n  statusline_installed: 1\n  meters_installed: 3\n")
     }
 }
 
@@ -293,7 +293,7 @@ struct DebugStateTests {
         """))
         #expect(yaml.contains("    pace: null\n"))
         #expect(yaml.contains("last_fetch: \"1970-01-01T00:00:00Z\"\n"))
-        #expect(yaml.contains("credentials_store: file\naccount_ref: null\naccounts_count: 0\nhistory_days: 30\ndata:\n  activity: \"off\"\n  names: names\n  share: \"off\"\n  folder_linked: false\nlocal_activity:\n  reading: false\n  events: 0\nvault:\n  recording: false\n  months: 0\n  last_ingest_ok: false\nintegrations:\n  mcp_installed: 0\n  statusline_installed: 0\nfollow: false\nfollow_paused: false\nversion: \"2.1.0\"\n"))
+        #expect(yaml.contains("credentials_store: file\naccount_ref: null\naccounts_count: 0\nhistory_days: 30\ndata:\n  activity: \"off\"\n  names: names\n  share: \"off\"\n  folder_linked: false\nlocal_activity:\n  reading: false\n  events: 0\nvault:\n  recording: false\n  months: 0\n  last_ingest_ok: false\nintegrations:\n  mcp_installed: 0\n  statusline_installed: 0\n  meters_installed: 0\nfollow: false\nfollow_paused: false\nversion: \"2.1.0\"\n"))
         #expect(yaml.contains("version: \"2.1.0\"\nbuild: \"3\"\n"))
         #expect(yaml.contains("""
           - header: Tools

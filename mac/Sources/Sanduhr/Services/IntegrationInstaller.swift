@@ -1,16 +1,19 @@
 import Foundation
 
-/// The two Claude Code integrations Settings installs (item 49).
+/// The Claude Code integrations Settings installs (items 49 and 50).
 enum IntegrationKind: String, Codable, CaseIterable, Sendable {
     /// `mcpServers.sanduhr` in the folder's `.claude.json` (placement rule).
     case mcp
     /// `statusLine` in the folder's `settings.json`.
     case statusline
+    /// The meters mod's folder in `env.CLAUDE_CODE_PLUGIN_DIRS` of the folder's `settings.json`.
+    case meters
 
     var title: String {
         switch self {
         case .mcp: "MCP server"
         case .statusline: "Statusline"
+        case .meters: "Meters above the prompt"
         }
     }
 
@@ -19,8 +22,12 @@ enum IntegrationKind: String, Codable, CaseIterable, Sendable {
         switch self {
         case .mcp: "mcpServers.sanduhr"
         case .statusline: "statusLine"
+        case .meters: "env.CLAUDE_CODE_PLUGIN_DIRS"
         }
     }
+
+    /// Runs on python3 (the mod runs inside Claude Code).
+    var needsPython: Bool { self != .meters }
 }
 
 /// What a folder has for one integration.
@@ -56,8 +63,12 @@ struct IntegrationReceipt: Codable, Equatable, Sendable {
     /// What sat between the braces of the object Sanduhr's member went into when it was empty.
     var emptyInner: String?
     /// The value Sanduhr replaced (someone else's statusline or `sanduhr` entry), byte for byte:
-    /// Remove puts it back.
+    /// Remove puts it back. For the mod, the plugin folders list before Sanduhr's entry joined
+    /// it: Remove puts those bytes back when the list is otherwise what it was.
     var previous: String?
+    /// The mod: `CLAUDE_CODE_PLUGIN_DIRS` didn't exist, so Remove deletes it once only Sanduhr's
+    /// entry is left. Optional so receipts written before the mod still read.
+    var createdKey: Bool?
 }
 
 /// Installs and removes the Claude Code integrations in one chosen folder (item 49), the Mac
@@ -91,6 +102,11 @@ struct IntegrationInstaller {
     static let serversKey = "mcpServers"
     static let backupSuffix = ".sanduhr-backup"
     static let receiptsName = "installs.json"
+    static let envKey = "env"
+    static let pluginDirsKey = "CLAUDE_CODE_PLUGIN_DIRS"
+    /// Claude Code splits the plugin folders on the platform's path-list separator (Node's
+    /// `path.delimiter`): `:` here, `;` on Windows.
+    static let pluginDirsSeparator = ":"
 
     static var standard: IntegrationInstaller {
         IntegrationInstaller(home: NSHomeDirectory(), scripts: .standard)
@@ -120,7 +136,7 @@ struct IntegrationInstaller {
     func configFile(_ kind: IntegrationKind, folder: String) -> String {
         switch kind {
         case .mcp: return ClaudeCodeFolders.configFile(for: folder, home: home)
-        case .statusline: return (AccountData.normalized(folder) as NSString).appendingPathComponent("settings.json")
+        case .statusline, .meters: return (AccountData.normalized(folder) as NSString).appendingPathComponent("settings.json")
         }
     }
 
@@ -139,6 +155,8 @@ struct IntegrationInstaller {
                 JSONEdit.Pair("command", .string(Self.statuslineCommand(
                     python: python, script: scripts.installedPath(IntegrationScripts.statuslineScript)))),
             ])
+        case .meters:
+            return .string(scripts.installedModPath)
         }
     }
 
@@ -176,6 +194,43 @@ struct IntegrationInstaller {
         return c.hasSuffix(name) || c.hasSuffix(name + "'") || c.hasSuffix(name + "\"")
     }
 
+    /// One entry of the plugin folders list that is Sanduhr's mod: the folder inside Sanduhr's
+    /// integrations, through the link or a stamped folder. A copy of the mod elsewhere (a
+    /// checkout, the user's own) is theirs.
+    static func isOurModEntry(_ entry: String) -> Bool {
+        let e = entry.trimmingCharacters(in: .whitespaces)
+        return e.hasSuffix("/\(IntegrationScripts.modPath)") && e.contains("/Sanduhr/integrations/")
+    }
+
+    /// The plugin folders list with Sanduhr's mod in it: an older entry of Sanduhr's is replaced
+    /// where it stands (later ones dropped), else the mod goes last. Every other entry stays,
+    /// byte for byte.
+    static func addingPluginDir(_ ours: String, to value: String) -> String {
+        let parts = value.components(separatedBy: pluginDirsSeparator)
+        if parts.contains(where: isOurModEntry) {
+            var out: [String] = []
+            var placed = false
+            for p in parts {
+                if !isOurModEntry(p) {
+                    out.append(p)
+                } else if !placed {
+                    out.append(ours)
+                    placed = true
+                }
+            }
+            return out.joined(separator: pluginDirsSeparator)
+        }
+        if value.trimmingCharacters(in: .whitespaces).isEmpty { return ours }
+        return value + pluginDirsSeparator + ours
+    }
+
+    /// The list without Sanduhr's mod, or nil when it holds none.
+    static func removingPluginDir(from value: String) -> String? {
+        let parts = value.components(separatedBy: pluginDirsSeparator)
+        guard parts.contains(where: isOurModEntry) else { return nil }
+        return parts.filter { !isOurModEntry($0) }.joined(separator: pluginDirsSeparator)
+    }
+
     // MARK: Status
 
     /// What `folder` has for `kind`. Reads the one config file.
@@ -184,8 +239,11 @@ struct IntegrationInstaller {
         guard FileManager.default.fileExists(atPath: file) else { return .notInstalled }
         guard let data = FileManager.default.contents(atPath: file),
               let root = try? JSONEdit.root(data) else { return .unreadable }
+        if kind == .meters { return metersStatus(root) }
         let value: Any?
         switch kind {
+        case .meters:
+            return .unreadable
         case .mcp:
             guard let servers = root[Self.serversKey] else { return .notInstalled }
             guard let s = servers as? [String: Any] else { return .unreadable }
@@ -199,12 +257,27 @@ struct IntegrationInstaller {
         return isCurrent(kind, value) ? .installed : .outdated
     }
 
+    /// The mod in the plugin folders list: current when it names the link and the installed
+    /// files are the app's.
+    private func metersStatus(_ root: [String: Any]) -> IntegrationStatus {
+        guard let envValue = root[Self.envKey] else { return .notInstalled }
+        guard let env = envValue as? [String: Any] else { return .unreadable }
+        guard let dirs = env[Self.pluginDirsKey] else { return .notInstalled }
+        guard let list = dirs as? String else { return .unreadable }
+        let parts = list.components(separatedBy: Self.pluginDirsSeparator)
+        guard parts.contains(where: Self.isOurModEntry) else { return .notInstalled }
+        let exact = parts.filter(Self.isOurModEntry).map { $0.trimmingCharacters(in: .whitespaces) }
+        return exact == [scripts.installedModPath] && scripts.isCurrent && scripts.hasMod ? .installed : .outdated
+    }
+
     /// Sanduhr's entry names the current scripts through the stable link, with a python3 that
     /// exists, and the scripts there are the app's.
     private func isCurrent(_ kind: IntegrationKind, _ value: Any) -> Bool {
         guard scripts.isCurrent, let o = value as? [String: Any] else { return false }
         let fm = FileManager.default
         switch kind {
+        case .meters:
+            return false
         case .mcp:
             guard let command = o["command"] as? String, fm.isExecutableFile(atPath: command),
                   let args = o["args"] as? [String] else { return false }
@@ -222,12 +295,16 @@ struct IntegrationInstaller {
 
     /// The text of someone else's entry, for the replace question (nil when there is none).
     func otherEntry(_ kind: IntegrationKind, folder: String) -> String? {
+        // The mod joins a list: nothing of anyone's is replaced.
+        if kind == .meters { return nil }
         let file = configFile(kind, folder: folder)
         guard let data = FileManager.default.contents(atPath: file), (try? JSONEdit.root(data)) != nil else { return nil }
         let b = Array(data)
         guard let top = try? JSONEdit.topObject(b) else { return nil }
         let member: JSONEdit.Member?
         switch kind {
+        case .meters:
+            return nil
         case .statusline:
             member = top.member(Self.statusLineKey)
         case .mcp:
@@ -255,6 +332,7 @@ struct IntegrationInstaller {
         } catch {
             throw Failure.writeFailed(file: scripts.dir.path)
         }
+        if kind == .meters && !scripts.hasMod { throw Failure.scriptsMissing }
         let file = configFile(kind, folder: folder)
         let value = entry(kind, python: python)
         var receipts = loadReceipts()
@@ -305,6 +383,8 @@ struct IntegrationInstaller {
         var result: [UInt8]
         var other: String?
         switch kind {
+        case .meters:
+            return try planInstallMeters(bytes: b, root: root, top: top, receipt: receipt, prior: prior)
         case .statusline:
             let existing = root[Self.statusLineKey]
             if let m = top.member(Self.statusLineKey) {
@@ -348,6 +428,44 @@ struct IntegrationInstaller {
         return Plan(bytes: result, receipt: receipt, other: other)
     }
 
+    /// The mod's install: its folder joins `env.CLAUDE_CODE_PLUGIN_DIRS`, the object and the key
+    /// made when missing, every other entry of the list left as it was.
+    private func planInstallMeters(bytes b: [UInt8], root: [String: Any], top: JSONEdit.Object,
+                                   receipt start: IntegrationReceipt, prior: IntegrationReceipt?) throws -> Plan {
+        let ours = scripts.installedModPath
+        var receipt = start
+        var result: [UInt8]
+        if let m = top.member(Self.envKey) {
+            guard let env = root[Self.envKey] as? [String: Any] else { throw Failure.malformed(file: "") }
+            let envObject = try JSONEdit.object(b, at: m.valueStart)
+            if let km = envObject.member(Self.pluginDirsKey) {
+                guard let list = env[Self.pluginDirsKey] as? String else { throw Failure.malformed(file: "") }
+                if let prior {
+                    receipt = prior
+                } else {
+                    receipt.previous = String(decoding: JSONEdit.text(b, km), as: UTF8.self)
+                }
+                let updated = Self.addingPluginDir(ours, to: list)
+                result = updated == list ? b
+                    : JSONEdit.set(b, in: envObject, key: Self.pluginDirsKey, value: .string(updated)).bytes
+            } else {
+                let r = JSONEdit.set(b, in: envObject, key: Self.pluginDirsKey, value: .string(ours))
+                receipt.createdKey = true
+                if let inner = r.emptyInner { receipt.emptyInner = String(decoding: inner, as: UTF8.self) }
+                result = r.bytes
+            }
+        } else {
+            let r = JSONEdit.set(b, in: top, key: Self.envKey,
+                                 value: .object([JSONEdit.Pair(Self.pluginDirsKey, .string(ours))]))
+            receipt.createdParent = true
+            receipt.createdKey = true
+            if let inner = r.emptyInner { receipt.emptyInner = String(decoding: inner, as: UTF8.self) }
+            result = r.bytes
+        }
+        try verifyMeters(before: b, after: result, installed: true)
+        return Plan(bytes: result, receipt: receipt, other: nil)
+    }
+
     // MARK: Remove
 
     /// Takes Sanduhr's entry for `kind` out of `folder`'s config, undoing what Install did.
@@ -384,6 +502,8 @@ struct IntegrationInstaller {
         var result: [UInt8]
         var expect: Any?
         switch kind {
+        case .meters:
+            return try planRemoveMeters(bytes: b, root: root, top: top, receipt: receipt)
         case .statusline:
             guard top.member(Self.statusLineKey) != nil, Self.isOurStatusline(root[Self.statusLineKey]) else { return nil }
             if let restored {
@@ -418,6 +538,39 @@ struct IntegrationInstaller {
         return result
     }
 
+    /// The mod's remove: only Sanduhr's entry leaves the list. The key goes when Sanduhr made it
+    /// and nothing else is in it, the `env` object too when Sanduhr made that; a list that is
+    /// back to what it was gets its original bytes.
+    private func planRemoveMeters(bytes b: [UInt8], root: [String: Any], top: JSONEdit.Object,
+                                  receipt: IntegrationReceipt?) throws -> [UInt8]? {
+        guard let m = top.member(Self.envKey), let env = root[Self.envKey] as? [String: Any],
+              let list = env[Self.pluginDirsKey] as? String,
+              let remaining = Self.removingPluginDir(from: list) else { return nil }
+        let envObject = try JSONEdit.object(b, at: m.valueStart)
+        let inner = receipt?.emptyInner.map { Array($0.utf8) }
+        var result: [UInt8]
+        let isEmpty = remaining.trimmingCharacters(in: .whitespaces).isEmpty
+        if isEmpty && (receipt?.createdKey ?? (receipt?.previous == nil)) {
+            if receipt?.createdParent == true {
+                result = JSONEdit.remove(b, in: envObject, key: Self.pluginDirsKey)
+                let after = try JSONEdit.topObject(result)
+                if let em = after.member(Self.envKey), (try JSONEdit.object(result, at: em.valueStart)).members.isEmpty {
+                    result = JSONEdit.remove(result, in: after, key: Self.envKey, emptyInner: inner)
+                }
+            } else {
+                result = JSONEdit.remove(b, in: envObject, key: Self.pluginDirsKey, emptyInner: inner)
+            }
+        } else if let previous = receipt?.previous,
+                  let was = try? JSONSerialization.jsonObject(with: Data(previous.utf8), options: [.fragmentsAllowed]) as? String,
+                  was == remaining {
+            result = JSONEdit.restore(b, in: envObject, key: Self.pluginDirsKey, previous: Array(previous.utf8))
+        } else {
+            result = JSONEdit.set(b, in: envObject, key: Self.pluginDirsKey, value: .string(remaining)).bytes
+        }
+        try verifyMeters(before: b, after: result, installed: false)
+        return result
+    }
+
     // MARK: Checks
 
     private func parse(_ b: [UInt8]) throws -> [String: Any] {
@@ -433,6 +586,9 @@ struct IntegrationInstaller {
         var oldRest = old
         let got: Any?
         switch kind {
+        case .meters:
+            // The mod's edits are checked by verifyMeters.
+            throw Failure.malformed(file: "")
         case .statusline:
             got = new.removeValue(forKey: Self.statusLineKey)
             oldRest.removeValue(forKey: Self.statusLineKey)
@@ -451,6 +607,31 @@ struct IntegrationInstaller {
         default:
             throw Failure.malformed(file: "")
         }
+    }
+
+    /// The mod's edit changed the plugin folders list and nothing else: the parsed files agree
+    /// once `env.CLAUDE_CODE_PLUGIN_DIRS` (and an `env` left empty) is set aside, the list's other
+    /// entries are the same in the same order, and Sanduhr's entry is there once (Install) or
+    /// gone (Remove).
+    private func verifyMeters(before: [UInt8], after: [UInt8], installed: Bool) throws {
+        let old = try parse(before)
+        guard let new = try? JSONEdit.root(Data(after)) else { throw Failure.malformed(file: "") }
+        func split(_ root: [String: Any]) -> (rest: [String: Any], dirs: [String]) {
+            var rest = root
+            var env = rest.removeValue(forKey: Self.envKey) as? [String: Any]
+            let list = env?.removeValue(forKey: Self.pluginDirsKey) as? String
+            if let env, !env.isEmpty { rest[Self.envKey] = env }
+            return (rest, list.map { $0.components(separatedBy: Self.pluginDirsSeparator) } ?? [])
+        }
+        let (oldRest, oldDirs) = split(old)
+        let (newRest, newDirs) = split(new)
+        guard NSDictionary(dictionary: newRest).isEqual(to: oldRest) else { throw Failure.malformed(file: "") }
+        let others = { (dirs: [String]) in
+            dirs.filter { !Self.isOurModEntry($0) && !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        }
+        guard others(oldDirs) == others(newDirs) else { throw Failure.malformed(file: "") }
+        let ours = newDirs.filter(Self.isOurModEntry).map { $0.trimmingCharacters(in: .whitespaces) }
+        guard ours == (installed ? [scripts.installedModPath] : []) else { throw Failure.malformed(file: "") }
     }
 
     // MARK: Files
@@ -537,14 +718,15 @@ struct IntegrationInstaller {
 
     /// state.yaml's `integrations:`: how many of `folders` (plus the ones installed into) hold
     /// Sanduhr's entry, current or outdated. Counts only, never a path.
-    func installedCounts(folders: [String]) -> (mcp: Int, statusline: Int) {
+    func installedCounts(folders: [String]) -> (mcp: Int, statusline: Int, meters: Int) {
         var all: [String] = []
         for f in folders + installedFolders() {
             let n = AccountData.normalized(f)
             if !all.contains(n) { all.append(n) }
         }
         return (all.filter { status(.mcp, folder: $0).isOurs }.count,
-                all.filter { status(.statusline, folder: $0).isOurs }.count)
+                all.filter { status(.statusline, folder: $0).isOurs }.count,
+                all.filter { status(.meters, folder: $0).isOurs }.count)
     }
 
     /// The folders Sanduhr installed into (Settings lists them even when discovery doesn't).

@@ -74,10 +74,11 @@ struct DebugStateInput {
     /// The vault (item 46) for the active account: recording, months kept, whether the last
     /// cycle completed. Never a path, a project, an id or the label.
     var vault = VaultState()
-    /// Claude Code folders holding Sanduhr's MCP server and statusline entries (item 49).
-    /// Counts only, never a path.
+    /// Claude Code folders holding Sanduhr's MCP server, statusline (item 49) and meters mod
+    /// (item 50) entries. Counts only, never a path.
     var mcpInstalled = 0
     var statuslineInstalled = 0
+    var metersInstalled = 0
     /// Follow the account I'm using, and whether a manual switch is pausing it. Never labels.
     var follow = false
     var followPaused = false
@@ -106,8 +107,9 @@ enum DebugState {
     }
 
     /// `integrations:` (item 49): counts of folders, never a path.
-    static func integrationsYAML(mcp: Int, statusline: Int) -> YAMLNode {
-        .map([YAMLPair("mcp_installed", .int(mcp)), YAMLPair("statusline_installed", .int(statusline))])
+    static func integrationsYAML(mcp: Int, statusline: Int, meters: Int = 0) -> YAMLNode {
+        .map([YAMLPair("mcp_installed", .int(mcp)), YAMLPair("statusline_installed", .int(statusline)),
+              YAMLPair("meters_installed", .int(meters))])
     }
 
     /// `vault:` (item 46): flags and a count only.
@@ -175,7 +177,8 @@ enum DebugState {
         pairs.append(("local_activity", localActivityYAML(reading: s.localActivityReading,
                                                           events: s.localActivityEvents)))
         pairs.append(("vault", vaultYAML(s.vault)))
-        pairs.append(("integrations", integrationsYAML(mcp: s.mcpInstalled, statusline: s.statuslineInstalled)))
+        pairs.append(("integrations", integrationsYAML(mcp: s.mcpInstalled, statusline: s.statuslineInstalled,
+                                                                meters: s.metersInstalled)))
         pairs.append(("follow", .bool(s.follow)))
         pairs.append(("follow_paused", .bool(s.followPaused)))
         pairs.append(("version", .string(s.version)))

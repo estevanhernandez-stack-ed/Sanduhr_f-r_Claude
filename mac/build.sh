@@ -83,6 +83,15 @@ mkdir -p "$APP/Contents/Resources/integrations"
 for script in sanduhr_mcp.py sanduhr_statusline.py; do
     install -m 0644 "integrations/$script" "$APP/Contents/Resources/integrations/$script"
 done
+# The meters mod for Claude Code (item 50), copied beside the scripts into the same stamped
+# folder. Its tests and the types Claude Code writes into a mod folder it loads stay behind.
+rm -rf "$APP/Contents/Resources/integrations/mods"
+MOD="integrations/mods/sanduhr-meters"
+while IFS= read -r file; do
+    install -d "$APP/Contents/Resources/$(dirname "$MOD/$file")"
+    install -m 0644 "$MOD/$file" "$APP/Contents/Resources/$MOD/$file"
+done < <(cd "$MOD" && find . -type f ! -name '*.test.ts' ! -name '*.test.tsx' ! -name '.DS_Store' \
+    ! -name '.gitignore' ! -path './.claude-plugin/types/*' | sed 's|^\./||' | sort)
 
 # Embed Sparkle.framework so the app can self-update.
 SPARKLE_FRAMEWORK=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"

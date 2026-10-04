@@ -20,11 +20,21 @@ import Foundation
 /// moment before the swap still finds it); every older stamped folder is deleted. Python reads a
 /// script whole when it starts, so a running server or statusline never needs its folder again.
 /// The flat copies `install.sh` makes beside them are never touched.
+///
+/// The Claude Code mod (item 50) rides in the same stamped folder, under `mods/sanduhr-meters/`:
+/// its files join the stamp, and Claude Code loads it from `…/integrations/current/mods/sanduhr-meters`.
+/// Claude Code writes its type declarations into a mod folder it loads
+/// (`.claude-plugin/types/`); the stamp covers only the files the app ships, so those never make
+/// a folder look altered.
 struct IntegrationScripts {
     static let mcpScript = "sanduhr_mcp.py"
     static let statuslineScript = "sanduhr_statusline.py"
     static let names = [mcpScript, statuslineScript]
     static let currentName = "current"
+    static let modsName = "mods"
+    static let modName = "sanduhr-meters"
+    /// The mod's folder inside a stamped folder.
+    static let modPath = "\(modsName)/\(modName)"
 
     /// The scripts as the app ships them; nil where they are missing (a `swift run` build).
     let source: URL?
@@ -49,12 +59,48 @@ struct IntegrationScripts {
     /// The path written into Claude Code's settings for `name`.
     func installedPath(_ name: String) -> String { current.appendingPathComponent(name).path }
 
+    /// The mod's folder through the stable link: the entry in Claude Code's plugin folders.
+    var installedModPath: String { current.appendingPathComponent(Self.modPath).path }
+
+    /// The app carries the mod (its manifest is there).
+    var hasMod: Bool {
+        guard let source else { return false }
+        return FileManager.default.fileExists(
+            atPath: source.appendingPathComponent("\(Self.modPath)/.claude-plugin/plugin.json").path)
+    }
+
     // MARK: Stamps
 
-    /// The stamp of a folder holding the scripts, or nil when one is missing.
-    static func stamp(of folder: URL) -> String? {
+    /// The files a stamped folder holds, relative to it: the two scripts, then every file of the
+    /// mods folder in path order, without what Claude Code writes there or the mod's tests.
+    static func files(in folder: URL) -> [String] {
+        var out = names
+        let mods = folder.appendingPathComponent(modsName, isDirectory: true)
+        guard let walk = FileManager.default.enumerator(atPath: mods.path) else { return out }
+        var found: [String] = []
+        while let rel = walk.nextObject() as? String {
+            let path = "\(modsName)/\(rel)"
+            var isDir: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: folder.appendingPathComponent(path).path, isDirectory: &isDir),
+                  !isDir.boolValue, isShipped(path) else { continue }
+            found.append(path)
+        }
+        out += found.sorted()
+        return out
+    }
+
+    /// A mod file the app ships: not Claude Code's generated types, a test, the repo's ignore file or
+    /// Finder's litter (build.sh leaves the same out).
+    static func isShipped(_ path: String) -> Bool {
+        let name = (path as NSString).lastPathComponent
+        if path.contains("/.claude-plugin/types/") || name == ".DS_Store" || name == ".gitignore" { return false }
+        return !(name.hasSuffix(".test.ts") || name.hasSuffix(".test.tsx"))
+    }
+
+    /// The stamp of a folder holding `files` (the app's list), or nil when one is missing.
+    static func stamp(of folder: URL, files: [String]) -> String? {
         var hasher = SHA256()
-        for name in names {
+        for name in files {
             guard let data = try? Data(contentsOf: folder.appendingPathComponent(name)) else { return nil }
             hasher.update(data: Data(name.utf8))
             hasher.update(data: Data([0]))
@@ -62,6 +108,9 @@ struct IntegrationScripts {
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined().prefix(12).description
     }
+
+    /// The stamp of a folder over the files it holds itself.
+    static func stamp(of folder: URL) -> String? { stamp(of: folder, files: files(in: folder)) }
 
     /// The stamp of the scripts inside the app.
     var bundledStamp: String? { source.flatMap(Self.stamp(of:)) }
@@ -88,19 +137,24 @@ struct IntegrationScripts {
     /// stamped folders no longer in use. Returns the stamp.
     @discardableResult
     func refresh() throws -> String {
-        guard let source, let stamp = Self.stamp(of: source) else { throw Failure.missingFromApp }
+        guard let source else { throw Failure.missingFromApp }
+        let files = Self.files(in: source)
+        guard let stamp = Self.stamp(of: source, files: files) else { throw Failure.missingFromApp }
         let fm = FileManager.default
         do {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)
             let target = dir.appendingPathComponent(stamp, isDirectory: true)
-            if Self.stamp(of: target) != stamp {
+            if Self.stamp(of: target, files: files) != stamp {
                 // Missing or altered: build it beside, then move it into place whole.
                 let staging = dir.appendingPathComponent(".staging-\(UUID().uuidString)", isDirectory: true)
                 try fm.createDirectory(at: staging, withIntermediateDirectories: true)
-                for name in Self.names {
+                for name in files {
                     let dest = staging.appendingPathComponent(name)
+                    try fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
                     try fm.copyItem(at: source.appendingPathComponent(name), to: dest)
-                    try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dest.path)
+                    // The scripts run; the mod's files are read.
+                    let mode = Self.names.contains(name) ? 0o755 : 0o644
+                    try fm.setAttributes([.posixPermissions: mode], ofItemAtPath: dest.path)
                 }
                 try? fm.removeItem(at: target)
                 try fm.moveItem(at: staging, to: target)

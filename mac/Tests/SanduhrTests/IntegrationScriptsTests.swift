@@ -17,11 +17,19 @@ struct IntegrationRig {
         ship(version: "1")
     }
 
-    /// Puts a version of the scripts in the app, as an update would.
+    /// Puts a version of the scripts and the mod in the app, as an update would.
     func ship(version: String) {
         for name in IntegrationScripts.names {
             FileManager.default.createFile(atPath: app.appendingPathComponent(name).path,
                                            contents: Data("# \(name) v\(version)\n".utf8))
+        }
+        let mod = app.appendingPathComponent(IntegrationScripts.modPath)
+        for (rel, text) in [(".claude-plugin/plugin.json", "{ \"name\": \"sanduhr-meters\", \"version\": \"\(version)\" }\n"),
+                            ("hooks/hooks.json", "{ \"modules\": [\"./register.tsx\"] }\n"),
+                            ("hooks/register.tsx", "// v\(version)\n")] {
+            let url = mod.appendingPathComponent(rel)
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: url.path, contents: Data(text.utf8))
         }
     }
 
@@ -89,9 +97,47 @@ struct IntegrationScriptsTests {
         #expect(Set(try FileManager.default.contentsOfDirectory(atPath: r.support.path)) == ["sanduhr_mcp.py"])
     }
 
+    @Test func theModRidesInTheStampedFolderAndClaudeCodesTypesDontAlterIt() throws {
+        let r = IntegrationRig()
+        defer { r.cleanUp() }
+        let s = r.scripts
+        #expect(s.hasMod)
+        // A test file in the app's copy is never shipped on.
+        FileManager.default.createFile(atPath: r.app.appendingPathComponent("\(IntegrationScripts.modPath)/hooks/x.test.ts").path,
+                                       contents: Data("test".utf8))
+        #expect(IntegrationScripts.files(in: r.app) == [
+            "sanduhr_mcp.py", "sanduhr_statusline.py",
+            "mods/sanduhr-meters/.claude-plugin/plugin.json", "mods/sanduhr-meters/hooks/hooks.json",
+            "mods/sanduhr-meters/hooks/register.tsx",
+        ])
+        let one = try s.refresh()
+        let mod = URL(fileURLWithPath: s.installedModPath)
+        #expect(s.installedModPath == r.support.path + "/current/mods/sanduhr-meters")
+        #expect(try String(contentsOf: mod.appendingPathComponent("hooks/register.tsx"), encoding: .utf8) == "// v1\n")
+        #expect(!FileManager.default.fileExists(atPath: mod.appendingPathComponent("hooks/x.test.ts").path))
+
+        // Claude Code lays its declarations into a mod folder it loads: same stamp, left alone.
+        let types = mod.appendingPathComponent(".claude-plugin/types/claude-code/index.d.ts")
+        try FileManager.default.createDirectory(at: types.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("declare module 'claude-code' {}".utf8).write(to: types)
+        #expect(try s.refresh() == one)
+        #expect(s.isCurrent)
+        #expect(FileManager.default.fileExists(atPath: types.path))
+
+        // A changed mod is a new stamp.
+        r.ship(version: "2")
+        #expect(try s.refresh() != one)
+        #expect(try String(contentsOf: mod.appendingPathComponent("hooks/register.tsx"), encoding: .utf8) == "// v2\n")
+    }
+
     @Test func theRealScriptsHaveAStamp() {
         let repo = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appendingPathComponent("integrations")
         #expect(IntegrationScripts.stamp(of: repo).map(IntegrationScripts.isStampName) == true)
+        // The mod as build.sh bundles it: no tests, no generated types.
+        let files = IntegrationScripts.files(in: repo)
+        #expect(files.contains("mods/sanduhr-meters/hooks/register.tsx"))
+        #expect(files.contains("mods/sanduhr-meters/.claude-plugin/plugin.json"))
+        #expect(!files.contains { $0.contains(".test.") || $0.contains("/.claude-plugin/types/") })
     }
 }

@@ -110,6 +110,7 @@ vault:
 integrations:
   mcp_installed: 0
   statusline_installed: 0
+  meters_installed: 0
 follow: false
 follow_paused: false
 version: "2.1.0"
