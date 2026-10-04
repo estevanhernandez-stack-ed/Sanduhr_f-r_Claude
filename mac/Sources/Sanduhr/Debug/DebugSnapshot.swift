@@ -94,15 +94,20 @@ struct DebugStateInput {
 
 /// state.yaml's `now_playing:`.
 struct NowPlayingDebug: Equatable {
+    /// Running: placed somewhere and Desk on.
     var enabled = false
+    /// Where it is placed (item 53b), never what plays.
+    var placed: [NowPlayingPlacement.Place] = []
     var source = NowPlayingSource.off
     var state = NowPlayingState.none
 }
 
 enum DebugState {
-    /// `now_playing:` (item 53): flags only, never what plays.
+    /// `now_playing:` (items 53, 53b): flags and places only, never what plays.
     static func nowPlayingYAML(_ n: NowPlayingDebug) -> YAMLNode {
-        .map([YAMLPair("enabled", .bool(n.enabled)), YAMLPair("source", .string(n.source.rawValue)),
+        .map([YAMLPair("enabled", .bool(n.enabled)),
+              YAMLPair("placed", .list(n.placed.map { .string($0.rawValue) })),
+              YAMLPair("source", .string(n.source.rawValue)),
               YAMLPair("state", .string(n.state.rawValue))])
     }
 

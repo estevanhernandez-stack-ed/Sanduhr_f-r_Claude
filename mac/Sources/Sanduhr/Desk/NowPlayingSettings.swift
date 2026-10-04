@@ -1,28 +1,25 @@
 import SwiftUI
 import AppKit
 
-/// Settings, Desk, Now Playing (item 53): the switch (off by default), where it shows, which apps,
-/// the source the self-test chose, the AppleScript fallback and the adapter's credit.
+/// Settings, Desk, Now Playing (item 53): the source the self-test chose (or that it is placed
+/// nowhere), Hide while paused, which apps, the AppleScript fallback and the adapter's credit.
+/// Where it shows is arranged with everything else (item 53b): the wings and the strip in Notch,
+/// the element in Layout; the two buttons go there.
 struct NowPlayingSection: View {
-    @AppStorage(NowPlayingPrefs.enabledKey, store: .desk) private var enabled = false
     @AppStorage(DeskController.enabledKey, store: .desk) private var deskEnabled = false
 
     var body: some View {
         Form {
             Section {
-                Toggle("Show what's playing", isOn: $enabled)
-                    .onChange(of: enabled) { _, _ in NowPlayingController.shared.apply() }
-                NowPlayingSourceRow(enabled: enabled, deskEnabled: deskEnabled)
-                Text("Shows the song or video playing in any app, browsers included: on the notch (pick Now playing for a wing or the strip in Settings, Notch) and under the Desk meters. Click it to play or pause; two-finger click for Previous and Next. Nothing leaves your Mac, and titles are never saved. Runs only while Desk is on.")
+                NowPlayingSourceRow(deskEnabled: deskEnabled)
+                Text("Shows the song or video playing in any app, browsers included, wherever you place it: a notch wing or the strip under the camera (Notch), or the Desk (Layout). Click it to play or pause; two-finger click for Previous and Next. Nothing leaves your Mac, and titles are never saved. Runs only while it is placed somewhere and Desk is on.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                NowPlayingArrangeRow()
             }
             NowPlayingShowSection()
-                .disabled(!enabled)
             NowPlayingAppsSection()
-                .disabled(!enabled)
             NowPlayingAskSection()
-                .disabled(!enabled)
             Section {
                 Text("Now playing uses mediaremote-adapter by Jonas van den Berg (BSD-3-Clause).")
                     .font(.caption).foregroundStyle(.secondary)
@@ -34,28 +31,36 @@ struct NowPlayingSection: View {
     }
 }
 
-/// "Source: Adapter working", "Fallback (Music and Spotify only)", "Off".
+/// "Source: Adapter working", "Fallback (Music and Spotify only)", "Not placed anywhere".
 private struct NowPlayingSourceRow: View {
-    let enabled: Bool
     let deskEnabled: Bool
 
     var body: some View {
         let c = NowPlayingController.shared
         LabeledContent("Source", value: NowPlayingStatus.text(
-            source: c.source, enabled: enabled, deskRunning: deskEnabled,
+            source: c.source, placed: !c.placed.isEmpty, deskRunning: deskEnabled,
             checking: c.checking, adapterFailed: c.adapterFailed))
     }
 }
 
+/// The two ways to place it: the Notch page (wings, strip) and the Layout page (the Desk element).
+private struct NowPlayingArrangeRow: View {
+    var body: some View {
+        HStack {
+            Button("Arrange on the Notch…") { SettingsWindowController.shared.show(.notch) }
+            Button("Arrange on the Desk…") { SettingsWindowController.shared.show(.deskLayout) }
+            Spacer()
+        }
+    }
+}
+
 private struct NowPlayingShowSection: View {
-    @AppStorage(NowPlayingPrefs.deskLineKey, store: .desk) private var deskLine = true
     @AppStorage(NowPlayingPrefs.hidePausedKey, store: .desk) private var hidePaused = false
 
     var body: some View {
         Section("Show") {
-            Toggle("A line under the Desk meters", isOn: $deskLine)
             Toggle("Hide while paused", isOn: $hidePaused)
-            Text("Nothing shows when nothing plays. With the meters off the desktop, the line sits under the Claude line.")
+            Text("Nothing shows when nothing plays.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

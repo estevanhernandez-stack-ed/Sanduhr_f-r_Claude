@@ -101,8 +101,7 @@ enum DeskElements {
         var noteFrame: CGRect = .zero
         var meetingsFrame: CGRect = .zero
         var rowFrames: [String: CGRect] = [:]
-        /// The Desk's now playing line is drawn (a track shows, the line is on, and the meters or
-        /// the claude line are there to carry it).
+        /// The Desk's now playing element is drawn: the layout places it and a track shows.
         var nowPlayingLine = false
         var nowPlayingFrame: CGRect = .zero
         /// The strip under the camera shows now playing (Desk's notch strip).

@@ -258,29 +258,26 @@ struct NowPlayingSupervisor: Equatable {
     mutating func reset() { quickExits = 0 }
 }
 
-/// The Now Playing settings that decide whether a track shows (UserDefaults.desk).
+/// The Now Playing settings that decide whether a track shows (UserDefaults.desk). Where it shows
+/// is NowPlayingPlacement's: the notch choices and the Desk layout.
 struct NowPlayingPrefs: Equatable {
+    /// Item 53's switch and Desk line. Read only by NowPlayingPlacement.upgrade, once; ignored after.
     static let enabledKey = "nowPlaying"
+    static let deskLineKey = "nowPlayingDesk"
     static let hidePausedKey = "nowPlayingHidePaused"
     static let excludedKey = "nowPlayingExcluded"
-    static let deskLineKey = "nowPlayingDesk"
     static let askAppsKey = "nowPlayingAskApps"
 
-    var enabled = false
     var hideWhilePaused = false
     /// Bundle ids whose playback never shows.
     var excluded: Set<String> = []
-    /// The Desk line under the meters.
-    var deskLine = true
     /// AppleScript to Music and Spotify while on the fallback (raises the Automation prompt).
     var askApps = false
 
     static func saved(in defaults: UserDefaults) -> NowPlayingPrefs {
         NowPlayingPrefs(
-            enabled: defaults.bool(forKey: enabledKey),
             hideWhilePaused: defaults.bool(forKey: hidePausedKey),
             excluded: Set(defaults.stringArray(forKey: excludedKey) ?? []),
-            deskLine: defaults.object(forKey: deskLineKey) as? Bool ?? true,
             askApps: defaults.bool(forKey: askAppsKey))
     }
 
@@ -426,9 +423,11 @@ enum NowPlayingFallback {
 
 /// Settings' source line and state.yaml's `source`, from what the controller knows.
 enum NowPlayingStatus {
-    static func text(source: NowPlayingSource, enabled: Bool, deskRunning: Bool, checking: Bool,
+    static let notPlaced = "Not placed anywhere"
+
+    static func text(source: NowPlayingSource, placed: Bool, deskRunning: Bool, checking: Bool,
                      adapterFailed: Bool) -> String {
-        if !enabled { return "Off" }
+        if !placed { return notPlaced }
         if !deskRunning { return "Off (needs Desk)" }
         if checking { return "Checking…" }
         switch source {

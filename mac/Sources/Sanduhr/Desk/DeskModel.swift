@@ -82,8 +82,6 @@ final class DeskModel {
     /// What plays, after Now Playing's hide rules (NowPlayingController), nil for nothing to show.
     /// In memory only.
     var nowPlaying: NowPlayingInfo?
-    /// The Desk's now playing line is switched on and has a track to show.
-    var nowPlayingDeskLine = false
     /// Where the meeting list sits in the window (SwiftUI global coordinates, top-left origin).
     /// The app delegate lets clicks through everywhere except here, so the rows can be clicked.
     @ObservationIgnored var meetingsFrame: CGRect = .zero { didSet { if meetingsFrame != oldValue { onHitAreasChange?() } } }
@@ -353,7 +351,7 @@ final class DeskModel {
         input.noteFrame = noteFrame
         input.meetingsFrame = meetingsFrame
         input.rowFrames = rowFrames
-        input.nowPlayingLine = nowPlayingDeskLine && DeskNowPlaying.host(placed: input.placed) != nil
+        input.nowPlayingLine = input.placed.contains(NowPlayingPlacement.widget) && nowPlaying != nil
         input.nowPlayingFrame = nowPlayingFrame
         input.nowPlayingStrip = DeskNowPlaying.stripShows(
             notch: desk.bool(forKey: DeskController.notchKey), hasNotch: notchRect != nil,

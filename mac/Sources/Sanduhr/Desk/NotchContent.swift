@@ -21,7 +21,8 @@ enum NotchContent: String, CaseIterable, Identifiable {
     /// Today's Desk message line.
     case message
     /// What plays on the Mac ("▶ Title · Artist", item 53), absent when nothing plays or, with
-    /// Hide while paused, while paused. Needs Settings, Desk, Now Playing switched on.
+    /// Hide while paused, while paused. Choosing it is enough: now playing runs while placed
+    /// somewhere (NowPlayingPlacement).
     case nowPlaying
     case nothing
 

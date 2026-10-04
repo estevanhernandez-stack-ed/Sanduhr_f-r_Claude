@@ -9,7 +9,7 @@ import AppKit
 /// Settings live in the com.626labs.sanduhr.desk defaults domain:
 ///   defaults write com.626labs.sanduhr.desk layout "message:tl clock:bl claude:bl meetings:bl"
 ///       widgets: clock (time and date), claude (Sanduhr line), meters (a bar per limit),
-///                meetings, message
+///                nowPlaying (what plays, item 53b), meetings, message
 ///       slots:   tl tr bl br; leave a widget out to hide it
 ///   defaults write com.626labs.sanduhr.desk font "EsteFont"       (any installed font family)
 ///   defaults write com.626labs.sanduhr.desk timeSize -float 112    (clock size; the rest scales from it)
@@ -42,7 +42,7 @@ struct DeskView: View {
     @AppStorage("showClaude", store: .desk) private var showClaude = true
     @AppStorage("inkColor", store: .desk) private var ink = "ffffff"
 
-    enum Widget: String { case clock, claude, meters, meetings, message }
+    enum Widget: String { case clock, claude, meters, nowPlaying, meetings, message }
     enum Slot: String { case tl, tr, bl, br }
 
     private var inset: CGFloat { timeSize * 0.18 }
@@ -87,7 +87,7 @@ struct DeskView: View {
     }
 
     private func column(top: [Widget], bottom: [Widget], alignment: HorizontalAlignment) -> some View {
-        VStack(alignment: alignment, spacing: 10) {
+        VStack(alignment: alignment, spacing: DeskNowPlaying.columnSpacing) {
             ForEach(top, id: \.self) { view(for: $0, alignment: alignment) }
             Spacer(minLength: 32)
             ForEach(bottom, id: \.self) { view(for: $0, alignment: alignment) }
@@ -99,27 +99,22 @@ struct DeskView: View {
     private func view(for widget: Widget, alignment: HorizontalAlignment) -> some View {
         switch widget {
         case .clock: clock(alignment: alignment).deskInk()
-        case .claude: withNowPlaying(under: .claude, claude, alignment: alignment).deskInk()
-        case .meters: withNowPlaying(under: .meters, meters(alignment: alignment), alignment: alignment).deskInk()
+        case .claude: claude.deskInk()
+        case .meters: meters(alignment: alignment).deskInk()
+        case .nowPlaying: nowPlaying(alignment: alignment).deskInk()
         case .meetings: meetings(alignment: alignment).deskInk()
         case .message: message(alignment: alignment)
         }
     }
 
-    /// `content`, with the now playing line under it when this widget carries the line
-    /// (DeskNowPlaying.host) and a track shows.
+    /// The now playing element (item 53b): "▶ Title · Artist" over its position bar while a track
+    /// shows, nothing otherwise. Padded so its click area stays clear of its neighbours'.
     @ViewBuilder
-    private func withNowPlaying(under widget: Widget, _ content: some View, alignment: HorizontalAlignment) -> some View {
-        let placed = Set(placement.values.joined().map(\.rawValue))
-        if model.nowPlayingDeskLine, let info = model.nowPlaying,
-           DeskNowPlaying.host(placed: placed) == widget.rawValue {
-            VStack(alignment: alignment, spacing: DeskNowPlaying.gap) {
-                content
-                DeskNowPlayingLine(info: info, model: model, ink: ink, font: font, size: timeSize * 0.17,
-                                   width: timeSize * 3.2, alignment: alignment)
-            }
-        } else {
-            content
+    private func nowPlaying(alignment: HorizontalAlignment) -> some View {
+        if let info = model.nowPlaying {
+            DeskNowPlayingLine(info: info, model: model, ink: ink, font: font, size: timeSize * 0.17,
+                               width: timeSize * 3.2, alignment: alignment)
+                .padding(.vertical, DeskNowPlaying.padding)
         }
     }
 

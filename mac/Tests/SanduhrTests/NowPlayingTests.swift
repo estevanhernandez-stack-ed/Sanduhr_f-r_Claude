@@ -270,15 +270,16 @@ struct NowPlayingFallbackTests {
     }
 
     @Test func statusLines() {
-        func text(_ s: NowPlayingSource, enabled: Bool = true, desk: Bool = true, checking: Bool = false,
+        func text(_ s: NowPlayingSource, placed: Bool = true, desk: Bool = true, checking: Bool = false,
                   failed: Bool = false) -> String {
-            NowPlayingStatus.text(source: s, enabled: enabled, deskRunning: desk, checking: checking, adapterFailed: failed)
+            NowPlayingStatus.text(source: s, placed: placed, deskRunning: desk, checking: checking, adapterFailed: failed)
         }
         #expect(text(.adapter) == "Adapter working")
         #expect(text(.fallback) == "Fallback (Music and Spotify only)")
         #expect(text(.fallback, failed: true).hasPrefix("Fallback (Music and Spotify only): "))
         #expect(text(.off) == "Off")
-        #expect(text(.adapter, enabled: false) == "Off")
+        #expect(text(.adapter, placed: false) == "Not placed anywhere")
+        #expect(text(.off, placed: false, desk: false) == "Not placed anywhere")
         #expect(text(.off, desk: false) == "Off (needs Desk)")
         #expect(text(.off, checking: true) == "Checking…")
     }
@@ -290,7 +291,7 @@ struct NowPlayingVisibilityTests {
     var paused: NowPlayingInfo { var p = playing; p.playing = false; return p }
 
     @Test func nothingPlayingNeverShows() {
-        let prefs = NowPlayingPrefs(enabled: true)
+        let prefs = NowPlayingPrefs()
         #expect(prefs.visible(nil) == nil)
         #expect(prefs.visible(NowPlayingInfo()) == nil)
         #expect(prefs.visible(playing) == playing)
@@ -298,13 +299,13 @@ struct NowPlayingVisibilityTests {
     }
 
     @Test func hideWhilePaused() {
-        let prefs = NowPlayingPrefs(enabled: true, hideWhilePaused: true)
+        let prefs = NowPlayingPrefs(hideWhilePaused: true)
         #expect(prefs.visible(paused) == nil)
         #expect(prefs.visible(playing) == playing)
     }
 
     @Test func excludedAppsNeverShow() {
-        let prefs = NowPlayingPrefs(enabled: true, excluded: ["com.google.Chrome"])
+        let prefs = NowPlayingPrefs(excluded: ["com.google.Chrome"])
         #expect(prefs.visible(playing) == nil)
         var music = playing
         music.bundleID = "com.apple.Music"
@@ -318,15 +319,13 @@ struct NowPlayingVisibilityTests {
     @Test func savedPrefsAndDefaults() {
         let d = UserDefaults(suiteName: "sanduhr.tests.nowplaying.\(UUID().uuidString)")!
         #expect(NowPlayingPrefs.saved(in: d) == NowPlayingPrefs())
-        #expect(NowPlayingPrefs().enabled == false)
-        #expect(NowPlayingPrefs().deskLine == true)
         d.set(true, forKey: NowPlayingPrefs.enabledKey)
         d.set(true, forKey: NowPlayingPrefs.hidePausedKey)
         d.set(["a", "b"], forKey: NowPlayingPrefs.excludedKey)
         d.set(false, forKey: NowPlayingPrefs.deskLineKey)
         d.set(true, forKey: NowPlayingPrefs.askAppsKey)
-        #expect(NowPlayingPrefs.saved(in: d) == NowPlayingPrefs(enabled: true, hideWhilePaused: true, excluded: ["a", "b"],
-                                                                deskLine: false, askApps: true))
+        // Item 53's switch and line no longer count here (NowPlayingPlacement.upgrade reads them once).
+        #expect(NowPlayingPrefs.saved(in: d) == NowPlayingPrefs(hideWhilePaused: true, excluded: ["a", "b"], askApps: true))
     }
 
     @Test func seenAppsInOrderWithoutRepeats() {
@@ -386,10 +385,9 @@ struct NowPlayingTextTests {
 
 @Suite("Now playing on the Desk")
 struct DeskNowPlayingTests {
-    @Test func theLineSitsUnderTheMetersElseTheClaudeLine() {
-        #expect(DeskNowPlaying.host(placed: ["meters", "claude", "clock"]) == "meters")
-        #expect(DeskNowPlaying.host(placed: ["claude", "clock"]) == "claude")
-        #expect(DeskNowPlaying.host(placed: ["clock", "message"]) == nil)
+    @Test func theGapIsTheColumnSpacingAndThePadding() {
+        #expect(DeskNowPlaying.columnSpacing + DeskNowPlaying.padding == DeskNowPlaying.gap)
+        #expect(DeskNowPlaying.gap > DeskHitTest.slack(.meters).height + DeskHitTest.slack(.nowPlaying).height)
     }
 
     @Test func theStripNeedsEverySwitch() {
@@ -447,10 +445,132 @@ struct DeskNowPlayingTests {
 struct NowPlayingDebugTests {
     @Test func flagsOnlyNeverWhatPlays() {
         var s = DebugStateInput()
-        s.nowPlaying = NowPlayingDebug(enabled: true, source: .adapter, state: .playing)
+        s.nowPlaying = NowPlayingDebug(enabled: true, placed: [.wingRight, .desk], source: .adapter, state: .playing)
         let yaml = YAMLEmitter.emit(DebugState.yaml(s))
-        #expect(yaml.contains("camera_light: false\nnow_playing:\n  enabled: true\n  source: adapter\n  state: playing\nwidget_visible:"))
+        #expect(yaml.contains("camera_light: false\nnow_playing:\n  enabled: true\n  placed:\n    - wing_right\n    - desk\n  source: adapter\n  state: playing\nwidget_visible:"))
         let off = YAMLEmitter.emit(DebugState.yaml(DebugStateInput()))
-        #expect(off.contains("now_playing:\n  enabled: false\n  source: \"off\"\n  state: none\n"))
+        #expect(off.contains("now_playing:\n  enabled: false\n  placed: []\n  source: \"off\"\n  state: none\n"))
+    }
+}
+
+@Suite("Now playing placement")
+struct NowPlayingPlacementTests {
+    typealias P = NowPlayingPlacement
+
+    @Test func placedNowhereByDefault() {
+        #expect(P.places(P.Input()).isEmpty)
+        #expect(P.saved(in: MemoryDefaults()).isEmpty)
+        #expect(!DeskLayout.placed(DeskLayout.standard).contains(P.widget))
+    }
+
+    @Test func eachPlaceCounts() {
+        var i = P.Input()
+        i.notch = true
+        i.left = .nowPlaying
+        #expect(P.places(i) == [.wingLeft])
+        i.right = .nowPlaying
+        #expect(P.places(i) == [.wingLeft, .wingRight])
+        i.chinText = true
+        i.strip = .nowPlaying
+        #expect(P.places(i) == [.wingLeft, .wingRight, .strip])
+        i.layout = "clock:bl meters:bl nowPlaying:bl"
+        #expect(P.places(i) == [.wingLeft, .wingRight, .strip, .desk])
+    }
+
+    @Test func aChoiceThatCannotShowDoesNotCount() {
+        var i = P.Input()
+        i.left = .nowPlaying
+        i.chinText = true
+        i.strip = .nowPlaying
+        // The island off: the wings and the strip are not drawn.
+        #expect(P.places(i).isEmpty)
+        i.notch = true
+        i.wingText = false
+        i.chin = 0
+        #expect(P.places(i).isEmpty)
+        // A corner the Desk does not know.
+        i.layout = "nowPlaying:xx"
+        #expect(P.places(i).isEmpty)
+    }
+
+    @Test func placementImpliesRunningWithDesk() {
+        #expect(P.isRunning(deskRunning: true, places: [.desk]))
+        #expect(P.isRunning(deskRunning: true, places: [.wingRight]))
+        #expect(!P.isRunning(deskRunning: true, places: []))
+        #expect(!P.isRunning(deskRunning: false, places: [.wingLeft, .desk]))
+    }
+
+    @Test func savedSettings() {
+        let d = MemoryDefaults()
+        d.set(true, forKey: DeskController.notchKey)
+        d.set("nowPlaying", forKey: NotchContent.Place.right.key)
+        d.set("message:tl nowPlaying:br", forKey: "layout")
+        #expect(P.saved(in: d) == [.wingRight, .desk])
+        d.set(false, forKey: "notchText")
+        #expect(P.saved(in: d) == [.desk])
+        // Item 53's switch on its own places nothing.
+        let old = MemoryDefaults()
+        old.set(true, forKey: NowPlayingPrefs.enabledKey)
+        #expect(P.saved(in: old).isEmpty)
+    }
+
+    @Test func upgradePlacesTheLineWhereItWas() {
+        // Under the meters, in their corner, the rest of the layout untouched.
+        #expect(P.upgradedLayout("meetings:bl meters:bl message:tl", enabled: true, deskLine: true, showClaude: true)
+                == "meetings:bl meters:bl nowPlaying:bl message:tl")
+        // Meters off the desktop: under the Claude line.
+        #expect(P.upgradedLayout(DeskLayout.standard, enabled: true, deskLine: true, showClaude: true)
+                == "message:tl clock:bl claude:bl nowPlaying:bl meetings:bl")
+        #expect(P.upgradedLayout("claude:tr meters:br", enabled: true, deskLine: true, showClaude: true)
+                == "claude:tr meters:br nowPlaying:br")
+    }
+
+    @Test func upgradeLeavesTheLayoutAlone() {
+        let layout = "clock:bl meters:bl"
+        #expect(P.upgradedLayout(layout, enabled: false, deskLine: true, showClaude: true) == nil)
+        #expect(P.upgradedLayout(layout, enabled: true, deskLine: false, showClaude: true) == nil)
+        #expect(P.upgradedLayout("clock:bl meters:bl nowPlaying:tr", enabled: true, deskLine: true, showClaude: true) == nil)
+        // Nothing for the line to sit under: it never showed.
+        #expect(P.upgradedLayout("clock:bl message:tl", enabled: true, deskLine: true, showClaude: true) == nil)
+        #expect(P.upgradedLayout(layout, enabled: true, deskLine: true, showClaude: false) == nil)
+    }
+
+    @Test func upgradeRunsOnce() {
+        let d = MemoryDefaults()
+        d.set(true, forKey: NowPlayingPrefs.enabledKey)
+        d.set("clock:bl meters:bl", forKey: "layout")
+        P.upgrade(d)
+        #expect(d.values["layout"] as? String == "clock:bl meters:bl nowPlaying:bl")
+        #expect(d.bool(forKey: P.upgradedKey))
+        // Moved to Hidden afterwards: the old switch does not bring it back.
+        d.set("clock:bl meters:bl", forKey: "layout")
+        P.upgrade(d)
+        #expect(d.values["layout"] as? String == "clock:bl meters:bl")
+    }
+
+    @Test func upgradeWithNoSavedLayoutUsesTheStandardOne() {
+        let d = MemoryDefaults()
+        d.set(true, forKey: NowPlayingPrefs.enabledKey)
+        P.upgrade(d)
+        #expect(d.values["layout"] as? String == "message:tl clock:bl claude:bl nowPlaying:bl meetings:bl")
+        // A fresh install: nothing saved, nothing placed, only the flag.
+        let fresh = MemoryDefaults()
+        P.upgrade(fresh)
+        #expect(fresh.values.keys.sorted() == [P.upgradedKey])
+    }
+
+    @Test func theLayoutPickerKnowsTheElement() {
+        #expect(DeskLayout.widgets.contains { $0.key == P.widget && $0.name == "Now playing" })
+        #expect(DeskLayout.placing(P.widget, in: "bl", layout: "meetings:bl meters:bl")
+                == "meters:bl nowPlaying:bl meetings:bl")
+        #expect(DeskLayout.placing(P.widget, in: "", layout: "meters:bl nowPlaying:bl") == "meters:bl")
+    }
+
+    @Test func theDeskElementNeedsThePlacementAndATrack() {
+        var input = DeskElements.Input()
+        input.placed = DeskLayout.placed("meters:bl nowPlaying:bl")
+        input.nowPlayingLine = input.placed.contains(P.widget)
+        input.nowPlayingFrame = CGRect(x: 52, y: 820, width: 360, height: 30)
+        #expect(DeskElements.build(input).contains { $0.kind == .nowPlaying && $0.key == "desk" })
     }
 }

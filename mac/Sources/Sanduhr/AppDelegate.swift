@@ -116,6 +116,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Desk: the desktop layer and the notch, when switched on (Settings, General, Surfaces).
         DeskMigration.run()
+        // Item 53's Now Playing switch becomes a place in the Desk layout, once (item 53b).
+        NowPlayingPlacement.upgrade(UserDefaults.desk)
         DeskController.shared.apply()
         // The camera light watches the cameras while its switch is on, with or without Desk.
         CameraLightController.shared.apply()

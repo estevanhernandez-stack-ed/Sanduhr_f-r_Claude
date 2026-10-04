@@ -27,7 +27,7 @@ struct DeskLayoutSection: View {
                         ForEach(Self.slots, id: \.key) { Text($0.name).tag($0.key) }
                     }
                 }
-                Text("Pieces in the same corner stack in this order. The top and bottom of a side share a column, so they never overlap.")
+                Text("Pieces in the same corner stack in this order. The top and bottom of a side share a column, so they never overlap. Now playing shows only while something plays; its other settings are in Now Playing.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Margins") {
@@ -48,14 +48,15 @@ struct DeskLayoutSection: View {
 }
 
 /// The layout string the Layout section edits ("message:tl clock:bl claude:bl meetings:bl"), kept
-/// apart from the view so it tests without AppKit. DeskView reads the same string.
+/// apart from the view so it tests without AppKit. DeskView reads the same string. Now playing
+/// (item 53b) is an element like the others, off unless placed.
 enum DeskLayout {
     /// The layout DeskView draws when none is saved.
     static let standard = "message:tl clock:bl claude:bl meetings:bl"
 
     static let widgets: [(key: String, name: String)] = [
         ("message", "Message"), ("clock", "Clock and date"), ("claude", "Claude line"),
-        ("meters", "Claude meters (bars)"), ("meetings", "Meetings"),
+        ("meters", "Claude meters (bars)"), ("nowPlaying", "Now playing"), ("meetings", "Meetings"),
     ]
 
     /// Widget to slot. Words without exactly one colon are skipped; a repeated widget keeps its last slot.

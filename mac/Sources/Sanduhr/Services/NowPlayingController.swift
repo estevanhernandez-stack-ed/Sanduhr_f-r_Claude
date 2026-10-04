@@ -32,7 +32,9 @@ enum MediaRemoteControl {
 }
 
 /// Now playing (item 53): reads what plays on the Mac and hands it to the notch and the Desk.
-/// Off by default (Settings, Desk, Now Playing), and it runs only while Desk does. When on:
+/// It has no switch (item 53b): it runs while it is placed somewhere (a notch wing or the strip in
+/// Settings, Notch, or the element in Settings, Layout) and Desk is on (NowPlayingPlacement).
+/// Placed nowhere by default. While it runs:
 ///
 /// 1. `test`: the bundled mediaremote-adapter's self-check, once at start and after each wake,
 ///    through `/usr/bin/perl` (MediaRemote answers Apple-signed hosts only).
@@ -61,8 +63,10 @@ final class NowPlayingController {
     private(set) var adapterFailed = false
     /// Apps seen playing since launch (bundle ids), for Settings' app list. Memory only.
     private(set) var seenApps: [String] = []
-    /// Running: switched on and Desk running.
+    /// Running: placed somewhere and Desk running.
     private(set) var active = false
+    /// Where it is placed, as last read from the settings (Settings' status, state.yaml `placed`).
+    private(set) var placed: [NowPlayingPlacement.Place] = []
 
     @ObservationIgnored private var tracker = NowPlayingTracker()
     @ObservationIgnored private var supervisor = NowPlayingSupervisor()
@@ -82,11 +86,14 @@ final class NowPlayingController {
 
     // MARK: Switching
 
-    /// At launch, when Desk starts or stops, and when the switch flips: runs only while both are on.
+    /// At launch, when Desk starts or stops, and when a placement changes: runs only while it is
+    /// placed somewhere and Desk is on.
     func apply() {
         observeOnce()
         prefs = NowPlayingPrefs.saved(in: .desk)
-        let wanted = prefs.enabled && DeskController.shared.running
+        let places = NowPlayingPlacement.saved(in: UserDefaults.desk)
+        if places != placed { placed = places }
+        let wanted = NowPlayingPlacement.isRunning(deskRunning: DeskController.shared.running, places: places)
         if wanted, !active { start() }
         if !wanted, active { stop() }
         publish()
@@ -136,17 +143,19 @@ final class NowPlayingController {
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { [weak self] _ in self?.restartAfterWake() }
-        // Hide while paused, excluded apps, the AppleScript switch: Settings writes defaults.
+        // Placements, hide while paused, excluded apps, the AppleScript switch: Settings writes
+        // defaults.
         NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification, object: nil, queue: .main
         ) { [weak self] _ in self?.prefsChanged() }
     }
 
     private func prefsChanged() {
+        let places = NowPlayingPlacement.saved(in: UserDefaults.desk)
+        if places != placed { apply(); return }
         let old = prefs
         let new = NowPlayingPrefs.saved(in: .desk)
         guard new != old else { return }
-        if new.enabled != old.enabled { apply(); return }
         prefs = new
         if new.askApps, !old.askApps, active, source == .fallback { askApps() }
         publish()
@@ -391,8 +400,6 @@ final class NowPlayingController {
         if v != visible { visible = v }
         let model = DeskController.shared.model
         if model.nowPlaying != v { model.nowPlaying = v }
-        let line = prefs.deskLine && v != nil
-        if model.nowPlayingDeskLine != line { model.nowPlayingDeskLine = line }
     }
 
     // MARK: Controls

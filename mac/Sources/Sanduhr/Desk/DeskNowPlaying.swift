@@ -3,14 +3,6 @@ import AppKit
 
 /// Where now playing (item 53) shows on the Desk, decided from the same settings DeskView reads.
 enum DeskNowPlaying {
-    /// The widget the Desk's now playing line sits under: the meters, else the claude line when
-    /// the meters are not on the desktop, else none (no line).
-    static func host(placed: Set<String>) -> String? {
-        if placed.contains("meters") { return "meters" }
-        if placed.contains("claude") { return "claude" }
-        return nil
-    }
-
     /// True when the strip under the camera shows now playing text (NotchView): the island on,
     /// a notch, a strip, its text on, its choice Now playing, and a track to show.
     static func stripShows(notch: Bool, hasNotch: Bool, chin: Double, chinText: Bool,
@@ -18,9 +10,13 @@ enum DeskNowPlaying {
         notch && hasNotch && chin > 0 && chinText && strip == .nowPlaying && hasTrack
     }
 
-    /// Room between the meters and the line, so their click areas never meet (DeskFrameCheck):
-    /// more than the meters' 6 and the line's 4 points of slack.
+    /// Room between the line and its neighbours in a corner, so their click areas never meet
+    /// (DeskFrameCheck): more than the meters' 6 and the line's 4 points of slack.
     static let gap: CGFloat = 14
+    /// The spacing DeskView puts between the pieces in a column.
+    static let columnSpacing: CGFloat = 10
+    /// The padding above and below the line that makes up the gap.
+    static var padding: CGFloat { gap - columnSpacing }
 }
 
 /// The Desk's now playing line: "▶ Title · Artist" over a thin position bar, in the Desk ink.
