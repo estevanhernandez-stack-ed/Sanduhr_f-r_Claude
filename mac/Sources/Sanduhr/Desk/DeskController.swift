@@ -570,19 +570,6 @@ final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
     @MainActor @preconcurrency required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-    // TEMPORARY click probe (not for commit).
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        let v = super.hitTest(point)
-        if let e = NSApp.currentEvent, e.type == .leftMouseDown {
-            let l = convert(point, from: superview)
-            ProbeLog.logger.notice("wings hitTest local=(\(Int(l.x), privacy: .public),\(Int(l.y), privacy: .public)) bounds=\(Int(self.bounds.width), privacy: .public)x\(Int(self.bounds.height), privacy: .public) hit=\(v.map { String(describing: type(of: $0)) } ?? "nil", privacy: .public)")
-        }
-        return v
-    }
-    override func mouseDown(with event: NSEvent) {
-        ProbeLog.logger.notice("wings mouseDown at \(Int(event.locationInWindow.x), privacy: .public),\(Int(event.locationInWindow.y), privacy: .public)")
-        super.mouseDown(with: event)
-    }
 }
 
 /// Opens a join link in the meeting's own app when it is installed (Teams, Zoom), so there is
@@ -611,7 +598,3 @@ enum MeetingOpener {
         NSWorkspace.shared.open(link)
     }
 }
-
-// TEMPORARY click probe (not for commit).
-import os
-enum ProbeLog { static let logger = Logger(subsystem: "com.626labs.sanduhr", category: "probe") }

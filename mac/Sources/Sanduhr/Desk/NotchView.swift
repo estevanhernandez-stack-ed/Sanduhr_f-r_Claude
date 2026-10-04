@@ -170,10 +170,13 @@ struct NotchWingsView: View {
                         }
                     }
                     .frame(width: notchWidth + wingL + wingR, height: barHeight)
-                    .offset(x: (wingR - wingL) / 2)
                     .contentShape(Rectangle())
                     .onTapGesture { DeskController.shared.showSettings() }
                     .help("Sanduhr Settings")
+                    // Last, so the island's click area moves with its drawing: an offset before
+                    // contentShape left the click area at the unshifted place, so the far end of
+                    // the wider wing (a paused Next button) drew where nothing took the click.
+                    .offset(x: (wingR - wingL) / 2)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
             }
@@ -201,6 +204,10 @@ struct NotchWingsView: View {
         let state = model.nowPlaying?.state
         let side = NowPlayingWingLayout.nextSide(place, state: state)
         let room = NowPlayingWingLayout.textRoom(place, width: width, state: state, size: size)
+        let parts = NowPlayingText.splitGlyph(text)
+        let glyphGap = size * 0.3
+        let glyphWidth = parts.glyph.map { Self.textWidth($0, size, font) + glyphGap } ?? 0
+        let titleRoom = max(0, room - glyphWidth)
         return HStack(spacing: 0) {
             if side == .leading {
                 nextButton(size)
@@ -208,10 +215,16 @@ struct NotchWingsView: View {
             } else if place == .left {
                 Spacer(minLength: 0)
             }
-            ScrollOnceText(text: text, trackKey: NowPlayingScroll.trackKey(model.nowPlaying),
-                           scrolls: NowPlayingScroll.scrolls(model.nowPlaying),
-                           textWidth: Self.textWidth(text, size, font), room: room,
-                           font: .custom(font, size: size))
+            // The play-state glyph stays put at the wing's inner end; only the title scrolls.
+            HStack(spacing: glyphGap) {
+                if let glyph = parts.glyph {
+                    Text(glyph).font(.custom(font, size: size)).fixedSize()
+                }
+                ScrollOnceText(text: parts.rest, trackKey: NowPlayingScroll.trackKey(model.nowPlaying),
+                               scrolls: NowPlayingScroll.scrolls(model.nowPlaying),
+                               textWidth: Self.textWidth(parts.rest, size, font), room: titleRoom,
+                               font: .custom(font, size: size))
+            }
                 .foregroundStyle(LinearGradient.ink(textColor))
                 .opacity(0.88)
                 .frame(maxHeight: .infinity)
@@ -228,6 +241,11 @@ struct NotchWingsView: View {
         }
         .frame(width: max(0, width - NowPlayingWingLayout.wingInsets))
         .padding(place == .left ? .leading : .trailing, NowPlayingWingLayout.outerInset)
+        // The whole wing is now playing's: a click in the gaps beside the title or Next lands here
+        // and does nothing, instead of reaching the island's tap that opens Settings.
+        .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
+        .contentShape(Rectangle())
+        .onTapGesture {}
         .contextMenu { NowPlayingMenuItems() }
     }
 

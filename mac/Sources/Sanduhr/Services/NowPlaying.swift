@@ -323,6 +323,15 @@ enum NowPlayingText {
         return "\(glyph) \(title) · \(artist)"
     }
 
+    /// A line split into its play-state glyph and the rest, so a wing can keep the glyph still
+    /// while the title scrolls. A line without a leading glyph comes back whole.
+    static func splitGlyph(_ line: String) -> (glyph: String?, rest: String) {
+        for g in [playingGlyph, pausedGlyph] where line.hasPrefix(g + " ") {
+            return (g, String(line.dropFirst(g.count + 1)))
+        }
+        return (nil, line)
+    }
+
     /// The Desk line: the same text (the view truncates to its width).
     static func desk(_ info: NowPlayingInfo?) -> String? {
         line(info, at: .strip)
