@@ -2,7 +2,9 @@
 
 Named Claude accounts on the Mac, ported from Windows 2.2 (`AccountStore`, `UsageHistory`,
 `SnapshotContract.AccountRef`, `WidgetViewModel.SwitchAccount`). One account is active and only
-it is fetched (decided 2026-10-03). The all-accounts chart and CSV export are item 37, later.
+it is shown and fetched on the normal cadence (decided 2026-10-03). With following on, the other
+accounts get a slow usage check too (below). The all-accounts chart and CSV export are item 37,
+later.
 
 ## What an account is
 
@@ -48,6 +50,38 @@ From the widget's account chip, the Accounts menu or Settings, Accounts. A switc
 
 A switch never needs a relaunch. Desk and the notch follow the active account.
 
+## Following the account in use
+
+A setting, **Follow the account I'm using** (Settings, Accounts), **off by default** for new
+installs and upgrades (decided 2026-10-03). It only appears with two or more accounts. When on,
+Sanduhr switches to the account you are using, automatically, by watching the session meters.
+
+- **Slow checks of the others.** Every 15 minutes, each signed-in inactive account gets one
+  usage request through its own client (the org id cached per account; no `/organizations`
+  call after the first). The active account keeps its 5-minute cadence. A failed check is
+  ignored, never shown, and an auth error just skips that account until its key is saved again.
+- **What counts as use.** An account is *in use* when its five-hour session utilization rose
+  since its previous check (any rise; a reset to a lower value is not use). The active
+  account's rise is read from its normal fetches over the same 15-minute window.
+- **When it switches.** Only on a clear signal: an inactive account was in use in the latest
+  check *and* the active account was not in use over that window. Then it switches, through the
+  same path as a manual switch.
+- **When it doesn't.**
+  - Both in use: no switch. The menu marks the other one ("Work · in use"), and the chip shows
+    a small dot for it.
+  - At most one automatic switch per 30 minutes.
+  - A manual switch (chip, menu, Settings) pauses following for 3 hours, or until the account
+    you picked has been idle for 30 minutes, whichever comes first.
+  - Never while signed out, while a switch is already running, or with fewer than two
+    signed-in accounts.
+- **It says why.** After an automatic switch the chip and the Desk's claude line read
+  "Work (in use)" for a minute, then the plain label. No notification.
+- **Pure and tested.** The decision is a pure function of the per-account check history, the
+  last automatic switch, the pause and the clock (`AccountFollow.decide`), so every rule above
+  is a unit test. The scheduling shell stays thin.
+- **Later, not in 2.4.0:** reading which account Claude Code on this Mac is logged into, as a
+  second signal with no request.
+
 ## Sign Out and Remove are different
 
 Windows' account-scoped sign-out removes the account. The Mac keeps item 32's promise instead
@@ -84,7 +118,8 @@ Windows' account-scoped sign-out removes the account. The Mac keeps item 32's pr
 ## Debug hooks
 
 `sanduhr://debug/action?name=account&arg=next` cycles the active account (safe: nothing is
-deleted). No hook adds, renames, signs out or removes an account.
+deleted). No hook adds, renames, signs out or removes an account. `state.yaml` adds `follow`
+(on or off) and `follow_paused` so a scenario can check the setting, never labels.
 
 ## Testing
 
@@ -92,7 +127,9 @@ deleted). No hook adds, renames, signs out or removes an account.
   file and marker follow), remove (active moves to the next); the legacy promotion including a
   failed write; history rename on upgrade; switch clears usage and deletes the snapshot;
   `account_ref` matches the Windows hash for known labels; Sign Out keeps the account and
-  history, Remove drops both.
+  history, Remove drops both; `AccountFollow.decide` for each following rule (clear signal,
+  both in use, the 30-minute limit, the manual pause and its idle end, a reset not counting as
+  use, signed-out and single-account cases).
 - Smoke: the settings scenario expects the Accounts page; `state.yaml` keys.
 - By hand, on the file store with two keys (back up first, restore through the release app's
   file-wins migration, per the dev-build Keychain lesson).
@@ -101,8 +138,8 @@ deleted). No hook adds, renames, signs out or removes an account.
 
 One branch, one commit each: (1) registry, slots and the Personal promotion; (2) history per
 account and the per-account marker; (3) switching, the API client rebuild and `account_ref`;
-(4) Settings, Accounts, the menus and the widget chip; (5) Desk line, smoke, docs. Ships as
-2.4.0: a new capability, not a fix.
+(4) Settings, Accounts, the menus and the widget chip; (5) following the account in use;
+(6) Desk line, smoke, docs. Ships as 2.4.0: a new capability, not a fix.
 
 ## Open questions
 
