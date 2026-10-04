@@ -85,6 +85,8 @@ eq('follow off by default', [state['follow'], state['follow_paused']], [false, f
 # Item 38: the menu bar choice, Whichever is higher until changed.
 eq('menu bar follows the higher limit by default', state['menu_bar'], 'higher')
 eq('no limit hidden by default', state['hidden_limits'], [])
+# Item 39: silencing a limit from its menu shows here; the session warns only once switched on.
+eq('only the session silenced by default', state['silenced_limits'], ['five_hour'])
 app_acct = FakeApp.new
 app_acct.action('account', 'next')
 check('account next changes account_ref', app_acct.state_now['account_ref'] != state['account_ref'])

@@ -295,7 +295,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// The shared menu (SanduhrMenu) as AppKit items, for the menu bar item's menu and Desk's
     /// clock menu. The widget's own two-finger menu (RootView) renders the same groups.
-    func addMenuItems(to menu: NSMenu) {
+    /// `accounts` false leaves the Accounts submenu out, for a limit menu that already has it.
+    func addMenuItems(to menu: NSMenu, accounts withAccounts: Bool = true) {
         for (i, group) in currentMenu(widgetVisible: panel?.isVisible ?? false).enumerated() {
             if i > 0 { menu.addItem(.separator()) }
             if let header = group.header { menu.addItem(.sectionHeader(title: header)) }
@@ -308,10 +309,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 menu.addItem(m)
             }
             // The Accounts submenu sits after Show/Hide, with two or more accounts.
-            if i == 0, let accounts = currentAccountsMenu() {
+            if i == 0, withAccounts, let accounts = currentAccountsMenu() {
                 menu.addItem(.separator())
                 menu.addItem(accountsMenuItem(accounts))
             }
+        }
+    }
+
+    /// A Desk meter row's two-finger menu (LimitMenu): Accounts, Hide and the warnings item for
+    /// `tier`, Meter Settings…, then the shared menu under a separator. `tier` nil, a click beside
+    /// the rows, leaves the limit's own items out.
+    func addLimitMenuItems(to menu: NSMenu, tier: Tier?) {
+        let groups = LimitMenu.groups(tier: tier, accounts: currentAccountsMenu(), store: UserDefaults.desk)
+        for (i, group) in groups.enumerated() {
+            if i > 0 { menu.addItem(.separator()) }
+            for entry in group { menu.addItem(limitMenuItem(entry)) }
+        }
+        menu.addItem(.separator())
+        addMenuItems(to: menu, accounts: false)
+    }
+
+    private func limitMenuItem(_ entry: LimitMenuEntry) -> NSMenuItem {
+        if case .accounts(let accounts) = entry { return accountsMenuItem(accounts) }
+        let m = NSMenuItem(title: entry.title, action: #selector(limitItemChosen(_:)), keyEquivalent: "")
+        m.target = self
+        m.representedObject = LimitMenuBox(entry)
+        return m
+    }
+
+    @objc private func limitItemChosen(_ sender: NSMenuItem) {
+        if let box = sender.representedObject as? LimitMenuBox { performLimit(box.entry) }
+    }
+
+    /// What a limit menu's items do, from Desk and the widget alike: Hide and the warnings item
+    /// write the desk-suite keys Settings, Desk, Meters reads (both refresh on the change notice),
+    /// Meter Settings… opens that page.
+    func performLimit(_ entry: LimitMenuEntry) {
+        switch entry {
+        case .accounts: break
+        case .meterSettings: SettingsWindowController.shared.show(.deskMeters)
+        case .hide, .warnings: LimitMenu.apply(entry, to: UserDefaults.desk)
         }
     }
 
@@ -566,4 +603,10 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+}
+
+/// Carries a limit menu item's entry on its NSMenuItem.
+private final class LimitMenuBox: NSObject {
+    let entry: LimitMenuEntry
+    init(_ entry: LimitMenuEntry) { self.entry = entry }
 }

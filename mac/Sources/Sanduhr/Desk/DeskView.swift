@@ -145,6 +145,9 @@ struct DeskView: View {
             VStack(alignment: alignment, spacing: size * 0.6) {
                 ForEach(model.meters) { row in
                     MeterRow(row: row, ink: ink, font: font, size: size, width: timeSize * 3.2, alignment: alignment)
+                        .background(GeometryReader { geo in
+                            Color.clear.preference(key: MeterRowFramesKey.self, value: [row.tier: geo.frame(in: .global)])
+                        })
                         .deskPulse(model.pulses[row.tier] ?? 0, ink: ink, size: size)
                 }
                 if model.signInNeeded {
@@ -162,7 +165,7 @@ struct DeskView: View {
             .font(.custom(font, size: size))
             .opacity(model.claudeLineIsStale ? 0.5 : 1)
             // Clickable like a meeting row: the click itself is handled in DeskController, which
-            // shows the widget beside the meters.
+            // shows the widget beside the meters; a two-finger click opens the row's limit menu.
             .contentShape(Rectangle())
             .onHover { inside in
                 if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
@@ -173,7 +176,13 @@ struct DeskView: View {
             .onPreferenceChange(MetersFrameKey.self) { frame in
                 model.metersFrame = frame
             }
-            .onDisappear { model.metersFrame = .zero }
+            .onPreferenceChange(MeterRowFramesKey.self) { frames in
+                model.meterRowFrames = frames
+            }
+            .onDisappear {
+                model.metersFrame = .zero
+                model.meterRowFrames = [:]
+            }
         }
     }
 
@@ -450,6 +459,13 @@ private struct MetersFrameKey: PreferenceKey {
 private struct MeetingsFrameKey: PreferenceKey {
     static let defaultValue: CGRect = .zero
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
+}
+
+private struct MeterRowFramesKey: PreferenceKey {
+    static let defaultValue: [Tier: CGRect] = [:]
+    static func reduce(value: inout [Tier: CGRect], nextValue: () -> [Tier: CGRect]) {
+        value.merge(nextValue()) { _, new in new }
+    }
 }
 
 private struct AccountFrameKey: PreferenceKey {

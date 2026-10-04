@@ -65,6 +65,7 @@ struct RootView: View {
                                     warning: vm.warningTiers.contains(row.tier),
                                     sparklineMode: SparklineView.mode(themeID: vm.theme.id)
                                 )
+                                .modifier(LimitContextMenu(tier: row.tier, vm: vm))
                             }
                             if let extra = vm.usage?.extraUsage, extra.isEnabled, !vm.compact {
                                 ExtraUsageCard(extra: extra, palette: t)
@@ -152,20 +153,7 @@ struct RootView: View {
             // The same items, in the same order, as the menu bar item's menu and Desk's clock
             // menu (SanduhrMenu). The widget shows while its menu is open.
             if let app = NSApp.delegate as? AppDelegate {
-                let groups = app.currentMenu(widgetVisible: true)
-                ForEach(groups.indices, id: \.self) { i in
-                    if i > 0 { Divider() }
-                    if let header = groups[i].header {
-                        Section(header) { menuRows(groups[i].entries, app) }
-                    } else {
-                        menuRows(groups[i].entries, app)
-                    }
-                    // The Accounts submenu after Show/Hide, as AppDelegate.addMenuItems puts it.
-                    if i == 0, let accounts = app.currentAccountsMenu() {
-                        Divider()
-                        AccountsSubmenu(accounts: accounts, vm: vm, onManage: app.manageAccounts)
-                    }
-                }
+                SanduhrMenuItems(app: app, vm: vm)
             }
         }
         .sheet(isPresented: $showOnboarding) {
@@ -179,27 +167,6 @@ struct RootView: View {
             // items) — safe to call on every view appearance.
             if !KeychainStore.exists(account: KeychainAccount.sessionKey) {
                 showOnboarding = true
-            }
-        }
-    }
-
-    /// One menu row: a checkmark toggle for a tool, a plain button otherwise.
-    @ViewBuilder
-    private func menuRows(_ entries: [MenuEntry], _ app: AppDelegate) -> some View {
-        ForEach(entries, id: \.command) { entry in
-            let row = Group {
-                if [.deepWork, .pacing, .snake, .cameraLight].contains(entry.command) {
-                    Toggle(entry.title, isOn: Binding(
-                        get: { entry.checked },
-                        set: { _ in withAnimation { app.perform(entry.command) } }))
-                } else {
-                    Button(entry.title) { app.perform(entry.command) }
-                }
-            }
-            if let key = entry.key.first {
-                row.keyboardShortcut(KeyEquivalent(key), modifiers: .command)
-            } else {
-                row
             }
         }
     }
@@ -252,6 +219,96 @@ struct AccountsSubmenu: View {
             }
             Divider()
             Button(AccountsMenu.manage, action: onManage)
+        }
+    }
+}
+
+/// The shared menu (SanduhrMenu) as SwiftUI items, separators between the groups, the Accounts
+/// submenu after Show/Hide as AppDelegate.addMenuItems puts it. `accounts` false leaves the
+/// submenu out, for a card's limit menu that already has it.
+struct SanduhrMenuItems: View {
+    let app: AppDelegate
+    var vm: UsageViewModel
+    var accounts = true
+
+    var body: some View {
+        let groups = app.currentMenu(widgetVisible: true)
+        ForEach(groups.indices, id: \.self) { i in
+            if i > 0 { Divider() }
+            if let header = groups[i].header {
+                Section(header) { menuRows(groups[i].entries) }
+            } else {
+                menuRows(groups[i].entries)
+            }
+            if i == 0, accounts, let menu = app.currentAccountsMenu() {
+                Divider()
+                AccountsSubmenu(accounts: menu, vm: vm, onManage: app.manageAccounts)
+            }
+        }
+    }
+
+    /// One menu row: a checkmark toggle for a tool, a plain button otherwise.
+    @ViewBuilder
+    private func menuRows(_ entries: [MenuEntry]) -> some View {
+        ForEach(entries, id: \.command) { entry in
+            let row = Group {
+                if [.deepWork, .pacing, .snake, .cameraLight].contains(entry.command) {
+                    Toggle(entry.title, isOn: Binding(
+                        get: { entry.checked },
+                        set: { _ in withAnimation { app.perform(entry.command) } }))
+                } else {
+                    Button(entry.title) { app.perform(entry.command) }
+                }
+            }
+            if let key = entry.key.first {
+                row.keyboardShortcut(KeyEquivalent(key), modifiers: .command)
+            } else {
+                row
+            }
+        }
+    }
+}
+
+/// A tier card's two-finger menu (LimitMenu), in place of the widget's own menu on the card:
+/// Accounts, Hide and the warnings item for the card's limit, Meter Settings…, then the widget's
+/// shared items under a separator, so nothing the widget menu offers is lost on a card. The
+/// warning switch is read through @AppStorage on the same key as Settings, Desk, Meters, so the
+/// menu reads the current setting whichever side changed it.
+struct LimitContextMenu: ViewModifier {
+    let tier: Tier
+    var vm: UsageViewModel
+    @AppStorage private var warningsOn: Bool
+
+    init(tier: Tier, vm: UsageViewModel) {
+        self.tier = tier
+        self.vm = vm
+        _warningsOn = AppStorage(wrappedValue: MeterWarningSettings.standard(for: tier).enabled,
+                                 MeterWarningSettings.onKey(tier), store: .desk)
+    }
+
+    func body(content: Content) -> some View {
+        content.contextMenu {
+            if let app = NSApp.delegate as? AppDelegate {
+                let groups = LimitMenu.groups(tier: tier, accounts: app.currentAccountsMenu(),
+                                              hidden: vm.hiddenTiers, warningsOn: warningsOn)
+                ForEach(groups.indices, id: \.self) { i in
+                    if i > 0 { Divider() }
+                    ForEach(groups[i].indices, id: \.self) { j in
+                        entryView(groups[i][j], app: app)
+                    }
+                }
+                Divider()
+                SanduhrMenuItems(app: app, vm: vm, accounts: false)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func entryView(_ entry: LimitMenuEntry, app: AppDelegate) -> some View {
+        if case .accounts(let accounts) = entry {
+            AccountsSubmenu(accounts: accounts, vm: vm, onManage: app.manageAccounts)
+        } else {
+            Button(entry.title) { app.performLimit(entry) }
         }
     }
 }

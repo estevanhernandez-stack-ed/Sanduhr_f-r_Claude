@@ -79,6 +79,8 @@ final class DeskModel {
     /// Where the meters sit in the window, same coordinates, or .zero when they are not drawn.
     /// The meters take clicks here; a click shows the widget beside them.
     @ObservationIgnored var metersFrame: CGRect = .zero
+    /// Each meter row's frame, same coordinates: a two-finger click opens that limit's menu.
+    @ObservationIgnored var meterRowFrames: [Tier: CGRect] = [:]
     /// Where the calendar note sits, same coordinates, or .zero when it is not drawn. A click
     /// here opens System Settings at Privacy & Security, Calendars.
     @ObservationIgnored var noteFrame: CGRect = .zero

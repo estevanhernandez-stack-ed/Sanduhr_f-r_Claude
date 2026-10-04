@@ -192,6 +192,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         if let g = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown], handler: { [weak self] _ in
             // Another app's window over the clock means the click was meant for that app.
             guard let self, !Self.appWindowCoversPointer() else { return }
+            // A control-click is a two-finger click; whichever app took it shows its own menu.
+            guard !NSEvent.modifierFlags.contains(.control) else { return }
             _ = self.clickUnderPointer()
         }) {
             mouseMonitors.append(g)
@@ -199,10 +201,38 @@ final class DeskController: NSObject, NSMenuDelegate {
         if let l = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown], handler: { [weak self] event in
             // Same process as the widget and its settings: only clicks on the desk layer count.
             guard let self, event.window == nil || event.window === self.window else { return event }
+            // Control-click is a two-finger click.
+            if event.modifierFlags.contains(.control) { return self.limitMenuUnderPointer(event) ? nil : event }
             return self.clickUnderPointer() ? nil : event
         }) {
             mouseMonitors.append(l)
         }
+        // Two-finger clicks: on the meters, the limit menu. Only clicks that reach Desk itself: the
+        // window takes the mouse while the pointer is over the meters, and a click that went to
+        // another app (the Finder's desktop) already opened that app's menu.
+        if let l = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown], handler: { [weak self] event in
+            guard let self, event.window == nil || event.window === self.window else { return event }
+            return self.limitMenuUnderPointer(event) ? nil : event
+        }) {
+            mouseMonitors.append(l)
+        }
+    }
+
+    /// The meter row under the pointer, with the same slack as the rows' clicks; nil beside them.
+    private func meterRowUnderPointer(_ point: CGPoint) -> Tier? {
+        model.meters.first { model.meterRowFrames[$0.tier]?.insetBy(dx: -8, dy: -4).contains(point) ?? false }?.tier
+    }
+
+    /// A two-finger click on the meters opens the limit menu for the row under the pointer
+    /// (LimitMenu): Accounts, Hide, the warnings item, Meter Settings…, then the shared menu.
+    private func limitMenuUnderPointer(_ event: NSEvent) -> Bool {
+        guard let view = window?.contentView, let point = pointerInWindow(), pointerOverMeters(point) else { return false }
+        let tier = meterRowUnderPointer(point)
+        let menu = NSMenu()
+        // Event monitors run on the main thread.
+        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.addLimitMenuItems(to: menu, tier: tier) }
+        NSMenu.popUpContextMenu(menu, with: event, for: view)
+        return true
     }
 
     /// Pointer position in the window's SwiftUI coordinates (top-left origin).

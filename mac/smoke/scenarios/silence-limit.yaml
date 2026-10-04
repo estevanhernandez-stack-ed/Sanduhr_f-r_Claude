@@ -1,0 +1,16 @@
+# Item 39: "Stop warnings for this limit" on a meter's two-finger menu turns off that limit's
+# "Warn when nearly full" (the same desk-suite key as Settings, Desk, Meters), and "Warn again"
+# turns it back on. The menus themselves are checked by hand (docs/mac-smoke-test.md, section 11);
+# this run writes the key they write and checks the state and Settings follow. It puts the key back.
+name: Silence a limit's warnings
+needs: [desk, credentials]
+steps:
+  - expect_state: { silenced_limits: [five_hour] }
+  - defaults: { domain: desk, key: meterWarn.seven_day.on, type: bool, value: false }
+  - expect_state: { silenced_limits: [five_hour, seven_day], meters.1.warning: false }
+  - do: settings
+    arg: deskMeters
+  - expect_state: { settings_section: deskMeters }
+  - snap: silence-limit
+  - defaults: { domain: desk, key: meterWarn.seven_day.on, type: bool, value: true }
+  - expect_state: { silenced_limits: [five_hour] }

@@ -225,3 +225,26 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   numbers come in, as with a chip click (`account_ref` changes, `follow_paused: true` with
   following on). A click on the meters still shows the widget beside them. With one account the
   line starts with "claude" and nothing on it is clickable.
+- [ ] Limit menu on Desk: two-finger click (or Control-click) the Weekly — All Models meter: an
+  Accounts submenu (two accounts, the active one checked), then "Stop warnings for this limit"
+  (no Hide), then "Meter Settings…", then the widget's usual items (Show Widget, Tools, Refresh,
+  Settings…, Quit) with no second Accounts submenu. On the Session meter the warnings item reads
+  "Warn again for this limit" (off by default). On a limit beyond those two (Weekly — Opus,
+  Weekly — Special…) "Hide Weekly — …" shows too. With one account there is no Accounts submenu.
+  A plain click on a meter still shows the widget; the Finder's own desktop menu never opens over
+  the meters.
+- [ ] Switch from the menu: pick the other account in the Accounts submenu: its numbers come in
+  (`account_ref` changes), as from the chip.
+- [ ] Silence: with Settings, Desk, Meters open beside it, choose "Stop warnings for this limit"
+  on the weekly meter: its "Warn when nearly full" switch turns off at once, and
+  `smoke/smoke state` lists `seven_day` under `silenced_limits`. Open the menu again: "Warn again
+  for this limit"; choose it: the switch is back on. Turn the switch off in Settings: the menu
+  reads "Warn again" next time. `smoke/smoke run smoke/scenarios/silence-limit.yaml` (from
+  `mac/`) writes the same key and puts it back.
+- [ ] Hide: choose "Hide Weekly — …": the row leaves the Desk and the card the widget at once, its
+  "Show this limit" turns off in Settings, and it is under `hidden_limits`. Switch it back on in
+  Settings.
+- [ ] Widget cards: two-finger click a tier card: the same items as the Desk meter, then the widget
+  menu's items. Two-finger click elsewhere on the widget (the title, the action row): the widget
+  menu as before, with its Accounts submenu. "Meter Settings…" from either opens Settings on
+  Desk, Meters.

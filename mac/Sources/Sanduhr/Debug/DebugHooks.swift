@@ -268,6 +268,7 @@ enum DebugHooks {
         vm.refreshMeterWarnings()
         s.widgetWarnings = Tier.allCases.filter(vm.warningTiers.contains)
         s.hiddenLimits = Tier.allCases.filter(vm.hiddenTiers.contains)
+        s.silencedLimits = LimitMenu.silenced(in: UserDefaults.desk)
         s.meetingsCount = desk.model.meetings.count
         s.alerts = AlertSettings(UserDefaults.standard)
         s.lastFetch = vm.lastUpdated
