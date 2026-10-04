@@ -15,6 +15,23 @@ struct DockPrefsTests {
         #expect(!p.autohide)
         #expect(p.tilesize == DockPrefs.defaultTileSize)
         #expect(p.delay == DockPrefs.defaultDelay)
+        #expect(p.timeModifier == nil)
+        #expect(p.slideDuration == 0.5)
+    }
+
+    @Test func theSlideTakesTheDocksOwnTime() {
+        func duration(_ scale: Any?) -> TimeInterval {
+            DockPrefs.read { $0 == "autohide-time-modifier" ? scale : nil }.slideDuration
+        }
+        #expect(duration(nil) == DockPrefs.defaultSlide)
+        #expect(duration(NSNumber(value: 1)) == 0.5)
+        #expect(abs(duration(NSNumber(value: 0.3)) - 0.15) < 1e-9)
+        #expect(duration(NSNumber(value: 0)) == 0)
+        #expect(duration(NSNumber(value: -1)) == DockPrefs.defaultSlide)
+        #expect(duration(NSNumber(value: 60)) == 2.5)
+        #expect(DockFollower.animation(showing: true, duration: 0) == nil)
+        #expect(DockFollower.animation(showing: true, duration: 0.15) != nil)
+        #expect(DockFollower.animation(showing: false, duration: 0.15) != nil)
     }
 
     @Test func readsSideAutohideTileSizeAndDelay() {
@@ -140,6 +157,18 @@ struct DockExtentTests {
         #expect(!DockGeometry.inTriggerZone(CGPoint(x: 900, y: 1169 - 72 - 13), size: size, side: .bottom, shownExtent: 72))
     }
 
+    @Test func theRevealEdgeIsTheVeryEdge() {
+        #expect(DockGeometry.atRevealEdge(CGPoint(x: 900, y: 1169), size: size, side: .bottom))
+        #expect(DockGeometry.atRevealEdge(CGPoint(x: 900, y: 1167.5), size: size, side: .bottom))
+        // In the trigger zone, where the list is read, but short of where the Dock reacts.
+        #expect(!DockGeometry.atRevealEdge(CGPoint(x: 900, y: 1164), size: size, side: .bottom))
+        #expect(DockGeometry.inTriggerZone(CGPoint(x: 900, y: 1164), size: size, side: .bottom, shownExtent: 0))
+        #expect(DockGeometry.atRevealEdge(CGPoint(x: 0, y: 500), size: size, side: .left))
+        #expect(DockGeometry.atRevealEdge(CGPoint(x: 1800, y: 500), size: size, side: .right))
+        #expect(!DockGeometry.atRevealEdge(CGPoint(x: 1800, y: 500), size: size, side: .left))
+        #expect(!DockGeometry.atRevealEdge(CGPoint(x: 2400, y: 1169), size: size, side: .bottom))
+    }
+
     @Test func aPointerOnAnotherScreenIsNeverInTheZone() {
         #expect(!DockGeometry.inTriggerZone(CGPoint(x: 2400, y: 1168), size: size, side: .bottom, shownExtent: 0))
         #expect(!DockGeometry.inTriggerZone(CGPoint(x: 900, y: 1300), size: size, side: .bottom, shownExtent: 0))
@@ -234,6 +263,72 @@ struct DockSlideTests {
         #expect(s == DockSlide())
     }
 
+    let t0 = Date(timeIntervalSinceReferenceDate: 1000)
+
+    @Test func anticipatedSlideShowsBeforeTheListAndAReadingConfirmsIt() {
+        var s = DockSlide()
+        let slid = s.anticipate(73, now: t0)
+        #expect(slid)
+        #expect(s.phase == .showing && s.inset == 73 && s.unconfirmed)
+        // The list has not caught up yet: nothing changes.
+        let early = s.observe(nil, now: t0.addingTimeInterval(0.1))
+        #expect(!early)
+        #expect(s.phase == .showing)
+        s.settle()
+        let confirmed = s.observe(73, now: t0.addingTimeInterval(0.2))
+        #expect(!confirmed)
+        #expect(s.phase == .shown && !s.unconfirmed)
+        // Confirmed: the next reading without the Dock slides back at once.
+        let gone = s.observe(nil, now: t0.addingTimeInterval(0.3))
+        #expect(gone)
+        #expect(s.phase == .hiding && s.inset == 0)
+    }
+
+    @Test func anUnconfirmedSlideGoesBack() {
+        var s = DockSlide()
+        s.anticipate(73, now: t0)
+        s.settle()
+        let waiting = s.observe(nil, now: t0.addingTimeInterval(DockSlide.confirmWithin - 0.05))
+        #expect(!waiting)
+        #expect(s.phase == .shown)
+        let back = s.observe(nil, now: t0.addingTimeInterval(DockSlide.confirmWithin))
+        #expect(back)
+        #expect(s.phase == .hiding && s.inset == 0 && !s.unconfirmed)
+    }
+
+    @Test func onlyARestingDockAnticipates() {
+        var s = DockSlide()
+        let none = s.anticipate(0, now: t0)
+        #expect(!none)
+        s.observe(72)
+        let alreadyUp = s.anticipate(73, now: t0)
+        #expect(!alreadyUp)
+        #expect(s.inset == 72 && !s.unconfirmed)
+        s.pointerLeft()
+        let dropping = s.anticipate(73, now: t0)
+        #expect(dropping)
+        #expect(s.phase == .showing)
+    }
+
+    @Test func thePointerLeavingSlidesBack() {
+        var s = DockSlide()
+        s.anticipate(73, now: t0)
+        let left = s.pointerLeft()
+        #expect(left)
+        #expect(s.phase == .hiding && !s.unconfirmed)
+        let again = s.pointerLeft()
+        #expect(!again)
+        // The Dock is still on screen while it drops: a reading away from its zone does not
+        // bring the Desk back up.
+        let stillDropping = s.observe(73, canShow: false, now: t0.addingTimeInterval(0.1))
+        #expect(!stillDropping)
+        #expect(s.phase == .hiding)
+        s.settle()
+        let stillAway = s.observe(73, canShow: false)
+        #expect(!stillAway)
+        #expect(s.phase == .hidden)
+    }
+
     @Test func framesStayValidThroughTheSlide() {
         // A bottom-left stack (meters over the meeting list) moved up by the slide, at rest,
         // midway and clear of the Dock: DeskFrameCheck holds at every step.
@@ -251,8 +346,75 @@ struct DockSlideTests {
     }
 }
 
+@Suite("Dock dwell")
+struct DockDwellTests {
+    let t0 = Date(timeIntervalSinceReferenceDate: 1000)
+
+    @Test func dueAfterTheDocksDelay() {
+        var d = DockDwell()
+        #expect(!d.due(delay: 0.5, now: t0))
+        d.update(atEdge: true, now: t0)
+        d.update(atEdge: true, now: t0.addingTimeInterval(0.3))
+        #expect(!d.due(delay: 0.5, now: t0.addingTimeInterval(0.45)))
+        #expect(d.due(delay: 0.5, now: t0.addingTimeInterval(0.5)))
+    }
+
+    @Test func aZeroDelayIsDueAtOnce() {
+        var d = DockDwell()
+        d.update(atEdge: true, now: t0)
+        #expect(d.due(delay: 0, now: t0))
+    }
+
+    @Test func oneSlidePerVisit() {
+        var d = DockDwell()
+        d.update(atEdge: true, now: t0)
+        d.spend()
+        #expect(!d.due(delay: 0, now: t0.addingTimeInterval(5)))
+        d.update(atEdge: false, now: t0.addingTimeInterval(5))
+        #expect(d == DockDwell())
+        d.update(atEdge: true, now: t0.addingTimeInterval(6))
+        #expect(d.due(delay: 0.5, now: t0.addingTimeInterval(6.5)))
+    }
+
+    @Test func dwellThenSlideThenConfirmOrRetract() {
+        // The tick's order: the pointer rests at the edge, the Desk starts with the Dock, the
+        // list confirms it; a second visit the list never confirms slides back and stays down.
+        let delay = 0.5
+        var d = DockDwell()
+        var s = DockSlide()
+        for ms in stride(from: 0, through: 500, by: 50) {
+            let now = t0.addingTimeInterval(Double(ms) / 1000)
+            d.update(atEdge: true, now: now)
+            if d.due(delay: delay, now: now) { d.spend(); s.anticipate(73, now: now) }
+            if ms < 500 { #expect(s.phase == .hidden) }
+        }
+        #expect(s.phase == .showing && s.inset == 73)
+        s.observe(73, now: t0.addingTimeInterval(0.55))
+        #expect(!s.unconfirmed)
+
+        s.pointerLeft(); s.settle()
+        d.update(atEdge: false, now: t0.addingTimeInterval(2))
+        let t1 = t0.addingTimeInterval(3)
+        for ms in stride(from: 0, through: 1500, by: 50) {
+            let now = t1.addingTimeInterval(Double(ms) / 1000)
+            d.update(atEdge: true, now: now)
+            if d.due(delay: delay, now: now) { d.spend(); s.anticipate(73, now: now) }
+            s.observe(nil, now: now)
+        }
+        #expect(s.phase == .hiding && s.inset == 0)
+    }
+}
+
 @Suite("Dock watch")
 struct DockWatchTests {
+    @Test func aRestingPointerReadsLongEnoughToConfirm() {
+        for delay in [0.0, 0.5, 2] {
+            #expect(DockWatch.quietAfter(delay: delay) > DockSlide.confirmWithin)
+            #expect(DockWatch.shouldRead(inZone: true, phase: .shown, pointerMoved: false,
+                                         sinceActivity: DockSlide.confirmWithin, delay: delay, tick: 1))
+        }
+    }
+
     @Test func nothingReadsAwayFromAHiddenDock() {
         for tick in 0..<8 {
             #expect(!DockWatch.shouldRead(inZone: false, phase: .hidden, pointerMoved: true,

@@ -859,9 +859,13 @@ Desktop & Dock, and put them back at the end. After each step, `mac/smoke/smoke 
   column stays; `side: left`. On the right: the right column moves; `side: right`. The message at
   the top moves with its column; nothing at the top goes under the menu bar.
 - [ ] Auto-hide on (bottom): the stack rests at the screen edge margin (`inset: 0`). Move the
-  pointer to the bottom edge: as the Dock comes up the stack glides up clear of it (about a quarter
-  second), `inset` reads the Dock's height while it shows; move away and it settles back once the
-  Dock hides. Meeting rows and the meters' two-finger menu work while the Dock is up; `desk_frames_ok`
+  pointer to the bottom edge and rest it there: the stack starts up together with the Dock, not
+  after it (the Dock's own delay, `defaults read com.apple.dock autohide-delay`, 0.5 s when unset),
+  and rises as fast as the Dock does (`autohide-time-modifier` scales it, about half a second when
+  unset); `inset` reads the Dock's height while it shows. Move away and the stack drops in step
+  with the Dock. Rest the pointer a few points above the edge, short of where the Dock reacts:
+  nothing moves, or the stack comes up and drops back within about half a second and stays down.
+  Meeting rows and the meters' two-finger menu work while the Dock is up; `desk_frames_ok`
   stays true during and after.
 - [ ] Auto-hide on the left and on the right: the same, sideways.
 - [ ] Reduce Motion on (Accessibility, Display): the stack jumps instead of gliding.

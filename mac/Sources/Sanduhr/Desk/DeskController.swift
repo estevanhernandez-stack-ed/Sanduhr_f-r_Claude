@@ -57,7 +57,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         for id in ["com.estevan.desk", "com.626labs.sanduhrdesk"] {
             NSRunningApplication.runningApplications(withBundleIdentifier: id).forEach { $0.terminate() }
         }
-        dock.apply = { [weak self] insets, animated in self?.applyDock(insets, animated: animated) }
+        dock.apply = { [weak self] insets, animation in self?.applyDock(insets, animation: animation) }
         dock.start()
         buildWindow()
         // The clock menu is off by default: Sanduhr owns the menu bar, meetings join from the
@@ -90,11 +90,11 @@ final class DeskController: NSObject, NSMenuDelegate {
     }
 
     /// The Dock's reach changed (DockFollower): the corners move, sliding with the auto-hiding
-    /// Dock (no slide with Reduce Motion, which DockFollower passes as not animated).
-    private func applyDock(_ insets: DockInsets, animated: Bool) {
+    /// Dock (no slide with Reduce Motion, which DockFollower passes as no animation).
+    private func applyDock(_ insets: DockInsets, animation: Animation?) {
         guard model.dockInsets != insets else { return }
-        if animated {
-            withAnimation(DockFollower.animation) { model.dockInsets = insets }
+        if let animation {
+            withAnimation(animation) { model.dockInsets = insets }
         } else {
             model.dockInsets = insets
         }

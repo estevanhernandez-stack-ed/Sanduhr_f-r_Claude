@@ -8,19 +8,26 @@ import SwiftUI
 /// which they do when the Dock moves, resizes or starts or stops hiding.
 ///
 /// Auto-hiding: the items rest at the edge and slide clear while the Dock shows (DockSlide).
-/// Whether it shows comes from the window list (`CGWindowListCopyWindowInfo`): a window owned
+/// The slide starts when the pointer has rested at the Dock's edge for the Dock's own delay
+/// (`autohide-delay`), the moment the Dock starts to rise, and runs as long as the Dock's rise
+/// (`autohide-time-modifier`) with an ease-out; it slides back with the Dock's drop when the
+/// pointer leaves the Dock's zone. Whether the Dock really came up comes from the window list (`CGWindowListCopyWindowInfo`): a window owned
 /// by the Dock process at the Dock's window layer, on screen and over this screen. Bounds and
 /// flags only, so no Screen Recording permission. The list is read only on the Desk's pointer
 /// watch, while the pointer is in the Dock's trigger zone (its edge, a few points deep, or over
-/// the shown Dock) or the Dock has not hidden again yet (DockWatch). A Dock that comes up for
+/// the shown Dock) or the Dock has not hidden again yet (DockWatch). A slide the list has not
+/// confirmed within DockSlide.confirmWithin goes back. A Dock that comes up for
 /// another reason while the pointer is elsewhere (Mission Control, App Exposé) is followed only
 /// once the pointer comes near; one shown and gone without the pointer near is missed.
 final class DockFollower {
-    /// Called with the insets to lay out against; `animated` for the auto-hiding Dock's slide.
-    var apply: ((DockInsets, _ animated: Bool) -> Void)?
+    /// Called with the insets to lay out against, and the animation for the auto-hiding Dock's
+    /// slide (nil: no slide, as with Reduce Motion).
+    var apply: ((DockInsets, _ animation: Animation?) -> Void)?
 
     private(set) var prefs = DockPrefs()
     private(set) var slide = DockSlide()
+    /// The pointer's rest at the Dock's edge, for the anticipated slide.
+    private var dwell = DockDwell()
     /// The always-shown Dock's reservation on the Desk's screen.
     private var reserved = DockInsets()
     /// The Desk's screen.
@@ -55,6 +62,7 @@ final class DockFollower {
         if observing { DistributedNotificationCenter.default().removeObserver(self) }
         observing = false
         slide.reset()
+        dwell = DockDwell()
         generation += 1
     }
 
@@ -74,7 +82,7 @@ final class DockFollower {
         prefs = fresh
         if let screen { measure(screen) }
         if !prefs.autohide { slide.reset() }
-        push(animated: false)
+        push(nil)
     }
 
     /// The Desk's window was built or rebuilt on `screen`: screen parameters changed.
@@ -85,7 +93,7 @@ final class DockFollower {
         screenCG = DebugTree.topLeft(screen.frame, primaryHeight: primaryHeight)
         measure(screen)
         if !prefs.autohide { slide.reset() }
-        push(animated: false)
+        push(nil)
     }
 
     /// The always-shown Dock's reservation on `screen`, kept as the thickness to expect once
@@ -105,45 +113,67 @@ final class DockFollower {
         return DockGeometry.inTriggerZone(pointer, size: size, side: prefs.side, shownExtent: 0)
     }
 
-    /// One tick of the Desk's close watch. Reads the window list when DockWatch says so.
+    /// One tick of the Desk's close watch: slides ahead of the Dock once the pointer has rested
+    /// at its edge for its delay, back when the pointer leaves its zone, and reads the window
+    /// list when DockWatch says so.
     func tick(pointer: CGPoint?, size: CGSize, moved: Bool, now: Date = Date()) {
         guard prefs.autohide else { return }
         ticks &+= 1
         if moved { lastActivity = now }
-        let shown = slide.phase == .shown || slide.phase == .showing ? slide.extent : 0
         let inZone = pointer.map {
-            DockGeometry.inTriggerZone($0, size: size, side: prefs.side, shownExtent: shown)
+            DockGeometry.inTriggerZone($0, size: size, side: prefs.side, shownExtent: slide.inset)
         } ?? false
+        let atEdge = pointer.map { DockGeometry.atRevealEdge($0, size: size, side: prefs.side) } ?? false
+        dwell.update(atEdge: atEdge, now: now)
+        if !inZone {
+            if slide.pointerLeft() { slid(now: now) }
+        } else if slide.phase == .hidden || slide.phase == .hiding, dwell.due(delay: prefs.delay, now: now) {
+            dwell.spend()
+            if slide.anticipate(thickness, now: now) { slid(now: now) }
+        }
         guard DockWatch.shouldRead(inZone: inZone, phase: slide.phase, pointerMoved: moved,
                                    sinceActivity: now.timeIntervalSince(lastActivity),
                                    delay: prefs.delay, tick: ticks) else { return }
-        observe(Self.dockWindows(), now: now)
+        observe(Self.dockWindows(), inZone: inZone, now: now)
     }
 
-    /// A reading of the Dock's windows: start a slide when the Dock came or went.
-    func observe(_ windows: [DockGeometry.DockWindow], now: Date = Date()) {
-        let fallback = DockGeometry.estimatedThickness(
+    /// A reading of the Dock's windows: confirm, start or end a slide. Only a pointer in the
+    /// Dock's zone starts one.
+    func observe(_ windows: [DockGeometry.DockWindow], inZone: Bool = true, now: Date = Date()) {
+        let seen = DockGeometry.shownExtent(windows, layer: Self.dockLayer, screen: screenCG,
+                                            side: prefs.side, fallback: thickness)
+        guard slide.observe(seen, canShow: inZone, now: now) else { return }
+        slid(now: now)
+    }
+
+    /// The Dock's thickness when the window list gives no strip (and for an anticipated slide).
+    private var thickness: CGFloat {
+        DockGeometry.estimatedThickness(
             tilesize: prefs.tilesize,
             measured: measured.flatMap { $0.tilesize == prefs.tilesize && $0.side == prefs.side ? $0.inset : nil })
-        let seen = DockGeometry.shownExtent(windows, layer: Self.dockLayer, screen: screenCG,
-                                            side: prefs.side, fallback: fallback)
-        guard slide.observe(seen) else { return }
+    }
+
+    /// The inset changed: slide in step with the Dock (or jump with Reduce Motion or a Dock
+    /// that does not animate), and settle when the slide is done.
+    private func slid(now: Date) {
         lastActivity = now
         generation += 1
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        push(animated: !reduceMotion)
-        if reduceMotion {
+        let duration = prefs.slideDuration
+        let animation = reduceMotion ? nil : Self.animation(showing: slide.phase == .showing, duration: duration)
+        push(animation)
+        if animation == nil {
             slide.settle()
         } else {
             let mine = generation
-            DispatchQueue.main.asyncAfter(deadline: .now() + DockSlide.duration) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
                 guard let self, self.generation == mine else { return }
                 self.slide.settle()
             }
         }
     }
 
-    private func push(animated: Bool) { apply?(insets, animated) }
+    private func push(_ animation: Animation?) { apply?(insets, animation) }
 
     /// The Dock's window layer.
     static var dockLayer: Int { Int(CGWindowLevelForKey(.dockWindow)) }
@@ -163,6 +193,10 @@ final class DockFollower {
         }
     }
 
-    /// The slide's animation: an ease about as long as the Dock's own.
-    static let animation = Animation.easeInOut(duration: DockSlide.duration)
+    /// The slide's animation, as long as the Dock's own: an ease-out as it rises, an ease-in as
+    /// it drops. Nil for a Dock that does not animate (`autohide-time-modifier` 0).
+    static func animation(showing: Bool, duration: TimeInterval) -> Animation? {
+        guard duration > 0 else { return nil }
+        return showing ? .easeOut(duration: duration) : .easeIn(duration: duration)
+    }
 }
