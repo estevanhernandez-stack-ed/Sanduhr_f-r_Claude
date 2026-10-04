@@ -253,7 +253,7 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: a login whose first org is an API org fetches the subscription org's usage.
   Verify: swift-testing on the choice and on decoding real-shaped org JSON (capabilities missing, empty, mixed).
 
-- [ ] **36. Accounts (Windows 2.2 parity)**
+- [x] **36. Accounts (Windows 2.2 parity)**
   Spec: `docs/mac-accounts-spec.md`.
   Spec ref: `docs/mac-merge-plan.md` feature inventory (multi-account registry, Accounts tab, active-account label, account-scoped sign-out; per-account history); Windows `AccountStore`, `UsageHistory`, `SnapshotContract.AccountRef`
   What to build: named accounts (registry and active label in defaults; each account's key in the Keychain under `sessionKey:{label}` / `cf_clearance:{label}`, the file on dev builds); the existing key promotes to "Personal" on first launch; Settings, Accounts to add, rename, remove and switch; the active account's name on the widget and in the menus; Sign Out removes the active account; history per account (`history.{label}.json`, the current file moving to Personal); `account_ref` in `snapshot.json` hashed as on Windows. Only the active account is shown and fetched on the normal cadence (decided 2026-10-03); "Follow the account I'm using" (off by default) slow-checks the others and switches automatically on a clear signal.
@@ -263,31 +263,31 @@ New options keep today's behavior by default; the camera light and the glow star
 - [ ] **37. All-accounts chart and CSV export** (later; decided 2026-10-03)
   Spec ref: `docs/mac-merge-plan.md` (Per-account history, All-accounts chart toggle, CSV export)
 
-- [ ] **38. Menu bar limit choice, hide special limits, inline duplicate-name error**
+- [x] **38. Menu bar limit choice, hide special limits, inline duplicate-name error**
   Spec ref: on-screen check of item 36 (2026-10-03): a used-up promo limit ("Weekly — Special", `iguana_necktie`) pinned the menu bar at 100% because it shows the highest of every limit; Add Account's duplicate-name error showed only after Add, while the label-rule error shows under the field as you type.
   What to build: (a) Settings, Menu bar choice: Session, Weekly, Whichever is higher (default), Rotate (alternates the two every 8 s, "S 12%" / "W 96%"); limits other than Session and Weekly never drive the menu bar. (b) A Show switch per limit other than Session and Weekly in Settings, Desk, Meters (on by default, so a new limit appears once and the user decides); off hides it on the widget, Desk and from alerts. (c) Add Account (and Rename) show the duplicate-name error inline under the field as you type, like the label-rule error.
   Acceptance: a 100% special limit no longer shows in the menu bar; hiding it removes it everywhere; Rotate alternates; a duplicate name is flagged before Add.
   Verify: swift-testing for the menu bar choice (each mode, missing tiers, rotation step) and the visible-tier filter; state.yaml key for the menu bar mode; by hand.
 
-- [ ] **39. Switch, hide and silence from the meters**
+- [x] **39. Switch, hide and silence from the meters**
   Spec ref: on-screen check of items 36 and 38 (2026-10-03): the user expected to switch accounts and hide or silence temporary limits right on the Desk, not only in Settings.
   What to build: (a) the account name at the start of the Desk's claude line is clickable with 2+ accounts and cycles to the next account (same path as the widget chip); a plain click on the bars still opens the widget. (b) A context menu (two-finger click) on Desk meter rows and widget tier cards: Accounts submenu (2+ accounts, active checked); "Hide <limit>" for limits beyond Session and Weekly (the item-38 Show switch); "Stop warnings for this limit" / "Warn again for this limit" (the existing "Warn when nearly full" setting for that limit); "Meter Settings…" opening Settings, Desk, Meters. Settings and the menus stay in sync.
   Acceptance: switching, hiding and silencing all work from the Desk and the widget without opening Settings.
   Verify: swift-testing for the menu model (which items appear for which tier and account count); smoke state reflects hide/silence; by hand.
 
-- [ ] **40. Desk meter menu, menu bar submenu, graceful account switch**
+- [x] **40. Desk meter menu, menu bar submenu, graceful account switch**
   Spec ref: on-screen check of items 38 and 39 (2026-10-04).
   What to build: (a) the two-finger (right-click / Control-click) menu on the Desk meter rows does not open; make it open over the Desk bars as it does on the widget cards, without a second menu from the Finder. (b) A "Menu Bar Shows" submenu in the menu bar's own menu (Session, Weekly, Whichever is higher, Rotate; the current one checked), in sync with Settings, General, Menu bar. (c) Switching accounts is graceful: the old account's meters fade out and the new account's fade in when they arrive (widget cards, Desk meters, the Desk line), with a faint "Switching account…" in between when the fetch is slow; never a hard blank. Old numbers are never shown as the new account's (they fade out before the new ones arrive, and the snapshot is still deleted at once).
   Acceptance: the Desk bar menu opens; the menu bar mode can be changed from the menu bar; a switch reads as a crossfade.
   Verify: swift-testing for the menu model; by hand for the menu and the animation.
 
-- [ ] **41. Desk geometry you can trust, passive meters, a gentle departure**
+- [x] **41. Desk geometry you can trust, passive meters, a gentle departure**
   Spec ref: on-screen check 2026-10-04: Desk clicks were dead because the meters' frame never reached the click code (fixed in `9901381`); the user asked that every Desk item's coordinates be known so they interact properly; a plain click on the meters repeated the same meters in the widget; the leaving account still vanished abruptly.
   What to build: (a) every interactive Desk element (meters block, each meter row, the account name, the calendar note, each meeting row, the meetings block) publishes its frame in `state.yaml` (`desk_frames`, keyed by element kind and tier or row index, never labels or meeting titles), plus a smoke scenario that fails when a visible element's frame is empty, off the Desk window, or when two click areas overlap; a pure, tested hit-test that picks the element under a point in priority order, used by DeskController for both left and two-finger clicks. (b) A plain click on the meters does nothing (passes through to the desktop); the two-finger menu keeps everything and gains "Show Widget"; the "Click the meters…" hint goes. (c) Account switch departure: slower, gentler fade out (about 0.6 s ease-in-out), and the account name on the chip and the Desk line changes only when the old numbers are gone.
   Acceptance: smoke catches a dead click area; a plain meter click does nothing; the switch reads as a calm handoff.
   Verify: swift-testing (hit-test, frame checks); smoke scenario; by hand.
 
-- [ ] **42. Hide only temporary limits, and bring them back when they refill**
+- [x] **42. Hide only temporary limits, and bring them back when they refill**
   Spec ref: on-screen check 2026-10-04: hidden meters should come back if they refill; Hide should be offered only for limits believed temporary.
   What to build: (a) a pure, tested `LimitLifetime` rule: Session and Weekly — All Models are never temporary; another limit is temporary when its reset is more than 8 days away, or it is a known promo slot (`iguana_necktie`), or it first appeared within the last 14 days and is not a known model limit (Sonnet, Opus, Cowork, Design, OAuth Apps). First-seen dates per tier are kept in the desk defaults. Hide (menus and Settings' Show switch) is offered only for temporary limits; a hidden limit that is no longer temporary shows again. (b) Hiding records the limit's reset time and utilization at that moment; it shows again on its own when that reset passes (a new window) or its utilization drops by 10 points or more (a refill). (c) The Desk and widget two-finger menus gain a "Hidden Limits" submenu (only when something is hidden) to show one again by hand. (d) The Desk takes the mouse as soon as the pointer is over a click area, including right after launch and after the layout moves, so a two-finger click without prior movement still reaches Desk instead of the Finder.
   Acceptance: no Hide on permanent limits; a refilled or reset hidden limit reappears; hidden limits can be restored from the menu.
