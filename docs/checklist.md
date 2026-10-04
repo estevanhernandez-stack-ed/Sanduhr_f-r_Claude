@@ -293,13 +293,13 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: no Hide on permanent limits; a refilled or reset hidden limit reappears; hidden limits can be restored from the menu.
   Verify: swift-testing for every rule (temporary detection, refill and reset return, permanent limits never hideable); state.yaml `hidden_limits`, plus `temporary_limits`; by hand.
 
-- [ ] **43. Thirty days of meter history**
+- [x] **43. Thirty days of meter history**
   Spec ref: `docs/mac-usage-data-spec.md` > Build order 1 (Windows keeps 30 days per account; the Mac kept 24 points, about 2 hours)
   What to build: `HistoryStore` keeps 30 days per account (time-based trim plus the Windows point cap of 8640), reads old files unchanged; the sparklines keep drawing their recent window from the longer series; a per-account "Meter history: Off · 30 days" choice (default 30 days) in Settings, Accounts, where Off stops recording for that account and offers to erase its file.
   Acceptance: history survives 30 days, sparklines unchanged, Off stops and erases on request.
   Verify: swift-testing on temp folders (trim by age and count, old 24-point files, Off); by hand.
 
-- [ ] **44. The Data section and Claude Code folder linking**
+- [x] **44. The Data section and Claude Code folder linking**
   Spec ref: `docs/mac-usage-data-spec.md` > What an account can have; Suggesting the folder; Decisions
   What to build: per-account data choices stored and shown in Settings, Accounts, Data (Meter history from item 43, Claude Code folder, Claude Code activity: Not tracked · Live only · Keep a record, Project names: Names · Hidden · Full paths, Share with Claude: Off · Meters · Meters and activity; defaults as the spec); Claude Code folder discovery (`~/.claude`, `~/.claude-*` folders that look like Claude Code homes, plus Choose…); one folder per account and one account per folder; the suggestion by organization match (read only `oauthAccount.organizationUuid` from the folder's `.claude.json`, in memory, never stored or logged; compare with the account's organization from claude.ai); choices follow rename and removal. Activity, names and sharing are stored for items 45 to 47 to act on.
   Acceptance: each account's choices persist and follow rename; a folder can't be linked twice; the matching folder is suggested, never auto-linked.
