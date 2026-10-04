@@ -394,11 +394,17 @@ struct GeneralSection: View {
                 Toggle("Desk: clock, meters, meetings and the message on the desktop", isOn: $deskEnabled)
                     .onChange(of: deskEnabled) { _, _ in DeskController.shared.apply() }
                 Toggle("Notch: the island around the camera (needs Desk)", isOn: $notch)
-                Picker("Widget: the floating window with the tools", selection: $widgetVisibility) {
+                // A choice made here, not any change to the key: onChange also fired for writes
+                // from outside (a smoke run's defaults step), even with Settings closed, and
+                // treated them as a pick (issue #105's "Always shown shows the widget").
+                Picker("Widget: the floating window with the tools", selection: Binding(
+                    get: { widgetVisibility },
+                    set: { choice in
+                        guard choice != widgetVisibility else { return }
+                        widgetVisibility = choice
+                        (NSApp.delegate as? AppDelegate)?.widgetVisibilityDidChange()
+                    })) {
                     ForEach(WidgetVisibility.allCases) { Text($0.label).tag($0) }
-                }
-                .onChange(of: widgetVisibility) { _, _ in
-                    (NSApp.delegate as? AppDelegate)?.widgetVisibilityDidChange()
                 }
                 Toggle("Show the widget now", isOn: Binding(
                     get: { !panelHidden },
