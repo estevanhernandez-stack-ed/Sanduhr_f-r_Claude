@@ -169,6 +169,9 @@ final class UsageViewModel {
     @ObservationIgnored private let localBurnSource = LocalBurnSource()
     @ObservationIgnored private var localScanRunning = false
     @ObservationIgnored private var localScanPending = false
+    /// The vault (item 46): records Claude Code activity for every account that keeps one, off
+    /// the main thread, at launch, after each refresh and when a choice changes.
+    @ObservationIgnored let vault = VaultService.standard
     /// The accounts in list order and the active one, as the Accounts page, the menus and the
     /// widget chip show them. Read from the registry's defaults (never the Keychain) and kept
     /// current by every account change here (`reloadAccounts`).
@@ -304,6 +307,8 @@ final class UsageViewModel {
     /// Called once the app has a window + a session key.
     /// Checks `exists()` first so a first launch goes straight to onboarding.
     func bootstrap() {
+        // The record keeps up for every recording account, signed in or not.
+        vault.trigger()
         guard KeychainStore.exists(account: KeychainAccount.sessionKey) else {
             status = .connecting     // onboarding sheet will drive the next step
             return
@@ -370,7 +375,10 @@ final class UsageViewModel {
     @discardableResult
     func removeAccount(_ label: String) -> SignOutResult {
         let wasActive = label == KeychainStore.accounts.active
+        let folder = dataChoices(for: label).folder
         let result = KeychainStore.remove(label: label)
+        // Removing forgets the account's choices (the tombstone), so its record can go.
+        if let folder { vault.erase(folder: folder) }
         follower.forget(label)
         if wasActive { showActiveAccount(leaving: accountLabel) } else { reloadAccounts() }
         refreshInUse()
@@ -410,7 +418,8 @@ final class UsageViewModel {
         accountDataChoices[label] ?? .defaults
     }
 
-    /// Settings, Accounts, Data: stored now; items 45 to 47 act on them.
+    /// Settings, Accounts, Data: activity (items 45 and 46), project names (item 46); sharing is
+    /// stored for item 47.
     func setActivity(_ value: ActivityChoice, for label: String) {
         AccountData.setActivity(value, for: label, in: KeychainStore.accounts.defaults)
         reloadAccounts()
@@ -424,6 +433,31 @@ final class UsageViewModel {
     func setShare(_ value: ShareChoice, for label: String) {
         AccountData.setShare(value, for: label, in: KeychainStore.accounts.defaults)
         reloadAccounts()
+    }
+
+    // MARK: The record (item 46)
+
+    /// Whether Sanduhr holds a record of the folder (any account's, kept until erased).
+    func hasRecord(folder: String) -> Bool {
+        vault.hasRecord(folder: folder)
+    }
+
+    /// Deletes the record of a folder no account records any more (the caller turned Keep a
+    /// record off or unlinked it first: the choice is the tombstone). Off the main thread.
+    func eraseRecord(folder: String) {
+        vault.erase(folder: folder)
+    }
+
+    /// Erase this account's data: its meter history and its Claude Code record. Keep a record
+    /// becomes Live only first, so a cycle can't bring the record back.
+    func eraseAccountData(_ label: String) {
+        let choices = dataChoices(for: label)
+        if choices.activity == .record {
+            AccountData.setActivity(.live, for: label, in: KeychainStore.accounts.defaults)
+            reloadAccounts()
+        }
+        eraseHistory(label)
+        if let folder = choices.folder { vault.erase(folder: folder) }
     }
 
     /// Links a Claude Code folder to the account. A folder linked to another account is moved
@@ -515,8 +549,10 @@ final class UsageViewModel {
         let data = AccountData.allChoices(in: accounts.defaults)
         if data != accountDataChoices {
             accountDataChoices = data
-            // Activity or the linked folder may have changed: read, stop reading or switch folder.
+            // Activity or the linked folder may have changed: read, stop reading or switch folder,
+            // and start (or catch up) a record that was just asked for.
             refreshLocalBurn()
+            vault.trigger()
         }
     }
 
@@ -784,6 +820,7 @@ final class UsageViewModel {
         // A fresh refresh re-anchors the local burn: the badges start again from zero.
         self.localBurn = LocalBurn()
         refreshLocalBurn()
+        vault.trigger()
         Notifier.shared.evaluate(u)
         SnapshotWriter.writeOk(u, accountRef: ref)
         follower.recordActive(account, usage: u)

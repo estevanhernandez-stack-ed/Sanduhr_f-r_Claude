@@ -317,6 +317,7 @@ enum DebugHooks {
         s.accountData = AccountData.choices(for: KeychainStore.accounts.active, in: KeychainStore.accounts.defaults)
         s.localActivityReading = vm.localActivityReading
         s.localActivityEvents = vm.localBurn.events
+        s.vault = vm.vault.state(for: s.accountData)
         s.follow = vm.followEnabled
         s.followPaused = vm.followPaused
         s.version = info["CFBundleShortVersionString"] as? String ?? ""

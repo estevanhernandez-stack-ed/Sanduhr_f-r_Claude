@@ -68,6 +68,9 @@ struct DebugStateInput {
     /// events counted since the last refresh. Never a path, a project or a model.
     var localActivityReading = false
     var localActivityEvents = 0
+    /// The vault (item 46) for the active account: recording, months kept, whether the last
+    /// cycle completed. Never a path, a project, an id or the label.
+    var vault = VaultState()
     /// Follow the account I'm using, and whether a manual switch is pausing it. Never labels.
     var follow = false
     var followPaused = false
@@ -88,6 +91,12 @@ enum DebugState {
     /// `local_activity:` (item 45): counts only.
     static func localActivityYAML(reading: Bool, events: Int) -> YAMLNode {
         .map([YAMLPair("reading", .bool(reading)), YAMLPair("events", .int(events))])
+    }
+
+    /// `vault:` (item 46): flags and a count only.
+    static func vaultYAML(_ v: VaultState) -> YAMLNode {
+        .map([YAMLPair("recording", .bool(v.recording)), YAMLPair("months", .int(v.months)),
+              YAMLPair("last_ingest_ok", .bool(v.lastIngestOK))])
     }
 
     static func yaml(_ s: DebugStateInput) -> YAMLNode {
@@ -147,6 +156,7 @@ enum DebugState {
         pairs.append(("data", accountDataYAML(s.accountData)))
         pairs.append(("local_activity", localActivityYAML(reading: s.localActivityReading,
                                                           events: s.localActivityEvents)))
+        pairs.append(("vault", vaultYAML(s.vault)))
         pairs.append(("follow", .bool(s.follow)))
         pairs.append(("follow_paused", .bool(s.followPaused)))
         pairs.append(("version", .string(s.version)))

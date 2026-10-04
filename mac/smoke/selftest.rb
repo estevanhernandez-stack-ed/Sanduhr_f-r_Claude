@@ -90,6 +90,8 @@ eq('data choices default to nothing tracked or shared', state['data'],
 check('data block holds no path', !state['data'].to_s.include?('/'))
 # Item 45: live Claude Code activity, counts only: not read while activity is off.
 eq('local activity not read by default', state['local_activity'], { 'reading' => false, 'events' => 0 })
+# Item 46: the vault, flags and a count only: nothing recorded by default.
+eq('nothing recorded by default', state['vault'], { 'recording' => false, 'months' => 0, 'last_ingest_ok' => false })
 # Item 38: the menu bar choice, Whichever is higher until changed.
 eq('menu bar follows the higher limit by default', state['menu_bar'], 'higher')
 eq('no limit hidden by default', state['hidden_limits'], [])
