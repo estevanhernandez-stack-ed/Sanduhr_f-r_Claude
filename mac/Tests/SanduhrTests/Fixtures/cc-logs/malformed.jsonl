@@ -1,0 +1,4 @@
+{"type":"assistant","timestamp":"2026-05-05T10:00:00Z","message":{"model":"claude-opus-4-7","usage":{"input_tokens":50,"output_tokens":50}}}
+{not valid json
+{"type":"assistant"}
+{"type":"assistant","message":{}}

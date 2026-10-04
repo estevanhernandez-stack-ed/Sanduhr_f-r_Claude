@@ -315,6 +315,8 @@ enum DebugHooks {
         s.accountsCount = KeychainStore.accounts.labels.count
         s.historyDays = MeterHistory.days(KeychainStore.accounts.active, in: KeychainStore.accounts.defaults)
         s.accountData = AccountData.choices(for: KeychainStore.accounts.active, in: KeychainStore.accounts.defaults)
+        s.localActivityReading = vm.localActivityReading
+        s.localActivityEvents = vm.localBurn.events
         s.follow = vm.followEnabled
         s.followPaused = vm.followPaused
         s.version = info["CFBundleShortVersionString"] as? String ?? ""

@@ -3,8 +3,8 @@ import SwiftUI
 
 /// Settings, Accounts, Data (item 44): what Sanduhr keeps for the selected account and what
 /// Claude can see of it. Meter history (item 43) works now; the Claude Code folder link is kept
-/// now and read from item 45 on; Claude Code activity, project names and sharing are stored for
-/// items 45 to 47, and the page says so.
+/// now and read from item 45 on, when activity is Live only or Keep a record; project names and
+/// sharing are stored for items 46 and 47, and the page says so.
 ///
 /// Folder paths show on this page only (as `~/…`); they never reach a log or state.yaml. The
 /// organization match runs in the view model, which returns only the folder to suggest.
@@ -202,7 +202,7 @@ private struct SuggestionBox: View {
     }
 }
 
-/// Claude Code activity, project names and Share with Claude: stored now for items 45 to 47.
+/// Claude Code activity, project names and Share with Claude: activity reads the linked folder (item 45); names and sharing are stored for items 46 and 47.
 private struct DataChoiceRows: View {
     var vm: UsageViewModel
     let label: String
@@ -214,7 +214,7 @@ private struct DataChoiceRows: View {
             activityRow
             namesRow
             shareRow
-            Caption("These three are saved now and take effect as they arrive: live activity in the next update, then the record and sharing with Claude.")
+            Caption("Live activity works now: the cards show what Claude Code used since the last refresh. The record and sharing with Claude are saved now and take effect in later updates.")
                 .italic()
         }
     }

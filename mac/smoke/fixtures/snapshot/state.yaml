@@ -97,6 +97,9 @@ data:
   names: names
   share: "off"
   folder_linked: false
+local_activity:
+  reading: false
+  events: 0
 follow: false
 follow_paused: false
 version: "2.1.0"

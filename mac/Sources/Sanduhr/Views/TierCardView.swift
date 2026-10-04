@@ -17,6 +17,9 @@ struct TierCardView: View {
     var warning = false
     /// The sparkline's style for the current theme (`SparklineView.mode(themeID:)`).
     var sparklineMode: SparklineView.Mode = .horizon
+    /// Tokens Claude Code used in this limit since the last refresh (item 45,
+    /// `UsageViewModel.localBurn`): the "+Nk" before the percent, hidden at zero.
+    var localTokens: Int64 = 0
 
     @State private var showDeepMath = false
 
@@ -38,7 +41,7 @@ struct TierCardView: View {
                             warning: warning)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(tier.label)
-                .accessibilityValue(spokenValue)
+                .accessibilityValue(spokenWithLocal)
             infoRow
             reminderRow
         }
@@ -92,6 +95,17 @@ struct TierCardView: View {
                     .frame(width: 44, height: 14)
             }
 
+            if localTokens > 0 {
+                Text("+" + TokenFormat.compact(localTokens))
+                    .font(.app(size: 9, weight: .medium, design: palette.numericFontDesign))
+                    .foregroundStyle(palette.textDim)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()
+                    .help("Tokens Claude Code used in this limit since the last refresh, from the linked folder's logs. claude.ai's numbers lag by a few minutes; this starts again from zero at each refresh.")
+                    .accessibilityHidden(true)
+            }
+
             HStack(spacing: 3) {
                 // A warning row says so without the red: the glyph in the theme's text color.
                 if warning {
@@ -108,12 +122,18 @@ struct TierCardView: View {
                             radius: palette.accentBloom.blur)
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(spokenValue)
+            .accessibilityLabel(spokenWithLocal)
         }
     }
 
     /// "92%", or "92%, nearly full" on a warning tier, for VoiceOver.
     private var spokenValue: String { MeterWarning.spokenValue(percent: Int(util), warning: warning) }
+
+    /// `spokenValue`, then the local burn when there is some: "92%, plus 1.5 thousand local
+    /// tokens since the last refresh".
+    private var spokenWithLocal: String {
+        localTokens > 0 ? spokenValue + ", " + TokenFormat.spoken(localTokens) : spokenValue
+    }
 
     private var infoRow: some View {
         HStack {

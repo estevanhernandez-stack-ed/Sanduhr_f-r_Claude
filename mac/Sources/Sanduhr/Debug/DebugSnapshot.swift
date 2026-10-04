@@ -64,6 +64,10 @@ struct DebugStateInput {
     /// The active account's data choices (AccountData): values and whether a folder is linked,
     /// never the folder's path or the label.
     var accountData = AccountDataChoices.defaults
+    /// Live Claude Code activity (item 45): whether the shown account's folder is read, and the
+    /// events counted since the last refresh. Never a path, a project or a model.
+    var localActivityReading = false
+    var localActivityEvents = 0
     /// Follow the account I'm using, and whether a manual switch is pausing it. Never labels.
     var follow = false
     var followPaused = false
@@ -79,6 +83,11 @@ enum DebugState {
               YAMLPair("names", .string(c.names.rawValue)),
               YAMLPair("share", .string(c.share.rawValue)),
               YAMLPair("folder_linked", .bool(c.folder != nil))])
+    }
+
+    /// `local_activity:` (item 45): counts only.
+    static func localActivityYAML(reading: Bool, events: Int) -> YAMLNode {
+        .map([YAMLPair("reading", .bool(reading)), YAMLPair("events", .int(events))])
     }
 
     static func yaml(_ s: DebugStateInput) -> YAMLNode {
@@ -136,6 +145,8 @@ enum DebugState {
         pairs.append(("accounts_count", .int(s.accountsCount)))
         pairs.append(("history_days", .int(s.historyDays)))
         pairs.append(("data", accountDataYAML(s.accountData)))
+        pairs.append(("local_activity", localActivityYAML(reading: s.localActivityReading,
+                                                          events: s.localActivityEvents)))
         pairs.append(("follow", .bool(s.follow)))
         pairs.append(("follow_paused", .bool(s.followPaused)))
         pairs.append(("version", .string(s.version)))

@@ -28,7 +28,9 @@ let package = Package(
         .testTarget(
             name: "SanduhrTests",
             dependencies: ["Sanduhr"],
-            path: "Tests/SanduhrTests"
+            path: "Tests/SanduhrTests",
+            // Synthetic Claude Code session logs (item 45), ported from the Windows tests' inputs.
+            resources: [.copy("Fixtures")]
         ),
     ]
 )

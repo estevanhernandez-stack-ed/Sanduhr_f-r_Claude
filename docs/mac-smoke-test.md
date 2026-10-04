@@ -345,8 +345,9 @@ whose names are fine to show; remove it afterwards.
 
 - [ ] Settings, Accounts, select an account: a Data section shows Meter history (30 days),
   Claude Code folder (None), Claude Code activity (Not tracked), Project names in the record
-  (Names, dimmed until Keep a record), Share with Claude (Off), with a caption that activity,
-  names and sharing take effect in coming updates. The page scrolls when it doesn't fit.
+  (Names, dimmed until Keep a record), Share with Claude (Off), with a caption that live
+  activity works now and the record and sharing take effect in later updates. The page scrolls
+  when it doesn't fit.
 - [ ] `smoke/smoke state` shows `data:` with `activity: "off"`, `names: names`, `share: "off"`,
   `folder_linked: false`, and no label or path anywhere.
 - [ ] The folder menu lists `~/.claude` and the `~/.claude-*` folders that hold `projects/` or a
@@ -363,3 +364,34 @@ whose names are fine to show; remove it afterwards.
   `state.yaml` `data:` shows `record`, `hidden`, `meters`, `folder_linked: true`. `defaults read
   com.626labs.sanduhr accountData` shows them under B. Rename B: the choices and the link follow.
   Remove B: `accountData` no longer lists it and the folder is free for another account.
+
+## 16. Live Claude Code activity (item 45)
+
+Use a test Claude Code folder, never a real one, and remove it afterwards. Make one from the
+shape of the test fixtures (`mac/Tests/SanduhrTests/Fixtures/cc-logs/by-tier.jsonl`), with the
+current time so the lines count as new:
+
+```sh
+mkdir -p ~/.claude-smoketest/projects/demo
+cc_line() {   # model input output
+  printf '{"type":"assistant","timestamp":"%s","message":{"model":"%s","usage":{"input_tokens":%s,"output_tokens":%s}},"cwd":"/tmp/demo"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" "$1" "$2" "$3" >> ~/.claude-smoketest/projects/demo/session.jsonl
+}
+```
+
+- [ ] Link `~/.claude-smoketest` to the active account, activity Not tracked. `cc_line
+  claude-sonnet-4-6 1000 499`: no card changes within a minute, and `smoke/smoke state` shows
+  `local_activity: {reading: false, events: 0}`. `sudo fs_usage -w -f filesys Sanduhr | grep
+  smoketest` shows no open of `session.jsonl`.
+- [ ] Activity Live only: `reading: true`. Refresh, then `cc_line claude-sonnet-4-6 1000 499`:
+  within 30 seconds the Weekly — Sonnet card shows "+1.5k" before its percent, small and in the
+  theme's dim text; hovering it explains the badge. VoiceOver on the percent reads "…%, plus 1.5
+  thousand local tokens since the last refresh". `state.yaml` shows `events: 1`.
+- [ ] Another `cc_line claude-sonnet-4-6 10000 0`: the badge reads "+12k" after the next scan.
+  `cc_line claude-haiku-4-5 2000 0` adds "+2.0k" to Weekly — All Models; a `gpt-4o` line shows
+  nowhere. Refresh: every badge goes away until the next line.
+- [ ] Switch to an account with no folder: no badge, `reading: false`. Back, then Not tracked:
+  the badges go at once and `reading: false`. Keep a record reads like Live only.
+- [ ] `state.yaml`, `snapshot.json` and Console (`log stream --predicate 'subsystem ==
+  "com.626labs.sanduhr"'`) carry no folder path, project, model or label. Then `rm -rf
+  ~/.claude-smoketest` and unlink it.

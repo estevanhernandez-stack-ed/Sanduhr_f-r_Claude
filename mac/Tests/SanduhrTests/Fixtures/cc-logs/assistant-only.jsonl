@@ -1,0 +1,3 @@
+{"type":"user","timestamp":"2026-05-05T10:00:00Z","message":{"role":"user"}}
+{"type":"assistant","timestamp":"2026-05-05T10:01:00Z","message":{"model":"claude-opus-4-7","usage":{"input_tokens":100,"output_tokens":200}},"cwd":"C:/proj/Sanduhr","attributionSkill":"my-skill"}
+{"type":"system","timestamp":"2026-05-05T10:02:00Z"}

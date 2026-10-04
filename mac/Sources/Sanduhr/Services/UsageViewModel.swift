@@ -160,6 +160,15 @@ final class UsageViewModel {
     /// Every account's data choices (AccountData), as Settings, Accounts, Data shows them. Holds
     /// linked folder paths: never logged or written to state.yaml.
     private(set) var accountDataChoices: [String: AccountDataChoices] = AccountData.allChoices(in: KeychainStore.accounts.defaults)
+    /// Live Claude Code activity (item 45): the tokens the shown account's linked folder used
+    /// since the last meter refresh, by tier, for the cards' "+Nk". Zero after each refresh, grown
+    /// by the 30-second scans; empty when its activity is Not tracked or no folder is linked.
+    private(set) var localBurn = LocalBurn()
+    /// Whether the shown account's folder is being read (state.yaml `local_activity.reading`).
+    private(set) var localActivityReading = false
+    @ObservationIgnored private let localBurnSource = LocalBurnSource()
+    @ObservationIgnored private var localScanRunning = false
+    @ObservationIgnored private var localScanPending = false
     /// The accounts in list order and the active one, as the Accounts page, the menus and the
     /// widget chip show them. Read from the registry's defaults (never the Keychain) and kept
     /// current by every account change here (`reloadAccounts`).
@@ -504,7 +513,11 @@ final class UsageViewModel {
         let off = Set(MeterHistory.offLabels(in: accounts.defaults))
         if off != historyOffAccounts { historyOffAccounts = off }
         let data = AccountData.allChoices(in: accounts.defaults)
-        if data != accountDataChoices { accountDataChoices = data }
+        if data != accountDataChoices {
+            accountDataChoices = data
+            // Activity or the linked folder may have changed: read, stop reading or switch folder.
+            refreshLocalBurn()
+        }
     }
 
     nonisolated private static func signedIn(_ accounts: AccountRegistry) -> Set<String> {
@@ -715,6 +728,7 @@ final class UsageViewModel {
         apiAccount = nil
         usage = nil
         lastUpdated = nil
+        refreshLocalBurn()
     }
 
     // MARK: Timers
@@ -732,7 +746,10 @@ final class UsageViewModel {
         refreshTimer = refresh
         countdownTimer = Timer.scheduledTimer(withTimeInterval: countdownInterval,
                                               repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.countdownTick &+= 1 }
+            Task { @MainActor in
+                self?.countdownTick &+= 1
+                self?.refreshLocalBurn()
+            }
         }
     }
 
@@ -764,6 +781,9 @@ final class UsageViewModel {
         Self.reconcileHidden(u, now: Date())
         self.usage = u
         self.lastUpdated = Date()
+        // A fresh refresh re-anchors the local burn: the badges start again from zero.
+        self.localBurn = LocalBurn()
+        refreshLocalBurn()
         Notifier.shared.evaluate(u)
         SnapshotWriter.writeOk(u, accountRef: ref)
         follower.recordActive(account, usage: u)
@@ -794,6 +814,50 @@ final class UsageViewModel {
         default:
             status = .error(error.localizedDescription, isAuth: false)
             SnapshotWriter.writeError("network", accountRef: ref)
+        }
+    }
+
+    // MARK: Local Claude Code activity (item 45)
+
+    /// The shown account's data choices (the account the client was built for).
+    private var shownAccountChoices: AccountDataChoices {
+        accountDataChoices[AccountData.label(apiAccount)] ?? .defaults
+    }
+
+    /// Scans the shown account's linked folder for the tokens used since the last refresh, off
+    /// the main thread and one scan at a time (a request during a scan runs once it ends). With
+    /// activity Not tracked, no folder or no refresh yet, clears the badges and reads nothing.
+    func refreshLocalBurn() {
+        let choices = shownAccountChoices
+        guard let anchor = lastUpdated, let folder = LocalActivity.folder(for: choices) else {
+            localBurnSource.drop()
+            if localBurn != LocalBurn() { localBurn = LocalBurn() }
+            if localActivityReading { localActivityReading = false }
+            return
+        }
+        if !localActivityReading { localActivityReading = true }
+        guard !localScanRunning else {
+            localScanPending = true
+            return
+        }
+        localScanRunning = true
+        let source = localBurnSource
+        let account = apiAccount
+        Task { [weak self] in
+            let burn = await Task.detached(priority: .utility) {
+                source.scan(choices, since: anchor)
+            }.value
+            guard let self else { return }
+            self.localScanRunning = false
+            // A refresh, a switch or a changed choice since the scan began makes it stale.
+            if let burn, self.lastUpdated == anchor, self.apiAccount == account,
+               LocalActivity.folder(for: self.shownAccountChoices) == folder, burn != self.localBurn {
+                self.localBurn = burn
+            }
+            if self.localScanPending {
+                self.localScanPending = false
+                self.refreshLocalBurn()
+            }
         }
     }
 

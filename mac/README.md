@@ -95,11 +95,25 @@ with the label. The notch stays as it is. A switch never needs a relaunch: the m
   Windows); Choose… takes any folder that looks like one. One folder per account, one account
   per folder; a folder linked elsewhere moves only after a confirmation. The suggestion compares
   `oauthAccount.organizationUuid` (the only field decoded) with the account's organization, in
-  memory. Activity, names and sharing are stored for items 45 to 47.
+  memory. Names and sharing are stored for items 46 and 47.
+- **Live Claude Code activity (item 45).** With activity Live only or Keep a record and a linked
+  folder, the widget reads that folder's session logs (`projects/<project>/**/*.jsonl`, nested
+  subagent transcripts included) for the shown account and puts a small "+Nk" before a card's
+  percent: the input and output tokens Claude Code used in that limit since the last refresh
+  (opus, sonnet and haiku models map to the Opus, Sonnet and All Models weekly cards, as on
+  Windows). claude.ai's numbers lag by minutes and the widget asks every 5; the badge covers
+  both. It starts again from zero at each refresh and grows with a scan every 30 seconds, off
+  the main thread. `CCLogReader` is a port of Windows `CcLogReader` (worktree and subfolder
+  folding for project names, burn for a local day, by model, by project, by skill); it reads
+  only the timestamp, model, token counts, cwd and skill of `assistant` lines, never message
+  content, and keeps its parse in memory: per file the offset of the last whole line, so a
+  grown file is read from there (after checking the 64 bytes before it) and an unchanged one
+  isn't opened. Not tracked, or no folder, opens nothing. Nothing is stored.
 - **Readers.** `snapshot.json` names the active account by `account_ref` (first 4 bytes of the
   SHA-256 of the label, as on Windows) and is deleted at once on a switch; `state.yaml` has
   `account_ref`, `accounts_count`, `history_days`, `data` (the active account's choices and
-  `folder_linked`), `follow` and `follow_paused`. Labels and folder paths never go into a log,
+  `folder_linked`), `local_activity` (`reading`, and `events` counted since the last refresh),
+  `follow` and `follow_paused`. Labels and folder paths never go into a log,
   `snapshot.json` or `state.yaml`.
 
 #### Following the account in use
