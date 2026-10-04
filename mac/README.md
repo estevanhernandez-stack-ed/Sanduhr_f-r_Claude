@@ -95,7 +95,7 @@ with the label. The notch stays as it is. A switch never needs a relaunch: the m
   Windows); Choose… takes any folder that looks like one. One folder per account, one account
   per folder; a folder linked elsewhere moves only after a confirmation. The suggestion compares
   `oauthAccount.organizationUuid` (the only field decoded) with the account's organization, in
-  memory. Names and sharing are stored for items 46 and 47.
+  memory. Sharing is stored for item 47.
 - **Live Claude Code activity (item 45).** With activity Live only or Keep a record and a linked
   folder, the widget reads that folder's session logs (`projects/<project>/**/*.jsonl`, nested
   subagent transcripts included) for the shown account and puts a small "+Nk" before a card's
@@ -109,11 +109,35 @@ with the label. The notch stays as it is. A switch never needs a relaunch: the m
   content, and keeps its parse in memory: per file the offset of the last whole line, so a
   grown file is read from there (after checking the 64 bytes before it) and an unchanged one
   isn't opened. Not tracked, or no folder, opens nothing. Nothing is stored.
+- **The vault (item 46).** Keep a record writes the Windows usage vault, same formats and file
+  names (`docs/superpowers/specs/2026-07-12-usage-vault-design.md`), for every account whose
+  activity is Keep a record with a folder linked, not only the shown one:
+  `~/Library/Application Support/Sanduhr/vault/<folder id>/` holds `sessions-YYYY-MM.json`
+  (the record: one row per session per month it touched, continuation rows for later months,
+  nested subagent transcripts as their own rows with `parent_session`), `rollups-YYYY-MM.json`
+  (a cache rebuilt from the month's sessions), `checkpoints.json` (per log file, keyed by the
+  SHA-256 of its lowercased path: size, .NET-ticks mtime, offset, the 64-byte tail guard, the
+  months it touched) and `meta.json`. The folder id is the first 16 hex digits of the SHA-256 of
+  the folder's standardized path, lowercased (Mac volumes are case-insensitive; checkpoint keys
+  fold the same way, as on Windows). `VaultIngester` is a port of Windows `VaultIngester`:
+  ingest order shards, rollups, checkpoints last; a grown file is read from its offset after the
+  tail guard checks out, a shrunk or rewritten one whole, a file quiet for an hour once more and
+  then sealed; a torn last line is never consumed; an unreadable shard becomes a timestamped
+  `.bad` (never deleted) and the folder's checkpoints go, so the next cycle rebuilds. One writer:
+  an `flock` on `vault/.writer.lock` in place of the Windows named mutex (a second Sanduhr skips
+  its cycle). `VaultService` runs a cycle at launch, after each refresh and when a choice changes,
+  on a utility queue, one at a time. Project names: Names as Windows (`name~` + 8 hex of the
+  cwd's hash); Hidden `p-` + 10 hex of the SHA-256 of the folded project name in `project_key`
+  and `project_name`, never the name or cwd; Full paths keeps `cwd`. Erase: the activity leaves
+  Keep a record first (the tombstone), then the writer lock is taken (up to 10 s; an in-flight
+  cycle checks the choice before each file and before writing, and stops), then the folder's
+  directory is deleted. `VaultReader` (by day, week, project, model, tier, skill, sessions,
+  coverage) and `VaultLedgerCsv` are pure and tested, for items 47 and 48.
 - **Readers.** `snapshot.json` names the active account by `account_ref` (first 4 bytes of the
   SHA-256 of the label, as on Windows) and is deleted at once on a switch; `state.yaml` has
   `account_ref`, `accounts_count`, `history_days`, `data` (the active account's choices and
   `folder_linked`), `local_activity` (`reading`, and `events` counted since the last refresh),
-  `follow` and `follow_paused`. Labels and folder paths never go into a log,
+  `vault` (`recording`, `months`, `last_ingest_ok`), `follow` and `follow_paused`. Labels and folder paths never go into a log,
   `snapshot.json` or `state.yaml`.
 
 #### Following the account in use

@@ -395,3 +395,35 @@ cc_line() {   # model input output
 - [ ] `state.yaml`, `snapshot.json` and Console (`log stream --predicate 'subsystem ==
   "com.626labs.sanduhr"'`) carry no folder path, project, model or label. Then `rm -rf
   ~/.claude-smoketest` and unlink it.
+
+## 17. The vault (item 46)
+
+Use the test folder from section 16 (`~/.claude-smoketest`), never a real one, with the same
+`cc_line`. A folder id is 16 hex digits; find the test folder's with `ls ~/Library/Application\
+Support/Sanduhr/vault/` before and after.
+
+- [ ] Activity Live only: `cc_line claude-sonnet-4-6 1000 499`, refresh. No new folder under
+  `vault/`, and `state.yaml` shows `vault: {recording: false, months: 0, last_ingest_ok: false}`.
+- [ ] Keep a record (names Names): within a refresh a new `vault/<id>/` holds
+  `sessions-<this month>.json`, `rollups-…`, `checkpoints.json`, `meta.json`; `state.yaml` shows
+  `recording: true, months: 1, last_ingest_ok: true`; the activity caption says "Kept so far: 1
+  month". `jq '.sessions[] | {project_name, total}' sessions-*.json` shows `demo` and 1499. The
+  folder name and file names hold no path or label; `grep -r smoketest vault/` finds nothing.
+- [ ] Another `cc_line … 10000 0`, refresh: the same session's total grows to 11499 (one row,
+  no double count).
+- [ ] Names Hidden, then a new session (`cc_line` into `projects/demo/second.jsonl` the same
+  way): its row's `project_name` and `project_key` are `p-` and 10 hex digits, no `cwd`. The
+  first row still reads `demo`; once its file has been quiet for an hour it is read a last time
+  and reads `p-…` too. A session that had already gone quiet keeps its name (as the caption
+  says).
+- [ ] With a second Sanduhr running (a dev build beside the release), refresh both: the vault
+  stays consistent and Console shows "ingest skipped (writer lock held)" from one of them.
+- [ ] Activity Live only: "Keep the record or erase it?" appears. Keep It: the folder stays.
+  Keep a record again, then Live only, Erase Record: `vault/<id>/` is gone and stays gone after
+  two refreshes; `state.yaml` `months: 0`.
+- [ ] Keep a record again; Erase this account's data…: the confirmation names the meter history
+  and the record from `~/.claude-smoketest`; Erase Data: activity reads Live only, the vault
+  folder and `history.<account>.json` are gone. Keep a record, refresh, then Remove Account (on
+  a throwaway account): its vault folder is gone.
+- [ ] Console (`log stream --predicate 'subsystem == "com.626labs.sanduhr" && category ==
+  "vault"'`) shows fixed phrases only. Then `rm -rf ~/.claude-smoketest` and unlink it.
