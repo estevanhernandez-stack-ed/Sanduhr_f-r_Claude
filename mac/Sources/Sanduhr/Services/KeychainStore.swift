@@ -52,6 +52,7 @@ enum KeychainStore {
                 if accounts.active == nil, kind == KeychainAccount.sessionKey {
                     try accounts.add(AccountRegistry.defaultLabel, sessionKey: value)
                     accounts.dropLegacy()
+                    accounts.adoptLegacyHistory()
                     return
                 }
                 try state.backend.set(value, account: slot(kind))
@@ -98,7 +99,8 @@ enum KeychainStore {
         log(state.registry.signOut(label), "sign out")
     }
 
-    /// Remove Account: Sign Out, then drop it from the list (the next one becomes active).
+    /// Remove Account: Sign Out, delete its history, then drop it from the list (the next one
+    /// becomes active).
     @discardableResult
     static func remove(label: String) -> SignOutResult {
         log(state.registry.remove(label), "remove account")
@@ -132,7 +134,7 @@ enum KeychainStore {
     }
 
     /// Decided once, on first use: the one-time move from the file (the legacy pair and every
-    /// listed account's pair), then the legacy key's promotion to Personal.
+    /// listed account's pair), then the legacy key's promotion to Personal and its history's.
     private static let state: State = {
         let file = FileBackend.standard
         let keychain = KeychainBackend(service: KeychainBackend.service)
@@ -148,12 +150,14 @@ enum KeychainStore {
         }
         let kind = r.store
         let backend: any CredentialBackend = kind == .keychain ? keychain : file
-        let registry = AccountRegistry(backend: backend, stores: bothStores, defaults: UserDefaults.standard)
+        let registry = AccountRegistry(backend: backend, stores: bothStores, defaults: UserDefaults.standard,
+                                       history: .standard)
         switch registry.promoteLegacy() {
         case .promoted: NSLog("Sanduhr: the saved session key is now the Personal account")
         case .keptLegacyBecause(let why): NSLog("Sanduhr: kept the legacy credentials this launch: \(describe(why))")
         case .nothingToPromote: break
         }
+        registry.adoptLegacyHistory()
         return State(kind: kind, backend: backend, registry: registry)
     }()
 

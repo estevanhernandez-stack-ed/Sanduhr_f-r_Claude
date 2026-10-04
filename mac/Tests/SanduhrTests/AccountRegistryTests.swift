@@ -280,3 +280,110 @@ struct CredentialMigrationGroupTests {
         #expect(keychain.items == ["sessionKey:Work": "w"])
     }
 }
+
+/// History files in a temporary folder, never the real Application Support one.
+struct TempHistory {
+    let files: HistoryStore.Files
+
+    init() {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sanduhr-history-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        files = HistoryStore.Files(dir: dir)
+    }
+
+    func cleanUp() { try? FileManager.default.removeItem(at: files.dir) }
+
+    func exists(_ name: String) -> Bool {
+        FileManager.default.fileExists(atPath: files.dir.appendingPathComponent(name).path)
+    }
+
+    /// The file names in the folder, sorted (exact case, unlike a fileExists check).
+    var names: [String] {
+        ((try? FileManager.default.contentsOfDirectory(atPath: files.dir.path)) ?? []).sorted()
+    }
+}
+
+@Suite("History per account")
+struct HistoryPerAccountTests {
+    @Test func eachAccountHasItsOwnFile() {
+        let h = TempHistory()
+        defer { h.cleanUp() }
+        h.files.append(.fiveHour, utilization: 10, account: "Personal")
+        h.files.append(.fiveHour, utilization: 70, account: "Work")
+        #expect(h.files.load("Personal")["five_hour"]?.map(\.v) == [10])
+        #expect(h.files.load("Work")["five_hour"]?.map(\.v) == [70])
+        #expect(h.names == ["history.Personal.json", "history.Work.json"])
+        #expect(h.files.url(for: nil).lastPathComponent == "history.json")
+    }
+
+    @Test func theLegacyFileBecomesPersonalsOnce() {
+        let h = TempHistory()
+        defer { h.cleanUp() }
+        h.files.append(.sevenDay, utilization: 42, account: nil)
+        #expect(h.files.adoptLegacy(into: "Personal"))
+        #expect(h.names == ["history.Personal.json"])
+        #expect(h.files.load("Personal")["seven_day"]?.map(\.v) == [42])
+        #expect(!h.files.adoptLegacy(into: "Personal"))
+    }
+
+    @Test func theLegacyFileNeverClobbersPersonals() {
+        let h = TempHistory()
+        defer { h.cleanUp() }
+        h.files.append(.sevenDay, utilization: 1, account: nil)
+        h.files.append(.sevenDay, utilization: 2, account: "Personal")
+        #expect(!h.files.adoptLegacy(into: "Personal"))
+        #expect(h.files.load("Personal")["seven_day"]?.map(\.v) == [2])
+        #expect(h.exists("history.json"))
+    }
+
+    @Test func registryAdoptsOnlyOncePersonalIsListed() {
+        let h = TempHistory()
+        defer { h.cleanUp() }
+        h.files.append(.sevenDay, utilization: 5, account: nil)
+        let defaults = MemoryDefaults()
+        let backend = FakeBackend(["sessionKey": "sk-1"])
+        let registry = AccountRegistry(backend: backend, stores: [(kind: .file, backend: backend)],
+                                       defaults: defaults, history: h.files)
+        registry.adoptLegacyHistory()
+        #expect(h.names == ["history.json"])          // no accounts yet: the legacy launch uses it
+        #expect(registry.promoteLegacy() == .promoted)
+        registry.adoptLegacyHistory()
+        #expect(h.names == ["history.Personal.json"])
+    }
+
+    @Test func renameMovesTheHistoryAndTheMarker() throws {
+        let h = TempHistory()
+        defer { h.cleanUp() }
+        let f = RegistryFixture(keychain: ["sessionKey:Work": "sk-w"], labels: ["Work"])
+        let registry = AccountRegistry(backend: f.keychain, stores: f.registry.stores, defaults: f.defaults,
+                                       history: h.files)
+        h.files.append(.fiveHour, utilization: 33, account: "Work")
+        SignInGate.record(fetched: true, needsSignIn: false, account: "Work", in: f.defaults)
+        try registry.rename("Work", to: "Office")
+        #expect(h.names == ["history.Office.json"])
+        #expect(h.files.load("Office")["five_hour"]?.map(\.v) == [33])
+        #expect(SignInGate.labels(in: f.defaults) == ["Office"])
+        try registry.rename("Office", to: "office")
+        #expect(h.names == ["history.office.json"])
+    }
+
+    @Test func signOutKeepsTheHistoryAndRemoveDropsIt() {
+        let h = TempHistory()
+        defer { h.cleanUp() }
+        let f = RegistryFixture(keychain: ["sessionKey:Work": "sk-w", "sessionKey:Home": "sk-h"], labels: ["Home", "Work"])
+        let registry = AccountRegistry(backend: f.keychain, stores: f.registry.stores, defaults: f.defaults,
+                                       history: h.files)
+        h.files.append(.fiveHour, utilization: 1, account: "Home")
+        h.files.append(.fiveHour, utilization: 2, account: "Work")
+        SignInGate.record(fetched: true, needsSignIn: false, account: "Work", in: f.defaults)
+        SignInGate.record(fetched: true, needsSignIn: false, account: "Home", in: f.defaults)
+        registry.signOut("Work")
+        #expect(registry.labels == ["Home", "Work"])
+        #expect(h.names == ["history.Home.json", "history.Work.json"])
+        #expect(SignInGate.labels(in: f.defaults) == ["Home"])
+        registry.remove("Work")
+        #expect(registry.labels == ["Home"])
+        #expect(h.names == ["history.Home.json"])
+    }
+}

@@ -120,7 +120,8 @@ final class UsageViewModel {
     private(set) var warningTiers: Set<Tier> = []
     var lastUpdated: Date?
     var status: StatusMessage = .connecting
-    var history: HistoryStore.History = HistoryStore.load()
+    /// The active account's sparkline history.
+    var history: HistoryStore.History = HistoryStore.load(account: KeychainStore.accounts.active)
     /// Bumped every 30s so countdown labels re-render without refetching.
     var countdownTick: Int = 0 {
         didSet { refreshMeterWarnings() }
@@ -254,6 +255,8 @@ final class UsageViewModel {
               !key.isEmpty else { return }
         let cf = KeychainStore.get(account: KeychainAccount.cfClearance)
         api = ClaudeAPI(sessionKey: key, cfClearance: cf)
+        // The first key saved creates Personal, whose history may be the upgrade's.
+        history = HistoryStore.load(account: KeychainStore.accounts.active)
         Task { await refresh() }
         startTimers()
     }
@@ -317,12 +320,13 @@ final class UsageViewModel {
         self.lastUpdated = Date()
         Notifier.shared.evaluate(u)
         SnapshotWriter.writeOk(u)
+        let account = KeychainStore.accounts.active
         for (tier, t) in u.tiers {
             if let util = t.utilization {
-                HistoryStore.append(tier, utilization: util)
+                HistoryStore.append(tier, utilization: util, account: account)
             }
         }
-        self.history = HistoryStore.load()
+        self.history = HistoryStore.load(account: account)
         self.status = u.tiers.isEmpty ? .noTiers : .idle
     }
 

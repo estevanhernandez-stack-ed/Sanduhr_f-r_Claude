@@ -117,43 +117,72 @@ struct WidgetVisibilityTests {
     @Test func aKeyThatNeverFetchedIsStillSigningIn() {
         let d = MemoryDefaults()
         // Saved but never worked (or an update from 2.3.2, which wrote no marker): still signing in.
-        #expect(SignInGate.awaitingSignIn(fresh: false, hasSessionKey: true, in: d))
-        #expect(SignInGate.awaitingSignIn(fresh: false, hasSessionKey: false, in: d))
-        SignInGate.record(fetched: true, needsSignIn: false, in: d)
-        #expect(!SignInGate.awaitingSignIn(fresh: false, hasSessionKey: true, in: d))
+        #expect(SignInGate.awaitingSignIn(fresh: false, hasSessionKey: true, account: "Personal", in: d))
+        #expect(SignInGate.awaitingSignIn(fresh: false, hasSessionKey: false, account: "Personal", in: d))
+        SignInGate.record(fetched: true, needsSignIn: false, account: "Personal", in: d)
+        #expect(!SignInGate.awaitingSignIn(fresh: false, hasSessionKey: true, account: "Personal", in: d))
         // The marker never stands in for a key, or for a brand-new install's first launch.
-        #expect(SignInGate.awaitingSignIn(fresh: false, hasSessionKey: false, in: d))
-        #expect(SignInGate.awaitingSignIn(fresh: true, hasSessionKey: true, in: d))
+        #expect(SignInGate.awaitingSignIn(fresh: false, hasSessionKey: false, account: "Personal", in: d))
+        #expect(SignInGate.awaitingSignIn(fresh: true, hasSessionKey: true, account: "Personal", in: d))
     }
 
     @Test func signOutOrARefusedKeyClearsTheMarker() {
         let d = MemoryDefaults()
-        SignInGate.record(fetched: true, needsSignIn: false, in: d)
+        SignInGate.record(fetched: true, needsSignIn: false, account: "Personal", in: d)
         // A refresh in progress or a network error leaves it.
-        SignInGate.record(fetched: false, needsSignIn: false, in: d)
-        #expect(d.bool(forKey: SignInGate.key))
+        SignInGate.record(fetched: false, needsSignIn: false, account: "Personal", in: d)
+        #expect(SignInGate.fetched("Personal", in: d))
         // Sign Out, or claude.ai refusing the key: the next launch waits for a good fetch.
-        SignInGate.record(fetched: false, needsSignIn: true, in: d)
+        SignInGate.record(fetched: false, needsSignIn: true, account: "Personal", in: d)
         #expect(d.object(forKey: SignInGate.key) == nil)
-        #expect(SignInGate.awaitingSignIn(fresh: false, hasSessionKey: true, in: d))
+        #expect(SignInGate.awaitingSignIn(fresh: false, hasSessionKey: true, account: "Personal", in: d))
         // Signing in again sets it.
-        SignInGate.record(fetched: true, needsSignIn: false, in: d)
-        #expect(!SignInGate.awaitingSignIn(fresh: false, hasSessionKey: true, in: d))
+        SignInGate.record(fetched: true, needsSignIn: false, account: "Personal", in: d)
+        #expect(!SignInGate.awaitingSignIn(fresh: false, hasSessionKey: true, account: "Personal", in: d))
+    }
+
+    @Test func theMarkerIsPerAccount() {
+        let d = MemoryDefaults()
+        SignInGate.record(fetched: true, needsSignIn: false, account: "Work", in: d)
+        #expect(!SignInGate.awaitingSignIn(fresh: false, hasSessionKey: true, account: "Work", in: d))
+        #expect(SignInGate.awaitingSignIn(fresh: false, hasSessionKey: true, account: "Home", in: d))
+        SignInGate.record(fetched: true, needsSignIn: false, account: "Home", in: d)
+        SignInGate.record(fetched: false, needsSignIn: true, account: "Work", in: d)
+        #expect(SignInGate.labels(in: d) == ["Home"])
+        SignInGate.rename("Home", to: "Office", in: d)
+        #expect(SignInGate.labels(in: d) == ["Office"])
+        SignInGate.forget("Office", in: d)
+        #expect(d.object(forKey: SignInGate.key) == nil)
+    }
+
+    @Test func theOldFlagSeedsPersonalOnce() {
+        let d = MemoryDefaults()
+        d.set(true, forKey: SignInGate.legacyKey)
+        #expect(!SignInGate.awaitingSignIn(fresh: false, hasSessionKey: true, account: "Personal", in: d))
+        #expect(d.object(forKey: SignInGate.legacyKey) == nil)
+        #expect(SignInGate.labels(in: d) == ["Personal"])
+        // No accounts yet (a launch on the legacy key) counts as Personal.
+        #expect(SignInGate.fetched(nil, in: d))
+
+        let unset = MemoryDefaults()
+        unset.set(false, forKey: SignInGate.legacyKey)
+        #expect(SignInGate.labels(in: unset).isEmpty)
+        #expect(unset.object(forKey: SignInGate.legacyKey) == nil)
     }
 
     @Test func anUpgraderWithAWorkingKeyShowsOnceThenFollowsTheChoice() {
         let d = MemoryDefaults()
         // 2.3.2, Desk on, hidden while Desk is on, key works: first launch shows for sign-in.
-        var awaiting = SignInGate.awaitingSignIn(fresh: false, hasSessionKey: true, in: d)
+        var awaiting = SignInGate.awaitingSignIn(fresh: false, hasSessionKey: true, account: "Personal", in: d)
         #expect(WidgetVisibilityRule.resolve(showing: false, setting: .whileDeskOff, deskOn: true,
                                              hasSessionKey: !awaiting, event: .launch))
         // The first fetch succeeds: the choice hides it.
-        SignInGate.record(fetched: true, needsSignIn: false, in: d)
+        SignInGate.record(fetched: true, needsSignIn: false, account: "Personal", in: d)
         awaiting = false
         #expect(WidgetVisibilityRule.shouldShow(setting: .whileDeskOff, deskOn: true,
                                                 hasSessionKey: !awaiting, event: .signedIn) == false)
         // The next launch hides it straight away.
-        awaiting = SignInGate.awaitingSignIn(fresh: false, hasSessionKey: true, in: d)
+        awaiting = SignInGate.awaitingSignIn(fresh: false, hasSessionKey: true, account: "Personal", in: d)
         #expect(WidgetVisibilityRule.resolve(showing: false, setting: .whileDeskOff, deskOn: true,
                                              hasSessionKey: !awaiting, event: .launch) == false)
     }

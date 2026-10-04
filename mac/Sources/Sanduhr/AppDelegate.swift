@@ -57,7 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         awaitingSignIn = SignInGate.awaitingSignIn(
             fresh: firstRun == .fresh,
             hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey),
-            in: UserDefaults.standard)
+            account: KeychainStore.accounts.active, in: UserDefaults.standard)
         let wasShowing = !UserDefaults.standard.bool(forKey: Self.panelHiddenKey)
         let show = WidgetVisibilityRule.resolve(
             showing: wasShowing, setting: .saved(), deskOn: DeskController.shared.enabled,
@@ -79,9 +79,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // every refresh even while the widget is hidden (or Desk is off, ready for when it starts).
             guard let vm = self?.viewModel else { return }
             let fetched = vm.usage != nil && (vm.status == .idle || vm.status == .noTiers)
-            // Remembered for the next launch: has this key fetched (SignInGate)?
+            // Remembered for the next launch: has the active account's key fetched (SignInGate)?
             SignInGate.record(fetched: fetched, needsSignIn: vm.status.needsSignIn,
-                              in: UserDefaults.standard)
+                              account: KeychainStore.accounts.active, in: UserDefaults.standard)
             // The widget showed for sign-in; once the numbers arrive the choice takes over.
             if self?.awaitingSignIn == true, fetched {
                 self?.awaitingSignIn = false

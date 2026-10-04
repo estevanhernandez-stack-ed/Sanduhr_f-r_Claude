@@ -63,14 +63,18 @@ final class AccountRegistry: @unchecked Sendable {
     let backend: any CredentialBackend
     /// Every store Sign Out clears (both, whichever one this launch uses).
     let stores: [(kind: CredentialStoreKind, backend: any CredentialBackend)]
+    /// Also holds the sign-in marker (SignInGate), which follows renames and removals.
     let defaults: DefaultsStore
+    /// The per-account history files, which follow renames and removals. Nil leaves files alone.
+    let history: HistoryStore.Files?
 
     init(backend: any CredentialBackend,
          stores: [(kind: CredentialStoreKind, backend: any CredentialBackend)],
-         defaults: DefaultsStore) {
+         defaults: DefaultsStore, history: HistoryStore.Files? = nil) {
         self.backend = backend
         self.stores = stores
         self.defaults = defaults
+        self.history = history
     }
 
     // MARK: Labels and slots
@@ -174,8 +178,8 @@ final class AccountRegistry: @unchecked Sendable {
     }
 
     /// Renames an account in place. Its secrets move the 2.3.2 way: written under the new
-    /// label, read back, and only then is the list changed and the old slots deleted. A failed
-    /// write or read-back leaves everything as it was.
+    /// label, read back, and only then is the list changed and the old slots deleted. Its history
+    /// file and sign-in marker follow. A failed write or read-back leaves everything as it was.
     func rename(_ old: String, to new: String) throws {
         guard Self.isValid(new) else { throw AccountError.invalidLabel }
         var list = labels
@@ -194,6 +198,8 @@ final class AccountRegistry: @unchecked Sendable {
         // The new copy is verified; a stale old slot left by a failed delete holds nothing the
         // list points at.
         for slot in Self.slots(for: old) { try? backend.delete(account: slot) }
+        history?.rename(old, to: new)
+        SignInGate.rename(old, to: new, in: defaults)
     }
 
     /// Writes each value and reads it back. On a failure the slots written so far are deleted
@@ -217,13 +223,15 @@ final class AccountRegistry: @unchecked Sendable {
     // MARK: Sign Out and Remove
 
     /// Sign Out for one account (item 32, per account): deletes its key and cf_clearance from
-    /// both stores. The account stays listed, signed out. The legacy unlabelled slots are swept
+    /// both stores and forgets its sign-in marker. The account stays listed, signed out, with its
+    /// history. The legacy unlabelled slots are swept
     /// too, so no pre-accounts copy is left behind in either store. Nil signs out the legacy
     /// slots alone (a launch still running on them).
     @discardableResult
     func signOut(_ label: String?) -> SignOutResult {
         var slots = Self.slots(for: nil)
         if let label { slots = Self.slots(for: label) + slots }
+        SignInGate.forget(label, in: defaults)
         return SignOut.run(backends: stores, accounts: slots)
     }
 
@@ -235,7 +243,7 @@ final class AccountRegistry: @unchecked Sendable {
         return SignOut.anythingStored(backends: stores, accounts: slots)
     }
 
-    /// Remove Account: Sign Out, then drop it from the list. Removing the active account makes
+    /// Remove Account: Sign Out, delete its history file, then drop it from the list. Removing the active account makes
     /// the next one active (the one after it, wrapping), or none when it was the last.
     @discardableResult
     func remove(_ label: String) -> SignOutResult {
@@ -243,6 +251,7 @@ final class AccountRegistry: @unchecked Sendable {
         guard let index = list.firstIndex(of: label) else { return SignOutResult(outcomes: []) }
         let wasActive = active == label
         let result = signOut(label)
+        history?.delete(label)
         list.remove(at: index)
         writeList(list)
         if wasActive {
@@ -301,6 +310,13 @@ final class AccountRegistry: @unchecked Sendable {
         }
         for slot in Self.slots(for: nil) { try? backend.delete(account: slot) }
         return .promoted
+    }
+
+    /// The upgrade's one-time move of `history.json` to Personal's file (spec "Upgrade", step 2),
+    /// once Personal is listed; never over an existing file. Safe to call at every launch.
+    func adoptLegacyHistory() {
+        guard labels.contains(Self.defaultLabel) else { return }
+        history?.adoptLegacy(into: Self.defaultLabel)
     }
 
     /// Deletes the legacy slots from the active store: a key saved with no accounts creates
