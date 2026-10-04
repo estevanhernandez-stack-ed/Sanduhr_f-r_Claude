@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Settings, Accounts, Data (item 44): what Sanduhr keeps for the selected account and what
 /// Claude can see of it. Meter history (item 43), live activity (item 45) and the record with its
-/// project names (item 46) work; sharing is stored for item 47, and the page says so.
+/// project names (item 46) and sharing (item 47) work.
 ///
 /// Leaving Keep a record, or unlinking the folder while recording, asks whether to erase what
 /// was kept (the choice changes first: it is the tombstone). "Erase this account's data" deletes
@@ -276,8 +276,8 @@ private struct SuggestionBox: View {
 }
 
 /// Claude Code activity, project names and Share with Claude: activity reads the linked folder
-/// (item 45) and keeps the record (item 46) with the project names chosen; sharing is stored for
-/// item 47.
+/// (item 45) and keeps the record (item 46) with the project names chosen; sharing writes
+/// `mcp-access.json` (item 47).
 private struct DataChoiceRows: View {
     var vm: UsageViewModel
     let label: String
@@ -291,8 +291,6 @@ private struct DataChoiceRows: View {
             activityRow
             namesRow
             shareRow
-            Caption("Live activity and the record work now. Sharing with Claude is saved now and takes effect in a later update.")
-                .italic()
         }
     }
 
@@ -323,8 +321,8 @@ private struct DataChoiceRows: View {
             }
             .pickerStyle(.menu)
             .fixedSize()
-            .disabled(choices.activity != .record)
-            Caption("Hidden keeps a short code per project instead of its name, so the record still groups by project; Full paths also keeps each project's folder path. Used only with Keep a record. A change applies to sessions recorded or still running from now on; finished sessions already kept keep the names they were recorded with.")
+            .disabled(choices.activity != .record && choices.share != .activity)
+            Caption("Hidden keeps a short code per project instead of its name, so the record still groups by project; Full paths also keeps each project's folder path. Used with Keep a record, and for what Claude sees with Meters and activity. A change applies to sessions recorded or still running from now on; finished sessions already kept keep the names they were recorded with.")
         }
     }
 
@@ -346,7 +344,7 @@ private struct DataChoiceRows: View {
             }
             .pickerStyle(.menu)
             .fixedSize()
-            Caption("What Claude can read about this account through the Sanduhr MCP server. Off answers as if the account weren't here.")
+            Caption("What Claude can read about this account through the Sanduhr MCP server. Meters: the meters and their history. Meters and activity: also Claude Code tokens by day, model and project, with project names as chosen above. Off answers as if the account weren't here.")
         }
     }
 }

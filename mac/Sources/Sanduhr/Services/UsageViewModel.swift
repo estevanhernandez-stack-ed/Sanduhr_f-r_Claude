@@ -309,6 +309,8 @@ final class UsageViewModel {
     func bootstrap() {
         // The record keeps up for every recording account, signed in or not.
         vault.trigger()
+        // The access file as this launch's choices say, before any tool call can read it.
+        reloadAccounts()
         guard KeychainStore.exists(account: KeychainAccount.sessionKey) else {
             status = .connecting     // onboarding sheet will drive the next step
             return
@@ -418,8 +420,8 @@ final class UsageViewModel {
         accountDataChoices[label] ?? .defaults
     }
 
-    /// Settings, Accounts, Data: activity (items 45 and 46), project names (item 46); sharing is
-    /// stored for item 47.
+    /// Settings, Accounts, Data: activity (items 45 and 46), project names (item 46) and sharing
+    /// (item 47, through `mcp-access.json`).
     func setActivity(_ value: ActivityChoice, for label: String) {
         AccountData.setActivity(value, for: label, in: KeychainStore.accounts.defaults)
         reloadAccounts()
@@ -554,6 +556,9 @@ final class UsageViewModel {
             refreshLocalBurn()
             vault.trigger()
         }
+        // What the MCP server may read follows every change to choices, links, the account list
+        // and the active account (item 47). Rewritten only when its bytes change.
+        MCPAccess.sync(labels: labels, active: active, choices: data)
     }
 
     nonisolated private static func signedIn(_ accounts: AccountRegistry) -> Set<String> {
