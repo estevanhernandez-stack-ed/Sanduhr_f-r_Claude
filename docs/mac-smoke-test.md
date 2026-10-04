@@ -427,3 +427,41 @@ Support/Sanduhr/vault/` before and after.
   a throwaway account): its vault folder is gone.
 - [ ] Console (`log stream --predicate 'subsystem == "com.626labs.sanduhr" && category ==
   "vault"'`) shows fixed phrases only. Then `rm -rf ~/.claude-smoketest` and unlink it.
+
+## 18. Share with Claude: the MCP tools (item 47)
+
+Use the test folder from section 16 (`~/.claude-smoketest`, linked to a throwaway or test account,
+activity Keep a record, names Names) with a few `cc_line`s and one refresh, so the record has a day.
+Register the server the way `install.sh` does (`bash mac/integrations/install.sh`, which runs
+`claude mcp add sanduhr --scope user -- python3 ".../integrations/sanduhr_mcp.py"`; skip it if
+`claude mcp get sanduhr` already lists it). Ask Claude Code by tool name, in a new session after
+each change ("call the sanduhr get_usage tool", and so on). `F=~/Library/Application\
+Support/Sanduhr/mcp-access.json`.
+
+- [ ] Share Off on every account: `jq . "$F"` shows `"accounts": []`. `get_usage` answers
+  `no_data` / `not_shared` with a remedy naming Settings > Accounts > Data; `ping` shows
+  `sharing.access_file: "ok"`, `accounts_shared: 0`, `tools_available` with five tools and
+  `tools_not_on_mac` naming `publish_usage` and `propose_theme`.
+- [ ] Meters on the active account: the file lists it with `share: "meters"`, its
+  `account_ref` (as in `snapshot.json`), `history_file`, and no `names`, `vault_id` or
+  `live_folder`; `ls -l "$F"` shows `-rw-------`. `get_usage` shows the widget's percentages
+  with `local_burn_since_snapshot: null`; `get_usage_history` shows `meter_history` for it and
+  no days; `get_local_burn_by_project` and `get_model_usage` answer `disabled`.
+- [ ] Meters and activity: the entry gains `names: "names"`, a 16-hex `vault_id` and
+  `live_folder` = the test folder. `get_local_burn_by_project` lists one root (its
+  `account_ref`) with project `demo`; `get_model_usage` lists `claude-sonnet-4-6` beside the
+  Sonnet meter; `get_usage_history` (7 days) shows today with `top_projects` `demo`; a new
+  `cc_line` shows in `get_usage`'s `local_burn_since_snapshot` before the next refresh.
+- [ ] Names Hidden: `get_local_burn_by_project` names the project `p-` and 10 hex digits, with
+  `"names": "hidden"`, even when asked for full paths; nothing in any answer says `demo` or
+  `smoketest`. Names Full paths: asked for full paths, the project is `/tmp/demo`.
+- [ ] Activity Live only: `vault_id` leaves the file; burn and model still answer. Not tracked:
+  `live_folder` leaves too and both answer `disabled`.
+- [ ] Switch to another account with sharing Off: within a second the file's `active` flags
+  follow, and `get_usage` answers `not_shared` while the shared account's activity tools still
+  answer for it. Rename the shared account: its `account_ref` and `history_file` change with it.
+- [ ] `mv "$F" "$F.bak"`: every tool answers `not_shared`, `ping` says `access_file: "missing"`;
+  change any choice and the file comes back. `log stream --predicate 'subsystem ==
+  "com.626labs.sanduhr"'` while changing choices shows no label or path.
+- [ ] Clean up: Share Off, unlink and `rm -rf ~/.claude-smoketest`; `bash
+  mac/integrations/install.sh --remove` if the server was registered only for this test.

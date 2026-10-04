@@ -95,7 +95,7 @@ with the label. The notch stays as it is. A switch never needs a relaunch: the m
   Windows); Choose… takes any folder that looks like one. One folder per account, one account
   per folder; a folder linked elsewhere moves only after a confirmation. The suggestion compares
   `oauthAccount.organizationUuid` (the only field decoded) with the account's organization, in
-  memory. Sharing is stored for item 47.
+  memory. Sharing goes to the MCP server through `mcp-access.json` (item 47, see Claude Code integrations).
 - **Live Claude Code activity (item 45).** With activity Live only or Keep a record and a linked
   folder, the widget reads that folder's session logs (`projects/<project>/**/*.jsonl`, nested
   subagent transcripts included) for the shown account and puts a small "+Nk" before a card's
@@ -133,6 +133,11 @@ with the label. The notch stays as it is. A switch never needs a relaunch: the m
   cycle checks the choice before each file and before writing, and stops), then the folder's
   directory is deleted. `VaultReader` (by day, week, project, model, tier, skill, sessions,
   coverage) and `VaultLedgerCsv` are pure and tested, for items 47 and 48.
+- **Share with Claude (item 47).** `MCPAccess` (pure, tested) turns the accounts' choices into
+  `mcp-access.json`; the view model rewrites it from `reloadAccounts`, so every change to a choice,
+  a link, the account list or the active account lands, atomically (a temp file renamed over it,
+  mode 0600) and only when its bytes change. The Project names picker is enabled for Keep a record
+  or Meters and activity.
 - **Readers.** `snapshot.json` names the active account by `account_ref` (first 4 bytes of the
   SHA-256 of the label, as on Windows) and is deleted at once on a switch; `state.yaml` has
   `account_ref`, `accounts_count`, `history_days`, `data` (the active account's choices and
@@ -178,6 +183,47 @@ If the widget shows "Cloudflare — add cf_clearance", copy the `cf_clearance`
 cookie the same way and paste it into the second field in **Settings, Accounts**.
 Most accounts don't need this.
 
+## Claude Code integrations
+
+`mac/integrations/` holds a statusline segment and the `sanduhr` MCP server, Python 3 standard
+library only. `bash mac/integrations/install.sh` copies both to
+`~/Library/Application Support/Sanduhr/integrations/` and registers the server with Claude Code
+(`claude mcp add sanduhr --scope user`); `--remove` undoes it. The statusline reads only
+`snapshot.json`.
+
+The server (`sanduhr_mcp.py`) speaks the Windows `sanduhr-mcp` protocol with the same tool names
+and result shapes: `get_usage`, `get_local_burn_by_project`, `get_model_usage`,
+`get_usage_history`, `ping`. `publish_usage` is dropped on the Mac and `propose_theme` is not
+ported. What it may read comes from `mcp-access.json`, which the app writes:
+
+```json
+{ "schema_version": 1,
+  "accounts": [ { "account_ref": "1a2b3c4d", "active": true, "share": "activity",
+                  "history_file": "history.Work.json", "names": "hidden",
+                  "vault_id": "0123456789abcdef", "live_folder": "/Users/me/.claude-work" } ] }
+```
+
+Only accounts that share are listed. `names` and `live_folder` come with `activity` and a folder
+that is read (Live only or Keep a record), `vault_id` with `activity` and Keep a record.
+`live_folder` is there because the burn and model tools read the raw session logs for rolling
+1, 7 and 30-day windows, as Windows does; the vault holds whole local days only.
+
+| Tool | Off | Meters | Meters and activity |
+| --- | --- | --- | --- |
+| `get_usage` | `not_shared` | the active account's meters | also `local_burn_since_snapshot` from its folder |
+| `get_local_burn_by_project` | nothing | nothing (`disabled` when no account shares activity) | tokens by project per account (`root` is its `account_ref`), names as chosen |
+| `get_model_usage` | nothing | nothing | tokens by model; the meter join only with the snapshot of an account in the totals |
+| `get_usage_history` | nothing | `meter_history`: daily peak per limit | also the record's days and top projects (Keep a record) |
+| `ping` | counts only | counts only | counts only |
+
+No access file, an unreadable one or another `schema_version` shares nothing (`not_shared`, and
+`ping.sharing.access_file` says why). Hidden returns the record's `p-` code for every project,
+full paths only for Full paths. The server never takes a path argument, never writes, never
+logs and makes no network request. `SANDUHR_SUPPORT_DIR` points it at a test folder.
+
+Tests: `python3 -m unittest discover -s mac/integrations/tests` (also a Mac CI step), over temp
+folders: each sharing level, no access file, hidden names, and the Windows MCP tests' cases.
+
 ## Files
 
 - `sessionKey:{label}` + `cf_clearance:{label}` per account → the Keychain, service `com.626labs.sanduhr` (release builds), or `~/Library/Application Support/Sanduhr/credentials.json` (mode `0600`, dev builds); see First run and Accounts above
@@ -185,6 +231,7 @@ Most accounts don't need this.
 - Selected theme → `UserDefaults` (`theme`)
 - Meter history → `~/Library/Application Support/Sanduhr/history.{label}.json`, one per account, the Windows format. Each reading is kept 30 days (and at most 8640 points per limit, Windows' cap), trimmed when the next one is written; the sparklines draw the last 24 points (about 2 hours). Settings, Accounts, Meter history: Off stops recording an account (`UserDefaults` `meterHistoryOff`, the labels switched off) and offers to erase its file; Remove Account deletes it. `state.yaml` shows the active account's `history_days` (30, or 0 when off)
 - Data choices per account (Claude Code folder, activity, project names, Share with Claude) → `UserDefaults` (`accountData`); the linked folder's path stays there, never in `state.yaml`
+- What the MCP server may read → `~/Library/Application Support/Sanduhr/mcp-access.json` (mode 0600; see Claude Code integrations)
 - Window position → `UserDefaults` (`windowFrame`)
 
 ## Controls
