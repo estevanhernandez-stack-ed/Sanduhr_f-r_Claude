@@ -75,6 +75,15 @@ if [[ ! -f icon/Sanduhr.icns ]]; then
 fi
 cp icon/Sanduhr.icns "$APP/Contents/Resources/Sanduhr.icns"
 
+# The Claude Code integration scripts (item 49). Settings, Integrations copies them to
+# ~/Library/Application Support/Sanduhr/integrations/<stamp>/, so an app update refreshes them.
+# Plain files (not executable): python3 runs them, and the signature seals them as resources.
+echo "→ Bundling the integration scripts..."
+mkdir -p "$APP/Contents/Resources/integrations"
+for script in sanduhr_mcp.py sanduhr_statusline.py; do
+    install -m 0644 "integrations/$script" "$APP/Contents/Resources/integrations/$script"
+done
+
 # Embed Sparkle.framework so the app can self-update.
 SPARKLE_FRAMEWORK=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
 if [[ ! -d "$SPARKLE_FRAMEWORK" ]]; then

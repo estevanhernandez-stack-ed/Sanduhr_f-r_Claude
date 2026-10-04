@@ -121,6 +121,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         CameraLightController.shared.apply()
         // The notch glow checks for meetings a minute out while its meetings switch is on.
         NotchGlowController.shared.apply()
+        // Claude Code integrations (item 49): where they are installed, this version's scripts
+        // replace the last one's (a new stamped folder, the link swapped). No install, no write.
+        Task.detached(priority: .utility) { IntegrationScripts.standard.refreshIfInstalled() }
     }
 
     /// estedesk:// and sanduhr:// links (Option+J joins the next meeting, …/settings opens
