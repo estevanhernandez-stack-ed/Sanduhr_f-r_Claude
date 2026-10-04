@@ -181,14 +181,6 @@ struct DeskView: View {
                 if model.signInNeeded {
                     Text("sign in again in Sanduhr").opacity(0.75)
                 }
-                if model.meterHintVisible && !model.meters.isEmpty {
-                    Text(DeskMeterHint.text)
-                        .font(.custom(font, size: size * 0.75))
-                        .multilineTextAlignment(alignment == .trailing ? .trailing : .leading)
-                        .frame(maxWidth: timeSize * 3.2, alignment: alignment == .trailing ? .trailing : .leading)
-                        .opacity(0.7)
-                        .onAppear { model.meterHintShown() }
-                }
             }
             .font(.custom(font, size: size))
             .opacity(model.veiled ? 0 : (model.claudeLineIsStale ? 0.5 : 1))
@@ -197,16 +189,12 @@ struct DeskView: View {
             .overlay(alignment: alignment == .trailing ? .topTrailing : .topLeading) {
                 if noteHere { switchingNote(size: size) }
             }
-            // Clickable like a meeting row: the click itself is handled in DeskController, which
-            // shows the widget beside the meters; a two-finger click opens the row's limit menu.
-            // The faint plate, as wide as the click slack, is what lets those clicks reach this
-            // transparent window at all (DeskPointerMenu).
+            // Passive to a plain click (item 41): no hand, nothing happens. A two-finger click
+            // opens the row's limit menu (DeskController). The faint plate, as wide as the click
+            // slack, is what lets that click reach this transparent window at all (DeskPointerMenu).
             .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity)
                 .padding(EdgeInsets(top: -6, leading: -8, bottom: -6, trailing: -8)))
             .contentShape(Rectangle())
-            .onHover { inside in
-                if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-            }
             .onGlobalFrame { model.metersFrame = $0 }
             .onDisappear {
                 model.metersFrame = .zero

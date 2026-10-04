@@ -82,7 +82,7 @@ final class DeskModel {
     /// Each meeting row's frame, same coordinates, keyed by meeting id. Clicks are matched here.
     @ObservationIgnored var rowFrames: [String: CGRect] = [:]
     /// Where the meters sit in the window, same coordinates, or .zero when they are not drawn.
-    /// The meters take clicks here; a click shows the widget beside them.
+    /// The window takes the mouse here for the two-finger limit menu; a plain click does nothing.
     @ObservationIgnored var metersFrame: CGRect = .zero { didSet { if metersFrame != oldValue { onHitAreasChange?() } } }
     /// Each meter row's frame, same coordinates: a two-finger click opens that limit's menu.
     @ObservationIgnored var meterRowFrames: [Tier: CGRect] = [:]
@@ -99,9 +99,6 @@ final class DeskModel {
     var pulses: [Tier: Int] = [:]
     /// Every pulse so far, whatever the limit; the notch island pulses when it goes up.
     var pulseCount = 0
-    /// The one-time hint under the meters (DeskMeterHint) is still due.
-    var meterHintVisible = false
-    @ObservationIgnored private let meterHint = DeskMeterHint()
 
     /// The widget's last numbers (see `update`).
     @ObservationIgnored private var usage = DeskUsage()
@@ -287,8 +284,6 @@ final class DeskModel {
         if parts != claudeParts { claudeParts = parts }
         claudeCompact = DeskClaudeText.compact(usage, now: now)
         claudeLineIsStale = usage.isStale(now: now)
-        let hint = meterHint.isVisible(now: now)
-        if meterHintVisible != hint { meterHintVisible = hint }
     }
 
     /// The meter rows for the limits that show, with the saved warning settings (Settings, Desk, Meters).
@@ -310,15 +305,6 @@ final class DeskModel {
     func pulse(_ tiers: Set<Tier>) {
         for tier in tiers { pulses[tier, default: 0] += 1 }
         pulseCount += 1
-    }
-
-    /// The hint was drawn under the meters; its three days start now if they have not already.
-    func meterHintShown() { meterHint.markShown(now: Date()) }
-
-    /// The meters were clicked: the hint has done its job.
-    func meterHintDismissed() {
-        meterHint.dismiss()
-        meterHintVisible = false
     }
 
     /// Every interactive element DeskView draws, with the frame it reported (.zero when none

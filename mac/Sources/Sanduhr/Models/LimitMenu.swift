@@ -2,6 +2,9 @@ import Foundation
 
 /// One item of a limit's two-finger menu (item 39), on a Desk meter row or a widget tier card.
 enum LimitMenuEntry: Equatable {
+    /// Show Widget, or Hide Widget when it shows (`visible`): on a Desk meter's menu only, at the
+    /// top, since a plain click on the meters does nothing (item 41).
+    case widget(visible: Bool)
     /// The Accounts submenu, with two or more accounts. Its titles are labels: never in state.yaml.
     case accounts(AccountsMenu)
     /// Hide this limit (MeterVisibility, the Settings "Show this limit" switch turned off).
@@ -13,6 +16,7 @@ enum LimitMenuEntry: Equatable {
 
     var title: String {
         switch self {
+        case .widget(let visible): visible ? "Hide Widget" : "Show Widget"
         case .accounts: AccountsMenu.title
         case .hide(let tier): LimitMenu.hideTitle(tier)
         case .warnings(_, let on): on ? LimitMenu.stopWarnings : LimitMenu.warnAgain
@@ -32,13 +36,15 @@ enum LimitMenu {
 
     static func hideTitle(_ tier: Tier) -> String { "Hide \(tier.label)" }
 
-    /// The items in runs between separators: the Accounts submenu (two or more accounts), then the
-    /// limit's own items, then Meter Settings…. `tier` is the row or card the menu opened on; nil
-    /// (a click beside the rows) leaves the limit's own items out. Hide shows only for a limit that
-    /// can be hidden and still shows; `warningsOn` is the limit's "Warn when nearly full".
+    /// The items in runs between separators: Show or Hide Widget (Desk only: `widgetVisible` is
+    /// nil on a widget card), the Accounts submenu (two or more accounts), then the limit's own
+    /// items, then Meter Settings…. `tier` is the row or card the menu opened on; nil (a click
+    /// beside the rows) leaves the limit's own items out. Hide shows only for a limit that can be
+    /// hidden and still shows; `warningsOn` is the limit's "Warn when nearly full".
     static func groups(tier: Tier?, accounts: AccountsMenu?, hidden: Set<Tier>,
-                       warningsOn: Bool) -> [[LimitMenuEntry]] {
+                       warningsOn: Bool, widgetVisible: Bool? = nil) -> [[LimitMenuEntry]] {
         var groups: [[LimitMenuEntry]] = []
+        if let widgetVisible { groups.append([.widget(visible: widgetVisible)]) }
         if let accounts { groups.append([.accounts(accounts)]) }
         if let tier {
             var own: [LimitMenuEntry] = []
@@ -51,13 +57,15 @@ enum LimitMenu {
     }
 
     /// The same, with the hidden limits and the warning switch read from `store` (the desk suite).
-    static func groups(tier: Tier?, accounts: AccountsMenu?, store: DefaultsStore) -> [[LimitMenuEntry]] {
+    static func groups(tier: Tier?, accounts: AccountsMenu?, store: DefaultsStore,
+                       widgetVisible: Bool? = nil) -> [[LimitMenuEntry]] {
         groups(tier: tier, accounts: accounts, hidden: MeterVisibility.hidden(in: store),
-               warningsOn: tier.map { MeterWarningSettings.saved($0, in: store).enabled } ?? false)
+               warningsOn: tier.map { MeterWarningSettings.saved($0, in: store).enabled } ?? false,
+               widgetVisible: widgetVisible)
     }
 
-    /// Does what Hide and the warnings item say, in `store`. The Accounts submenu and Meter
-    /// Settings… are the caller's (a switch, a window), so they change nothing here.
+    /// Does what Hide and the warnings item say, in `store`. The widget item, the Accounts
+    /// submenu and Meter Settings… are the caller's (a window, a switch), so they change nothing here.
     static func apply(_ entry: LimitMenuEntry, to store: DefaultsStore) {
         switch entry {
         case .hide(let tier) where MeterVisibility.canHide(tier):

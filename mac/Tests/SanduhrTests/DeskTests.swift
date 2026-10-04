@@ -490,47 +490,6 @@ struct DeskFirstRunTests {
     }
 }
 
-@Suite("Desk meter hint")
-struct DeskMeterHintTests {
-    let start = Date(timeIntervalSince1970: 1_790_000_000)
-    let day: TimeInterval = 24 * 60 * 60
-
-    @Test func dueBeforeItHasEverShown() {
-        let hint = DeskMeterHint(store: MemoryDefaults())
-        #expect(hint.isVisible(now: start))
-        // Its three days start when it is drawn, not before.
-        #expect(hint.isVisible(now: start.addingTimeInterval(30 * day)))
-    }
-
-    @Test func expiresThreeDaysAfterItFirstShowed() {
-        let store = MemoryDefaults()
-        let hint = DeskMeterHint(store: store)
-        hint.markShown(now: start)
-        // Drawn again later (a new window, a relaunch): the first date stands.
-        hint.markShown(now: start.addingTimeInterval(2 * day))
-        #expect(store.object(forKey: DeskMeterHint.firstShownKey) as? Date == start)
-        #expect(hint.isVisible(now: start.addingTimeInterval(3 * day - 60)))
-        #expect(hint.isVisible(now: start.addingTimeInterval(3 * day)) == false)
-        #expect(hint.isVisible(now: start.addingTimeInterval(10 * day)) == false)
-    }
-
-    @Test func firstMeterClickEndsItForGood() {
-        let store = MemoryDefaults()
-        let hint = DeskMeterHint(store: store)
-        hint.markShown(now: start)
-        hint.dismiss()
-        #expect(hint.isVisible(now: start.addingTimeInterval(60)) == false)
-        // A later launch reads the same store.
-        #expect(DeskMeterHint(store: store).isVisible(now: start.addingTimeInterval(60)) == false)
-    }
-
-    @Test func dismissedBeforeShowingNeverShows() {
-        let hint = DeskMeterHint(store: MemoryDefaults())
-        hint.dismiss()
-        #expect(hint.isVisible(now: start) == false)
-    }
-}
-
 @Suite("Widget beside the meters")
 struct DeskPanelPlacementTests {
     let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)

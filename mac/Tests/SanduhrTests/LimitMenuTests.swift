@@ -81,11 +81,35 @@ struct LimitMenuTests {
         #expect(LimitMenu.silenced(in: d) == [.fiveHour])
     }
 
+    /// Item 41: a plain click on the Desk meters does nothing, so their menu has the widget on top.
+    @Test func aDeskMeterMenuStartsWithShowOrHideWidget() {
+        let hidden = LimitMenu.groups(tier: .sevenDay, accounts: two, hidden: [], warningsOn: true, widgetVisible: false)
+        #expect(flat(hidden) == [
+            "Show Widget", "-", "Accounts", "-", "Stop warnings for this limit", "-", "Meter Settings…",
+        ])
+        let shown = LimitMenu.groups(tier: nil, accounts: nil, hidden: [], warningsOn: true, widgetVisible: true)
+        #expect(flat(shown) == ["Hide Widget", "-", "Meter Settings…"])
+        #expect(LimitMenu.groups(tier: nil, accounts: nil, store: MemoryDefaults(), widgetVisible: false)[0]
+            == [.widget(visible: false)])
+        // A widget card's menu (no widgetVisible) has no widget item.
+        #expect(LimitMenu.groups(tier: nil, accounts: nil, hidden: [], warningsOn: true)[0] == [.meterSettings])
+    }
+
+    /// Below the limit's items the shared menu follows without its own Show or Hide Widget.
+    @Test func theSharedMenuCanDropShowHide() {
+        let groups = SanduhrMenu.groups(widgetVisible: false, deepWork: false, pacing: false, snake: false)
+        let rest = SanduhrMenu.without(.showHide, in: groups)
+        #expect(rest.count == groups.count - 1)
+        #expect(rest.first?.header == "Tools")
+        #expect(!rest.flatMap(\.entries).contains { $0.command == .showHide })
+    }
+
     @Test func applyNeverHidesSessionOrWeeklyAndLeavesTheRestAlone() {
         let d = MemoryDefaults()
         LimitMenu.apply(.hide(.fiveHour), to: d)
         LimitMenu.apply(.hide(.sevenDay), to: d)
         LimitMenu.apply(.meterSettings, to: d)
+        LimitMenu.apply(.widget(visible: false), to: d)
         if let two { LimitMenu.apply(.accounts(two), to: d) }
         #expect(d.values.isEmpty)
     }

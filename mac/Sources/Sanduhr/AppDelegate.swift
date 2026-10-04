@@ -298,10 +298,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The shared menu (SanduhrMenu) as AppKit items, for the menu bar item's menu and Desk's
     /// clock menu. The widget's own two-finger menu (RootView) renders the same groups.
     /// `accounts` false leaves the Accounts submenu out, for a limit menu that already has it;
-    /// `menuBarModes` adds Menu Bar Shows after it, in the menu bar item's own menu only.
-    func addMenuItems(to menu: NSMenu, accounts withAccounts: Bool = true, menuBarModes: Bool = false) {
+    /// `menuBarModes` adds Menu Bar Shows after it, in the menu bar item's own menu only;
+    /// `showHide` false leaves Show or Hide Widget out, for a Desk limit menu that has it on top.
+    func addMenuItems(to menu: NSMenu, accounts withAccounts: Bool = true, menuBarModes: Bool = false,
+                      showHide: Bool = true) {
         let accounts = withAccounts ? currentAccountsMenu() : nil
-        for (i, group) in currentMenu(widgetVisible: panel?.isVisible ?? false).enumerated() {
+        var groups = currentMenu(widgetVisible: panel?.isVisible ?? false)
+        // A Desk limit menu has Show or Hide Widget at its top already.
+        if !showHide { groups = SanduhrMenu.without(.showHide, in: groups) }
+        for (i, group) in groups.enumerated() {
             if i > 0 { menu.addItem(.separator()) }
             if let header = group.header { menu.addItem(.sectionHeader(title: header)) }
             for entry in group.entries {
@@ -348,17 +353,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBarModeDidChange()
     }
 
-    /// A Desk meter row's two-finger menu (LimitMenu): Accounts, Hide and the warnings item for
-    /// `tier`, Meter Settings…, then the shared menu under a separator. `tier` nil, a click beside
-    /// the rows, leaves the limit's own items out.
+    /// A Desk meter row's two-finger menu (LimitMenu): Show or Hide Widget, Accounts, Hide and the
+    /// warnings item for `tier`, Meter Settings…, then the shared menu under a separator, less its
+    /// own Show or Hide Widget. `tier` nil, a click beside the rows, leaves the limit's own items out.
     func addLimitMenuItems(to menu: NSMenu, tier: Tier?) {
-        let groups = LimitMenu.groups(tier: tier, accounts: currentAccountsMenu(), store: UserDefaults.desk)
+        let groups = LimitMenu.groups(tier: tier, accounts: currentAccountsMenu(), store: UserDefaults.desk,
+                                      widgetVisible: widgetVisible)
         for (i, group) in groups.enumerated() {
             if i > 0 { menu.addItem(.separator()) }
             for entry in group { menu.addItem(limitMenuItem(entry)) }
         }
         menu.addItem(.separator())
-        addMenuItems(to: menu, accounts: false)
+        addMenuItems(to: menu, accounts: false, showHide: false)
     }
 
     private func limitMenuItem(_ entry: LimitMenuEntry) -> NSMenuItem {
@@ -378,6 +384,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Meter Settings… opens that page.
     func performLimit(_ entry: LimitMenuEntry) {
         switch entry {
+        case .widget(let visible):
+            if visible { hidePanel() } else { DeskController.shared.showWidgetBesideMeters() }
         case .accounts: break
         case .meterSettings: SettingsWindowController.shared.show(.deskMeters)
         case .hide, .warnings: LimitMenu.apply(entry, to: UserDefaults.desk)
@@ -500,8 +508,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.orderFrontRegardless()
     }
 
-    /// A click on the Desk meters: a hidden widget comes back beside them (`meters` is their
-    /// frame on screen); a widget already showing is only brought forward.
+    /// Show Widget in the Desk meters' menu: a hidden widget comes back beside them (`meters` is
+    /// their frame on screen); a widget already showing is only brought forward.
     func showPanel(beside meters: CGRect, on screen: NSScreen?) {
         if let panel, !panel.isVisible, let screen {
             let frame = DeskPanelPlacement.frame(beside: meters, size: panel.frame.size,

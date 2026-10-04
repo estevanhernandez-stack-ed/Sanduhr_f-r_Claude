@@ -52,6 +52,16 @@ enum SanduhrMenu {
     }
 }
 
+extension SanduhrMenu {
+    /// `groups` without `command`'s item, dropping a group it leaves empty.
+    static func without(_ command: MenuCommand, in groups: [MenuGroup]) -> [MenuGroup] {
+        groups.compactMap { group in
+            let entries = group.entries.filter { $0.command != command }
+            return entries.isEmpty ? nil : MenuGroup(header: group.header, entries: entries)
+        }
+    }
+}
+
 /// One account in the Accounts submenu: the active one checked, one that following saw in use
 /// marked "· in use".
 struct AccountMenuItem: Equatable {

@@ -188,8 +188,8 @@ final class DeskController: NSObject, NSMenuDelegate {
             mouseMonitors.append(l)
         }
         // Clicks: whichever app macOS gives the click to, if it landed on a meeting row with a
-        // link, open the meeting; on the meters, show the widget. A click that reaches Desk
-        // itself is consumed.
+        // link, open the meeting (DeskHitTest decides what is under the pointer). A plain click
+        // on the meters does nothing. A click that reaches Desk itself is consumed.
         if let g = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown], handler: { [weak self] event in
             // Another app's window over the clock means the click was meant for that app.
             guard let self, !Self.appWindowCoversPointer() else { return }
@@ -311,8 +311,9 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     /// A left click on whatever DeskHitTest finds under the pointer: a meeting row opens its
     /// link, the calendar note opens System Settings, the account label switches to the next
-    /// account (as the widget chip does; a manual switch, so following pauses), and the meters
-    /// show the widget. True when the click was used.
+    /// account (as the widget chip does; a manual switch, so following pauses). The meters are
+    /// passive (item 41): a plain click there does nothing at all, and the widget, history and
+    /// tools are in their two-finger menu. True when the click was Desk's, so it goes no further.
     private func clickUnderPointer() -> Bool {
         guard let hit = elementUnderPointer() else { return false }
         switch hit.kind {
@@ -326,22 +327,27 @@ final class DeskController: NSObject, NSMenuDelegate {
             // Event monitors run on the main thread.
             MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.viewModel.cycleAccount() }
         case .meters, .meterRow:
-            showWidgetFromMeters()
+            // The window holds the mouse over the meters so a two-finger click reaches the limit
+            // menu; a plain click is swallowed there, so nothing reacts to it.
+            break
         case .meetings:
             return false
         }
         return true
     }
 
-    /// A click on the meters ends the hint and shows the widget beside them.
-    private func showWidgetFromMeters() {
-        guard let w = window else { return }
-        model.meterHintDismissed()
+    /// The limit menu's Show Widget: a hidden widget comes back beside the meters, or where it
+    /// was when the meters are not drawn.
+    func showWidgetBesideMeters() {
+        guard let w = window, !model.metersFrame.isEmpty else {
+            MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.showPanel() }
+            return
+        }
         let f = model.metersFrame
         let onScreen = CGRect(x: w.frame.minX + f.minX, y: w.frame.maxY - f.maxY,
                               width: f.width, height: f.height)
         let screen = w.screen ?? NSScreen.main
-        // Event monitors run on the main thread.
+        // Menu items act on the main thread.
         MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.showPanel(beside: onScreen, on: screen) }
     }
 

@@ -86,16 +86,15 @@ Fresh-install and migration checks stay manual.
 
 - [ ] Hide the widget, with Ice hiding the menu bar hourglass: Option+S opens one window titled "Sanduhr Settings", a sidebar with General, Alerts, Accounts; Desk: Layout, Look, Meters, Message, Notch; Widget: Look, Themes, Pacing & Focus; Sanduhr: Updates, About. Every section opens and edits with the widget still hidden. Settings… in the widget's menu and the hourglass's menu bring the same window forward (never a second one); there is no "Sanduhr Desk" window and no settings sheet on the widget.
 - [ ] General, Surfaces: "Show the widget now" off hides the widget and on shows it (the switch follows the hourglass too); Notch flips the island (Desk on).
-- [ ] General, Surfaces, Widget picker: "Hidden while Desk is on" hides it at once with Desk on; turn Desk off, it shows; on, it hides. Show it from the hourglass: it stays until Desk next flips. "Only when I open it": hidden after every Desk flip and after a relaunch until a meter click, Tools or Show Widget brings it. "Always shown": choosing it brings a hidden widget back; Desk flips leave it where it is. Put back "Always shown" (or what it was). Pacing & Focus, "Pin the pacing calculators" and Tools, Pacing Calculators show the same state: flip one, the other follows.
+- [ ] General, Surfaces, Widget picker: "Hidden while Desk is on" hides it at once with Desk on; turn Desk off, it shows; on, it hides. Show it from the hourglass: it stays until Desk next flips. "Only when I open it": hidden after every Desk flip and after a relaunch until Show Widget (any menu, a Desk meter's two-finger menu included) or Tools brings it. "Always shown": choosing it brings a hidden widget back; Desk flips leave it where it is. Put back "Always shown" (or what it was). Pacing & Focus, "Pin the pacing calculators" and Tools, Pacing Calculators show the same state: flip one, the other follows.
 - [ ] After section 1, Desk is already on: clock, date, message and the meters (a bar per limit with a pace tick and reset time). General, Surfaces, Desk is on. The notch stays plain (its own switch, off).
 - [ ] General, "Read today's meetings" (off on a fresh install): switch it on and the Calendar prompt appears right away, no restart. Allow: today's remaining timed meetings show. Switch it off: they go.
 - [ ] Meters: their pace ticks sit where the widget's do; hide the widget and refresh from the menu, and the meters still update.
-- [ ] Hint: on the first run with meters on the desktop, "Click the meters for history and tools. Option+S for settings." shows under them in the Desk font. `defaults read com.626labs.sanduhr.desk meterHintFirstShown` prints the time it first showed.
-- [ ] Meter click: hide the widget, point at the meters (the pointer turns into a hand), click. The widget appears beside them (to their right in a left corner, to their left in a right corner), fully on screen, in front. The hint is gone and stays gone after a relaunch (`meterHintDismissed = 1`).
-- [ ] Click the meters again with the widget showing: it comes forward and does not move. Drag it elsewhere, hide it with the hourglass and show it again with the hourglass: it comes back where it was dragged, not beside the meters.
+- [ ] No hint: nothing is written under the meters (the old "Click the meters for history and tools" line is gone, item 41).
+- [ ] Passive meters (item 41): hide the widget, point at the meters: the pointer stays an arrow. Click a meter, a bar, the gap between the label and the percent, and beside the rows: nothing happens: no widget, no menu. Two-finger click (or Control-click) a meter: the menu starts with Show Widget; choose it and the widget appears beside the meters (to their right in a left corner, to their left in a right corner), fully on screen, in front. With the widget showing the same item reads Hide Widget and hides it, and the widget's usual items below have no second Show or Hide Widget.
+- [ ] Show Widget from a meter's menu again after hiding it: beside the meters again. Drag it elsewhere, hide it with the hourglass and show it again with the hourglass: it comes back where it was dragged, not beside the meters.
 - [ ] Click empty desktop beside the meters: Finder gets it (desktop icons select). Put a Finder window over the meters and click it there: the window takes the click, no widget.
-- [ ] Hint expiry: quit, `defaults write com.626labs.sanduhr.desk meterHintFirstShown -date "2026-01-01 00:00:00 +0000"; defaults delete com.626labs.sanduhr.desk meterHintDismissed`, relaunch: no hint. `defaults delete com.626labs.sanduhr.desk meterHintFirstShown`, relaunch: the hint is back (tidy up by clicking the meters).
-- [ ] Tools with Ice hiding the hourglass and the widget hidden: click the meters, two-finger click the widget, Tools: Deep Work opens the hourglass overlay, Cooldown Snake the game, Pacing Calculators keeps cool-down or surplus showing on every card (checked; choose again to put them back under the pointer), Hide Widget hides it.
+- [ ] Tools with Ice hiding the hourglass and the widget hidden: two-finger click a Desk meter, Show Widget, two-finger click the widget, Tools: Deep Work opens the hourglass overlay, Cooldown Snake the game, Pacing Calculators keeps cool-down or surplus showing on every card (checked; choose again to put them back under the pointer), Hide Widget hides it.
 - [ ] Tools from the menu bar hourglass's menu, widget hidden first each time: Show Widget shows it; Deep Work, Cooldown Snake and Pacing Calculators each show the widget with that tool open. With `menuIcon` on, Desk's clock menu lists today's meetings and Join next meeting, then the same items as the hourglass's menu in the same order. A tool open on the widget shows checked in all three menus.
 - [ ] Meters: Settings, Desk, Meters lists Session and Weekly — All Models (plus any other weekly limit the account reports), each with "Warn when nearly full", an "At" slider (50 to 100%) and "Only while the reset is more than". Drop the weekly slider below its current percent with a "more than" shorter than its reset: the weekly bar turns red at once with a steady glow in the Desk ink around it, and its percent turns red. Raise the slider back, or pick a "more than" longer than the time to reset: it goes back to the ink. The session bar never turns red until its own switch is on. Put the settings back (weekly: on, 90%, 1 day).
 - [ ] Layout: move Clock to Top right; it moves live. Hide Meetings; they go. Put both back.
@@ -223,16 +222,17 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   the start of the line: the pointer turns into a hand and the name underlines; the rest of the
   line keeps the arrow and a click there reaches the desktop. Click the name: the next account's
   numbers come in, as with a chip click (`account_ref` changes, `follow_paused: true` with
-  following on). A click on the meters still shows the widget beside them. With one account the
+  following on). A plain click on the meters does nothing (item 41). With one account the
   line starts with "claude" and nothing on it is clickable.
 - [ ] Limit menu on Desk: two-finger click (or Control-click) the Weekly — All Models meter: an
   Accounts submenu (two accounts, the active one checked), then "Stop warnings for this limit"
-  (no Hide), then "Meter Settings…", then the widget's usual items (Show Widget, Tools, Refresh,
-  Settings…, Quit) with no second Accounts submenu. On the Session meter the warnings item reads
+  (no Hide), then "Meter Settings…", then the widget's usual items (Tools, Refresh, Settings…,
+  Quit) with no second Accounts submenu. On the Session meter the warnings item reads
   "Warn again for this limit" (off by default). On a limit beyond those two (Weekly — Opus,
   Weekly — Special…) "Hide Weekly — …" shows too. With one account there is no Accounts submenu.
-  A plain click on a meter still shows the widget; the Finder's own desktop menu never opens over
-  the meters.
+  The Desk menu starts with Show Widget (Hide Widget when it shows) since item 41, and the widget's
+  usual items below it have no second one. A plain click on a meter does nothing; the Finder's own
+  desktop menu never opens over the meters.
 - [ ] Switch from the menu: pick the other account in the Accounts submenu: its numbers come in
   (`account_ref` changes), as from the chip.
 - [ ] Silence: with Settings, Desk, Meters open beside it, choose "Stop warnings for this limit"
