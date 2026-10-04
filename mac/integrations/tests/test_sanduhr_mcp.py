@@ -545,8 +545,8 @@ class ActivityLevel(Base):
         self.assertEqual(p["cc_roots_consented"], [ref("Home")])
         self.assertEqual(p["tools_available"],
                          ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
-                          "get_desk_messages", "propose_desk_messages"])
-        self.assertEqual(sorted(p["tools_not_on_mac"]), ["propose_theme", "publish_usage"])
+                          "get_desk_messages", "propose_desk_messages", "propose_theme"])
+        self.assertEqual(sorted(p["tools_not_on_mac"]), ["publish_usage"])
         text = json.dumps(p)
         for secret in ("Home", "Work", ".claude-personal", VAULT_A):
             self.assertNotIn(secret, text)
@@ -605,13 +605,21 @@ class Protocol(Base):
         self.assertEqual([f.get("id") for f in frames], [1, 2, 3, 4, 5, 6])
         names = [t["name"] for t in frames[1]["result"]["tools"]]
         self.assertEqual(names, ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
-                                 "get_desk_messages", "propose_desk_messages"])
+                                 "get_desk_messages", "propose_desk_messages", "propose_theme"])
         for t in frames[1]["result"]["tools"]:
             if t["name"] == "propose_desk_messages":
                 # The one tool that asks for a change: not read-only, never destructive, no path.
                 self.assertFalse(t["annotations"]["readOnlyHint"])
                 self.assertFalse(t["annotations"]["destructiveHint"])
                 self.assertEqual(sorted(t["inputSchema"]["properties"]), ["lines", "mode", "note"])
+                self.assertFalse(t["inputSchema"]["additionalProperties"])
+                continue
+            if t["name"] == "propose_theme":
+                # The Windows tool's inputs, no path.
+                self.assertFalse(t["annotations"]["readOnlyHint"])
+                self.assertFalse(t["annotations"]["destructiveHint"])
+                self.assertEqual(sorted(t["inputSchema"]["properties"]), ["apply", "save_as", "theme"])
+                self.assertEqual(t["inputSchema"]["required"], ["theme"])
                 self.assertFalse(t["inputSchema"]["additionalProperties"])
                 continue
             self.assertTrue(t["annotations"]["readOnlyHint"])
@@ -866,6 +874,308 @@ class DeskMessages(Base):
                          "{write}", "{shimmer}", "40 characters"):
                 self.assertIn(word, tools[name], (name, word))
         self.assertIn("never writes messages.txt", tools["propose_desk_messages"])
+
+
+BUILTIN_THEMES = os.path.join(FIXTURES, "theme-builtins.json")
+
+
+def clean_theme():
+    """A clean theme (Obsidian's values), as the Windows ThemeLintTests' Clean()."""
+    return {
+        "name": "Test",
+        "bg": "#0d0d0d", "glass": "#1c1c1c", "glass_on_mica": "#1a1a1c",
+        "title_bg": "#161616", "border": "#333333", "footer_bg": "#111111", "bar_bg": "#2a2a2a",
+        "text": "#e8e4dc", "text_secondary": "#b8b4ac", "text_dim": "#777777", "text_muted": "#555555",
+        "accent": "#6c63ff", "pace_marker": "#ff6b6b", "sparkline": "#6c63ff",
+        "glass_alpha": 0.85, "border_alpha": 0.30,
+    }
+
+
+def fields(findings, level):
+    return [f["field"] for f in findings if f["level"] == level]
+
+
+class ThemeLint(unittest.TestCase):
+    """The Windows ThemeLintTests' cases, against the Python port (item 55)."""
+
+    def lint(self, theme):
+        return mcp.lint_theme(theme)
+
+    def test_every_built_in_lints_with_no_findings(self):
+        with open(BUILTIN_THEMES, encoding="utf-8") as f:
+            builtins = json.load(f)
+        keys = [k for k in builtins if not k.startswith("_")]
+        self.assertEqual(sorted(keys), sorted(k for k in mcp.BUILT_IN_THEME_IDS if k != "match-desk"))
+        for key in keys:
+            self.assertEqual(self.lint(builtins[key]), [], key)
+
+    def test_clean_theme_is_ok(self):
+        self.assertEqual(self.lint(clean_theme()), [])
+
+    def test_not_an_object(self):
+        r = self.lint([1, 2])
+        self.assertEqual([f["field"] for f in r], ["json"])
+
+    def test_missing_required_color(self):
+        j = clean_theme()
+        del j["pace_marker"]
+        self.assertIn("pace_marker", fields(self.lint(j), "error"))
+
+    def test_malformed_hex_names_the_accepted_form(self):
+        for bad in ("#fff", "#ff00ff80", "ff00ff", "#gg0000", "red"):
+            j = clean_theme()
+            j["accent"] = bad
+            errors = [f for f in self.lint(j) if f["level"] == "error"]
+            self.assertEqual([f["field"] for f in errors], ["accent"], bad)
+            self.assertIn("#rrggbb", errors[0]["message"])
+
+    def test_non_string_color_is_an_error(self):
+        j = clean_theme()
+        j["bg"] = 12
+        self.assertIn("bg", fields(self.lint(j), "error"))
+
+    def test_dial_out_of_range(self):
+        for field, value in (("glass_alpha", 1.5), ("border_alpha", -0.1), ("card_corner_radius", 99),
+                             ("breath_period_ms", 10), ("ghost_alpha", 2), ("glass_alpha", True), ("glass_alpha", "0.8")):
+            j = clean_theme()
+            j[field] = value
+            self.assertIn(field, fields(self.lint(j), "error"), (field, value))
+
+    def test_nested_dials_use_dotted_names(self):
+        j = clean_theme()
+        j["accent_bloom"] = {"blur": 40, "alpha": 0.5}
+        j["inner_highlight"] = {"color": "nope", "alpha": 0.2}
+        errors = fields(self.lint(j), "error")
+        self.assertIn("accent_bloom.blur", errors)
+        self.assertIn("inner_highlight.color", errors)
+        j = clean_theme()
+        j["accent_bloom"] = 3
+        j["inner_highlight"] = {"alpha": 0.2}
+        errors = fields(self.lint(j), "error")
+        self.assertIn("accent_bloom", errors)
+        self.assertIn("inner_highlight.color", errors)
+
+    def test_name_rules(self):
+        j = clean_theme()
+        for name in ("", "   ", "x" * 25, None, 7, "two\nlines"):
+            j["name"] = name
+            self.assertIn("name", fields(self.lint(j), "error"), name)
+        del j["name"]
+        self.assertIn("name", fields(self.lint(j), "error"))
+        j["name"] = "x" * 24
+        self.assertEqual(self.lint(j), [])
+
+    def test_present_nulls_are_fine(self):
+        j = clean_theme()
+        j.update({"border_tint": None, "inner_highlight": None, "accent_bloom": None, "description": None,
+                  "monospace_font": None})
+        self.assertEqual(self.lint(j), [])
+
+    def test_mac_fields(self):
+        j = clean_theme()
+        j.update({"description": "Night sea glass.", "ghost_alpha": 0.6, "monospace_font": "SF Mono"})
+        self.assertEqual(self.lint(j), [])
+        for field, value in (("description", "x" * 201), ("description", "a\nb"), ("description", 3),
+                             ("monospace_font", True), ("opts_out_of_mica", "yes")):
+            j = clean_theme()
+            j[field] = value
+            self.assertIn(field, fields(self.lint(j), "error"), (field, value))
+
+    def test_light_base_warns_and_still_passes(self):
+        j = clean_theme()
+        j["glass_on_mica"] = "#f0f0f0"
+        j["glass"] = "#f0f0f0"
+        r = self.lint(j)
+        self.assertEqual(fields(r, "error"), [])
+        self.assertIn("glass_on_mica", fields(r, "warning"))
+        self.assertIn("glass", fields(r, "warning"))
+        self.assertNotIn("bg", fields(r, "warning"))
+
+    def test_low_text_contrast_names_the_ratio(self):
+        j = clean_theme()
+        j["text"] = "#5a5a5a"
+        text = [f for f in self.lint(j) if f["field"] == "text"]
+        self.assertEqual(len(text), 1)
+        self.assertIn(":1", text[0]["message"])
+        self.assertIn("4.5", text[0]["message"])
+
+    def test_text_ramp_descends_and_shares_a_hue(self):
+        j = clean_theme()
+        j["text_dim"] = "#ffffff"
+        self.assertIn("text_dim", fields(self.lint(j), "warning"))
+        j = clean_theme()
+        j.update({"text": "#ffb0b0", "text_secondary": "#b0ffb0", "text_dim": "#802020", "text_muted": "#501010"})
+        self.assertIn("text_secondary", fields(self.lint(j), "warning"))
+        g = clean_theme()
+        g.update({"text": "#eeeeee", "text_secondary": "#bbbbbb", "text_dim": "#777777", "text_muted": "#555555"})
+        self.assertNotIn("text_secondary", fields(self.lint(g), "warning"))
+
+    def test_pace_marker_on_the_green_fill(self):
+        j = clean_theme()
+        j["pace_marker"] = "#4ade80"
+        self.assertIn("pace_marker", fields(self.lint(j), "warning"))
+        j["pace_marker"] = "#fbbf24"
+        self.assertNotIn("pace_marker", fields(self.lint(j), "warning"))
+
+    def test_sparkline_and_border_tint_share_the_accent_hue(self):
+        j = clean_theme()
+        j["sparkline"] = "#ff8800"
+        j["border_tint"] = "#00ff88"
+        r = fields(self.lint(j), "warning")
+        self.assertIn("sparkline", r)
+        self.assertIn("border_tint", r)
+
+    def test_mica_opt_out_with_translucent_glass(self):
+        j = clean_theme()
+        j["opts_out_of_mica"] = True
+        self.assertIn("glass_alpha", fields(self.lint(j), "warning"))
+        j["glass_alpha"] = 1.0
+        self.assertNotIn("glass_alpha", fields(self.lint(j), "warning"))
+
+    def test_finding_shape(self):
+        j = clean_theme()
+        del j["bg"]
+        one = self.lint(j)[0]
+        self.assertEqual((one["level"], one["field"]), ("error", "bg"))
+        self.assertTrue(one["message"])
+
+    def test_color_math(self):
+        white, black = mcp.theme_hex("#ffffff"), mcp.theme_hex("#000000")
+        red, green = mcp.theme_hex("#ff0000"), mcp.theme_hex("#00ff00")
+        self.assertAlmostEqual(mcp.luminance(white), 1.0, 3)
+        self.assertAlmostEqual(mcp.contrast(mcp.luminance(white), mcp.luminance(black)), 21.0, 1)
+        self.assertAlmostEqual(mcp.hue(red), 0, 1)
+        self.assertAlmostEqual(mcp.hue(green), 120, 1)
+        self.assertAlmostEqual(mcp.hue_distance(red, green), 120, 1)
+        self.assertIsNone(mcp.hue_distance(red, black))
+        self.assertAlmostEqual(mcp.composite(black, 0.5, white)[0], 0.5, 3)
+
+    def test_slug(self):
+        self.assertEqual(mcp.theme_slug("  Sunset Neon! "), "sunset-neon")
+        self.assertEqual(mcp.theme_slug("Café Noir"), "caf-noir")
+        self.assertEqual(mcp.theme_slug("!!!"), "theme")
+        self.assertEqual(len(mcp.theme_slug("a" * 50)), 40)
+
+
+class ProposeTheme(Base):
+    """propose_theme (item 55): the Windows ToolLogicThemeTests' cases on a temp folder; the app's
+    answer is played by a fake sleep."""
+
+    def propose(self, args, answer=None, wait=1.0):
+        ticks = [0.0]
+
+        def clock():
+            return ticks[0]
+
+        def sleep(seconds):
+            ticks[0] += seconds
+            if answer is None or not os.path.exists(self.paths.theme_request):
+                return
+            with open(self.paths.theme_request, encoding="utf-8") as f:
+                req = json.load(f)
+            res = answer(req)
+            if res is not None:
+                self.fx.write_json(mcp.THEME_RESULT_FILE, {"id": req["id"], "completed_at": iso(NOW), "result": res})
+
+        return mcp.build_propose_theme(args, now=NOW, paths=self.paths, wait=wait, poll=0.25, sleep=sleep, clock=clock)
+
+    def test_paths_stay_in_the_test_folder(self):
+        self.assertEqual(self.paths.theme_request, os.path.join(self.fx.support, "theme-request.json"))
+        self.assertEqual(self.paths.theme_result, os.path.join(self.fx.support, "theme-result.json"))
+
+    def test_broken_theme_is_rejected_with_findings_and_writes_nothing(self):
+        before = sorted(os.listdir(self.fx.support))
+        bad = clean_theme()
+        del bad["accent"]
+        r = self.propose({"theme": bad})
+        self.assertEqual((r["status"], r["reason"]), ("rejected", "invalid_theme"))
+        self.assertIn("accent", fields(r["findings"], "error"))
+        self.assertEqual(sorted(os.listdir(self.fx.support)), before)
+
+    def test_bad_arguments_are_typed_invalid_params(self):
+        before = sorted(os.listdir(self.fx.support))
+        for args in ({}, None, {"theme": "x"}, {"theme": clean_theme(), "save_as": "Bad Key"},
+                     {"theme": clean_theme(), "save_as": "-x"}, {"theme": clean_theme(), "save_as": "a" * 41},
+                     {"theme": clean_theme(), "apply": "yes"}, {"theme": clean_theme(), "path": "/etc"},
+                     {"theme": dict(clean_theme(), padding="x" * 20000)}):
+            r = self.propose(args)
+            self.assertEqual((r["status"], r["reason"]), ("rejected", "invalid_params"), args and list(args))
+            self.assertTrue(r["remedy"])
+        self.assertEqual(sorted(os.listdir(self.fx.support)), before)
+
+    def test_a_built_in_name_is_reserved(self):
+        for args in ({"theme": dict(clean_theme(), name="Obsidian")}, {"theme": dict(clean_theme(), name="Match Desk")},
+                     {"theme": clean_theme(), "save_as": "626-labs"}):
+            r = self.propose(args)
+            self.assertEqual((r["status"], r["reason"]), ("rejected", "reserved_name"))
+        self.assertFalse(os.path.exists(self.paths.theme_request))
+        # save_as frees a built-in's display name.
+        r = self.propose({"theme": dict(clean_theme(), name="Obsidian"), "save_as": "my-obsidian"}, wait=0)
+        self.assertEqual(r["status"], "queued")
+
+    def test_the_request_file_and_a_pending_answer(self):
+        seen = []
+
+        def app(req):
+            seen.append(req)
+            return {"status": "pending_approval", "key": "test", "name": "Test"}
+
+        theme = dict(clean_theme(), description="Quiet graphite.")
+        r = self.propose({"theme": theme, "save_as": "graphite", "apply": False}, app)
+        self.assertEqual(r["status"], "pending_approval")
+        self.assertEqual(r["request_id"], seen[0]["id"])
+        self.assertEqual(r["findings"], [])   # the server's lint rides along when the app sends none
+        req = seen[0]
+        self.assertEqual((req["schema_version"], req["save_as"], req["apply"]), (1, "graphite", False))
+        self.assertEqual(req["theme"], theme)
+        self.assertTrue(mcp.parse(req["requested_at"]))
+        self.assertEqual(os.stat(self.paths.theme_request).st_mode & 0o777, 0o600)
+        self.assertFalse(os.path.exists(self.paths.theme_request + ".tmp"))
+        self.assertFalse(os.path.exists(os.path.join(self.fx.dir, "Sanduhr", "themes")))   # never a theme itself
+
+    def test_applied_answers_pass_through(self):
+        r = self.propose({"theme": clean_theme()}, lambda req: {
+            "status": "applied", "key": "test-2", "name": "Test", "previous_key": "obsidian",
+            "saved_path": "/x/test-2.json", "renamed_from": "test", "findings": [], "extra": "dropped"})
+        self.assertEqual((r["status"], r["key"], r["previous_key"], r["renamed_from"]),
+                         ("applied", "test-2", "obsidian", "test"))
+        self.assertNotIn("extra", r)
+        self.assertTrue(self.propose({"theme": clean_theme(), "apply": False},
+                                     lambda req: {"status": "saved", "key": "test"})["status"] == "saved")
+
+    def test_warnings_do_not_block_but_travel(self):
+        j = clean_theme()
+        j["text"] = "#5a5a5a"
+        r = self.propose({"theme": j}, wait=0)
+        self.assertEqual(r["status"], "queued")
+        self.assertIn("text", fields(r["findings"], "warning"))
+
+    def test_silent_app_returns_queued_and_leaves_the_request(self):
+        self.fx.write_json(mcp.THEME_RESULT_FILE, {"id": "someone-else", "result": {"status": "applied"}})
+        r = self.propose({"theme": clean_theme()}, answer=lambda req: None)
+        self.assertEqual((r["status"], r["reason"], r["name"]), ("queued", "app_not_responding", "Test"))
+        self.assertTrue(os.path.exists(self.paths.theme_request))
+
+    def test_over_stdio(self):
+        env = dict(os.environ, SANDUHR_SUPPORT_DIR=self.fx.support)
+        import subprocess
+        msgs = [{"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                 "params": {"name": "propose_theme", "arguments": {"theme": {"name": "Broken"}}}}]
+        out = subprocess.run([sys.executable, SERVER], input="\n".join(json.dumps(m) for m in msgs) + "\n",
+                             capture_output=True, text=True, env=env, timeout=30)
+        self.assertEqual(out.stderr, "")
+        refused = json.loads(json.loads(out.stdout.splitlines()[0])["result"]["content"][0]["text"])
+        self.assertEqual((refused["status"], refused["reason"]), ("rejected", "invalid_theme"))
+        self.assertEqual(len(fields(refused["findings"], "error")), 14)
+        self.assertFalse(os.path.exists(self.paths.theme_request))
+
+    def test_description_teaches_the_fields_and_the_rules(self):
+        d = next(t["description"] for t in mcp.TOOLS if t["name"] == "propose_theme")
+        for word in mcp.THEME_COLOR_FIELDS + ["name", "description", "glass_alpha", "border_alpha", "border_tint",
+                                             "accent_bloom", "inner_highlight", "#rrggbb", "4.5:1", "pace_marker",
+                                             "Match Desk", "Save and Apply", "pending_approval", "applied", "saved",
+                                             "rejected", "queued", "renamed_from", "previous_key", "never writes"]:
+            self.assertIn(word, d, word)
 
 
 class ProjectNames(unittest.TestCase):
