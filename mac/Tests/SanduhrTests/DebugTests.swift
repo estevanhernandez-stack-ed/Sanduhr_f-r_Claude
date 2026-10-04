@@ -67,6 +67,7 @@ struct DebugLinkTests {
         #expect(parse("sanduhr://debug/action?name=glow&arg=CAMERA").command == .action(.glow(.camera), dir: nil))
         #expect(parse("sanduhr://debug/action?name=theme&arg=match-desk").command == .action(.theme("match-desk"), dir: nil))
         #expect(parse("sanduhr://debug/action?name=theme&arg=Obsidian").command == .action(.theme("obsidian"), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=account&arg=next").command == .action(.cycleAccount, dir: nil))
     }
 
     @Test func badActionsKeepTheDirForTheError() {
@@ -78,6 +79,9 @@ struct DebugLinkTests {
         #expect(parse("sanduhr://debug/action?name=camera-light").error == "camera-light needs arg=on or arg=off")
         #expect(parse("sanduhr://debug/action?name=glow&arg=sound").error == "glow needs arg=alert, meeting or camera")
         #expect(parse("sanduhr://debug/action?name=theme").error == "theme needs arg=<theme id>")
+        // Only cycling: no hook adds, renames, signs out or removes an account.
+        #expect(parse("sanduhr://debug/action?name=account").error == "account needs arg=next")
+        #expect(parse("sanduhr://debug/action?name=account&arg=remove").error == "account needs arg=next")
         #expect(parse("sanduhr://debug/action?name=tool&arg=hammer").error == "tool needs arg=deep-work, pacing or snake")
         #expect(parse("sanduhr://debug/action?name=settings&arg=nowhere").error?.hasPrefix("unknown settings section") == true)
         #expect(parse("sanduhr://debug/action?name=pulse&arg=hourly").error == "unknown tier: hourly")
@@ -247,7 +251,7 @@ struct DebugStateTests {
                          "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "widget_visible", "widget_visibility",
                          "settings_open", "settings_section", "meters", "widget_warnings", "meetings_count", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
-                         "glow_camera", "theme", "menu", "credentials_store",
+                         "glow_camera", "theme", "menu", "credentials_store", "account_ref", "accounts_count",
                          "version", "build"])
         #expect(yaml.contains("settings_section: notch\n"))
         #expect(yaml.contains("widget_visible: true\nwidget_visibility: whileDeskOff\nsettings_open: true\n"))
@@ -268,7 +272,7 @@ struct DebugStateTests {
         """))
         #expect(yaml.contains("    pace: null\n"))
         #expect(yaml.contains("last_fetch: \"1970-01-01T00:00:00Z\"\n"))
-        #expect(yaml.contains("credentials_store: file\nversion: \"2.1.0\"\n"))
+        #expect(yaml.contains("credentials_store: file\naccount_ref: null\naccounts_count: 0\nversion: \"2.1.0\"\n"))
         #expect(yaml.contains("version: \"2.1.0\"\nbuild: \"3\"\n"))
         #expect(yaml.contains("""
           - header: Tools

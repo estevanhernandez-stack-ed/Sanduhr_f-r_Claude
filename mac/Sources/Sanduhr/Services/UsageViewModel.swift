@@ -166,6 +166,8 @@ final class UsageViewModel {
         case error(String, isAuth: Bool)
         /// After Sign Out: no credentials, nothing fetched until a new key is saved.
         case signedOut
+        /// An account switch, until the new account's first fetch answers.
+        case switching
 
         var text: String {
             switch self {
@@ -174,6 +176,7 @@ final class UsageViewModel {
             case .idle, .noTiers:       return ""
             case .error(let m, _):      return m
             case .signedOut:            return "Signed out — sign in"
+            case .switching:            return "Switching account…"
             }
         }
         var isError: Bool {
@@ -193,6 +196,9 @@ final class UsageViewModel {
     // MARK: Private
 
     private var api: ClaudeAPI?
+    /// The account `api` was built for (nil while a launch runs on the legacy key): history and
+    /// snapshot.json's `account_ref` follow the client, not whatever is active when a fetch ends.
+    private var apiAccount: String?
     private var refreshTimer: Timer?
     private var countdownTimer: Timer?
 
@@ -238,10 +244,7 @@ final class UsageViewModel {
             status = .connecting     // onboarding sheet will drive the next step
             return
         }
-        if let key = KeychainStore.get(account: KeychainAccount.sessionKey),
-           !key.isEmpty {
-            let cf = KeychainStore.get(account: KeychainAccount.cfClearance)
-            api = ClaudeAPI(sessionKey: key, cfClearance: cf)
+        if connect() {
             Task { await refresh() }
             startTimers()
         } else {
@@ -251,33 +254,114 @@ final class UsageViewModel {
 
     /// Called after the user saves new credentials: rebuilds the API client and refreshes.
     func credentialsChanged() {
-        guard let key = KeychainStore.get(account: KeychainAccount.sessionKey),
-              !key.isEmpty else { return }
-        let cf = KeychainStore.get(account: KeychainAccount.cfClearance)
-        api = ClaudeAPI(sessionKey: key, cfClearance: cf)
+        guard connect() else { return }
         // The first key saved creates Personal, whose history may be the upgrade's.
-        history = HistoryStore.load(account: KeychainStore.accounts.active)
+        history = HistoryStore.load(account: apiAccount)
         Task { await refresh() }
         startTimers()
     }
 
-    /// Settings, Credentials, Sign Out (after its confirmation). Deletes the credentials from
-    /// both stores, stops fetching, drops the shown numbers and writes snapshot.json signed out;
-    /// history and settings stay. Saving a key again goes through `credentialsChanged()`.
+    /// A fresh client from the active account's key: no cookie or org id carries over from
+    /// another account (the org rule from item 35 runs again). False when it has no key.
+    @discardableResult
+    private func connect() -> Bool {
+        guard let key = KeychainStore.get(account: KeychainAccount.sessionKey), !key.isEmpty else { return false }
+        let cf = KeychainStore.get(account: KeychainAccount.cfClearance)
+        api = ClaudeAPI(sessionKey: key, cfClearance: cf)
+        apiAccount = KeychainStore.accounts.active
+        return true
+    }
+
+    /// Settings, Credentials, Sign Out (after its confirmation): signs out the active account.
+    /// Deletes its credentials from both stores, stops fetching, drops the shown numbers and
+    /// writes snapshot.json signed out; the account stays listed, and history and settings stay.
+    /// Saving a key again goes through `credentialsChanged()`.
     @discardableResult
     func signOut() -> SignOutResult {
-        let result = KeychainStore.signOut()
+        let active = KeychainStore.accounts.active
+        let result = KeychainStore.signOut(label: active)
+        stopFetching()
+        status = .signedOut
+        SnapshotWriter.writeSignedOut(accountRef: AccountRef.of(active))
+        onUsageUpdate?()
+        return result
+    }
+
+    /// Sign Out for any account: the active one as `signOut()`, another one quietly.
+    @discardableResult
+    func signOut(account label: String) -> SignOutResult {
+        guard label != KeychainStore.accounts.active else { return signOut() }
+        return KeychainStore.signOut(label: label)
+    }
+
+    /// Remove Account (after its own confirmation): Sign Out, its history file deleted, dropped
+    /// from the list. Removing the active account shows the next one, or the no-account state
+    /// when it was the last.
+    @discardableResult
+    func removeAccount(_ label: String) -> SignOutResult {
+        let wasActive = label == KeychainStore.accounts.active
+        let result = KeychainStore.remove(label: label)
+        if wasActive { showActiveAccount() }
+        return result
+    }
+
+    /// Rename an account; its secrets, history file and sign-in marker follow (AccountRegistry).
+    func renameAccount(_ old: String, to new: String) throws {
+        try KeychainStore.accounts.rename(old, to: new)
+        if apiAccount == old { apiAccount = new }
+        onUsageUpdate?()
+    }
+
+    // MARK: Accounts
+
+    /// Switches the active account (spec "Switching"): sets it, deletes snapshot.json at once,
+    /// clears the shown numbers and the menu bar percent, says "Switching account…", resets the
+    /// alert baseline, loads that account's history, then builds a new client and fetches. A
+    /// fetch still running for the old account is discarded when it answers (`refresh`).
+    func switchAccount(to label: String) {
+        let accounts = KeychainStore.accounts
+        guard label != accounts.active, (try? accounts.setActive(label)) != nil else { return }
+        showActiveAccount()
+    }
+
+    /// The next account, wrapping (the widget chip's click, Windows `CycleAccount`). Nothing
+    /// with fewer than two accounts.
+    func cycleAccount() {
+        guard let next = KeychainStore.accounts.nextLabel else { return }
+        switchAccount(to: next)
+    }
+
+    /// After the active account changed: nothing of the old account stays on screen or in
+    /// snapshot.json, then the new one is fetched, or shown signed out when it has no key.
+    private func showActiveAccount() {
+        SnapshotWriter.delete()
+        stopFetching()
+        Notifier.shared.resetForSwitch()
+        let active = KeychainStore.accounts.active
+        history = active.map { HistoryStore.load(account: $0) } ?? [:]
+        if connect() {
+            status = .switching
+            onUsageUpdate?()
+            Task { await refresh() }
+            startTimers()
+        } else {
+            status = .signedOut
+            if active != nil { SnapshotWriter.writeSignedOut(accountRef: AccountRef.of(active)) }
+            onUsageUpdate?()
+        }
+    }
+
+    /// Stops the timers, drops the client (an answer still on its way is ignored) and the shown
+    /// numbers.
+    private func stopFetching() {
         refreshTimer?.invalidate()
         refreshTimer = nil
         countdownTimer?.invalidate()
         countdownTimer = nil
         api = nil
+        apiAccount = nil
         usage = nil
         lastUpdated = nil
-        status = .signedOut
-        SnapshotWriter.writeSignedOut()
-        onUsageUpdate?()
-        return result
     }
 
     // MARK: Timers
@@ -303,24 +387,26 @@ final class UsageViewModel {
 
     func refresh() async {
         guard let api else { return }
-        status = .refreshing
+        let account = apiAccount
+        let ref = AccountRef.of(account)
+        // "Switching account…" stays up until the new account's first answer.
+        if status != .switching { status = .refreshing }
         onUsageUpdate?()
         defer { onUsageUpdate?() }
         let u: UsageResponse
         do {
             u = try await api.getUsage()
         } catch {
-            // Signed out (or a new key saved) while this fetch ran: its answer is stale.
+            // Signed out, switched, or a new key saved while this fetch ran: its answer is stale.
             guard self.api === api else { return }
-            showFailure(error)
+            showFailure(error, accountRef: ref)
             return
         }
         guard self.api === api else { return }
         self.usage = u
         self.lastUpdated = Date()
         Notifier.shared.evaluate(u)
-        SnapshotWriter.writeOk(u)
-        let account = KeychainStore.accounts.active
+        SnapshotWriter.writeOk(u, accountRef: ref)
         for (tier, t) in u.tiers {
             if let util = t.utilization {
                 HistoryStore.append(tier, utilization: util, account: account)
@@ -331,20 +417,20 @@ final class UsageViewModel {
     }
 
     /// A failed fetch: the status line and snapshot.json's error kind.
-    private func showFailure(_ error: Error) {
+    private func showFailure(_ error: Error, accountRef ref: String?) {
         switch error as? ClaudeAPI.APIError {
         case .unauthorized?:
             status = .error("Session expired — click Key", isAuth: true)
-            SnapshotWriter.writeError("session_expired")
+            SnapshotWriter.writeError("session_expired", accountRef: ref)
         case .cloudflareChallenge?:
             status = .error("Cloudflare — add cf_clearance", isAuth: true)
-            SnapshotWriter.writeError("cloudflare")
+            SnapshotWriter.writeError("cloudflare", accountRef: ref)
         case .http(let c)?:
             status = .error("HTTP \(c)", isAuth: false)
-            SnapshotWriter.writeError("network")
+            SnapshotWriter.writeError("network", accountRef: ref)
         default:
             status = .error(error.localizedDescription, isAuth: false)
-            SnapshotWriter.writeError("network")
+            SnapshotWriter.writeError("network", accountRef: ref)
         }
     }
 

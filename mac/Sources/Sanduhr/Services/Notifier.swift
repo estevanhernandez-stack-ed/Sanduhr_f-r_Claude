@@ -60,6 +60,14 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         deliver(outcome, sound: settings.sound)
     }
 
+    /// An account switch: the next fetch is the new account's first, so nothing is compared with
+    /// the old account's numbers (a reset alert would fire off another account's baseline, as
+    /// Windows' AlertEngine.Reset prevents). The once-per-window memory stays: its keys name each
+    /// tier's reset time, which belongs to one account, so switching back never repeats an alert.
+    func resetForSwitch() {
+        lastUsage = nil
+    }
+
     /// A sample alert through the chosen delivery and sound. Quiet hours do not apply to it.
     func sendTest() {
         let settings = AlertSettings(defaults)

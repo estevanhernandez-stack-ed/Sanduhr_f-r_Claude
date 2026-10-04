@@ -43,6 +43,9 @@ struct DebugStateInput {
     var theme = ""
     /// Where credentials live this launch (KeychainStore.kind); never a value.
     var credentialsStore = CredentialStoreKind.file
+    /// The active account as snapshot.json names it (AccountRef), never its label.
+    var accountRef: String?
+    var accountsCount = 0
     var menu: [MenuGroup] = []
     var version = ""
     var build = ""
@@ -88,6 +91,8 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("theme", .string(s.theme)))
         pairs.append(("menu", .list(menu)))
         pairs.append(("credentials_store", .string(s.credentialsStore.rawValue)))
+        pairs.append(("account_ref", s.accountRef.map(YAMLNode.string) ?? .null))
+        pairs.append(("accounts_count", .int(s.accountsCount)))
         pairs.append(("version", .string(s.version)))
         pairs.append(("build", .string(s.build)))
         return .object(pairs)

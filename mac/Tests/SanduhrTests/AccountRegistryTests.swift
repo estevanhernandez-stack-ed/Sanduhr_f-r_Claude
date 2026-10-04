@@ -387,3 +387,45 @@ struct HistoryPerAccountTests {
         #expect(h.names == ["history.Home.json"])
     }
 }
+
+@Suite("Snapshot account_ref")
+struct SnapshotAccountRefTests {
+    /// Expected values computed outside the app, as Windows' SnapshotContract.AccountRef does:
+    /// `printf %s Personal | shasum -a 256`, first 8 hex digits.
+    @Test func matchesTheWindowsHash() {
+        #expect(AccountRef.of("Personal") == "845f9286")
+        #expect(AccountRef.of("Work") == "104ab921")
+        #expect(AccountRef.of(nil) == nil)
+        #expect(AccountRef.of("") == nil)
+    }
+
+    @Test func signedOutSnapshotCarriesTheRefNeverTheLabel() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sanduhr-snap-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("snapshot.json")
+        SnapshotWriter.writeSignedOut(accountRef: AccountRef.of("Work"), now: Date(timeIntervalSince1970: 0), to: url)
+        let text = try String(contentsOf: url, encoding: .utf8)
+        #expect(text.contains("\"account_ref\":\"104ab921\""))
+        #expect(!text.contains("Work"))
+    }
+
+    @Test func switchingIsNeitherAnErrorNorASignIn() {
+        let s = UsageViewModel.StatusMessage.switching
+        #expect(s.text == "Switching account…")
+        #expect(!s.isError)
+        #expect(!s.needsSignIn)
+    }
+
+    @Test func aSwitchDeletesTheSnapshot() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sanduhr-snap-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("snapshot.json")
+        SnapshotWriter.writeSignedOut(accountRef: nil, to: url)
+        #expect(FileManager.default.fileExists(atPath: url.path))
+        SnapshotWriter.delete(at: url)
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+        SnapshotWriter.delete(at: url)      // already gone is fine
+    }
+}

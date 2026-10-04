@@ -115,6 +115,7 @@ enum DebugHooks {
         case .glow: NotchGlowController.shared.fire()
         case .demo(let on): DeskController.shared.model.setDemo(on)
         case .theme(let id): app.viewModel.selectTheme(id: id)
+        case .cycleAccount: app.viewModel.cycleAccount()
         }
         settle()
     }
@@ -281,6 +282,8 @@ enum DebugHooks {
         s.theme = vm.theme.id
         s.menu = app.currentMenu(widgetVisible: widgetVisible)
         s.credentialsStore = KeychainStore.kind
+        s.accountRef = AccountRef.of(KeychainStore.accounts.active)
+        s.accountsCount = KeychainStore.accounts.labels.count
         s.version = info["CFBundleShortVersionString"] as? String ?? ""
         s.build = info["CFBundleVersion"] as? String ?? ""
         return s

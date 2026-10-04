@@ -36,10 +36,13 @@ enum DebugAction: Equatable {
     /// Demo data on the Desk for screenshots: made-up meetings and a pinned message, held in
     /// memory only (the calendar is never touched). Off puts the real ones back.
     case demo(Bool)
+    /// The next account, as the widget's chip cycles it. Safe: nothing is added, signed out or
+    /// removed, and no hook can do those.
+    case cycleAccount
 
     static let names = ["show-widget", "hide-widget", "settings", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
-                        "theme"]
+                        "theme", "account"]
 }
 
 enum DebugCommand: Equatable {
@@ -131,6 +134,9 @@ enum DebugLink {
         case "theme":
             guard let arg else { return bad("theme needs arg=<theme id>") }
             return .success(.theme(arg.lowercased()))
+        case "account":
+            guard arg?.lowercased() == "next" else { return bad("account needs arg=next") }
+            return .success(.cycleAccount)
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }
