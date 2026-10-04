@@ -215,3 +215,31 @@ struct DeskFrameCheckTests {
         #expect(!DeskFrameCheck.overlaps(a, .null))
     }
 }
+
+/// The close pointer watch (item 42): only near a Desk block, never for an empty frame.
+@Suite("Desk pointer watch")
+struct DeskPointerWatchTests {
+    let meters = CGRect(x: 52, y: 742, width: 358, height: 136)
+
+    @Test func nearABlockWithinReach() {
+        let r = DeskPointerWatch.reach
+        #expect(DeskPointerWatch.near(CGPoint(x: 100, y: 800), frames: [meters]))
+        #expect(DeskPointerWatch.near(CGPoint(x: meters.minX - r + 1, y: 800), frames: [meters]))
+        #expect(DeskPointerWatch.near(CGPoint(x: 100, y: meters.maxY + r - 1), frames: [.zero, meters]))
+        #expect(!DeskPointerWatch.near(CGPoint(x: meters.minX - r - 1, y: 800), frames: [meters]))
+        #expect(!DeskPointerWatch.near(CGPoint(x: 900, y: 100), frames: [meters]))
+    }
+
+    @Test func emptyFramesNeverStartTheWatch() {
+        #expect(!DeskPointerWatch.near(.zero, frames: [.zero, .null]))
+        #expect(!DeskPointerWatch.near(CGPoint(x: 10, y: 10), frames: []))
+    }
+
+    @Test func theWatchIsShortAndTheReachLargerThanAnyClickSlack() {
+        #expect(DeskPointerWatch.interval <= 0.1)
+        for kind in DeskElement.Kind.allCases {
+            let s = DeskHitTest.slack(kind)
+            #expect(DeskPointerWatch.reach > max(s.width, s.height))
+        }
+    }
+}

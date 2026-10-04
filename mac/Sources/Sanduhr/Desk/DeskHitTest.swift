@@ -183,3 +183,22 @@ enum DeskFrameCheck {
         e.key.map { "\(e.kind.rawValue) \($0)" } ?? e.kind.rawValue
     }
 }
+
+/// When Desk watches the pointer closely (item 42). The window takes the mouse only over a click
+/// area (DeskHitTest), and normally learns where the pointer is from mouse-moved events. Those
+/// can miss the moment the pointer arrives (the last event fell just short, the layout moved
+/// under a still pointer, the frames arrived after launch), and a two-finger click then reaches
+/// the Finder. So while the pointer is within `reach` of a Desk block, Desk also checks it on a
+/// short timer; anywhere else nothing polls.
+enum DeskPointerWatch {
+    /// How far around each block the close watch starts, in points.
+    static let reach: CGFloat = 48
+    /// The close watch's tick: well under the time from arriving to clicking.
+    static let interval: TimeInterval = 0.05
+
+    /// True when `point` is within `reach` of any of `frames` (the Desk blocks as reported:
+    /// meters, the account name, the calendar note, the meeting list). Empty frames never count.
+    static func near(_ point: CGPoint, frames: [CGRect]) -> Bool {
+        frames.contains { !$0.isEmpty && $0.insetBy(dx: -reach, dy: -reach).contains(point) }
+    }
+}

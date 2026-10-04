@@ -19,6 +19,10 @@ final class DeskController: NSObject, NSMenuDelegate {
     private(set) var window: NSWindow?
     private var statusItem: NSStatusItem?
     private var mouseMonitors: [Any] = []
+    /// The close pointer watch (DeskPointerWatch): runs only while the pointer is near a block.
+    private var approachTimer: Timer?
+    /// Where the pointer was at the close watch's last tick (screen coordinates).
+    private var lastWatchedPointer: NSPoint?
     private(set) var wingsWindow: NSWindow?
     private var wingsTimer: Timer?
     let model = DeskModel()
@@ -64,9 +68,18 @@ final class DeskController: NSObject, NSMenuDelegate {
         NotificationCenter.default.addObserver(
             self, selector: #selector(appBecameActive),
             name: NSApplication.didBecomeActiveNotification, object: nil)
+        // Command-Tab or a click elsewhere: the pointer may rest on the meters without moving.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(otherAppActivated),
+            name: NSWorkspace.didActivateApplicationNotification, object: nil)
     }
 
-    @objc private func appBecameActive() { recheckCalendar() }
+    @objc private func otherAppActivated() { updateMouseThrough() }
+
+    @objc private func appBecameActive() {
+        recheckCalendar()
+        updateMouseThrough()
+    }
 
     /// An alert chose the Desk (or the debug pulse): pulse those meters once and glow the notch,
     /// whatever the Glow switches, so a pulse has the one notch glow (item 27).
@@ -87,6 +100,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         wingsTimer?.invalidate(); wingsTimer = nil
         mouseMonitors.forEach { NSEvent.removeMonitor($0) }
         mouseMonitors = []
+        watchApproach(false)
         model.onHitAreasChange = nil
         setMenuIcon(false)
         model.stop()
@@ -136,6 +150,10 @@ final class DeskController: NSObject, NSMenuDelegate {
         w.setFrame(screen.frame, display: true)
         w.orderFront(nil)
         window = w
+        // A pointer already resting near the Desk is watched from the start, before any movement;
+        // once the frames arrive (onHitAreasChange) it takes the mouse over a click area.
+        updateMouseThrough()
+        DispatchQueue.main.async { [weak self] in self?.updateMouseThrough() }
     }
 
     /// A menu-bar-tall, click-through window over the notch, one level above the menu bar,
@@ -173,7 +191,10 @@ final class DeskController: NSObject, NSMenuDelegate {
         }
     }
 
-    @objc private func spaceChanged() { wingsWindow?.orderFrontRegardless() }
+    @objc private func spaceChanged() {
+        wingsWindow?.orderFrontRegardless()
+        updateMouseThrough()
+    }
 
     /// The window ignores the mouse, except while the pointer is over a Desk element that takes
     /// clicks (DeskHitTest), so the desktop and its icons keep working and those can be clicked.
@@ -352,11 +373,45 @@ final class DeskController: NSObject, NSMenuDelegate {
     }
 
     /// Takes the mouse over the clickable pieces (DeskHitTest: meeting rows with a link, the
-    /// calendar note, the account label, the meters) and lets it through everywhere else.
+    /// calendar note, the account label, the meters) and lets it through everywhere else. Runs on
+    /// every mouse move, when the frames change, when the window appears, on a Space or app
+    /// switch, and on the close watch's tick while the pointer is near a block (DeskPointerWatch).
     private func updateMouseThrough() {
-        guard let w = window else { return }
-        let over = elementUnderPointer() != nil
+        guard let w = window, let point = pointerInWindow() else {
+            watchApproach(false)
+            return
+        }
+        let over = DeskHitTest.element(at: point, in: model.elements()) != nil
         if w.ignoresMouseEvents == over { w.ignoresMouseEvents = !over }
+        let blocks = [model.metersFrame, model.accountFrame, model.noteFrame, model.meetingsFrame]
+        watchApproach(DeskPointerWatch.near(point, frames: blocks))
+    }
+
+    /// The close watch's tick: a pointer that has not moved since the last tick needs nothing
+    /// (layout changes arrive through onHitAreasChange), so a resting pointer costs one read.
+    private func watchTick() {
+        let p = NSEvent.mouseLocation
+        guard p != lastWatchedPointer else { return }
+        lastWatchedPointer = p
+        updateMouseThrough()
+    }
+
+    /// Starts the close watch when `on` and none runs, stops it when off. Common run loop modes,
+    /// so it keeps ticking while a menu tracks or a window drags.
+    private func watchApproach(_ on: Bool) {
+        if !on {
+            approachTimer?.invalidate()
+            approachTimer = nil
+            lastWatchedPointer = nil
+            return
+        }
+        guard approachTimer == nil else { return }
+        let t = Timer(timeInterval: DeskPointerWatch.interval, repeats: true) { [weak self] _ in
+            self?.watchTick()
+        }
+        t.tolerance = DeskPointerWatch.interval / 2
+        RunLoop.main.add(t, forMode: .common)
+        approachTimer = t
     }
 
     /// estedesk://join-next opens the next meeting's link (Option+J does the same, see applyHotKeys).
