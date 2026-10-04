@@ -683,3 +683,26 @@ struct NotchContentTests {
         #expect(Set(NotchContent.allCases.map(\.label)).count == 6)
     }
 }
+
+@Suite("Desk meter menu")
+struct DeskPointerMenuTests {
+    /// The plate must leave a drawn pixel in an 8-bit backing after the Desk ink's 0.92 opacity,
+    /// and stay far too faint to see.
+    @Test func hitPlateIsDrawnButFaint() {
+        let alpha = DeskPointerMenu.hitPlateOpacity * 0.92 * 255
+        #expect(alpha.rounded() >= 3)
+        #expect(DeskPointerMenu.hitPlateOpacity <= 0.02)
+    }
+
+    @Test func fallbackOnlyOverUncoveredMetersWithNoOtherMenu() {
+        #expect(DeskPointerMenu.fallbackOpens(overMeters: true, appWindowCovers: false, otherMenuOpen: false))
+        #expect(!DeskPointerMenu.fallbackOpens(overMeters: false, appWindowCovers: false, otherMenuOpen: false))
+        #expect(!DeskPointerMenu.fallbackOpens(overMeters: true, appWindowCovers: true, otherMenuOpen: false))
+        // The desktop (the Finder) opened its own menu: never a second one.
+        #expect(!DeskPointerMenu.fallbackOpens(overMeters: true, appWindowCovers: false, otherMenuOpen: true))
+    }
+
+    @Test func fallbackWaitsLessThanAMenuWouldFeelLate() {
+        #expect(DeskPointerMenu.fallbackDelay > 0 && DeskPointerMenu.fallbackDelay <= 0.25)
+    }
+}

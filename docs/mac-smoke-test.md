@@ -248,3 +248,17 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   menu's items. Two-finger click elsewhere on the widget (the title, the action row): the widget
   menu as before, with its Accounts submenu. "Meter Settings…" from either opens Settings on
   Desk, Meters.
+
+## 12. Desk meter menu, menu bar submenu, graceful switch (item 40)
+
+- [ ] Desk meter menu with another app in front: click into a Finder or Terminal window, then
+  move the pointer onto the Desk meters (off that window) and two-finger click a row, then the
+  gap between its label and percent, then just under its bar: each time the limit menu opens for
+  that row, Sanduhr does not come to the front, and no Finder desktop menu opens (check with
+  Finder's Show items on desktop both on and off). Control-click does the same. Escape closes
+  it; the app you were in is still in front.
+- [ ] Without moving first: rest the pointer on a meter, Command-Tab to another app, two-finger
+  click without moving the pointer: the menu opens (a moment later, at most 0.15 s).
+- [ ] Left clicks unchanged: a click on the bars shows the widget beside them; with two accounts
+  a click on the account name cycles; a click on empty desktop beside the meters reaches Finder.
+  No visible tint behind the meters on a light and a dark wallpaper.

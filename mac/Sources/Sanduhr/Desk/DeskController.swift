@@ -87,6 +87,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         wingsTimer?.invalidate(); wingsTimer = nil
         mouseMonitors.forEach { NSEvent.removeMonitor($0) }
         mouseMonitors = []
+        model.onHitAreasChange = nil
         setMenuIcon(false)
         model.stop()
         applyHotKeys()
@@ -189,12 +190,18 @@ final class DeskController: NSObject, NSMenuDelegate {
         // Clicks: whichever app macOS gives the click to, if it landed on a meeting row with a
         // link, open the meeting; on the meters, show the widget. A click that reaches Desk
         // itself is consumed.
-        if let g = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown], handler: { [weak self] _ in
+        if let g = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown], handler: { [weak self] event in
             // Another app's window over the clock means the click was meant for that app.
             guard let self, !Self.appWindowCoversPointer() else { return }
-            // A control-click is a two-finger click; whichever app took it shows its own menu.
-            guard !NSEvent.modifierFlags.contains(.control) else { return }
+            // A control-click is a two-finger click.
+            if event.modifierFlags.contains(.control) { self.limitMenuAfterMissedClick(); return }
             _ = self.clickUnderPointer()
+        }) {
+            mouseMonitors.append(g)
+        }
+        // A two-finger click that still went to another app (the desktop) over the meters.
+        if let g = NSEvent.addGlobalMonitorForEvents(matching: [.rightMouseDown], handler: { [weak self] _ in
+            self?.limitMenuAfterMissedClick()
         }) {
             mouseMonitors.append(g)
         }
@@ -207,14 +214,45 @@ final class DeskController: NSObject, NSMenuDelegate {
         }) {
             mouseMonitors.append(l)
         }
-        // Two-finger clicks: on the meters, the limit menu. Only clicks that reach Desk itself: the
-        // window takes the mouse while the pointer is over the meters, and a click that went to
-        // another app (the Finder's desktop) already opened that app's menu.
+        // Two-finger clicks: on the meters, the limit menu. The window takes the mouse while the
+        // pointer is over the meters and the hit plate behind them (DeskPointerMenu) gives every
+        // point there a drawn pixel, so the click reaches Desk and the desktop never sees it.
         if let l = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown], handler: { [weak self] event in
             guard let self, event.window == nil || event.window === self.window else { return event }
             return self.limitMenuUnderPointer(event) ? nil : event
         }) {
             mouseMonitors.append(l)
+        }
+        // The meters moved under a still pointer (a limit came or went, a font change): take the
+        // mouse or let it through again without waiting for the pointer to move.
+        model.onHitAreasChange = { [weak self] in self?.updateMouseThrough() }
+    }
+
+    /// A two-finger click over the meters that went to another app anyway (the window had not
+    /// taken the mouse yet): Desk opens the limit menu itself, a moment later, unless an app
+    /// window covers the meters or that app opened its own menu (DeskPointerMenu.fallbackOpens).
+    /// The window then takes the mouse, so the next click reaches Desk directly.
+    private func limitMenuAfterMissedClick() {
+        guard let point = pointerInWindow(), pointerOverMeters(point), !Self.appWindowCoversPointer() else { return }
+        updateMouseThrough()
+        DispatchQueue.main.asyncAfter(deadline: .now() + DeskPointerMenu.fallbackDelay) { [weak self] in
+            guard let self, let w = self.window, let view = w.contentView, let now = self.pointerInWindow() else { return }
+            guard DeskPointerMenu.fallbackOpens(overMeters: self.pointerOverMeters(now),
+                                                appWindowCovers: Self.appWindowCoversPointer(),
+                                                otherMenuOpen: Self.otherAppMenuOpen()) else { return }
+            let at = view.convert(w.mouseLocationOutsideOfEventStream, from: nil)
+            self.limitMenu(at: now).popUp(positioning: nil, at: at, in: view)
+        }
+    }
+
+    /// True when another app has a menu open (a window on the pop-up menu layer). Window list
+    /// metadata only: no Screen Recording permission needed.
+    private static func otherAppMenuOpen() -> Bool {
+        let menuLayer = Int(CGWindowLevelForKey(.popUpMenuWindow))
+        let mine = ProcessInfo.processInfo.processIdentifier
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else { return false }
+        return list.contains {
+            ($0[kCGWindowLayer as String] as? Int) == menuLayer && ($0[kCGWindowOwnerPID as String] as? Int32) != mine
         }
     }
 
@@ -227,12 +265,17 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// (LimitMenu): Accounts, Hide, the warnings item, Meter Settings…, then the shared menu.
     private func limitMenuUnderPointer(_ event: NSEvent) -> Bool {
         guard let view = window?.contentView, let point = pointerInWindow(), pointerOverMeters(point) else { return false }
+        NSMenu.popUpContextMenu(limitMenu(at: point), with: event, for: view)
+        return true
+    }
+
+    /// The limit menu for the meter row at `point` (window coordinates, top-left origin).
+    private func limitMenu(at point: CGPoint) -> NSMenu {
         let tier = meterRowUnderPointer(point)
         let menu = NSMenu()
-        // Event monitors run on the main thread.
+        // Event monitors and their follow-ups run on the main thread.
         MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.addLimitMenuItems(to: menu, tier: tier) }
-        NSMenu.popUpContextMenu(menu, with: event, for: view)
-        return true
+        return menu
     }
 
     /// Pointer position in the window's SwiftUI coordinates (top-left origin).
@@ -325,6 +368,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         return true
     }
 
+    /// Takes the mouse over the clickable pieces (meeting rows, the calendar note, the account
+    /// label, the meters) and lets it through everywhere else.
     private func updateMouseThrough() {
         guard let w = window, let point = pointerInWindow() else { return }
         let overRows = model.meetings.contains { $0.link != nil }

@@ -166,6 +166,10 @@ struct DeskView: View {
             .opacity(model.claudeLineIsStale ? 0.5 : 1)
             // Clickable like a meeting row: the click itself is handled in DeskController, which
             // shows the widget beside the meters; a two-finger click opens the row's limit menu.
+            // The faint plate, as wide as the click slack, is what lets those clicks reach this
+            // transparent window at all (DeskPointerMenu).
+            .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity)
+                .padding(EdgeInsets(top: -6, leading: -8, bottom: -6, trailing: -8)))
             .contentShape(Rectangle())
             .onHover { inside in
                 if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }

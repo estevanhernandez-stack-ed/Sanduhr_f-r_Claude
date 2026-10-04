@@ -170,3 +170,26 @@ enum DeskPanelPlacement {
         return CGRect(origin: CGPoint(x: clampedX, y: clampedY), size: size)
     }
 }
+
+/// How a two-finger click on the Desk meters reaches the limit menu. The Desk window is
+/// transparent, and the window server hands a click to a transparent window only where a pixel
+/// is drawn: between the label, the percent and the bar, the click fell through to the desktop
+/// even while the window took the mouse. A left click survived that (a global monitor acts on a
+/// click that went to the desktop), but a two-finger click had only a local monitor, so it was
+/// lost: no menu, or the Finder's own desktop menu.
+enum DeskPointerMenu {
+    /// The fill behind the meters (and their click slack) that gives every point there a drawn
+    /// pixel: alpha 3 of 255 in an 8-bit backing even under the Desk ink's 0.92, so the window
+    /// server delivers the click, and too faint to see on any wallpaper.
+    static let hitPlateOpacity = 0.015
+
+    /// How long a two-finger click that still went to the desktop waits before Desk opens the
+    /// menu itself, so a menu the desktop opened (the Finder's) can show up first and win.
+    static let fallbackDelay: TimeInterval = 0.15
+
+    /// A two-finger click that reached another app opens the limit menu only over the meters,
+    /// with no app window over them and no other app's menu already open.
+    static func fallbackOpens(overMeters: Bool, appWindowCovers: Bool, otherMenuOpen: Bool) -> Bool {
+        overMeters && !appWindowCovers && !otherMenuOpen
+    }
+}

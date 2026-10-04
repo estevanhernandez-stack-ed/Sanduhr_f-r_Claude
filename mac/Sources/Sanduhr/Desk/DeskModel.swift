@@ -73,20 +73,22 @@ final class DeskModel {
     var claudeCompact: String?
     /// Where the meeting list sits in the window (SwiftUI global coordinates, top-left origin).
     /// The app delegate lets clicks through everywhere except here, so the rows can be clicked.
-    @ObservationIgnored var meetingsFrame: CGRect = .zero
+    @ObservationIgnored var meetingsFrame: CGRect = .zero { didSet { if meetingsFrame != oldValue { onHitAreasChange?() } } }
     /// Each meeting row's frame, same coordinates, keyed by meeting id. Clicks are matched here.
     @ObservationIgnored var rowFrames: [String: CGRect] = [:]
     /// Where the meters sit in the window, same coordinates, or .zero when they are not drawn.
     /// The meters take clicks here; a click shows the widget beside them.
-    @ObservationIgnored var metersFrame: CGRect = .zero
+    @ObservationIgnored var metersFrame: CGRect = .zero { didSet { if metersFrame != oldValue { onHitAreasChange?() } } }
     /// Each meter row's frame, same coordinates: a two-finger click opens that limit's menu.
     @ObservationIgnored var meterRowFrames: [Tier: CGRect] = [:]
     /// Where the calendar note sits, same coordinates, or .zero when it is not drawn. A click
     /// here opens System Settings at Privacy & Security, Calendars.
-    @ObservationIgnored var noteFrame: CGRect = .zero
+    @ObservationIgnored var noteFrame: CGRect = .zero { didSet { if noteFrame != oldValue { onHitAreasChange?() } } }
     /// Where the account label at the start of the claude line sits, same coordinates, or .zero
     /// with one account or no line. A click here switches to the next account.
-    @ObservationIgnored var accountFrame: CGRect = .zero
+    @ObservationIgnored var accountFrame: CGRect = .zero { didSet { if accountFrame != oldValue { onHitAreasChange?() } } }
+    /// Called when a clickable piece moves or comes and goes (DeskController takes the mouse there).
+    @ObservationIgnored var onHitAreasChange: (() -> Void)?
     /// Alert pulses so far, per limit (Settings, Alerts, Where alerts show). A meter row pulses
     /// when its count goes up.
     var pulses: [Tier: Int] = [:]
