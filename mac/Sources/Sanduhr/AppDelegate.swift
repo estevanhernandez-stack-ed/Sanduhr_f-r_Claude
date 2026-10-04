@@ -461,6 +461,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .deepWork: toggleTool(.deepWork, visible: visible)
         case .snake: toggleTool(.snake, visible: visible)
         case .cameraLight: CameraLightController.shared.toggleManual()
+        case .usage: SettingsWindowController.shared.show(.usage)
         case .pacing:
             if viewModel.pacingPinned && visible {
                 viewModel.pacingPinned = false

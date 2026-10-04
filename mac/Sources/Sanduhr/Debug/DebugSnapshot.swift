@@ -26,6 +26,9 @@ struct DebugStateInput {
     var menuBar = MenuBarMode.higher
     var settingsOpen = false
     var settingsSection: SettingsSection?
+    /// The Claude Usage page (item 48) shows, and its tab. Never a label, project or number.
+    var usagePageOpen = false
+    var usageTab = UsageTab.overview
     var meters: [DeskMeterRow] = []
     /// The widget's tiers drawing red with a glow (MeterWarning), in display order.
     var widgetWarnings: [Tier] = []
@@ -93,6 +96,11 @@ enum DebugState {
         .map([YAMLPair("reading", .bool(reading)), YAMLPair("events", .int(events))])
     }
 
+    /// `usage_page:` (item 48): open and the tab, nothing it shows.
+    static func usagePageYAML(open: Bool, tab: UsageTab) -> YAMLNode {
+        .map([YAMLPair("open", .bool(open)), YAMLPair("tab", .string(tab.rawValue))])
+    }
+
     /// `vault:` (item 46): flags and a count only.
     static func vaultYAML(_ v: VaultState) -> YAMLNode {
         .map([YAMLPair("recording", .bool(v.recording)), YAMLPair("months", .int(v.months)),
@@ -122,6 +130,7 @@ enum DebugState {
         pairs.append(("settings_open", .bool(s.settingsOpen)))
         let section: YAMLNode = s.settingsSection.map { .string($0.rawValue) } ?? .null
         pairs.append(("settings_section", section))
+        pairs.append(("usage_page", usagePageYAML(open: s.usagePageOpen, tab: s.usageTab)))
         pairs.append(("meters", .list(meters)))
         let widgetWarnings: [YAMLNode] = s.widgetWarnings.map { .string($0.rawValue) }
         pairs.append(("widget_warnings", .list(widgetWarnings)))

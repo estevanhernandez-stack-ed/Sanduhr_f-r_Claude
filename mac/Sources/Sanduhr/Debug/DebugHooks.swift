@@ -116,6 +116,7 @@ enum DebugHooks {
         case .demo(let on): DeskController.shared.model.setDemo(on)
         case .theme(let id): app.viewModel.selectTheme(id: id)
         case .cycleAccount: app.viewModel.cycleAccount()
+        case .usage(let tab): SettingsWindowController.shared.show(.usage, usageTab: tab)
         }
         settle()
     }
@@ -281,6 +282,8 @@ enum DebugHooks {
         s.menuBar = .saved()
         s.settingsOpen = settings.isOpen
         s.settingsSection = settings.window == nil ? nil : settings.section
+        s.usagePageOpen = settings.isOpen && settings.section == .usage
+        s.usageTab = settings.usageTab
         // A `defaults write` from the smoke runner posts no change notice here: apply the saved
         // warning settings before reporting, as Desk's minute refresh and the widget's countdown
         // tick would.

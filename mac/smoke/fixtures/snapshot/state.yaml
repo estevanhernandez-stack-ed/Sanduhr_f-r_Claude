@@ -13,6 +13,9 @@ widget_visibility: always
 menu_bar: higher
 settings_open: true
 settings_section: notch
+usage_page:
+  open: false
+  tab: overview
 meters:
   - tier: five_hour
     label: Session (5hr)

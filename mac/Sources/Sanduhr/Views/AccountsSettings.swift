@@ -8,7 +8,14 @@ import SwiftUI
 /// Secrets are write-only here, as before: a key is never read back onto the screen.
 struct AccountsSettings: View {
     @Bindable var vm: UsageViewModel
+    /// Carries an account to select on arrival (from the Claude Usage page).
+    var navigation: SettingsNavigation?
     @State private var selection: String?
+    /// Scroll to the Data section once, after arriving for an account.
+    @State private var scrollToData = false
+
+    /// The Data section's scroll anchor.
+    static let dataAnchor = "account-data"
     @State private var adding = false
 
     var body: some View {
@@ -33,10 +40,19 @@ struct AccountsSettings: View {
                 AccountList(vm: vm, selection: $selection, adding: $adding)
                     .frame(width: 190)
                 // The Data section makes the account taller than the window.
-                ScrollView {
-                    detail
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                        .padding(.trailing, 12)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        detail
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                            .padding(.trailing, 12)
+                    }
+                    .onChange(of: scrollToData) { _, go in
+                        guard go else { return }
+                        scrollToData = false
+                        DispatchQueue.main.async {
+                            withAnimation { proxy.scrollTo(Self.dataAnchor, anchor: .top) }
+                        }
+                    }
                 }
             }
             if vm.showsAccounts {
@@ -45,7 +61,16 @@ struct AccountsSettings: View {
             }
             Spacer(minLength: 0)
         }
-        .onAppear { if selection == nil { selection = vm.activeAccount } }
+        .onAppear {
+            if let wanted = navigation?.accountToShow, vm.accountLabels.contains(wanted) {
+                selection = wanted
+                adding = false
+                scrollToData = true
+            } else if selection == nil {
+                selection = vm.activeAccount
+            }
+            navigation?.accountToShow = nil
+        }
         // A removed or renamed account leaves the selection pointing at nothing.
         .onChange(of: vm.accountLabels) { _, labels in
             if let s = selection, !labels.contains(s) { selection = vm.activeAccount }
@@ -215,6 +240,7 @@ private struct AccountDetail: View {
             renameRow
             Divider()
             AccountDataSection(vm: vm, label: label)
+                .id(AccountsSettings.dataAnchor)
             Divider()
             endRow
             if let note { FormNote(text: note, isError: noteIsError) }

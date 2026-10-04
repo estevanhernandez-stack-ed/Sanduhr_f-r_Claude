@@ -1,0 +1,29 @@
+# docs/mac-smoke-test.md section 4: the Claude Usage page (item 48) opens in Settings and each
+# tab renders, whatever the active account keeps. Read only: nothing is linked, recorded,
+# exported or erased here.
+name: Claude Usage page tabs
+steps:
+  - do: usage
+    arg: overview
+  - expect_state: { settings_open: true, settings_section: usage, usage_page.open: true, usage_page.tab: overview }
+  - expect:
+      window: settings
+      contains: { text: Records on this Mac }
+  - snap: overview
+  - do: usage
+    arg: trends
+  - expect_state: { usage_page.open: true, usage_page.tab: trends }
+  - expect:
+      window: settings
+      contains: { text: "/(come from the record|weeks)/" }
+  - snap: trends
+  - do: usage
+    arg: sessions
+  - expect_state: { usage_page.open: true, usage_page.tab: sessions }
+  - expect:
+      window: settings
+      contains: { text: "/(come from the record|Export CSV)/" }
+  - snap: sessions
+  - do: settings
+    arg: general
+  - expect_state: { settings_section: general, usage_page.open: false, usage_page.tab: sessions }

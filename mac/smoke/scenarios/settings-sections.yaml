@@ -17,6 +17,10 @@ steps:
       window: settings
       contains: { text: "/(own|Paste the) session key/" }
   - do: settings
+    arg: usage
+  # Item 48: Claude Usage sits under Accounts.
+  - expect_state: { settings_section: usage, usage_page.open: true }
+  - do: settings
     arg: deskLayout
   - expect_state: { settings_section: deskLayout }
   - do: settings
