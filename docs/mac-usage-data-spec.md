@@ -32,7 +32,10 @@ Each account in Settings, Accounts gets a **Data** section:
 - **Meter history** is the utilization series behind the sparklines and trends (`history.{label}.json`),
   today capped at 2 hours on the Mac; 30 days matches Windows.
 - **Claude Code folder** links the account to the Claude Code home whose logs belong to it. A folder
-  links to at most one account. Sanduhr suggests the folders it finds and never links one on its own.
+  links to at most one account, and an account to one folder: people who use Claude Code with
+  several accounts keep a folder per login (`~/.claude`, `~/.claude-<name>` with
+  `CLAUDE_CONFIG_DIR`) so they never sign in again, so a folder already is an account. Sanduhr
+  suggests the folders it finds and never links one on its own (see Suggesting the folder).
 - **Claude Code activity**: *Live only* reads the folder's logs for the cards' local burn and the
   Claude Usage page and stores nothing. *Keep a record* also writes the vault for that folder
   (monthly session shards, rollups, checkpoints), kept until erased.
@@ -47,6 +50,15 @@ Each account in Settings, Accounts gets a **Data** section:
 
 Every choice is local. Nothing in this spec sends anything off the Mac; Windows' publish feature
 stays out (merge plan: drop).
+
+## Suggesting the folder
+
+Each Claude Code folder records which organization it is signed in to (`oauthAccount.organizationUuid`
+in its `.claude.json`). Sanduhr reads that one field, never the email, names or organization name
+beside it, and compares it with the organization each account fetches from claude.ai (item 35's
+choice). A match is offered as a suggestion on the account's Data section ("This folder is signed in
+to this account. Link it?"); no match, or several, offers the found folders as a list. The uuid is
+compared in memory and never stored or logged.
 
 ## How the MCP server learns the choices
 
@@ -88,8 +100,8 @@ Hidden-name hashing and erase; the vault ports the Windows fixtures (torn files,
 worktree folding). Development and screenshots use a test Claude Code folder or a folder whose
 project names are fine to show; release material never shows real project names.
 
-## Open questions
+## Decisions (2026-10-04)
 
-1. Meter history: 30 days on by default, or off until chosen?
-2. One Claude Code folder per account, or allow several (for someone with two folders on one login)?
-3. Is *Hidden* project names worth having in the first vault release, or later?
+1. Meter history is on (30 days) by default.
+2. One Claude Code folder per account and one account per folder, suggested by organization match.
+3. *Hidden* project names ship with the first vault release (item 46).
