@@ -70,19 +70,32 @@ struct NotchView: View {
 
     private var stripSize: CGFloat { max(11, chin * 0.55) }
 
-    /// Now playing under the camera: the whole line, scrolling once when it doesn't fit (item 53b).
-    /// It takes clicks like the Desk line (DeskController: click play/pause, two-finger click its
-    /// menu), found by the frame it reports.
+    /// Now playing under the camera: the whole line, scrolling once when it doesn't fit, and while
+    /// paused a Next button at its trailing end (item 53b). Both take clicks like the Desk line
+    /// (DeskController: the text plays or pauses, the button skips, a two-finger click opens the
+    /// menu), found by the frames they report.
     private func stripNowPlaying(_ line: String, width: CGFloat) -> some View {
-        let room = max(0, width - 36)
-        return ScrollOnceText(text: line, trackKey: NowPlayingScroll.trackKey(model.nowPlaying),
-                              textWidth: NotchWingsView.textWidth(line, stripSize, font), room: room,
-                              font: .custom(font, size: stripSize))
-            .foregroundStyle(LinearGradient.ink(textColor))
-            .opacity(0.85)
-            .frame(height: chin)
-            .onGlobalFrame { model.stripFrame = $0 }
-            .frame(width: room)
+        let state = model.nowPlaying?.state
+        let room = NowPlayingWingLayout.textRoom(.strip, width: width, state: state, size: stripSize)
+        return HStack(spacing: NowPlayingWingLayout.stripSpacing) {
+            ScrollOnceText(text: line, trackKey: NowPlayingScroll.trackKey(model.nowPlaying),
+                           textWidth: NotchWingsView.textWidth(line, stripSize, font), room: room,
+                           font: .custom(font, size: stripSize))
+                .foregroundStyle(LinearGradient.ink(textColor))
+                .opacity(0.85)
+                .frame(height: chin)
+                .onGlobalFrame { model.stripFrame = $0 }
+            if NowPlayingWingLayout.nextSide(.strip, state: state) != nil {
+                Image(systemName: "forward.end.fill")
+                    .font(.system(size: stripSize * 0.8, weight: .semibold))
+                    .foregroundStyle(LinearGradient.ink(textColor))
+                    .opacity(0.85)
+                    .frame(width: NowPlayingWingLayout.nextWidth(stripSize), height: chin)
+                    .onGlobalFrame { model.stripNextFrame = $0 }
+                    .accessibilityLabel("Next")
+            }
+        }
+        .frame(width: max(0, width - NowPlayingWingLayout.stripPadding * 2))
     }
 }
 
@@ -148,9 +161,9 @@ struct NotchWingsView: View {
                         IslandShape(flare: 8, radius: min(10, barHeight * 0.3))
                             .fill(Color.black)
                         HStack(spacing: 0) {
-                            wing(left, size, leftContent, width: wingL).frame(width: max(0, wingL - 10), alignment: .trailing)
+                            wing(left, size, leftContent, place: .left, width: wingL).frame(width: max(0, wingL - 10), alignment: .trailing)
                             Color.clear.frame(width: notchWidth + 20)
-                            wing(right, size, rightContent, width: wingR).frame(width: max(0, wingR - 10), alignment: .leading)
+                            wing(right, size, rightContent, place: .right, width: wingR).frame(width: max(0, wingR - 10), alignment: .leading)
                         }
                     }
                     .frame(width: notchWidth + wingL + wingR, height: barHeight)
@@ -168,21 +181,65 @@ struct NotchWingsView: View {
     /// click opens Previous, Play/Pause, Next and Now Playing Settings…; the rest of the island
     /// still opens Settings. A title too long for the wing scrolls through once (item 53b).
     @ViewBuilder
-    private func wing(_ text: String?, _ size: CGFloat, _ content: NotchContent, width: CGFloat) -> some View {
+    private func wing(_ text: String?, _ size: CGFloat, _ content: NotchContent, place: NotchContent.Place,
+                      width: CGFloat) -> some View {
         if content == .nowPlaying, let text {
+            nowPlayingWing(text, size, place: place, width: width)
+        } else {
+            label(text, size)
+        }
+    }
+
+    /// Now playing in a wing: the title, scrolling once when it doesn't fit (item 53b), and while
+    /// paused a Next button at the wing's outer edge (item 53b). The title keeps its beginning
+    /// visible; a click on it plays or pauses, a click on the button skips. Both carry the
+    /// two-finger menu.
+    private func nowPlayingWing(_ text: String, _ size: CGFloat, place: NotchContent.Place, width: CGFloat) -> some View {
+        let state = model.nowPlaying?.state
+        let side = NowPlayingWingLayout.nextSide(place, state: state)
+        let room = NowPlayingWingLayout.textRoom(place, width: width, state: state, size: size)
+        return HStack(spacing: 0) {
+            if side == .leading {
+                nextButton(size)
+                Spacer(minLength: NowPlayingWingLayout.wingSpacing)
+            } else if place == .left {
+                Spacer(minLength: 0)
+            }
             ScrollOnceText(text: text, trackKey: NowPlayingScroll.trackKey(model.nowPlaying),
-                           textWidth: Self.textWidth(text, size, font), room: max(0, width - 22),
+                           textWidth: Self.textWidth(text, size, font), room: room,
                            font: .custom(font, size: size))
                 .foregroundStyle(LinearGradient.ink(textColor))
                 .opacity(0.88)
                 .frame(maxHeight: .infinity)
                 .contentShape(Rectangle())
                 .onTapGesture { NowPlayingController.shared.togglePlayPause() }
-                .contextMenu { NowPlayingMenuItems() }
-                .help("Play or pause. Two-finger click for more.")
-        } else {
-            label(text, size)
+                .help(state == .paused ? "Play. Two-finger click for more." : "Play or pause. Two-finger click for more.")
+            if side == .trailing {
+                Spacer(minLength: NowPlayingWingLayout.wingSpacing)
+                nextButton(size)
+            } else if place == .right {
+                Spacer(minLength: 0)
+            }
         }
+        .frame(width: max(0, width - NowPlayingWingLayout.wingInsets))
+        .padding(place == .left ? .leading : .trailing, NowPlayingWingLayout.outerInset)
+        .contextMenu { NowPlayingMenuItems() }
+    }
+
+    /// The paused wing's Next button: its own click area, the wing's height.
+    private func nextButton(_ size: CGFloat) -> some View {
+        Image(systemName: "forward.end.fill")
+            .font(.system(size: size * 0.8, weight: .semibold))
+            .foregroundStyle(LinearGradient.ink(textColor))
+            .opacity(0.88)
+            .frame(width: NowPlayingWingLayout.nextWidth(size))
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .onTapGesture { NowPlayingController.shared.next() }
+            .help("Next")
+            .accessibilityElement()
+            .accessibilityLabel("Next")
+            .accessibilityAddTraits(.isButton)
     }
 
     private func label(_ text: String?, _ size: CGFloat) -> some View {
@@ -203,8 +260,16 @@ struct NotchWingsView: View {
         let left = showText ? text(leftContent, at: .left, model: model, now: now) : nil
         let right = showText ? text(rightContent, at: .right, model: model, now: now) : nil
         let size = max(10, notchHeight * 0.42)
-        return Layout(left: min(maxWings, max(wings, textWidth(left, size, font) + 22)),
-                      right: min(maxWings, max(wings, textWidth(right, size, font) + 22)),
+        let state = model.nowPlaying?.state
+        func wingWidth(_ text: String?, _ content: NotchContent, _ place: NotchContent.Place) -> CGFloat {
+            // A paused now playing also makes room for its Next button (item 53b).
+            NowPlayingWingLayout.wingWidth(
+                textWidth: textWidth(text, size, font), place: place,
+                state: content == .nowPlaying && text != nil ? state : nil,
+                size: size, minimum: wings, maximum: maxWings)
+        }
+        return Layout(left: wingWidth(left, leftContent, .left),
+                      right: wingWidth(right, rightContent, .right),
                       leftText: left, rightText: right, size: size)
     }
 

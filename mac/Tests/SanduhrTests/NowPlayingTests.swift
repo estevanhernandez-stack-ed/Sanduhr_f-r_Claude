@@ -613,3 +613,68 @@ struct NowPlayingScrollTests {
         #expect(S.trackKey(nil) == "")
     }
 }
+
+@Suite("Now playing while paused")
+struct NowPlayingPausedLayoutTests {
+    typealias L = NowPlayingWingLayout
+
+    @Test func nextShowsOnlyWhilePaused() {
+        #expect(L.showsNext(.paused))
+        #expect(!L.showsNext(.playing))
+        #expect(!L.showsNext(NowPlayingState.none))
+        #expect(!L.showsNext(nil))
+        #expect(L.nextSide(.left, state: .playing) == nil)
+        #expect(L.nextRoom(.right, state: .playing, size: 16) == 0)
+    }
+
+    @Test func nextSitsAtTheOuterEdge() {
+        // Away from the camera: the left wing's left, the right wing's right; the strip's end.
+        #expect(L.nextSide(.left, state: .paused) == .leading)
+        #expect(L.nextSide(.right, state: .paused) == .trailing)
+        #expect(L.nextSide(.strip, state: .paused) == .trailing)
+    }
+
+    @Test func theTitleKeepsTheRestOfTheWing() {
+        let size: CGFloat = 16
+        let next = L.nextWidth(size) + L.wingSpacing
+        #expect(L.textRoom(.right, width: 180, state: .playing, size: size) == 180 - L.wingInsets)
+        #expect(L.textRoom(.right, width: 180, state: .paused, size: size) == 180 - L.wingInsets - next)
+        #expect(L.textRoom(.left, width: 180, state: .paused, size: size) == 180 - L.wingInsets - next)
+        #expect(L.textRoom(.left, width: 10, state: .paused, size: size) == 0)
+        let stripNext = L.nextWidth(size) + L.stripSpacing
+        #expect(L.textRoom(.strip, width: 400, state: .paused, size: size) == 400 - 36 - stripNext)
+    }
+
+    @Test func aPausedWingGrowsForTheButtonUpToTheLimit() {
+        let size: CGFloat = 16
+        let playing = L.wingWidth(textWidth: 60, place: .right, state: .playing, size: size, minimum: 36, maximum: 180)
+        let paused = L.wingWidth(textWidth: 60, place: .right, state: .paused, size: size, minimum: 36, maximum: 180)
+        #expect(playing == 60 + L.wingInsets)
+        #expect(paused == playing + L.nextWidth(size) + L.wingSpacing)
+        #expect(L.wingWidth(textWidth: 400, place: .left, state: .paused, size: size, minimum: 36, maximum: 180) == 180)
+        // Other content (no state) never gets the room.
+        #expect(L.wingWidth(textWidth: 0, place: .left, state: nil, size: size, minimum: 36, maximum: 180) == 36)
+    }
+
+    @Test func theStripButtonIsItsOwnClickArea() {
+        var input = DeskElements.Input()
+        input.nowPlayingStrip = true
+        input.stripFrame = CGRect(x: 640, y: 38, width: 200, height: 26)
+        input.nowPlayingStripNext = true
+        let nextX = input.stripFrame.maxX + L.stripSpacing
+        input.stripNextFrame = CGRect(x: nextX, y: 38, width: L.nextWidth(14), height: 26)
+        let out = DeskElements.build(input)
+        let next = DeskElement(kind: .nowPlayingNext, key: "strip", frame: input.stripNextFrame)
+        #expect(out.last == next)
+        #expect(DeskHitTest.element(at: CGPoint(x: nextX + 5, y: 50), in: out) == next)
+        #expect(DeskHitTest.element(at: CGPoint(x: 700, y: 50), in: out)?.kind == .nowPlaying)
+        #expect(DeskHitTest.hasMenu(next))
+        #expect(DeskFrameCheck.problem(out, window: CGSize(width: 1512, height: 982)) == nil)
+        #expect(DeskFrameCheck.name(next) == "now_playing_next strip")
+        // Playing: no button.
+        input.nowPlayingStripNext = false
+        #expect(!DeskElements.build(input).contains { $0.kind == .nowPlayingNext })
+        // The spacing keeps both click areas apart.
+        #expect(L.stripSpacing > DeskHitTest.slack(.nowPlaying).width + DeskHitTest.slack(.nowPlayingNext).width)
+    }
+}

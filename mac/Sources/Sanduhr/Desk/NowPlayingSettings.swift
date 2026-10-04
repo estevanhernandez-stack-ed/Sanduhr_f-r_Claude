@@ -60,7 +60,7 @@ private struct NowPlayingShowSection: View {
     var body: some View {
         Section("Show") {
             Toggle("Hide while paused", isOn: $hidePaused)
-            Text("Nothing shows when nothing plays.")
+            Text("Nothing shows when nothing plays. While paused, a wing shows a Next button at its outer edge (the strip at its end): click the title to play, the button to skip.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

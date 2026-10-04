@@ -357,6 +357,8 @@ final class DeskController: NSObject, NSMenuDelegate {
             MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.viewModel.cycleAccount() }
         case .nowPlaying:
             NowPlayingController.shared.togglePlayPause()
+        case .nowPlayingNext:
+            NowPlayingController.shared.next()
         case .meters, .meterRow:
             // The window holds the mouse over the meters so a two-finger click reaches the limit
             // menu; a plain click is swallowed there, so nothing reacts to it.
@@ -394,7 +396,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         let over = DeskHitTest.element(at: point, in: model.elements()) != nil
         if w.ignoresMouseEvents == over { w.ignoresMouseEvents = !over }
         let blocks = [model.metersFrame, model.accountFrame, model.noteFrame, model.meetingsFrame,
-                      model.nowPlayingFrame, model.stripFrame]
+                      model.nowPlayingFrame, model.stripFrame, model.stripNextFrame]
         watchApproach(DeskPointerWatch.near(point, frames: blocks))
     }
 

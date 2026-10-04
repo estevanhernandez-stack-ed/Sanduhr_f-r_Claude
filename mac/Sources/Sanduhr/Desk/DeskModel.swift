@@ -103,6 +103,8 @@ final class DeskModel {
     /// Where the text in the strip under the camera sits, same coordinates (clickable while it
     /// shows now playing).
     @ObservationIgnored var stripFrame: CGRect = .zero { didSet { if stripFrame != oldValue { onHitAreasChange?() } } }
+    /// Where the strip's Next button sits while paused (item 53b), same coordinates. A click skips.
+    @ObservationIgnored var stripNextFrame: CGRect = .zero { didSet { if stripNextFrame != oldValue { onHitAreasChange?() } } }
     /// Called when a clickable piece moves or comes and goes (DeskController takes the mouse there).
     @ObservationIgnored var onHitAreasChange: (() -> Void)?
     /// Alert pulses so far, per limit (Settings, Alerts, Where alerts show). A meter row pulses
@@ -359,6 +361,8 @@ final class DeskModel {
             chinText: desk.bool(forKey: "notchChinText"),
             strip: NotchContent.saved(.strip, in: desk), hasTrack: nowPlaying != nil)
         input.stripFrame = stripFrame
+        input.nowPlayingStripNext = NowPlayingWingLayout.showsNext(nowPlaying?.state)
+        input.stripNextFrame = stripNextFrame
         return DeskElements.build(input)
     }
 

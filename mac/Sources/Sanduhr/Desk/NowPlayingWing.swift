@@ -47,6 +47,59 @@ enum NowPlayingScroll {
     }
 }
 
+/// How a now playing place is laid out (item 53b): the text's room and, while paused, where the
+/// Next button sits. A wing's button sits at its outer edge (away from the camera: the left wing's
+/// left, the right wing's right); the strip's at its trailing end. The text keeps its beginning
+/// visible on the other side.
+enum NowPlayingWingLayout {
+    enum Side: Equatable { case leading, trailing }
+
+    /// Between a wing's text and the camera.
+    static let cameraInset: CGFloat = 10
+    /// Between a wing's content and its outer edge.
+    static let outerInset: CGFloat = 12
+    /// A wing's content is this much narrower than the wing.
+    static var wingInsets: CGFloat { cameraInset + outerInset }
+    /// Between a wing's text and its Next button.
+    static let wingSpacing: CGFloat = 6
+    /// The strip's padding on each side.
+    static let stripPadding: CGFloat = 18
+    /// Between the strip's text and its Next button: wider than both click slacks together
+    /// (DeskHitTest), so their click areas never meet.
+    static let stripSpacing: CGFloat = 14
+
+    /// The Next button's width for a text size.
+    static func nextWidth(_ size: CGFloat) -> CGFloat { ceil(size * 1.5) }
+
+    /// Next shows while paused, and only then.
+    static func showsNext(_ state: NowPlayingState?) -> Bool { state == .paused }
+
+    /// The Next button's side at `place`, or nil when it doesn't show.
+    static func nextSide(_ place: NotchContent.Place, state: NowPlayingState?) -> Side? {
+        guard showsNext(state) else { return nil }
+        return place == .left ? .leading : .trailing
+    }
+
+    /// The extra width a place needs for the button.
+    static func nextRoom(_ place: NotchContent.Place, state: NowPlayingState?, size: CGFloat) -> CGFloat {
+        guard showsNext(state) else { return 0 }
+        return nextWidth(size) + (place == .strip ? stripSpacing : wingSpacing)
+    }
+
+    /// A wing's width for its text: room for the text, the insets and (paused) the button, at
+    /// least `minimum` (the Wings setting), at most `maximum`.
+    static func wingWidth(textWidth: CGFloat, place: NotchContent.Place, state: NowPlayingState?,
+                          size: CGFloat, minimum: CGFloat, maximum: CGFloat) -> CGFloat {
+        min(maximum, max(minimum, textWidth + wingInsets + nextRoom(place, state: state, size: size)))
+    }
+
+    /// The width the text has at `place`, given the place's whole width (a wing's, or the strip's).
+    static func textRoom(_ place: NotchContent.Place, width: CGFloat, state: NowPlayingState?, size: CGFloat) -> CGFloat {
+        let insets = place == .strip ? stripPadding * 2 : wingInsets
+        return max(0, width - insets - nextRoom(place, state: state, size: size))
+    }
+}
+
 /// One line of now playing text that scrolls once when it doesn't fit (NowPlayingScroll): clipped
 /// to `room` with a soft fade at the clipped edge, resting at its beginning.
 struct ScrollOnceText: View {
