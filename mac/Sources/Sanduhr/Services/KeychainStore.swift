@@ -19,6 +19,11 @@ import Security
 /// leaves the file in place and the launch carries on with it; the next launch tries again
 /// (CredentialMigration.swift). Values are never logged.
 ///
+/// **Accounts (item 36).** Since 2.4.0 each named account has its own slots,
+/// `sessionKey:{label}` and `cf_clearance:{label}` (AccountRegistry.swift). `set`/`get`/`exists`
+/// take the slot kind and act on the active account; the legacy unlabelled slots are used only
+/// while there are no accounts (a launch whose promotion to Personal failed).
+///
 /// **History: why the file existed.** Through 2.3.1 every build used the file:
 /// - Default Keychain ACLs bind items to the exact code signature that wrote them, so every
 ///   ad-hoc rebuild triggered a "Sanduhr wants to use the Keychain" login-password prompt. Real
@@ -34,48 +39,83 @@ import Security
 /// Type name kept as `KeychainStore` to avoid a big rename everywhere.
 enum KeychainStore {
 
-    // MARK: Public API (unchanged shape)
+    // MARK: Public API (the active account)
 
-    /// A nil or empty value deletes the account. Goes to whichever store this launch uses.
-    static func set(_ value: String?, account: String) {
+    /// `account` is the slot kind (`KeychainAccount.sessionKey` or `.cfClearance`); the value
+    /// goes to the active account's slot (AccountRegistry.swift) in whichever store this launch
+    /// uses. A nil or empty value deletes it. With no accounts yet, saving a session key creates
+    /// Personal (onboarding and Credentials keep working as before accounts).
+    static func set(_ value: String?, account kind: String) {
+        let accounts = state.registry
         do {
             if let value, !value.isEmpty {
-                try active.backend.set(value, account: account)
+                if accounts.active == nil, kind == KeychainAccount.sessionKey {
+                    try accounts.add(AccountRegistry.defaultLabel, sessionKey: value)
+                    accounts.dropLegacy()
+                    return
+                }
+                try state.backend.set(value, account: slot(kind))
             } else {
-                try active.backend.delete(account: account)
+                try state.backend.delete(account: slot(kind))
             }
         } catch {
-            NSLog("Sanduhr: failed to save credential \(account) to the \(active.kind.rawValue) store: \(error)")
+            NSLog("Sanduhr: failed to save credential \(kind) to the \(state.kind.rawValue) store: \(error)")
         }
     }
 
-    static func get(account: String) -> String? {
-        active.backend.get(account: account)
+    static func get(account kind: String) -> String? {
+        state.backend.get(account: slot(kind))
     }
 
-    static func exists(account: String) -> Bool {
-        active.backend.exists(account: account)
+    static func exists(account kind: String) -> Bool {
+        state.backend.exists(account: slot(kind))
+    }
+
+    /// The active account's slot for `kind`, or the legacy slot while there are no accounts.
+    private static func slot(_ kind: String) -> String {
+        AccountRegistry.slot(kind, for: state.registry.active)
     }
 
     /// The store this launch uses (state.yaml's `credentials_store`).
-    static var kind: CredentialStoreKind { active.kind }
+    static var kind: CredentialStoreKind { state.kind }
 
-    /// Deletes the session key and cf_clearance from both stores, whichever this launch uses
-    /// (SignOut.swift). Failures are logged by store and account, never with a value. On a dev
-    /// build the Keychain delete can ask for the login password when a signed build wrote the item.
+    /// The account registry over this launch's store. Listing labels and reading the active one
+    /// touch only the defaults, never the Keychain.
+    static var accounts: AccountRegistry { state.registry }
+
+    /// Signs out the active account (item 32): its key and cf_clearance leave both stores,
+    /// whichever this launch uses; the account stays listed (SignOut.swift). Failures are logged
+    /// by store and slot kind, never with a label or a value. On a dev build the Keychain delete
+    /// can ask for the login password when a signed build wrote the item.
     @discardableResult
     static func signOut() -> SignOutResult {
-        let result = SignOut.run(backends: bothStores, accounts: KeychainAccount.all)
+        signOut(label: state.registry.active)
+    }
+
+    /// Sign Out for one account (nil: the legacy slots alone).
+    @discardableResult
+    static func signOut(label: String?) -> SignOutResult {
+        log(state.registry.signOut(label), "sign out")
+    }
+
+    /// Remove Account: Sign Out, then drop it from the list (the next one becomes active).
+    @discardableResult
+    static func remove(label: String) -> SignOutResult {
+        log(state.registry.remove(label), "remove account")
+    }
+
+    private static func log(_ result: SignOutResult, _ what: String) -> SignOutResult {
         for f in result.failures {
-            NSLog("Sanduhr: sign out could not remove \(f.account) from the \(f.store.rawValue) store: \(f.error ?? "")")
+            NSLog("Sanduhr: \(what) could not remove \(AccountRegistry.slotKind(f.account)) from the \(f.store.rawValue) store: \(f.error ?? "")")
         }
         return result
     }
 
-    /// Whether either store still holds a credential: Settings, Credentials offers Sign Out
-    /// only then. Never reads a Keychain value, so it doesn't prompt on a dev build.
+    /// Whether either store still holds a credential of the active account: Settings,
+    /// Credentials offers Sign Out only then. Never reads a Keychain value, so it doesn't
+    /// prompt on a dev build.
     static var anythingToSignOut: Bool {
-        SignOut.anythingStored(backends: bothStores, accounts: KeychainAccount.all)
+        state.registry.anythingToSignOut(state.registry.active)
     }
 
     private static var bothStores: [(kind: CredentialStoreKind, backend: any CredentialBackend)] {
@@ -85,27 +125,47 @@ enum KeychainStore {
 
     // MARK: Choosing the store
 
-    private struct Active: Sendable {
+    private struct State: Sendable {
         var kind: CredentialStoreKind
         var backend: any CredentialBackend
+        var registry: AccountRegistry
     }
 
-    /// Decided once, on first use, with the one-time move from the file.
-    private static let active: Active = {
+    /// Decided once, on first use: the one-time move from the file (the legacy pair and every
+    /// listed account's pair), then the legacy key's promotion to Personal.
+    private static let state: State = {
         let file = FileBackend.standard
         let keychain = KeychainBackend(service: KeychainBackend.service)
         let env = ProcessInfo.processInfo.environment["SANDUHR_KEYCHAIN"]
         let isSigned = env == "1" || CodeSignature.teamIdentifier() == CodeSignature.team
-        let r = CredentialMigration.resolve(isSigned: isSigned, file: file, keychain: keychain,
-                                            accounts: KeychainAccount.all)
+        let labels = AccountRegistry.savedLabels(in: UserDefaults.standard)
+        let groups = [AccountRegistry.slots(for: nil)] + labels.map { AccountRegistry.slots(for: $0) }
+        let r = CredentialMigration.resolve(isSigned: isSigned, file: file, keychain: keychain, groups: groups)
         switch r.outcome {
         case .migrated?: NSLog("Sanduhr: moved credentials from the file to the Keychain")
-        case .keptFileBecause(let why)?: NSLog("Sanduhr: kept the credentials file: \(why)")
+        case .keptFileBecause(let why)?: NSLog("Sanduhr: kept the credentials file: \(describe(why))")
         case .nothingToMove?, nil: break
         }
-        return r.store == .keychain ? Active(kind: .keychain, backend: keychain)
-                                    : Active(kind: .file, backend: file)
+        let kind = r.store
+        let backend: any CredentialBackend = kind == .keychain ? keychain : file
+        let registry = AccountRegistry(backend: backend, stores: bothStores, defaults: UserDefaults.standard)
+        switch registry.promoteLegacy() {
+        case .promoted: NSLog("Sanduhr: the saved session key is now the Personal account")
+        case .keptLegacyBecause(let why): NSLog("Sanduhr: kept the legacy credentials this launch: \(describe(why))")
+        case .nothingToPromote: break
+        }
+        return State(kind: kind, backend: backend, registry: registry)
     }()
+
+    /// A failure for the log: the slot kind only, never a label.
+    private static func describe(_ failure: CredentialMigrationFailure) -> String {
+        switch failure {
+        case .writeFailed(let a): "write failed (\(AccountRegistry.slotKind(a)))"
+        case .readBackMismatch(let a): "read-back mismatch (\(AccountRegistry.slotKind(a)))"
+        case .clearFailed(let a): "clear failed (\(AccountRegistry.slotKind(a)))"
+        case .sourceDeleteFailed(let a): "file delete failed (\(AccountRegistry.slotKind(a)))"
+        }
+    }
 }
 
 enum KeychainAccount {
@@ -136,9 +196,9 @@ enum CodeSignature {
 
 // MARK: - File backend
 
-/// `~/Library/Application Support/Sanduhr/credentials.json`, a JSON dict of
-/// `{"sessionKey": "...", "cf_clearance": "..."}`, mode 0600. The file is removed once it holds
-/// nothing, so a completed move to the Keychain leaves no file behind.
+/// `~/Library/Application Support/Sanduhr/credentials.json`, a JSON dict of slot to
+/// value (`{"sessionKey:Personal": "...", "cf_clearance:Personal": "..."}`), mode 0600. The file
+/// is removed once it holds nothing, so a completed move to the Keychain leaves no file behind.
 struct FileBackend: CredentialBackend {
     let url: URL
 
