@@ -169,8 +169,10 @@ $repo = 'estevanhernandez-stack-ed/Sanduhr_f-r_Claude'
 & $gh release upload v<v> (Get-ChildItem windows-dotnet/dist/release/* | ForEach-Object FullName) --repo $repo
 
 & $gh release edit v<v> --notes-file docs/store/release-notes-<v>.md --repo $repo
-& $gh release edit v<v> --draft=false --latest --repo $repo
+& $gh release edit v<v> --draft=false --latest=false --repo $repo
 ```
+
+**Never mark a Windows release Latest.** The repo's Latest slot belongs to the Mac app: 626labs.dev's Sanduhr page and this repo's own landing page send Mac users to `/releases/latest`, so a Windows release marked Latest hands them a `Setup.exe`. The Windows updater doesn't need the flag: Velopack's `GithubSource` lists every non-prerelease release and picks the newest with a feed. Untick "Set as the latest release" if you publish from the web UI.
 
 Auto-update rolls out within ~24h of publishing — existing installs poll `releases.win.json` and
 pick up the delta.
@@ -292,6 +294,7 @@ both proven on the .NET build.
 | MSIX launch fails "framework missing" on a fresh box | Published framework-dependent, not self-contained | `build-msix.ps1` already passes `--self-contained true`; don't flip it off |
 | Store rejects with trademark complaint | Disclaimer missing on a required surface | Re-check all six surfaces in 10.1.4.4(a) above |
 | `vpk` "not found" | Global tool not installed | `dotnet tool install -g vpk` |
+| 626labs.dev's Mac download hands people a Windows `Setup.exe` | A Windows release was published with `--latest` (or the web UI's "Set as the latest release"), taking the slot the Mac badges link to | Re-mark the newest `v*-mac` release Latest (`gh release edit v<mac>-mac --latest`); publish Windows releases with `--latest=false` |
 | Auto-updater never picks up a release | Only `Setup.exe` uploaded | Upload EVERY file from `dist/release/` (esp. `releases.win.json` + `*-full.nupkg`) |
 | Store tiles look generic / off-brand | Logos folder regenerated from the wrong source, or stale after a brand-art change | Re-run `generate-store-assets.ps1` from the committed lockup + app icon (Package/Logos/README.md) |
 | Velopack install DESTROYS `%LOCALAPPDATA%\Sanduhr` contents (the vault) | packId `Sanduhr` made the install dir collide with the app's data dir — the installer rollback-renames a pre-existing dir and deletes it on success (verified live 2026-07-13) | packId is `626Labs.Sanduhr` (install tree disjoint from data tree). NEVER revert — the packId froze when v3.2.0.0 published; changing it orphans every installed updater |
