@@ -122,6 +122,13 @@ final class UsageViewModel {
     var status: StatusMessage = .connecting
     /// The active account's sparkline history.
     var history: HistoryStore.History = HistoryStore.load(account: KeychainStore.accounts.active)
+    /// The accounts in list order and the active one, as the Accounts page, the menus and the
+    /// widget chip show them. Read from the registry's defaults (never the Keychain) and kept
+    /// current by every account change here (`reloadAccounts`).
+    private(set) var accountLabels: [String] = KeychainStore.accounts.labels
+    private(set) var activeAccount: String? = KeychainStore.accounts.active
+    /// The accounts with a session key in this launch's store (asked without reading a value).
+    private(set) var signedInAccounts: Set<String> = UsageViewModel.signedIn(KeychainStore.accounts)
     /// Bumped every 30s so countdown labels re-render without refetching.
     var countdownTick: Int = 0 {
         didSet { refreshMeterWarnings() }
@@ -254,6 +261,7 @@ final class UsageViewModel {
 
     /// Called after the user saves new credentials: rebuilds the API client and refreshes.
     func credentialsChanged() {
+        reloadAccounts()
         guard connect() else { return }
         // The first key saved creates Personal, whose history may be the upgrade's.
         history = HistoryStore.load(account: apiAccount)
@@ -283,6 +291,7 @@ final class UsageViewModel {
         stopFetching()
         status = .signedOut
         SnapshotWriter.writeSignedOut(accountRef: AccountRef.of(active))
+        reloadAccounts()
         onUsageUpdate?()
         return result
     }
@@ -291,7 +300,9 @@ final class UsageViewModel {
     @discardableResult
     func signOut(account label: String) -> SignOutResult {
         guard label != KeychainStore.accounts.active else { return signOut() }
-        return KeychainStore.signOut(label: label)
+        let result = KeychainStore.signOut(label: label)
+        reloadAccounts()
+        return result
     }
 
     /// Remove Account (after its own confirmation): Sign Out, its history file deleted, dropped
@@ -301,7 +312,7 @@ final class UsageViewModel {
     func removeAccount(_ label: String) -> SignOutResult {
         let wasActive = label == KeychainStore.accounts.active
         let result = KeychainStore.remove(label: label)
-        if wasActive { showActiveAccount() }
+        if wasActive { showActiveAccount() } else { reloadAccounts() }
         return result
     }
 
@@ -309,7 +320,66 @@ final class UsageViewModel {
     func renameAccount(_ old: String, to new: String) throws {
         try KeychainStore.accounts.rename(old, to: new)
         if apiAccount == old { apiAccount = new }
+        reloadAccounts()
         onUsageUpdate?()
+    }
+
+    /// Settings, Accounts, Add Account: a new account with its key, at the end of the list. It
+    /// is fetched at once when it becomes active: asked for, or the first account there is.
+    /// Refusals (`AccountError`) name no label and no value, so their text can be shown as is.
+    func addAccount(_ label: String, sessionKey: String, cfClearance: String?, makeActive: Bool) throws {
+        let accounts = KeychainStore.accounts
+        let wasEmpty = accounts.labels.isEmpty
+        try accounts.add(label, sessionKey: sessionKey, cfClearance: cfClearance)
+        if wasEmpty {
+            // The first account: no legacy copy may outlive it (KeychainStore.set does the same).
+            accounts.dropLegacy()
+            accounts.adoptLegacyHistory()
+            credentialsChanged()
+        } else if makeActive {
+            switchAccount(to: label)
+        } else {
+            reloadAccounts()
+        }
+    }
+
+    /// Settings, Accounts, Save for one account: a value replaces, nil keeps, "" deletes. Saving
+    /// the active account's key fetches with it at once.
+    func saveCredentials(_ label: String, sessionKey: String?, cfClearance: String?) throws {
+        try KeychainStore.accounts.save(label, sessionKey: sessionKey, cfClearance: cfClearance)
+        if label == KeychainStore.accounts.active { credentialsChanged() } else { reloadAccounts() }
+    }
+
+    /// Re-reads the account list and the active label from the registry. Assigns only on a
+    /// change, so views redraw only then.
+    func reloadAccounts() {
+        let accounts = KeychainStore.accounts
+        let labels = accounts.labels
+        let active = accounts.active
+        if labels != accountLabels { accountLabels = labels }
+        if active != activeAccount { activeAccount = active }
+        let signedIn = Self.signedIn(accounts)
+        if signedIn != signedInAccounts { signedInAccounts = signedIn }
+    }
+
+    nonisolated private static func signedIn(_ accounts: AccountRegistry) -> Set<String> {
+        Set(accounts.labels.filter(accounts.hasKey))
+    }
+
+    /// Two or more accounts: the chip, the Accounts submenu and the Desk's label show.
+    var showsAccounts: Bool { accountLabels.count > 1 }
+
+    /// What the widget's account chip shows.
+    struct AccountChipText: Equatable {
+        var text: String
+        /// Another account is in use too (following saw both): a small dot beside the label.
+        var otherInUse = false
+    }
+
+    /// The chip in the title area, nil with fewer than two accounts.
+    var accountChip: AccountChipText? {
+        guard showsAccounts, let active = activeAccount else { return nil }
+        return AccountChipText(text: active)
     }
 
     // MARK: Accounts
@@ -337,6 +407,7 @@ final class UsageViewModel {
         SnapshotWriter.delete()
         stopFetching()
         Notifier.shared.resetForSwitch()
+        reloadAccounts()
         let active = KeychainStore.accounts.active
         history = active.map { HistoryStore.load(account: $0) } ?? [:]
         if connect() {

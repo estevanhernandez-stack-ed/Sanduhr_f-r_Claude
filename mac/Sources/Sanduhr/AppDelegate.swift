@@ -273,7 +273,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 m.state = entry.checked ? .on : .off
                 menu.addItem(m)
             }
+            // The Accounts submenu sits after Show/Hide, with two or more accounts.
+            if i == 0, let accounts = currentAccountsMenu() {
+                menu.addItem(.separator())
+                menu.addItem(accountsMenuItem(accounts))
+            }
         }
+    }
+
+    /// "Accounts ▸": each account (the active one checked), then Manage Accounts….
+    private func accountsMenuItem(_ accounts: AccountsMenu) -> NSMenuItem {
+        let sub = NSMenu(title: AccountsMenu.title)
+        for item in accounts.items {
+            let m = NSMenuItem(title: item.title, action: #selector(accountChosen(_:)), keyEquivalent: "")
+            m.target = self
+            m.representedObject = item.label
+            m.state = item.checked ? .on : .off
+            sub.addItem(m)
+        }
+        sub.addItem(.separator())
+        let manage = NSMenuItem(title: AccountsMenu.manage, action: #selector(manageAccounts), keyEquivalent: "")
+        manage.target = self
+        sub.addItem(manage)
+        let top = NSMenuItem(title: AccountsMenu.title, action: nil, keyEquivalent: "")
+        top.submenu = sub
+        return top
     }
 
     /// The shared menu with the tools' current checkmarks.
@@ -285,8 +309,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                            cameraLight: CameraLightController.shared.manual)
     }
 
+    /// The Accounts submenu as it stands, nil with fewer than two accounts.
+    func currentAccountsMenu() -> AccountsMenu? {
+        SanduhrMenu.accounts(viewModel.accountLabels, active: viewModel.activeAccount)
+    }
+
     @objc private func menuItemChosen(_ sender: NSMenuItem) {
         if let command = MenuCommand(rawValue: sender.tag) { perform(command) }
+    }
+
+    @objc private func accountChosen(_ sender: NSMenuItem) {
+        if let label = sender.representedObject as? String { viewModel.switchAccount(to: label) }
+    }
+
+    /// Manage Accounts…: Settings, Accounts.
+    @objc func manageAccounts() {
+        SettingsWindowController.shared.show(.credentials)
     }
 
     /// What every menu's items do. Each tool works with the widget hidden: it shows the widget

@@ -2,6 +2,10 @@ import AppKit
 import SwiftUI
 
 /// The sections of the Settings window, in sidebar order.
+///
+/// `credentials` is the Accounts page (item 36 replaced Settings, Credentials with it). The case
+/// and its raw value stay, so `sanduhr://debug/action?name=settings&arg=credentials`, the smoke
+/// scenarios and state.yaml's `settings_section` keep working unchanged.
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general, alerts, credentials
     case deskLayout, deskLook, deskMeters, message, notch
@@ -14,7 +18,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: "General"
         case .alerts: "Alerts"
-        case .credentials: "Credentials"
+        case .credentials: "Accounts"
         case .deskLayout: "Layout"
         case .deskLook: "Look"
         case .deskMeters: "Meters"
@@ -32,7 +36,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: "gearshape"
         case .alerts: "bell"
-        case .credentials: "key"
+        case .credentials: "person.2"
         case .deskLayout: "rectangle.3.group"
         case .deskLook: "textformat"
         case .deskMeters: "gauge.with.dots.needle.67percent"
@@ -57,7 +61,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
 /// The one Settings window: every Sanduhr, Desk and widget setting, reachable with the widget
 /// hidden. Option+S, sanduhr:// and estedesk:// settings links, the notch island, every menu's
-/// Settings… item and the widget's gear all open it; onboarding opens it at Credentials.
+/// Settings… item and the widget's gear all open it; onboarding opens it at Accounts.
 @MainActor
 final class SettingsWindowController {
     static let shared = SettingsWindowController()
@@ -150,7 +154,8 @@ struct SettingsRoot: View {
         case .notch: DeskNotchSection()
         case .updates: UpdatesSection(updates: updates)
         case .about: AboutSection()
-        case .widgetLook, .themes, .pacing, .alerts, .credentials:
+        case .credentials: AccountsSettings(vm: vm)
+        case .widgetLook, .themes, .pacing, .alerts:
             // A fresh view per section, so a section's unsaved fields start empty.
             WidgetSettings(vm: vm, section: navigation.selection).id(navigation.selection)
         }

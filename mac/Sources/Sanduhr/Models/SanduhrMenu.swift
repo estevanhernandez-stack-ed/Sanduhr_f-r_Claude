@@ -51,3 +51,34 @@ enum SanduhrMenu {
         ]
     }
 }
+
+/// One account in the Accounts submenu: the active one checked, one that following saw in use
+/// marked "· in use".
+struct AccountMenuItem: Equatable {
+    let label: String
+    var checked = false
+    var inUse = false
+
+    var title: String { inUse ? "\(label) · in use" : label }
+}
+
+/// The Accounts submenu (item 36): each account, then Manage Accounts…, which opens Settings,
+/// Accounts. Kept apart from `MenuGroup` because its titles are labels, which never go into
+/// state.yaml (the debug state lists the groups' titles).
+struct AccountsMenu: Equatable {
+    static let title = "Accounts"
+    static let manage = "Manage Accounts…"
+    let items: [AccountMenuItem]
+}
+
+extension SanduhrMenu {
+    /// The Accounts submenu, nil with fewer than two accounts (one account needs no choosing).
+    /// `inUse` marks the inactive accounts following saw in use; the active one is never marked.
+    static func accounts(_ labels: [String], active: String?, inUse: Set<String> = []) -> AccountsMenu? {
+        guard labels.count > 1 else { return nil }
+        return AccountsMenu(items: labels.map { label in
+            AccountMenuItem(label: label, checked: label == active,
+                            inUse: label != active && inUse.contains(label))
+        })
+    }
+}

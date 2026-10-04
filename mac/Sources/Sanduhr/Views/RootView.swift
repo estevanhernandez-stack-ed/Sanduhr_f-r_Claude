@@ -160,6 +160,11 @@ struct RootView: View {
                     } else {
                         menuRows(groups[i].entries, app)
                     }
+                    // The Accounts submenu after Show/Hide, as AppDelegate.addMenuItems puts it.
+                    if i == 0, let accounts = app.currentAccountsMenu() {
+                        Divider()
+                        AccountsSubmenu(accounts: accounts, vm: vm, onManage: app.manageAccounts)
+                    }
                 }
             }
         }
@@ -211,7 +216,7 @@ struct RootView: View {
         let t = vm.theme.palette
         let color: Color = vm.status.isError ? .hex("f87171") : t.textDim
         if vm.status == .signedOut {
-            // Signed out: the line is the way back, straight to Settings, Credentials.
+            // Signed out: the line is the way back, straight to Settings, Accounts.
             Button { SettingsWindowController.shared.show(.credentials) } label: {
                 Text(vm.status.text)
                     .font(.app(size: 11))
@@ -221,12 +226,32 @@ struct RootView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityHint("Opens Settings, Credentials")
+            .accessibilityHint("Opens Settings, Accounts")
         } else {
             Text(vm.status.text)
                 .font(.app(size: 11))
                 .foregroundStyle(color)
                 .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+/// The widget menu's Accounts submenu (SanduhrMenu.accounts): each account, the active one
+/// checked, then Manage Accounts….
+struct AccountsSubmenu: View {
+    let accounts: AccountsMenu
+    var vm: UsageViewModel
+    var onManage: () -> Void
+
+    var body: some View {
+        Menu(AccountsMenu.title) {
+            ForEach(accounts.items, id: \.label) { item in
+                Toggle(item.title, isOn: Binding(
+                    get: { item.checked },
+                    set: { _ in vm.switchAccount(to: item.label) }))
+            }
+            Divider()
+            Button(AccountsMenu.manage, action: onManage)
         }
     }
 }

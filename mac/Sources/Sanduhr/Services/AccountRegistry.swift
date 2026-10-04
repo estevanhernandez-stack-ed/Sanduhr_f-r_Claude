@@ -172,6 +172,12 @@ final class AccountRegistry: @unchecked Sendable {
         }
     }
 
+    /// Whether this launch's store holds a session key for `label`: signed in, as the Accounts
+    /// page and the menus show it. Asks for attributes only, so it never prompts.
+    func hasKey(_ label: String) -> Bool {
+        backend.holds(account: Self.slot(KeychainAccount.sessionKey, for: label))
+    }
+
     func credentials(for label: String) -> AccountCredentials {
         AccountCredentials(sessionKey: backend.get(account: Self.slot(KeychainAccount.sessionKey, for: label)),
                            cfClearance: backend.get(account: Self.slot(KeychainAccount.cfClearance, for: label)))

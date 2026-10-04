@@ -59,6 +59,37 @@ struct SanduhrMenuTests {
     }
 }
 
+@Suite("Accounts submenu")
+struct AccountsMenuTests {
+    @Test func onlyWithTwoOrMoreAccounts() {
+        #expect(SanduhrMenu.accounts([], active: nil) == nil)
+        #expect(SanduhrMenu.accounts(["Personal"], active: "Personal") == nil)
+        #expect(SanduhrMenu.accounts(["Personal", "Work"], active: "Personal") != nil)
+    }
+
+    @Test func eachAccountInOrderWithTheActiveOneChecked() throws {
+        let menu = try #require(SanduhrMenu.accounts(["Personal", "Work", "Team 2"], active: "Work"))
+        #expect(menu.items.map(\.title) == ["Personal", "Work", "Team 2"])
+        #expect(menu.items.map(\.checked) == [false, true, false])
+        #expect(AccountsMenu.title == "Accounts")
+        #expect(AccountsMenu.manage == "Manage Accounts…")
+    }
+
+    @Test func inUseMarksOnlyAnInactiveAccount() throws {
+        let menu = try #require(SanduhrMenu.accounts(["Personal", "Work"], active: "Personal",
+                                                     inUse: ["Personal", "Work"]))
+        #expect(menu.items.map(\.title) == ["Personal", "Work · in use"])
+        #expect(menu.items.map(\.label) == ["Personal", "Work"])
+    }
+
+    @Test func labelsStayOutOfTheSharedGroups() {
+        // state.yaml lists the shared groups' titles; the submenu's labels never join them.
+        let titles = SanduhrMenu.groups(widgetVisible: true, deepWork: false, pacing: false, snake: false)
+            .flatMap(\.entries).map(\.title)
+        #expect(!titles.contains("Accounts"))
+    }
+}
+
 @Suite("Settings sidebar")
 struct SettingsSidebarTests {
     @Test func everySectionOnceInOrder() {
@@ -67,5 +98,12 @@ struct SettingsSidebarTests {
         #expect(SettingsSection.groups.map(\.header) == [nil, "Desk", "Widget", "Sanduhr"])
         #expect(SettingsSection.groups.last?.sections == [.updates, .about])
         #expect(SettingsSection.allCases.suffix(2).map(\.title) == ["Updates", "About"])
+    }
+
+    @Test func accountsKeepsTheCredentialsLink() {
+        // Item 36: Accounts replaced Credentials; the raw value stays for links and smoke.
+        #expect(SettingsSection(rawValue: "credentials") == .credentials)
+        #expect(SettingsSection.credentials.title == "Accounts")
+        #expect(SettingsSection.groups.first?.sections == [.general, .alerts, .credentials])
     }
 }

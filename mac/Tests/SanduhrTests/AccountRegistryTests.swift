@@ -170,6 +170,16 @@ struct AccountRegistryTests {
         #expect(f.registry.remove("Missing").outcomes.isEmpty)
     }
 
+    @Test func hasKeyIsPerAccountAndInThisStoreOnly() {
+        let f = RegistryFixture(keychain: ["sessionKey:Work": "sk-w", "cf_clearance:Home": "cf-h"],
+                                file: ["sessionKey:Home": "sk-f"], labels: ["Home", "Work"])
+        #expect(f.registry.hasKey("Work"))
+        // A cf_clearance alone is not signed in, and the other store's key does not count.
+        #expect(!f.registry.hasKey("Home"))
+        f.registry.signOut("Work")
+        #expect(!f.registry.hasKey("Work"))
+    }
+
     @Test func nextLabelCycles() {
         #expect(RegistryFixture(labels: ["A"]).registry.nextLabel == nil)
         #expect(RegistryFixture(labels: ["A", "B", "C"], active: "B").registry.nextLabel == "C")
