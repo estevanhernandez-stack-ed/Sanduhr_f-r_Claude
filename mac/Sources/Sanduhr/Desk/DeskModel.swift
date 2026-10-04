@@ -73,6 +73,9 @@ final class DeskModel {
     var switchNote = false
     /// Today's line from MessageEngine (messages.txt), or nil when there is none.
     var message: String?
+    /// Nobody can see the Desk (covered, screens asleep, screen saver, session switched away):
+    /// the message's {shimmer} rests (MessageMotion). Set by DeskController.
+    var motionPaused = false
     /// Height of the menu bar strip at the top of the screen, so top slots sit below it.
     var topInset: CGFloat = 0
     /// The camera notch in window coordinates (top-left origin), or nil on screens without one.

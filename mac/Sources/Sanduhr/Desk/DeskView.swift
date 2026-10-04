@@ -15,6 +15,7 @@ import AppKit
 ///   defaults write com.626labs.sanduhr.desk timeSize -float 112    (clock size; the rest scales from it)
 ///   defaults write com.626labs.sanduhr.desk messageSize -float 84
 ///   defaults write com.626labs.sanduhr.desk messageColor 9ad7ff    (hex, or "5b8cff,a86bff" for a gradient)
+///   defaults write com.626labs.sanduhr.desk messageGlow -bool false (no glow; a line's {glow} still glows)
 ///   defaults write com.626labs.sanduhr.desk message "text"         (pin one line; see Message.swift)
 ///   defaults write com.626labs.sanduhr.desk left -float 52         (edge margins in points;
 ///   defaults write com.626labs.sanduhr.desk right -float 52         top is measured below the menu bar)
@@ -38,6 +39,7 @@ struct DeskView: View {
     @AppStorage("timeSize", store: .desk) private var timeSize = 112.0
     @AppStorage("messageSize", store: .desk) private var messageSize = 84.0
     @AppStorage("messageColor", store: .desk) private var messageColor = "9ad7ff"
+    @AppStorage(DeskMessageLook.glowKey, store: .desk) private var messageGlow = true
     @AppStorage("showMeetings", store: .desk) private var showMeetings = true
     @AppStorage("showClaude", store: .desk) private var showClaude = true
     @AppStorage("inkColor", store: .desk) private var ink = "ffffff"
@@ -234,24 +236,15 @@ struct DeskView: View {
         .onGlobalFrame { model.meetingsFrame = $0 }
     }
 
-    /// The handwritten line, drawn the way handwritten.py baked it: colored ink with a soft
-    /// glow in the same color. messageColor takes one hex, or two or more separated by commas
-    /// for a left-to-right gradient (to match Ice's menu bar tint). Two lines at most, then it
-    /// scales down rather than collide.
+    /// The handwritten line with its per-line effects (DeskMessageLine, item 54). messageColor
+    /// takes one hex, or two or more separated by commas for a left-to-right gradient (to match
+    /// Ice's menu bar tint); a line's {ink:…} replaces it for that line.
     @ViewBuilder
     private func message(alignment: HorizontalAlignment) -> some View {
         if let text = model.message {
-            let colors = Color.inkStops(messageColor, fallback: "9ad7ff")
-            let glow = colors[colors.count / 2]
-            Text(text)
-                .font(.custom(messageFont.isEmpty ? font : messageFont, size: messageSize))
-                .multilineTextAlignment(alignment == .trailing ? .trailing : .leading)
-                .lineLimit(2)
-                .minimumScaleFactor(0.4)
-                .foregroundStyle(LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing))
-                .opacity(0.94)
-                .shadow(color: glow.opacity(0.55), radius: messageSize * 0.18)
-                .shadow(color: glow.opacity(0.35), radius: messageSize * 0.18)
+            DeskMessageLine(raw: text, font: messageFont.isEmpty ? font : messageFont, baseSize: messageSize,
+                            inkSpec: messageColor, globalGlow: messageGlow, alignment: alignment,
+                            paused: model.motionPaused)
         }
     }
 

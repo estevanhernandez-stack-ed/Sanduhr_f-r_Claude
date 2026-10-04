@@ -74,9 +74,51 @@ final class DeskController: NSObject, NSMenuDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(otherAppActivated),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
+        watchVisibility()
     }
 
     @objc private func otherAppActivated() { updateMouseThrough() }
+
+    // MARK: Out of sight (item 54: the message's {shimmer} rests)
+
+    private var screensAsleep = false
+    private var screenSaver = false
+    private var sessionAway = false
+    private static let screenSaverStarted = Notification.Name("com.apple.screensaver.didstart")
+    private static let screenSaverStopped = Notification.Name("com.apple.screensaver.didstop")
+
+    private func watchVisibility() {
+        let ws = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.screensDidSleepNotification, NSWorkspace.screensDidWakeNotification,
+                     NSWorkspace.sessionDidResignActiveNotification, NSWorkspace.sessionDidBecomeActiveNotification] {
+            ws.addObserver(self, selector: #selector(visibilityEvent(_:)), name: name, object: nil)
+        }
+        let dist = DistributedNotificationCenter.default()
+        dist.addObserver(self, selector: #selector(visibilityEvent(_:)), name: Self.screenSaverStarted, object: nil)
+        dist.addObserver(self, selector: #selector(visibilityEvent(_:)), name: Self.screenSaverStopped, object: nil)
+    }
+
+    @objc private func visibilityEvent(_ note: Notification) {
+        switch note.name {
+        case NSWorkspace.screensDidSleepNotification: screensAsleep = true
+        case NSWorkspace.screensDidWakeNotification: screensAsleep = false
+        case NSWorkspace.sessionDidResignActiveNotification: sessionAway = true
+        case NSWorkspace.sessionDidBecomeActiveNotification: sessionAway = false
+        case Self.screenSaverStarted: screenSaver = true
+        case Self.screenSaverStopped: screenSaver = false
+        default: break
+        }
+        updateMotion()
+    }
+
+    @objc private func occlusionChanged() { updateMotion() }
+
+    private func updateMotion() {
+        let visible = window.map { $0.occlusionState.contains(.visible) } ?? false
+        let paused = MessageMotion.paused(deskVisible: visible, screensAsleep: screensAsleep,
+                                          screenSaver: screenSaver, sessionAway: sessionAway)
+        if model.motionPaused != paused { model.motionPaused = paused }
+    }
 
     @objc private func appBecameActive() {
         recheckCalendar()
@@ -109,6 +151,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         applyHotKeys()
         NotificationCenter.default.removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
+        DistributedNotificationCenter.default().removeObserver(self)
+        screensAsleep = false; screenSaver = false; sessionAway = false
     }
 
     /// Called when Desk starts or stops and when the shortcuts switch flips.
@@ -131,6 +175,9 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// One transparent, click-through window covering the main screen, above the desktop
     /// icons and below every app window.
     private func buildWindow() {
+        if let old = window {
+            NotificationCenter.default.removeObserver(self, name: NSWindow.didChangeOcclusionStateNotification, object: old)
+        }
         window?.close()
         guard let screen = NSScreen.main else { return }
         let w = NSWindow(contentRect: screen.frame, styleMask: [.borderless],
@@ -152,6 +199,10 @@ final class DeskController: NSObject, NSMenuDelegate {
         w.setFrame(screen.frame, display: true)
         w.orderFront(nil)
         window = w
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(occlusionChanged),
+            name: NSWindow.didChangeOcclusionStateNotification, object: w)
+        updateMotion()
         // A pointer already resting near the Desk is watched from the start, before any movement;
         // once the frames arrive (onHitAreasChange) it takes the mouse over a click area.
         updateMouseThrough()
@@ -519,6 +570,19 @@ final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
     @MainActor @preconcurrency required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    // TEMPORARY click probe (not for commit).
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let v = super.hitTest(point)
+        if let e = NSApp.currentEvent, e.type == .leftMouseDown {
+            let l = convert(point, from: superview)
+            ProbeLog.logger.notice("wings hitTest local=(\(Int(l.x), privacy: .public),\(Int(l.y), privacy: .public)) bounds=\(Int(self.bounds.width), privacy: .public)x\(Int(self.bounds.height), privacy: .public) hit=\(v.map { String(describing: type(of: $0)) } ?? "nil", privacy: .public)")
+        }
+        return v
+    }
+    override func mouseDown(with event: NSEvent) {
+        ProbeLog.logger.notice("wings mouseDown at \(Int(event.locationInWindow.x), privacy: .public),\(Int(event.locationInWindow.y), privacy: .public)")
+        super.mouseDown(with: event)
+    }
 }
 
 /// Opens a join link in the meeting's own app when it is installed (Teams, Zoom), so there is
@@ -547,3 +611,7 @@ enum MeetingOpener {
         NSWorkspace.shared.open(link)
     }
 }
+
+// TEMPORARY click probe (not for commit).
+import os
+enum ProbeLog { static let logger = Logger(subsystem: "com.626labs.sanduhr", category: "probe") }
