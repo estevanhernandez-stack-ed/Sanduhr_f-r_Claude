@@ -50,7 +50,7 @@ struct DebugStateInput {
     var activeTool: String?
     var pacingPinned = false
     var pulseCount = 0
-    /// Notch glows fired so far, and the three Glow switches.
+    /// Notch glows fired so far, and the Glow switches.
     var glowCount = 0
     /// What the last glow outlined: island, plain (the hardware notch alone) or none yet.
     var glowShape = NotchGlowShape.none
@@ -79,6 +79,8 @@ struct DebugStateInput {
     var mcpInstalled = 0
     var statuslineInstalled = 0
     var metersInstalled = 0
+    /// …and the Claude Code hooks for the notch glow (item 51).
+    var hooksInstalled = 0
     /// Follow the account I'm using, and whether a manual switch is pausing it. Never labels.
     var follow = false
     var followPaused = false
@@ -106,10 +108,10 @@ enum DebugState {
         .map([YAMLPair("open", .bool(open)), YAMLPair("tab", .string(tab.rawValue))])
     }
 
-    /// `integrations:` (item 49): counts of folders, never a path.
-    static func integrationsYAML(mcp: Int, statusline: Int, meters: Int = 0) -> YAMLNode {
+    /// `integrations:` (items 49 to 51): counts of folders, never a path.
+    static func integrationsYAML(mcp: Int, statusline: Int, meters: Int = 0, hooks: Int = 0) -> YAMLNode {
         .map([YAMLPair("mcp_installed", .int(mcp)), YAMLPair("statusline_installed", .int(statusline)),
-              YAMLPair("meters_installed", .int(meters))])
+              YAMLPair("meters_installed", .int(meters)), YAMLPair("hooks_installed", .int(hooks))])
     }
 
     /// `vault:` (item 46): flags and a count only.
@@ -167,6 +169,8 @@ enum DebugState {
         pairs.append(("glow_alerts", .bool(s.glowSwitches.alerts)))
         pairs.append(("glow_meetings", .bool(s.glowSwitches.meetings)))
         pairs.append(("glow_camera", .bool(s.glowSwitches.camera)))
+        pairs.append(("glow_claude_waiting", .bool(s.glowSwitches.claudeWaiting)))
+        pairs.append(("glow_claude_done", .bool(s.glowSwitches.claudeDone)))
         pairs.append(("theme", .string(s.theme)))
         pairs.append(("menu", .list(menu)))
         pairs.append(("credentials_store", .string(s.credentialsStore.rawValue)))
@@ -178,7 +182,7 @@ enum DebugState {
                                                           events: s.localActivityEvents)))
         pairs.append(("vault", vaultYAML(s.vault)))
         pairs.append(("integrations", integrationsYAML(mcp: s.mcpInstalled, statusline: s.statuslineInstalled,
-                                                                meters: s.metersInstalled)))
+                                                                meters: s.metersInstalled, hooks: s.hooksInstalled)))
         pairs.append(("follow", .bool(s.follow)))
         pairs.append(("follow_paused", .bool(s.followPaused)))
         pairs.append(("version", .string(s.version)))

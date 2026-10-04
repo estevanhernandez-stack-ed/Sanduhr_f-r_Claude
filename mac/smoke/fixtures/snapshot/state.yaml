@@ -76,6 +76,8 @@ glow_shape: none
 glow_alerts: false
 glow_meetings: false
 glow_camera: false
+glow_claude_waiting: false
+glow_claude_done: false
 theme: obsidian
 menu:
   - items:
@@ -111,6 +113,7 @@ integrations:
   mcp_installed: 0
   statusline_installed: 0
   meters_installed: 0
+  hooks_installed: 0
 follow: false
 follow_paused: false
 version: "2.1.0"

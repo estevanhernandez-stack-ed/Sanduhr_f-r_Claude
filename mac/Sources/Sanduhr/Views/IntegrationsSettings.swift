@@ -7,6 +7,7 @@ struct IntegrationFolderState: Identifiable, Equatable {
     var mcp: IntegrationStatus
     var statusline: IntegrationStatus
     var meters: IntegrationStatus
+    var hooks: IntegrationStatus = .notInstalled
     var id: String { path }
 
     func status(_ kind: IntegrationKind) -> IntegrationStatus {
@@ -14,6 +15,7 @@ struct IntegrationFolderState: Identifiable, Equatable {
         case .mcp: mcp
         case .statusline: statusline
         case .meters: meters
+        case .hooks: hooks
         }
     }
 }
@@ -48,7 +50,8 @@ final class IntegrationsModel {
             let states = paths.map {
                 IntegrationFolderState(path: $0, mcp: installer.status(.mcp, folder: $0),
                                        statusline: installer.status(.statusline, folder: $0),
-                                       meters: installer.status(.meters, folder: $0))
+                                       meters: installer.status(.meters, folder: $0),
+                                       hooks: installer.status(.hooks, folder: $0))
             }
             return (states, PythonFinder.find())
         }.value
@@ -98,6 +101,7 @@ final class IntegrationsModel {
     /// replaced (the consent sheet asked). Returns the other entry when one turned up unasked.
     func install(_ kind: IntegrationKind, folder: String, replaceOther: Bool, linked: [String]) async -> String? {
         // The mod runs inside Claude Code: no python3 needed.
+        // The mod and the hooks run inside Claude Code: no python3 needed.
         guard let python = kind.needsPython ? pythonPath : (pythonPath ?? "") else { return nil }
         busy = folder
         defer { busy = nil }
@@ -173,6 +177,7 @@ struct IntegrationsSettings: View {
                 IntegrationsIntro()
                 PythonRow(model: model, reload: reload)
                 folderList
+                GlowHint(openNotch: { navigation.selection = .notch })
                 Button("Add Folder…") {
                     model.choose()
                     reload()
@@ -195,6 +200,10 @@ struct IntegrationsSettings: View {
                                     openAccounts: {
                                         consent = nil
                                         navigation.selection = .credentials
+                                    },
+                                    openNotch: {
+                                        consent = nil
+                                        navigation.selection = .notch
                                     },
                                     cancel: { consent = nil })
         }
@@ -238,7 +247,7 @@ private struct IntegrationsIntro: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Claude Code").font(.headline)
-            Text("The MCP server lets Claude Code ask Sanduhr about your usage, as each account's Share with Claude choice allows. The statusline shows the active account's meters under Claude Code's prompt; the meters mod draws them as bars above it. Each is installed per Claude Code folder: Sanduhr adds one entry to that folder's settings, keeps a backup of the file beside it, and Remove takes the entry out again. Nothing leaves this Mac.")
+            Text("The MCP server lets Claude Code ask Sanduhr about your usage, as each account's Share with Claude choice allows. The statusline shows the active account's meters under Claude Code's prompt; the meters mod draws them as bars above it. The notch glow hooks let Claude Code tell Sanduhr when a session waits on you or finishes, so the notch can glow. Each is installed per Claude Code folder: Sanduhr adds one entry to that folder's settings, keeps a backup of the file beside it, and Remove takes the entry out again. Nothing leaves this Mac.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -283,7 +292,23 @@ private struct PythonRow: View {
     }
 }
 
-/// One folder: its MCP server and statusline rows.
+/// Where the glow the hooks feed is switched on (item 51).
+private struct GlowHint: View {
+    let openNotch: () -> Void
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("The notch glow hooks only tell Sanduhr; the glow itself is off until you turn it on in Notch, Glow.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            Button("Glow Settings…", action: openNotch)
+        }
+    }
+}
+
+/// One folder: its MCP server, statusline, meters mod and notch glow hooks rows.
 private struct IntegrationFolderBox: View {
     let folder: IntegrationFolderState
     var model: IntegrationsModel
@@ -378,6 +403,7 @@ private struct IntegrationConsentSheet: View {
     var model: IntegrationsModel
     let install: () -> Void
     let openAccounts: () -> Void
+    let openNotch: () -> Void
     let cancel: () -> Void
 
     var body: some View {
@@ -388,6 +414,8 @@ private struct IntegrationConsentSheet: View {
                 MCPConsentBody(vm: vm, folder: model.display(consent.folder), openAccounts: openAccounts)
             } else if consent.kind == .meters {
                 MetersConsentBody(folder: model.display(consent.folder))
+            } else if consent.kind == .hooks {
+                HooksConsentBody(folder: model.display(consent.folder), openNotch: openNotch)
             } else {
                 Text("Claude Code sessions using \(model.display(consent.folder)) show the active account's session and weekly meters under the prompt, read from the numbers Sanduhr saves on this Mac. Claude Code shows the line to you; it isn't added to the conversation.")
                     .fixedSize(horizontal: false, vertical: true)
@@ -424,12 +452,16 @@ private struct IntegrationConsentSheet: View {
         case .mcp: "Let Claude Code ask Sanduhr about your usage?"
         case .statusline: "Show the meters in Claude Code?"
         case .meters: "Show the meters above Claude Code's prompt?"
+        case .hooks: "Glow the notch when Claude Code needs you?"
         }
     }
 
     /// What Install writes, where.
     private var writes: String {
         let file = model.configDisplay(consent.kind, folder: consent.folder)
+        if consent.kind == .hooks {
+            return "Sanduhr adds one entry to each of \(consent.kind.keyPath) in \(file), keeping every hook already there, and keeps a copy of the file as it was, with .sanduhr-backup added to its name. Remove takes out only those two entries."
+        }
         if consent.kind == .meters {
             return "Sanduhr adds its mod's folder to \(consent.kind.keyPath) in \(file), keeping any folders already listed, and keeps a copy of the file as it was, with .sanduhr-backup added to its name. Remove takes out only that folder."
         }
@@ -449,6 +481,30 @@ private struct MetersConsentBody: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// What the notch glow hooks tell Sanduhr (item 51), and where the glow is switched on.
+private struct HooksConsentBody: View {
+    let folder: String
+    let openNotch: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Claude Code sessions using \(folder) tell Sanduhr when they wait on you (a permission prompt or a question) and when a turn finishes, so the notch can glow.")
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Claude Code tells Sanduhr only that it is waiting or finished, by opening a sanduhr:// link that carries that one word. Nothing about the conversation, the project or the folder is sent, and nothing leaves this Mac. While Sanduhr isn't running, the hooks do nothing.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .firstTextBaseline) {
+                Text("The glow stays off until you turn it on in Notch, Glow.")
+                    .font(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Button("Glow Settings…", action: openNotch)
+            }
         }
     }
 }

@@ -105,8 +105,8 @@ struct UsagePageStateTests {
     }
 
     @Test func stateYAMLCountsIntegrationsWithoutPaths() {
-        let yaml = YAMLEmitter.emit(.object([("integrations", DebugState.integrationsYAML(mcp: 2, statusline: 1, meters: 3))]))
-        #expect(yaml == "integrations:\n  mcp_installed: 2\n  statusline_installed: 1\n  meters_installed: 3\n")
+        let yaml = YAMLEmitter.emit(.object([("integrations", DebugState.integrationsYAML(mcp: 2, statusline: 1, meters: 3, hooks: 4))]))
+        #expect(yaml == "integrations:\n  mcp_installed: 2\n  statusline_installed: 1\n  meters_installed: 3\n  hooks_installed: 4\n")
     }
 }
 
@@ -272,12 +272,12 @@ struct DebugStateTests {
                          "menu_bar", "settings_open", "settings_section", "usage_page", "meters", "widget_warnings", "hidden_limits",
                          "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
-                         "glow_camera", "theme", "menu", "credentials_store", "account_ref", "accounts_count", "history_days", "data",
+                         "glow_camera", "glow_claude_waiting", "glow_claude_done", "theme", "menu", "credentials_store", "account_ref", "accounts_count", "history_days", "data",
                          "local_activity", "vault", "integrations", "follow", "follow_paused", "version", "build"])
         #expect(yaml.contains("settings_section: notch\nusage_page:\n  open: false\n  tab: overview\nmeters:"))
         #expect(yaml.contains("widget_visible: true\nwidget_visibility: whileDeskOff\nmenu_bar: rotate\nsettings_open: true\n"))
         #expect(yaml.contains("notch_left: meetingOrTime\nnotch_right: message\nnotch_strip: meetingOrMeters\ncamera_in_use: false\ncamera_light: true\n"))
-        #expect(yaml.contains("pulse_count: 3\nglow_count: 2\nglow_shape: plain\nglow_alerts: true\nglow_meetings: false\nglow_camera: true\ntheme: aurora\nmenu:\n"))
+        #expect(yaml.contains("pulse_count: 3\nglow_count: 2\nglow_shape: plain\nglow_alerts: true\nglow_meetings: false\nglow_camera: true\nglow_claude_waiting: false\nglow_claude_done: false\ntheme: aurora\nmenu:\n"))
         #expect(yaml.contains("layout: message:tl") == false)   // the colons force quotes
         #expect(yaml.contains("layout: \"message:tl clock:bl meters:bl meetings:bl\"\n"))
         #expect(yaml.contains("""
@@ -293,7 +293,7 @@ struct DebugStateTests {
         """))
         #expect(yaml.contains("    pace: null\n"))
         #expect(yaml.contains("last_fetch: \"1970-01-01T00:00:00Z\"\n"))
-        #expect(yaml.contains("credentials_store: file\naccount_ref: null\naccounts_count: 0\nhistory_days: 30\ndata:\n  activity: \"off\"\n  names: names\n  share: \"off\"\n  folder_linked: false\nlocal_activity:\n  reading: false\n  events: 0\nvault:\n  recording: false\n  months: 0\n  last_ingest_ok: false\nintegrations:\n  mcp_installed: 0\n  statusline_installed: 0\n  meters_installed: 0\nfollow: false\nfollow_paused: false\nversion: \"2.1.0\"\n"))
+        #expect(yaml.contains("credentials_store: file\naccount_ref: null\naccounts_count: 0\nhistory_days: 30\ndata:\n  activity: \"off\"\n  names: names\n  share: \"off\"\n  folder_linked: false\nlocal_activity:\n  reading: false\n  events: 0\nvault:\n  recording: false\n  months: 0\n  last_ingest_ok: false\nintegrations:\n  mcp_installed: 0\n  statusline_installed: 0\n  meters_installed: 0\n  hooks_installed: 0\nfollow: false\nfollow_paused: false\nversion: \"2.1.0\"\n"))
         #expect(yaml.contains("version: \"2.1.0\"\nbuild: \"3\"\n"))
         #expect(yaml.contains("""
           - header: Tools

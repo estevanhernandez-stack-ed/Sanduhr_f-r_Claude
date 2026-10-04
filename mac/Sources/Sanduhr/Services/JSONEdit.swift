@@ -11,9 +11,12 @@ import Foundation
 /// more than the object's own line when it was empty), so removing that member again gives back
 /// the original bytes.
 enum JSONEdit {
-    /// A value Sanduhr writes: strings, arrays and objects with their keys in order.
+    /// A value Sanduhr writes: strings, booleans, integers, arrays and objects with their keys
+    /// in order.
     indirect enum Value: Equatable {
         case string(String)
+        case bool(Bool)
+        case int(Int)
         case array([Value])
         case object([Pair])
 
@@ -21,6 +24,8 @@ enum JSONEdit {
         var plain: Any {
             switch self {
             case .string(let s): return s
+            case .bool(let b): return b
+            case .int(let n): return n
             case .array(let a): return a.map(\.plain)
             case .object(let pairs):
                 var d: [String: Any] = [:]
@@ -68,6 +73,19 @@ enum JSONEdit {
         func index(_ key: String) -> Int? { members.lastIndex { $0.key == key } }
     }
 
+    /// One element of an array: its value's bytes.
+    struct Element {
+        let start: Int
+        let end: Int
+    }
+
+    /// An array: its brackets and elements in file order (item 51's hook lists).
+    struct ArrayValue {
+        let open: Int
+        let close: Int
+        let elements: [Element]
+    }
+
     // MARK: Checking and reading
 
     /// The top-level object, parsed, or `.malformed`. Strict JSON, as Claude Code's own
@@ -92,6 +110,19 @@ enum JSONEdit {
         s.skipSpace()
         guard s.peek == UInt8(ascii: "{") else { throw Failure.notAnObject }
         return try s.object()
+    }
+
+    /// The array whose `[` is the first non-space byte at or after `start`.
+    static func array(_ b: [UInt8], at start: Int) throws -> ArrayValue {
+        var s = Scanner(b: b, i: start)
+        s.skipSpace()
+        guard s.peek == UInt8(ascii: "[") else { throw Failure.notAnObject }
+        return try s.array()
+    }
+
+    /// One element's value, parsed (nil when it doesn't parse on its own, which valid JSON does).
+    static func parsed(_ b: [UInt8], _ e: Element) -> Any? {
+        try? JSONSerialization.jsonObject(with: Data(b[e.start..<e.end]), options: [.fragmentsAllowed])
     }
 
     /// The top-level object of a valid file.
@@ -183,6 +214,72 @@ enum JSONEdit {
         return out
     }
 
+    // MARK: Editing arrays
+
+    /// Appends `value` as the last element of `arr`: on its own line at the last element's
+    /// indent (or the array's own line plus one step when it was empty), or inline in an array
+    /// written on one line. `emptyInner` is what sat between the brackets of an empty array.
+    static func append(_ b: [UInt8], in arr: ArrayValue, value: Value) -> SetResult {
+        let unit = indentUnit(b)
+        if let last = arr.elements.last {
+            let compact = !b[arr.open...arr.close].contains(UInt8(ascii: "\n"))
+            var insert: [UInt8]
+            if arr.elements.count >= 2 {
+                // The separator the file already uses between elements.
+                let prev = arr.elements[arr.elements.count - 2]
+                insert = Array(b[prev.end..<last.start])
+            } else {
+                insert = compact ? Array(",".utf8) : Array(",\n".utf8) + lineIndent(b, at: last.start)
+            }
+            let indent = compact ? [] : lineIndent(b, at: last.start)
+            insert += render(value, indent: indent, unit: unit, compact: compact)
+            var out = Array(b[..<last.end])
+            out += insert
+            out += b[last.end...]
+            return SetResult(bytes: out, previous: nil, emptyInner: nil)
+        }
+        let outer = lineIndent(b, at: arr.open)
+        let indent = outer + unit
+        var inner: [UInt8] = [UInt8(ascii: "\n")] + indent
+        inner += render(value, indent: indent, unit: unit, compact: false)
+        inner += [UInt8(ascii: "\n")] + outer
+        var out = Array(b[...arr.open])
+        out += inner
+        out += b[arr.close...]
+        return SetResult(bytes: out, previous: nil, emptyInner: Array(b[(arr.open + 1)..<arr.close]))
+    }
+
+    /// Replaces element `index` of `arr` with `value`, rendered at that element's indent.
+    static func replaceElement(_ b: [UInt8], in arr: ArrayValue, index: Int, value: Value) -> [UInt8] {
+        let e = arr.elements[index]
+        let compact = !b[arr.open...arr.close].contains(UInt8(ascii: "\n"))
+        var out = Array(b[..<e.start])
+        out += render(value, indent: compact ? [] : lineIndent(b, at: e.start), unit: indentUnit(b), compact: compact)
+        out += b[e.end...]
+        return out
+    }
+
+    /// Removes element `index` and its separator. The only element leaves the array holding
+    /// `emptyInner` (what was between the brackets before it was added), or nothing.
+    static func removeElement(_ b: [UInt8], in arr: ArrayValue, index: Int, emptyInner: [UInt8]? = nil) -> [UInt8] {
+        let es = arr.elements
+        guard es.indices.contains(index) else { return b }
+        let range: Range<Int>
+        var replacement: [UInt8] = []
+        if es.count == 1 {
+            range = (arr.open + 1)..<arr.close
+            replacement = emptyInner ?? []
+        } else if index == es.count - 1 {
+            range = es[index - 1].end..<es[index].end
+        } else {
+            range = es[index].start..<es[index + 1].start
+        }
+        var out = Array(b[..<range.lowerBound])
+        out += replacement
+        out += b[range.upperBound...]
+        return out
+    }
+
     // MARK: Rendering
 
     /// The JSON string literal for `s`, slashes left alone.
@@ -198,6 +295,10 @@ enum JSONEdit {
         switch value {
         case .string(let s):
             return quoted(s)
+        case .bool(let b):
+            return Array((b ? "true" : "false").utf8)
+        case .int(let n):
+            return Array(String(n).utf8)
         case .array(let items):
             if items.isEmpty { return Array("[]".utf8) }
             let parts = items.map { render($0, indent: indent + unit, unit: unit, compact: compact) }
@@ -299,18 +400,7 @@ enum JSONEdit {
             case UInt8(ascii: "{"):
                 _ = try object()
             case UInt8(ascii: "["):
-                i += 1
-                skipSpace()
-                if peek == UInt8(ascii: "]") { i += 1; return }
-                while true {
-                    skipSpace()
-                    try value()
-                    skipSpace()
-                    guard let d = peek else { throw Failure.malformed }
-                    i += 1
-                    if d == UInt8(ascii: "]") { return }
-                    guard d == UInt8(ascii: ",") else { throw Failure.malformed }
-                }
+                _ = try array()
             case UInt8(ascii: "\""):
                 try string()
             default:
@@ -323,6 +413,28 @@ enum JSONEdit {
                     i += 1
                 }
                 if i == start { throw Failure.malformed }
+            }
+        }
+
+        mutating func array() throws -> ArrayValue {
+            let open = i
+            i += 1
+            var elements: [Element] = []
+            skipSpace()
+            if peek == UInt8(ascii: "]") {
+                i += 1
+                return ArrayValue(open: open, close: i - 1, elements: [])
+            }
+            while true {
+                skipSpace()
+                let start = i
+                try value()
+                elements.append(Element(start: start, end: i))
+                skipSpace()
+                guard let d = peek else { throw Failure.malformed }
+                i += 1
+                if d == UInt8(ascii: "]") { return ArrayValue(open: open, close: i - 1, elements: elements) }
+                guard d == UInt8(ascii: ",") else { throw Failure.malformed }
             }
         }
 

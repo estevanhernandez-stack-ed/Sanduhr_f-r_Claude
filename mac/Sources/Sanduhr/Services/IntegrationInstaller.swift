@@ -1,6 +1,6 @@
 import Foundation
 
-/// The Claude Code integrations Settings installs (items 49 and 50).
+/// The Claude Code integrations Settings installs (items 49 to 51).
 enum IntegrationKind: String, Codable, CaseIterable, Sendable {
     /// `mcpServers.sanduhr` in the folder's `.claude.json` (placement rule).
     case mcp
@@ -8,12 +8,16 @@ enum IntegrationKind: String, Codable, CaseIterable, Sendable {
     case statusline
     /// The meters mod's folder in `env.CLAUDE_CODE_PLUGIN_DIRS` of the folder's `settings.json`.
     case meters
+    /// Sanduhr's entries in `hooks.Notification` and `hooks.Stop` of the folder's
+    /// `settings.json`: Claude Code opens `sanduhr://claude-code?event=…` and the notch glows.
+    case hooks
 
     var title: String {
         switch self {
         case .mcp: "MCP server"
         case .statusline: "Statusline"
         case .meters: "Meters above the prompt"
+        case .hooks: "Notch glow when Claude needs you"
         }
     }
 
@@ -23,11 +27,15 @@ enum IntegrationKind: String, Codable, CaseIterable, Sendable {
         case .mcp: "mcpServers.sanduhr"
         case .statusline: "statusLine"
         case .meters: "env.CLAUDE_CODE_PLUGIN_DIRS"
+        case .hooks: "hooks.Notification and hooks.Stop"
         }
     }
 
-    /// Runs on python3 (the mod runs inside Claude Code).
-    var needsPython: Bool { self != .meters }
+    /// Runs on python3 (the mod runs inside Claude Code; the hooks run `open`).
+    var needsPython: Bool { self == .mcp || self == .statusline }
+
+    /// Needs Sanduhr's integration scripts copied out of the app (the hooks need none).
+    var needsScripts: Bool { self != .hooks }
 }
 
 /// What a folder has for one integration.
@@ -69,6 +77,19 @@ struct IntegrationReceipt: Codable, Equatable, Sendable {
     /// The mod: `CLAUDE_CODE_PLUGIN_DIRS` didn't exist, so Remove deletes it once only Sanduhr's
     /// entry is left. Optional so receipts written before the mod still read.
     var createdKey: Bool?
+    /// The hooks (item 51): what Install made, so Remove takes out exactly that.
+    var hooks: HookReceipt?
+}
+
+/// What the hooks' install made in `hooks` (item 51).
+struct HookReceipt: Codable, Equatable, Sendable {
+    /// The event lists Sanduhr created (`Notification`, `Stop`): Remove deletes them once only
+    /// Sanduhr's entry was in them.
+    var createdEvents: [String] = []
+    /// What sat between the braces of `hooks` when it was empty before Sanduhr's first list.
+    var hooksInner: String?
+    /// Per event: what sat between the brackets of a list that was empty before Sanduhr's entry.
+    var arrayInners: [String: String] = [:]
 }
 
 /// Installs and removes the Claude Code integrations in one chosen folder (item 49), the Mac
@@ -108,6 +129,15 @@ struct IntegrationInstaller {
     /// `path.delimiter`): `:` here, `;` on Windows.
     static let pluginDirsSeparator = ":"
 
+    static let hooksKey = "hooks"
+    /// The hook events Sanduhr adds an entry to, and the event each one reports.
+    static let hookEvents: [(name: String, event: ClaudeCodeEvent)] = [("Notification", .waiting), ("Stop", .done)]
+    /// The notifications that mean "waiting on you": a permission prompt, the idle reminder, a
+    /// question from an MCP server. Not a sign-in notice or the others.
+    static let waitingMatcher = "permission_prompt|idle_prompt|elicitation_dialog"
+    /// Seconds Claude Code gives the hook; it returns at once (it runs in the background anyway).
+    static let hookTimeout = 5
+
     static var standard: IntegrationInstaller {
         IntegrationInstaller(home: NSHomeDirectory(), scripts: .standard)
     }
@@ -136,7 +166,7 @@ struct IntegrationInstaller {
     func configFile(_ kind: IntegrationKind, folder: String) -> String {
         switch kind {
         case .mcp: return ClaudeCodeFolders.configFile(for: folder, home: home)
-        case .statusline, .meters: return (AccountData.normalized(folder) as NSString).appendingPathComponent("settings.json")
+        case .statusline, .meters, .hooks: return (AccountData.normalized(folder) as NSString).appendingPathComponent("settings.json")
         }
     }
 
@@ -157,7 +187,48 @@ struct IntegrationInstaller {
             ])
         case .meters:
             return .string(scripts.installedModPath)
+        case .hooks:
+            return .object(Self.hookEvents.map { JSONEdit.Pair($0.name, .array([Self.hookGroup($0.name)])) })
         }
+    }
+
+    // MARK: The hooks (item 51)
+
+    /// The command a hook runs: open Sanduhr's link in the background, only while Sanduhr runs
+    /// (`open` would otherwise launch it after every turn), and always exit 0 so Claude Code
+    /// never reports a hook error. `open -g` returns at once and never brings Sanduhr forward.
+    static func hookCommand(_ event: ClaudeCodeEvent) -> String {
+        "/usr/bin/pgrep -xq Sanduhr && /usr/bin/open -g '\(ClaudeCodeLink.url(event))' || true"
+    }
+
+    /// Sanduhr's entry in one event's list: a matcher group with one command hook, in the
+    /// background (`async`) with a short timeout. `Notification` matches only the waiting kinds.
+    static func hookGroup(_ eventName: String) -> JSONEdit.Value {
+        let event = hookEvents.first { $0.name == eventName }?.event ?? .done
+        let hook = JSONEdit.Value.object([
+            JSONEdit.Pair("type", .string("command")),
+            JSONEdit.Pair("command", .string(hookCommand(event))),
+            JSONEdit.Pair("async", .bool(true)),
+            JSONEdit.Pair("timeout", .int(hookTimeout)),
+        ])
+        var pairs: [JSONEdit.Pair] = []
+        if event == .waiting { pairs.append(JSONEdit.Pair("matcher", .string(waitingMatcher))) }
+        pairs.append(JSONEdit.Pair("hooks", .array([hook])))
+        return .object(pairs)
+    }
+
+    /// One hook command is Sanduhr's: it opens Sanduhr's Claude Code link.
+    static func isOurHookCommand(_ hook: Any?) -> Bool {
+        guard let o = hook as? [String: Any], o["type"] as? String == "command",
+              let command = o["command"] as? String else { return false }
+        return command.contains("\(ClaudeCodeLink.scheme)://\(ClaudeCodeLink.host)?")
+    }
+
+    /// One matcher group is Sanduhr's: every hook in it is Sanduhr's command. A group of the
+    /// user's that also runs Sanduhr's command beside their own is theirs and never removed.
+    static func isOurHookGroup(_ group: Any?) -> Bool {
+        guard let o = group as? [String: Any], let hooks = o["hooks"] as? [Any], !hooks.isEmpty else { return false }
+        return hooks.allSatisfy(isOurHookCommand)
     }
 
     static func statuslineCommand(python: String, script: String) -> String {
@@ -240,9 +311,10 @@ struct IntegrationInstaller {
         guard let data = FileManager.default.contents(atPath: file),
               let root = try? JSONEdit.root(data) else { return .unreadable }
         if kind == .meters { return metersStatus(root) }
+        if kind == .hooks { return hooksStatus(root) }
         let value: Any?
         switch kind {
-        case .meters:
+        case .meters, .hooks:
             return .unreadable
         case .mcp:
             guard let servers = root[Self.serversKey] else { return .notInstalled }
@@ -270,13 +342,32 @@ struct IntegrationInstaller {
         return exact == [scripts.installedModPath] && scripts.isCurrent && scripts.hasMod ? .installed : .outdated
     }
 
+    /// The hooks: current when each event's list holds exactly Sanduhr's entry as this version
+    /// writes it, outdated when an entry of Sanduhr's is there in another form or only one list
+    /// has it.
+    private func hooksStatus(_ root: [String: Any]) -> IntegrationStatus {
+        guard let value = root[Self.hooksKey] else { return .notInstalled }
+        guard let hooks = value as? [String: Any] else { return .unreadable }
+        var ours = false
+        var current = true
+        for e in Self.hookEvents {
+            guard let listValue = hooks[e.name] else { current = false; continue }
+            guard let list = listValue as? [Any] else { return .unreadable }
+            let mine = list.filter(Self.isOurHookGroup)
+            if !mine.isEmpty { ours = true }
+            if mine.count != 1 || !NSArray(array: mine).isEqual(to: [Self.hookGroup(e.name).plain]) { current = false }
+        }
+        guard ours else { return .notInstalled }
+        return current ? .installed : .outdated
+    }
+
     /// Sanduhr's entry names the current scripts through the stable link, with a python3 that
     /// exists, and the scripts there are the app's.
     private func isCurrent(_ kind: IntegrationKind, _ value: Any) -> Bool {
         guard scripts.isCurrent, let o = value as? [String: Any] else { return false }
         let fm = FileManager.default
         switch kind {
-        case .meters:
+        case .meters, .hooks:
             return false
         case .mcp:
             guard let command = o["command"] as? String, fm.isExecutableFile(atPath: command),
@@ -295,15 +386,15 @@ struct IntegrationInstaller {
 
     /// The text of someone else's entry, for the replace question (nil when there is none).
     func otherEntry(_ kind: IntegrationKind, folder: String) -> String? {
-        // The mod joins a list: nothing of anyone's is replaced.
-        if kind == .meters { return nil }
+        // The mod and the hooks join lists: nothing of anyone's is replaced.
+        if kind == .meters || kind == .hooks { return nil }
         let file = configFile(kind, folder: folder)
         guard let data = FileManager.default.contents(atPath: file), (try? JSONEdit.root(data)) != nil else { return nil }
         let b = Array(data)
         guard let top = try? JSONEdit.topObject(b) else { return nil }
         let member: JSONEdit.Member?
         switch kind {
-        case .meters:
+        case .meters, .hooks:
             return nil
         case .statusline:
             member = top.member(Self.statusLineKey)
@@ -325,12 +416,14 @@ struct IntegrationInstaller {
     @discardableResult
     func install(_ kind: IntegrationKind, folder: String, python: String,
                  replaceOther: Bool = false) throws -> Outcome {
-        do {
-            try scripts.refresh()
-        } catch IntegrationScripts.Failure.missingFromApp {
-            throw Failure.scriptsMissing
-        } catch {
-            throw Failure.writeFailed(file: scripts.dir.path)
+        if kind.needsScripts {
+            do {
+                try scripts.refresh()
+            } catch IntegrationScripts.Failure.missingFromApp {
+                throw Failure.scriptsMissing
+            } catch {
+                throw Failure.writeFailed(file: scripts.dir.path)
+            }
         }
         if kind == .meters && !scripts.hasMod { throw Failure.scriptsMissing }
         let file = configFile(kind, folder: folder)
@@ -385,6 +478,8 @@ struct IntegrationInstaller {
         switch kind {
         case .meters:
             return try planInstallMeters(bytes: b, root: root, top: top, receipt: receipt, prior: prior)
+        case .hooks:
+            return try planInstallHooks(bytes: b, root: root, top: top, receipt: receipt, prior: prior)
         case .statusline:
             let existing = root[Self.statusLineKey]
             if let m = top.member(Self.statusLineKey) {
@@ -466,6 +561,86 @@ struct IntegrationInstaller {
         return Plan(bytes: result, receipt: receipt, other: nil)
     }
 
+    /// The hooks' install: Sanduhr's entry joins the `Notification` and `Stop` lists, `hooks`
+    /// and the lists made when missing, an older entry of Sanduhr's replaced where it stands,
+    /// every other entry and hook left as it was.
+    private func planInstallHooks(bytes b: [UInt8], root: [String: Any], top: JSONEdit.Object,
+                                  receipt start: IntegrationReceipt, prior: IntegrationReceipt?) throws -> Plan {
+        var receipt = start
+        var made = HookReceipt()
+        var result = b
+        if top.member(Self.hooksKey) == nil {
+            let r = JSONEdit.set(b, in: top, key: Self.hooksKey, value: entry(.hooks, python: ""))
+            receipt.createdParent = true
+            if let inner = r.emptyInner { receipt.emptyInner = String(decoding: inner, as: UTF8.self) }
+            made.createdEvents = Self.hookEvents.map(\.name)
+            result = r.bytes
+        } else {
+            guard let hooks = root[Self.hooksKey] as? [String: Any] else { throw Failure.malformed(file: "") }
+            // Updating Sanduhr's own entries keeps what the first install recorded.
+            if let prior, Self.hookEvents.contains(where: { (hooks[$0.name] as? [Any])?.contains(where: Self.isOurHookGroup) == true }) {
+                receipt = prior
+                made = prior.hooks ?? HookReceipt()
+            }
+            for e in Self.hookEvents {
+                result = try addHookGroup(e.name, to: result, made: &made)
+            }
+        }
+        receipt.hooks = made
+        try verifyHooks(before: b, after: result, installed: true)
+        return Plan(bytes: result, receipt: receipt, other: nil)
+    }
+
+    /// `hooks` of a file that has one, as an object.
+    private func hooksObject(_ b: [UInt8]) throws -> JSONEdit.Object? {
+        let top = try JSONEdit.topObject(b)
+        guard let m = top.member(Self.hooksKey) else { return nil }
+        do { return try JSONEdit.object(b, at: m.valueStart) } catch { throw Failure.malformed(file: "") }
+    }
+
+    /// One event's list in `hooks`, nil when there is none; malformed when it isn't a list.
+    private func hookList(_ b: [UInt8], _ hooks: JSONEdit.Object, _ name: String) throws -> JSONEdit.ArrayValue? {
+        guard let m = hooks.member(name) else { return nil }
+        do { return try JSONEdit.array(b, at: m.valueStart) } catch { throw Failure.malformed(file: "") }
+    }
+
+    /// The indexes of Sanduhr's entries in a list.
+    private static func ourIndexes(_ b: [UInt8], _ list: JSONEdit.ArrayValue) -> [Int] {
+        list.elements.indices.filter { isOurHookGroup(JSONEdit.parsed(b, list.elements[$0])) }
+    }
+
+    /// Puts Sanduhr's entry into one event's list: the first entry of Sanduhr's is rewritten in
+    /// place and any more of them dropped, else the entry goes last; the list is made when
+    /// missing. What it made goes into `made`.
+    private func addHookGroup(_ name: String, to b: [UInt8], made: inout HookReceipt) throws -> [UInt8] {
+        guard let hooks = try hooksObject(b) else { throw Failure.malformed(file: "") }
+        let group = Self.hookGroup(name)
+        guard let list = try hookList(b, hooks, name) else {
+            let r = JSONEdit.set(b, in: hooks, key: name, value: .array([group]))
+            if let inner = r.emptyInner, made.hooksInner == nil { made.hooksInner = String(decoding: inner, as: UTF8.self) }
+            if !made.createdEvents.contains(name) { made.createdEvents.append(name) }
+            return r.bytes
+        }
+        let mine = Self.ourIndexes(b, list)
+        guard let first = mine.first else {
+            let r = JSONEdit.append(b, in: list, value: group)
+            if let inner = r.emptyInner, made.arrayInners[name] == nil {
+                made.arrayInners[name] = String(decoding: inner, as: UTF8.self)
+            }
+            return r.bytes
+        }
+        var out = b
+        // Extra copies of Sanduhr's entry go, last first, so the earlier offsets hold.
+        for i in mine.dropFirst().reversed() {
+            guard let h = try hooksObject(out), let l = try hookList(out, h, name) else { break }
+            out = JSONEdit.removeElement(out, in: l, index: i)
+        }
+        guard let h = try hooksObject(out), let l = try hookList(out, h, name) else { throw Failure.malformed(file: "") }
+        let current = JSONEdit.parsed(out, l.elements[first])
+        if let current, NSArray(array: [current]).isEqual(to: [group.plain]) { return out }
+        return JSONEdit.replaceElement(out, in: l, index: first, value: group)
+    }
+
     // MARK: Remove
 
     /// Takes Sanduhr's entry for `kind` out of `folder`'s config, undoing what Install did.
@@ -504,6 +679,8 @@ struct IntegrationInstaller {
         switch kind {
         case .meters:
             return try planRemoveMeters(bytes: b, root: root, top: top, receipt: receipt)
+        case .hooks:
+            return try planRemoveHooks(bytes: b, root: root, top: top, receipt: receipt)
         case .statusline:
             guard top.member(Self.statusLineKey) != nil, Self.isOurStatusline(root[Self.statusLineKey]) else { return nil }
             if let restored {
@@ -571,6 +748,39 @@ struct IntegrationInstaller {
         return result
     }
 
+    /// The hooks' remove: only Sanduhr's entries leave the two lists. A list Sanduhr made goes
+    /// once nothing else is in it, a list that was empty gets its old inside back, and `hooks`
+    /// goes when Sanduhr made it and nothing else is in it. Lists are emptied in the reverse of
+    /// the order Install filled them, so each emptied object gets back exactly what it held.
+    private func planRemoveHooks(bytes b: [UInt8], root: [String: Any], top: JSONEdit.Object,
+                                 receipt: IntegrationReceipt?) throws -> [UInt8]? {
+        guard let hooks = root[Self.hooksKey] as? [String: Any],
+              Self.hookEvents.contains(where: { (hooks[$0.name] as? [Any])?.contains(where: Self.isOurHookGroup) == true })
+        else { return nil }
+        let made = receipt?.hooks
+        var result = b
+        for e in Self.hookEvents.reversed() {
+            guard let h = try hooksObject(result), let list = try hookList(result, h, e.name) else { continue }
+            let mine = Self.ourIndexes(result, list)
+            guard !mine.isEmpty else { continue }
+            let inner = made?.arrayInners[e.name].map { Array($0.utf8) }
+            for i in mine.reversed() {
+                guard let h2 = try hooksObject(result), let l = try hookList(result, h2, e.name) else { break }
+                result = JSONEdit.removeElement(result, in: l, index: i, emptyInner: inner)
+            }
+            guard made?.createdEvents.contains(e.name) == true,
+                  let h3 = try hooksObject(result), let l = try hookList(result, h3, e.name),
+                  l.elements.isEmpty else { continue }
+            result = JSONEdit.remove(result, in: h3, key: e.name, emptyInner: made?.hooksInner.map { Array($0.utf8) })
+        }
+        if receipt?.createdParent == true, let h = try hooksObject(result), h.members.isEmpty {
+            result = JSONEdit.remove(result, in: try JSONEdit.topObject(result), key: Self.hooksKey,
+                                     emptyInner: receipt?.emptyInner.map { Array($0.utf8) })
+        }
+        try verifyHooks(before: b, after: result, installed: false)
+        return result
+    }
+
     // MARK: Checks
 
     private func parse(_ b: [UInt8]) throws -> [String: Any] {
@@ -586,8 +796,8 @@ struct IntegrationInstaller {
         var oldRest = old
         let got: Any?
         switch kind {
-        case .meters:
-            // The mod's edits are checked by verifyMeters.
+        case .meters, .hooks:
+            // The mod's and the hooks' edits are checked by verifyMeters and verifyHooks.
             throw Failure.malformed(file: "")
         case .statusline:
             got = new.removeValue(forKey: Self.statusLineKey)
@@ -632,6 +842,44 @@ struct IntegrationInstaller {
         guard others(oldDirs) == others(newDirs) else { throw Failure.malformed(file: "") }
         let ours = newDirs.filter(Self.isOurModEntry).map { $0.trimmingCharacters(in: .whitespaces) }
         guard ours == (installed ? [scripts.installedModPath] : []) else { throw Failure.malformed(file: "") }
+    }
+
+    /// The hooks' edit changed Sanduhr's entries and nothing else: the parsed files agree once
+    /// `hooks` is set aside; in `hooks`, every other event is the same; in the two lists, the
+    /// other entries are the same in the same order; and each list holds Sanduhr's entry once
+    /// (Install) or not at all (Remove). A list or `hooks` Sanduhr made or took out counts as
+    /// empty.
+    private func verifyHooks(before: [UInt8], after: [UInt8], installed: Bool) throws {
+        let old = try parse(before)
+        guard let new = try? JSONEdit.root(Data(after)) else { throw Failure.malformed(file: "") }
+        func split(_ root: [String: Any]) throws -> (rest: [String: Any], others: [String: Any], lists: [String: [Any]]) {
+            var rest = root
+            let hooksValue = rest.removeValue(forKey: Self.hooksKey)
+            var hooks: [String: Any] = [:]
+            if let hooksValue {
+                guard let h = hooksValue as? [String: Any] else { throw Failure.malformed(file: "") }
+                hooks = h
+            }
+            var lists: [String: [Any]] = [:]
+            for e in Self.hookEvents {
+                let v = hooks.removeValue(forKey: e.name)
+                if v != nil, !(v is [Any]) { throw Failure.malformed(file: "") }
+                lists[e.name] = v as? [Any] ?? []
+            }
+            return (rest, hooks, lists)
+        }
+        let (oldRest, oldOthers, oldLists) = try split(old)
+        let (newRest, newOthers, newLists) = try split(new)
+        guard NSDictionary(dictionary: newRest).isEqual(to: oldRest),
+              NSDictionary(dictionary: newOthers).isEqual(to: oldOthers) else { throw Failure.malformed(file: "") }
+        for e in Self.hookEvents {
+            let o = oldLists[e.name] ?? [], n = newLists[e.name] ?? []
+            guard NSArray(array: o.filter { !Self.isOurHookGroup($0) }).isEqual(to: n.filter { !Self.isOurHookGroup($0) })
+            else { throw Failure.malformed(file: "") }
+            let mine = n.filter(Self.isOurHookGroup)
+            let want: [Any] = installed ? [Self.hookGroup(e.name).plain] : []
+            guard NSArray(array: mine).isEqual(to: want) else { throw Failure.malformed(file: "") }
+        }
     }
 
     // MARK: Files
@@ -718,7 +966,7 @@ struct IntegrationInstaller {
 
     /// state.yaml's `integrations:`: how many of `folders` (plus the ones installed into) hold
     /// Sanduhr's entry, current or outdated. Counts only, never a path.
-    func installedCounts(folders: [String]) -> (mcp: Int, statusline: Int, meters: Int) {
+    func installedCounts(folders: [String]) -> (mcp: Int, statusline: Int, meters: Int, hooks: Int) {
         var all: [String] = []
         for f in folders + installedFolders() {
             let n = AccountData.normalized(f)
@@ -726,7 +974,8 @@ struct IntegrationInstaller {
         }
         return (all.filter { status(.mcp, folder: $0).isOurs }.count,
                 all.filter { status(.statusline, folder: $0).isOurs }.count,
-                all.filter { status(.meters, folder: $0).isOurs }.count)
+                all.filter { status(.meters, folder: $0).isOurs }.count,
+                all.filter { status(.hooks, folder: $0).isOurs }.count)
     }
 
     /// The folders Sanduhr installed into (Settings lists them even when discovery doesn't).

@@ -198,7 +198,7 @@ struct IntegrationMetersTests {
         #expect(r.snapshot().isEmpty)
     }
 
-    @Test func installingAllThreeAndRemovingOneKeepsTheOthers() throws {
+    @Test func installingAllAndRemovingOneKeepsTheOthers() throws {
         let r = IntegrationRig()
         defer { r.cleanUp() }
         r.home.dir(".claude/projects")
@@ -206,11 +206,12 @@ struct IntegrationMetersTests {
         let folder = r.home.at(".claude")
         let before = r.snapshot()
         for kind in IntegrationKind.allCases { try r.installer.install(kind, folder: folder, python: r.python) }
-        #expect(r.installer.installedCounts(folders: [folder]) == (1, 1, 1))
+        #expect(r.installer.installedCounts(folders: [folder]) == (1, 1, 1, 1))
         try r.installer.remove(.meters, folder: folder)
         #expect(r.json(".claude/settings.json")["statusLine"] != nil)
         #expect(r.json(".claude/settings.json")["env"] == nil)
         try r.installer.remove(.statusline, folder: folder)
+        try r.installer.remove(.hooks, folder: folder)
         try r.installer.remove(.mcp, folder: folder)
         #expect(r.snapshot() == before)
     }
