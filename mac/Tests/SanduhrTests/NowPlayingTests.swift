@@ -357,19 +357,14 @@ struct NowPlayingTextTests {
         #expect(NowPlayingText.line(NowPlayingInfo(), at: .left) == nil)
     }
 
-    @Test func wingsClipTheStripAndDeskKeepItWhole() {
+    @Test func everyPlaceGetsTheWholeLine() {
+        // Item 53b: a wing no longer clips; a title too long for it scrolls through once.
         let long = NowPlayingInfo(title: "Shine On You Crazy Diamond (Parts I-V)", artist: "Pink Floyd and Friends", playing: true)
-        let wing = NowPlayingText.line(long, at: .left)!
-        #expect(wing == "\(NowPlayingText.playingGlyph) Shine On You Crazy… · Pink Floyd and…")
-        #expect(NowPlayingText.line(long, at: .strip)!.contains("Shine On You Crazy Diamond (Parts I-V) · Pink Floyd and Friends"))
-        #expect(NowPlayingText.desk(long) == NowPlayingText.line(long, at: .strip))
-    }
-
-    @Test func clip() {
-        #expect(NowPlayingText.clip("short", 10) == "short")
-        #expect(NowPlayingText.clip("abcdefghijkl", 6) == "abcde…")
-        #expect(NowPlayingText.clip("one two three four", 10) == "one two…")
-        #expect(NowPlayingText.clip("x", 1) == "x")
+        let whole = "\(NowPlayingText.playingGlyph) Shine On You Crazy Diamond (Parts I-V) · Pink Floyd and Friends"
+        #expect(NowPlayingText.line(long, at: .left) == whole)
+        #expect(NowPlayingText.line(long, at: .right) == whole)
+        #expect(NowPlayingText.line(long, at: .strip) == whole)
+        #expect(NowPlayingText.desk(long) == whole)
     }
 
     @Test func notchChoiceShowsNowPlaying() {
@@ -572,5 +567,49 @@ struct NowPlayingPlacementTests {
         input.nowPlayingLine = input.placed.contains(P.widget)
         input.nowPlayingFrame = CGRect(x: 52, y: 820, width: 360, height: 30)
         #expect(DeskElements.build(input).contains { $0.kind == .nowPlaying && $0.key == "desk" })
+    }
+}
+
+@Suite("Now playing scroll")
+struct NowPlayingScrollTests {
+    typealias S = NowPlayingScroll
+
+    @Test func aTitleThatFitsNeverMoves() {
+        #expect(S.plan(textWidth: 120, room: 158, reduceMotion: false) == nil)
+        #expect(S.plan(textWidth: 158, room: 158, reduceMotion: false) == nil)
+        // Measuring and drawing may differ by a fraction of a point.
+        #expect(S.plan(textWidth: 158.8, room: 158, reduceMotion: false) == nil)
+        #expect(S.fits(textWidth: 158.8, room: 158))
+        #expect(!S.fits(textWidth: 160, room: 158))
+    }
+
+    @Test func aLongTitleScrollsOnceAtThirtyPointsASecond() throws {
+        let plan = try #require(S.plan(textWidth: 400, room: 158, reduceMotion: false))
+        // Until the end clears the fade at the trailing edge.
+        #expect(plan.distance == 400 - 158 + S.fade)
+        #expect(abs(plan.travel - Double(plan.distance) / 30) < 0.0001)
+        #expect(S.speed == 30)
+        // A pause at the start and the end, then back to the beginning, and that's all.
+        #expect(abs(plan.total - (S.startPause + plan.travel + S.endPause + S.returnDuration)) < 0.0001)
+        #expect(S.startPause >= 1 && S.endPause >= 0.5 && S.returnDuration < 1)
+    }
+
+    @Test func reduceMotionOrNoRoomNeverScrolls() {
+        #expect(S.plan(textWidth: 400, room: 158, reduceMotion: true) == nil)
+        #expect(S.plan(textWidth: 400, room: 0, reduceMotion: false) == nil)
+    }
+
+    @Test func aNewTrackScrollsAgainAPauseDoesNot() {
+        let song = NowPlayingInfo(title: "Tune", artist: "Singer", playing: true)
+        var paused = song
+        paused.playing = false
+        var next = song
+        next.title = "Other Tune"
+        #expect(S.trackKey(song) == S.trackKey(paused))
+        #expect(S.trackKey(song) != S.trackKey(next))
+        var otherArtist = song
+        otherArtist.artist = "Someone"
+        #expect(S.trackKey(song) != S.trackKey(otherArtist))
+        #expect(S.trackKey(nil) == "")
     }
 }

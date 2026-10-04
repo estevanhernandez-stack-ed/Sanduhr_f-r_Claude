@@ -309,38 +309,23 @@ enum NowPlayingApps {
     }
 }
 
-/// "Title · Artist" with a play-state glyph, short enough for where it goes.
+/// "Title · Artist" with a play-state glyph. Whole everywhere: a wing or the strip that is too
+/// short scrolls it through once (NowPlayingScroll), and the Desk line truncates to its width.
 enum NowPlayingText {
     static let playingGlyph = "▶\u{FE0E}"
     static let pausedGlyph = "\u{23F8}\u{FE0E}"
-    /// The wings have little room: the title and the artist each get a cap.
-    static let wingTitle = 22
-    static let wingArtist = 16
 
     /// The line for a notch place, nil when there is no track.
     static func line(_ info: NowPlayingInfo?, at place: NotchContent.Place) -> String? {
         guard let info, info.state != .none, let title = clean(info.title) else { return nil }
-        let wing = place != .strip
-        let t = wing ? clip(title, wingTitle) : title
         let glyph = info.state == .playing ? playingGlyph : pausedGlyph
-        guard let artist = clean(info.artist) else { return "\(glyph) \(t)" }
-        let a = wing ? clip(artist, wingArtist) : artist
-        return "\(glyph) \(t) · \(a)"
+        guard let artist = clean(info.artist) else { return "\(glyph) \(title)" }
+        return "\(glyph) \(title) · \(artist)"
     }
 
-    /// The Desk line: the whole title and artist (the view truncates to its width).
+    /// The Desk line: the same text (the view truncates to its width).
     static func desk(_ info: NowPlayingInfo?) -> String? {
         line(info, at: .strip)
-    }
-
-    /// `s` cut to `max` characters with an ellipsis, on a word boundary when one is near.
-    static func clip(_ s: String, _ max: Int) -> String {
-        guard s.count > max, max > 1 else { return s }
-        let cut = String(s.prefix(max - 1))
-        if let space = cut.lastIndex(of: " "), cut.distance(from: cut.startIndex, to: space) >= max / 2 {
-            return cut[..<space].trimmingCharacters(in: .whitespaces) + "…"
-        }
-        return cut.trimmingCharacters(in: .whitespaces) + "…"
     }
 
     private static func clean(_ s: String?) -> String? {

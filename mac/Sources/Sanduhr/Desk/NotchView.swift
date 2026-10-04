@@ -45,18 +45,19 @@ struct NotchView: View {
                     if showChinText, let line = stripContent.text(
                         at: .strip, meetings: model.meetings, meters: model.claudeCompact,
                         message: model.message, nowPlaying: model.nowPlaying, now: context.date) {
-                        Text(line)
-                            .font(.custom(font, size: max(11, chin * 0.55)))
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .minimumScaleFactor(0.7)
-                            .foregroundStyle(LinearGradient.ink(textColor))
-                            .opacity(0.85)
-                            .padding(.horizontal, 18)
-                            .frame(height: chin)
-                            // Now playing under the camera takes clicks like the Desk line
-                            // (DeskController: click play/pause, two-finger click its menu).
-                            .onGlobalFrame { model.stripFrame = $0 }
+                        if stripContent == .nowPlaying {
+                            stripNowPlaying(line, width: notch.width + w.left + w.right)
+                        } else {
+                            Text(line)
+                                .font(.custom(font, size: stripSize))
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .minimumScaleFactor(0.7)
+                                .foregroundStyle(LinearGradient.ink(textColor))
+                                .opacity(0.85)
+                                .padding(.horizontal, 18)
+                                .frame(height: chin)
+                        }
                     }
                 }
                 .frame(width: notch.width + w.left + w.right, height: height)
@@ -65,6 +66,23 @@ struct NotchView: View {
             .position(x: notch.midX, y: height / 2)
             .allowsHitTesting(false)
         }
+    }
+
+    private var stripSize: CGFloat { max(11, chin * 0.55) }
+
+    /// Now playing under the camera: the whole line, scrolling once when it doesn't fit (item 53b).
+    /// It takes clicks like the Desk line (DeskController: click play/pause, two-finger click its
+    /// menu), found by the frame it reports.
+    private func stripNowPlaying(_ line: String, width: CGFloat) -> some View {
+        let room = max(0, width - 36)
+        return ScrollOnceText(text: line, trackKey: NowPlayingScroll.trackKey(model.nowPlaying),
+                              textWidth: NotchWingsView.textWidth(line, stripSize, font), room: room,
+                              font: .custom(font, size: stripSize))
+            .foregroundStyle(LinearGradient.ink(textColor))
+            .opacity(0.85)
+            .frame(height: chin)
+            .onGlobalFrame { model.stripFrame = $0 }
+            .frame(width: room)
     }
 }
 
@@ -130,9 +148,9 @@ struct NotchWingsView: View {
                         IslandShape(flare: 8, radius: min(10, barHeight * 0.3))
                             .fill(Color.black)
                         HStack(spacing: 0) {
-                            wing(left, size, leftContent).frame(width: max(0, wingL - 10), alignment: .trailing)
+                            wing(left, size, leftContent, width: wingL).frame(width: max(0, wingL - 10), alignment: .trailing)
                             Color.clear.frame(width: notchWidth + 20)
-                            wing(right, size, rightContent).frame(width: max(0, wingR - 10), alignment: .leading)
+                            wing(right, size, rightContent, width: wingR).frame(width: max(0, wingR - 10), alignment: .leading)
                         }
                     }
                     .frame(width: notchWidth + wingL + wingR, height: barHeight)
@@ -148,11 +166,15 @@ struct NotchWingsView: View {
 
     /// One wing's text. Now playing takes its own clicks: a click plays or pauses, a two-finger
     /// click opens Previous, Play/Pause, Next and Now Playing Settings…; the rest of the island
-    /// still opens Settings.
+    /// still opens Settings. A title too long for the wing scrolls through once (item 53b).
     @ViewBuilder
-    private func wing(_ text: String?, _ size: CGFloat, _ content: NotchContent) -> some View {
-        if content == .nowPlaying, text != nil {
-            label(text, size)
+    private func wing(_ text: String?, _ size: CGFloat, _ content: NotchContent, width: CGFloat) -> some View {
+        if content == .nowPlaying, let text {
+            ScrollOnceText(text: text, trackKey: NowPlayingScroll.trackKey(model.nowPlaying),
+                           textWidth: Self.textWidth(text, size, font), room: max(0, width - 22),
+                           font: .custom(font, size: size))
+                .foregroundStyle(LinearGradient.ink(textColor))
+                .opacity(0.88)
                 .frame(maxHeight: .infinity)
                 .contentShape(Rectangle())
                 .onTapGesture { NowPlayingController.shared.togglePlayPause() }
@@ -181,8 +203,8 @@ struct NotchWingsView: View {
         let left = showText ? text(leftContent, at: .left, model: model, now: now) : nil
         let right = showText ? text(rightContent, at: .right, model: model, now: now) : nil
         let size = max(10, notchHeight * 0.42)
-        return Layout(left: min(maxWings, max(wings, width(left, size, font) + 22)),
-                      right: min(maxWings, max(wings, width(right, size, font) + 22)),
+        return Layout(left: min(maxWings, max(wings, textWidth(left, size, font) + 22)),
+                      right: min(maxWings, max(wings, textWidth(right, size, font) + 22)),
                       leftText: left, rightText: right, size: size)
     }
 
@@ -192,7 +214,9 @@ struct NotchWingsView: View {
                      message: model.message, nowPlaying: model.nowPlaying, now: now)
     }
 
-    private static func width(_ text: String?, _ size: CGFloat, _ font: String) -> CGFloat {
+    /// The text's width in the notch font: what the wings grow by and what a now playing title
+    /// scrolls against.
+    static func textWidth(_ text: String?, _ size: CGFloat, _ font: String) -> CGFloat {
         guard let text, !text.isEmpty else { return 0 }
         // The setting holds a family name; measure with that family's regular face.
         let nsFont = NSFontManager.shared.font(withFamily: font, traits: [], weight: 5, size: size)
