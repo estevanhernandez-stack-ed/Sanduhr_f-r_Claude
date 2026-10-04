@@ -43,6 +43,12 @@ enum AboutLinks {
     /// The MIT license file at the repo root.
     static let license = URL(string: repo + "/blob/main/LICENSE")!
     static let sparkle = URL(string: "https://sparkle-project.org")!
+    /// Now playing's source (item 53), credited in About and Settings, Desk, Now Playing.
+    static let mediaRemoteAdapter = URL(string: "https://github.com/ungive/mediaremote-adapter")!
+    /// The third-party notices bundled in the app (mac/THIRD-PARTY-NOTICES.txt), nil when missing.
+    static func thirdPartyNotices(_ bundle: Bundle = .main) -> URL? {
+        bundle.url(forResource: "THIRD-PARTY-NOTICES", withExtension: "txt")
+    }
 
     /// The release page of a Mac version (tagged `v<version>-mac`); the releases list when the
     /// version is unknown or would not make a URL.

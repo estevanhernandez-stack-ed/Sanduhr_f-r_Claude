@@ -8,7 +8,7 @@ import SwiftUI
 /// scenarios and state.yaml's `settings_section` keep working unchanged.
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general, alerts, credentials, usage, integrations
-    case deskLayout, deskLook, deskMeters, message, notch
+    case deskLayout, deskLook, deskMeters, message, notch, nowPlaying
     case widgetLook, themes, pacing
     case updates, about
 
@@ -26,6 +26,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .deskMeters: "Meters"
         case .message: "Message"
         case .notch: "Notch"
+        case .nowPlaying: "Now Playing"
         case .widgetLook: "Look"
         case .themes: "Themes"
         case .pacing: "Pacing & Focus"
@@ -46,6 +47,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .deskMeters: "gauge.with.dots.needle.67percent"
         case .message: "text.quote"
         case .notch: "rectangle.topthird.inset.filled"
+        case .nowPlaying: "music.note"
         case .widgetLook: "textformat"
         case .themes: "paintpalette"
         case .pacing: "speedometer"
@@ -60,7 +62,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     /// Claude, and its consent points back at Accounts.
     static let groups: [(header: String?, sections: [SettingsSection])] = [
         (nil, [.general, .alerts, .credentials, .usage, .integrations]),
-        ("Desk", [.deskLayout, .deskLook, .deskMeters, .message, .notch]),
+        ("Desk", [.deskLayout, .deskLook, .deskMeters, .message, .notch, .nowPlaying]),
         ("Widget", [.widgetLook, .themes, .pacing]),
         ("Sanduhr", [.updates, .about]),
     ]
@@ -169,6 +171,7 @@ struct SettingsRoot: View {
         case .deskMeters: DeskMetersSection(model: deskModel)
         case .message: DeskMessageSection(model: deskModel).padding(20)
         case .notch: DeskNotchSection()
+        case .nowPlaying: NowPlayingSection()
         case .updates: UpdatesSection(updates: updates)
         case .about: AboutSection()
         case .credentials: AccountsSettings(vm: vm, navigation: navigation)

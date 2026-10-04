@@ -70,6 +70,12 @@ struct AboutSection: View {
             }
             Section {
                 Link("Updates by Sparkle", destination: AboutLinks.sparkle)
+                Link("Now playing uses mediaremote-adapter by Jonas van den Berg (BSD-3-Clause)",
+                     destination: AboutLinks.mediaRemoteAdapter)
+                if let notices = AboutLinks.thirdPartyNotices() {
+                    Button("Third-Party Notices") { NSWorkspace.shared.open(notices) }
+                        .help("The licenses of Sparkle and mediaremote-adapter")
+                }
                 if !info.copyright.isEmpty {
                     Text(info.copyright).font(.caption).foregroundStyle(.secondary)
                 }
