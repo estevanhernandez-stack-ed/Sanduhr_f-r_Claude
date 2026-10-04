@@ -675,3 +675,55 @@ cp ~/.claude-smoketest/settings.json /tmp/st-hooks.json
 - [ ] `state.yaml` shows `hooks_installed` with the count, `glow_claude_waiting` and
   `glow_claude_done`, and no path. Clean up: Remove, then `rm -f /tmp/st-hooks.json` (and
   `rm -rf ~/.claude-smoketest` once the other sections are done).
+
+## 23. Now playing (item 53)
+
+Desk on. Have YouTube Music open in Chrome (or Safari) and Music with a song queued; start and stop
+playback yourself. Never put titles in a bug report: `state.yaml` carries only flags.
+
+- [ ] `lipo -archs mac/Sanduhr.app/Contents/Frameworks/MediaRemoteAdapter.framework/Versions/A/MediaRemoteAdapter`
+  and `lipo -archs mac/Sanduhr.app/Contents/Helpers/MediaRemoteAdapterTestClient` print
+  `x86_64 arm64`; `codesign --verify --strict mac/Sanduhr.app` passes.
+- [ ] Off by default: Settings, Desk, Now Playing shows the switch off and Source: Off;
+  `pgrep -fl mediaremote-adapter` finds nothing; `state.yaml` shows
+  `now_playing: {enabled: false, source: off, state: none}`. Settings, Notch lists Now playing as
+  a choice for both wings and the strip.
+- [ ] Switch it on: Source reads Checking… for a moment, then Adapter working; one `perl …
+  mediaremote-adapter.pl … stream` process runs (`pgrep -fl mediaremote-adapter`). Pick Now playing
+  for the right wing.
+- [ ] Play in YouTube Music: within two seconds the right wing shows "▶ Title · Artist" (long
+  titles clipped with …) and a line with a position bar sits under the Desk meters, the bar moving
+  about once a second. `state.yaml`: `source: adapter`, `state: playing`, no title anywhere in it.
+- [ ] Pause in the browser: the glyph turns to a pause sign and the bar stops within two seconds.
+  Skip twice: each new title shows without the wing blinking empty in between.
+- [ ] Click the wing: playback pauses; click again: it plays. Two-finger click the wing: Previous,
+  Pause, Next, Now Playing Settings…; Next and Previous skip; the last item opens this page.
+  The rest of the island still opens Settings on a click.
+- [ ] The Desk line: a click plays or pauses (pointing hand on hover); a two-finger click opens the
+  same menu and the Finder's desktop menu never opens there; `state.yaml` lists a `now_playing`
+  `desk` frame and `desk_frames_ok: true`. With the strip on Now playing (Notch, Text under the
+  camera), the strip shows the whole title and takes the same clicks (a `now_playing` `strip` frame).
+- [ ] Stop the browser tab and play in Music: the wing and the line follow Music within two seconds.
+  Settings, Apps lists Chrome and Music; switch Chrome off and play in the browser: nothing shows
+  (the wing goes back to plain black); switch it back on.
+- [ ] Hide while paused on: pausing hides the wing and the line; playing brings them back. With
+  nothing playing at all, neither shows and no timer ticks (the line is gone).
+- [ ] Line under the Desk meters off: the line goes, the notch stays. Move the meters to Hidden in
+  Layout: the line sits under the Claude line instead.
+- [ ] Switch Now Playing off: the wing and line go and `pgrep -fl mediaremote-adapter` finds
+  nothing within a second. Switch Desk off with Now Playing on: the same. Quit Sanduhr with it on:
+  no `perl` process is left behind.
+- [ ] Fallback: quit, then `open -n --env SANDUHR_NOWPLAYING_TEST=fail mac/Sanduhr.app`. Source
+  reads "Fallback (Music and Spotify only): the system now playing isn't available on this macOS";
+  no adapter process runs; no prompt appears. Play, pause or skip in Music: the wing follows from the
+  next change. The browser player shows nothing (expected). Clicks still play and pause.
+- [ ] Still on the fallback, switch Ask Music and Spotify directly on with Music open: macOS asks
+  once whether Sanduhr may control Music; Allow, and the current track shows without waiting for a
+  change. With Music quit the switch launches nothing. Switch it off again and reset the grant with
+  `tccutil reset AppleEvents com.626labs.sanduhr` if you want the prompt back.
+- [ ] Sleep the Mac with Now Playing on and wake it: Source settles on Adapter working again and
+  the wing follows the next change.
+- [ ] Settings, About: "Now playing uses mediaremote-adapter by Jonas van den Berg (BSD-3-Clause)"
+  links to its GitHub page; Third-Party Notices opens the text with the adapter's and Sparkle's
+  licenses. Console (`log stream --predicate 'subsystem == "com.626labs.sanduhr" AND category ==
+  "nowplaying"'`) shows only on/off, test and stream lines, never a title.

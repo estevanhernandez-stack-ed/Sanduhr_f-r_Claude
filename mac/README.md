@@ -379,6 +379,39 @@ logs and makes no network request. `SANDUHR_SUPPORT_DIR` points it at a test fol
 Tests: `python3 -m unittest discover -s mac/integrations/tests` (also a Mac CI step), over temp
 folders: each sharing level, no access file, hidden names, and the Windows MCP tests' cases.
 
+## Now playing
+
+Settings, Desk, Now Playing (off by default; item 53) shows what plays on the Mac, in any app that
+publishes now playing (Music, Spotify, Pandora, browser players such as YouTube Music): "▶ Title ·
+Artist" in a notch wing or the strip under the camera (pick Now playing in Settings, Notch) and a
+line with a position bar under the Desk meters (under the Claude line when the meters are off the
+desktop). Click it to play or pause; two-finger click for Previous, Play/Pause, Next and Now Playing
+Settings…. It hides when nothing plays, optionally while paused, and for apps switched off on the
+page. It runs only while Desk does.
+
+- **Source.** macOS 15.4 and later answer the MediaRemote "now playing" calls only for Apple-signed
+  processes, so Sanduhr bundles [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter)
+  (BSD-3, vendored unchanged in `Vendor/mediaremote-adapter/`, built by
+  `scripts/build-mediaremote-adapter.sh`) and runs its script with `/usr/bin/perl`: `test` once at
+  start and after a wake, then `stream --no-artwork --micros` as a child process, restarted with a
+  growing wait if it exits and given up after four quick exits in a row. The findings behind this are
+  in `docs/mac-now-playing-spike.md`.
+- **Fallback.** When `test` fails (or the stream keeps dying), Music's and Spotify's distributed
+  notifications (`com.apple.Music.playerInfo`, `com.spotify.client.PlaybackStateChanged`): no prompt,
+  but only those two apps and only from their next change. "Ask Music and Spotify directly" adds
+  AppleScript to the running ones when the fallback starts (the Automation prompt, once per app; the
+  app's `com.apple.security.automation.apple-events` entitlement and `NSAppleEventsUsageDescription`
+  exist for this). The page's Source line says Adapter working, Fallback (Music and Spotify only) or
+  Off. Force the fallback with `open -n --env SANDUHR_NOWPLAYING_TEST=fail mac/Sanduhr.app`.
+- **Controls** go from Sanduhr's own process through `MRMediaRemoteSendCommand` (not gated).
+- **In the bundle:** `Contents/Frameworks/MediaRemoteAdapter.framework`,
+  `Contents/Helpers/MediaRemoteAdapterTestClient`, `Contents/Resources/NowPlaying/mediaremote-adapter.pl`,
+  all universal. Release builds sign the helper, then the framework, then the app (Developer ID,
+  hardened runtime, timestamp); CI checks their architectures and the release workflow their
+  signatures.
+- **Privacy.** Titles and artists stay in memory: never on disk, in a log or in `state.yaml`
+  (`now_playing: {enabled, source, state}` only). No network.
+
 ## Files
 
 - `sessionKey:{label}` + `cf_clearance:{label}` per account → the Keychain, service `com.626labs.sanduhr` (release builds), or `~/Library/Application Support/Sanduhr/credentials.json` (mode `0600`, dev builds); see First run and Accounts above
@@ -389,6 +422,8 @@ folders: each sharing level, no access file, hidden names, and the Windows MCP t
 - What the MCP server may read → `~/Library/Application Support/Sanduhr/mcp-access.json` (mode 0600; see Claude Code integrations)
 - Claude Code integrations (items 49 to 51) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json` (the notch glow hooks in its `hooks`), with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed, hooks_installed}`
 - Window position → `UserDefaults` (`windowFrame`)
+- Now playing (item 53) → the desk preferences `nowPlaying`, `nowPlayingDesk`, `nowPlayingHidePaused`, `nowPlayingAskApps` and `nowPlayingExcluded` (bundle ids switched off); what plays stays in memory
+- Third-party notices (Sparkle, mediaremote-adapter) → `Sanduhr.app/Contents/Resources/THIRD-PARTY-NOTICES.txt`, from `mac/THIRD-PARTY-NOTICES.txt`; Settings, About opens it
 
 ## Controls
 
@@ -411,9 +446,12 @@ folders: each sharing level, no access file, hidden names, and the Windows MCP t
 | Two-finger click a tier card | Accounts, Hide (temporary limits), Stop warnings, Hidden Limits, Meter Settings, then the widget menu |
 | Click a Desk meter          | Nothing: the meters are passive, clicks there do nothing |
 | Two-finger click a Desk meter | Show or Hide Widget, then the same limit menu |
+| Click now playing (notch or Desk) | Play or pause (item 53) |
+| Two-finger click now playing | Previous, Play/Pause, Next, Now Playing Settings… |
 | Right-click the hourglass   | The widget menu plus Menu Bar Shows (Session, Weekly, Whichever is higher, Rotate) |
 | **×**                       | Hide the widget (Desk keeps running) |
 
 ## License
 
-MIT. Python original by [626Labs LLC](https://626labs.dev).
+MIT. Python original by [626Labs LLC](https://626labs.dev). Third-party code: Sparkle (MIT) and
+mediaremote-adapter (BSD-3-Clause), with their licenses in `THIRD-PARTY-NOTICES.txt`.

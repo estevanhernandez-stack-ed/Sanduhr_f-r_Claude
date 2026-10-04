@@ -59,7 +59,9 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   `notch_left`, `notch_right`, `notch_strip` (what each place on the island shows, a
   `NotchContent` raw value such as `meetingOrTime`, `meters` or `nothing`; the default when unset),
   `camera_in_use` (an app is using a camera; only watched while the camera light switch is on),
-  `camera_light` (the camera light shows, for a camera or by hand),
+  `camera_light` (the camera light shows, for a camera or by hand), `now_playing` (item 53:
+  `enabled`, the Now Playing switch; `source`, `adapter`, `fallback` or `off`; `state`, `playing`,
+  `paused` or `none`; never a title, an artist or an app),
   `widget_visible`, `widget_visibility` (When the widget shows: `always`, `whileDeskOff` or
   `onRequest`; `always` when unset), `settings_open`, `settings_section`, `meters` (tier, label, percent, fill,
   pace, reset, `warning`: the row draws red with the ink glow, per Settings, Desk, Meters), `widget_warnings` (the
