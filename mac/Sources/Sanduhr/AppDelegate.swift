@@ -311,7 +311,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// The Accounts submenu as it stands, nil with fewer than two accounts.
     func currentAccountsMenu() -> AccountsMenu? {
-        SanduhrMenu.accounts(viewModel.accountLabels, active: viewModel.activeAccount)
+        SanduhrMenu.accounts(viewModel.accountLabels, active: viewModel.activeAccount,
+                             inUse: viewModel.accountsInUse)
     }
 
     @objc private func menuItemChosen(_ sender: NSMenuItem) {

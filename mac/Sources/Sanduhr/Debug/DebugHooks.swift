@@ -284,6 +284,8 @@ enum DebugHooks {
         s.credentialsStore = KeychainStore.kind
         s.accountRef = AccountRef.of(KeychainStore.accounts.active)
         s.accountsCount = KeychainStore.accounts.labels.count
+        s.follow = vm.followEnabled
+        s.followPaused = vm.followPaused
         s.version = info["CFBundleShortVersionString"] as? String ?? ""
         s.build = info["CFBundleVersion"] as? String ?? ""
         return s

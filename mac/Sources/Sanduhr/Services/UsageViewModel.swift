@@ -129,6 +129,22 @@ final class UsageViewModel {
     private(set) var activeAccount: String? = KeychainStore.accounts.active
     /// The accounts with a session key in this launch's store (asked without reading a value).
     private(set) var signedInAccounts: Set<String> = UsageViewModel.signedIn(KeychainStore.accounts)
+
+    /// Settings, Accounts, Follow the account I'm using: off by default (AccountFollower).
+    var followEnabled: Bool = UserDefaults.standard.bool(forKey: AccountFollower.enabledKey) {
+        didSet {
+            guard followEnabled != oldValue else { return }
+            UserDefaults.standard.set(followEnabled, forKey: AccountFollower.enabledKey)
+            follower.apply(enabled: followEnabled)
+            refreshInUse()
+        }
+    }
+    /// The other accounts following saw in use: "· in use" in the Accounts menu, a dot on the chip.
+    private(set) var accountsInUse: Set<String> = []
+    /// For a minute after an automatic switch the chip and the Desk line read "Label (in use)".
+    private(set) var followNote = false
+    @ObservationIgnored private let follower = AccountFollower()
+    @ObservationIgnored private var followNoteTask: Task<Void, Never>?
     /// Bumped every 30s so countdown labels re-render without refetching.
     var countdownTick: Int = 0 {
         didSet { refreshMeterWarnings() }
@@ -242,6 +258,10 @@ final class UsageViewModel {
                 self?.userThemesTick &+= 1
             }
         }
+        follower.context = { [weak self] in self?.followContext() ?? AccountFollow.State() }
+        follower.onSwitch = { [weak self] label in self?.switchAccount(to: label, automatic: true) }
+        follower.onReadings = { [weak self] in self?.refreshInUse() }
+        follower.apply(enabled: followEnabled)
     }
 
     /// Called once the app has a window + a session key.
@@ -301,7 +321,9 @@ final class UsageViewModel {
     func signOut(account label: String) -> SignOutResult {
         guard label != KeychainStore.accounts.active else { return signOut() }
         let result = KeychainStore.signOut(label: label)
+        follower.forget(label)
         reloadAccounts()
+        refreshInUse()
         return result
     }
 
@@ -312,7 +334,9 @@ final class UsageViewModel {
     func removeAccount(_ label: String) -> SignOutResult {
         let wasActive = label == KeychainStore.accounts.active
         let result = KeychainStore.remove(label: label)
+        follower.forget(label)
         if wasActive { showActiveAccount() } else { reloadAccounts() }
+        refreshInUse()
         return result
     }
 
@@ -320,7 +344,9 @@ final class UsageViewModel {
     func renameAccount(_ old: String, to new: String) throws {
         try KeychainStore.accounts.rename(old, to: new)
         if apiAccount == old { apiAccount = new }
+        follower.rename(old, to: new)
         reloadAccounts()
+        refreshInUse()
         onUsageUpdate?()
     }
 
@@ -378,8 +404,56 @@ final class UsageViewModel {
 
     /// The chip in the title area, nil with fewer than two accounts.
     var accountChip: AccountChipText? {
+        guard let label = accountLabel else { return nil }
+        return AccountChipText(text: label, otherInUse: !accountsInUse.isEmpty)
+    }
+
+    /// The active label as the chip and the Desk line show it, nil with fewer than two
+    /// accounts: "Work", or "Work (in use)" for a minute after an automatic switch.
+    var accountLabel: String? {
         guard showsAccounts, let active = activeAccount else { return nil }
-        return AccountChipText(text: active)
+        return followNote ? "\(active) (in use)" : active
+    }
+
+    // MARK: Following
+
+    /// The view model's part of the decision state.
+    /// Read from the registry each time (defaults, and Keychain attributes only), so a key
+    /// saved or signed out anywhere counts at once.
+    private func followContext() -> AccountFollow.State {
+        let accounts = KeychainStore.accounts
+        var s = AccountFollow.State()
+        s.enabled = followEnabled
+        s.active = accounts.active
+        s.signedIn = Self.signedIn(accounts)
+        s.activeSignedOut = status == .signedOut || api == nil
+        s.switching = status == .switching
+        return s
+    }
+
+    private func refreshInUse() {
+        let fresh = AccountFollow.othersInUse(follower.current(), now: Date())
+        if fresh != accountsInUse {
+            accountsInUse = fresh
+            onUsageUpdate?()
+        }
+    }
+
+    /// Whether a manual switch is holding following back (state.yaml's `follow_paused`).
+    var followPaused: Bool { AccountFollow.isPaused(follower.current(), now: Date()) }
+
+    /// "Label (in use)" for a minute, then the plain label. No notification.
+    private func showFollowNote(_ on: Bool) {
+        followNoteTask?.cancel()
+        followNoteTask = nil
+        followNote = on
+        guard on else { return }
+        followNoteTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(AccountFollow.noteLength * 1_000_000_000))
+            guard !Task.isCancelled, let self else { return }
+            self.followNote = false
+            self.onUsageUpdate?()
+        }
     }
 
     // MARK: Accounts
@@ -388,10 +462,20 @@ final class UsageViewModel {
     /// clears the shown numbers and the menu bar percent, says "Switching account…", resets the
     /// alert baseline, loads that account's history, then builds a new client and fetches. A
     /// fetch still running for the old account is discarded when it answers (`refresh`).
+    /// A switch from the chip, a menu or Settings pauses following (AccountFollow.isPaused).
     func switchAccount(to label: String) {
+        switchAccount(to: label, automatic: false)
+    }
+
+    /// Both kinds of switch take the same path; an automatic one starts the 30-minute spacing
+    /// and the minute of "(in use)", a manual one pauses following.
+    private func switchAccount(to label: String, automatic: Bool) {
         let accounts = KeychainStore.accounts
         guard label != accounts.active, (try? accounts.setActive(label)) != nil else { return }
+        if automatic { follower.automaticSwitch() } else { follower.manualSwitch(to: label) }
+        showFollowNote(automatic)
         showActiveAccount()
+        refreshInUse()
     }
 
     /// The next account, wrapping (the widget chip's click, Windows `CycleAccount`). Nothing
@@ -478,6 +562,7 @@ final class UsageViewModel {
         self.lastUpdated = Date()
         Notifier.shared.evaluate(u)
         SnapshotWriter.writeOk(u, accountRef: ref)
+        follower.recordActive(account, usage: u)
         for (tier, t) in u.tiers {
             if let util = t.utilization {
                 HistoryStore.append(tier, utilization: util, account: account)

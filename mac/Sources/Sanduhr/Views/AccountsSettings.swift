@@ -35,6 +35,10 @@ struct AccountsSettings: View {
                 detail
                     .frame(maxWidth: .infinity, alignment: .topLeading)
             }
+            if vm.showsAccounts {
+                Divider()
+                FollowSetting(vm: vm)
+            }
             Spacer(minLength: 0)
         }
         .onAppear { if selection == nil { selection = vm.activeAccount } }
@@ -59,6 +63,21 @@ struct AccountsSettings: View {
             Text("Select an account.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Follow the account I'm using (AccountFollow), shown with two or more accounts.
+private struct FollowSetting: View {
+    @Bindable var vm: UsageViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle("Follow the account I'm using", isOn: $vm.followEnabled)
+            Text("Every 15 minutes Sanduhr checks your other signed-in accounts and switches to the one whose session meter is climbing, when the active one is idle. Switching by hand pauses it for up to 3 hours.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

@@ -46,6 +46,9 @@ struct DebugStateInput {
     /// The active account as snapshot.json names it (AccountRef), never its label.
     var accountRef: String?
     var accountsCount = 0
+    /// Follow the account I'm using, and whether a manual switch is pausing it. Never labels.
+    var follow = false
+    var followPaused = false
     var menu: [MenuGroup] = []
     var version = ""
     var build = ""
@@ -93,6 +96,8 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("credentials_store", .string(s.credentialsStore.rawValue)))
         pairs.append(("account_ref", s.accountRef.map(YAMLNode.string) ?? .null))
         pairs.append(("accounts_count", .int(s.accountsCount)))
+        pairs.append(("follow", .bool(s.follow)))
+        pairs.append(("follow_paused", .bool(s.followPaused)))
         pairs.append(("version", .string(s.version)))
         pairs.append(("build", .string(s.build)))
         return .object(pairs)
