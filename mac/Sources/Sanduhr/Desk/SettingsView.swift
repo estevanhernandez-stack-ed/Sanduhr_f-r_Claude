@@ -170,7 +170,7 @@ private struct Swatch: View {
 // MARK: - Meters
 
 /// Warnings on the meters, on Desk and the widget alike, set per meter: a group for the session, the all-models weekly
-/// limit, and every other weekly limit the server reports.
+/// limit, and every other weekly limit the server reports, each of those with a Show switch (MeterVisibility).
 struct DeskMetersSection: View {
     var model: DeskModel
 
@@ -184,8 +184,10 @@ struct DeskMetersSection: View {
             Section {
                 Text("A meter that is nearly full while its reset is still far off draws its bar in red with a soft glow around it, on the Desk (in the Desk ink) and on the widget (in the theme's color). Each meter has its own setting; changes show at once on both.")
                     .font(.caption).foregroundStyle(.secondary)
+                Text("Limits other than the session and the weekly all-models limit can be hidden: a hidden limit leaves the widget, the Desk meters and the alerts. A new limit shows until you hide it.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
-            ForEach(Self.tiers(present: model.meters.map(\.tier)), id: \.self) { tier in
+            ForEach(Self.tiers(present: model.reportedTiers), id: \.self) { tier in
                 MeterWarningGroup(tier: tier)
             }
         }
@@ -198,9 +200,11 @@ private struct MeterWarningGroup: View {
     @AppStorage private var enabled: Bool
     @AppStorage private var threshold: Double
     @AppStorage private var minReset: Double
+    @AppStorage private var shown: Bool
 
     init(tier: Tier) {
         self.tier = tier
+        _shown = AppStorage(wrappedValue: true, MeterVisibility.showKey(tier), store: .desk)
         let standard = MeterWarningSettings.standard(for: tier)
         _enabled = AppStorage(wrappedValue: standard.enabled, MeterWarningSettings.onKey(tier), store: .desk)
         _threshold = AppStorage(wrappedValue: standard.threshold, MeterWarningSettings.thresholdKey(tier), store: .desk)
@@ -209,23 +213,31 @@ private struct MeterWarningGroup: View {
 
     var body: some View {
         Section(tier.label) {
-            Toggle("Warn when nearly full", isOn: $enabled)
-            HStack {
-                Text("At")
-                Slider(value: $threshold, in: 50...100, step: 5)
-                Text("\(Int(threshold))%")
-                    .font(.system(.body, design: .monospaced))
-                    .frame(width: 48, alignment: .trailing)
+            if MeterVisibility.canHide(tier) {
+                Toggle("Show this limit", isOn: $shown)
             }
-            .disabled(!enabled)
-            Picker("Only while the reset is more than", selection: $minReset) {
-                ForEach(MeterWarning.minResetChoices, id: \.seconds) { Text($0.name).tag($0.seconds) }
-                if !MeterWarning.minResetChoices.contains(where: { $0.seconds == minReset }) {
-                    Text("Custom").tag(minReset)
-                }
-            }
-            .disabled(!enabled)
+            warningControls
+                .disabled(!shown && MeterVisibility.canHide(tier))
         }
+    }
+
+    @ViewBuilder private var warningControls: some View {
+        Toggle("Warn when nearly full", isOn: $enabled)
+        HStack {
+            Text("At")
+            Slider(value: $threshold, in: 50...100, step: 5)
+            Text("\(Int(threshold))%")
+                .font(.system(.body, design: .monospaced))
+                .frame(width: 48, alignment: .trailing)
+        }
+        .disabled(!enabled)
+        Picker("Only while the reset is more than", selection: $minReset) {
+            ForEach(MeterWarning.minResetChoices, id: \.seconds) { Text($0.name).tag($0.seconds) }
+            if !MeterWarning.minResetChoices.contains(where: { $0.seconds == minReset }) {
+                Text("Custom").tag(minReset)
+            }
+        }
+        .disabled(!enabled)
     }
 }
 

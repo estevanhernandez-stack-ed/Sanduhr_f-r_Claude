@@ -118,6 +118,9 @@ final class UsageViewModel {
     /// meters (MeterWarning, Settings, Desk, Meters). Re-applied when the numbers arrive, on the
     /// countdown tick (the reset draws nearer) and at once when a Meters setting changes.
     private(set) var warningTiers: Set<Tier> = []
+    /// The limits switched off in Settings, Desk, Meters (MeterVisibility): left off the cards
+    /// and out of `warningTiers`. Re-read with the warnings; a change resizes the panel.
+    private(set) var hiddenTiers: Set<Tier> = MeterVisibility.hidden(in: UserDefaults.desk)
     var lastUpdated: Date?
     var status: StatusMessage = .connecting
     /// The active account's sparkline history.
@@ -585,21 +588,29 @@ final class UsageViewModel {
     /// Re-applies the saved warning settings to the current numbers. The set is only reassigned
     /// when a tier turns red or back, so the cards only redraw then.
     func refreshMeterWarnings(now: Date = Date()) {
+        let hidden = MeterVisibility.hidden(in: UserDefaults.desk)
+        if hidden != hiddenTiers {
+            hiddenTiers = hidden
+            // Cards came or went: the panel fits its new height, as after a compact toggle.
+            NotificationCenter.default.post(name: .sanduhrCompactDidChange, object: nil)
+        }
         let fresh = Self.warningTiers(usage, now: now, desk: UserDefaults.desk)
         if fresh != warningTiers { warningTiers = fresh }
     }
 
     /// The widget's warning tiers for these numbers with the Meters settings saved in `desk`:
-    /// `MeterWarning.tiers`, the rule the Desk rows use.
+    /// `MeterWarning.tiers`, the rule the Desk rows use, over the limits that show.
     nonisolated static func warningTiers(_ usage: UsageResponse?, now: Date, desk: DefaultsStore) -> Set<Tier> {
-        MeterWarning.tiers(usage, now: now) { MeterWarningSettings.saved($0, in: desk) }
+        let shown = MeterVisibility.visible(usage, hidden: MeterVisibility.hidden(in: desk))
+        return MeterWarning.tiers(shown, now: now) { MeterWarningSettings.saved($0, in: desk) }
     }
 
-    /// Returns tiers the server reported (with a non-nil utilization), in
-    /// display order. If compact mode is on, returns only the highest one.
+    /// Returns the tiers the server reported (with a non-nil utilization) that are not hidden
+    /// (MeterVisibility), in display order. If compact mode is on, returns only the highest of
+    /// those, so a hidden limit never takes compact mode's one card.
     /// Mirrors sanduhr.py:468-478.
     func visibleTiers() -> [(tier: Tier, usage: TierUsage)] {
-        guard let u = usage else { return [] }
+        guard let u = MeterVisibility.visible(usage, hidden: hiddenTiers) else { return [] }
         let active = Tier.allCases.compactMap { t -> (Tier, TierUsage)? in
             guard let tu = u.tiers[t], tu.utilization != nil else { return nil }
             return (t, tu)

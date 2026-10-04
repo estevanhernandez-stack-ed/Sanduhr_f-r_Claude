@@ -203,3 +203,10 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   percent (`menu_bar: session` / `weekly`). Rotate: "S 12%", then 8 seconds later "W 96%", and
   so on, also while a menu is open; nothing else in the menu bar moves. Back to Whichever is
   higher: the letters go and the text stops changing.
+- [ ] Hidden limits: with a limit other than Session and Weekly reported (Weekly — Opus, Weekly —
+  Special…), Settings, Desk, Meters shows "Show this limit" on in its group (none on Session or
+  Weekly — All Models). Switch it off: its card leaves the widget and its row the Desk meters at
+  once (the widget shrinks to fit), its warning controls grey out, and `smoke/smoke state` lists
+  it under `hidden_limits`. Settings, Alerts, a line low enough to cross it: no alert for it on
+  the next refresh. Compact mode shows the fullest limit still shown. Switch it on: it comes back
+  everywhere. `smoke/smoke run smoke/scenarios/hide-limit.yaml` (from `mac/`) does the switch and puts it back.

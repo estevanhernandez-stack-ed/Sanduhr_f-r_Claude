@@ -52,7 +52,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         var fired = defaults.stringArray(forKey: Key.fired) ?? []
         let outcome = AlertRules.evaluate(usage: usage, previous: previous, settings: settings,
                                           fired: Set(fired), deskRunning: DeskController.shared.running,
-                                          now: Date())
+                                          now: Date(), hidden: MeterVisibility.hidden(in: UserDefaults.desk))
         guard !outcome.alerts.isEmpty else { return }
         // Recorded even when quiet hours hold the banner back, so nothing bursts out at the end.
         fired.append(contentsOf: outcome.alerts.map(\.onceKey))

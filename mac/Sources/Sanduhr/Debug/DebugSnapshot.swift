@@ -29,6 +29,8 @@ struct DebugStateInput {
     var meters: [DeskMeterRow] = []
     /// The widget's tiers drawing red with a glow (MeterWarning), in display order.
     var widgetWarnings: [Tier] = []
+    /// The limits switched off in Settings, Desk, Meters (MeterVisibility), in display order.
+    var hiddenLimits: [Tier] = []
     var meetingsCount = 0
     var alerts = AlertSettings()
     var lastFetch: Date?
@@ -82,6 +84,8 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("meters", .list(meters)))
         let widgetWarnings: [YAMLNode] = s.widgetWarnings.map { .string($0.rawValue) }
         pairs.append(("widget_warnings", .list(widgetWarnings)))
+        let hiddenLimits: [YAMLNode] = s.hiddenLimits.map { .string($0.rawValue) }
+        pairs.append(("hidden_limits", .list(hiddenLimits)))
         pairs.append(("meetings_count", .int(s.meetingsCount)))
         pairs.append(("alerts", alerts(s.alerts)))
         let fetched: YAMLNode = s.lastFetch.map { .string(iso.string(from: $0)) } ?? .null

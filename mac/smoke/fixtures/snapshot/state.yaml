@@ -29,6 +29,7 @@ meters:
     reset: ""
     warning: false
 widget_warnings: []
+hidden_limits: []
 meetings_count: 0
 alerts:
   enabled: false

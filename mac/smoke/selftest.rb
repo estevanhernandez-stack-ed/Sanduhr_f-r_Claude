@@ -84,6 +84,7 @@ eq('accounts count', state['accounts_count'], 2)
 eq('follow off by default', [state['follow'], state['follow_paused']], [false, false])
 # Item 38: the menu bar choice, Whichever is higher until changed.
 eq('menu bar follows the higher limit by default', state['menu_bar'], 'higher')
+eq('no limit hidden by default', state['hidden_limits'], [])
 app_acct = FakeApp.new
 app_acct.action('account', 'next')
 check('account next changes account_ref', app_acct.state_now['account_ref'] != state['account_ref'])

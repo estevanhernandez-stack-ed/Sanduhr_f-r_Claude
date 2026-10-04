@@ -48,8 +48,11 @@ enum CalendarAccess {
 final class DeskModel {
     var meetings: [Meeting] = []
     var calendarNote: String?
-    /// One row per Claude limit for the meters piece, in the widget's order.
+    /// One row per Claude limit for the meters piece, in the widget's order, hidden limits left out.
     var meters: [DeskMeterRow] = []
+    /// Every limit the server reported with a utilization, hidden or not, in the widget's order:
+    /// Settings, Desk, Meters lists these, so a hidden limit can be shown again.
+    var reportedTiers: [Tier] = []
     /// One line of Claude usage, or nil when there is none.
     var claudeLine: String?
     /// The numbers are older than 15 minutes or the sign-in was refused; the meters and the
@@ -258,6 +261,8 @@ final class DeskModel {
     /// Runs on every update and once a minute, so pace ticks and staleness move with the clock.
     func refreshClaude(now: Date = Date()) {
         meters = Self.meterRows(usage.usage, now: now)
+        let reported = Tier.allCases.filter { usage.usage?.tiers[$0]?.utilization != nil }
+        if reported != reportedTiers { reportedTiers = reported }
         signInNeeded = usage.signInNeeded
         claudeLine = DeskClaudeText.line(usage)
         claudeCompact = DeskClaudeText.compact(usage, now: now)
@@ -266,9 +271,11 @@ final class DeskModel {
         if meterHintVisible != hint { meterHintVisible = hint }
     }
 
-    /// The meter rows with the saved warning settings (Settings, Desk, Meters).
+    /// The meter rows for the limits that show, with the saved warning settings (Settings, Desk, Meters).
     private static func meterRows(_ usage: UsageResponse?, now: Date) -> [DeskMeterRow] {
-        DeskMeterRow.rows(from: usage, now: now) { MeterWarningSettings.saved($0, in: UserDefaults.desk) }
+        let desk = UserDefaults.desk
+        let shown = MeterVisibility.visible(usage, hidden: MeterVisibility.hidden(in: desk))
+        return DeskMeterRow.rows(from: shown, now: now) { MeterWarningSettings.saved($0, in: desk) }
     }
 
     /// Re-applies the warning settings at once: a Meters setting changed. Rows that already match
