@@ -115,6 +115,9 @@ check('desk frames are [x, y, w, h] in whole points',
       state['desk_frames'].all? { |f| f['frame'].length == 4 && f['frame'].all? { |n| n.is_a?(Integer) } })
 check('desk frames carry no labels or titles',
       state['desk_frames'].all? { |f| (f.keys - %w[kind key clickable frame]).empty? })
+# Item 56: the Dock as the Desk sees it; its side, auto-hide and the inset applied now.
+eq('dock at the bottom, shown, nothing applied in the fixture', state['dock'],
+   { 'side' => 'bottom', 'autohide' => false, 'inset' => 0 })
 app_acct = FakeApp.new
 app_acct.action('account', 'next')
 check('account next changes account_ref', app_acct.state_now['account_ref'] != state['account_ref'])

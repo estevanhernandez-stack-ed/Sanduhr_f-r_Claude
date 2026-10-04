@@ -47,6 +47,8 @@ struct DebugStateInput {
     var deskFrames: [DeskElement] = []
     /// DeskFrameCheck's answer for `deskFrames`: nil when the geometry holds.
     var deskFramesProblem: String?
+    /// The Dock as the Desk sees it (item 56): its side, auto-hide, and the inset applied now.
+    var dock = DockDebug()
     var alerts = AlertSettings()
     var lastFetch: Date?
     /// "deep-work", "snake" or nil.
@@ -95,6 +97,14 @@ struct DebugStateInput {
     var build = ""
 }
 
+/// state.yaml's `dock:` (item 56): the Dock's side and auto-hide (its own settings, read only),
+/// and how far the Desk's corners on that side are moved in now, in whole points.
+struct DockDebug: Equatable {
+    var side = DockSide.bottom
+    var autohide = false
+    var inset = 0
+}
+
 /// state.yaml's `now_playing:`.
 struct NowPlayingDebug: Equatable {
     /// Running: placed somewhere and Desk on.
@@ -112,6 +122,12 @@ enum DebugState {
               YAMLPair("placed", .list(n.placed.map { .string($0.rawValue) })),
               YAMLPair("source", .string(n.source.rawValue)),
               YAMLPair("state", .string(n.state.rawValue))])
+    }
+
+    /// `dock:` (item 56): side, auto-hide and the inset applied now.
+    static func dockYAML(_ d: DockDebug) -> YAMLNode {
+        .map([YAMLPair("side", .string(d.side.rawValue)), YAMLPair("autohide", .bool(d.autohide)),
+              YAMLPair("inset", .int(d.inset))])
     }
 
     /// `data:` (item 44): the active account's choices, and `folder_linked` instead of the path.
@@ -188,6 +204,7 @@ enum DebugState {
         pairs.append(("desk_frames", .list(frames)))
         pairs.append(("desk_frames_ok", .bool(s.deskFramesProblem == nil)))
         pairs.append(("desk_frames_problem", s.deskFramesProblem.map(YAMLNode.string) ?? .null))
+        pairs.append(("dock", dockYAML(s.dock)))
         pairs.append(("alerts", alerts(s.alerts)))
         let fetched: YAMLNode = s.lastFetch.map { .string(iso.string(from: $0)) } ?? .null
         pairs.append(("last_fetch", fetched))

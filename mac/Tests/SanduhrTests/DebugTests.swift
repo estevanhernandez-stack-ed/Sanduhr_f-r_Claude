@@ -270,7 +270,7 @@ struct DebugStateTests {
         #expect(keys == ["desk_enabled", "desk_running", "layout", "notch", "has_notch",
                          "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "now_playing", "widget_visible", "widget_visibility",
                          "menu_bar", "settings_open", "settings_section", "usage_page", "meters", "widget_warnings", "hidden_limits",
-                         "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "alerts",
+                         "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "dock", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
                          "glow_camera", "glow_claude_waiting", "glow_claude_done", "theme", "menu", "credentials_store", "account_ref", "accounts_count", "history_days", "data",
                          "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "version", "build"])
@@ -359,6 +359,16 @@ struct DebugStateTests {
         """))
         let empty = YAMLEmitter.emit(DebugState.yaml(DebugStateInput()))
         #expect(empty.contains("desk_frames: []\ndesk_frames_ok: true\ndesk_frames_problem: null\n"))
+    }
+
+    /// Item 56: the Dock's side and auto-hide, and the inset the Desk applies now.
+    @Test func dockFollowsTheDeskFrames() {
+        var s = DebugStateInput()
+        s.dock = DockDebug(side: .left, autohide: true, inset: 73)
+        let yaml = YAMLEmitter.emit(DebugState.yaml(s))
+        #expect(yaml.contains("desk_frames_problem: null\ndock:\n  side: left\n  autohide: true\n  inset: 73\nalerts:\n"))
+        let rest = YAMLEmitter.emit(DebugState.yaml(DebugStateInput()))
+        #expect(rest.contains("dock:\n  side: bottom\n  autohide: false\n  inset: 0\n"))
     }
 
     @Test func emptyState() {

@@ -303,6 +303,11 @@ enum DebugHooks {
             s.deskFrames = desk.model.elements()
             s.deskFramesProblem = DeskFrameCheck.problem(s.deskFrames, window: size)
         }
+        // A `defaults write com.apple.dock` posts nothing here: read the Dock's settings now.
+        if desk.running { desk.dock.refreshPrefs() }
+        let dockPrefs = desk.running ? desk.dock.prefs : DockFollower.readPrefs()
+        let dockInset = desk.running ? desk.model.dockInsets.amount(on: dockPrefs.side) : 0
+        s.dock = DockDebug(side: dockPrefs.side, autohide: dockPrefs.autohide, inset: Int(dockInset.rounded()))
         s.alerts = AlertSettings(UserDefaults.standard)
         s.lastFetch = vm.lastUpdated
         switch vm.activeTool {

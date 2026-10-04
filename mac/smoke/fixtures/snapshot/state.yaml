@@ -54,6 +54,10 @@ desk_frames:
     frame: [52, 898, 260, 22]
 desk_frames_ok: true
 desk_frames_problem: null
+dock:
+  side: bottom
+  autohide: false
+  inset: 0
 alerts:
   enabled: false
   session_line: 80
