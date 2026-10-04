@@ -58,6 +58,10 @@ class FakeApp
     when 'hide-widget' then s['widget_visible'] = false
     when 'settings' then s['settings_open'] = true; s['settings_section'] = arg if arg
     when 'close-settings' then s['settings_open'] = false
+    when 'usage'
+      s['settings_open'] = true
+      s['settings_section'] = 'usage'
+      s['usage_page'] = { 'open' => true, 'tab' => arg || 'overview' }
     when 'theme' then s['theme'] = arg
     when 'account' then s['account_ref'] = s['account_ref'] == '104ab921' ? '0f1e2d3c' : '104ab921'
     when 'tool'
@@ -82,6 +86,21 @@ eq('credentials store is a name, never a value', state['credentials_store'], 'fi
 check('account_ref is 8 hex digits', state['account_ref'].to_s =~ /\A[0-9a-f]{8}\z/)
 eq('accounts count', state['accounts_count'], 2)
 eq('follow off by default', [state['follow'], state['follow_paused']], [false, false])
+# Item 43: the active account's Meter history, 30 days unless switched off (0); never a label.
+eq('meter history kept 30 days by default', state['history_days'], 30)
+# Item 44: the active account's data choices, defaults until chosen; never a label or a path.
+eq('data choices default to nothing tracked or shared', state['data'],
+   { 'activity' => 'off', 'names' => 'names', 'share' => 'off', 'folder_linked' => false })
+check('data block holds no path', !state['data'].to_s.include?('/'))
+# Item 45: live Claude Code activity, counts only: not read while activity is off.
+eq('local activity not read by default', state['local_activity'], { 'reading' => false, 'events' => 0 })
+# Item 46: the vault, flags and a count only: nothing recorded by default.
+eq('nothing recorded by default', state['vault'], { 'recording' => false, 'months' => 0, 'last_ingest_ok' => false })
+# Item 49: Claude Code folders holding Sanduhr's entries, counts only: none by default.
+eq('no integration installed by default', state['integrations'], { 'mcp_installed' => 0, 'statusline_installed' => 0, 'meters_installed' => 0, 'hooks_installed' => 0 })
+check('integrations block holds no path', !state['integrations'].to_s.include?('/'))
+# Item 48: the Claude Usage page, open and its tab only: never a label, a project or a number.
+eq('usage page closed on its first tab', state['usage_page'], { 'open' => false, 'tab' => 'overview' })
 # Item 38: the menu bar choice, Whichever is higher until changed.
 eq('menu bar follows the higher limit by default', state['menu_bar'], 'higher')
 eq('no limit hidden by default', state['hidden_limits'], [])
@@ -283,7 +302,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account]
+    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end

@@ -338,9 +338,6 @@ struct DeskNotchSection: View {
     @AppStorage(CameraLightController.enabledKey, store: .desk) private var cameraLight = false
     @AppStorage(CameraLightController.brightnessKey, store: .desk) private var lightBrightness = CameraLightController.defaultBrightness
     @AppStorage(CameraLightController.sizeKey, store: .desk) private var lightSize = CameraLightController.defaultSize
-    @AppStorage(NotchGlowSwitches.alertsKey, store: .desk) private var glowAlerts = false
-    @AppStorage(NotchGlowSwitches.meetingsKey, store: .desk) private var glowMeetings = false
-    @AppStorage(NotchGlowSwitches.cameraKey, store: .desk) private var glowCamera = false
 
     var body: some View {
         Form {
@@ -379,20 +376,7 @@ struct DeskNotchSection: View {
                 Text("While any app uses a camera, a soft white light around the notch lights your face, above every app. It ends when the camera stops, with or without Desk or the island. Tools, Camera Light shows it by hand. Screens without a notch get it at the top center.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section("Glow") {
-                Toggle("For Sanduhr alerts", isOn: $glowAlerts)
-                Toggle("A minute before a meeting", isOn: $glowMeetings)
-                    .onChange(of: glowMeetings) { _, _ in NotchGlowController.shared.apply() }
-                Toggle("When the camera light comes on", isOn: $glowCamera)
-                HStack {
-                    Text("The notch's edge glows softly in the notch text color for a few seconds, once per event: around the island when it is on, around the notch itself when it is off. A Desk pulse always glows it. It never takes a click.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    // Glows once whatever the switches say, so the look can be checked before
-                    // turning any of them on.
-                    Button("Test Glow") { NotchGlowController.shared.fire() }
-                }
-            }
+            NotchGlowSection()
         }
         .formStyle(.grouped)
     }
@@ -400,6 +384,48 @@ struct DeskNotchSection: View {
     private func contentPicker(_ title: String, _ selection: Binding<NotchContent>) -> some View {
         Picker(title, selection: selection) {
             ForEach(NotchContent.allCases) { Text($0.label).tag($0) }
+        }
+    }
+}
+
+/// Notch, Glow: which events glow the notch. Its own view so the Notch page's body stays small
+/// enough for Swift 6.0 and 6.1 to type-check.
+private struct NotchGlowSection: View {
+    @AppStorage(NotchGlowSwitches.alertsKey, store: .desk) private var glowAlerts = false
+    @AppStorage(NotchGlowSwitches.meetingsKey, store: .desk) private var glowMeetings = false
+    @AppStorage(NotchGlowSwitches.cameraKey, store: .desk) private var glowCamera = false
+    @AppStorage(NotchGlowSwitches.claudeWaitingKey, store: .desk) private var claudeWaiting = false
+    @AppStorage(NotchGlowSwitches.claudeDoneKey, store: .desk) private var claudeDone = false
+    @AppStorage(NotchGlowSwitches.claudeSkipTerminalKey, store: .desk) private var skipTerminal = true
+
+    var body: some View {
+        Section("Glow") {
+            Toggle("For Sanduhr alerts", isOn: $glowAlerts)
+            Toggle("A minute before a meeting", isOn: $glowMeetings)
+                .onChange(of: glowMeetings) { _, _ in NotchGlowController.shared.apply() }
+            Toggle("When the camera light comes on", isOn: $glowCamera)
+            HStack {
+                Text("The notch's edge glows softly in the notch text color for a few seconds, once per event: around the island when it is on, around the notch itself when it is off. A Desk pulse always glows it. It never takes a click.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                // Glows once whatever the switches say, so the look can be checked before
+                // turning any of them on.
+                Button("Test Glow") { NotchGlowController.shared.fire() }
+            }
+        }
+        claudeSection
+    }
+
+    /// Claude Code's events (item 51).
+    private var claudeSection: some View {
+        Section("Glow for Claude Code") {
+            Toggle("When Claude Code is waiting on you", isOn: $claudeWaiting)
+            Toggle("When Claude Code finishes", isOn: $claudeDone)
+            Toggle("Not while a terminal is in front", isOn: $skipTerminal)
+                .disabled(!claudeWaiting && !claudeDone)
+            Text("Needs the notch glow hooks in the Claude Code folder (Settings, Integrations). Claude Code tells Sanduhr only that it waits or finished, nothing about the conversation. At most one glow of each kind every 20 seconds. With a terminal or an editor that runs Claude Code in front (Terminal, iTerm2, Ghostty, Warp, WezTerm, Alacritty, kitty, VS Code, Cursor, Zed), you are already looking, so it doesn't glow. Screens without a notch glow at the top center.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

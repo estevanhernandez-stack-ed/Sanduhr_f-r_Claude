@@ -171,7 +171,8 @@ struct RootView: View {
                     tick: vm.countdownTick,
                     pinDeepMath: vm.pacingPinned,
                     warning: vm.warningTiers.contains(row.tier),
-                    sparklineMode: SparklineView.mode(themeID: vm.theme.id)
+                    sparklineMode: SparklineView.mode(themeID: vm.theme.id),
+                    localTokens: vm.localBurn.tokens(for: row.tier)
                 )
                 .modifier(LimitContextMenu(tier: row.tier, vm: vm))
             }

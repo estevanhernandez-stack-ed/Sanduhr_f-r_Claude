@@ -13,6 +13,9 @@ widget_visibility: always
 menu_bar: higher
 settings_open: true
 settings_section: notch
+usage_page:
+  open: false
+  tab: overview
 meters:
   - tier: five_hour
     label: Session (5hr)
@@ -73,6 +76,8 @@ glow_shape: none
 glow_alerts: false
 glow_meetings: false
 glow_camera: false
+glow_claude_waiting: false
+glow_claude_done: false
 theme: obsidian
 menu:
   - items:
@@ -91,6 +96,24 @@ menu:
 credentials_store: file
 account_ref: "104ab921"
 accounts_count: 2
+history_days: 30
+data:
+  activity: "off"
+  names: names
+  share: "off"
+  folder_linked: false
+local_activity:
+  reading: false
+  events: 0
+vault:
+  recording: false
+  months: 0
+  last_ingest_ok: false
+integrations:
+  mcp_installed: 0
+  statusline_installed: 0
+  meters_installed: 0
+  hooks_installed: 0
 follow: false
 follow_paused: false
 version: "2.1.0"

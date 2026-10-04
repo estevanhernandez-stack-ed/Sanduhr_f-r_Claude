@@ -321,3 +321,357 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   for them, then two-finger click without moving: the limit menu. Hide a limit so the meters move
   under a still pointer, then two-finger click: the limit menu. With the pointer far from the
   Desk blocks, Activity Monitor shows Sanduhr idle (no timer runs there).
+
+## 14. Thirty days of meter history (item 43)
+
+- [ ] Upgrade: with a 2.4.0 `history.{label}.json` (24 points per limit) in place, launch the new
+  build: the sparklines look as they did. After the next fetches the file grows past 24 points
+  per limit (`jq '.five_hour | length'`) while the cards still draw the last 24 (about 2 hours).
+- [ ] `smoke/smoke state` shows `history_days: 30` and no label.
+- [ ] Settings, Accounts, select the active account: Meter history reads 30 days. Choose Off: a
+  confirmation asks to erase this account's meter history. Keep It: the file stays, Refresh adds
+  nothing to it (its modification time doesn't change), `history_days: 0`, and `defaults read
+  com.626labs.sanduhr meterHistoryOff` lists the account. Back to 30 days: the next Refresh writes
+  again.
+- [ ] Off again, then Erase History: "Meter history erased.", the file is gone and the cards'
+  sparklines empty; the meters still update.
+- [ ] Rename an account with Meter history off: it stays off under the new name. Remove it: it
+  leaves `meterHistoryOff`. Another account's history is never touched.
+
+## 15. The Data section and Claude Code folder linking (item 44)
+
+Use a test Claude Code folder (for example `mkdir -p ~/.claude-smoketest/projects`) or folders
+whose names are fine to show; remove it afterwards.
+
+- [ ] Settings, Accounts, select an account: a Data section shows Meter history (30 days),
+  Claude Code folder (None), Claude Code activity (Not tracked), Project names in the record
+  (Names, dimmed until Keep a record), Share with Claude (Off), with a caption that live
+  activity works now and the record and sharing take effect in later updates. The page scrolls
+  when it doesn't fit.
+- [ ] `smoke/smoke state` shows `data:` with `activity: "off"`, `names: names`, `share: "off"`,
+  `folder_linked: false`, and no label or path anywhere.
+- [ ] The folder menu lists `~/.claude` and the `~/.claude-*` folders that hold `projects/` or a
+  `.claude.json`, and not an empty `~/.claude-x` folder. Choose… on a folder without either says
+  it doesn't look like a Claude Code folder and links nothing.
+- [ ] With a folder signed in to the same organization as the account (its `.claude.json`
+  `oauthAccount.organizationUuid`), "This folder is signed in to this account. Link it?" shows
+  with the folder; nothing is linked until Link. Selecting an inactive account fetches its
+  organization once; nothing about it appears in Console (`log stream --predicate
+  'subsystem == "com.626labs.sanduhr"'`).
+- [ ] Link a folder to account A, then pick the same folder for account B: a confirmation names
+  A; Cancel keeps it with A, Move It to B unlinks it from A. A's menu then reads None.
+- [ ] Set B's activity to Keep a record, names to Hidden, share to Meters; Make B active:
+  `state.yaml` `data:` shows `record`, `hidden`, `meters`, `folder_linked: true`. `defaults read
+  com.626labs.sanduhr accountData` shows them under B. Rename B: the choices and the link follow.
+  Remove B: `accountData` no longer lists it and the folder is free for another account.
+
+## 16. Live Claude Code activity (item 45)
+
+Use a test Claude Code folder, never a real one, and remove it afterwards. Make one from the
+shape of the test fixtures (`mac/Tests/SanduhrTests/Fixtures/cc-logs/by-tier.jsonl`), with the
+current time so the lines count as new:
+
+```sh
+mkdir -p ~/.claude-smoketest/projects/demo
+cc_line() {   # model input output
+  printf '{"type":"assistant","timestamp":"%s","message":{"model":"%s","usage":{"input_tokens":%s,"output_tokens":%s}},"cwd":"/tmp/demo"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" "$1" "$2" "$3" >> ~/.claude-smoketest/projects/demo/session.jsonl
+}
+```
+
+- [ ] Link `~/.claude-smoketest` to the active account, activity Not tracked. `cc_line
+  claude-sonnet-4-6 1000 499`: no card changes within a minute, and `smoke/smoke state` shows
+  `local_activity: {reading: false, events: 0}`. `sudo fs_usage -w -f filesys Sanduhr | grep
+  smoketest` shows no open of `session.jsonl`.
+- [ ] Activity Live only: `reading: true`. Refresh, then `cc_line claude-sonnet-4-6 1000 499`:
+  within 30 seconds the Weekly — Sonnet card shows "+1.5k" before its percent, small and in the
+  theme's dim text; hovering it explains the badge. VoiceOver on the percent reads "…%, plus 1.5
+  thousand local tokens since the last refresh". `state.yaml` shows `events: 1`.
+- [ ] Another `cc_line claude-sonnet-4-6 10000 0`: the badge reads "+12k" after the next scan.
+  `cc_line claude-haiku-4-5 2000 0` adds "+2.0k" to Weekly — All Models; a `gpt-4o` line shows
+  nowhere. Refresh: every badge goes away until the next line.
+- [ ] Switch to an account with no folder: no badge, `reading: false`. Back, then Not tracked:
+  the badges go at once and `reading: false`. Keep a record reads like Live only.
+- [ ] `state.yaml`, `snapshot.json` and Console (`log stream --predicate 'subsystem ==
+  "com.626labs.sanduhr"'`) carry no folder path, project, model or label. Then `rm -rf
+  ~/.claude-smoketest` and unlink it.
+
+## 17. The vault (item 46)
+
+Use the test folder from section 16 (`~/.claude-smoketest`), never a real one, with the same
+`cc_line`. A folder id is 16 hex digits; find the test folder's with `ls ~/Library/Application\
+Support/Sanduhr/vault/` before and after.
+
+- [ ] Activity Live only: `cc_line claude-sonnet-4-6 1000 499`, refresh. No new folder under
+  `vault/`, and `state.yaml` shows `vault: {recording: false, months: 0, last_ingest_ok: false}`.
+- [ ] Keep a record (names Names): within a refresh a new `vault/<id>/` holds
+  `sessions-<this month>.json`, `rollups-…`, `checkpoints.json`, `meta.json`; `state.yaml` shows
+  `recording: true, months: 1, last_ingest_ok: true`; the activity caption says "Kept so far: 1
+  month". `jq '.sessions[] | {project_name, total}' sessions-*.json` shows `demo` and 1499. The
+  folder name and file names hold no path or label; `grep -r smoketest vault/` finds nothing.
+- [ ] Another `cc_line … 10000 0`, refresh: the same session's total grows to 11499 (one row,
+  no double count).
+- [ ] Names Hidden, then a new session (`cc_line` into `projects/demo/second.jsonl` the same
+  way): its row's `project_name` and `project_key` are `p-` and 10 hex digits, no `cwd`. The
+  first row still reads `demo`; once its file has been quiet for an hour it is read a last time
+  and reads `p-…` too. A session that had already gone quiet keeps its name (as the caption
+  says).
+- [ ] With a second Sanduhr running (a dev build beside the release), refresh both: the vault
+  stays consistent and Console shows "ingest skipped (writer lock held)" from one of them.
+- [ ] Activity Live only: "Keep the record or erase it?" appears. Keep It: the folder stays.
+  Keep a record again, then Live only, Erase Record: `vault/<id>/` is gone and stays gone after
+  two refreshes; `state.yaml` `months: 0`.
+- [ ] Keep a record again; Erase this account's data…: the confirmation names the meter history
+  and the record from `~/.claude-smoketest`; Erase Data: activity reads Live only, the vault
+  folder and `history.<account>.json` are gone. Keep a record, refresh, then Remove Account (on
+  a throwaway account): its vault folder is gone.
+- [ ] Console (`log stream --predicate 'subsystem == "com.626labs.sanduhr" && category ==
+  "vault"'`) shows fixed phrases only. Then `rm -rf ~/.claude-smoketest` and unlink it.
+
+## 18. Share with Claude: the MCP tools (item 47)
+
+Use the test folder from section 16 (`~/.claude-smoketest`, linked to a throwaway or test account,
+activity Keep a record, names Names) with a few `cc_line`s and one refresh, so the record has a day.
+Register the server the way `install.sh` does (`bash mac/integrations/install.sh`, which runs
+`claude mcp add sanduhr --scope user -- python3 ".../integrations/sanduhr_mcp.py"`; skip it if
+`claude mcp get sanduhr` already lists it). Ask Claude Code by tool name, in a new session after
+each change ("call the sanduhr get_usage tool", and so on). `F=~/Library/Application\
+Support/Sanduhr/mcp-access.json`.
+
+- [ ] Share Off on every account: `jq . "$F"` shows `"accounts": []`. `get_usage` answers
+  `no_data` / `not_shared` with a remedy naming Settings > Accounts > Data; `ping` shows
+  `sharing.access_file: "ok"`, `accounts_shared: 0`, `tools_available` with five tools and
+  `tools_not_on_mac` naming `publish_usage` and `propose_theme`.
+- [ ] Meters on the active account: the file lists it with `share: "meters"`, its
+  `account_ref` (as in `snapshot.json`), `history_file`, and no `names`, `vault_id` or
+  `live_folder`; `ls -l "$F"` shows `-rw-------`. `get_usage` shows the widget's percentages
+  with `local_burn_since_snapshot: null`; `get_usage_history` shows `meter_history` for it and
+  no days; `get_local_burn_by_project` and `get_model_usage` answer `disabled`.
+- [ ] Meters and activity: the entry gains `names: "names"`, a 16-hex `vault_id` and
+  `live_folder` = the test folder. `get_local_burn_by_project` lists one root (its
+  `account_ref`) with project `demo`; `get_model_usage` lists `claude-sonnet-4-6` beside the
+  Sonnet meter; `get_usage_history` (7 days) shows today with `top_projects` `demo`; a new
+  `cc_line` shows in `get_usage`'s `local_burn_since_snapshot` before the next refresh.
+- [ ] Names Hidden: `get_local_burn_by_project` names the project `p-` and 10 hex digits, with
+  `"names": "hidden"`, even when asked for full paths; nothing in any answer says `demo` or
+  `smoketest`. Names Full paths: asked for full paths, the project is `/tmp/demo`.
+- [ ] Activity Live only: `vault_id` leaves the file; burn and model still answer. Not tracked:
+  `live_folder` leaves too and both answer `disabled`.
+- [ ] Switch to another account with sharing Off: within a second the file's `active` flags
+  follow, and `get_usage` answers `not_shared` while the shared account's activity tools still
+  answer for it. Rename the shared account: its `account_ref` and `history_file` change with it.
+- [ ] `mv "$F" "$F.bak"`: every tool answers `not_shared`, `ping` says `access_file: "missing"`;
+  change any choice and the file comes back. `log stream --predicate 'subsystem ==
+  "com.626labs.sanduhr"'` while changing choices shows no label or path.
+- [ ] Clean up: Share Off, unlink and `rm -rf ~/.claude-smoketest`; `bash
+  mac/integrations/install.sh --remove` if the server was registered only for this test.
+
+## 19. The Claude Usage page (item 48)
+
+Use the test folder from section 16 (`~/.claude-smoketest`, `cc_line` as there), linked to a test
+or throwaway account, never a real folder: the page shows project names, so screenshots come from
+this folder only. A second helper writes a line on an earlier day:
+
+```sh
+cc_line_at() {   # UTC timestamp, model, input, output, project
+  mkdir -p ~/.claude-smoketest/projects/"$5"
+  printf '{"type":"assistant","timestamp":"%s","message":{"model":"%s","usage":{"input_tokens":%s,"output_tokens":%s}},"cwd":"/tmp/%s"}\n' \
+    "$1" "$2" "$3" "$4" "$5" >> ~/.claude-smoketest/projects/"$5"/past.jsonl
+}
+cc_line_at "$(date -u -v-3d +%Y-%m-%dT10:00:00.000Z)" claude-sonnet-4-6 4000 1000 api
+cc_line_at "$(date -u -v-10d +%Y-%m-%dT10:00:00.000Z)" claude-opus-4-1 20000 0 web
+```
+
+- [ ] `smoke/smoke run usage-page` and `smoke/smoke run settings-sections` pass; the snapshots
+  show each tab. Tools, Claude Usage… in the widget's menu, the menu bar menu and a Desk meter's
+  two-finger menu each open Settings at Claude Usage; `state.yaml` shows `usage_page: {open: true,
+  tab: overview}` and nothing else about the page.
+- [ ] Activity Not tracked: Overview says to choose a folder and activity, with Data Settings…,
+  which opens Accounts on that account scrolled to Data. Trends and Sessions say they come from
+  the record, with the same button.
+- [ ] Live only: Overview's status line says Live only; Today shows the `cc_line` tokens with sent
+  and received; the strip has bars 3 and 10 days back; Projects lists `demo`, `api`, `web`.
+  Trends and Sessions still ask for a record. No folder appears under `vault/`.
+- [ ] Keep a record, refresh: the status line goes; the strip's old days now come from the
+  record (`rm ~/.claude-smoketest/projects/api/past.jsonl`, wait a minute: the bar 3 days back
+  stays). Days before the record's coverage are dotted ("no record"), never empty bars. Today
+  grows with each `cc_line` within a minute.
+- [ ] Trends: 4/12/26 weeks; the current week is hatched; weeks before the record began are
+  dotted, never zero bars; the footer reads "History kept since <today>" and the first-day note
+  shows. Top projects match Overview's.
+- [ ] Sessions: 7d by default; three rows (`demo`, `api`, `web`), the `web` one shows "—" under
+  7d and moves to the top under All when sorted by tokens. Today/Yesterday change the column and
+  its header ("Tokens (Today) ▼"). Each header sorts, a second click flips the glyph. Clicking a
+  row shows the wall-clock span, each day with its models, and `Record: .claude-smoketest`;
+  a refresh keeps it open and the scroll where it was.
+- [ ] Export CSV… to the Desktop: the file opens in Numbers with the header `session,root,
+  project,first_seen_utc,last_seen_utc,tokens_in_scope,tokens_total,models`, the rows in the
+  order shown and `.claude-smoketest` as root. Nothing is written until you click Save.
+- [ ] Names Hidden, then a new `cc_line` into `projects/demo2/session.jsonl`: Overview and
+  Sessions show its `p-` code and the caption explaining codes; nothing on the page or in the
+  CSV reads `demo2`.
+- [ ] Two accounts: the picker shows both; picking the other shows its own folder's numbers
+  (or the setup note); the Records list doesn't change.
+- [ ] Records on this Mac lists the test folder's record with its size, oldest day ("since
+  …", 10 days back), the account and "recording". Unlink the folder (Keep It when asked): the
+  row reads "Not linked to an account (<8 hex>)". Show in Finder selects `vault/<id>`. Erase…
+  names it as not linked; Erase Record: the row and `vault/<id>/` are gone and stay gone after
+  two refreshes. Link and record again, then Erase… on the linked row: the confirmation says the
+  account switches to Live only first; after it, Data shows Live only and the folder is gone.
+- [ ] Console (`log stream --predicate 'subsystem == "com.626labs.sanduhr"'`) shows no label,
+  path, project or number from the page. Then `rm -rf ~/.claude-smoketest ~/Desktop/sanduhr-sessions-*.csv`
+  and unlink it.
+
+## 20. One-click MCP and statusline install (item 49)
+
+Use test Claude Code folders, never your real `~/.claude`, `~/.claude-*` or `~/.claude.json`:
+two folders cover both placements of `.claude.json` without touching the default home. Make
+them, with configs that have keys of their own, and keep copies to compare with:
+
+```sh
+mkdir -p ~/.claude-smoketest/projects ~/.claude-smoketest2/projects
+printf '{\n  "numStartups": 3,\n  "mcpServers": {\n    "other": {"type": "stdio", "command": "true"}\n  }\n}\n' > ~/.claude-smoketest/.claude.json
+printf '{\n  "model": "opus",\n  "statusLine": {"type": "command", "command": "echo mine"}\n}\n' > ~/.claude-smoketest/settings.json
+cp ~/.claude-smoketest/.claude.json /tmp/st-claude.json; cp ~/.claude-smoketest/settings.json /tmp/st-settings.json
+S=~/Library/Application\ Support/Sanduhr/integrations
+```
+
+- [ ] `smoke/smoke run settings-sections` passes; Settings shows Integrations under Claude
+  Usage. The page lists `~/.claude-smoketest` and `~/.claude-smoketest2` (and any real folders:
+  leave those alone) with MCP server and Statusline rows, and a "Runs with Python 3.x at …"
+  line. On a Mac without Command Line Tools (or with `/usr/bin/python3` only), the page says
+  what is needed instead, Install buttons are off, and nothing asks to install until Install
+  Command Line Tools… is clicked.
+- [ ] MCP server, Install… on `~/.claude-smoketest`: the sheet lists every account with its
+  Share with Claude choice ("Off: nothing" and so on), Change in Accounts… goes to Accounts,
+  and it names `~/.claude-smoketest/.claude.json`. Install: the row reads Installed; `jq
+  .mcpServers ~/.claude-smoketest/.claude.json` shows `other` unchanged and `sanduhr` as
+  `{"type": "stdio", "command": "<python3>", "args": [".../integrations/current/sanduhr_mcp.py"]}`;
+  `diff /tmp/st-claude.json ~/.claude-smoketest/.claude.json.sanduhr-backup` is empty; `ls -l
+  "$S"` shows `current -> <12 hex>` and that folder holds both scripts.
+- [ ] `CLAUDE_CONFIG_DIR=~/.claude-smoketest claude` then `/mcp`: sanduhr is connected; "call
+  the sanduhr ping tool" answers with `0.2.0-mac`.
+- [ ] Statusline, Install…: the sheet shows `echo mine` as the statusline it would replace;
+  Not Now changes nothing (`diff /tmp/st-settings.json ~/.claude-smoketest/settings.json`
+  is empty). Replace and Install: Installed; `"model"` is still there; the Claude Code session
+  above shows the meters under the prompt after its next refresh.
+- [ ] Remove both: `diff /tmp/st-claude.json ~/.claude-smoketest/.claude.json` and `diff
+  /tmp/st-settings.json ~/.claude-smoketest/settings.json` are empty (the `echo mine` statusline
+  is back), the `.sanduhr-backup` files are gone, and with nothing installed anywhere `"$S"`
+  holds no `current` and no stamped folder (install.sh's own copies, if any, stay).
+- [ ] `~/.claude-smoketest2` has no `.claude.json` or `settings.json`: install both, then remove
+  both: the folder holds only `projects` again.
+- [ ] Break `~/.claude-smoketest/settings.json` (add a trailing comma): the row says it isn't
+  valid JSON and offers no button; the file is unchanged. Fix it.
+- [ ] Update path: install the MCP server, then `ls "$S"`, quit, build and launch a copy whose
+  `sanduhr_mcp.py` differs (any edit in `mac/integrations/`, `./build.sh --debug`): after launch
+  `current` points at a new stamp, the old stamp folder is still there, and
+  `.claude-smoketest/.claude.json` is unchanged; the row reads Installed. Launch again: the old
+  stamp folder is gone.
+- [ ] `state.yaml` shows `integrations: {mcp_installed: N, statusline_installed: N}` with the
+  counts, and no path. `log stream --predicate 'subsystem == "com.626labs.sanduhr"'` while
+  installing shows no path or label.
+- [ ] Clean up: Remove everything installed above, then `rm -rf ~/.claude-smoketest2
+  /tmp/st-claude.json /tmp/st-settings.json` (and `~/.claude-smoketest` once sections 16 to 19
+  are done).
+
+## 21. Meters above Claude Code's prompt (item 50)
+
+A Claude Code with mods (`claude plugin test --help` works). Use a test folder, never your real
+`~/.claude*`. The `/tmp/other-mod` entry stands for a mod of your own already in the list:
+
+```sh
+mkdir -p ~/.claude-smoketest/projects /tmp/other-mod
+printf '{\n  "model": "opus",\n  "env": {\n    "CLAUDE_CODE_PLUGIN_DIRS": "/tmp/other-mod"\n  }\n}\n' > ~/.claude-smoketest/settings.json
+cp ~/.claude-smoketest/settings.json /tmp/st-meters.json
+S=~/Library/Application\ Support/Sanduhr/integrations
+```
+
+- [ ] `claude plugin test mac/integrations/mods/sanduhr-meters` and `claude plugin validate
+  mac/integrations/mods/sanduhr-meters` pass.
+- [ ] Settings, Integrations: `~/.claude-smoketest` has a third row, Meters above the prompt, Not
+  installed. Its Install… works even where the page says Python is missing.
+- [ ] Install…: the sheet says the band shows the session and weekly bars, reads only
+  `snapshot.json`, and that Sanduhr adds its folder to `env.CLAUDE_CODE_PLUGIN_DIRS` in
+  `~/.claude-smoketest/settings.json`, keeping the folders already listed. Install: Installed;
+  `jq -r '.env.CLAUDE_CODE_PLUGIN_DIRS' ~/.claude-smoketest/settings.json` prints
+  `/tmp/other-mod:<…>/integrations/current/mods/sanduhr-meters`, `"model"` is still there, and
+  `ls "$S/current/mods/sanduhr-meters"` shows `.claude-plugin`, `hooks`, `types` and no tests.
+- [ ] `CLAUDE_CONFIG_DIR=~/.claude-smoketest claude`: above the prompt, `Session ▕…▏ N% resets
+  …   Weekly ▕…▏ N% resets …` with the widget's percentages and countdowns (compare with the
+  cards), the pink pace mark where the card's pace marker is, colors as on the cards. After a
+  widget refresh the band changes within 30 seconds; a countdown moves each minute.
+- [ ] States, each in a fresh session with `SANDUHR_SNAPSHOT=/tmp/snap.json` in front of the
+  command above, writing `/tmp/snap.json` first:
+  `W=$(date -u -v+2d +%FT%TZ); A=$(date -u -v-9M +%FT%TZ)` and
+  `printf '{"schema_version":1,"captured_at":"%s","status":"ok","error_kind":null,"tiers":[{"key":"seven_day","utilization":93,"resets_at":"%s"}]}' "$A" "$W" > /tmp/snap.json`:
+  the band is dimmed with a red ⚠ after 93% and `(9m ago)`, and a notice says the weekly limit
+  is at 93%; a second session shows no notice. With `captured_at` 20 minutes back: one dim line,
+  `Sanduhr: no update for 20m. Is the widget running?`. With `"status":"error",
+  "error_kind":"session_expired","tiers":[]`: `Sanduhr: sign in to see your meters.`. With
+  `SANDUHR_SNAPSHOT=/tmp/none.json`: no band at all.
+- [ ] Session reset: write a session tier whose `resets_at` is a minute ahead
+  (`date -u -v+1M +%FT%TZ`); within the next minute the bar becomes `Session reset` and a notice
+  says the session limit has reset, once.
+- [ ] `/config`: the mod's Meters (both, session, weekly), Style (compact, full) and Label rows;
+  full shows a line per meter with `on pace` or `N% ahead` and `resets Mon 9:00 AM`; a short
+  terminal folds it to one line; the label shows first.
+- [ ] Remove: `diff /tmp/st-meters.json ~/.claude-smoketest/settings.json` is empty and the
+  `.sanduhr-backup` is gone. Install again, add `:/tmp/mine` after Sanduhr's entry by hand,
+  Remove: the list reads `/tmp/other-mod:/tmp/mine`.
+- [ ] `state.yaml` shows `meters_installed` with the count and no path. Clean up: Remove, then
+  `rm -rf /tmp/other-mod /tmp/st-meters.json /tmp/snap.json`.
+
+## 22. The notch glows when Claude Code needs you (item 51)
+
+A `sanduhr://` link goes to the default app for the scheme. With a dev build and an installed copy on the same Mac, a hook (or a plain `open`) can reach or launch the installed copy: aim tests at the dev build with `open -g -a <dev Sanduhr.app> 'sanduhr://claude-code?event=waiting'`. One copy, as users have, has no such issue.
+
+Use a test folder, never your real `~/.claude*`. The `say` hook stands for a hook of your own:
+
+```sh
+mkdir -p ~/.claude-smoketest/projects
+printf '{\n  "hooks": {\n    "Stop": [\n      {\n        "hooks": [\n          { "type": "command", "command": "say done" }\n        ]\n      }\n    ]\n  }\n}\n' > ~/.claude-smoketest/settings.json
+cp ~/.claude-smoketest/settings.json /tmp/st-hooks.json
+```
+
+- [ ] The link alone, before any install: Settings, Notch, Glow for Claude Code, both switches
+  off. Bring Finder to the front and run `open -g 'sanduhr://claude-code?event=waiting'` from a
+  script or another Mac app (or with "Not while a terminal is in front" off): nothing glows.
+  Turn "When Claude Code is waiting on you" on: the same command glows the notch once within a
+  second (around the island with the notch on, around the hardware notch with it off). Again
+  within 20 seconds: no glow; after 20 seconds: one glow.
+- [ ] `event=done` with "When Claude Code finishes" on glows once, but not within 5 seconds of a
+  waiting glow. `open -g 'sanduhr://claude-code?event=other'`,
+  `open -g 'sanduhr://claude-code?event=waiting&x=1'` and `open -g 'sanduhr://claude-code'`: no
+  glow, no window, no error.
+- [ ] "Not while a terminal is in front" on: run the waiting command in Terminal (Terminal stays
+  in front): no glow. Switch it off: it glows from Terminal too. Put it back on.
+- [ ] Settings, Integrations: `~/.claude-smoketest` has a fourth row, Notch glow when Claude needs
+  you, Not installed, and Install… works even where the page says Python is missing. Under the
+  folders, a line says the glow is off until turned on in Notch, Glow, and Glow Settings… opens
+  the Notch page.
+- [ ] Install…: the sheet says Claude Code tells Sanduhr only that it is waiting or finished,
+  nothing about the conversation, and that Sanduhr adds one entry to each of
+  `hooks.Notification and hooks.Stop` in `~/.claude-smoketest/settings.json`; Glow Settings…
+  there opens the Notch page. Install: Installed;
+  `jq '.hooks.Stop | length, .[0].hooks[0].command' ~/.claude-smoketest/settings.json` prints 2
+  and `"say done"`, and `jq '.hooks.Notification[0]' ~/.claude-smoketest/settings.json` shows the
+  matcher `permission_prompt|idle_prompt|elicitation_dialog` and the `open -g
+  'sanduhr://claude-code?event=waiting'` command with `"async": true`.
+- [ ] With Claude Code: both switches on, "Not while a terminal is in front" on.
+  `CLAUDE_CONFIG_DIR=~/.claude-smoketest claude` in a scratch folder, ask for something that needs
+  a permission (`create a file x.txt`), and switch to Finder before it asks: the notch glows
+  within a second of the prompt. Answer it; when the turn finishes with Finder in front, a
+  second glow (unless within 5 seconds of the first). With the terminal in front: no glow, and
+  you hear "done" from your own hook every turn. Claude Code never waits on the hooks and shows
+  no hook error.
+- [ ] Quit Sanduhr and finish a turn: Sanduhr is not launched. Open it again.
+- [ ] No notch (an external display alone, or a Mac without one): the waiting command glows a
+  soft halo around a notch-wide spot at the top center of the main screen; `state.yaml` shows
+  `glow_shape: top`.
+- [ ] Remove: `diff /tmp/st-hooks.json ~/.claude-smoketest/settings.json` is empty and the
+  `.sanduhr-backup` is gone; a waiting prompt no longer glows. Install with no `settings.json`
+  (`rm ~/.claude-smoketest/settings.json`): it is created; Remove deletes it again.
+- [ ] `state.yaml` shows `hooks_installed` with the count, `glow_claude_waiting` and
+  `glow_claude_done`, and no path. Clean up: Remove, then `rm -f /tmp/st-hooks.json` (and
+  `rm -rf ~/.claude-smoketest` once the other sections are done).

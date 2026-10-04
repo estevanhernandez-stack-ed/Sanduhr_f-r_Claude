@@ -20,7 +20,7 @@ struct SanduhrMenuTests {
     @Test func itemsInOrder() {
         #expect(flat(menu()) == [
             "Hide Widget", "-",
-            "Deep Work", "Pacing Calculators", "Cooldown Snake", "Camera Light", "-",
+            "Deep Work", "Pacing Calculators", "Cooldown Snake", "Camera Light", "Claude Usage…", "-",
             "Refresh", "Settings…", "Check for Updates…", "-",
             "Quit Sanduhr für Claude",
         ])
@@ -37,10 +37,10 @@ struct SanduhrMenuTests {
         func checks(_ g: [MenuGroup]) -> [MenuCommand: Bool] {
             Dictionary(uniqueKeysWithValues: g[1].entries.map { ($0.command, $0.checked) })
         }
-        #expect(checks(menu()) == [.deepWork: false, .pacing: false, .snake: false, .cameraLight: false])
-        #expect(checks(menu(deepWork: true)) == [.deepWork: true, .pacing: false, .snake: false, .cameraLight: false])
-        #expect(checks(menu(pacing: true, snake: true)) == [.deepWork: false, .pacing: true, .snake: true, .cameraLight: false])
-        #expect(checks(menu(camera: true)) == [.deepWork: false, .pacing: false, .snake: false, .cameraLight: true])
+        #expect(checks(menu()) == [.deepWork: false, .pacing: false, .snake: false, .cameraLight: false, .usage: false])
+        #expect(checks(menu(deepWork: true)) == [.deepWork: true, .pacing: false, .snake: false, .cameraLight: false, .usage: false])
+        #expect(checks(menu(pacing: true, snake: true)) == [.deepWork: false, .pacing: true, .snake: true, .cameraLight: false, .usage: false])
+        #expect(checks(menu(camera: true)) == [.deepWork: false, .pacing: false, .snake: false, .cameraLight: true, .usage: false])
         // Only tools carry checkmarks.
         let rest = menu(deepWork: true, pacing: true, snake: true, camera: true).enumerated()
             .filter { $0.offset != 1 }.flatMap(\.element.entries)
@@ -49,7 +49,7 @@ struct SanduhrMenuTests {
 
     @Test func keyEquivalents() {
         let keys = Dictionary(uniqueKeysWithValues: menu().flatMap(\.entries).map { ($0.command, $0.key) })
-        #expect(keys == [.showHide: "", .deepWork: "p", .pacing: "", .snake: "", .cameraLight: "",
+        #expect(keys == [.showHide: "", .deepWork: "p", .pacing: "", .snake: "", .cameraLight: "", .usage: "",
                          .refresh: "r", .settings: ",", .checkForUpdates: "", .quit: "q"])
     }
 
@@ -104,7 +104,17 @@ struct SettingsSidebarTests {
         // Item 36: Accounts replaced Credentials; the raw value stays for links and smoke.
         #expect(SettingsSection(rawValue: "credentials") == .credentials)
         #expect(SettingsSection.credentials.title == "Accounts")
-        #expect(SettingsSection.groups.first?.sections == [.general, .alerts, .credentials])
+        #expect(SettingsSection.groups.first?.sections == [.general, .alerts, .credentials, .usage, .integrations])
+        // Item 49: Integrations follows Claude Usage.
+        #expect(SettingsSection(rawValue: "integrations")?.title == "Integrations")
+    }
+
+    @Test func claudeUsageSitsUnderAccounts() {
+        // Item 48: the page is per account; its setup is in Accounts, Data, one row up.
+        #expect(SettingsSection(rawValue: "usage") == .usage)
+        #expect(SettingsSection.usage.title == "Claude Usage")
+        #expect(SanduhrMenu.groups(widgetVisible: true, deepWork: false, pacing: false, snake: false)[1]
+            .entries.last == MenuEntry(command: .usage, title: "Claude Usage…"))
     }
 }
 

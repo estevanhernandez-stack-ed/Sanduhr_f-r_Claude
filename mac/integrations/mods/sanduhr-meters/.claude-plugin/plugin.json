@@ -1,0 +1,29 @@
+{
+  "name": "sanduhr-meters",
+  "version": "0.1.0",
+  "author": { "name": "626Labs LLC" },
+  "description": "Sanduhr's session and weekly meters above the prompt: bars with the pace mark, reset countdowns, a toast when a limit nearly fills or the session resets. Reads only Sanduhr's snapshot.json on this machine.",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "bars": {
+      "type": "string",
+      "title": "Meters",
+      "description": "Which meters the band shows: both, session or weekly.",
+      "options": ["both", "session", "weekly"],
+      "default": "both"
+    },
+    "style": {
+      "type": "string",
+      "title": "Style",
+      "description": "compact: one line. full: a line per meter with pace words and the reset time.",
+      "options": ["compact", "full"],
+      "default": "compact"
+    },
+    "label": {
+      "type": "string",
+      "title": "Label",
+      "description": "A name shown before the meters, for your eyes only (the snapshot never names the account). Empty shows none.",
+      "default": ""
+    }
+  }
+}

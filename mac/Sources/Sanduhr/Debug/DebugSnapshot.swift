@@ -26,6 +26,9 @@ struct DebugStateInput {
     var menuBar = MenuBarMode.higher
     var settingsOpen = false
     var settingsSection: SettingsSection?
+    /// The Claude Usage page (item 48) shows, and its tab. Never a label, project or number.
+    var usagePageOpen = false
+    var usageTab = UsageTab.overview
     var meters: [DeskMeterRow] = []
     /// The widget's tiers drawing red with a glow (MeterWarning), in display order.
     var widgetWarnings: [Tier] = []
@@ -47,7 +50,7 @@ struct DebugStateInput {
     var activeTool: String?
     var pacingPinned = false
     var pulseCount = 0
-    /// Notch glows fired so far, and the three Glow switches.
+    /// Notch glows fired so far, and the Glow switches.
     var glowCount = 0
     /// What the last glow outlined: island, plain (the hardware notch alone) or none yet.
     var glowShape = NotchGlowShape.none
@@ -59,6 +62,25 @@ struct DebugStateInput {
     /// The active account as snapshot.json names it (AccountRef), never its label.
     var accountRef: String?
     var accountsCount = 0
+    /// The active account's Meter history: 30 days, or 0 when off (MeterHistory). No label.
+    var historyDays = MeterHistory.days
+    /// The active account's data choices (AccountData): values and whether a folder is linked,
+    /// never the folder's path or the label.
+    var accountData = AccountDataChoices.defaults
+    /// Live Claude Code activity (item 45): whether the shown account's folder is read, and the
+    /// events counted since the last refresh. Never a path, a project or a model.
+    var localActivityReading = false
+    var localActivityEvents = 0
+    /// The vault (item 46) for the active account: recording, months kept, whether the last
+    /// cycle completed. Never a path, a project, an id or the label.
+    var vault = VaultState()
+    /// Claude Code folders holding Sanduhr's MCP server, statusline (item 49) and meters mod
+    /// (item 50) entries. Counts only, never a path.
+    var mcpInstalled = 0
+    var statuslineInstalled = 0
+    var metersInstalled = 0
+    /// …and the Claude Code hooks for the notch glow (item 51).
+    var hooksInstalled = 0
     /// Follow the account I'm using, and whether a manual switch is pausing it. Never labels.
     var follow = false
     var followPaused = false
@@ -67,7 +89,38 @@ struct DebugStateInput {
     var build = ""
 }
 
-enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
+enum DebugState {
+    /// `data:` (item 44): the active account's choices, and `folder_linked` instead of the path.
+    static func accountDataYAML(_ c: AccountDataChoices) -> YAMLNode {
+        .map([YAMLPair("activity", .string(c.activity.rawValue)),
+              YAMLPair("names", .string(c.names.rawValue)),
+              YAMLPair("share", .string(c.share.rawValue)),
+              YAMLPair("folder_linked", .bool(c.folder != nil))])
+    }
+
+    /// `local_activity:` (item 45): counts only.
+    static func localActivityYAML(reading: Bool, events: Int) -> YAMLNode {
+        .map([YAMLPair("reading", .bool(reading)), YAMLPair("events", .int(events))])
+    }
+
+    /// `usage_page:` (item 48): open and the tab, nothing it shows.
+    static func usagePageYAML(open: Bool, tab: UsageTab) -> YAMLNode {
+        .map([YAMLPair("open", .bool(open)), YAMLPair("tab", .string(tab.rawValue))])
+    }
+
+    /// `integrations:` (items 49 to 51): counts of folders, never a path.
+    static func integrationsYAML(mcp: Int, statusline: Int, meters: Int = 0, hooks: Int = 0) -> YAMLNode {
+        .map([YAMLPair("mcp_installed", .int(mcp)), YAMLPair("statusline_installed", .int(statusline)),
+              YAMLPair("meters_installed", .int(meters)), YAMLPair("hooks_installed", .int(hooks))])
+    }
+
+    /// `vault:` (item 46): flags and a count only.
+    static func vaultYAML(_ v: VaultState) -> YAMLNode {
+        .map([YAMLPair("recording", .bool(v.recording)), YAMLPair("months", .int(v.months)),
+              YAMLPair("last_ingest_ok", .bool(v.lastIngestOK))])
+    }
+
+    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         // Built in typed steps: one literal holding the whole map is more than Swift 6.0 and 6.1
         // will type-check in reasonable time.
         let iso = ISO8601DateFormatter()
@@ -90,6 +143,7 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("settings_open", .bool(s.settingsOpen)))
         let section: YAMLNode = s.settingsSection.map { .string($0.rawValue) } ?? .null
         pairs.append(("settings_section", section))
+        pairs.append(("usage_page", usagePageYAML(open: s.usagePageOpen, tab: s.usageTab)))
         pairs.append(("meters", .list(meters)))
         let widgetWarnings: [YAMLNode] = s.widgetWarnings.map { .string($0.rawValue) }
         pairs.append(("widget_warnings", .list(widgetWarnings)))
@@ -115,11 +169,20 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("glow_alerts", .bool(s.glowSwitches.alerts)))
         pairs.append(("glow_meetings", .bool(s.glowSwitches.meetings)))
         pairs.append(("glow_camera", .bool(s.glowSwitches.camera)))
+        pairs.append(("glow_claude_waiting", .bool(s.glowSwitches.claudeWaiting)))
+        pairs.append(("glow_claude_done", .bool(s.glowSwitches.claudeDone)))
         pairs.append(("theme", .string(s.theme)))
         pairs.append(("menu", .list(menu)))
         pairs.append(("credentials_store", .string(s.credentialsStore.rawValue)))
         pairs.append(("account_ref", s.accountRef.map(YAMLNode.string) ?? .null))
         pairs.append(("accounts_count", .int(s.accountsCount)))
+        pairs.append(("history_days", .int(s.historyDays)))
+        pairs.append(("data", accountDataYAML(s.accountData)))
+        pairs.append(("local_activity", localActivityYAML(reading: s.localActivityReading,
+                                                          events: s.localActivityEvents)))
+        pairs.append(("vault", vaultYAML(s.vault)))
+        pairs.append(("integrations", integrationsYAML(mcp: s.mcpInstalled, statusline: s.statuslineInstalled,
+                                                                meters: s.metersInstalled, hooks: s.hooksInstalled)))
         pairs.append(("follow", .bool(s.follow)))
         pairs.append(("follow_paused", .bool(s.followPaused)))
         pairs.append(("version", .string(s.version)))

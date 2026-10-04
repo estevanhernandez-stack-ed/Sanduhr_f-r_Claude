@@ -51,17 +51,23 @@ actor ClaudeAPI {
 
     /// Two-step fetch (orgs → usage), mirroring sanduhr.py:145-152.
     func getUsage() async throws -> UsageResponse {
-        if orgID == nil {
-            let url = Self.base.appendingPathComponent("organizations")
-            let orgs: [Organization] = try await getJSON(url)
-            guard let org = Organization.tracked(in: orgs) else { throw APIError.noOrganizations }
-            orgID = org.uuid
-        }
+        let org = try await organizationID()
         let url = Self.base
             .appendingPathComponent("organizations")
-            .appendingPathComponent(orgID!)
+            .appendingPathComponent(org)
             .appendingPathComponent("usage")
         return try await getJSON(url)
+    }
+
+    /// The organization this client tracks (`Organization.tracked`), fetched once per client. The
+    /// Data section compares it in memory with a Claude Code folder's; never stored or logged.
+    func organizationID() async throws -> String {
+        if let orgID { return orgID }
+        let url = Self.base.appendingPathComponent("organizations")
+        let orgs: [Organization] = try await getJSON(url)
+        guard let org = Organization.tracked(in: orgs) else { throw APIError.noOrganizations }
+        orgID = org.uuid
+        return org.uuid
     }
 
     // MARK: Internal

@@ -1,7 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// What can make the notch island glow: Sanduhr's own events, never another app's.
+/// What can make the notch island glow: Sanduhr's own events, and Claude Code's hooks telling
+/// it a session waits or finished (item 51, `ClaudeCodeEvent`).
 enum NotchGlowEvent: Equatable {
     /// An alert went out, whatever its delivery (banner, Desk pulse or both).
     case alert
@@ -11,7 +12,11 @@ enum NotchGlowEvent: Equatable {
     case cameraLightOn
 
     /// The switch that governs it, which is also the debug action's argument.
-    enum Kind: String, CaseIterable { case alert, meeting, camera }
+    enum Kind: String, CaseIterable {
+        case alert, meeting, camera
+        case claudeWaiting = "claude-waiting"
+        case claudeDone = "claude-done"
+    }
 
     var kind: Kind {
         switch self {
@@ -22,26 +27,40 @@ enum NotchGlowEvent: Equatable {
     }
 }
 
-/// The three switches in Settings, Desk, Notch, Glow. All off by default.
+/// The switches in Settings, Desk, Notch, Glow. Every event's switch is off by default; "Not
+/// while a terminal is in front" (Claude Code's events only) is on.
 struct NotchGlowSwitches: Equatable {
     static let alertsKey = "notchGlowAlerts"
     static let meetingsKey = "notchGlowMeetings"
     static let cameraKey = "notchGlowCamera"
+    static let claudeWaitingKey = "notchGlowClaudeWaiting"
+    static let claudeDoneKey = "notchGlowClaudeDone"
+    static let claudeSkipTerminalKey = "notchGlowClaudeSkipTerminal"
 
     var alerts = false
     var meetings = false
     var camera = false
+    var claudeWaiting = false
+    var claudeDone = false
+    var claudeSkipTerminal = true
 
-    init(alerts: Bool = false, meetings: Bool = false, camera: Bool = false) {
+    init(alerts: Bool = false, meetings: Bool = false, camera: Bool = false,
+         claudeWaiting: Bool = false, claudeDone: Bool = false, claudeSkipTerminal: Bool = true) {
         self.alerts = alerts
         self.meetings = meetings
         self.camera = camera
+        self.claudeWaiting = claudeWaiting
+        self.claudeDone = claudeDone
+        self.claudeSkipTerminal = claudeSkipTerminal
     }
 
     init(_ d: DefaultsStore) {
         alerts = d.bool(forKey: Self.alertsKey)
         meetings = d.bool(forKey: Self.meetingsKey)
         camera = d.bool(forKey: Self.cameraKey)
+        claudeWaiting = d.bool(forKey: Self.claudeWaitingKey)
+        claudeDone = d.bool(forKey: Self.claudeDoneKey)
+        claudeSkipTerminal = d.object(forKey: Self.claudeSkipTerminalKey) as? Bool ?? true
     }
 
     func isOn(_ kind: NotchGlowEvent.Kind) -> Bool {
@@ -49,6 +68,8 @@ struct NotchGlowSwitches: Equatable {
         case .alert: alerts
         case .meeting: meetings
         case .camera: camera
+        case .claudeWaiting: claudeWaiting
+        case .claudeDone: claudeDone
         }
     }
 }
@@ -171,10 +192,20 @@ enum NotchGlowLayout {
     // MARK: The plain notch
 
     /// What a glow outlines: the extended island while Desk draws it, else the hardware notch
-    /// itself when a screen has one (whether or not Desk runs), else nothing.
-    static func shape(deskRunning: Bool, notchOn: Bool, hasIsland: Bool, hasNotch: Bool) -> NotchGlowShape {
+    /// itself when a screen has one (whether or not Desk runs), else, for a glow that asks for it
+    /// (Claude Code's), a notch-wide spot at the top center as the camera light uses, else nothing.
+    static func shape(deskRunning: Bool, notchOn: Bool, hasIsland: Bool, hasNotch: Bool,
+                      topFallback: Bool = false) -> NotchGlowShape {
         if deskRunning, notchOn, hasIsland { return .island }
-        return hasNotch ? .plain : .none
+        if hasNotch { return .plain }
+        return topFallback ? .top : .none
+    }
+
+    /// The spot a top-center glow outlines on a screen without a notch, in points from the
+    /// screen's top-left corner: the camera light's notch-wide core, the menu bar's height.
+    static func topSpot(screenWidth: CGFloat, barHeight: CGFloat) -> CGRect {
+        let w = CameraLightLayout.noNotchWidth
+        return CGRect(x: (screenWidth - w) / 2, y: 0, width: w, height: max(barHeight, 1))
     }
 
     /// The plain notch's glow window, flush with the screen's top: the notch (points from the
@@ -243,6 +274,8 @@ enum NotchGlowShape: String {
     case island
     /// The hardware notch alone: the island is off, or Desk is not running.
     case plain
+    /// No notch: a notch-wide spot at the top center, for Claude Code's glows (item 51).
+    case top
     /// No notched screen (or no glow yet): nothing drawn.
     case none
 }
@@ -324,7 +357,8 @@ private final class NotchGlowContainer: NSView {
 }
 
 /// The notch glows for Sanduhr's events (Settings, Desk, Notch, Glow): an alert, a meeting a
-/// minute out, the camera light coming on, and every Desk pulse (forced). A gentle halo in the
+/// minute out, the camera light coming on, Claude Code waiting or finished (item 51), and every
+/// Desk pulse (forced). A gentle halo in the
 /// notch ink, about three seconds, in its own click-through window: around the island while Desk
 /// runs with the island on, else around the plain hardware notch, whenever Sanduhr runs on a Mac
 /// with a notched screen.
@@ -344,6 +378,8 @@ final class NotchGlowController {
     private var meetingTimer: Timer?
     /// Bumped on every glow, so an older glow's fade-out cannot end a newer one.
     private var generation = 0
+    /// Claude Code's glows so far, for the rate limit.
+    private var claudeLimiter = ClaudeCodeGlowLimiter()
 
     var switches: NotchGlowSwitches { NotchGlowSwitches(UserDefaults.desk) }
 
@@ -368,6 +404,16 @@ final class NotchGlowController {
         if NotchGlowRules.decide(event, switches: switches, memory: &memory, now: Date()) { fire() }
     }
 
+    /// Claude Code's hook opened `sanduhr://claude-code?event=…` (item 51): glow when its switch
+    /// is on, no terminal is in front (when that option is on) and the rate limit allows. Screens
+    /// without a notch get the glow at the top center.
+    func claudeCode(_ event: ClaudeCodeEvent) {
+        let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        guard ClaudeCodeGlowRules.decide(event, switches: switches, frontmost: front,
+                                         limiter: &claudeLimiter, now: Date()) else { return }
+        fire(topFallback: true)
+    }
+
     private func checkMeetings() {
         let desk = DeskController.shared
         guard desk.running else { return }
@@ -376,14 +422,16 @@ final class NotchGlowController {
     }
 
     /// Glows once, whatever the switches (a Desk pulse and the debug action call this directly).
-    func fire() {
+    /// With `topFallback`, a Mac with no notched screen glows at the top center of the main
+    /// screen instead of not at all.
+    func fire(topFallback: Bool = false) {
         count += 1
         let desk = DeskController.shared
         let notchOn = UserDefaults.desk.bool(forKey: DeskController.notchKey)
         let screen = Self.notchedScreen()
         let shape = NotchGlowLayout.shape(deskRunning: desk.running, notchOn: notchOn,
                                           hasIsland: desk.wingsWindow != nil && desk.model.notchRect != nil,
-                                          hasNotch: screen != nil)
+                                          hasNotch: screen != nil, topFallback: topFallback)
         let frame: CGRect
         let content: AnyView
         switch shape {
@@ -405,6 +453,15 @@ final class NotchGlowController {
             let cut = NotchGlowLayout.plainCutout(notch: notch)
             content = AnyView(NotchHaloView(width: cut.width, height: cut.height,
                                             radius: NotchGlowLayout.plainRadius(notchHeight: notch.height)))
+        case .top:
+            guard let main = NSScreen.main ?? NSScreen.screens.first else { return }
+            // A hidden menu bar leaves no inset: use the bar's usual thickness.
+            let inset = main.frame.maxY - main.visibleFrame.maxY
+            let bar = inset > 0 ? inset : NSStatusBar.system.thickness
+            let spot = NotchGlowLayout.topSpot(screenWidth: main.frame.width, barHeight: bar)
+            frame = NotchGlowLayout.plainFrame(screen: main.frame, notch: spot)
+            content = AnyView(NotchHaloView(width: spot.width, height: spot.height,
+                                            radius: NotchGlowLayout.plainRadius(notchHeight: spot.height)))
         case .none:
             return
         }

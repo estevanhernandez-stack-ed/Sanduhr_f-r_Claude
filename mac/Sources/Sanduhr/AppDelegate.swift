@@ -121,15 +121,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         CameraLightController.shared.apply()
         // The notch glow checks for meetings a minute out while its meetings switch is on.
         NotchGlowController.shared.apply()
+        // Claude Code integrations (item 49): where they are installed, this version's scripts
+        // replace the last one's (a new stamped folder, the link swapped). No install, no write.
+        Task.detached(priority: .utility) { IntegrationScripts.standard.refreshIfInstalled() }
     }
 
     /// estedesk:// and sanduhr:// links (Option+J joins the next meeting, …/settings opens
     /// Sanduhr Settings). sanduhr://debug/… goes to the smoke tools' hooks, which ignore it
-    /// unless they are switched on (DebugGate).
+    /// unless they are switched on (DebugGate). sanduhr://claude-code?event=… comes from Claude
+    /// Code's hooks (item 51) and is public: it carries only an event, and anything else on that
+    /// host is dropped.
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
             if DebugLink.isDebug(url) {
                 DebugHooks.handle(url, app: self)
+            } else if ClaudeCodeLink.isClaudeCode(url) {
+                if let event = ClaudeCodeLink.event(url) { NotchGlowController.shared.claudeCode(event) }
             } else if ["estedesk", "sanduhr"].contains(url.scheme ?? "") {
                 DeskController.shared.handle(url)
             }
@@ -461,6 +468,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .deepWork: toggleTool(.deepWork, visible: visible)
         case .snake: toggleTool(.snake, visible: visible)
         case .cameraLight: CameraLightController.shared.toggleManual()
+        case .usage: SettingsWindowController.shared.show(.usage)
         case .pacing:
             if viewModel.pacingPinned && visible {
                 viewModel.pacingPinned = false

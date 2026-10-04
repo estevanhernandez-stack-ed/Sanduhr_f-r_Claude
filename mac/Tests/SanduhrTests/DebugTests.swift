@@ -68,6 +68,10 @@ struct DebugLinkTests {
         #expect(parse("sanduhr://debug/action?name=theme&arg=match-desk").command == .action(.theme("match-desk"), dir: nil))
         #expect(parse("sanduhr://debug/action?name=theme&arg=Obsidian").command == .action(.theme("obsidian"), dir: nil))
         #expect(parse("sanduhr://debug/action?name=account&arg=next").command == .action(.cycleAccount, dir: nil))
+        #expect(parse("sanduhr://debug/action?name=usage").command == .action(.usage(.overview), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=usage&arg=Sessions").command == .action(.usage(.sessions), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=usage&arg=trends").command == .action(.usage(.trends), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=settings&arg=usage").command == .action(.settings(.usage), dir: nil))
     }
 
     @Test func badActionsKeepTheDirForTheError() {
@@ -77,7 +81,8 @@ struct DebugLinkTests {
         #expect(r.error?.hasPrefix("unknown action: explode") == true)
         #expect(parse("sanduhr://debug/action?name=desk").error == "desk needs arg=on or arg=off")
         #expect(parse("sanduhr://debug/action?name=camera-light").error == "camera-light needs arg=on or arg=off")
-        #expect(parse("sanduhr://debug/action?name=glow&arg=sound").error == "glow needs arg=alert, meeting or camera")
+        #expect(parse("sanduhr://debug/action?name=glow&arg=sound").error == "glow needs arg=alert, meeting, camera, claude-waiting or claude-done")
+        #expect(parse("sanduhr://debug/action?name=usage&arg=ledger").error == "usage needs arg=overview, trends or sessions")
         #expect(parse("sanduhr://debug/action?name=theme").error == "theme needs arg=<theme id>")
         // Only cycling: no hook adds, renames, signs out or removes an account.
         #expect(parse("sanduhr://debug/action?name=account").error == "account needs arg=next")
@@ -88,6 +93,20 @@ struct DebugLinkTests {
         #expect(parse("sanduhr://debug/action").error == "action needs name=<action>")
         #expect(parse("sanduhr://debug/launch").error == "unknown debug command: launch")
         #expect(parse("sanduhr://debug").error == "no debug command")
+    }
+}
+
+@Suite("Claude Usage page state")
+struct UsagePageStateTests {
+    @Test func stateYAMLSaysOpenAndTabOnly() {
+        let yaml = YAMLEmitter.emit(.object([("usage_page", DebugState.usagePageYAML(open: true, tab: .sessions))]))
+        #expect(yaml == "usage_page:\n  open: true\n  tab: sessions\n")
+        #expect(UsageTab.allCases.map(\.rawValue) == ["overview", "trends", "sessions"])
+    }
+
+    @Test func stateYAMLCountsIntegrationsWithoutPaths() {
+        let yaml = YAMLEmitter.emit(.object([("integrations", DebugState.integrationsYAML(mcp: 2, statusline: 1, meters: 3, hooks: 4))]))
+        #expect(yaml == "integrations:\n  mcp_installed: 2\n  statusline_installed: 1\n  meters_installed: 3\n  hooks_installed: 4\n")
     }
 }
 
@@ -250,15 +269,15 @@ struct DebugStateTests {
             .map { String($0.split(separator: ":")[0]) }
         #expect(keys == ["desk_enabled", "desk_running", "layout", "notch", "has_notch",
                          "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "widget_visible", "widget_visibility",
-                         "menu_bar", "settings_open", "settings_section", "meters", "widget_warnings", "hidden_limits",
+                         "menu_bar", "settings_open", "settings_section", "usage_page", "meters", "widget_warnings", "hidden_limits",
                          "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
-                         "glow_camera", "theme", "menu", "credentials_store", "account_ref", "accounts_count",
-                         "follow", "follow_paused", "version", "build"])
-        #expect(yaml.contains("settings_section: notch\n"))
+                         "glow_camera", "glow_claude_waiting", "glow_claude_done", "theme", "menu", "credentials_store", "account_ref", "accounts_count", "history_days", "data",
+                         "local_activity", "vault", "integrations", "follow", "follow_paused", "version", "build"])
+        #expect(yaml.contains("settings_section: notch\nusage_page:\n  open: false\n  tab: overview\nmeters:"))
         #expect(yaml.contains("widget_visible: true\nwidget_visibility: whileDeskOff\nmenu_bar: rotate\nsettings_open: true\n"))
         #expect(yaml.contains("notch_left: meetingOrTime\nnotch_right: message\nnotch_strip: meetingOrMeters\ncamera_in_use: false\ncamera_light: true\n"))
-        #expect(yaml.contains("pulse_count: 3\nglow_count: 2\nglow_shape: plain\nglow_alerts: true\nglow_meetings: false\nglow_camera: true\ntheme: aurora\nmenu:\n"))
+        #expect(yaml.contains("pulse_count: 3\nglow_count: 2\nglow_shape: plain\nglow_alerts: true\nglow_meetings: false\nglow_camera: true\nglow_claude_waiting: false\nglow_claude_done: false\ntheme: aurora\nmenu:\n"))
         #expect(yaml.contains("layout: message:tl") == false)   // the colons force quotes
         #expect(yaml.contains("layout: \"message:tl clock:bl meters:bl meetings:bl\"\n"))
         #expect(yaml.contains("""
@@ -274,7 +293,7 @@ struct DebugStateTests {
         """))
         #expect(yaml.contains("    pace: null\n"))
         #expect(yaml.contains("last_fetch: \"1970-01-01T00:00:00Z\"\n"))
-        #expect(yaml.contains("credentials_store: file\naccount_ref: null\naccounts_count: 0\nfollow: false\nfollow_paused: false\nversion: \"2.1.0\"\n"))
+        #expect(yaml.contains("credentials_store: file\naccount_ref: null\naccounts_count: 0\nhistory_days: 30\ndata:\n  activity: \"off\"\n  names: names\n  share: \"off\"\n  folder_linked: false\nlocal_activity:\n  reading: false\n  events: 0\nvault:\n  recording: false\n  months: 0\n  last_ingest_ok: false\nintegrations:\n  mcp_installed: 0\n  statusline_installed: 0\n  meters_installed: 0\n  hooks_installed: 0\nfollow: false\nfollow_paused: false\nversion: \"2.1.0\"\n"))
         #expect(yaml.contains("version: \"2.1.0\"\nbuild: \"3\"\n"))
         #expect(yaml.contains("""
           - header: Tools

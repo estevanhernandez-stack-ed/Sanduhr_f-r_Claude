@@ -39,10 +39,12 @@ enum DebugAction: Equatable {
     /// The next account, as the widget's chip cycles it. Safe: nothing is added, signed out or
     /// removed, and no hook can do those.
     case cycleAccount
+    /// Settings at the Claude Usage page (item 48), on a tab. Reads only; erases nothing.
+    case usage(UsageTab)
 
     static let names = ["show-widget", "hide-widget", "settings", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
-                        "theme", "account"]
+                        "theme", "account", "usage"]
 }
 
 enum DebugCommand: Equatable {
@@ -128,7 +130,7 @@ enum DebugLink {
         case "glow":
             guard let arg else { return .success(.glow(.alert)) }
             guard let kind = NotchGlowEvent.Kind(rawValue: arg.lowercased()) else {
-                return bad("glow needs arg=alert, meeting or camera")
+                return bad("glow needs arg=alert, meeting, camera, claude-waiting or claude-done")
             }
             return .success(.glow(kind))
         case "theme":
@@ -137,6 +139,12 @@ enum DebugLink {
         case "account":
             guard arg?.lowercased() == "next" else { return bad("account needs arg=next") }
             return .success(.cycleAccount)
+        case "usage":
+            guard let arg else { return .success(.usage(.overview)) }
+            guard let tab = UsageTab(rawValue: arg.lowercased()) else {
+                return bad("usage needs arg=overview, trends or sessions")
+            }
+            return .success(.usage(tab))
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }

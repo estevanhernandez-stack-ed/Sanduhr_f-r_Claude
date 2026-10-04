@@ -152,8 +152,29 @@ final class UsageViewModel {
     var shownHistory: HistoryStore.History {
         switchVeil && usage == nil ? departingHistory ?? history : history
     }
-    /// The active account's sparkline history.
-    var history: HistoryStore.History = HistoryStore.load(account: KeychainStore.accounts.active)
+    /// The active account's sparklines: the recent window of its history (HistoryStore.sparklines),
+    /// never the 30 days on file.
+    var history: HistoryStore.History = HistoryStore.sparklines(HistoryStore.load(account: KeychainStore.accounts.active))
+    /// The accounts whose Meter history is off (MeterHistory), as Settings, Accounts shows them.
+    private(set) var historyOffAccounts: Set<String> = Set(MeterHistory.offLabels(in: KeychainStore.accounts.defaults))
+    /// Every account's data choices (AccountData), as Settings, Accounts, Data shows them. Holds
+    /// linked folder paths: never logged or written to state.yaml.
+    private(set) var accountDataChoices: [String: AccountDataChoices] = AccountData.allChoices(in: KeychainStore.accounts.defaults)
+    /// Live Claude Code activity (item 45): the tokens the shown account's linked folder used
+    /// since the last meter refresh, by tier, for the cards' "+Nk". Zero after each refresh, grown
+    /// by the 30-second scans; empty when its activity is Not tracked or no folder is linked.
+    private(set) var localBurn = LocalBurn()
+    /// Whether the shown account's folder is being read (state.yaml `local_activity.reading`).
+    private(set) var localActivityReading = false
+    @ObservationIgnored private let localBurnSource = LocalBurnSource()
+    @ObservationIgnored private var localScanRunning = false
+    @ObservationIgnored private var localScanPending = false
+    /// The vault (item 46): records Claude Code activity for every account that keeps one, off
+    /// the main thread, at launch, after each refresh and when a choice changes.
+    @ObservationIgnored let vault = VaultService.standard
+    /// Bumped after each ingest cycle and each erase from the Claude Usage page, so the page
+    /// reloads what the record now holds.
+    private(set) var vaultCycles = 0
     /// The accounts in list order and the active one, as the Accounts page, the menus and the
     /// widget chip show them. Read from the registry's defaults (never the Keychain) and kept
     /// current by every account change here (`reloadAccounts`).
@@ -284,11 +305,18 @@ final class UsageViewModel {
         follower.onSwitch = { [weak self] label in self?.switchAccount(to: label, automatic: true) }
         follower.onReadings = { [weak self] in self?.refreshInUse() }
         follower.apply(enabled: followEnabled)
+        vault.onCycleEnd = { [weak self] in
+            Task { @MainActor in self?.vaultCycles += 1 }
+        }
     }
 
     /// Called once the app has a window + a session key.
     /// Checks `exists()` first so a first launch goes straight to onboarding.
     func bootstrap() {
+        // The record keeps up for every recording account, signed in or not.
+        vault.trigger()
+        // The access file as this launch's choices say, before any tool call can read it.
+        reloadAccounts()
         guard KeychainStore.exists(account: KeychainAccount.sessionKey) else {
             status = .connecting     // onboarding sheet will drive the next step
             return
@@ -306,7 +334,7 @@ final class UsageViewModel {
         reloadAccounts()
         guard connect() else { return }
         // The first key saved creates Personal, whose history may be the upgrade's.
-        history = HistoryStore.load(account: apiAccount)
+        history = HistoryStore.sparklines(HistoryStore.load(account: apiAccount))
         Task { await refresh() }
         startTimers()
     }
@@ -355,7 +383,10 @@ final class UsageViewModel {
     @discardableResult
     func removeAccount(_ label: String) -> SignOutResult {
         let wasActive = label == KeychainStore.accounts.active
+        let folder = dataChoices(for: label).folder
         let result = KeychainStore.remove(label: label)
+        // Removing forgets the account's choices (the tombstone), so its record can go.
+        if let folder { vault.erase(folder: folder) }
         follower.forget(label)
         if wasActive { showActiveAccount(leaving: accountLabel) } else { reloadAccounts() }
         refreshInUse()
@@ -370,6 +401,140 @@ final class UsageViewModel {
         reloadAccounts()
         refreshInUse()
         onUsageUpdate?()
+    }
+
+    /// Settings, Accounts, Meter history (item 43): Off stops recording the account's meters from
+    /// its next fetch; what was kept stays until `eraseHistory`. 30 days records again.
+    func setMeterHistory(_ label: String, on: Bool) {
+        MeterHistory.set(on, for: label, in: KeychainStore.accounts.defaults)
+        reloadAccounts()
+        onUsageUpdate?()
+    }
+
+    /// Deletes the account's history file (after the confirmation Off offers). The active
+    /// account's sparklines empty at once.
+    func eraseHistory(_ label: String) {
+        HistoryStore.Files.standard.delete(label)
+        if label == KeychainStore.accounts.active { history = [:] }
+        onUsageUpdate?()
+    }
+
+    // MARK: Data choices (item 44)
+
+    /// An account's data choices, the defaults until one is made.
+    func dataChoices(for label: String) -> AccountDataChoices {
+        accountDataChoices[label] ?? .defaults
+    }
+
+    /// Settings, Accounts, Data: activity (items 45 and 46), project names (item 46) and sharing
+    /// (item 47, through `mcp-access.json`).
+    func setActivity(_ value: ActivityChoice, for label: String) {
+        AccountData.setActivity(value, for: label, in: KeychainStore.accounts.defaults)
+        reloadAccounts()
+    }
+
+    func setProjectNames(_ value: ProjectNamesChoice, for label: String) {
+        AccountData.setNames(value, for: label, in: KeychainStore.accounts.defaults)
+        reloadAccounts()
+    }
+
+    func setShare(_ value: ShareChoice, for label: String) {
+        AccountData.setShare(value, for: label, in: KeychainStore.accounts.defaults)
+        reloadAccounts()
+    }
+
+    // MARK: The record (item 46)
+
+    /// Whether Sanduhr holds a record of the folder (any account's, kept until erased).
+    func hasRecord(folder: String) -> Bool {
+        vault.hasRecord(folder: folder)
+    }
+
+    /// Deletes the record of a folder no account records any more (the caller turned Keep a
+    /// record off or unlinked it first: the choice is the tombstone). Off the main thread.
+    func eraseRecord(folder: String) {
+        vault.erase(folder: folder)
+    }
+
+    /// Erase from the Claude Usage page's list of records (item 48), by vault id, so a record
+    /// whose folder no account links any more can go too. An account still keeping this record
+    /// switches to Live only first (item 46's order: the choice is the tombstone), then the
+    /// record is deleted off the main thread; `done` gets whether it is gone.
+    func eraseRecord(id: String, done: (@MainActor (Bool) -> Void)? = nil) {
+        let defaults = KeychainStore.accounts.defaults
+        var changed = false
+        for (label, c) in AccountData.allChoices(in: defaults) where c.activity == .record {
+            guard let folder = c.folder, VaultFolderID.of(folder) == id else { continue }
+            AccountData.setActivity(.live, for: label, in: defaults)
+            changed = true
+        }
+        if changed { reloadAccounts() }
+        vault.erase(id: id) { [weak self] ok in
+            Task { @MainActor in
+                self?.vaultCycles += 1
+                done?(ok)
+            }
+        }
+    }
+
+    /// Erase this account's data: its meter history and its Claude Code record. Keep a record
+    /// becomes Live only first, so a cycle can't bring the record back.
+    func eraseAccountData(_ label: String) {
+        let choices = dataChoices(for: label)
+        if choices.activity == .record {
+            AccountData.setActivity(.live, for: label, in: KeychainStore.accounts.defaults)
+            reloadAccounts()
+        }
+        eraseHistory(label)
+        if let folder = choices.folder { vault.erase(folder: folder) }
+    }
+
+    /// Links a Claude Code folder to the account. A folder linked to another account is moved
+    /// only with `move` (after the page's confirmation); otherwise nothing changes.
+    @discardableResult
+    func linkFolder(_ path: String, to label: String, move: Bool = false) -> AccountData.LinkOutcome {
+        let outcome = AccountData.link(path, to: label, move: move, in: KeychainStore.accounts.defaults)
+        reloadAccounts()
+        return outcome
+    }
+
+    func unlinkFolder(_ label: String) {
+        AccountData.unlink(label, in: KeychainStore.accounts.defaults)
+        reloadAccounts()
+    }
+
+    /// The account another account's folder is linked to, for the move confirmation.
+    func account(linkedTo path: String) -> String? {
+        AccountData.account(linkedTo: path, in: KeychainStore.accounts.defaults)
+    }
+
+    /// The found folder signed in to the account's organization, if exactly one is and it is not
+    /// another account's. The account's organization comes from its client (the active one's,
+    /// already fetched) or from one `/organizations` request with its key; the folders' from
+    /// their `.claude.json`, one field. Both uuids are compared here and dropped: never stored,
+    /// returned or logged.
+    func suggestedFolder(for label: String, among folders: [ClaudeCodeFolders.Folder],
+                         home: String) async -> ClaudeCodeFolders.Folder? {
+        guard !folders.isEmpty else { return nil }
+        let defaults = KeychainStore.accounts.defaults
+        let elsewhere = Set(folders.filter { f in
+            AccountData.account(linkedTo: f.path, in: defaults).map { $0 != label } ?? false
+        }.map(\.path))
+        guard folders.contains(where: { !elsewhere.contains($0.path) }),
+              let organization = await organization(of: label) else { return nil }
+        return await Task.detached(priority: .userInitiated) {
+            ClaudeCodeFolders.suggestion(among: folders, organization: organization,
+                                         isLinkedElsewhere: { elsewhere.contains($0.path) },
+                                         organizationOf: { ClaudeCodeFolders.organizationUuid(of: $0.path, home: home) })
+        }.value
+    }
+
+    /// The organization the account fetches (item 35's choice), nil without a key or on a failure.
+    private func organization(of label: String) async -> String? {
+        if label == apiAccount, let api { return try? await api.organizationID() }
+        let creds = KeychainStore.accounts.credentials(for: label)
+        guard let key = creds.sessionKey, !key.isEmpty else { return nil }
+        return try? await ClaudeAPI(sessionKey: key, cfClearance: creds.cfClearance).organizationID()
     }
 
     /// Settings, Accounts, Add Account: a new account with its key, at the end of the list. It
@@ -408,6 +573,19 @@ final class UsageViewModel {
         if active != activeAccount { activeAccount = active }
         let signedIn = Self.signedIn(accounts)
         if signedIn != signedInAccounts { signedInAccounts = signedIn }
+        let off = Set(MeterHistory.offLabels(in: accounts.defaults))
+        if off != historyOffAccounts { historyOffAccounts = off }
+        let data = AccountData.allChoices(in: accounts.defaults)
+        if data != accountDataChoices {
+            accountDataChoices = data
+            // Activity or the linked folder may have changed: read, stop reading or switch folder,
+            // and start (or catch up) a record that was just asked for.
+            refreshLocalBurn()
+            vault.trigger()
+        }
+        // What the MCP server may read follows every change to choices, links, the account list
+        // and the active account (item 47). Rewritten only when its bytes change.
+        MCPAccess.sync(labels: labels, active: active, choices: data)
     }
 
     nonisolated private static func signedIn(_ accounts: AccountRegistry) -> Set<String> {
@@ -526,7 +704,7 @@ final class UsageViewModel {
             Notifier.shared.resetForSwitch()
             reloadAccounts()
             let active = KeychainStore.accounts.active
-            history = active.map { HistoryStore.load(account: $0) } ?? [:]
+            history = active.map { HistoryStore.sparklines(HistoryStore.load(account: $0)) } ?? [:]
             if connect() {
                 status = .switching
                 onUsageUpdate?()
@@ -618,6 +796,7 @@ final class UsageViewModel {
         apiAccount = nil
         usage = nil
         lastUpdated = nil
+        refreshLocalBurn()
     }
 
     // MARK: Timers
@@ -635,7 +814,10 @@ final class UsageViewModel {
         refreshTimer = refresh
         countdownTimer = Timer.scheduledTimer(withTimeInterval: countdownInterval,
                                               repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.countdownTick &+= 1 }
+            Task { @MainActor in
+                self?.countdownTick &+= 1
+                self?.refreshLocalBurn()
+            }
         }
     }
 
@@ -667,15 +849,20 @@ final class UsageViewModel {
         Self.reconcileHidden(u, now: Date())
         self.usage = u
         self.lastUpdated = Date()
+        // A fresh refresh re-anchors the local burn: the badges start again from zero.
+        self.localBurn = LocalBurn()
+        refreshLocalBurn()
+        vault.trigger()
         Notifier.shared.evaluate(u)
         SnapshotWriter.writeOk(u, accountRef: ref)
         follower.recordActive(account, usage: u)
-        for (tier, t) in u.tiers {
-            if let util = t.utilization {
-                HistoryStore.append(tier, utilization: util, account: account)
-            }
+        // One write of the history file per fetch, off the main thread, skipped while the
+        // account's Meter history is off (item 43). The sparklines gain the same points in memory.
+        let readings: [(Tier, Double)] = u.tiers.compactMap { tier, t in t.utilization.map { (tier, $0) } }
+        let now = Date()
+        if HistoryStore.record(readings, account: account, defaults: KeychainStore.accounts.defaults, now: now) {
+            self.history = HistoryStore.sparklines(history, adding: readings, at: now)
         }
-        self.history = HistoryStore.load(account: account)
         self.status = u.tiers.isEmpty ? .noTiers : .idle
         // A switch's new numbers: they fade in.
         endSwitchVeil()
@@ -696,6 +883,50 @@ final class UsageViewModel {
         default:
             status = .error(error.localizedDescription, isAuth: false)
             SnapshotWriter.writeError("network", accountRef: ref)
+        }
+    }
+
+    // MARK: Local Claude Code activity (item 45)
+
+    /// The shown account's data choices (the account the client was built for).
+    private var shownAccountChoices: AccountDataChoices {
+        accountDataChoices[AccountData.label(apiAccount)] ?? .defaults
+    }
+
+    /// Scans the shown account's linked folder for the tokens used since the last refresh, off
+    /// the main thread and one scan at a time (a request during a scan runs once it ends). With
+    /// activity Not tracked, no folder or no refresh yet, clears the badges and reads nothing.
+    func refreshLocalBurn() {
+        let choices = shownAccountChoices
+        guard let anchor = lastUpdated, let folder = LocalActivity.folder(for: choices) else {
+            localBurnSource.drop()
+            if localBurn != LocalBurn() { localBurn = LocalBurn() }
+            if localActivityReading { localActivityReading = false }
+            return
+        }
+        if !localActivityReading { localActivityReading = true }
+        guard !localScanRunning else {
+            localScanPending = true
+            return
+        }
+        localScanRunning = true
+        let source = localBurnSource
+        let account = apiAccount
+        Task { [weak self] in
+            let burn = await Task.detached(priority: .utility) {
+                source.scan(choices, since: anchor)
+            }.value
+            guard let self else { return }
+            self.localScanRunning = false
+            // A refresh, a switch or a changed choice since the scan began makes it stale.
+            if let burn, self.lastUpdated == anchor, self.apiAccount == account,
+               LocalActivity.folder(for: self.shownAccountChoices) == folder, burn != self.localBurn {
+                self.localBurn = burn
+            }
+            if self.localScanPending {
+                self.localScanPending = false
+                self.refreshLocalBurn()
+            }
         }
     }
 
