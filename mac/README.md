@@ -83,10 +83,11 @@ with the label. The notch stays as it is. A switch never needs a relaunch: the m
 - **Registry.** The labels and the active one are in the app's defaults (`accounts`,
   `activeAccount`), so menus and Settings never touch the Keychain to list them.
 - **History.** One file per account, `history.{label}.json`; the old `history.json` becomes
-  Personal's once. Rename moves the file, Remove deletes it, Sign Out keeps it.
+  Personal's once. Rename moves the file, Remove deletes it, Sign Out keeps it. Each keeps 30
+  days of readings (item 43), unless that account's Meter history is Off (below).
 - **Readers.** `snapshot.json` names the active account by `account_ref` (first 4 bytes of the
   SHA-256 of the label, as on Windows) and is deleted at once on a switch; `state.yaml` has
-  `account_ref`, `accounts_count`, `follow` and `follow_paused`. Labels never go into a log,
+  `account_ref`, `accounts_count`, `history_days`, `follow` and `follow_paused`. Labels never go into a log,
   `snapshot.json` or `state.yaml`.
 
 #### Following the account in use
@@ -132,7 +133,7 @@ Most accounts don't need this.
 - `sessionKey:{label}` + `cf_clearance:{label}` per account → the Keychain, service `com.626labs.sanduhr` (release builds), or `~/Library/Application Support/Sanduhr/credentials.json` (mode `0600`, dev builds); see First run and Accounts above
 - Account labels and the active one → `UserDefaults` (`accounts`, `activeAccount`); following → `followAccount`
 - Selected theme → `UserDefaults` (`theme`)
-- Sparkline history → `~/Library/Application Support/Sanduhr/history.{label}.json`, one per account
+- Meter history → `~/Library/Application Support/Sanduhr/history.{label}.json`, one per account, the Windows format. Each reading is kept 30 days (and at most 8640 points per limit, Windows' cap), trimmed when the next one is written; the sparklines draw the last 24 points (about 2 hours). Settings, Accounts, Meter history: Off stops recording an account (`UserDefaults` `meterHistoryOff`, the labels switched off) and offers to erase its file; Remove Account deletes it. `state.yaml` shows the active account's `history_days` (30, or 0 when off)
 - Window position → `UserDefaults` (`windowFrame`)
 
 ## Controls

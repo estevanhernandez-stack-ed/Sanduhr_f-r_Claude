@@ -152,8 +152,11 @@ final class UsageViewModel {
     var shownHistory: HistoryStore.History {
         switchVeil && usage == nil ? departingHistory ?? history : history
     }
-    /// The active account's sparkline history.
-    var history: HistoryStore.History = HistoryStore.load(account: KeychainStore.accounts.active)
+    /// The active account's sparklines: the recent window of its history (HistoryStore.sparklines),
+    /// never the 30 days on file.
+    var history: HistoryStore.History = HistoryStore.sparklines(HistoryStore.load(account: KeychainStore.accounts.active))
+    /// The accounts whose Meter history is off (MeterHistory), as Settings, Accounts shows them.
+    private(set) var historyOffAccounts: Set<String> = Set(MeterHistory.offLabels(in: KeychainStore.accounts.defaults))
     /// The accounts in list order and the active one, as the Accounts page, the menus and the
     /// widget chip show them. Read from the registry's defaults (never the Keychain) and kept
     /// current by every account change here (`reloadAccounts`).
@@ -306,7 +309,7 @@ final class UsageViewModel {
         reloadAccounts()
         guard connect() else { return }
         // The first key saved creates Personal, whose history may be the upgrade's.
-        history = HistoryStore.load(account: apiAccount)
+        history = HistoryStore.sparklines(HistoryStore.load(account: apiAccount))
         Task { await refresh() }
         startTimers()
     }
@@ -372,6 +375,22 @@ final class UsageViewModel {
         onUsageUpdate?()
     }
 
+    /// Settings, Accounts, Meter history (item 43): Off stops recording the account's meters from
+    /// its next fetch; what was kept stays until `eraseHistory`. 30 days records again.
+    func setMeterHistory(_ label: String, on: Bool) {
+        MeterHistory.set(on, for: label, in: KeychainStore.accounts.defaults)
+        reloadAccounts()
+        onUsageUpdate?()
+    }
+
+    /// Deletes the account's history file (after the confirmation Off offers). The active
+    /// account's sparklines empty at once.
+    func eraseHistory(_ label: String) {
+        HistoryStore.Files.standard.delete(label)
+        if label == KeychainStore.accounts.active { history = [:] }
+        onUsageUpdate?()
+    }
+
     /// Settings, Accounts, Add Account: a new account with its key, at the end of the list. It
     /// is fetched at once when it becomes active: asked for, or the first account there is.
     /// Refusals (`AccountError`) name no label and no value, so their text can be shown as is.
@@ -408,6 +427,8 @@ final class UsageViewModel {
         if active != activeAccount { activeAccount = active }
         let signedIn = Self.signedIn(accounts)
         if signedIn != signedInAccounts { signedInAccounts = signedIn }
+        let off = Set(MeterHistory.offLabels(in: accounts.defaults))
+        if off != historyOffAccounts { historyOffAccounts = off }
     }
 
     nonisolated private static func signedIn(_ accounts: AccountRegistry) -> Set<String> {
@@ -526,7 +547,7 @@ final class UsageViewModel {
             Notifier.shared.resetForSwitch()
             reloadAccounts()
             let active = KeychainStore.accounts.active
-            history = active.map { HistoryStore.load(account: $0) } ?? [:]
+            history = active.map { HistoryStore.sparklines(HistoryStore.load(account: $0)) } ?? [:]
             if connect() {
                 status = .switching
                 onUsageUpdate?()
@@ -670,12 +691,13 @@ final class UsageViewModel {
         Notifier.shared.evaluate(u)
         SnapshotWriter.writeOk(u, accountRef: ref)
         follower.recordActive(account, usage: u)
-        for (tier, t) in u.tiers {
-            if let util = t.utilization {
-                HistoryStore.append(tier, utilization: util, account: account)
-            }
+        // One write of the history file per fetch, off the main thread, skipped while the
+        // account's Meter history is off (item 43). The sparklines gain the same points in memory.
+        let readings: [(Tier, Double)] = u.tiers.compactMap { tier, t in t.utilization.map { (tier, $0) } }
+        let now = Date()
+        if HistoryStore.record(readings, account: account, defaults: KeychainStore.accounts.defaults, now: now) {
+            self.history = HistoryStore.sparklines(history, adding: readings, at: now)
         }
-        self.history = HistoryStore.load(account: account)
         self.status = u.tiers.isEmpty ? .noTiers : .idle
         // A switch's new numbers: they fade in.
         endSwitchVeil()

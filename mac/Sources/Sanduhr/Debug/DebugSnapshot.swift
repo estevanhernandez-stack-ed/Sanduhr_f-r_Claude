@@ -59,6 +59,8 @@ struct DebugStateInput {
     /// The active account as snapshot.json names it (AccountRef), never its label.
     var accountRef: String?
     var accountsCount = 0
+    /// The active account's Meter history: 30 days, or 0 when off (MeterHistory). No label.
+    var historyDays = MeterHistory.days
     /// Follow the account I'm using, and whether a manual switch is pausing it. Never labels.
     var follow = false
     var followPaused = false
@@ -120,6 +122,7 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("credentials_store", .string(s.credentialsStore.rawValue)))
         pairs.append(("account_ref", s.accountRef.map(YAMLNode.string) ?? .null))
         pairs.append(("accounts_count", .int(s.accountsCount)))
+        pairs.append(("history_days", .int(s.historyDays)))
         pairs.append(("follow", .bool(s.follow)))
         pairs.append(("follow_paused", .bool(s.followPaused)))
         pairs.append(("version", .string(s.version)))

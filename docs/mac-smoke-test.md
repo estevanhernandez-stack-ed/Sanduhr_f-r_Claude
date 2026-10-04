@@ -321,3 +321,19 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   for them, then two-finger click without moving: the limit menu. Hide a limit so the meters move
   under a still pointer, then two-finger click: the limit menu. With the pointer far from the
   Desk blocks, Activity Monitor shows Sanduhr idle (no timer runs there).
+
+## 14. Thirty days of meter history (item 43)
+
+- [ ] Upgrade: with a 2.4.0 `history.{label}.json` (24 points per limit) in place, launch the new
+  build: the sparklines look as they did. After the next fetches the file grows past 24 points
+  per limit (`jq '.five_hour | length'`) while the cards still draw the last 24 (about 2 hours).
+- [ ] `smoke/smoke state` shows `history_days: 30` and no label.
+- [ ] Settings, Accounts, select the active account: Meter history reads 30 days. Choose Off: a
+  confirmation asks to erase this account's meter history. Keep It: the file stays, Refresh adds
+  nothing to it (its modification time doesn't change), `history_days: 0`, and `defaults read
+  com.626labs.sanduhr meterHistoryOff` lists the account. Back to 30 days: the next Refresh writes
+  again.
+- [ ] Off again, then Erase History: "Meter history erased.", the file is gone and the cards'
+  sparklines empty; the meters still update.
+- [ ] Rename an account with Meter history off: it stays off under the new name. Remove it: it
+  leaves `meterHistoryOff`. Another account's history is never touched.

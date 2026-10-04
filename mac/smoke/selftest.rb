@@ -82,6 +82,8 @@ eq('credentials store is a name, never a value', state['credentials_store'], 'fi
 check('account_ref is 8 hex digits', state['account_ref'].to_s =~ /\A[0-9a-f]{8}\z/)
 eq('accounts count', state['accounts_count'], 2)
 eq('follow off by default', [state['follow'], state['follow_paused']], [false, false])
+# Item 43: the active account's Meter history, 30 days unless switched off (0); never a label.
+eq('meter history kept 30 days by default', state['history_days'], 30)
 # Item 38: the menu bar choice, Whichever is higher until changed.
 eq('menu bar follows the higher limit by default', state['menu_bar'], 'higher')
 eq('no limit hidden by default', state['hidden_limits'], [])

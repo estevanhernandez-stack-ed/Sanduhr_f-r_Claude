@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **Thirty days of meter history, per account.** Sanduhr now keeps each account's meter readings for 30 days instead of about 2 hours, as the Windows app does; the sparklines on the cards look as before, drawing the last two hours or so. Settings, Accounts has a Meter history choice for each account, Off or 30 days (the default). Off stops recording that account's meters and asks whether to erase what was kept; the meters themselves don't change. Your existing history carries over.
+
 ## v2.4.0-mac — 2026-10-04
 
 - **More than one Claude account.** Settings, Credentials is now Settings, Accounts. Add Account… takes a name (Work, Team, whatever you like) and that account's session key; each account keeps its own key and its own usage history. One account is active at a time: the widget, the menu bar, Desk and the notch show it. With two or more accounts the widget's title shows the active name as a chip (click it for the next account), the widget and menu bar menus gain an Accounts submenu with Manage Accounts…, and Desk's Claude line starts with the name. Switching is instant, no relaunch. Your existing key becomes the Personal account when you update, with its history; nothing else changes.

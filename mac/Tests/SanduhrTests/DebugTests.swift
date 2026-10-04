@@ -253,7 +253,7 @@ struct DebugStateTests {
                          "menu_bar", "settings_open", "settings_section", "meters", "widget_warnings", "hidden_limits",
                          "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
-                         "glow_camera", "theme", "menu", "credentials_store", "account_ref", "accounts_count",
+                         "glow_camera", "theme", "menu", "credentials_store", "account_ref", "accounts_count", "history_days",
                          "follow", "follow_paused", "version", "build"])
         #expect(yaml.contains("settings_section: notch\n"))
         #expect(yaml.contains("widget_visible: true\nwidget_visibility: whileDeskOff\nmenu_bar: rotate\nsettings_open: true\n"))
@@ -274,7 +274,7 @@ struct DebugStateTests {
         """))
         #expect(yaml.contains("    pace: null\n"))
         #expect(yaml.contains("last_fetch: \"1970-01-01T00:00:00Z\"\n"))
-        #expect(yaml.contains("credentials_store: file\naccount_ref: null\naccounts_count: 0\nfollow: false\nfollow_paused: false\nversion: \"2.1.0\"\n"))
+        #expect(yaml.contains("credentials_store: file\naccount_ref: null\naccounts_count: 0\nhistory_days: 30\nfollow: false\nfollow_paused: false\nversion: \"2.1.0\"\n"))
         #expect(yaml.contains("version: \"2.1.0\"\nbuild: \"3\"\n"))
         #expect(yaml.contains("""
           - header: Tools
