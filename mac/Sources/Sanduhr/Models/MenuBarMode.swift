@@ -32,6 +32,12 @@ enum MenuBarMode: String, CaseIterable, Identifiable {
     static func saved(in store: DefaultsStore = UserDefaults.standard) -> MenuBarMode {
         (store.object(forKey: key) as? String).flatMap(MenuBarMode.init(rawValue:)) ?? .higher
     }
+
+    /// Saves `mode` as the choice, under the key Settings, General, Menu bar reads through
+    /// @AppStorage, so the picker follows the menu bar item's Menu Bar Shows submenu.
+    static func save(_ mode: MenuBarMode, in store: DefaultsStore = UserDefaults.standard) {
+        store.set(mode.rawValue, forKey: key)
+    }
 }
 
 /// What the menu bar shows: which limit, its percent, and the text beside the hourglass.

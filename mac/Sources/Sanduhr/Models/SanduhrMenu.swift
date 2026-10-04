@@ -82,3 +82,27 @@ extension SanduhrMenu {
         })
     }
 }
+
+/// One choice in the Menu Bar Shows submenu.
+struct MenuBarModeItem: Equatable {
+    let mode: MenuBarMode
+    var checked = false
+
+    /// The same words as Settings, General, Menu bar.
+    var title: String { mode.label }
+}
+
+/// The menu bar item's own Menu Bar Shows submenu (item 40): the four Menu bar choices, the
+/// current one checked. Choosing one writes the same `menuBarMode` default as Settings, so
+/// Settings follows.
+struct MenuBarModeMenu: Equatable {
+    static let title = "Menu Bar Shows"
+    let items: [MenuBarModeItem]
+}
+
+extension SanduhrMenu {
+    /// The Menu Bar Shows submenu with `current` checked, in Settings' order.
+    static func menuBarModes(current: MenuBarMode) -> MenuBarModeMenu {
+        MenuBarModeMenu(items: MenuBarMode.allCases.map { MenuBarModeItem(mode: $0, checked: $0 == current) })
+    }
+}

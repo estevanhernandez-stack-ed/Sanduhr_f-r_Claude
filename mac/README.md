@@ -155,6 +155,7 @@ Most accounts don't need this.
 | Two-finger click widget     | Tools, Refresh, Settings, Quit menu |
 | Two-finger click a tier card | Accounts, Hide, Stop warnings, Meter Settings, then the widget menu |
 | Two-finger click a Desk meter | The same limit menu |
+| Right-click the hourglass   | The widget menu plus Menu Bar Shows (Session, Weekly, Whichever is higher, Rotate) |
 | **×**                       | Hide the widget (Desk keeps running) |
 
 ## License

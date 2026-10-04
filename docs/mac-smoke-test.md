@@ -262,3 +262,10 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
 - [ ] Left clicks unchanged: a click on the bars shows the widget beside them; with two accounts
   a click on the account name cycles; a click on empty desktop beside the meters reaches Finder.
   No visible tint behind the meters on a light and a dark wallpaper.
+- [ ] Menu Bar Shows: right-click the hourglass: under Hide (or Show) Widget, and under Accounts
+  with two accounts, a Menu Bar Shows submenu lists Session, Weekly, Whichever is higher and
+  Rotate (session and weekly), the current one checked. Choose Weekly with Settings, General
+  open: the percent beside the hourglass changes at once and the Menu bar picker reads Weekly;
+  `smoke/smoke state` shows `menu_bar: weekly`. Choose Rotate: "S 12%" now, "W 96%" 8 s later.
+  Change the picker in Settings: the submenu checks the new choice next time. The widget's
+  two-finger menu and Desk's clock menu have no Menu Bar Shows. Put back Whichever is higher.

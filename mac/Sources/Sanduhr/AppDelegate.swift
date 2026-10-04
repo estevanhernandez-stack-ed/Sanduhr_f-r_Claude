@@ -284,7 +284,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showStatusMenu(from button: NSStatusBarButton) {
         let menu = NSMenu()
-        addMenuItems(to: menu)
+        addMenuItems(to: menu, menuBarModes: true)
 
         // Briefly attach, pop, detach — so default L-click behavior stays
         // as "toggle panel" rather than "always show menu".
@@ -295,8 +295,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// The shared menu (SanduhrMenu) as AppKit items, for the menu bar item's menu and Desk's
     /// clock menu. The widget's own two-finger menu (RootView) renders the same groups.
-    /// `accounts` false leaves the Accounts submenu out, for a limit menu that already has it.
-    func addMenuItems(to menu: NSMenu, accounts withAccounts: Bool = true) {
+    /// `accounts` false leaves the Accounts submenu out, for a limit menu that already has it;
+    /// `menuBarModes` adds Menu Bar Shows after it, in the menu bar item's own menu only.
+    func addMenuItems(to menu: NSMenu, accounts withAccounts: Bool = true, menuBarModes: Bool = false) {
+        let accounts = withAccounts ? currentAccountsMenu() : nil
         for (i, group) in currentMenu(widgetVisible: panel?.isVisible ?? false).enumerated() {
             if i > 0 { menu.addItem(.separator()) }
             if let header = group.header { menu.addItem(.sectionHeader(title: header)) }
@@ -309,11 +311,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 menu.addItem(m)
             }
             // The Accounts submenu sits after Show/Hide, with two or more accounts.
-            if i == 0, withAccounts, let accounts = currentAccountsMenu() {
+            if i == 0, let accounts {
                 menu.addItem(.separator())
                 menu.addItem(accountsMenuItem(accounts))
             }
+            // Menu Bar Shows sits with the Accounts submenu, or after Show/Hide on its own.
+            if i == 0, menuBarModes {
+                if accounts == nil { menu.addItem(.separator()) }
+                menu.addItem(menuBarModesMenuItem(SanduhrMenu.menuBarModes(current: .saved())))
+            }
         }
+    }
+
+    /// "Menu Bar Shows ▸": the four Menu bar choices, the current one checked.
+    private func menuBarModesMenuItem(_ modes: MenuBarModeMenu) -> NSMenuItem {
+        let sub = NSMenu(title: MenuBarModeMenu.title)
+        for item in modes.items {
+            let m = NSMenuItem(title: item.title, action: #selector(menuBarModeChosen(_:)), keyEquivalent: "")
+            m.target = self
+            m.representedObject = item.mode.rawValue
+            m.state = item.checked ? .on : .off
+            sub.addItem(m)
+        }
+        let top = NSMenuItem(title: MenuBarModeMenu.title, action: nil, keyEquivalent: "")
+        top.submenu = sub
+        return top
+    }
+
+    /// A Menu Bar Shows choice: saved where Settings, General, Menu bar reads it (the picker
+    /// follows), and the menu bar redrawn at once.
+    @objc private func menuBarModeChosen(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let mode = MenuBarMode(rawValue: raw) else { return }
+        MenuBarMode.save(mode)
+        menuBarModeDidChange()
     }
 
     /// A Desk meter row's two-finger menu (LimitMenu): Accounts, Hide and the warnings item for

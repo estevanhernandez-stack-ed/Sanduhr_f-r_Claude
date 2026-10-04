@@ -107,3 +107,37 @@ struct SettingsSidebarTests {
         #expect(SettingsSection.groups.first?.sections == [.general, .alerts, .credentials])
     }
 }
+
+@Suite("Menu Bar Shows submenu")
+struct MenuBarModeMenuTests {
+    @Test func fourChoicesInSettingsOrderWithTheCurrentChecked() {
+        for current in MenuBarMode.allCases {
+            let menu = SanduhrMenu.menuBarModes(current: current)
+            #expect(menu.items.map(\.mode) == MenuBarMode.allCases)
+            #expect(menu.items.filter(\.checked).map(\.mode) == [current])
+        }
+        #expect(MenuBarModeMenu.title == "Menu Bar Shows")
+    }
+
+    @Test func titlesMatchSettings() {
+        #expect(SanduhrMenu.menuBarModes(current: .higher).items.map(\.title)
+                == ["Session", "Weekly", "Whichever is higher", "Rotate (session and weekly)"])
+    }
+
+    @Test func choosingWritesTheSettingsKey() {
+        let d = MemoryDefaults()
+        MenuBarMode.save(.rotate, in: d)
+        #expect(d.object(forKey: "menuBarMode") as? String == "rotate")
+        #expect(MenuBarMode.saved(in: d) == .rotate)
+        MenuBarMode.save(.session, in: d)
+        #expect(SanduhrMenu.menuBarModes(current: .saved(in: d)).items.first { $0.checked }?.mode == .session)
+    }
+
+    @Test func staysOutOfTheSharedGroups() {
+        // The widget's menu and Desk's clock menu render the shared groups; the submenu is the
+        // menu bar item's own.
+        let titles = SanduhrMenu.groups(widgetVisible: true, deepWork: false, pacing: false, snake: false)
+            .flatMap(\.entries).map(\.title)
+        #expect(!titles.contains(MenuBarModeMenu.title))
+    }
+}
