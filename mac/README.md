@@ -465,6 +465,44 @@ folders: each sharing level, no access file, hidden names, and the Windows MCP t
 two lints share `mac/Tests/SanduhrTests/Fixtures/theme-builtins.json`, the built-ins they must pass
 clean.
 
+## Desk and the Dock
+
+Desk's corners stay clear of the Dock on the Desk's screen (item 56, `DockFollower`, the pure
+pieces in `DockClearance.swift`). The Dock's own settings are read, never written: `com.apple.dock`
+`orientation` (no key is bottom), `autohide`, `tilesize`, `autohide-delay`. A bottom Dock moves the
+bottom corners up (`bl`, `br`); a side Dock moves its whole column in (`tl` and `bl` on the left,
+`tr` and `br` on the right). The Dock's reach is added to the corner margins (`left`, `right`,
+`bottom`), so the usual margin is kept from the Dock's edge instead of the screen's.
+
+- **Always shown.** The reach is the screen's `visibleFrame` against its `frame` on the Dock's side
+  (the menu bar never counts), read whenever the screen parameters change (the Dock moving,
+  resizing, starting or stopping to hide, a screen coming or going) and when the Dock's settings
+  change (`com.apple.dock.prefchanged` where macOS posts it, plus every app switch and Space change).
+  On two screens only the Desk's screen counts: a Dock on the other one moves nothing.
+- **Auto-hiding.** Items rest at the edge. When the Dock comes up they slide clear of it in
+  0.25 s (ease in and out, about as long as the Dock's own slide) and settle back when it hides;
+  with Reduce Motion they jump. Whether the Dock shows comes from `CGWindowListCopyWindowInfo`:
+  the on-screen windows owned by the Dock process (`com.apple.dock`) at the Dock's window layer
+  (`CGWindowLevelForKey(.dockWindow)`, 20) that cover the Desk's screen. Bounds and the on-screen
+  flag only, so no Screen Recording permission. A window shaped like a strip gives the Dock's
+  depth; on macOS 26 the Dock draws in one window as large as the screen, which only says that the
+  Dock shows, and the depth is then the always-shown reach last seen at the same tile size, else an
+  estimate from `tilesize` (tiles, shelf and gap, rounded up, so it errs clear of the Dock).
+  The slide is `DockSlide`: hidden, showing, shown, hiding.
+- **Cost.** Nothing polls while the pointer is away from the Dock. The window list is read only on
+  the Desk's close pointer watch (the 50 ms timer that already runs near Desk blocks), which also
+  runs while the pointer is in the Dock's trigger zone (its screen edge, 6 points deep) and while
+  the Dock has not hidden again (`DockWatch`): every tick while the pointer moves in the zone or
+  within the Dock's delay plus a second of resting there, every fourth tick once the pointer leaves
+  a shown Dock, and not at all once the Dock is hidden and the pointer is away.
+- **Missed on purpose.** A Dock that comes up without the pointer near it (Mission Control, App
+  Exposé, a keyboard shortcut) is followed once the pointer comes near; one that comes and goes
+  without the pointer near the edge is missed. Full-screen Spaces don't show the Desk, so nothing
+  there is affected.
+- **Click areas** move with the items: the frames are reported as the layout moves, so
+  `DeskHitTest` and `desk_frames` follow and `desk_frames_ok` holds during and after the slide.
+  `state.yaml` has `dock: {side, autohide, inset}`, `inset` the points applied now.
+
 ## Now playing
 
 Now playing (items 53, 53b) shows what plays on the Mac, in any app that publishes now playing

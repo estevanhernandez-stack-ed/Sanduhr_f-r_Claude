@@ -843,3 +843,34 @@ themes folder: `T=~/Library/Application\ Support/Sanduhr/themes; cp -R "$T" /tmp
   'subsystem == "com.626labs.sanduhr"'` holds no theme name. `state.yaml` shows
   `pending_suggestions: {messages: false, theme: true}` while one waits. Put the folder back:
   `rm -rf "$T" && cp -R /tmp/themes.mine "$T"`.
+
+## 26. Desk items move clear of the Dock (item 56)
+
+Desk on with something in a bottom corner (the standard layout: clock, meters, meetings at `bl`;
+add `nowPlaying:br` to have the right side too). Note your Dock settings in System Settings,
+Desktop & Dock, and put them back at the end. After each step, `mac/smoke/smoke snap` and read
+`dock:` and `desk_frames_ok` in its `state.yaml` (see `mac/smoke/README.md`).
+
+- [ ] Dock shown, at the bottom: the bottom-left stack sits above the Dock with the usual gap,
+  nothing under it. `dock: {side: bottom, autohide: false, inset: N}`, N the Dock's height (about
+  60 to 90), and `desk_frames_ok: true`. Make the Dock larger and smaller with the Size slider: the
+  stack follows within a second.
+- [ ] Dock shown, on the left: the left column (top and bottom) moves right of the Dock, the right
+  column stays; `side: left`. On the right: the right column moves; `side: right`. The message at
+  the top moves with its column; nothing at the top goes under the menu bar.
+- [ ] Auto-hide on (bottom): the stack rests at the screen edge margin (`inset: 0`). Move the
+  pointer to the bottom edge: as the Dock comes up the stack glides up clear of it (about a quarter
+  second), `inset` reads the Dock's height while it shows; move away and it settles back once the
+  Dock hides. Meeting rows and the meters' two-finger menu work while the Dock is up; `desk_frames_ok`
+  stays true during and after.
+- [ ] Auto-hide on the left and on the right: the same, sideways.
+- [ ] Reduce Motion on (Accessibility, Display): the stack jumps instead of gliding.
+- [ ] No cost away from the Dock: with the pointer in the middle of the screen for a minute,
+  Activity Monitor shows Sanduhr at 0.0 % CPU (as before this item).
+- [ ] Mission Control with the pointer in the middle: the Dock shows there and the Desk is not
+  visible, nothing moves; afterwards the stack is back at the edge. A full-screen app: the Desk is
+  not shown there; leave it and the Desk is where it was.
+- [ ] Two screens, Dock shown at the bottom of the other screen: the Desk's screen keeps
+  `inset: 0`. Move the Dock to the Desk's screen (bottom edge there): the stack moves up. With
+  auto-hide, the Dock coming up on the other screen moves nothing on the Desk's.
+- [ ] Put your Dock settings back as they were.
