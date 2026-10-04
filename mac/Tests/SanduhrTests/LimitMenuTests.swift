@@ -54,7 +54,7 @@ struct LimitMenuTests {
 
     @Test func anAlreadyHiddenLimitHasNoHide() {
         let groups = LimitMenu.groups(tier: .sevenDayOpus, accounts: nil, hidden: [.sevenDayOpus], temporary: Self.temp, warningsOn: true)
-        #expect(flat(groups) == ["Stop warnings for this limit", "-", "Meter Settings…"])
+        #expect(flat(groups) == ["Stop warnings for this limit", "-", "Hidden Limits", "Meter Settings…"])
     }
 
     /// Item 42: Hide only for a limit believed temporary; a permanent one keeps its warnings item.
@@ -66,6 +66,34 @@ struct LimitMenuTests {
         let temporary = LimitMenu.groups(tier: .sevenDaySonnet, accounts: nil, hidden: [],
                                          temporary: [.sevenDaySonnet], warningsOn: true)
         #expect(temporary[0] == [.hide(.sevenDaySonnet), .warnings(.sevenDaySonnet, on: true)])
+    }
+
+    /// Item 42: Hidden Limits lists every hidden limit in display order, beside the rows too, and
+    /// is gone when nothing is hidden.
+    @Test func hiddenLimitsSubmenu() {
+        let hidden: Set<Tier> = [.iguanaNecktie, .sevenDayOpus]
+        let groups = LimitMenu.groups(tier: nil, accounts: two, hidden: hidden, temporary: Self.temp,
+                                      warningsOn: true, widgetVisible: false)
+        #expect(flat(groups) == ["Show Widget", "-", "Accounts", "-", "Hidden Limits", "Meter Settings…"])
+        #expect(groups.last?.first == .hiddenLimits([.sevenDayOpus, .iguanaNecktie]))
+        #expect(LimitMenuEntry.show(.iguanaNecktie).title == "Weekly — Special")
+        let onRow = LimitMenu.groups(tier: .sevenDay, accounts: nil, hidden: [.iguanaNecktie],
+                                     temporary: Self.temp, warningsOn: true)
+        #expect(onRow.last == [.hiddenLimits([.iguanaNecktie]), .meterSettings])
+        let none = LimitMenu.groups(tier: .sevenDay, accounts: nil, hidden: [], temporary: Self.temp, warningsOn: true)
+        #expect(!none.joined().contains { if case .hiddenLimits = $0 { true } else { false } })
+    }
+
+    /// Picking a hidden limit shows it again: its hide and its record are cleared.
+    @Test func showFromTheSubmenuClearsTheHide() {
+        let d = MemoryDefaults()
+        LimitMenu.apply(.hide(.iguanaNecktie), to: d)
+        #expect(MeterVisibility.hidden(in: d) == [.iguanaNecktie])
+        #expect(LimitMenu.groups(tier: nil, accounts: nil, store: d, usage: nil, now: now).last?.first
+            == .hiddenLimits([.iguanaNecktie]))
+        LimitMenu.apply(.show(.iguanaNecktie), to: d)
+        #expect(MeterVisibility.hidden(in: d).isEmpty)
+        #expect(d.values.isEmpty)
     }
 
     @Test func besideTheRowsOnlyAccountsAndMeterSettings() {
@@ -143,6 +171,7 @@ struct LimitMenuTests {
         var u = UsageResponse()
         u.tiers[.sevenDaySonnet] = TierUsage(utilization: 40, resetsAt: iso(now.addingTimeInterval(3 * 86_400)))
         LimitMenu.apply(.hide(.sevenDaySonnet), to: d, usage: u, now: now)
+        LimitMenu.apply(.hiddenLimits([.iguanaNecktie]), to: d)
         LimitMenu.apply(.meterSettings, to: d)
         LimitMenu.apply(.widget(visible: false), to: d)
         if let two { LimitMenu.apply(.accounts(two), to: d) }

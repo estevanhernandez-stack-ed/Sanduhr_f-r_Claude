@@ -10,6 +10,11 @@ enum LimitMenuEntry: Equatable {
     /// Hide this limit (MeterVisibility, the Settings "Show this limit" switch turned off). Only
     /// for a limit believed temporary (LimitLifetime).
     case hide(Tier)
+    /// The Hidden Limits submenu, when something is hidden: one `show` item per hidden limit, in
+    /// display order. Its titles are labels: never in state.yaml.
+    case hiddenLimits([Tier])
+    /// Show this hidden limit again (an item of the Hidden Limits submenu).
+    case show(Tier)
     /// Turn this limit's "Warn when nearly full" off (`on` true) or back on (`on` false).
     case warnings(Tier, on: Bool)
     /// Settings, Desk, Meters.
@@ -20,6 +25,8 @@ enum LimitMenuEntry: Equatable {
         case .widget(let visible): visible ? "Hide Widget" : "Show Widget"
         case .accounts: AccountsMenu.title
         case .hide(let tier): LimitMenu.hideTitle(tier)
+        case .hiddenLimits: LimitMenu.hiddenLimits
+        case .show(let tier): tier.label
         case .warnings(_, let on): on ? LimitMenu.stopWarnings : LimitMenu.warnAgain
         case .meterSettings: LimitMenu.meterSettings
         }
@@ -34,12 +41,13 @@ enum LimitMenu {
     static let stopWarnings = "Stop warnings for this limit"
     static let warnAgain = "Warn again for this limit"
     static let meterSettings = "Meter Settings…"
+    static let hiddenLimits = "Hidden Limits"
 
     static func hideTitle(_ tier: Tier) -> String { "Hide \(tier.label)" }
 
     /// The items in runs between separators: Show or Hide Widget (Desk only: `widgetVisible` is
     /// nil on a widget card), the Accounts submenu (two or more accounts), then the limit's own
-    /// items, then Meter Settings….
+    /// items, then the Hidden Limits submenu (when something is hidden) and Meter Settings….
     /// `tier` is the row or card the menu opened on; nil (a click beside the rows) leaves the
     /// limit's own items out. Hide shows only for a limit in `temporary` that still shows;
     /// `warningsOn` is the limit's "Warn when nearly full".
@@ -54,7 +62,11 @@ enum LimitMenu {
             own.append(.warnings(tier, on: warningsOn))
             groups.append(own)
         }
-        groups.append([.meterSettings])
+        var last: [LimitMenuEntry] = []
+        let hiddenInOrder = Tier.allCases.filter(hidden.contains)
+        if !hiddenInOrder.isEmpty { last.append(.hiddenLimits(hiddenInOrder)) }
+        last.append(.meterSettings)
+        groups.append(last)
         return groups
     }
 
@@ -68,7 +80,7 @@ enum LimitMenu {
                widgetVisible: widgetVisible)
     }
 
-    /// Does what Hide and the warnings item say, in `store`. Hide records
+    /// Does what Hide, a Hidden Limits item and the warnings item say, in `store`. Hide records
     /// what the limit reads in `usage`, and does nothing for a limit that is not temporary. The
     /// widget item, the Accounts submenu and Meter Settings… are the caller's (a window, a
     /// switch), so they change nothing here.
@@ -77,6 +89,8 @@ enum LimitMenu {
         switch entry {
         case .hide(let tier):
             MeterVisibility.hide(tier, usage: usage, now: now, store: store)
+        case .show(let tier):
+            MeterVisibility.show(tier, store: store)
         case .warnings(let tier, let on):
             store.set(!on, forKey: MeterWarningSettings.onKey(tier))
         default:

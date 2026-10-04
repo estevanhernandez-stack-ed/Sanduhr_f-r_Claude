@@ -370,6 +370,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func limitMenuItem(_ entry: LimitMenuEntry) -> NSMenuItem {
         if case .accounts(let accounts) = entry { return accountsMenuItem(accounts) }
+        if case .hiddenLimits(let tiers) = entry { return hiddenLimitsMenuItem(tiers) }
         let m = NSMenuItem(title: entry.title, action: #selector(limitItemChosen(_:)), keyEquivalent: "")
         m.target = self
         m.representedObject = LimitMenuBox(entry)
@@ -380,16 +381,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let box = sender.representedObject as? LimitMenuBox { performLimit(box.entry) }
     }
 
-    /// What a limit menu's items do, from Desk and the widget alike: Hide and the warnings item
-    /// write the desk-suite keys Settings, Desk, Meters reads (both refresh on the change notice;
-    /// Hide records the limit's current numbers), Meter Settings… opens that page.
+    /// "Hidden Limits ▸": each hidden limit; picking one shows it again.
+    private func hiddenLimitsMenuItem(_ tiers: [Tier]) -> NSMenuItem {
+        let sub = NSMenu(title: LimitMenu.hiddenLimits)
+        for tier in tiers { sub.addItem(limitMenuItem(.show(tier))) }
+        let top = NSMenuItem(title: LimitMenu.hiddenLimits, action: nil, keyEquivalent: "")
+        top.submenu = sub
+        return top
+    }
+
+    /// What a limit menu's items do, from Desk and the widget alike: Hide, a Hidden Limits item
+    /// and the warnings item write the desk-suite keys Settings, Desk, Meters reads (both refresh
+    /// on the change notice; Hide records the limit's current numbers), Meter Settings… opens
+    /// that page.
     func performLimit(_ entry: LimitMenuEntry) {
         switch entry {
         case .widget(let visible):
             if visible { hidePanel() } else { DeskController.shared.showWidgetBesideMeters() }
-        case .accounts: break
+        case .accounts, .hiddenLimits: break
         case .meterSettings: SettingsWindowController.shared.show(.deskMeters)
-        case .hide, .warnings: LimitMenu.apply(entry, to: UserDefaults.desk, usage: viewModel.usage)
+        case .hide, .show, .warnings: LimitMenu.apply(entry, to: UserDefaults.desk, usage: viewModel.usage)
         }
     }
 
