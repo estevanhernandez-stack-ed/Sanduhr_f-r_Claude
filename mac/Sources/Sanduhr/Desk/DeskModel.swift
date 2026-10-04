@@ -55,6 +55,9 @@ final class DeskModel {
     var reportedTiers: [Tier] = []
     /// One line of Claude usage, or nil when there is none.
     var claudeLine: String?
+    /// The line in two pieces (DeskClaudeText.parts): with two or more accounts the Desk draws the
+    /// label as its own clickable element, which cycles to the next account.
+    var claudeParts: DeskClaudeText.Parts?
     /// The numbers are older than 15 minutes or the sign-in was refused; the meters and the
     /// line draw dimmed.
     var claudeLineIsStale = false
@@ -79,6 +82,9 @@ final class DeskModel {
     /// Where the calendar note sits, same coordinates, or .zero when it is not drawn. A click
     /// here opens System Settings at Privacy & Security, Calendars.
     @ObservationIgnored var noteFrame: CGRect = .zero
+    /// Where the account label at the start of the claude line sits, same coordinates, or .zero
+    /// with one account or no line. A click here switches to the next account.
+    @ObservationIgnored var accountFrame: CGRect = .zero
     /// Alert pulses so far, per limit (Settings, Alerts, Where alerts show). A meter row pulses
     /// when its count goes up.
     var pulses: [Tier: Int] = [:]
@@ -265,6 +271,8 @@ final class DeskModel {
         if reported != reportedTiers { reportedTiers = reported }
         signInNeeded = usage.signInNeeded
         claudeLine = DeskClaudeText.line(usage)
+        let parts = DeskClaudeText.parts(usage)
+        if parts != claudeParts { claudeParts = parts }
         claudeCompact = DeskClaudeText.compact(usage, now: now)
         claudeLineIsStale = usage.isStale(now: now)
         let hint = meterHint.isVisible(now: now)

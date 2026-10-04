@@ -120,7 +120,16 @@ struct DeskView: View {
 
     @ViewBuilder
     private var claude: some View {
-        if let line = model.claudeLine {
+        if let parts = model.claudeParts, let account = parts.account {
+            // Two or more accounts: the label is its own element, clickable like a meeting row
+            // (DeskController cycles to the next account); the rest of the line lets clicks through.
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                AccountLead(label: account, model: model)
+                Text("   \(parts.rest)")
+            }
+            .font(.custom(font, size: timeSize * 0.19))
+            .opacity(model.claudeLineIsStale ? 0.45 : 0.75)
+        } else if let line = model.claudeLine {
             Text(line)
                 .font(.custom(font, size: timeSize * 0.19))
                 .opacity(model.claudeLineIsStale ? 0.45 : 0.75)
@@ -369,6 +378,34 @@ private struct MeterRow: View {
     }
 }
 
+/// The account label at the start of the claude line, with two or more accounts. The pointer
+/// turns into a hand and the label underlines while over it; the click itself is handled in
+/// DeskController, which switches to the next account (the widget chip's cycle).
+private struct AccountLead: View {
+    let label: String
+    var model: DeskModel
+    @State private var hovering = false
+
+    var body: some View {
+        Text(label)
+            .underline(hovering)
+            .contentShape(Rectangle())
+            .background(GeometryReader { geo in
+                Color.clear.preference(key: AccountFrameKey.self, value: geo.frame(in: .global))
+            })
+            .onPreferenceChange(AccountFrameKey.self) { frame in
+                model.accountFrame = frame
+            }
+            .onDisappear { model.accountFrame = .zero }
+            .onHover { inside in
+                hovering = inside
+                if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint("Switches to the next account")
+    }
+}
+
 /// One meeting line. With a join link it is clickable: the pointer turns into a hand and a
 /// click opens the meeting in Teams, Zoom or the browser.
 private struct MeetingRow: View {
@@ -411,6 +448,11 @@ private struct MetersFrameKey: PreferenceKey {
 }
 
 private struct MeetingsFrameKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
+}
+
+private struct AccountFrameKey: PreferenceKey {
     static let defaultValue: CGRect = .zero
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
 }

@@ -216,3 +216,12 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   rule) and Add Account stays off; change it to `Team` and the line goes. On Work's page, type
   `personal` in the Rename field: the same line under it and Rename off; `work` (its own name in
   another case) is accepted.
+
+## 11. Switch, hide and silence from the meters (item 39)
+
+- [ ] Desk account name: with two accounts and Desk's Claude line showing, point at the name at
+  the start of the line: the pointer turns into a hand and the name underlines; the rest of the
+  line keeps the arrow and a click there reaches the desktop. Click the name: the next account's
+  numbers come in, as with a chip click (`account_ref` changes, `follow_paused: true` with
+  following on). A click on the meters still shows the widget beside them. With one account the
+  line starts with "claude" and nothing on it is clickable.

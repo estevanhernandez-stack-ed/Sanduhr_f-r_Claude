@@ -221,6 +221,22 @@ struct DeskMeterTests {
         input.signInNeeded = false
         #expect(DeskClaudeText.compact(input, now: now) == "5h 7%  wk 63%")
     }
+
+    /// The Desk draws the label as its own clickable element (it cycles accounts), the rest apart.
+    @Test func theLineSplitsIntoTheLabelAndTheRest() {
+        var input = DeskUsage(usage: usage([.fiveHour: TierUsage(utilization: 7, resetsAt: nil),
+                                            .sevenDay: TierUsage(utilization: 63, resetsAt: nil)]),
+                              fetchedAt: now.addingTimeInterval(-60), account: "Work")
+        #expect(DeskClaudeText.parts(input) == DeskClaudeText.Parts(account: "Work", rest: "7% session   63% week"))
+        input.signInNeeded = true
+        #expect(DeskClaudeText.parts(input) == DeskClaudeText.Parts(account: "Work", rest: "sign in again in Sanduhr"))
+        // One account: no label to click, the line starts with "claude".
+        input.account = nil
+        #expect(DeskClaudeText.parts(input)?.account == nil)
+        #expect(DeskClaudeText.line(input) == "claude   sign in again in Sanduhr")
+        // No numbers: no line at all.
+        #expect(DeskClaudeText.parts(DeskUsage(usage: nil, fetchedAt: nil, account: "Work")) == nil)
+    }
 }
 
 @Suite("Ink spec")

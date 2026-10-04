@@ -175,7 +175,7 @@ final class DeskController: NSObject, NSMenuDelegate {
     @objc private func spaceChanged() { wingsWindow?.orderFrontRegardless() }
 
     /// The window ignores the mouse, except while the pointer is over the meeting list, the
-    /// calendar note or the meters, so the desktop and its icons keep working and those can still be clicked.
+    /// calendar note, the account label or the meters, so the desktop and its icons keep working and those can still be clicked.
     private func watchMouse() {
         let moved: (NSEvent) -> Void = { [weak self] _ in self?.updateMouseThrough() }
         if let g = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved], handler: moved) {
@@ -242,9 +242,26 @@ final class DeskController: NSObject, NSMenuDelegate {
         return false
     }
 
-    /// A meeting row first, then the calendar note, then the meters. True when the click was used.
+    /// A meeting row first, then the calendar note, the account label, then the meters. True when
+    /// the click was used.
     private func clickUnderPointer() -> Bool {
-        joinMeetingUnderPointer() || openCalendarSettingsFromNote() || showWidgetFromMeters()
+        joinMeetingUnderPointer() || openCalendarSettingsFromNote() || cycleAccountFromLine()
+            || showWidgetFromMeters()
+    }
+
+    /// True when the claude line's account label is drawn (two or more accounts) and the pointer
+    /// is over it. Only the label: the rest of the line lets clicks through to the desktop.
+    private func pointerOverAccount(_ point: CGPoint) -> Bool {
+        !model.accountFrame.isEmpty && model.accountFrame.insetBy(dx: -4, dy: -2).contains(point)
+    }
+
+    /// A click on the account label switches to the next account, as the widget chip does (a
+    /// manual switch, so following pauses).
+    private func cycleAccountFromLine() -> Bool {
+        guard let point = pointerInWindow(), pointerOverAccount(point) else { return false }
+        // Event monitors run on the main thread.
+        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.viewModel.cycleAccount() }
+        return true
     }
 
     /// True when the calendar note is drawn and the pointer is over it.
@@ -282,7 +299,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         guard let w = window, let point = pointerInWindow() else { return }
         let overRows = model.meetings.contains { $0.link != nil }
             && model.meetingsFrame.insetBy(dx: -8, dy: -6).contains(point)
-        let over = overRows || pointerOverNote(point) || pointerOverMeters(point)
+        let over = overRows || pointerOverNote(point) || pointerOverAccount(point) || pointerOverMeters(point)
         if w.ignoresMouseEvents == over { w.ignoresMouseEvents = !over }
     }
 

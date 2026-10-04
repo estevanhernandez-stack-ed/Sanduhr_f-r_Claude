@@ -143,6 +143,7 @@ Most accounts don't need this.
 | Drag any edge or corner     | Resize the widget                   |
 | Double-click title          | Toggle compact mode                 |
 | Click the account chip      | Switch to the next account (2+ accounts) |
+| Click the account name on Desk | Switch to the next account (2+ accounts) |
 | Click theme name            | Switch theme                        |
 | **Focus** button            | Swap tier cards for hourglass timer |
 | **Snake** button            | Play the cooldown snake game        |

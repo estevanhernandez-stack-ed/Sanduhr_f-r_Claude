@@ -66,8 +66,19 @@ enum DeskClaudeText {
     /// With two or more accounts the line starts with the active label in place of "claude"
     /// ("Work   7% session …").
     static func line(_ input: DeskUsage) -> String? {
-        let lead = input.account ?? "claude"
-        if input.signInNeeded { return "\(lead)   sign in again in Sanduhr" }
+        parts(input).map { "\($0.account ?? "claude")   \($0.rest)" }
+    }
+
+    /// The line in its two pieces: the account label (nil with one account, where the line starts
+    /// with "claude") and everything after it. The Desk draws the label as its own element, the
+    /// one that switches accounts when clicked.
+    struct Parts: Equatable {
+        var account: String?
+        var rest: String
+    }
+
+    static func parts(_ input: DeskUsage) -> Parts? {
+        if input.signInNeeded { return Parts(account: input.account, rest: "sign in again in Sanduhr") }
         guard let tiers = input.usage?.tiers else { return nil }
         var parts: [String] = []
         if let s = tiers[.fiveHour], let util = s.utilization {
@@ -80,7 +91,7 @@ enum DeskClaudeText {
             parts.append(part)
         }
         if let w = tiers[.sevenDay]?.utilization { parts.append("\(Int(w))% week") }
-        return parts.isEmpty ? nil : "\(lead)   " + parts.joined(separator: "   ")
+        return parts.isEmpty ? nil : Parts(account: input.account, rest: parts.joined(separator: "   "))
     }
 
     /// The notch's short sign-in line, for the wings and the strip.
