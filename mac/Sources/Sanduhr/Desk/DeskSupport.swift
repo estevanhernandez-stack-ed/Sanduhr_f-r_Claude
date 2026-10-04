@@ -121,41 +121,7 @@ enum DeskFirstRun {
     }
 }
 
-/// The one-time line under the Desk meters ("Click the meters for history and tools. Option+S
-/// for settings."). Its clock starts the first time it is drawn, so a Mac without the meters on
-/// the desktop never spends its three days; the first meter click ends it for good.
-struct DeskMeterHint {
-    /// Desk suite: when the hint was first drawn.
-    static let firstShownKey = "meterHintFirstShown"
-    /// Desk suite: set by the first meter click.
-    static let dismissedKey = "meterHintDismissed"
-    /// How long the hint stays after it first showed.
-    static let lifetime: TimeInterval = 3 * 24 * 60 * 60
-    static let text = "Click the meters for history and tools. Option+S for settings."
-
-    /// Defaults to the Desk suite; tests pass an in-memory one.
-    var store: DefaultsStore = UserDefaults.desk
-
-    /// True until the hint is dismissed or three days after it first showed.
-    func isVisible(now: Date) -> Bool {
-        guard !store.bool(forKey: Self.dismissedKey) else { return false }
-        guard let first = store.object(forKey: Self.firstShownKey) as? Date else { return true }
-        return now.timeIntervalSince(first) < Self.lifetime
-    }
-
-    /// Called when the hint is drawn. Only the first call is recorded.
-    func markShown(now: Date) {
-        guard store.object(forKey: Self.firstShownKey) == nil else { return }
-        store.set(now, forKey: Self.firstShownKey)
-    }
-
-    /// Called on the first meter click.
-    func dismiss() {
-        store.set(true, forKey: Self.dismissedKey)
-    }
-}
-
-/// Where the widget goes when the Desk meters are clicked: beside them, on the side facing the
+/// Where the widget goes when Show Widget is chosen in the Desk meters' menu: beside them, on the side facing the
 /// middle of the screen (left of meters in a right corner, right of meters in a left corner),
 /// level with their bottom edge in a bottom corner and their top edge in a top corner, then
 /// pulled back inside the visible screen. Screen coordinates, bottom-left origin.
@@ -168,5 +134,28 @@ enum DeskPanelPlacement {
         let clampedX = min(max(x, visible.minX), visible.maxX - size.width)
         let clampedY = min(max(y, visible.minY), visible.maxY - size.height)
         return CGRect(origin: CGPoint(x: clampedX, y: clampedY), size: size)
+    }
+}
+
+/// How a two-finger click on the Desk meters reaches the limit menu. The Desk window is
+/// transparent, and the window server hands a click to a transparent window only where a pixel
+/// is drawn: between the label, the percent and the bar, the click fell through to the desktop
+/// even while the window took the mouse. A left click survived that (a global monitor acts on a
+/// click that went to the desktop), but a two-finger click had only a local monitor, so it was
+/// lost: no menu, or the Finder's own desktop menu.
+enum DeskPointerMenu {
+    /// The fill behind the meters (and their click slack) that gives every point there a drawn
+    /// pixel: alpha 3 of 255 in an 8-bit backing even under the Desk ink's 0.92, so the window
+    /// server delivers the click, and too faint to see on any wallpaper.
+    static let hitPlateOpacity = 0.015
+
+    /// How long a two-finger click that still went to the desktop waits before Desk opens the
+    /// menu itself, so a menu the desktop opened (the Finder's) can show up first and win.
+    static let fallbackDelay: TimeInterval = 0.15
+
+    /// A two-finger click that reached another app opens the limit menu only over the meters,
+    /// with no app window over them and no other app's menu already open.
+    static func fallbackOpens(overMeters: Bool, appWindowCovers: Bool, otherMenuOpen: Bool) -> Bool {
+        overMeters && !appWindowCovers && !otherMenuOpen
     }
 }

@@ -10,6 +10,14 @@ struct DeskUsage {
     var fetchedAt: Date?
     /// The session key or Cloudflare clearance was refused, so only a new sign-in helps.
     var signInNeeded = false
+    /// The active account as the claude line names it, with two or more accounts ("Work", or
+    /// "Work (in use)" just after an automatic switch); nil with one. The notch never shows it.
+    var account: String?
+    /// An account switch is under way: `usage` is the old account's, laid out but drawn unseen
+    /// (AccountSwitchFade), so the notch drops it and the meters and the line keep their place.
+    var veiled = false
+    /// The switch's fetch outlasts the fade: the faint "switching account…".
+    var switchNote = false
 
     /// Numbers older than this are drawn dimmed, and the notch drops them.
     static let staleAfter: TimeInterval = 15 * 60
@@ -60,8 +68,22 @@ struct DeskMeterRow: Identifiable, Equatable {
 /// The text forms of the same numbers: the one-line `claude` piece and the notch's short meters.
 enum DeskClaudeText {
     /// "claude   7% session, resets 3:00   63% week", or the sign-in line, or nil with no numbers.
+    /// With two or more accounts the line starts with the active label in place of "claude"
+    /// ("Work   7% session …").
     static func line(_ input: DeskUsage) -> String? {
-        if input.signInNeeded { return "claude   sign in again in Sanduhr" }
+        parts(input).map { "\($0.account ?? "claude")   \($0.rest)" }
+    }
+
+    /// The line in its two pieces: the account label (nil with one account, where the line starts
+    /// with "claude") and everything after it. The Desk draws the label as its own element, the
+    /// one that switches accounts when clicked.
+    struct Parts: Equatable {
+        var account: String?
+        var rest: String
+    }
+
+    static func parts(_ input: DeskUsage) -> Parts? {
+        if input.signInNeeded { return Parts(account: input.account, rest: "sign in again in Sanduhr") }
         guard let tiers = input.usage?.tiers else { return nil }
         var parts: [String] = []
         if let s = tiers[.fiveHour], let util = s.utilization {
@@ -74,17 +96,17 @@ enum DeskClaudeText {
             parts.append(part)
         }
         if let w = tiers[.sevenDay]?.utilization { parts.append("\(Int(w))% week") }
-        return parts.isEmpty ? nil : "claude   " + parts.joined(separator: "   ")
+        return parts.isEmpty ? nil : Parts(account: input.account, rest: parts.joined(separator: "   "))
     }
 
     /// The notch's short sign-in line, for the wings and the strip.
     static let compactSignIn = "sign in to Sanduhr"
 
     /// "5h 7%  wk 63%" for the notch, the short sign-in line when only a new sign-in helps,
-    /// nil when stale or empty.
+    /// nil when stale, empty or veiled by a switch (the old account's numbers).
     static func compact(_ input: DeskUsage, now: Date = Date()) -> String? {
         if input.signInNeeded { return compactSignIn }
-        guard !input.isStale(now: now), let tiers = input.usage?.tiers else { return nil }
+        guard !input.veiled, !input.isStale(now: now), let tiers = input.usage?.tiers else { return nil }
         let text = [tiers[.fiveHour]?.utilization.map { "5h \(Int($0))%" },
                     tiers[.sevenDay]?.utilization.map { "wk \(Int($0))%" }]
             .compactMap { $0 }.joined(separator: "  ")

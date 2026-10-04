@@ -22,12 +22,25 @@ struct DebugStateInput {
     var widgetVisible = false
     /// When the widget shows on its own (WidgetVisibility raw value).
     var widgetVisibility = WidgetVisibility.always
+    /// What the menu bar percent follows (MenuBarMode raw value).
+    var menuBar = MenuBarMode.higher
     var settingsOpen = false
     var settingsSection: SettingsSection?
     var meters: [DeskMeterRow] = []
     /// The widget's tiers drawing red with a glow (MeterWarning), in display order.
     var widgetWarnings: [Tier] = []
+    /// The limits switched off in Settings, Desk, Meters (MeterVisibility), in display order.
+    var hiddenLimits: [Tier] = []
+    /// The reported limits believed temporary (LimitLifetime), the ones that can be hidden, in
+    /// display order.
+    var temporaryLimits: [Tier] = []
+    /// The limits whose "Warn when nearly full" is off (LimitMenu.silenced), in display order.
+    var silencedLimits: [Tier] = []
     var meetingsCount = 0
+    /// Every interactive Desk element with its frame (DeskElements), empty while Desk is off.
+    var deskFrames: [DeskElement] = []
+    /// DeskFrameCheck's answer for `deskFrames`: nil when the geometry holds.
+    var deskFramesProblem: String?
     var alerts = AlertSettings()
     var lastFetch: Date?
     /// "deep-work", "snake" or nil.
@@ -43,6 +56,12 @@ struct DebugStateInput {
     var theme = ""
     /// Where credentials live this launch (KeychainStore.kind); never a value.
     var credentialsStore = CredentialStoreKind.file
+    /// The active account as snapshot.json names it (AccountRef), never its label.
+    var accountRef: String?
+    var accountsCount = 0
+    /// Follow the account I'm using, and whether a manual switch is pausing it. Never labels.
+    var follow = false
+    var followPaused = false
     var menu: [MenuGroup] = []
     var version = ""
     var build = ""
@@ -67,13 +86,24 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("camera_light", .bool(s.cameraLight)))
         pairs.append(("widget_visible", .bool(s.widgetVisible)))
         pairs.append(("widget_visibility", .string(s.widgetVisibility.rawValue)))
+        pairs.append(("menu_bar", .string(s.menuBar.rawValue)))
         pairs.append(("settings_open", .bool(s.settingsOpen)))
         let section: YAMLNode = s.settingsSection.map { .string($0.rawValue) } ?? .null
         pairs.append(("settings_section", section))
         pairs.append(("meters", .list(meters)))
         let widgetWarnings: [YAMLNode] = s.widgetWarnings.map { .string($0.rawValue) }
         pairs.append(("widget_warnings", .list(widgetWarnings)))
+        let hiddenLimits: [YAMLNode] = s.hiddenLimits.map { .string($0.rawValue) }
+        pairs.append(("hidden_limits", .list(hiddenLimits)))
+        let temporaryLimits: [YAMLNode] = s.temporaryLimits.map { .string($0.rawValue) }
+        pairs.append(("temporary_limits", .list(temporaryLimits)))
+        let silencedLimits: [YAMLNode] = s.silencedLimits.map { .string($0.rawValue) }
+        pairs.append(("silenced_limits", .list(silencedLimits)))
         pairs.append(("meetings_count", .int(s.meetingsCount)))
+        let frames: [YAMLNode] = s.deskFrames.map(deskFrame)
+        pairs.append(("desk_frames", .list(frames)))
+        pairs.append(("desk_frames_ok", .bool(s.deskFramesProblem == nil)))
+        pairs.append(("desk_frames_problem", s.deskFramesProblem.map(YAMLNode.string) ?? .null))
         pairs.append(("alerts", alerts(s.alerts)))
         let fetched: YAMLNode = s.lastFetch.map { .string(iso.string(from: $0)) } ?? .null
         pairs.append(("last_fetch", fetched))
@@ -88,6 +118,10 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("theme", .string(s.theme)))
         pairs.append(("menu", .list(menu)))
         pairs.append(("credentials_store", .string(s.credentialsStore.rawValue)))
+        pairs.append(("account_ref", s.accountRef.map(YAMLNode.string) ?? .null))
+        pairs.append(("accounts_count", .int(s.accountsCount)))
+        pairs.append(("follow", .bool(s.follow)))
+        pairs.append(("follow_paused", .bool(s.followPaused)))
         pairs.append(("version", .string(s.version)))
         pairs.append(("build", .string(s.build)))
         return .object(pairs)
@@ -106,6 +140,19 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         ])
     }
     
+    /// One Desk element: kind, key (a tier or a row index, never a title or a label), whether it
+    /// takes clicks, and its frame in whole points, `[x, y, w, h]` from the Desk window's top left.
+    private static func deskFrame(_ e: DeskElement) -> YAMLNode {
+        let f = e.frame
+        let rounded: [YAMLNode] = [f.minX, f.minY, f.width, f.height].map { .int(Int($0.rounded())) }
+        return .object([
+            ("kind", .string(e.kind.rawValue)),
+            ("key", e.key.map(YAMLNode.string)),
+            ("clickable", .bool(e.clickable)),
+            ("frame", .list(rounded)),
+        ])
+    }
+
     private static func menuGroup(_ group: MenuGroup) -> YAMLNode {
         let items: [YAMLNode] = group.entries.map { e in
             .object([("title", .string(e.title)), ("checked", .bool(e.checked))])

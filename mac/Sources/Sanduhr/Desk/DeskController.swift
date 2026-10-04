@@ -19,6 +19,10 @@ final class DeskController: NSObject, NSMenuDelegate {
     private(set) var window: NSWindow?
     private var statusItem: NSStatusItem?
     private var mouseMonitors: [Any] = []
+    /// The close pointer watch (DeskPointerWatch): runs only while the pointer is near a block.
+    private var approachTimer: Timer?
+    /// Where the pointer was at the close watch's last tick (screen coordinates).
+    private var lastWatchedPointer: NSPoint?
     private(set) var wingsWindow: NSWindow?
     private var wingsTimer: Timer?
     let model = DeskModel()
@@ -64,9 +68,18 @@ final class DeskController: NSObject, NSMenuDelegate {
         NotificationCenter.default.addObserver(
             self, selector: #selector(appBecameActive),
             name: NSApplication.didBecomeActiveNotification, object: nil)
+        // Command-Tab or a click elsewhere: the pointer may rest on the meters without moving.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(otherAppActivated),
+            name: NSWorkspace.didActivateApplicationNotification, object: nil)
     }
 
-    @objc private func appBecameActive() { recheckCalendar() }
+    @objc private func otherAppActivated() { updateMouseThrough() }
+
+    @objc private func appBecameActive() {
+        recheckCalendar()
+        updateMouseThrough()
+    }
 
     /// An alert chose the Desk (or the debug pulse): pulse those meters once and glow the notch,
     /// whatever the Glow switches, so a pulse has the one notch glow (item 27).
@@ -87,6 +100,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         wingsTimer?.invalidate(); wingsTimer = nil
         mouseMonitors.forEach { NSEvent.removeMonitor($0) }
         mouseMonitors = []
+        watchApproach(false)
+        model.onHitAreasChange = nil
         setMenuIcon(false)
         model.stop()
         applyHotKeys()
@@ -135,6 +150,10 @@ final class DeskController: NSObject, NSMenuDelegate {
         w.setFrame(screen.frame, display: true)
         w.orderFront(nil)
         window = w
+        // A pointer already resting near the Desk is watched from the start, before any movement;
+        // once the frames arrive (onHitAreasChange) it takes the mouse over a click area.
+        updateMouseThrough()
+        DispatchQueue.main.async { [weak self] in self?.updateMouseThrough() }
     }
 
     /// A menu-bar-tall, click-through window over the notch, one level above the menu bar,
@@ -172,10 +191,13 @@ final class DeskController: NSObject, NSMenuDelegate {
         }
     }
 
-    @objc private func spaceChanged() { wingsWindow?.orderFrontRegardless() }
+    @objc private func spaceChanged() {
+        wingsWindow?.orderFrontRegardless()
+        updateMouseThrough()
+    }
 
-    /// The window ignores the mouse, except while the pointer is over the meeting list, the
-    /// calendar note or the meters, so the desktop and its icons keep working and those can still be clicked.
+    /// The window ignores the mouse, except while the pointer is over a Desk element that takes
+    /// clicks (DeskHitTest), so the desktop and its icons keep working and those can be clicked.
     private func watchMouse() {
         let moved: (NSEvent) -> Void = { [weak self] _ in self?.updateMouseThrough() }
         if let g = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved], handler: moved) {
@@ -187,22 +209,97 @@ final class DeskController: NSObject, NSMenuDelegate {
             mouseMonitors.append(l)
         }
         // Clicks: whichever app macOS gives the click to, if it landed on a meeting row with a
-        // link, open the meeting; on the meters, show the widget. A click that reaches Desk
-        // itself is consumed.
-        if let g = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown], handler: { [weak self] _ in
+        // link, open the meeting (DeskHitTest decides what is under the pointer). A plain click
+        // on the meters does nothing. A click that reaches Desk itself is consumed.
+        if let g = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown], handler: { [weak self] event in
             // Another app's window over the clock means the click was meant for that app.
             guard let self, !Self.appWindowCoversPointer() else { return }
+            // A control-click is a two-finger click.
+            if event.modifierFlags.contains(.control) { self.limitMenuAfterMissedClick(); return }
             _ = self.clickUnderPointer()
+        }) {
+            mouseMonitors.append(g)
+        }
+        // A two-finger click that still went to another app (the desktop) over the meters.
+        if let g = NSEvent.addGlobalMonitorForEvents(matching: [.rightMouseDown], handler: { [weak self] _ in
+            self?.limitMenuAfterMissedClick()
         }) {
             mouseMonitors.append(g)
         }
         if let l = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown], handler: { [weak self] event in
             // Same process as the widget and its settings: only clicks on the desk layer count.
             guard let self, event.window == nil || event.window === self.window else { return event }
+            // Control-click is a two-finger click.
+            if event.modifierFlags.contains(.control) { return self.limitMenuUnderPointer(event) ? nil : event }
             return self.clickUnderPointer() ? nil : event
         }) {
             mouseMonitors.append(l)
         }
+        // Two-finger clicks: on the meters, the limit menu. The window takes the mouse while the
+        // pointer is over the meters and the hit plate behind them (DeskPointerMenu) gives every
+        // point there a drawn pixel, so the click reaches Desk and the desktop never sees it.
+        if let l = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown], handler: { [weak self] event in
+            guard let self, event.window == nil || event.window === self.window else { return event }
+            return self.limitMenuUnderPointer(event) ? nil : event
+        }) {
+            mouseMonitors.append(l)
+        }
+        // The meters moved under a still pointer (a limit came or went, a font change): take the
+        // mouse or let it through again without waiting for the pointer to move.
+        model.onHitAreasChange = { [weak self] in self?.updateMouseThrough() }
+    }
+
+    /// A two-finger click over the meters that went to another app anyway (the window had not
+    /// taken the mouse yet): Desk opens the limit menu itself, a moment later, unless an app
+    /// window covers the meters or that app opened its own menu (DeskPointerMenu.fallbackOpens).
+    /// The window then takes the mouse, so the next click reaches Desk directly.
+    private func limitMenuAfterMissedClick() {
+        guard DeskHitTest.isMeters(elementUnderPointer()), !Self.appWindowCoversPointer() else { return }
+        updateMouseThrough()
+        DispatchQueue.main.asyncAfter(deadline: .now() + DeskPointerMenu.fallbackDelay) { [weak self] in
+            guard let self, let w = self.window, let view = w.contentView else { return }
+            let hit = self.elementUnderPointer()
+            guard DeskPointerMenu.fallbackOpens(overMeters: DeskHitTest.isMeters(hit),
+                                                appWindowCovers: Self.appWindowCoversPointer(),
+                                                otherMenuOpen: Self.otherAppMenuOpen()) else { return }
+            let at = view.convert(w.mouseLocationOutsideOfEventStream, from: nil)
+            self.limitMenu(for: hit).popUp(positioning: nil, at: at, in: view)
+        }
+    }
+
+    /// True when another app has a menu open (a window on the pop-up menu layer). Window list
+    /// metadata only: no Screen Recording permission needed.
+    private static func otherAppMenuOpen() -> Bool {
+        let menuLayer = Int(CGWindowLevelForKey(.popUpMenuWindow))
+        let mine = ProcessInfo.processInfo.processIdentifier
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else { return false }
+        return list.contains {
+            ($0[kCGWindowLayer as String] as? Int) == menuLayer && ($0[kCGWindowOwnerPID as String] as? Int32) != mine
+        }
+    }
+
+    /// The Desk element under the pointer (DeskHitTest), nil where Desk lets the mouse through.
+    private func elementUnderPointer() -> DeskElement? {
+        guard let point = pointerInWindow() else { return nil }
+        return DeskHitTest.element(at: point, in: model.elements())
+    }
+
+    /// A two-finger click on the meters opens the limit menu for the row under the pointer
+    /// (LimitMenu): Accounts, Hide, the warnings item, Meter Settings…, then the shared menu.
+    private func limitMenuUnderPointer(_ event: NSEvent) -> Bool {
+        let hit = elementUnderPointer()
+        guard let view = window?.contentView, DeskHitTest.isMeters(hit) else { return false }
+        NSMenu.popUpContextMenu(limitMenu(for: hit), with: event, for: view)
+        return true
+    }
+
+    /// The limit menu for a hit on the meters: that row's limit, or none beside the rows.
+    private func limitMenu(for hit: DeskElement?) -> NSMenu {
+        let tier = hit?.kind == .meterRow ? hit?.key.flatMap(Tier.init(rawValue:)) : nil
+        let menu = NSMenu()
+        // Event monitors and their follow-ups run on the main thread.
+        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.addLimitMenuItems(to: menu, tier: tier) }
+        return menu
     }
 
     /// Pointer position in the window's SwiftUI coordinates (top-left origin).
@@ -211,6 +308,9 @@ final class DeskController: NSObject, NSMenuDelegate {
         let p = w.convertPoint(fromScreen: NSEvent.mouseLocation)
         return CGPoint(x: p.x, y: w.frame.height - p.y)
     }
+
+    /// The Desk window's size, for checking the frames (DeskFrameCheck); nil while Desk is off.
+    var windowSize: CGSize? { window?.frame.size }
 
     /// True when a normal app window (layer 0) is under the pointer. Desk sits at layer -1.
     private static func appWindowCoversPointer() -> Bool {
@@ -230,60 +330,88 @@ final class DeskController: NSObject, NSMenuDelegate {
         return false
     }
 
-    private func joinMeetingUnderPointer() -> Bool {
-        guard let point = pointerInWindow() else { return false }
-        for meeting in model.meetings {
-            guard let link = meeting.link,
-                  let frame = model.rowFrames[meeting.id],
-                  frame.insetBy(dx: -8, dy: -4).contains(point) else { continue }
-            MeetingOpener.open(link)
-            return true
-        }
-        return false
-    }
-
-    /// A meeting row first, then the calendar note, then the meters. True when the click was used.
+    /// A left click on whatever DeskHitTest finds under the pointer: a meeting row opens its
+    /// link, the calendar note opens System Settings, the account label switches to the next
+    /// account (as the widget chip does; a manual switch, so following pauses). The meters are
+    /// passive (item 41): a plain click there does nothing at all, and the widget, history and
+    /// tools are in their two-finger menu. True when the click was Desk's, so it goes no further.
     private func clickUnderPointer() -> Bool {
-        joinMeetingUnderPointer() || openCalendarSettingsFromNote() || showWidgetFromMeters()
-    }
-
-    /// True when the calendar note is drawn and the pointer is over it.
-    private func pointerOverNote(_ point: CGPoint) -> Bool {
-        model.calendarNote != nil && !model.noteFrame.isEmpty
-            && model.noteFrame.insetBy(dx: -8, dy: -4).contains(point)
-    }
-
-    /// A click on the calendar note opens System Settings at Privacy & Security, Calendars.
-    private func openCalendarSettingsFromNote() -> Bool {
-        guard let point = pointerInWindow(), pointerOverNote(point) else { return false }
-        model.openCalendarSettings()
+        guard let hit = elementUnderPointer() else { return false }
+        switch hit.kind {
+        case .meetingRow:
+            guard let i = hit.key.flatMap(Int.init), model.meetings.indices.contains(i),
+                  let link = model.meetings[i].link else { return false }
+            MeetingOpener.open(link)
+        case .note:
+            model.openCalendarSettings()
+        case .account:
+            // Event monitors run on the main thread.
+            MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.viewModel.cycleAccount() }
+        case .meters, .meterRow:
+            // The window holds the mouse over the meters so a two-finger click reaches the limit
+            // menu; a plain click is swallowed there, so nothing reacts to it.
+            break
+        case .meetings:
+            return false
+        }
         return true
     }
 
-    /// True when the pointer is over the meters (with a little slack, as for the meeting list).
-    private func pointerOverMeters(_ point: CGPoint) -> Bool {
-        !model.metersFrame.isEmpty && model.metersFrame.insetBy(dx: -8, dy: -6).contains(point)
-    }
-
-    /// A click on the meters ends the hint and shows the widget beside them.
-    private func showWidgetFromMeters() -> Bool {
-        guard let w = window, let point = pointerInWindow(), pointerOverMeters(point) else { return false }
-        model.meterHintDismissed()
+    /// The limit menu's Show Widget: a hidden widget comes back beside the meters, or where it
+    /// was when the meters are not drawn.
+    func showWidgetBesideMeters() {
+        guard let w = window, !model.metersFrame.isEmpty else {
+            MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.showPanel() }
+            return
+        }
         let f = model.metersFrame
         let onScreen = CGRect(x: w.frame.minX + f.minX, y: w.frame.maxY - f.maxY,
                               width: f.width, height: f.height)
         let screen = w.screen ?? NSScreen.main
-        // Event monitors run on the main thread.
+        // Menu items act on the main thread.
         MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.showPanel(beside: onScreen, on: screen) }
-        return true
     }
 
+    /// Takes the mouse over the clickable pieces (DeskHitTest: meeting rows with a link, the
+    /// calendar note, the account label, the meters) and lets it through everywhere else. Runs on
+    /// every mouse move, when the frames change, when the window appears, on a Space or app
+    /// switch, and on the close watch's tick while the pointer is near a block (DeskPointerWatch).
     private func updateMouseThrough() {
-        guard let w = window, let point = pointerInWindow() else { return }
-        let overRows = model.meetings.contains { $0.link != nil }
-            && model.meetingsFrame.insetBy(dx: -8, dy: -6).contains(point)
-        let over = overRows || pointerOverNote(point) || pointerOverMeters(point)
+        guard let w = window, let point = pointerInWindow() else {
+            watchApproach(false)
+            return
+        }
+        let over = DeskHitTest.element(at: point, in: model.elements()) != nil
         if w.ignoresMouseEvents == over { w.ignoresMouseEvents = !over }
+        let blocks = [model.metersFrame, model.accountFrame, model.noteFrame, model.meetingsFrame]
+        watchApproach(DeskPointerWatch.near(point, frames: blocks))
+    }
+
+    /// The close watch's tick: a pointer that has not moved since the last tick needs nothing
+    /// (layout changes arrive through onHitAreasChange), so a resting pointer costs one read.
+    private func watchTick() {
+        let p = NSEvent.mouseLocation
+        guard p != lastWatchedPointer else { return }
+        lastWatchedPointer = p
+        updateMouseThrough()
+    }
+
+    /// Starts the close watch when `on` and none runs, stops it when off. Common run loop modes,
+    /// so it keeps ticking while a menu tracks or a window drags.
+    private func watchApproach(_ on: Bool) {
+        if !on {
+            approachTimer?.invalidate()
+            approachTimer = nil
+            lastWatchedPointer = nil
+            return
+        }
+        guard approachTimer == nil else { return }
+        let t = Timer(timeInterval: DeskPointerWatch.interval, repeats: true) { [weak self] _ in
+            self?.watchTick()
+        }
+        t.tolerance = DeskPointerWatch.interval / 2
+        RunLoop.main.add(t, forMode: .common)
+        approachTimer = t
     }
 
     /// estedesk://join-next opens the next meeting's link (Option+J does the same, see applyHotKeys).

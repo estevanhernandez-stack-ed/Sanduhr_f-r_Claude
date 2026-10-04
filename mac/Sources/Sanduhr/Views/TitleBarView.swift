@@ -20,6 +20,10 @@ struct TitleBarView: View {
                 .font(.app(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(t.text)
 
+            if let chip = vm.accountChip {
+                AccountChip(chip: chip, palette: t) { vm.cycleAccount() }
+            }
+
             // Draggable spacer — claims the rest of the row so the user can
             // grab the widget anywhere to move it.
             Rectangle()
@@ -33,6 +37,39 @@ struct TitleBarView: View {
                 colors: [t.titleBg, t.titleBg.opacity(0.88)],
                 startPoint: .top, endPoint: .bottom)
             .opacity(Chrome.opacity))
+    }
+}
+
+/// The active account's label, only with two or more accounts (UsageViewModel.accountChip). A
+/// click switches to the next account, as Windows' CycleAccount.
+private struct AccountChip: View {
+    let chip: UsageViewModel.AccountChipText
+    let palette: Theme.Palette
+    var action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Text(chip.text)
+                    .font(.app(size: 10, weight: .medium, design: .rounded))
+                    .lineLimit(1)
+                    // A switch's name change crossfades (AccountSwitchFade.nameAnimation).
+                    .contentTransition(.opacity)
+                if chip.otherInUse {
+                    Circle().fill(palette.accent).frame(width: 5, height: 5)
+                }
+            }
+            .foregroundStyle(palette.textSecondary)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(palette.text.opacity(hovering ? 0.16 : 0.08)))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("Switch to the next account")
+        .accessibilityLabel("Account \(chip.text)")
+        .accessibilityHint("Switches to the next account")
     }
 }
 

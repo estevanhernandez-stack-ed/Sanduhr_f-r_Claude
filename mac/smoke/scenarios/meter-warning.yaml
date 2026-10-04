@@ -9,6 +9,9 @@ name: Meter warning on Desk and the widget
 needs: [desk, credentials]
 steps:
   - expect_state: { meters.0.tier: five_hour, meters.1.tier: seven_day, meters.1.warning: "/^(true|false)$/" }
+  # An account with a promo limit ("Weekly — Special") can have it warning too; hide it so only
+  # the weekly meter is in play. Put back with the rest.
+  - defaults: { domain: desk, key: meterShow.iguana_necktie, type: bool, value: false }
   - defaults: { domain: desk, key: meterWarn.seven_day.pct, type: float, value: 0 }
   - defaults: { domain: desk, key: meterWarn.seven_day.minReset, type: float, value: 0 }
   - defaults: { domain: desk, key: meterWarn.seven_day.on, type: bool, value: true }

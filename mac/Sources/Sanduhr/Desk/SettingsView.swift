@@ -50,6 +50,9 @@ struct DeskLayoutSection: View {
 /// The layout string the Layout section edits ("message:tl clock:bl claude:bl meetings:bl"), kept
 /// apart from the view so it tests without AppKit. DeskView reads the same string.
 enum DeskLayout {
+    /// The layout DeskView draws when none is saved.
+    static let standard = "message:tl clock:bl claude:bl meetings:bl"
+
     static let widgets: [(key: String, name: String)] = [
         ("message", "Message"), ("clock", "Clock and date"), ("claude", "Claude line"),
         ("meters", "Claude meters (bars)"), ("meetings", "Meetings"),
@@ -61,6 +64,25 @@ enum DeskLayout {
         for item in s.split(separator: " ") {
             let bits = item.split(separator: ":").map(String.init)
             if bits.count == 2 { out[bits[0]] = bits[1] }
+        }
+        return out
+    }
+
+    /// The corners DeskView knows.
+    static let slots: Set<String> = ["tl", "tr", "bl", "br"]
+
+    /// The widgets DeskView draws for `layout`: known widgets in a known corner, less the
+    /// meetings with the older showMeetings switch off and the claude line and meters with
+    /// showClaude off (DeskView.placement).
+    static func placed(_ layout: String, showMeetings: Bool = true, showClaude: Bool = true) -> Set<String> {
+        let known = Set(widgets.map(\.key))
+        var out: Set<String> = []
+        for item in layout.split(separator: " ") {
+            let bits = item.split(separator: ":").map(String.init)
+            guard bits.count == 2, known.contains(bits[0]), slots.contains(bits[1]) else { continue }
+            if bits[0] == "meetings" && !showMeetings { continue }
+            if (bits[0] == "claude" || bits[0] == "meters") && !showClaude { continue }
+            out.insert(bits[0])
         }
         return out
     }
@@ -170,7 +192,7 @@ private struct Swatch: View {
 // MARK: - Meters
 
 /// Warnings on the meters, on Desk and the widget alike, set per meter: a group for the session, the all-models weekly
-/// limit, and every other weekly limit the server reports.
+/// limit, and every other weekly limit the server reports, each of those with a Show switch (MeterVisibility).
 struct DeskMetersSection: View {
     var model: DeskModel
 
@@ -184,9 +206,11 @@ struct DeskMetersSection: View {
             Section {
                 Text("A meter that is nearly full while its reset is still far off draws its bar in red with a soft glow around it, on the Desk (in the Desk ink) and on the widget (in the theme's color). Each meter has its own setting; changes show at once on both.")
                     .font(.caption).foregroundStyle(.secondary)
+                Text("A limit that looks temporary (a promotion, or a new limit whose reset is far off) can be hidden: it leaves the widget, the Desk meters and the alerts, and comes back on its own when it resets or refills. Session, Weekly and the model limits always show.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
-            ForEach(Self.tiers(present: model.meters.map(\.tier)), id: \.self) { tier in
-                MeterWarningGroup(tier: tier)
+            ForEach(Self.tiers(present: model.reportedTiers), id: \.self) { tier in
+                MeterWarningGroup(tier: tier, model: model)
             }
         }
         .formStyle(.grouped)
@@ -195,12 +219,16 @@ struct DeskMetersSection: View {
 
 private struct MeterWarningGroup: View {
     let tier: Tier
+    var model: DeskModel
     @AppStorage private var enabled: Bool
     @AppStorage private var threshold: Double
     @AppStorage private var minReset: Double
+    @AppStorage private var shown: Bool
 
-    init(tier: Tier) {
+    init(tier: Tier, model: DeskModel) {
         self.tier = tier
+        self.model = model
+        _shown = AppStorage(wrappedValue: true, MeterVisibility.showKey(tier), store: .desk)
         let standard = MeterWarningSettings.standard(for: tier)
         _enabled = AppStorage(wrappedValue: standard.enabled, MeterWarningSettings.onKey(tier), store: .desk)
         _threshold = AppStorage(wrappedValue: standard.threshold, MeterWarningSettings.thresholdKey(tier), store: .desk)
@@ -209,23 +237,40 @@ private struct MeterWarningGroup: View {
 
     var body: some View {
         Section(tier.label) {
-            Toggle("Warn when nearly full", isOn: $enabled)
-            HStack {
-                Text("At")
-                Slider(value: $threshold, in: 50...100, step: 5)
-                Text("\(Int(threshold))%")
-                    .font(.system(.body, design: .monospaced))
-                    .frame(width: 48, alignment: .trailing)
+            // Only a temporary limit can be hidden (item 42); a permanent one keeps just its
+            // warning settings.
+            if temporary {
+                Toggle("Show this limit", isOn: showBinding)
             }
-            .disabled(!enabled)
-            Picker("Only while the reset is more than", selection: $minReset) {
-                ForEach(MeterWarning.minResetChoices, id: \.seconds) { Text($0.name).tag($0.seconds) }
-                if !MeterWarning.minResetChoices.contains(where: { $0.seconds == minReset }) {
-                    Text("Custom").tag(minReset)
-                }
-            }
-            .disabled(!enabled)
+            warningControls
+                .disabled(!shown && temporary)
         }
+    }
+
+    private var temporary: Bool { model.temporaryTiers.contains(tier) }
+
+    /// Reads the saved switch; writes through MeterVisibility, so a hide records the limit's numbers.
+    private var showBinding: Binding<Bool> {
+        Binding(get: { shown }, set: { model.setShown(tier, $0) })
+    }
+
+    @ViewBuilder private var warningControls: some View {
+        Toggle("Warn when nearly full", isOn: $enabled)
+        HStack {
+            Text("At")
+            Slider(value: $threshold, in: 50...100, step: 5)
+            Text("\(Int(threshold))%")
+                .font(.system(.body, design: .monospaced))
+                .frame(width: 48, alignment: .trailing)
+        }
+        .disabled(!enabled)
+        Picker("Only while the reset is more than", selection: $minReset) {
+            ForEach(MeterWarning.minResetChoices, id: \.seconds) { Text($0.name).tag($0.seconds) }
+            if !MeterWarning.minResetChoices.contains(where: { $0.seconds == minReset }) {
+                Text("Custom").tag(minReset)
+            }
+        }
+        .disabled(!enabled)
     }
 }
 
@@ -370,6 +415,7 @@ struct GeneralSection: View {
     @AppStorage(DeskController.notchKey, store: .desk) private var notch = false
     @AppStorage(AppDelegate.panelHiddenKey) private var panelHidden = false
     @AppStorage("menuIcon", store: .desk) private var menuIcon = false
+    @AppStorage(MenuBarMode.key) private var menuBarMode = MenuBarMode.higher
     @AppStorage("showMeetings", store: .desk) private var showMeetings = true
     @AppStorage("showClaude", store: .desk) private var showClaude = true
     @AppStorage(DeskController.hotKeysKey, store: .desk) private var hotKeys = true
@@ -381,11 +427,17 @@ struct GeneralSection: View {
                 Toggle("Desk: clock, meters, meetings and the message on the desktop", isOn: $deskEnabled)
                     .onChange(of: deskEnabled) { _, _ in DeskController.shared.apply() }
                 Toggle("Notch: the island around the camera (needs Desk)", isOn: $notch)
-                Picker("Widget: the floating window with the tools", selection: $widgetVisibility) {
+                // A choice made here, not any change to the key: onChange also fired for writes
+                // from outside (a smoke run's defaults step), even with Settings closed, and
+                // treated them as a pick (issue #105's "Always shown shows the widget").
+                Picker("Widget: the floating window with the tools", selection: Binding(
+                    get: { widgetVisibility },
+                    set: { choice in
+                        guard choice != widgetVisibility else { return }
+                        widgetVisibility = choice
+                        (NSApp.delegate as? AppDelegate)?.widgetVisibilityDidChange()
+                    })) {
                     ForEach(WidgetVisibility.allCases) { Text($0.label).tag($0) }
-                }
-                .onChange(of: widgetVisibility) { _, _ in
-                    (NSApp.delegate as? AppDelegate)?.widgetVisibilityDidChange()
                 }
                 Toggle("Show the widget now", isOn: Binding(
                     get: { !panelHidden },
@@ -402,9 +454,8 @@ struct GeneralSection: View {
                         do { if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() } }
                         catch { atLogin = SMAppService.mainApp.status == .enabled }
                     }
-                Toggle("Desk menu in the menu bar (meetings, join, settings)", isOn: $menuIcon)
-                    .onChange(of: menuIcon) { _, on in DeskController.shared.setMenuIcon(on) }
             }
+            menuBarSection
             Section("Calendar and Claude") {
                 Toggle("Read today's meetings", isOn: $showMeetings)
                     .onChange(of: showMeetings) { _, on in
@@ -432,6 +483,22 @@ struct GeneralSection: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// The percent beside the hourglass and the Desk menu's icon.
+    private var menuBarSection: some View {
+        Section("Menu bar") {
+            Picker("Percent beside the hourglass", selection: $menuBarMode) {
+                ForEach(MenuBarMode.allCases) { Text($0.label).tag($0) }
+            }
+            .onChange(of: menuBarMode) { _, _ in
+                (NSApp.delegate as? AppDelegate)?.menuBarModeDidChange()
+            }
+            Text("Only the session and the weekly all-models limit show here; Rotate switches between them every 8 seconds (S for session, W for weekly).")
+                .font(.caption).foregroundStyle(.secondary)
+            Toggle("Desk menu in the menu bar (meetings, join, settings)", isOn: $menuIcon)
+                .onChange(of: menuIcon) { _, on in DeskController.shared.setMenuIcon(on) }
+        }
     }
 }
 

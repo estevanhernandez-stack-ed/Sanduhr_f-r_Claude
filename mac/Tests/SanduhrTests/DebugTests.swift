@@ -67,6 +67,7 @@ struct DebugLinkTests {
         #expect(parse("sanduhr://debug/action?name=glow&arg=CAMERA").command == .action(.glow(.camera), dir: nil))
         #expect(parse("sanduhr://debug/action?name=theme&arg=match-desk").command == .action(.theme("match-desk"), dir: nil))
         #expect(parse("sanduhr://debug/action?name=theme&arg=Obsidian").command == .action(.theme("obsidian"), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=account&arg=next").command == .action(.cycleAccount, dir: nil))
     }
 
     @Test func badActionsKeepTheDirForTheError() {
@@ -78,6 +79,9 @@ struct DebugLinkTests {
         #expect(parse("sanduhr://debug/action?name=camera-light").error == "camera-light needs arg=on or arg=off")
         #expect(parse("sanduhr://debug/action?name=glow&arg=sound").error == "glow needs arg=alert, meeting or camera")
         #expect(parse("sanduhr://debug/action?name=theme").error == "theme needs arg=<theme id>")
+        // Only cycling: no hook adds, renames, signs out or removes an account.
+        #expect(parse("sanduhr://debug/action?name=account").error == "account needs arg=next")
+        #expect(parse("sanduhr://debug/action?name=account&arg=remove").error == "account needs arg=next")
         #expect(parse("sanduhr://debug/action?name=tool&arg=hammer").error == "tool needs arg=deep-work, pacing or snake")
         #expect(parse("sanduhr://debug/action?name=settings&arg=nowhere").error?.hasPrefix("unknown settings section") == true)
         #expect(parse("sanduhr://debug/action?name=pulse&arg=hourly").error == "unknown tier: hourly")
@@ -235,6 +239,7 @@ struct DebugStateTests {
         s.glowShape = .plain
         s.glowSwitches = NotchGlowSwitches(alerts: true, meetings: false, camera: true)
         s.theme = "aurora"
+        s.menuBar = .rotate
         s.notchRight = .message
         s.cameraLight = true
         s.menu = SanduhrMenu.groups(widgetVisible: true, deepWork: false, pacing: true, snake: false)
@@ -245,12 +250,13 @@ struct DebugStateTests {
             .map { String($0.split(separator: ":")[0]) }
         #expect(keys == ["desk_enabled", "desk_running", "layout", "notch", "has_notch",
                          "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "widget_visible", "widget_visibility",
-                         "settings_open", "settings_section", "meters", "widget_warnings", "meetings_count", "alerts",
+                         "menu_bar", "settings_open", "settings_section", "meters", "widget_warnings", "hidden_limits",
+                         "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
-                         "glow_camera", "theme", "menu", "credentials_store",
-                         "version", "build"])
+                         "glow_camera", "theme", "menu", "credentials_store", "account_ref", "accounts_count",
+                         "follow", "follow_paused", "version", "build"])
         #expect(yaml.contains("settings_section: notch\n"))
-        #expect(yaml.contains("widget_visible: true\nwidget_visibility: whileDeskOff\nsettings_open: true\n"))
+        #expect(yaml.contains("widget_visible: true\nwidget_visibility: whileDeskOff\nmenu_bar: rotate\nsettings_open: true\n"))
         #expect(yaml.contains("notch_left: meetingOrTime\nnotch_right: message\nnotch_strip: meetingOrMeters\ncamera_in_use: false\ncamera_light: true\n"))
         #expect(yaml.contains("pulse_count: 3\nglow_count: 2\nglow_shape: plain\nglow_alerts: true\nglow_meetings: false\nglow_camera: true\ntheme: aurora\nmenu:\n"))
         #expect(yaml.contains("layout: message:tl") == false)   // the colons force quotes
@@ -268,7 +274,7 @@ struct DebugStateTests {
         """))
         #expect(yaml.contains("    pace: null\n"))
         #expect(yaml.contains("last_fetch: \"1970-01-01T00:00:00Z\"\n"))
-        #expect(yaml.contains("credentials_store: file\nversion: \"2.1.0\"\n"))
+        #expect(yaml.contains("credentials_store: file\naccount_ref: null\naccounts_count: 0\nfollow: false\nfollow_paused: false\nversion: \"2.1.0\"\n"))
         #expect(yaml.contains("version: \"2.1.0\"\nbuild: \"3\"\n"))
         #expect(yaml.contains("""
           - header: Tools
@@ -293,8 +299,47 @@ struct DebugStateTests {
         var s = DebugStateInput()
         s.widgetWarnings = [.sevenDay, .sevenDayOpus]
         let yaml = YAMLEmitter.emit(DebugState.yaml(s))
-        #expect(yaml.contains("widget_warnings:\n  - seven_day\n  - seven_day_opus\nmeetings_count: 0\n"))
+        #expect(yaml.contains("widget_warnings:\n  - seven_day\n  - seven_day_opus\nhidden_limits: []\ntemporary_limits: []\nsilenced_limits: []\nmeetings_count: 0\n"))
         #expect(YAMLEmitter.emit(DebugState.yaml(DebugStateInput())).contains("widget_warnings: []\n"))
+        var hidden = DebugStateInput()
+        hidden.hiddenLimits = [.iguanaNecktie]
+        #expect(YAMLEmitter.emit(DebugState.yaml(hidden)).contains("hidden_limits:\n  - iguana_necktie\ntemporary_limits: []\n"))
+        var temporary = DebugStateInput()
+        temporary.temporaryLimits = [.sevenDayOpus, .iguanaNecktie]
+        #expect(YAMLEmitter.emit(DebugState.yaml(temporary))
+            .contains("temporary_limits:\n  - seven_day_opus\n  - iguana_necktie\nsilenced_limits: []\n"))
+        var silenced = DebugStateInput()
+        silenced.silencedLimits = [.fiveHour, .sevenDay]
+        #expect(YAMLEmitter.emit(DebugState.yaml(silenced)).contains("silenced_limits:\n  - five_hour\n  - seven_day\nmeetings_count: 0\n"))
+    }
+
+    @Test func deskFramesListKindsKeysAndRoundedFrames() {
+        var s = DebugStateInput()
+        s.deskFrames = [
+            DeskElement(kind: .meters, frame: CGRect(x: 52.4, y: 880.6, width: 358.5, height: 120)),
+            DeskElement(kind: .meterRow, key: "five_hour", frame: CGRect(x: 52, y: 881, width: 358, height: 50)),
+            DeskElement(kind: .meetingRow, key: "0", frame: CGRect(x: 52, y: 1010, width: 300, height: 25), clickable: false),
+        ]
+        s.deskFramesProblem = "meters frame empty"
+        let yaml = YAMLEmitter.emit(DebugState.yaml(s))
+        #expect(yaml.contains("""
+        desk_frames:
+          - kind: meters
+            clickable: true
+            frame: [52, 881, 359, 120]
+          - kind: meter_row
+            key: five_hour
+            clickable: true
+            frame: [52, 881, 358, 50]
+          - kind: meeting_row
+            key: "0"
+            clickable: false
+            frame: [52, 1010, 300, 25]
+        desk_frames_ok: false
+        desk_frames_problem: meters frame empty
+        """))
+        let empty = YAMLEmitter.emit(DebugState.yaml(DebugStateInput()))
+        #expect(empty.contains("desk_frames: []\ndesk_frames_ok: true\ndesk_frames_problem: null\n"))
     }
 
     @Test func emptyState() {

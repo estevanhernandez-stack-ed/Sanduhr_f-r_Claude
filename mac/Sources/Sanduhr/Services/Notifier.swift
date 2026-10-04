@@ -52,12 +52,20 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         var fired = defaults.stringArray(forKey: Key.fired) ?? []
         let outcome = AlertRules.evaluate(usage: usage, previous: previous, settings: settings,
                                           fired: Set(fired), deskRunning: DeskController.shared.running,
-                                          now: Date())
+                                          now: Date(), hidden: MeterVisibility.hidden(in: UserDefaults.desk))
         guard !outcome.alerts.isEmpty else { return }
         // Recorded even when quiet hours hold the banner back, so nothing bursts out at the end.
         fired.append(contentsOf: outcome.alerts.map(\.onceKey))
         defaults.set(Array(fired.suffix(Self.firedLimit)), forKey: Key.fired)
         deliver(outcome, sound: settings.sound)
+    }
+
+    /// An account switch: the next fetch is the new account's first, so nothing is compared with
+    /// the old account's numbers (a reset alert would fire off another account's baseline, as
+    /// Windows' AlertEngine.Reset prevents). The once-per-window memory stays: its keys name each
+    /// tier's reset time, which belongs to one account, so switching back never repeats an alert.
+    func resetForSwitch() {
+        lastUsage = nil
     }
 
     /// A sample alert through the chosen delivery and sound. Quiet hours do not apply to it.

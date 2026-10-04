@@ -10,6 +10,7 @@ camera_in_use: false
 camera_light: false
 widget_visible: true
 widget_visibility: always
+menu_bar: higher
 settings_open: true
 settings_section: notch
 meters:
@@ -28,7 +29,28 @@ meters:
     reset: ""
     warning: false
 widget_warnings: []
+hidden_limits: []
+temporary_limits: []
+silenced_limits:
+  - five_hour
 meetings_count: 0
+desk_frames:
+  - kind: meters
+    clickable: true
+    frame: [52, 742, 358, 136]
+  - kind: meter_row
+    key: five_hour
+    clickable: true
+    frame: [52, 742, 358, 58]
+  - kind: meter_row
+    key: seven_day
+    clickable: true
+    frame: [52, 820, 358, 58]
+  - kind: meetings
+    clickable: false
+    frame: [52, 898, 260, 22]
+desk_frames_ok: true
+desk_frames_problem: null
 alerts:
   enabled: false
   session_line: 80
@@ -67,5 +89,9 @@ menu:
       - title: Camera Light
         checked: false
 credentials_store: file
+account_ref: "104ab921"
+accounts_count: 2
+follow: false
+follow_paused: false
 version: "2.1.0"
 build: "3"

@@ -48,15 +48,29 @@ enum CalendarAccess {
 final class DeskModel {
     var meetings: [Meeting] = []
     var calendarNote: String?
-    /// One row per Claude limit for the meters piece, in the widget's order.
+    /// One row per Claude limit for the meters piece, in the widget's order, hidden limits left out.
     var meters: [DeskMeterRow] = []
+    /// Every limit the server reported with a utilization, hidden or not, in the widget's order:
+    /// Settings, Desk, Meters lists these, so a hidden limit can be shown again.
+    var reportedTiers: [Tier] = []
+    /// The reported limits believed temporary (LimitLifetime): only these get Settings' "Show
+    /// this limit" switch.
+    var temporaryTiers: Set<Tier> = []
     /// One line of Claude usage, or nil when there is none.
     var claudeLine: String?
+    /// The line in two pieces (DeskClaudeText.parts): with two or more accounts the Desk draws the
+    /// label as its own clickable element, which cycles to the next account.
+    var claudeParts: DeskClaudeText.Parts?
     /// The numbers are older than 15 minutes or the sign-in was refused; the meters and the
     /// line draw dimmed.
     var claudeLineIsStale = false
     /// The widget's session key or Cloudflare clearance was refused.
     var signInNeeded = false
+    /// An account switch is under way (AccountSwitchFade): the meters and the line keep the old
+    /// account's layout, drawn unseen, until the new numbers fade in.
+    var veiled = false
+    /// The switch's fetch outlasts the fade: the faint "switching account…".
+    var switchNote = false
     /// Today's line from MessageEngine (messages.txt), or nil when there is none.
     var message: String?
     /// Height of the menu bar strip at the top of the screen, so top slots sit below it.
@@ -67,23 +81,27 @@ final class DeskModel {
     var claudeCompact: String?
     /// Where the meeting list sits in the window (SwiftUI global coordinates, top-left origin).
     /// The app delegate lets clicks through everywhere except here, so the rows can be clicked.
-    @ObservationIgnored var meetingsFrame: CGRect = .zero
+    @ObservationIgnored var meetingsFrame: CGRect = .zero { didSet { if meetingsFrame != oldValue { onHitAreasChange?() } } }
     /// Each meeting row's frame, same coordinates, keyed by meeting id. Clicks are matched here.
     @ObservationIgnored var rowFrames: [String: CGRect] = [:]
     /// Where the meters sit in the window, same coordinates, or .zero when they are not drawn.
-    /// The meters take clicks here; a click shows the widget beside them.
-    @ObservationIgnored var metersFrame: CGRect = .zero
+    /// The window takes the mouse here for the two-finger limit menu; a plain click does nothing.
+    @ObservationIgnored var metersFrame: CGRect = .zero { didSet { if metersFrame != oldValue { onHitAreasChange?() } } }
+    /// Each meter row's frame, same coordinates: a two-finger click opens that limit's menu.
+    @ObservationIgnored var meterRowFrames: [Tier: CGRect] = [:]
     /// Where the calendar note sits, same coordinates, or .zero when it is not drawn. A click
     /// here opens System Settings at Privacy & Security, Calendars.
-    @ObservationIgnored var noteFrame: CGRect = .zero
+    @ObservationIgnored var noteFrame: CGRect = .zero { didSet { if noteFrame != oldValue { onHitAreasChange?() } } }
+    /// Where the account label at the start of the claude line sits, same coordinates, or .zero
+    /// with one account or no line. A click here switches to the next account.
+    @ObservationIgnored var accountFrame: CGRect = .zero { didSet { if accountFrame != oldValue { onHitAreasChange?() } } }
+    /// Called when a clickable piece moves or comes and goes (DeskController takes the mouse there).
+    @ObservationIgnored var onHitAreasChange: (() -> Void)?
     /// Alert pulses so far, per limit (Settings, Alerts, Where alerts show). A meter row pulses
     /// when its count goes up.
     var pulses: [Tier: Int] = [:]
     /// Every pulse so far, whatever the limit; the notch island pulses when it goes up.
     var pulseCount = 0
-    /// The one-time hint under the meters (DeskMeterHint) is still due.
-    var meterHintVisible = false
-    @ObservationIgnored private let meterHint = DeskMeterHint()
 
     /// The widget's last numbers (see `update`).
     @ObservationIgnored private var usage = DeskUsage()
@@ -258,17 +276,36 @@ final class DeskModel {
     /// Runs on every update and once a minute, so pace ticks and staleness move with the clock.
     func refreshClaude(now: Date = Date()) {
         meters = Self.meterRows(usage.usage, now: now)
+        // Settings' list of limits waits for the new account's numbers.
+        let reported = Tier.allCases.filter { usage.usage?.tiers[$0]?.utilization != nil }
+        if !usage.veiled, reported != reportedTiers { reportedTiers = reported }
+        let temporary = MeterVisibility.temporary(usage.usage, now: now, store: UserDefaults.desk)
+        if !usage.veiled, temporary != temporaryTiers { temporaryTiers = temporary }
         signInNeeded = usage.signInNeeded
+        if veiled != usage.veiled { veiled = usage.veiled }
+        if switchNote != usage.switchNote { switchNote = usage.switchNote }
         claudeLine = DeskClaudeText.line(usage)
+        let parts = DeskClaudeText.parts(usage)
+        if parts != claudeParts { claudeParts = parts }
         claudeCompact = DeskClaudeText.compact(usage, now: now)
         claudeLineIsStale = usage.isStale(now: now)
-        let hint = meterHint.isVisible(now: now)
-        if meterHintVisible != hint { meterHintVisible = hint }
     }
 
-    /// The meter rows with the saved warning settings (Settings, Desk, Meters).
+    /// Settings' "Show this limit" switch: hiding records what the limit reads now
+    /// (MeterVisibility.hide), showing clears the hide.
+    func setShown(_ tier: Tier, _ shown: Bool) {
+        if shown {
+            MeterVisibility.show(tier, store: UserDefaults.desk)
+        } else {
+            MeterVisibility.hide(tier, usage: usage.usage, now: Date(), store: UserDefaults.desk)
+        }
+    }
+
+    /// The meter rows for the limits that show, with the saved warning settings (Settings, Desk, Meters).
     private static func meterRows(_ usage: UsageResponse?, now: Date) -> [DeskMeterRow] {
-        DeskMeterRow.rows(from: usage, now: now) { MeterWarningSettings.saved($0, in: UserDefaults.desk) }
+        let desk = UserDefaults.desk
+        let shown = MeterVisibility.visible(usage, hidden: MeterVisibility.hidden(in: desk))
+        return DeskMeterRow.rows(from: shown, now: now) { MeterWarningSettings.saved($0, in: desk) }
     }
 
     /// Re-applies the warning settings at once: a Meters setting changed. Rows that already match
@@ -285,13 +322,28 @@ final class DeskModel {
         pulseCount += 1
     }
 
-    /// The hint was drawn under the meters; its three days start now if they have not already.
-    func meterHintShown() { meterHint.markShown(now: Date()) }
-
-    /// The meters were clicked: the hint has done its job.
-    func meterHintDismissed() {
-        meterHint.dismiss()
-        meterHintVisible = false
+    /// Every interactive element DeskView draws, with the frame it reported (.zero when none
+    /// arrived): what DeskHitTest picks from and state.yaml's `desk_frames` lists. Reads the same
+    /// layout settings as DeskView.
+    func elements() -> [DeskElement] {
+        let desk = UserDefaults.desk
+        var input = DeskElements.Input()
+        input.placed = DeskLayout.placed(desk.string(forKey: "layout") ?? DeskLayout.standard,
+                                         showMeetings: desk.object(forKey: "showMeetings") as? Bool ?? true,
+                                         showClaude: desk.object(forKey: "showClaude") as? Bool ?? true)
+        input.meterTiers = meters.map(\.tier)
+        input.signInNeeded = signInNeeded
+        input.switchNote = switchNote
+        input.hasAccount = claudeParts?.account != nil
+        input.calendarNote = calendarNote != nil
+        input.rows = meetings.map { DeskElements.Row(id: $0.id, hasLink: $0.link != nil) }
+        input.metersFrame = metersFrame
+        input.meterRowFrames = meterRowFrames
+        input.accountFrame = accountFrame
+        input.noteFrame = noteFrame
+        input.meetingsFrame = meetingsFrame
+        input.rowFrames = rowFrames
+        return DeskElements.build(input)
     }
 
     /// The first meeting still to come (or in progress) that has a join link.

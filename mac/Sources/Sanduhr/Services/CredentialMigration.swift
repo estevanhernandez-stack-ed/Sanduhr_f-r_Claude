@@ -71,7 +71,26 @@ enum CredentialMigration {
     /// working; a later launch tries again.
     static func run(from source: any CredentialBackend, to destination: any CredentialBackend,
                     accounts: [String]) -> CredentialMigrationOutcome {
-        let values: [(String, String)] = accounts.compactMap { a in source.get(account: a).map { (a, $0) } }
+        run(from: source, to: destination, groups: [accounts])
+    }
+
+    /// The same move over several groups of accounts at once: the legacy pair and each named
+    /// account's pair (AccountRegistry.swift). The source is the newer copy only for a group it
+    /// holds something of, so a stale item is cleared within that group and a group the source
+    /// lacks entirely is left alone (a file holding only the legacy key never clears another
+    /// account's Keychain items). All writes are checked before any clear, and all clears before
+    /// any source delete.
+    static func run(from source: any CredentialBackend, to destination: any CredentialBackend,
+                    groups: [[String]]) -> CredentialMigrationOutcome {
+        var values: [(String, String)] = []
+        var clears: [String] = []
+        for accounts in groups {
+            let found: [(String, String)] = accounts.compactMap { a in source.get(account: a).map { (a, $0) } }
+            guard !found.isEmpty else { continue }
+            values.append(contentsOf: found)
+            let moved = Set(found.map(\.0))
+            clears.append(contentsOf: accounts.filter { !moved.contains($0) })
+        }
         guard !values.isEmpty else { return .nothingToMove }
         for (account, value) in values {
             do { try destination.set(value, account: account) } catch {
@@ -81,8 +100,7 @@ enum CredentialMigration {
                 return .keptFileBecause(.readBackMismatch(account: account))
             }
         }
-        let moved = Set(values.map(\.0))
-        for account in accounts where !moved.contains(account) {
+        for account in clears {
             do { try destination.delete(account: account) } catch {
                 return .keptFileBecause(.clearFailed(account: account))
             }
@@ -99,12 +117,19 @@ enum CredentialMigration {
     /// store to use and, when a migration ran, its outcome.
     static func resolve(isSigned: Bool, file: any CredentialBackend, keychain: any CredentialBackend,
                         accounts: [String]) -> (store: CredentialStoreKind, outcome: CredentialMigrationOutcome?) {
+        resolve(isSigned: isSigned, file: file, keychain: keychain, groups: [accounts])
+    }
+
+    /// `resolve` over several groups of accounts (`run(from:to:groups:)`).
+    static func resolve(isSigned: Bool, file: any CredentialBackend, keychain: any CredentialBackend,
+                        groups: [[String]]) -> (store: CredentialStoreKind, outcome: CredentialMigrationOutcome?) {
+        let all = groups.flatMap { $0 }
         // Ask the Keychain only on a signed build: an ad-hoc one could prompt just for asking.
-        let keychainHas = isSigned && keychain.hasAny(accounts)
-        let plan = CredentialStorePlan.decide(isSigned: isSigned, fileHas: file.hasAny(accounts),
+        let keychainHas = isSigned && keychain.hasAny(all)
+        let plan = CredentialStorePlan.decide(isSigned: isSigned, fileHas: file.hasAny(all),
                                               keychainHas: keychainHas)
         guard plan.migrate else { return (plan.store, nil) }
-        let outcome = run(from: file, to: keychain, accounts: accounts)
+        let outcome = run(from: file, to: keychain, groups: groups)
         return (outcome.store, outcome)
     }
 }

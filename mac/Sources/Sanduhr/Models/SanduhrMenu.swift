@@ -51,3 +51,68 @@ enum SanduhrMenu {
         ]
     }
 }
+
+extension SanduhrMenu {
+    /// `groups` without `command`'s item, dropping a group it leaves empty.
+    static func without(_ command: MenuCommand, in groups: [MenuGroup]) -> [MenuGroup] {
+        groups.compactMap { group in
+            let entries = group.entries.filter { $0.command != command }
+            return entries.isEmpty ? nil : MenuGroup(header: group.header, entries: entries)
+        }
+    }
+}
+
+/// One account in the Accounts submenu: the active one checked, one that following saw in use
+/// marked "· in use".
+struct AccountMenuItem: Equatable {
+    let label: String
+    var checked = false
+    var inUse = false
+
+    var title: String { inUse ? "\(label) · in use" : label }
+}
+
+/// The Accounts submenu (item 36): each account, then Manage Accounts…, which opens Settings,
+/// Accounts. Kept apart from `MenuGroup` because its titles are labels, which never go into
+/// state.yaml (the debug state lists the groups' titles).
+struct AccountsMenu: Equatable {
+    static let title = "Accounts"
+    static let manage = "Manage Accounts…"
+    let items: [AccountMenuItem]
+}
+
+extension SanduhrMenu {
+    /// The Accounts submenu, nil with fewer than two accounts (one account needs no choosing).
+    /// `inUse` marks the inactive accounts following saw in use; the active one is never marked.
+    static func accounts(_ labels: [String], active: String?, inUse: Set<String> = []) -> AccountsMenu? {
+        guard labels.count > 1 else { return nil }
+        return AccountsMenu(items: labels.map { label in
+            AccountMenuItem(label: label, checked: label == active,
+                            inUse: label != active && inUse.contains(label))
+        })
+    }
+}
+
+/// One choice in the Menu Bar Shows submenu.
+struct MenuBarModeItem: Equatable {
+    let mode: MenuBarMode
+    var checked = false
+
+    /// The same words as Settings, General, Menu bar.
+    var title: String { mode.label }
+}
+
+/// The menu bar item's own Menu Bar Shows submenu (item 40): the four Menu bar choices, the
+/// current one checked. Choosing one writes the same `menuBarMode` default as Settings, so
+/// Settings follows.
+struct MenuBarModeMenu: Equatable {
+    static let title = "Menu Bar Shows"
+    let items: [MenuBarModeItem]
+}
+
+extension SanduhrMenu {
+    /// The Menu Bar Shows submenu with `current` checked, in Settings' order.
+    static func menuBarModes(current: MenuBarMode) -> MenuBarModeMenu {
+        MenuBarModeMenu(items: MenuBarMode.allCases.map { MenuBarModeItem(mode: $0, checked: $0 == current) })
+    }
+}

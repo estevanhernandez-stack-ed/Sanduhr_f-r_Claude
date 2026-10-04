@@ -1,0 +1,19 @@
+# Item 38: a limit other than the session and the weekly all-models one can be hidden (Settings,
+# Desk, Meters, Show this limit). Hiding Weekly — Special takes it off the widget, the Desk meters
+# and the alerts; the session and weekly meters stay. The run puts the key back, and the limit
+# shows again. Hidden or not, the menu bar follows only the session and weekly limits.
+# Watch the snap: no "Weekly — Special" card on the widget or row on the Desk.
+name: Hide a special limit
+needs: [desk, credentials]
+steps:
+  # Start from the limit shown, whatever the user chose; the run puts their choice back.
+  - defaults: { domain: desk, key: meterShow.iguana_necktie, type: bool, value: true }
+  - expect_state: { hidden_limits: [], meters.0.tier: five_hour }
+  - defaults: { domain: desk, key: meterShow.iguana_necktie, type: bool, value: false }
+  - expect_state: { hidden_limits: [iguana_necktie], meters.0.tier: five_hour, meters.1.tier: seven_day }
+  - do: settings
+    arg: deskMeters
+  - expect_state: { settings_section: deskMeters }
+  - snap: hide-limit
+  - defaults: { domain: desk, key: meterShow.iguana_necktie, type: bool, value: true }
+  - expect_state: { hidden_limits: [] }

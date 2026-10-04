@@ -206,6 +206,37 @@ struct DeskMeterTests {
         #expect(DeskClaudeText.compact(refused, now: now) == "sign in to Sanduhr")
         #expect(refused.isStale(now: now))
     }
+
+    @Test func withTwoOrMoreAccountsTheLineStartsWithTheLabel() {
+        var input = DeskUsage(usage: usage([.fiveHour: TierUsage(utilization: 7, resetsAt: nil),
+                                            .sevenDay: TierUsage(utilization: 63, resetsAt: nil)]),
+                              fetchedAt: now.addingTimeInterval(-60), account: "Work")
+        #expect(DeskClaudeText.line(input) == "Work   7% session   63% week")
+        input.account = "Work (in use)"
+        #expect(DeskClaudeText.line(input) == "Work (in use)   7% session   63% week")
+        input.signInNeeded = true
+        #expect(DeskClaudeText.line(input) == "Work (in use)   sign in again in Sanduhr")
+        // The notch has no room: it never shows the label.
+        #expect(DeskClaudeText.compact(input, now: now) == "sign in to Sanduhr")
+        input.signInNeeded = false
+        #expect(DeskClaudeText.compact(input, now: now) == "5h 7%  wk 63%")
+    }
+
+    /// The Desk draws the label as its own clickable element (it cycles accounts), the rest apart.
+    @Test func theLineSplitsIntoTheLabelAndTheRest() {
+        var input = DeskUsage(usage: usage([.fiveHour: TierUsage(utilization: 7, resetsAt: nil),
+                                            .sevenDay: TierUsage(utilization: 63, resetsAt: nil)]),
+                              fetchedAt: now.addingTimeInterval(-60), account: "Work")
+        #expect(DeskClaudeText.parts(input) == DeskClaudeText.Parts(account: "Work", rest: "7% session   63% week"))
+        input.signInNeeded = true
+        #expect(DeskClaudeText.parts(input) == DeskClaudeText.Parts(account: "Work", rest: "sign in again in Sanduhr"))
+        // One account: no label to click, the line starts with "claude".
+        input.account = nil
+        #expect(DeskClaudeText.parts(input)?.account == nil)
+        #expect(DeskClaudeText.line(input) == "claude   sign in again in Sanduhr")
+        // No numbers: no line at all.
+        #expect(DeskClaudeText.parts(DeskUsage(usage: nil, fetchedAt: nil, account: "Work")) == nil)
+    }
 }
 
 @Suite("Ink spec")
@@ -459,47 +490,6 @@ struct DeskFirstRunTests {
     }
 }
 
-@Suite("Desk meter hint")
-struct DeskMeterHintTests {
-    let start = Date(timeIntervalSince1970: 1_790_000_000)
-    let day: TimeInterval = 24 * 60 * 60
-
-    @Test func dueBeforeItHasEverShown() {
-        let hint = DeskMeterHint(store: MemoryDefaults())
-        #expect(hint.isVisible(now: start))
-        // Its three days start when it is drawn, not before.
-        #expect(hint.isVisible(now: start.addingTimeInterval(30 * day)))
-    }
-
-    @Test func expiresThreeDaysAfterItFirstShowed() {
-        let store = MemoryDefaults()
-        let hint = DeskMeterHint(store: store)
-        hint.markShown(now: start)
-        // Drawn again later (a new window, a relaunch): the first date stands.
-        hint.markShown(now: start.addingTimeInterval(2 * day))
-        #expect(store.object(forKey: DeskMeterHint.firstShownKey) as? Date == start)
-        #expect(hint.isVisible(now: start.addingTimeInterval(3 * day - 60)))
-        #expect(hint.isVisible(now: start.addingTimeInterval(3 * day)) == false)
-        #expect(hint.isVisible(now: start.addingTimeInterval(10 * day)) == false)
-    }
-
-    @Test func firstMeterClickEndsItForGood() {
-        let store = MemoryDefaults()
-        let hint = DeskMeterHint(store: store)
-        hint.markShown(now: start)
-        hint.dismiss()
-        #expect(hint.isVisible(now: start.addingTimeInterval(60)) == false)
-        // A later launch reads the same store.
-        #expect(DeskMeterHint(store: store).isVisible(now: start.addingTimeInterval(60)) == false)
-    }
-
-    @Test func dismissedBeforeShowingNeverShows() {
-        let hint = DeskMeterHint(store: MemoryDefaults())
-        hint.dismiss()
-        #expect(hint.isVisible(now: start) == false)
-    }
-}
-
 @Suite("Widget beside the meters")
 struct DeskPanelPlacementTests {
     let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
@@ -650,5 +640,109 @@ struct NotchContentTests {
     @Test func everyChoiceHasALabel() {
         #expect(NotchContent.allCases.count == 6)
         #expect(Set(NotchContent.allCases.map(\.label)).count == 6)
+    }
+}
+
+@Suite("Desk meter menu")
+struct DeskPointerMenuTests {
+    /// The plate must leave a drawn pixel in an 8-bit backing after the Desk ink's 0.92 opacity,
+    /// and stay far too faint to see.
+    @Test func hitPlateIsDrawnButFaint() {
+        let alpha = DeskPointerMenu.hitPlateOpacity * 0.92 * 255
+        #expect(alpha.rounded() >= 3)
+        #expect(DeskPointerMenu.hitPlateOpacity <= 0.02)
+    }
+
+    @Test func fallbackOnlyOverUncoveredMetersWithNoOtherMenu() {
+        #expect(DeskPointerMenu.fallbackOpens(overMeters: true, appWindowCovers: false, otherMenuOpen: false))
+        #expect(!DeskPointerMenu.fallbackOpens(overMeters: false, appWindowCovers: false, otherMenuOpen: false))
+        #expect(!DeskPointerMenu.fallbackOpens(overMeters: true, appWindowCovers: true, otherMenuOpen: false))
+        // The desktop (the Finder) opened its own menu: never a second one.
+        #expect(!DeskPointerMenu.fallbackOpens(overMeters: true, appWindowCovers: false, otherMenuOpen: true))
+    }
+
+    @Test func fallbackWaitsLessThanAMenuWouldFeelLate() {
+        #expect(DeskPointerMenu.fallbackDelay > 0 && DeskPointerMenu.fallbackDelay <= 0.25)
+    }
+}
+
+@Suite("Account switch fade")
+struct AccountSwitchFadeTests {
+    let start = Date(timeIntervalSince1970: 1_800_000_000)
+
+    @Test func timings() {
+        // Item 41: a slower, gentler departure; the arrival a touch quicker.
+        #expect(AccountSwitchFade.fadeOut == 0.6)
+        #expect(AccountSwitchFade.fadeIn == 0.45)
+        #expect(AccountSwitchFade.outAnimation(reduceMotion: false) == .easeInOut(duration: 0.6))
+        #expect(AccountSwitchFade.inAnimation(reduceMotion: false) == .easeOut(duration: 0.45))
+        #expect(AccountSwitchFade.nameAnimation(reduceMotion: false) == .easeInOut(duration: AccountSwitchFade.nameFade))
+        // The note comes up only once the old meters are gone.
+        #expect(AccountSwitchFade.noteDelay >= AccountSwitchFade.fadeOut)
+        #expect(AccountSwitchFade.noteOpacity > 0 && AccountSwitchFade.noteOpacity < 1)
+    }
+
+    @Test func reduceMotionIsAPlainSwap() {
+        #expect(AccountSwitchFade.outAnimation(reduceMotion: true) == nil)
+        #expect(AccountSwitchFade.inAnimation(reduceMotion: true) == nil)
+        #expect(AccountSwitchFade.nameAnimation(reduceMotion: true) == nil)
+        #expect(AccountSwitchFade.outAnimation(reduceMotion: false) != nil)
+        #expect(AccountSwitchFade.inAnimation(reduceMotion: false) != nil)
+        #expect(AccountSwitchFade.holdBack(since: start, now: start, reduceMotion: true) == 0)
+    }
+
+    @Test func newNumbersWaitOutTheFadeOut() {
+        // An answer 0.1 s after the switch waits the other 0.5 s; one after the fade shows at once.
+        let early = AccountSwitchFade.holdBack(since: start, now: start.addingTimeInterval(0.1), reduceMotion: false)
+        #expect(abs(early - 0.5) < 1e-6)
+        #expect(AccountSwitchFade.holdBack(since: start, now: start.addingTimeInterval(0.6), reduceMotion: false) == 0)
+        #expect(AccountSwitchFade.holdBack(since: start, now: start.addingTimeInterval(3), reduceMotion: false) == 0)
+        // Outside a switch nothing waits.
+        #expect(AccountSwitchFade.holdBack(since: nil, now: start, reduceMotion: false) == 0)
+    }
+
+    @Test func theNameStaysUntilTheOldNumbersAreGone() {
+        var hold = AccountSwitchFade.NameHold()
+        #expect(hold.shown(active: "Work") == "Work")
+        hold.begin(leaving: "Personal", reduceMotion: false)
+        // Fading out: the old name over the old numbers, though Work is already active.
+        #expect(hold.shown(active: "Work") == "Personal")
+        // A second switch mid-fade keeps the first one's name.
+        hold.begin(leaving: "Work", reduceMotion: false)
+        #expect(hold.shown(active: "Team") == "Personal")
+        hold.release()
+        #expect(hold.shown(active: "Team") == "Team")
+        #expect(hold == AccountSwitchFade.NameHold())
+    }
+
+    @Test func theNameHoldsThroughTheWholeFadeOut() {
+        // The name gives way when the note's wait ends, which is the fade out's end, and the new
+        // numbers never show before it (holdBack).
+        #expect(AccountSwitchFade.noteDelay == AccountSwitchFade.fadeOut)
+        #expect(AccountSwitchFade.holdBack(since: start, now: start, reduceMotion: false) == AccountSwitchFade.fadeOut)
+        #expect(AccountSwitchFade.nameFade < AccountSwitchFade.fadeOut)
+    }
+
+    @Test func reduceMotionSwapsTheNameAtOnce() {
+        var hold = AccountSwitchFade.NameHold()
+        hold.begin(leaving: "Personal", reduceMotion: true)
+        #expect(hold.shown(active: "Work") == "Work")
+        #expect(!hold.holding)
+    }
+
+    @Test func aHeldNameCanBeNone() {
+        // Leaving an account the chip did not name (one account then): the chip stays away until
+        // the fade out is over.
+        var hold = AccountSwitchFade.NameHold()
+        hold.begin(leaving: nil, reduceMotion: false)
+        #expect(hold.shown(active: "Work") == nil)
+    }
+
+    @Test func theNotchNeverShowsTheOldAccountsNumbers() {
+        let u = UsageResponse(tiers: [.fiveHour: TierUsage(utilization: 7, resetsAt: nil)], extraUsage: nil)
+        var input = DeskUsage(usage: u, fetchedAt: start)
+        #expect(DeskClaudeText.compact(input, now: start) == "5h 7%")
+        input.veiled = true
+        #expect(DeskClaudeText.compact(input, now: start) == nil)
     }
 }

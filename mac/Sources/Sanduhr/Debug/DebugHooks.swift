@@ -115,6 +115,7 @@ enum DebugHooks {
         case .glow: NotchGlowController.shared.fire()
         case .demo(let on): DeskController.shared.model.setDemo(on)
         case .theme(let id): app.viewModel.selectTheme(id: id)
+        case .cycleAccount: app.viewModel.cycleAccount()
         }
         settle()
     }
@@ -195,17 +196,29 @@ enum DebugHooks {
     /// per line, label = the text, frame on screen. SwiftUI only exposes its accessibility tree to
     /// a real assistive client, which the smoke tools are not, so this is what they match on.
     /// It also catches text that is clipped or drawn outside the window, which a tree would not.
+    ///
+    /// Vision runs off the main thread with a time limit: a synchronous call once never returned
+    /// during a long smoke run and froze the app (2026-10-04). A window whose text is not read in
+    /// time reports none, and the snapshot goes on.
     private static func recognizeText(_ image: CGImage, in area: CGRect) -> [DebugTreeNode] {
-        let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = false
-        do {
-            try VNImageRequestHandler(cgImage: image).perform([request])
-        } catch {
+        let job = TextJob()
+        job.request.recognitionLevel = .accurate
+        job.request.usesLanguageCorrection = false
+        let done = DispatchSemaphore(value: 0)
+        DispatchQueue.global(qos: .userInitiated).async {
+            do { try VNImageRequestHandler(cgImage: image).perform([job.request]) } catch { job.error = error }
+            done.signal()
+        }
+        guard done.wait(timeout: .now() + textTimeout) == .success else {
+            job.request.cancel()
+            log.error("debug: text recognition timed out after \(Int(textTimeout), privacy: .public) s")
+            return []
+        }
+        if let error = job.error {
             log.error("debug: text recognition failed: \(error.localizedDescription, privacy: .public)")
             return []
         }
-        return (request.results ?? []).compactMap { observation in
+        return (job.request.results ?? []).compactMap { observation in
             guard let text = observation.topCandidates(1).first?.string, !text.isEmpty else { return nil }
             return DebugTreeNode(role: "OCRText", label: text,
                                  frame: DebugTree.screenRect(normalized: observation.boundingBox, in: area))
@@ -214,6 +227,15 @@ enum DebugHooks {
 
     /// One element and what is under it. Elements that are not accessibility elements of their
     /// own (plain container views) are skipped and their children take their place.
+    /// How long one window's text recognition may take before the snapshot gives up on it.
+    private static let textTimeout: TimeInterval = 5
+
+    /// The request and its error, handed to the background queue and read back after the wait.
+    private final class TextJob: @unchecked Sendable {
+        let request = VNRecognizeTextRequest()
+        var error: Error?
+    }
+
     private static func walk(_ any: Any, depth: Int, budget: inout Int,
                              primaryHeight: CGFloat) -> [DebugTreeNode] {
         guard budget > 0, depth < DebugTree.maxDepth,
@@ -256,6 +278,7 @@ enum DebugHooks {
         s.cameraLight = CameraLightController.shared.showing
         s.widgetVisible = widgetVisible
         s.widgetVisibility = .saved()
+        s.menuBar = .saved()
         s.settingsOpen = settings.isOpen
         s.settingsSection = settings.window == nil ? nil : settings.section
         // A `defaults write` from the smoke runner posts no change notice here: apply the saved
@@ -265,7 +288,14 @@ enum DebugHooks {
         s.meters = desk.model.meters
         vm.refreshMeterWarnings()
         s.widgetWarnings = Tier.allCases.filter(vm.warningTiers.contains)
+        s.hiddenLimits = Tier.allCases.filter(vm.hiddenTiers.contains)
+        s.temporaryLimits = Tier.allCases.filter(vm.temporaryTiers.contains)
+        s.silencedLimits = LimitMenu.silenced(in: UserDefaults.desk)
         s.meetingsCount = desk.model.meetings.count
+        if desk.running, let size = desk.windowSize {
+            s.deskFrames = desk.model.elements()
+            s.deskFramesProblem = DeskFrameCheck.problem(s.deskFrames, window: size)
+        }
         s.alerts = AlertSettings(UserDefaults.standard)
         s.lastFetch = vm.lastUpdated
         switch vm.activeTool {
@@ -281,6 +311,10 @@ enum DebugHooks {
         s.theme = vm.theme.id
         s.menu = app.currentMenu(widgetVisible: widgetVisible)
         s.credentialsStore = KeychainStore.kind
+        s.accountRef = AccountRef.of(KeychainStore.accounts.active)
+        s.accountsCount = KeychainStore.accounts.labels.count
+        s.follow = vm.followEnabled
+        s.followPaused = vm.followPaused
         s.version = info["CFBundleShortVersionString"] as? String ?? ""
         s.build = info["CFBundleVersion"] as? String ?? ""
         return s

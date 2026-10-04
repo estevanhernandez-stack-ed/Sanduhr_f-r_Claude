@@ -10,6 +10,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let viewModel = UsageViewModel()
     private var panel: FloatingPanel?
     private var statusItem: NSStatusItem?
+    /// Rotate's timer (Settings, General, Menu bar), nil in every other mode; the step counts its turns.
+    private var menuBarRotateTimer: Timer?
+    private var menuBarStep = 0
     private let updaterController = SPUStandardUpdaterController(
         startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
     /// Sparkle's settings and Check Now for Settings, Updates; the same updater the menus use.
@@ -57,7 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         awaitingSignIn = SignInGate.awaitingSignIn(
             fresh: firstRun == .fresh,
             hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey),
-            in: UserDefaults.standard)
+            account: KeychainStore.accounts.active, in: UserDefaults.standard)
         let wasShowing = !UserDefaults.standard.bool(forKey: Self.panelHiddenKey)
         let show = WidgetVisibilityRule.resolve(
             showing: wasShowing, setting: .saved(), deskOn: DeskController.shared.enabled,
@@ -79,9 +82,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // every refresh even while the widget is hidden (or Desk is off, ready for when it starts).
             guard let vm = self?.viewModel else { return }
             let fetched = vm.usage != nil && (vm.status == .idle || vm.status == .noTiers)
-            // Remembered for the next launch: has this key fetched (SignInGate)?
+            // Remembered for the next launch: has the active account's key fetched (SignInGate)?
             SignInGate.record(fetched: fetched, needsSignIn: vm.status.needsSignIn,
-                              in: UserDefaults.standard)
+                              account: KeychainStore.accounts.active, in: UserDefaults.standard)
             // The widget showed for sign-in; once the numbers arrive the choice takes over.
             if self?.awaitingSignIn == true, fetched {
                 self?.awaitingSignIn = false
@@ -93,8 +96,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.awaitingSignIn = true
                 self?.applyWidgetVisibility(.signedOut)
             }
+            // During a switch the Desk lays out the old account's meters unseen (veiled), as the
+            // widget's cards do, and fades in the new ones with the view model's animation. The
+            // line keeps the old account's name until those numbers have faded out.
             DeskController.shared.model.update(DeskUsage(
-                usage: vm.usage, fetchedAt: vm.lastUpdated, signInNeeded: vm.status.needsSignIn))
+                usage: vm.shownUsage, fetchedAt: vm.lastUpdated, signInNeeded: vm.status.needsSignIn,
+                account: vm.shownAccountLabel, veiled: vm.switchVeil, switchNote: vm.switchNote))
         }
 
         // When the user toggles compact mode, resize the panel to fit the
@@ -104,6 +111,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: .sanduhrCompactDidChange, object: nil)
 
         viewModel.bootstrap()
+        applyMenuBarRotation()
         renderStatusItem()
 
         // Desk: the desktop layer and the notch, when switched on (Settings, General, Surfaces).
@@ -208,13 +216,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Re-renders the status item title based on the current usage data.
+    /// Settings, General, Menu bar changed: start or stop Rotate's timer and redraw at once.
+    func menuBarModeDidChange() {
+        applyMenuBarRotation()
+        renderStatusItem()
+    }
+
+    /// Rotate's timer runs only while Rotate is chosen. Added in the common modes so the text
+    /// keeps turning while a menu is open; only the shown text changes, nothing is fetched.
+    private func applyMenuBarRotation() {
+        let rotating = MenuBarMode.saved() == .rotate
+        if rotating, menuBarRotateTimer == nil {
+            let timer = Timer(timeInterval: MenuBarMode.rotateInterval, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.menuBarStep &+= 1
+                    self.renderStatusItem()
+                }
+            }
+            timer.tolerance = 1
+            RunLoop.main.add(timer, forMode: .common)
+            menuBarRotateTimer = timer
+        } else if !rotating, let timer = menuBarRotateTimer {
+            timer.invalidate()
+            menuBarRotateTimer = nil
+            menuBarStep = 0
+        }
+    }
+
+    /// Re-renders the status item title from the current usage and the Menu bar choice
+    /// (MenuBarText: the session, the weekly limit, the higher of the two, or both in turn).
     func renderStatusItem() {
         guard let button = statusItem?.button else { return }
-        let pct = viewModel.highestTier()?.usage.utilization
+        let reading = MenuBarText.reading(viewModel.usage, mode: .saved(), step: menuBarStep)
 
-        if let pct {
-            let intPct = Int(pct)
+        if let reading {
+            let intPct = reading.percent
             // Color the number only when urgency is high — keeps the menu
             // bar neutral the rest of the time (HIG preference).
             let color: NSColor
@@ -226,7 +263,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let font = NSFont.monospacedDigitSystemFont(
                 ofSize: NSFont.systemFontSize(for: .small), weight: .medium)
             button.attributedTitle = NSAttributedString(
-                string: " \(intPct)%",
+                string: " \(reading.text)",
                 attributes: [.foregroundColor: color, .font: font])
         } else {
             // No data yet — just the icon.
@@ -250,7 +287,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showStatusMenu(from button: NSStatusBarButton) {
         let menu = NSMenu()
-        addMenuItems(to: menu)
+        addMenuItems(to: menu, menuBarModes: true)
 
         // Briefly attach, pop, detach — so default L-click behavior stays
         // as "toggle panel" rather than "always show menu".
@@ -261,8 +298,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// The shared menu (SanduhrMenu) as AppKit items, for the menu bar item's menu and Desk's
     /// clock menu. The widget's own two-finger menu (RootView) renders the same groups.
-    func addMenuItems(to menu: NSMenu) {
-        for (i, group) in currentMenu(widgetVisible: panel?.isVisible ?? false).enumerated() {
+    /// `accounts` false leaves the Accounts submenu out, for a limit menu that already has it;
+    /// `menuBarModes` adds Menu Bar Shows after it, in the menu bar item's own menu only;
+    /// `showHide` false leaves Show or Hide Widget out, for a Desk limit menu that has it on top.
+    func addMenuItems(to menu: NSMenu, accounts withAccounts: Bool = true, menuBarModes: Bool = false,
+                      showHide: Bool = true) {
+        let accounts = withAccounts ? currentAccountsMenu() : nil
+        var groups = currentMenu(widgetVisible: panel?.isVisible ?? false)
+        // A Desk limit menu has Show or Hide Widget at its top already.
+        if !showHide { groups = SanduhrMenu.without(.showHide, in: groups) }
+        for (i, group) in groups.enumerated() {
             if i > 0 { menu.addItem(.separator()) }
             if let header = group.header { menu.addItem(.sectionHeader(title: header)) }
             for entry in group.entries {
@@ -273,7 +318,109 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 m.state = entry.checked ? .on : .off
                 menu.addItem(m)
             }
+            // The Accounts submenu sits after Show/Hide, with two or more accounts.
+            if i == 0, let accounts {
+                menu.addItem(.separator())
+                menu.addItem(accountsMenuItem(accounts))
+            }
+            // Menu Bar Shows sits with the Accounts submenu, or after Show/Hide on its own.
+            if i == 0, menuBarModes {
+                if accounts == nil { menu.addItem(.separator()) }
+                menu.addItem(menuBarModesMenuItem(SanduhrMenu.menuBarModes(current: .saved())))
+            }
         }
+    }
+
+    /// "Menu Bar Shows ▸": the four Menu bar choices, the current one checked.
+    private func menuBarModesMenuItem(_ modes: MenuBarModeMenu) -> NSMenuItem {
+        let sub = NSMenu(title: MenuBarModeMenu.title)
+        for item in modes.items {
+            let m = NSMenuItem(title: item.title, action: #selector(menuBarModeChosen(_:)), keyEquivalent: "")
+            m.target = self
+            m.representedObject = item.mode.rawValue
+            m.state = item.checked ? .on : .off
+            sub.addItem(m)
+        }
+        let top = NSMenuItem(title: MenuBarModeMenu.title, action: nil, keyEquivalent: "")
+        top.submenu = sub
+        return top
+    }
+
+    /// A Menu Bar Shows choice: saved where Settings, General, Menu bar reads it (the picker
+    /// follows), and the menu bar redrawn at once.
+    @objc private func menuBarModeChosen(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let mode = MenuBarMode(rawValue: raw) else { return }
+        MenuBarMode.save(mode)
+        menuBarModeDidChange()
+    }
+
+    /// A Desk meter row's two-finger menu (LimitMenu): Show or Hide Widget, Accounts, Hide and the
+    /// warnings item for `tier`, Meter Settings…, then the shared menu under a separator, less its
+    /// own Show or Hide Widget. `tier` nil, a click beside the rows, leaves the limit's own items out.
+    func addLimitMenuItems(to menu: NSMenu, tier: Tier?) {
+        let groups = LimitMenu.groups(tier: tier, accounts: currentAccountsMenu(), store: UserDefaults.desk,
+                                      usage: viewModel.usage, now: Date(), widgetVisible: widgetVisible)
+        for (i, group) in groups.enumerated() {
+            if i > 0 { menu.addItem(.separator()) }
+            for entry in group { menu.addItem(limitMenuItem(entry)) }
+        }
+        menu.addItem(.separator())
+        addMenuItems(to: menu, accounts: false, showHide: false)
+    }
+
+    private func limitMenuItem(_ entry: LimitMenuEntry) -> NSMenuItem {
+        if case .accounts(let accounts) = entry { return accountsMenuItem(accounts) }
+        if case .hiddenLimits(let tiers) = entry { return hiddenLimitsMenuItem(tiers) }
+        let m = NSMenuItem(title: entry.title, action: #selector(limitItemChosen(_:)), keyEquivalent: "")
+        m.target = self
+        m.representedObject = LimitMenuBox(entry)
+        return m
+    }
+
+    @objc private func limitItemChosen(_ sender: NSMenuItem) {
+        if let box = sender.representedObject as? LimitMenuBox { performLimit(box.entry) }
+    }
+
+    /// "Hidden Limits ▸": each hidden limit; picking one shows it again.
+    private func hiddenLimitsMenuItem(_ tiers: [Tier]) -> NSMenuItem {
+        let sub = NSMenu(title: LimitMenu.hiddenLimits)
+        for tier in tiers { sub.addItem(limitMenuItem(.show(tier))) }
+        let top = NSMenuItem(title: LimitMenu.hiddenLimits, action: nil, keyEquivalent: "")
+        top.submenu = sub
+        return top
+    }
+
+    /// What a limit menu's items do, from Desk and the widget alike: Hide, a Hidden Limits item
+    /// and the warnings item write the desk-suite keys Settings, Desk, Meters reads (both refresh
+    /// on the change notice; Hide records the limit's current numbers), Meter Settings… opens
+    /// that page.
+    func performLimit(_ entry: LimitMenuEntry) {
+        switch entry {
+        case .widget(let visible):
+            if visible { hidePanel() } else { DeskController.shared.showWidgetBesideMeters() }
+        case .accounts, .hiddenLimits: break
+        case .meterSettings: SettingsWindowController.shared.show(.deskMeters)
+        case .hide, .show, .warnings: LimitMenu.apply(entry, to: UserDefaults.desk, usage: viewModel.usage)
+        }
+    }
+
+    /// "Accounts ▸": each account (the active one checked), then Manage Accounts….
+    private func accountsMenuItem(_ accounts: AccountsMenu) -> NSMenuItem {
+        let sub = NSMenu(title: AccountsMenu.title)
+        for item in accounts.items {
+            let m = NSMenuItem(title: item.title, action: #selector(accountChosen(_:)), keyEquivalent: "")
+            m.target = self
+            m.representedObject = item.label
+            m.state = item.checked ? .on : .off
+            sub.addItem(m)
+        }
+        sub.addItem(.separator())
+        let manage = NSMenuItem(title: AccountsMenu.manage, action: #selector(manageAccounts), keyEquivalent: "")
+        manage.target = self
+        sub.addItem(manage)
+        let top = NSMenuItem(title: AccountsMenu.title, action: nil, keyEquivalent: "")
+        top.submenu = sub
+        return top
     }
 
     /// The shared menu with the tools' current checkmarks.
@@ -285,8 +432,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                            cameraLight: CameraLightController.shared.manual)
     }
 
+    /// The Accounts submenu as it stands, nil with fewer than two accounts.
+    func currentAccountsMenu() -> AccountsMenu? {
+        SanduhrMenu.accounts(viewModel.accountLabels, active: viewModel.activeAccount,
+                             inUse: viewModel.accountsInUse)
+    }
+
     @objc private func menuItemChosen(_ sender: NSMenuItem) {
         if let command = MenuCommand(rawValue: sender.tag) { perform(command) }
+    }
+
+    @objc private func accountChosen(_ sender: NSMenuItem) {
+        if let label = sender.representedObject as? String { viewModel.switchAccount(to: label) }
+    }
+
+    /// Manage Accounts…: Settings, Accounts.
+    @objc func manageAccounts() {
+        SettingsWindowController.shared.show(.credentials)
     }
 
     /// What every menu's items do. Each tool works with the widget hidden: it shows the widget
@@ -358,8 +520,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.orderFrontRegardless()
     }
 
-    /// A click on the Desk meters: a hidden widget comes back beside them (`meters` is their
-    /// frame on screen); a widget already showing is only brought forward.
+    /// Show Widget in the Desk meters' menu: a hidden widget comes back beside them (`meters` is
+    /// their frame on screen); a widget already showing is only brought forward.
     func showPanel(beside meters: CGRect, on screen: NSScreen?) {
         if let panel, !panel.isVisible, let screen {
             let frame = DeskPanelPlacement.frame(beside: meters, size: panel.frame.size,
@@ -493,4 +655,10 @@ final class FloatingPanel: NSPanel, NSWindowDelegate {
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+}
+
+/// Carries a limit menu item's entry on its NSMenuItem.
+private final class LimitMenuBox: NSObject {
+    let entry: LimitMenuEntry
+    init(_ entry: LimitMenuEntry) { self.entry = entry }
 }

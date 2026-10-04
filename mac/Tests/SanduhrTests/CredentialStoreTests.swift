@@ -300,7 +300,7 @@ struct SignOutTests {
             .appendingPathComponent("sanduhr-snapshot-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: dir) }
         let url = dir.appendingPathComponent("snapshot.json")
-        SnapshotWriter.writeSignedOut(now: Date(timeIntervalSince1970: 0), to: url)
+        SnapshotWriter.writeSignedOut(accountRef: nil, now: Date(timeIntervalSince1970: 0), to: url)
         let data = try Data(contentsOf: url)
         let obj = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         #expect(obj["status"] as? String == "error")

@@ -98,6 +98,7 @@ enum AlertRules {
 
     static func evaluate(usage: UsageResponse, previous: UsageResponse?, settings s: AlertSettings,
                          fired: Set<String>, deskRunning: Bool, now: Date,
+                         hidden: Set<Tier> = [],
                          calendar: Calendar = .current) -> AlertOutcome {
         guard s.enabled else { return AlertOutcome() }
         var alerts: [AlertDecision] = []
@@ -108,8 +109,10 @@ enum AlertRules {
             alerts.append(AlertDecision(kind: kind, tier: tier, title: title, body: body, onceKey: key))
         }
 
+        // A limit hidden in Settings, Desk, Meters never alerts (MeterVisibility).
+        let shown = MeterVisibility.visible(usage, hidden: hidden) ?? usage
         for tier in Tier.allCases {
-            guard let t = usage.tiers[tier], let util = t.utilization else { continue }
+            guard let t = shown.tiers[tier], let util = t.utilization else { continue }
             let window = t.resetsAt ?? "no-reset"
             let name = tier == .fiveHour ? "Session" : tier.label
             let resets = resetText(t.resetsAt, now: now, calendar: calendar)

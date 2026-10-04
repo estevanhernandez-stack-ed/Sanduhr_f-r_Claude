@@ -2,23 +2,11 @@ import SwiftUI
 import AppKit
 
 /// The widget's sections of the Settings window (SettingsWindow.swift): Pacing & Focus,
-/// Themes, Widget Look, Alerts and Credentials. They were the tabs of the widget's settings
-/// sheet; SettingsRoot picks one with `section`.
+/// Themes, Widget Look and Alerts. They were the tabs of the widget's settings sheet;
+/// SettingsRoot picks one with `section`. Accounts has its own view (AccountsSettings.swift).
 struct WidgetSettings: View {
     @Bindable var vm: UsageViewModel
     let section: SettingsSection
-
-    // Write-only fields: we never read the existing key back from the
-    // credential store (Keychain or file, KeychainStore.swift), so the
-    // secret never shows on screen. Leave blank to keep the existing
-    // value; any non-empty value replaces it in whichever store is active.
-    @State private var sessionKey: String = ""
-    @State private var cfClearance: String = ""
-    @State private var credentialsNote: String?
-    @State private var credentialsNoteIsError = false
-    @State private var confirmingSignOut = false
-    @State private var hasExistingKey = KeychainStore.exists(account: KeychainAccount.sessionKey)
-    @State private var canSignOut = KeychainStore.anythingToSignOut
 
     @AppStorage("remindSessionEnd") private var remindSessionEnd = false
     @AppStorage("alertsEnabled") private var alertsEnabled = false
@@ -57,111 +45,11 @@ struct WidgetSettings: View {
             case .themes: themesTab(t: t)
             case .widgetLook: fontTab(t: t)
             case .alerts: ScrollView { alertsTab(t: t) }
-            default: credentialsTab(t: t)
+            default: EmptyView()
             }
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    /// Writes only the fields that were filled in; blank means "keep what's there". A first
-    /// setup needs a session key (the Save button stays off without one).
-    private func saveCredentials() {
-        let trimmedKey = sessionKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedCF  = cfClearance.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedKey.isEmpty {
-            KeychainStore.set(trimmedKey, account: KeychainAccount.sessionKey)
-        }
-        if !trimmedCF.isEmpty {
-            KeychainStore.set(trimmedCF, account: KeychainAccount.cfClearance)
-        }
-        vm.credentialsChanged()
-        sessionKey = ""
-        cfClearance = ""
-        hasExistingKey = KeychainStore.exists(account: KeychainAccount.sessionKey)
-        canSignOut = KeychainStore.anythingToSignOut
-        credentialsNoteIsError = false
-        credentialsNote = "Saved. Sanduhr is fetching with the new values."
-    }
-
-    /// Sign Out, once confirmed: both stores cleared (UsageViewModel.signOut). Offered while
-    /// either store holds anything, so a value left in the other store can still be removed;
-    /// once both are empty the button reads Signed Out and is disabled.
-    private func signOut() {
-        let result = vm.signOut()
-        sessionKey = ""
-        cfClearance = ""
-        hasExistingKey = KeychainStore.exists(account: KeychainAccount.sessionKey)
-        canSignOut = KeychainStore.anythingToSignOut
-        credentialsNoteIsError = !result.succeeded
-        credentialsNote = result.succeeded
-            ? "Signed out. Paste a sessionKey to sign in again."
-            : "Signed out, but \(result.failures.count) item(s) could not be removed. See Console."
-    }
-
-    private func credentialsTab(t: Theme.Palette) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(hasExistingKey ? "sessionKey (replace)" : "sessionKey (required)")
-                    .font(.caption)
-                    .foregroundStyle(t.textSecondary)
-                Text("claude.ai → DevTools (⌥⌘I) → Application → Cookies → sessionKey")
-                    .font(.caption2)
-                    .foregroundStyle(t.textDim)
-                SecureField(
-                    hasExistingKey ? "Leave blank to keep existing key" : "sessionKey",
-                    text: $sessionKey)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("cf_clearance (optional)")
-                    .font(.caption)
-                    .foregroundStyle(t.textSecondary)
-                Text("Only needed if you see a Cloudflare challenge error.")
-                    .font(.caption2)
-                    .foregroundStyle(t.textDim)
-                SecureField(
-                    hasExistingKey ? "Leave blank to keep existing" : "cf_clearance",
-                    text: $cfClearance)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            HStack {
-                Button("Save") { saveCredentials() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(
-                        // Require a new key on first setup; otherwise blank keeps the current values.
-                        !hasExistingKey &&
-                        sessionKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    )
-                if let note = credentialsNote {
-                    Text(note).font(.caption)
-                        .foregroundStyle(Color.hex(credentialsNoteIsError ? "f87171" : "4ade80"))
-                }
-                Spacer()
-                Button(canSignOut ? "Sign Out" : "Signed Out", role: .destructive) {
-                    confirmingSignOut = true
-                }
-                .disabled(!canSignOut)
-            }
-            Spacer()
-        }
-        // Typing hides the last note; Save and Sign Out emptying the field must not, or their
-        // own note is wiped as it appears.
-        .onChange(of: sessionKey) { _, new in if !new.isEmpty { credentialsNote = nil } }
-        // The onboarding sheet can save a key while this page is closed.
-        .onAppear {
-            hasExistingKey = KeychainStore.exists(account: KeychainAccount.sessionKey)
-            canSignOut = KeychainStore.anythingToSignOut
-        }
-        .confirmationDialog("Sign out of Sanduhr?", isPresented: $confirmingSignOut,
-                            titleVisibility: .visible) {
-            Button("Sign Out", role: .destructive) { signOut() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Your session key is removed from this Mac. Your usage history and settings stay.")
-        }
     }
 
     // MARK: - Themes tab

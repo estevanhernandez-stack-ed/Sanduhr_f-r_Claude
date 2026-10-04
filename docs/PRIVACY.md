@@ -36,10 +36,12 @@ One opt-in exception, off by default: **Publish usage** lets you send a daily pe
 
 The table above describes the Windows app. The macOS app stores the same two credentials, `sessionKey` and the optional `cf_clearance`, which are sent only to `claude.ai`:
 
-- **Release builds** (signed with the publisher's Developer ID): the macOS Keychain, as generic-password items under service `com.626labs.sanduhr`, accounts `sessionKey` and `cf_clearance`, readable after first unlock and trusted only to the signed Sanduhr app. An update from 2.3.1 or earlier moves the values out of the old file once, checks the Keychain holds them, then deletes the file; if that fails, the file stays and is used as before.
+- **Release builds** (signed with the publisher's Developer ID): the macOS Keychain, as generic-password items under service `com.626labs.sanduhr`, readable after first unlock and trusted only to the signed Sanduhr app. An update from 2.3.1 or earlier moves the values out of the old file once, checks the Keychain holds them, then deletes the file; if that fails, the file stays and is used as before.
 - **Self-built development builds**: `~/Library/Application Support/Sanduhr/credentials.json`, plaintext, mode `0600` (only your macOS user account can read it).
 
-Neither is ever written to a log.
+**Accounts (2.4.0+).** Each named account has its own pair, under the same slot names as Windows: `sessionKey:{Account}` and `cf_clearance:{Account}`. Updating from 2.3.x moves the single saved key to an account called Personal. The list of account labels and which one is active live in the app's preferences (`defaults` keys `accounts` and `activeAccount`), so showing them never touches the Keychain. Each account's usage history is its own file, `~/Library/Application Support/Sanduhr/history.{Account}.json` (the old `history.json` becomes Personal's). Labels are the names you choose; they are shown in the app and used in those slot and file names, and **never written to a log, `snapshot.json` or the debug `state.yaml`**: the snapshot names the active account only by `account_ref`, a short hash of its label. With **Follow the account I'm using** on (off by default), Sanduhr also asks `claude.ai` for the usage of your other signed-in accounts every 15 minutes, each with its own key, the same request as for the active account; the readings stay in memory.
+
+No key is ever written to a log.
 
 ## What Sanduhr does NOT do
 
@@ -73,7 +75,8 @@ Nothing about your usage comes back to us. The short-version promise above ("doe
 - **Clear local storage:** delete `%APPDATA%\Sanduhr\` and `%LOCALAPPDATA%\Sanduhr\`.
 - **Uninstall does not wipe credentials.** Start → Apps & features → Sanduhr für Claude → Uninstall removes the installed app files only. It does **not** delete your Windows Credential Manager entries under `com.626labs.sanduhr`, on either the GitHub (.exe) or Microsoft Store install — sign out first, or delete the entries yourself afterward.
 - **Note for Microsoft Store installs:** uninstalling from Apps & features also does **not** remove `%LOCALAPPDATA%\Sanduhr` (Windows leaves per-user app data behind). If you want the usage vault gone after uninstall, delete that folder manually.
-- **On the Mac, Sign Out:** Sanduhr → Settings → Credentials → Sign Out, then confirm. This deletes `sessionKey` and `cf_clearance` from both the Keychain and the credentials file, stops fetching, and marks `snapshot.json` signed out with no usage figures in it. Your usage history (`history.json`) and settings stay; to remove those too, delete the folder `~/Library/Application Support/Sanduhr/` and run `defaults delete com.626labs.sanduhr` and `defaults delete com.626labs.sanduhr.desk`.
+- **On the Mac, Sign Out:** Sanduhr → Settings → Accounts → select the account → Sign Out, then confirm. This deletes that account's `sessionKey` and `cf_clearance` from both the Keychain and the credentials file; signing out the active account also stops fetching and marks `snapshot.json` signed out with no usage figures in it. The account stays in the list, and its usage history (`history.{Account}.json`) and your settings stay.
+- **On the Mac, Remove Account:** Settings → Accounts → select the account → Remove Account…, then confirm. This signs it out as above, deletes its history file, and drops it from the list. To remove everything, remove every account (or sign out), delete the folder `~/Library/Application Support/Sanduhr/` and run `defaults delete com.626labs.sanduhr` and `defaults delete com.626labs.sanduhr.desk`.
 - **On the Mac, by hand:** delete the `com.626labs.sanduhr` items in Keychain Access (release builds) or the folder `~/Library/Application Support/Sanduhr/` (development builds). Moving the app to the Trash removes neither, so sign out first.
 
 ## Third-party services Sanduhr does not use

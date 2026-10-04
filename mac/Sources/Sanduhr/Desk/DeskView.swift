@@ -118,12 +118,49 @@ struct DeskView: View {
         }
     }
 
-    @ViewBuilder
+    /// The claude line in the layout: a switch's note shows there, else on the meters.
+    private var lineInLayout: Bool { placement.values.contains { $0.contains(.claude) } }
+
+    /// The claude line. During an account switch the old account's line keeps its place unseen
+    /// (AccountSwitchFade) and the faint note shows over it once the fetch outlasts the fade.
     private var claude: some View {
-        if let line = model.claudeLine {
+        claudeText
+            .opacity(model.veiled ? 0 : 1)
+            .accessibilityHidden(model.veiled)
+            .overlay(alignment: .leading) {
+                if model.switchNote && model.claudeLine != nil {
+                    switchingNote(size: timeSize * 0.19).opacity(0.75)
+                }
+            }
+    }
+
+    /// The Desk's faint "switching account…".
+    private func switchingNote(size: CGFloat) -> some View {
+        Text(AccountSwitchFade.deskNote)
+            .font(.custom(font, size: size))
+            .fixedSize()
+            .opacity(AccountSwitchFade.noteOpacity)
+            .transition(.opacity)
+    }
+
+    @ViewBuilder
+    private var claudeText: some View {
+        if let parts = model.claudeParts, let account = parts.account {
+            // Two or more accounts: the label is its own element, clickable like a meeting row
+            // (DeskController cycles to the next account); the rest of the line lets clicks through.
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                AccountLead(label: account, model: model)
+                Text("   \(parts.rest)")
+            }
+            .font(.custom(font, size: timeSize * 0.19))
+            .opacity(model.claudeLineIsStale ? 0.45 : 0.75)
+        } else if let line = model.claudeLine {
             Text(line)
                 .font(.custom(font, size: timeSize * 0.19))
                 .opacity(model.claudeLineIsStale ? 0.45 : 0.75)
+        } else if model.switchNote {
+            // Nothing to fade out (the old account showed no line): the note on its own.
+            switchingNote(size: timeSize * 0.19).opacity(0.75)
         }
     }
 
@@ -131,40 +168,33 @@ struct DeskView: View {
     /// a pace tick where the widget puts its own, and the reset time underneath.
     @ViewBuilder
     private func meters(alignment: HorizontalAlignment) -> some View {
-        if !model.meters.isEmpty || model.signInNeeded {
+        let noteHere = model.switchNote && !lineInLayout
+        if !model.meters.isEmpty || model.signInNeeded || noteHere {
             let size = timeSize * 0.17
             VStack(alignment: alignment, spacing: size * 0.6) {
                 ForEach(model.meters) { row in
                     MeterRow(row: row, ink: ink, font: font, size: size, width: timeSize * 3.2, alignment: alignment)
+                        .onGlobalFrame { model.meterRowFrames[row.tier] = $0 }
                         .deskPulse(model.pulses[row.tier] ?? 0, ink: ink, size: size)
                 }
                 if model.signInNeeded {
                     Text("sign in again in Sanduhr").opacity(0.75)
                 }
-                if model.meterHintVisible && !model.meters.isEmpty {
-                    Text(DeskMeterHint.text)
-                        .font(.custom(font, size: size * 0.75))
-                        .multilineTextAlignment(alignment == .trailing ? .trailing : .leading)
-                        .frame(maxWidth: timeSize * 3.2, alignment: alignment == .trailing ? .trailing : .leading)
-                        .opacity(0.7)
-                        .onAppear { model.meterHintShown() }
-                }
             }
             .font(.custom(font, size: size))
-            .opacity(model.claudeLineIsStale ? 0.5 : 1)
-            // Clickable like a meeting row: the click itself is handled in DeskController, which
-            // shows the widget beside the meters.
+            .opacity(model.veiled ? 0 : (model.claudeLineIsStale ? 0.5 : 1))
+            .accessibilityHidden(model.veiled)
+            // A switch's note, when the claude line is not on the desktop to carry it.
+            .overlay(alignment: alignment == .trailing ? .topTrailing : .topLeading) {
+                if noteHere { switchingNote(size: size) }
+            }
+            // Passive to a plain click (item 41): no hand, nothing happens. A two-finger click
+            // opens the row's limit menu (DeskController). The faint plate, as wide as the click
+            // slack, is what lets that click reach this transparent window at all (DeskPointerMenu).
+            .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity)
+                .padding(EdgeInsets(top: -6, leading: -8, bottom: -6, trailing: -8)))
             .contentShape(Rectangle())
-            .onHover { inside in
-                if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-            }
-            .background(GeometryReader { geo in
-                Color.clear.preference(key: MetersFrameKey.self, value: geo.frame(in: .global))
-            })
-            .onPreferenceChange(MetersFrameKey.self) { frame in
-                model.metersFrame = frame
-            }
-            .onDisappear { model.metersFrame = .zero }
+            .onGlobalFrame { model.metersFrame = $0 }
         }
     }
 
@@ -178,31 +208,18 @@ struct DeskView: View {
                     .onHover { inside in
                         if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
                     }
-                    .background(GeometryReader { geo in
-                        Color.clear.preference(key: NoteFrameKey.self, value: geo.frame(in: .global))
-                    })
-                    .onPreferenceChange(NoteFrameKey.self) { frame in
-                        model.noteFrame = frame
-                    }
-                    .onDisappear { model.noteFrame = .zero }
+                    .onGlobalFrame { model.noteFrame = $0 }
             } else if model.meetings.isEmpty {
                 Text("Nothing else on the calendar today").opacity(0.6)
             } else {
                 ForEach(model.meetings) { meeting in
                     MeetingRow(meeting: meeting)
+                        .onGlobalFrame { model.rowFrames[meeting.id] = $0 }
                 }
             }
         }
         .font(.custom(font, size: timeSize * 0.21))
-        .background(GeometryReader { geo in
-            Color.clear.preference(key: MeetingsFrameKey.self, value: geo.frame(in: .global))
-        })
-        .onPreferenceChange(MeetingsFrameKey.self) { frame in
-            model.meetingsFrame = frame
-        }
-        .onPreferenceChange(RowFramesKey.self) { frames in
-            model.rowFrames = frames
-        }
+        .onGlobalFrame { model.meetingsFrame = $0 }
     }
 
     /// The handwritten line, drawn the way handwritten.py baked it: colored ink with a soft
@@ -369,6 +386,29 @@ private struct MeterRow: View {
     }
 }
 
+/// The account label at the start of the claude line, with two or more accounts. The pointer
+/// turns into a hand and the label underlines while over it; the click itself is handled in
+/// DeskController, which switches to the next account (the widget chip's cycle).
+private struct AccountLead: View {
+    let label: String
+    var model: DeskModel
+    @State private var hovering = false
+
+    var body: some View {
+        Text(label)
+            .underline(hovering)
+            .contentTransition(.opacity)
+            .contentShape(Rectangle())
+            .onGlobalFrame { model.accountFrame = $0 }
+            .onHover { inside in
+                hovering = inside
+                if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint("Switches to the next account")
+    }
+}
+
 /// One meeting line. With a join link it is clickable: the pointer turns into a hand and a
 /// click opens the meeting in Teams, Zoom or the browser.
 private struct MeetingRow: View {
@@ -385,9 +425,6 @@ private struct MeetingRow: View {
             }
         }
         .contentShape(Rectangle())
-        .background(GeometryReader { geo in
-            Color.clear.preference(key: RowFramesKey.self, value: [meeting.id: geo.frame(in: .global)])
-        })
         // The click itself is handled in AppDelegate, which sees it even when macOS hands
         // the first click to the desktop instead of this window.
         .onHover { inside in
@@ -398,24 +435,20 @@ private struct MeetingRow: View {
     }
 }
 
-private struct RowFramesKey: PreferenceKey {
-    static let defaultValue: [String: CGRect] = [:]
-    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
-        value.merge(nextValue()) { _, new in new }
+private extension View {
+    /// Reports this view's frame in global (window) coordinates when it appears and whenever it
+    /// moves or resizes, for the clicks DeskController routes by position. Reported straight to
+    /// the model, not through a PreferenceKey: on the Desk window the meters' preference reached
+    /// onPreferenceChange once, as .zero, and never again, so the meters took no clicks (found
+    /// 2026-10-04 with a click probe). The other click areas used the same pattern.
+    /// Nothing clears a frame on disappear: when Desk comes back (off and on, a layout change) the
+    /// old views' onDisappear ran after the new views' onAppear and wiped the fresh frames. A
+    /// stale frame is harmless, because DeskElements lists only what is drawn now.
+    func onGlobalFrame(_ report: @escaping (CGRect) -> Void) -> some View {
+        background(GeometryReader { geo in
+            Color.clear
+                .onAppear { report(geo.frame(in: .global)) }
+                .onChange(of: geo.frame(in: .global)) { _, frame in report(frame) }
+        })
     }
-}
-
-private struct MetersFrameKey: PreferenceKey {
-    static let defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
-}
-
-private struct MeetingsFrameKey: PreferenceKey {
-    static let defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
-}
-
-private struct NoteFrameKey: PreferenceKey {
-    static let defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
 }

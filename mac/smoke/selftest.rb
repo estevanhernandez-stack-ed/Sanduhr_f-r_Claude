@@ -59,6 +59,7 @@ class FakeApp
     when 'settings' then s['settings_open'] = true; s['settings_section'] = arg if arg
     when 'close-settings' then s['settings_open'] = false
     when 'theme' then s['theme'] = arg
+    when 'account' then s['account_ref'] = s['account_ref'] == '104ab921' ? '0f1e2d3c' : '104ab921'
     when 'tool'
       if arg == 'pacing' then s['pacing_pinned'] = !s['pacing_pinned']
       else s['active_tool'] = s['active_tool'] == arg ? nil : arg
@@ -77,6 +78,27 @@ eq('windows in the fixture', tree.map { |w| w['window'] }, %w[widget settings sh
 eq('quoted percent stays a string', tree[0]['tree'][0]['children'][1]['value'], '7%')
 eq('quoted version stays a string', state['version'], '2.1.0')
 eq('credentials store is a name, never a value', state['credentials_store'], 'file')
+# Item 36: the account is a hash, never a label; following is two switches.
+check('account_ref is 8 hex digits', state['account_ref'].to_s =~ /\A[0-9a-f]{8}\z/)
+eq('accounts count', state['accounts_count'], 2)
+eq('follow off by default', [state['follow'], state['follow_paused']], [false, false])
+# Item 38: the menu bar choice, Whichever is higher until changed.
+eq('menu bar follows the higher limit by default', state['menu_bar'], 'higher')
+eq('no limit hidden by default', state['hidden_limits'], [])
+# Item 42: only limits believed temporary can be hidden; raw values only, never labels.
+eq('no temporary limit in the fixture', state['temporary_limits'], [])
+# Item 39: silencing a limit from its menu shows here; the session warns only once switched on.
+eq('only the session silenced by default', state['silenced_limits'], ['five_hour'])
+# Item 41: the Desk's click areas, checked in the app; kinds and keys only, never labels or titles.
+eq('desk frames ok in the fixture', [state['desk_frames_ok'], state['desk_frames_problem']], [true, nil])
+eq('desk frame kinds', state['desk_frames'].map { |f| f['kind'] }, %w[meters meter_row meter_row meetings])
+check('desk frames are [x, y, w, h] in whole points',
+      state['desk_frames'].all? { |f| f['frame'].length == 4 && f['frame'].all? { |n| n.is_a?(Integer) } })
+check('desk frames carry no labels or titles',
+      state['desk_frames'].all? { |f| (f.keys - %w[kind key clickable frame]).empty? })
+app_acct = FakeApp.new
+app_acct.action('account', 'next')
+check('account next changes account_ref', app_acct.state_now['account_ref'] != state['account_ref'])
 
 # --- Match -------------------------------------------------------------------------------------
 
@@ -118,6 +140,14 @@ eq('negative index', State.dig(state, 'meters.-1.tier'), [true, 'seven_day'])
 eq('past the end', State.dig(state, 'meters.5.label'), [false, nil])
 eq('missing key', State.dig(state, 'nope.x'), [false, nil])
 eq('index into a map', State.dig(state, 'alerts.0'), [false, nil])
+eq('select a list item by a field', State.dig(state, 'desk_frames[kind=meter_row].key'), [true, 'five_hour'])
+eq('select then index', State.dig(state, 'desk_frames[kind=meters].frame.2'), [true, 358])
+eq('select a field compared as text', State.dig(state, 'desk_frames[clickable=false].kind'), [true, 'meetings'])
+eq('select with no match', State.dig(state, 'desk_frames[kind=note].frame'), [false, nil])
+eq('select on a map', State.dig(state, 'alerts[kind=x]'), [false, nil])
+eq('select a missing list', State.dig(state, 'nope[kind=x]'), [false, nil])
+eq('meters need met', Needs.unmet('meters', state), nil)
+check('meters need unmet without the meters', Needs.unmet('meters', state.merge('desk_frames' => [])).to_s.include?('no meters'))
 eq('state check passes', State.check(state, { 'settings_section' => 'notch', 'meters.0.percent' => 7, 'desk_running' => true }), [])
 eq('state check failures', State.check(state, { 'meters.0.percent' => 8, 'gone' => 1 }),
    ['meters.0.percent: expected 8, got 7', 'gone: not in state'])
@@ -217,6 +247,24 @@ r = runner4.run_file(File.join(FIXTURES, 'scenarios', 'theme-fail.yaml'))
 eq('theme scenario fails after picking a theme', [r['status'], app4.actions.first], ['fail', 'theme match-desk'])
 eq('failed theme scenario puts the theme back', [app4.actions.last, app4.state_now['theme']], ['theme obsidian', 'obsidian'])
 
+# The shipped geometry scenario passes on sound frames and fails on a dead click area.
+geo = File.join(Smoke::SCENARIOS, 'desk-geometry.yaml')
+app5 = FakeApp.new
+r = Runner.new(app5, mem, out, io: io, settle: 0, poll: 0.01, within: 0.05).run_file(geo)
+eq('desk geometry passes on sound frames', [r['status'], r['reason']], ['pass', nil])
+dead = state['desk_frames'].map(&:dup)
+dead[0]['frame'] = [0, 0, 0, 0]
+app6 = FakeApp.new('desk_frames' => dead, 'desk_frames_ok' => false, 'desk_frames_problem' => 'meters frame empty')
+r = Runner.new(app6, mem, out, io: io, settle: 0, poll: 0.01, within: 0.05).run_file(geo)
+eq('desk geometry fails on a dead click area', r['status'], 'fail')
+check('the failure names the problem', r['steps'][0]['detail'].to_s.include?('meters frame empty'))
+app7 = FakeApp.new('desk_frames' => state['desk_frames'].reject { |f| f['kind'] == 'meter_row' })
+r = Runner.new(app7, mem, out, io: io, settle: 0, poll: 0.01, within: 0.05).run_file(geo)
+eq('desk geometry fails without a meter row', r['status'], 'fail')
+app8 = FakeApp.new('desk_frames' => [])
+r = Runner.new(app8, mem, out, io: io, settle: 0, poll: 0.01, within: 0.05).run_file(geo)
+eq('desk geometry skips without the meters', r['status'], 'skip')
+
 app3 = FakeApp.new('meters' => [])
 runner3 = Runner.new(app3, mem, out, io: io, settle: 0, poll: 0.01, within: 0.05)
 r = runner3.run_file(File.join(FIXTURES, 'scenarios', 'skip.yaml'))
@@ -230,17 +278,20 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
   doc = YAML.safe_load(File.read(f))
   name = File.basename(f)
   check("#{name}: has name and steps", doc.is_a?(Hash) && doc['name'].is_a?(String) && doc['steps'].is_a?(Array))
-  Array(doc['needs']).each { |n| check("#{name}: known need #{n}", %w[desk notch credentials widget].include?(n)) }
+  Array(doc['needs']).each { |n| check("#{name}: known need #{n}", %w[desk notch credentials widget meters].include?(n)) }
   Array(doc['steps']).each_with_index do |s, i|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo]
+    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end
 # Item 32: a smoke run must never wipe real credentials, so no step may sign out.
 check('no scenario signs out', Dir[File.join(Smoke::SCENARIOS, '*.yaml')].none? { |f| File.read(f) =~ /do:\s*sign[-_ ]?out/i })
+# Item 36: a smoke run works on the real accounts, so no scenario adds, removes, renames, signs
+# out or even switches one.
+check('no scenario touches accounts', Dir[File.join(Smoke::SCENARIOS, '*.yaml')].none? { |f| File.read(f) =~ /do:\s*(account|add|remove|rename)/i })
 check('scenarios exist', Dir[File.join(Smoke::SCENARIOS, '*.yaml')].length >= 8)
 
 # --- Gallery -----------------------------------------------------------------------------------
