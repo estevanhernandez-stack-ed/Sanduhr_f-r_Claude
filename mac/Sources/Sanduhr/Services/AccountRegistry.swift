@@ -243,24 +243,38 @@ final class AccountRegistry: @unchecked Sendable {
     // MARK: Sign Out and Remove
 
     /// Sign Out for one account (item 32, per account): deletes its key and cf_clearance from
-    /// both stores and forgets its sign-in marker. The account stays listed, signed out, with its
-    /// history. The legacy unlabelled slots are swept
-    /// too, so no pre-accounts copy is left behind in either store. Nil signs out the legacy
-    /// slots alone (a launch still running on them).
+    /// the cleared stores and forgets its sign-in marker. The account stays listed, signed out,
+    /// with its history. Nil signs out the legacy slots alone (a launch still running on them).
     @discardableResult
     func signOut(_ label: String?) -> SignOutResult {
-        var slots = Self.slots(for: nil)
-        if let label { slots = Self.slots(for: label) + slots }
         SignInGate.forget(label, in: defaults)
-        return SignOut.run(backends: stores, accounts: slots)
+        return SignOut.run(backends: stores, accounts: Self.signOutSlots(for: label))
     }
 
-    /// Whether either store still holds a secret of `label` (or a legacy one). Never reads a
-    /// Keychain value, so it doesn't prompt on a dev build.
+    /// Whether a cleared store still holds a secret Sign Out of `label` would delete. Never
+    /// reads a Keychain value, so it doesn't prompt on a dev build.
     func anythingToSignOut(_ label: String?) -> Bool {
-        var slots = Self.slots(for: nil)
-        if let label { slots = Self.slots(for: label) + slots }
-        return SignOut.anythingStored(backends: stores, accounts: slots)
+        SignOut.anythingStored(backends: stores, accounts: Self.signOutSlots(for: label))
+    }
+
+    /// The slots Sign Out of `label` deletes. The legacy unlabelled slots belong to Personal (the
+    /// promotion's account), so only Personal's Sign Out, or nil's, sweeps them: signing out
+    /// another account must never take the key a launch still running on the legacy slots uses.
+    static func signOutSlots(for label: String?) -> [String] {
+        guard let label else { return slots(for: nil) }
+        let own = slots(for: label)
+        return label == defaultLabel ? own + slots(for: nil) : own
+    }
+
+    /// The stores Sign Out and Remove clear. A signed build clears both, so no copy is left in
+    /// the other. A dev (ad-hoc) build keeps its keys in the file and clears only the file: it
+    /// must never delete a Keychain item, which belongs to the release build on the same Mac
+    /// (a dev Sign Out once took the installed release's key with it, 2026-10-03).
+    static func clearedStores(isSigned: Bool, keychain: any CredentialBackend,
+                              file: any CredentialBackend)
+        -> [(kind: CredentialStoreKind, backend: any CredentialBackend)] {
+        isSigned ? [(kind: .keychain, backend: keychain), (kind: .file, backend: file)]
+                 : [(kind: .file, backend: file)]
     }
 
     /// Remove Account: Sign Out, delete its history file, then drop it from the list. Removing the active account makes

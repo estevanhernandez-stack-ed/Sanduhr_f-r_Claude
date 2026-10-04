@@ -106,8 +106,9 @@ is saved for it. The decision is `AccountFollow.decide`, pure and unit-tested.
 ### Signing out
 
 **Settings, Accounts, Sign Out** (after a confirmation) deletes the selected account's session
-key and `cf_clearance` from both the Keychain and the file, whichever one the build uses. The
-account stays in the list, signed out, with its history. Signing out the active account stops
+key and `cf_clearance` from both the Keychain and the file on a release build. A dev build clears
+only the file: it never deletes a Keychain item, which belongs to the release build on the same
+Mac. Only Personal's Sign Out also clears the pre-accounts `sessionKey` slots. The account stays in the list, signed out, with its history. Signing out the active account stops
 the refresh and clears the shown usage: the widget says "Signed out — sign in" (click it for
 Settings, Accounts), Desk and the notch show the sign-in line instead of meters, and
 `snapshot.json` says `session_expired` with no tiers so the statusline and MCP server stop

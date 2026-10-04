@@ -158,10 +158,35 @@ struct AccountRegistryTests {
         #expect(f.registry.labels == ["Home", "Work"])
         #expect(f.registry.active == "Work")
         #expect(f.keychain.items == ["sessionKey:Home": "sk-h"])
-        // The legacy slot goes too, so no pre-accounts copy is left in either store.
-        #expect(f.file.items.isEmpty)
+        // The legacy slot belongs to Personal: signing out Work leaves it, so a launch still
+        // running on it keeps its key.
+        #expect(f.file.items == ["sessionKey": "legacy"])
         #expect(!f.registry.anythingToSignOut("Work"))
         #expect(f.registry.anythingToSignOut("Home"))
+    }
+
+    @Test func signingOutPersonalSweepsTheLegacySlots() {
+        let f = RegistryFixture(keychain: ["sessionKey:Personal": "sk-p", "sessionKey": "legacy-k"],
+                                file: ["sessionKey": "legacy-f", "cf_clearance": "cf-legacy"],
+                                labels: ["Personal"], active: "Personal")
+        #expect(f.registry.signOut("Personal").succeeded)
+        #expect(f.keychain.items.isEmpty)
+        #expect(f.file.items.isEmpty)
+        #expect(AccountRegistry.signOutSlots(for: "Work") == ["sessionKey:Work", "cf_clearance:Work"])
+        #expect(AccountRegistry.signOutSlots(for: nil) == ["sessionKey", "cf_clearance"])
+    }
+
+    @Test func aDevBuildClearsOnlyTheFile() {
+        let keychain = FakeBackend(["sessionKey": "release-key"])
+        let file = FakeBackend(["sessionKey:Personal": "dev-copy"])
+        let dev = AccountRegistry.clearedStores(isSigned: false, keychain: keychain, file: file)
+        #expect(dev.map(\.kind) == [.file])
+        let result = SignOut.run(backends: dev, accounts: AccountRegistry.signOutSlots(for: "Personal"))
+        #expect(result.succeeded)
+        #expect(file.items.isEmpty)
+        #expect(keychain.items == ["sessionKey": "release-key"])   // the release build's key survives
+        let signed = AccountRegistry.clearedStores(isSigned: true, keychain: keychain, file: file)
+        #expect(signed.map(\.kind) == [.keychain, .file])
     }
 
     @Test func removeDropsTheAccountAndMovesActiveToTheNext() {

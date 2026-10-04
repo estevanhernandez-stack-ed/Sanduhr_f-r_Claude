@@ -84,10 +84,10 @@ enum KeychainStore {
     /// touch only the defaults, never the Keychain.
     static var accounts: AccountRegistry { state.registry }
 
-    /// Signs out the active account (item 32): its key and cf_clearance leave both stores,
-    /// whichever this launch uses; the account stays listed (SignOut.swift). Failures are logged
-    /// by store and slot kind, never with a label or a value. On a dev build the Keychain delete
-    /// can ask for the login password when a signed build wrote the item.
+    /// Signs out the active account (item 32): its key and cf_clearance leave the cleared stores
+    /// (both on a signed build, the file alone on a dev build; AccountRegistry.clearedStores);
+    /// the account stays listed. Failures are logged by store and slot kind, never with a label
+    /// or a value.
     @discardableResult
     static func signOut() -> SignOutResult {
         signOut(label: state.registry.active)
@@ -120,11 +120,6 @@ enum KeychainStore {
         state.registry.anythingToSignOut(state.registry.active)
     }
 
-    private static var bothStores: [(kind: CredentialStoreKind, backend: any CredentialBackend)] {
-        [(kind: .keychain, backend: KeychainBackend(service: KeychainBackend.service)),
-         (kind: .file, backend: FileBackend.standard)]
-    }
-
     // MARK: Choosing the store
 
     private struct State: Sendable {
@@ -150,7 +145,9 @@ enum KeychainStore {
         }
         let kind = r.store
         let backend: any CredentialBackend = kind == .keychain ? keychain : file
-        let registry = AccountRegistry(backend: backend, stores: bothStores, defaults: UserDefaults.standard,
+        let registry = AccountRegistry(backend: backend,
+                                       stores: AccountRegistry.clearedStores(isSigned: isSigned, keychain: keychain, file: file),
+                                       defaults: UserDefaults.standard,
                                        history: .standard)
         switch registry.promoteLegacy() {
         case .promoted: NSLog("Sanduhr: the saved session key is now the Personal account")
