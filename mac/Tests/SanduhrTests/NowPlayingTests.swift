@@ -583,12 +583,12 @@ struct NowPlayingScrollTests {
         #expect(!S.fits(textWidth: 160, room: 158))
     }
 
-    @Test func aLongTitleScrollsOnceAtThirtyPointsASecond() throws {
+    @Test func aLongTitleScrollsOnceAtEighteenPointsASecond() throws {
         let plan = try #require(S.plan(textWidth: 400, room: 158, reduceMotion: false))
         // Until the end clears the fade at the trailing edge.
         #expect(plan.distance == 400 - 158 + S.fade)
-        #expect(abs(plan.travel - Double(plan.distance) / 30) < 0.0001)
-        #expect(S.speed == 30)
+        #expect(abs(plan.travel - Double(plan.distance) / 18) < 0.0001)
+        #expect(S.speed == 18)
         // A pause at the start and the end, then back to the beginning, and that's all.
         #expect(abs(plan.total - (S.startPause + plan.travel + S.endPause + S.returnDuration)) < 0.0001)
         #expect(S.startPause >= 1 && S.endPause >= 0.5 && S.returnDuration < 1)
@@ -599,13 +599,16 @@ struct NowPlayingScrollTests {
         #expect(S.plan(textWidth: 400, room: 0, reduceMotion: false) == nil)
     }
 
-    @Test func aNewTrackScrollsAgainAPauseDoesNot() {
+    @Test func aNewTrackOrPlayingAgainScrollsAPauseHoldsStill() {
         let song = NowPlayingInfo(title: "Tune", artist: "Singer", playing: true)
         var paused = song
         paused.playing = false
         var next = song
         next.title = "Other Tune"
-        #expect(S.trackKey(song) == S.trackKey(paused))
+        // Pausing changes the key (the title goes back to its beginning and holds still), and
+        // playing again changes it back, so the scroll runs once more.
+        #expect(S.trackKey(song) != S.trackKey(paused))
+        #expect(S.scrolls(song) && !S.scrolls(paused) && !S.scrolls(nil))
         #expect(S.trackKey(song) != S.trackKey(next))
         var otherArtist = song
         otherArtist.artist = "Someone"

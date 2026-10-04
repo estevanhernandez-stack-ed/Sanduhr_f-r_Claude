@@ -79,11 +79,13 @@ struct NotchView: View {
         let room = NowPlayingWingLayout.textRoom(.strip, width: width, state: state, size: stripSize)
         return HStack(spacing: NowPlayingWingLayout.stripSpacing) {
             ScrollOnceText(text: line, trackKey: NowPlayingScroll.trackKey(model.nowPlaying),
+                           scrolls: NowPlayingScroll.scrolls(model.nowPlaying),
                            textWidth: NotchWingsView.textWidth(line, stripSize, font), room: room,
                            font: .custom(font, size: stripSize))
                 .foregroundStyle(LinearGradient.ink(textColor))
                 .opacity(0.85)
                 .frame(height: chin)
+                .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
                 .onGlobalFrame { model.stripFrame = $0 }
             if NowPlayingWingLayout.nextSide(.strip, state: state) != nil {
                 Image(systemName: "forward.end.fill")
@@ -91,6 +93,7 @@ struct NotchView: View {
                     .foregroundStyle(LinearGradient.ink(textColor))
                     .opacity(0.85)
                     .frame(width: NowPlayingWingLayout.nextWidth(stripSize), height: chin)
+                    .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
                     .onGlobalFrame { model.stripNextFrame = $0 }
                     .accessibilityLabel("Next")
             }
@@ -206,11 +209,13 @@ struct NotchWingsView: View {
                 Spacer(minLength: 0)
             }
             ScrollOnceText(text: text, trackKey: NowPlayingScroll.trackKey(model.nowPlaying),
+                           scrolls: NowPlayingScroll.scrolls(model.nowPlaying),
                            textWidth: Self.textWidth(text, size, font), room: room,
                            font: .custom(font, size: size))
                 .foregroundStyle(LinearGradient.ink(textColor))
                 .opacity(0.88)
                 .frame(maxHeight: .infinity)
+                .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
                 .contentShape(Rectangle())
                 .onTapGesture { NowPlayingController.shared.togglePlayPause() }
                 .help(state == .paused ? "Play. Two-finger click for more." : "Play or pause. Two-finger click for more.")
@@ -234,6 +239,11 @@ struct NotchWingsView: View {
             .opacity(0.88)
             .frame(width: NowPlayingWingLayout.nextWidth(size))
             .frame(maxHeight: .infinity)
+            // contentShape only routes clicks inside SwiftUI; the window server gives this
+            // transparent window a click only where a pixel is drawn, so a click between the
+            // glyph's strokes (or beside it, past the island's black) fell through to the menu
+            // bar. The faint plate draws a pixel under the whole button (DeskPointerMenu).
+            .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
             .contentShape(Rectangle())
             .onTapGesture { NowPlayingController.shared.next() }
             .help("Next")

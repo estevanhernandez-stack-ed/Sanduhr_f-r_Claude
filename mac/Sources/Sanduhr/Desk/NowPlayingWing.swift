@@ -6,11 +6,11 @@ import AppKit
 /// Never loops; with Reduce Motion it never moves. The decision is pure; ScrollOnceText runs it.
 enum NowPlayingScroll {
     /// Points per second while the text travels.
-    static let speed: CGFloat = 30
+    static let speed: CGFloat = 18
     /// The beginning stays readable this long before the text moves.
-    static let startPause: TimeInterval = 1.2
+    static let startPause: TimeInterval = 1.6
     /// The end stays readable this long before the text goes back.
-    static let endPause: TimeInterval = 1.0
+    static let endPause: TimeInterval = 1.6
     /// The way back to the beginning.
     static let returnDuration: TimeInterval = 0.6
     /// The soft fade at a clipped edge, in points.
@@ -39,11 +39,17 @@ enum NowPlayingScroll {
         return Plan(distance: distance, travel: TimeInterval(distance / speed))
     }
 
-    /// What restarts the scroll: the track (title and artist), not its play state, so pausing or
-    /// playing again does not scroll. In memory only, like the title itself.
+    /// What restarts the scroll: the track (title and artist) and its play state. A new track or
+    /// playing again after a pause scrolls once more; pausing puts the beginning back and holds
+    /// still (`scrolls`). In memory only, like the title itself.
     static func trackKey(_ info: NowPlayingInfo?) -> String {
         guard let info else { return "" }
-        return (info.title ?? "") + "\u{1F}" + (info.artist ?? "")
+        return (info.title ?? "") + "\u{1F}" + (info.artist ?? "") + (info.state == .playing ? "\u{1F}playing" : "\u{1F}paused")
+    }
+
+    /// Only while playing: a paused title rests at its beginning beside the Next button.
+    static func scrolls(_ info: NowPlayingInfo?) -> Bool {
+        info?.state == .playing
     }
 }
 
@@ -106,6 +112,8 @@ struct ScrollOnceText: View {
     let text: String
     /// NowPlayingScroll.trackKey: a new one scrolls again.
     let trackKey: String
+    /// False while paused: the title rests at its beginning.
+    var scrolls: Bool = true
     /// Measured with the same font as the place's width (NotchWingsView.textWidth).
     let textWidth: CGFloat
     let room: CGFloat
@@ -148,7 +156,7 @@ struct ScrollOnceText: View {
             offset = 0
             moving = false
         }
-        guard let plan = NowPlayingScroll.plan(textWidth: textWidth, room: room, reduceMotion: reduceMotion) else { return }
+        guard let plan = NowPlayingScroll.plan(textWidth: textWidth, room: room, reduceMotion: reduceMotion), scrolls else { return }
         do {
             try await Task.sleep(for: .seconds(NowPlayingScroll.startPause))
             moving = true
