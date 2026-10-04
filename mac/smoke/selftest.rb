@@ -84,6 +84,10 @@ eq('accounts count', state['accounts_count'], 2)
 eq('follow off by default', [state['follow'], state['follow_paused']], [false, false])
 # Item 43: the active account's Meter history, 30 days unless switched off (0); never a label.
 eq('meter history kept 30 days by default', state['history_days'], 30)
+# Item 44: the active account's data choices, defaults until chosen; never a label or a path.
+eq('data choices default to nothing tracked or shared', state['data'],
+   { 'activity' => 'off', 'names' => 'names', 'share' => 'off', 'folder_linked' => false })
+check('data block holds no path', !state['data'].to_s.include?('/'))
 # Item 38: the menu bar choice, Whichever is higher until changed.
 eq('menu bar follows the higher limit by default', state['menu_bar'], 'higher')
 eq('no limit hidden by default', state['hidden_limits'], [])

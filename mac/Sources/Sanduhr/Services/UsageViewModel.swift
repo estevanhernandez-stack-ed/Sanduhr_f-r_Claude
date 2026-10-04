@@ -157,6 +157,9 @@ final class UsageViewModel {
     var history: HistoryStore.History = HistoryStore.sparklines(HistoryStore.load(account: KeychainStore.accounts.active))
     /// The accounts whose Meter history is off (MeterHistory), as Settings, Accounts shows them.
     private(set) var historyOffAccounts: Set<String> = Set(MeterHistory.offLabels(in: KeychainStore.accounts.defaults))
+    /// Every account's data choices (AccountData), as Settings, Accounts, Data shows them. Holds
+    /// linked folder paths: never logged or written to state.yaml.
+    private(set) var accountDataChoices: [String: AccountDataChoices] = AccountData.allChoices(in: KeychainStore.accounts.defaults)
     /// The accounts in list order and the active one, as the Accounts page, the menus and the
     /// widget chip show them. Read from the registry's defaults (never the Keychain) and kept
     /// current by every account change here (`reloadAccounts`).
@@ -391,6 +394,77 @@ final class UsageViewModel {
         onUsageUpdate?()
     }
 
+    // MARK: Data choices (item 44)
+
+    /// An account's data choices, the defaults until one is made.
+    func dataChoices(for label: String) -> AccountDataChoices {
+        accountDataChoices[label] ?? .defaults
+    }
+
+    /// Settings, Accounts, Data: stored now; items 45 to 47 act on them.
+    func setActivity(_ value: ActivityChoice, for label: String) {
+        AccountData.setActivity(value, for: label, in: KeychainStore.accounts.defaults)
+        reloadAccounts()
+    }
+
+    func setProjectNames(_ value: ProjectNamesChoice, for label: String) {
+        AccountData.setNames(value, for: label, in: KeychainStore.accounts.defaults)
+        reloadAccounts()
+    }
+
+    func setShare(_ value: ShareChoice, for label: String) {
+        AccountData.setShare(value, for: label, in: KeychainStore.accounts.defaults)
+        reloadAccounts()
+    }
+
+    /// Links a Claude Code folder to the account. A folder linked to another account is moved
+    /// only with `move` (after the page's confirmation); otherwise nothing changes.
+    @discardableResult
+    func linkFolder(_ path: String, to label: String, move: Bool = false) -> AccountData.LinkOutcome {
+        let outcome = AccountData.link(path, to: label, move: move, in: KeychainStore.accounts.defaults)
+        reloadAccounts()
+        return outcome
+    }
+
+    func unlinkFolder(_ label: String) {
+        AccountData.unlink(label, in: KeychainStore.accounts.defaults)
+        reloadAccounts()
+    }
+
+    /// The account another account's folder is linked to, for the move confirmation.
+    func account(linkedTo path: String) -> String? {
+        AccountData.account(linkedTo: path, in: KeychainStore.accounts.defaults)
+    }
+
+    /// The found folder signed in to the account's organization, if exactly one is and it is not
+    /// another account's. The account's organization comes from its client (the active one's,
+    /// already fetched) or from one `/organizations` request with its key; the folders' from
+    /// their `.claude.json`, one field. Both uuids are compared here and dropped: never stored,
+    /// returned or logged.
+    func suggestedFolder(for label: String, among folders: [ClaudeCodeFolders.Folder],
+                         home: String) async -> ClaudeCodeFolders.Folder? {
+        guard !folders.isEmpty else { return nil }
+        let defaults = KeychainStore.accounts.defaults
+        let elsewhere = Set(folders.filter { f in
+            AccountData.account(linkedTo: f.path, in: defaults).map { $0 != label } ?? false
+        }.map(\.path))
+        guard folders.contains(where: { !elsewhere.contains($0.path) }),
+              let organization = await organization(of: label) else { return nil }
+        return await Task.detached(priority: .userInitiated) {
+            ClaudeCodeFolders.suggestion(among: folders, organization: organization,
+                                         isLinkedElsewhere: { elsewhere.contains($0.path) },
+                                         organizationOf: { ClaudeCodeFolders.organizationUuid(of: $0.path, home: home) })
+        }.value
+    }
+
+    /// The organization the account fetches (item 35's choice), nil without a key or on a failure.
+    private func organization(of label: String) async -> String? {
+        if label == apiAccount, let api { return try? await api.organizationID() }
+        let creds = KeychainStore.accounts.credentials(for: label)
+        guard let key = creds.sessionKey, !key.isEmpty else { return nil }
+        return try? await ClaudeAPI(sessionKey: key, cfClearance: creds.cfClearance).organizationID()
+    }
+
     /// Settings, Accounts, Add Account: a new account with its key, at the end of the list. It
     /// is fetched at once when it becomes active: asked for, or the first account there is.
     /// Refusals (`AccountError`) name no label and no value, so their text can be shown as is.
@@ -429,6 +503,8 @@ final class UsageViewModel {
         if signedIn != signedInAccounts { signedInAccounts = signedIn }
         let off = Set(MeterHistory.offLabels(in: accounts.defaults))
         if off != historyOffAccounts { historyOffAccounts = off }
+        let data = AccountData.allChoices(in: accounts.defaults)
+        if data != accountDataChoices { accountDataChoices = data }
     }
 
     nonisolated private static func signedIn(_ accounts: AccountRegistry) -> Set<String> {

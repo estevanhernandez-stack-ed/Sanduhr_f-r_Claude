@@ -337,3 +337,29 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   sparklines empty; the meters still update.
 - [ ] Rename an account with Meter history off: it stays off under the new name. Remove it: it
   leaves `meterHistoryOff`. Another account's history is never touched.
+
+## 15. The Data section and Claude Code folder linking (item 44)
+
+Use a test Claude Code folder (for example `mkdir -p ~/.claude-smoketest/projects`) or folders
+whose names are fine to show; remove it afterwards.
+
+- [ ] Settings, Accounts, select an account: a Data section shows Meter history (30 days),
+  Claude Code folder (None), Claude Code activity (Not tracked), Project names in the record
+  (Names, dimmed until Keep a record), Share with Claude (Off), with a caption that activity,
+  names and sharing take effect in coming updates. The page scrolls when it doesn't fit.
+- [ ] `smoke/smoke state` shows `data:` with `activity: "off"`, `names: names`, `share: "off"`,
+  `folder_linked: false`, and no label or path anywhere.
+- [ ] The folder menu lists `~/.claude` and the `~/.claude-*` folders that hold `projects/` or a
+  `.claude.json`, and not an empty `~/.claude-x` folder. Choose… on a folder without either says
+  it doesn't look like a Claude Code folder and links nothing.
+- [ ] With a folder signed in to the same organization as the account (its `.claude.json`
+  `oauthAccount.organizationUuid`), "This folder is signed in to this account. Link it?" shows
+  with the folder; nothing is linked until Link. Selecting an inactive account fetches its
+  organization once; nothing about it appears in Console (`log stream --predicate
+  'subsystem == "com.626labs.sanduhr"'`).
+- [ ] Link a folder to account A, then pick the same folder for account B: a confirmation names
+  A; Cancel keeps it with A, Move It to B unlinks it from A. A's menu then reads None.
+- [ ] Set B's activity to Keep a record, names to Hidden, share to Meters; Make B active:
+  `state.yaml` `data:` shows `record`, `hidden`, `meters`, `folder_linked: true`. `defaults read
+  com.626labs.sanduhr accountData` shows them under B. Rename B: the choices and the link follow.
+  Remove B: `accountData` no longer lists it and the folder is free for another account.

@@ -32,8 +32,12 @@ struct AccountsSettings: View {
             HStack(alignment: .top, spacing: 16) {
                 AccountList(vm: vm, selection: $selection, adding: $adding)
                     .frame(width: 190)
-                detail
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                // The Data section makes the account taller than the window.
+                ScrollView {
+                    detail
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                        .padding(.trailing, 12)
+                }
             }
             if vm.showsAccounts {
                 Divider()
@@ -198,7 +202,6 @@ private struct AccountDetail: View {
     @State private var noteIsError = false
     @State private var confirmingSignOut = false
     @State private var confirmingRemove = false
-    @State private var confirmingErase = false
 
     private var isActive: Bool { label == vm.activeAccount }
     private var hasKey: Bool { vm.signedInAccounts.contains(label) }
@@ -211,7 +214,7 @@ private struct AccountDetail: View {
             Divider()
             renameRow
             Divider()
-            historyRow
+            AccountDataSection(vm: vm, label: label)
             Divider()
             endRow
             if let note { FormNote(text: note, isError: noteIsError) }
@@ -231,14 +234,7 @@ private struct AccountDetail: View {
             Button("Remove Account", role: .destructive) { remove() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Its session key and its usage history are deleted from this Mac, and it leaves the list. This can't be undone.")
-        }
-        .confirmationDialog("Erase this account's meter history?", isPresented: $confirmingErase,
-                            titleVisibility: .visible) {
-            Button("Erase History", role: .destructive) { eraseHistory() }
-            Button("Keep It", role: .cancel) {}
-        } message: {
-            Text("Sanduhr no longer records this account's meters. The history it kept so far can be deleted from this Mac now, or kept until you erase it or remove the account.")
+            Text("Its session key, usage history and data choices are deleted from this Mac, its Claude Code folder is unlinked, and it leaves the list. This can't be undone.")
         }
     }
 
@@ -284,28 +280,6 @@ private struct AccountDetail: View {
                 Spacer()
             }
             if let renameProblem { FormNote(text: renameProblem, isError: true) }
-        }
-    }
-
-    /// Meter history (item 43): Off · 30 days. Choosing Off offers to erase what was kept.
-    private var historyRow: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Picker("Meter history", selection: Binding(
-                get: { !vm.historyOffAccounts.contains(label) },
-                set: { on in
-                    guard on == vm.historyOffAccounts.contains(label) else { return }
-                    vm.setMeterHistory(label, on: on)
-                    if !on { confirmingErase = true }
-                })) {
-                Text("Off").tag(false)
-                Text("\(MeterHistory.days) days").tag(true)
-            }
-            .pickerStyle(.segmented)
-            .fixedSize()
-            Text("The readings behind the sparklines, kept on this Mac for 30 days. Off stops recording this account's meters; the meters themselves don't change.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -355,11 +329,6 @@ private struct AccountDetail: View {
              ? "Signed out. Paste a sessionKey to sign in again."
              : "Signed out, but \(result.failures.count) item(s) could not be removed. See Console.",
              error: !result.succeeded)
-    }
-
-    private func eraseHistory() {
-        vm.eraseHistory(label)
-        show("Meter history erased.", error: false)
     }
 
     private func remove() {

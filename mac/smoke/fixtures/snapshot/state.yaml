@@ -92,6 +92,11 @@ credentials_store: file
 account_ref: "104ab921"
 accounts_count: 2
 history_days: 30
+data:
+  activity: "off"
+  names: names
+  share: "off"
+  folder_linked: false
 follow: false
 follow_paused: false
 version: "2.1.0"

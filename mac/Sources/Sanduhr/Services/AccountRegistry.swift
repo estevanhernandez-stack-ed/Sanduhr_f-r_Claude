@@ -199,7 +199,7 @@ final class AccountRegistry: @unchecked Sendable {
 
     /// Renames an account in place. Its secrets move the 2.3.2 way: written under the new
     /// label, read back, and only then is the list changed and the old slots deleted. Its history
-    /// file, sign-in marker and Meter history choice follow. A failed write or read-back leaves
+    /// file, sign-in marker, Meter history choice and data choices (folder link included) follow. A failed write or read-back leaves
     /// everything as it was.
     func rename(_ old: String, to new: String) throws {
         guard Self.isValid(new) else { throw AccountError.invalidLabel }
@@ -222,6 +222,7 @@ final class AccountRegistry: @unchecked Sendable {
         history?.rename(old, to: new)
         SignInGate.rename(old, to: new, in: defaults)
         MeterHistory.rename(old, to: new, in: defaults)
+        AccountData.rename(old, to: new, in: defaults)
     }
 
     /// Writes each value and reads it back. On a failure the slots written so far are deleted
@@ -289,6 +290,7 @@ final class AccountRegistry: @unchecked Sendable {
         let result = signOut(label)
         history?.delete(label)
         MeterHistory.forget(label, in: defaults)
+        AccountData.forget(label, in: defaults)
         list.remove(at: index)
         writeList(list)
         if wasActive {

@@ -85,9 +85,21 @@ with the label. The notch stays as it is. A switch never needs a relaunch: the m
 - **History.** One file per account, `history.{label}.json`; the old `history.json` becomes
   Personal's once. Rename moves the file, Remove deletes it, Sign Out keeps it. Each keeps 30
   days of readings (item 43), unless that account's Meter history is Off (below).
+- **Data (item 44).** Settings, Accounts, Data holds each account's Meter history, Claude Code
+  folder, Claude Code activity (`off`/`live`/`record`), Project names (`names`/`hidden`/`full`)
+  and Share with Claude (`off`/`meters`/`activity`), in defaults `accountData`
+  (`{label: {activity, names, share, folder}}`, missing means the default: nothing linked,
+  tracked or shared, names). They follow Rename and go with Remove. Folders are found in the
+  home folder (`.claude`, `.claude-*`, and `CLAUDE_CONFIG_DIR` when set) when they hold
+  `projects/` or their `.claude.json` (beside the home for `~/.claude`, inside it otherwise, as on
+  Windows); Choose… takes any folder that looks like one. One folder per account, one account
+  per folder; a folder linked elsewhere moves only after a confirmation. The suggestion compares
+  `oauthAccount.organizationUuid` (the only field decoded) with the account's organization, in
+  memory. Activity, names and sharing are stored for items 45 to 47.
 - **Readers.** `snapshot.json` names the active account by `account_ref` (first 4 bytes of the
   SHA-256 of the label, as on Windows) and is deleted at once on a switch; `state.yaml` has
-  `account_ref`, `accounts_count`, `history_days`, `follow` and `follow_paused`. Labels never go into a log,
+  `account_ref`, `accounts_count`, `history_days`, `data` (the active account's choices and
+  `folder_linked`), `follow` and `follow_paused`. Labels and folder paths never go into a log,
   `snapshot.json` or `state.yaml`.
 
 #### Following the account in use
@@ -134,6 +146,7 @@ Most accounts don't need this.
 - Account labels and the active one → `UserDefaults` (`accounts`, `activeAccount`); following → `followAccount`
 - Selected theme → `UserDefaults` (`theme`)
 - Meter history → `~/Library/Application Support/Sanduhr/history.{label}.json`, one per account, the Windows format. Each reading is kept 30 days (and at most 8640 points per limit, Windows' cap), trimmed when the next one is written; the sparklines draw the last 24 points (about 2 hours). Settings, Accounts, Meter history: Off stops recording an account (`UserDefaults` `meterHistoryOff`, the labels switched off) and offers to erase its file; Remove Account deletes it. `state.yaml` shows the active account's `history_days` (30, or 0 when off)
+- Data choices per account (Claude Code folder, activity, project names, Share with Claude) → `UserDefaults` (`accountData`); the linked folder's path stays there, never in `state.yaml`
 - Window position → `UserDefaults` (`windowFrame`)
 
 ## Controls

@@ -61,6 +61,9 @@ struct DebugStateInput {
     var accountsCount = 0
     /// The active account's Meter history: 30 days, or 0 when off (MeterHistory). No label.
     var historyDays = MeterHistory.days
+    /// The active account's data choices (AccountData): values and whether a folder is linked,
+    /// never the folder's path or the label.
+    var accountData = AccountDataChoices.defaults
     /// Follow the account I'm using, and whether a manual switch is pausing it. Never labels.
     var follow = false
     var followPaused = false
@@ -69,7 +72,16 @@ struct DebugStateInput {
     var build = ""
 }
 
-enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
+enum DebugState {
+    /// `data:` (item 44): the active account's choices, and `folder_linked` instead of the path.
+    static func accountDataYAML(_ c: AccountDataChoices) -> YAMLNode {
+        .map([YAMLPair("activity", .string(c.activity.rawValue)),
+              YAMLPair("names", .string(c.names.rawValue)),
+              YAMLPair("share", .string(c.share.rawValue)),
+              YAMLPair("folder_linked", .bool(c.folder != nil))])
+    }
+
+    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         // Built in typed steps: one literal holding the whole map is more than Swift 6.0 and 6.1
         // will type-check in reasonable time.
         let iso = ISO8601DateFormatter()
@@ -123,6 +135,7 @@ enum DebugState {    static func yaml(_ s: DebugStateInput) -> YAMLNode {
         pairs.append(("account_ref", s.accountRef.map(YAMLNode.string) ?? .null))
         pairs.append(("accounts_count", .int(s.accountsCount)))
         pairs.append(("history_days", .int(s.historyDays)))
+        pairs.append(("data", accountDataYAML(s.accountData)))
         pairs.append(("follow", .bool(s.follow)))
         pairs.append(("follow_paused", .bool(s.followPaused)))
         pairs.append(("version", .string(s.version)))
