@@ -544,7 +544,8 @@ class ActivityLevel(Base):
             "meters_and_activity": 1, "activity_read": 1, "records_shared": 1, "active_account": "activity"})
         self.assertEqual(p["cc_roots_consented"], [ref("Home")])
         self.assertEqual(p["tools_available"],
-                         ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping"])
+                         ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
+                          "get_desk_messages", "propose_desk_messages"])
         self.assertEqual(sorted(p["tools_not_on_mac"]), ["propose_theme", "publish_usage"])
         text = json.dumps(p)
         for secret in ("Home", "Work", ".claude-personal", VAULT_A):
@@ -603,8 +604,16 @@ class Protocol(Base):
         )
         self.assertEqual([f.get("id") for f in frames], [1, 2, 3, 4, 5, 6])
         names = [t["name"] for t in frames[1]["result"]["tools"]]
-        self.assertEqual(names, ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping"])
+        self.assertEqual(names, ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
+                                 "get_desk_messages", "propose_desk_messages"])
         for t in frames[1]["result"]["tools"]:
+            if t["name"] == "propose_desk_messages":
+                # The one tool that asks for a change: not read-only, never destructive, no path.
+                self.assertFalse(t["annotations"]["readOnlyHint"])
+                self.assertFalse(t["annotations"]["destructiveHint"])
+                self.assertEqual(sorted(t["inputSchema"]["properties"]), ["lines", "mode", "note"])
+                self.assertFalse(t["inputSchema"]["additionalProperties"])
+                continue
             self.assertTrue(t["annotations"]["readOnlyHint"])
             # No free-form argument: closed integer enums and booleans only.
             for prop in t["inputSchema"]["properties"].values():
@@ -619,7 +628,7 @@ class Protocol(Base):
         hist = json.loads(frames[5]["result"]["content"][0]["text"])
         self.assertEqual(hist["reason"], "missing")
 
-    def test_the_server_never_writes(self):
+    def test_the_server_never_writes_without_a_good_proposal(self):
         self.fx.access(entry("Home", "activity", names="names", vault_id=VAULT_A))
         before = sorted(os.listdir(self.fx.support))
         self.run_server(*[{"jsonrpc": "2.0", "id": i, "method": "tools/call", "params": {"name": n}}
@@ -641,6 +650,222 @@ class LocalDays(Base):
         finally:
             os.environ["TZ"] = "UTC"
             time.tzset()
+
+
+class DeskMessages(Base):
+    """get_desk_messages and propose_desk_messages (item 54): a temp Desk folder beside the temp
+    Sanduhr folder, never the real messages.txt; the app's answer is played by a fake sleep."""
+
+    def setUp(self):
+        super().setUp()
+        self.desk = self.fx.folder("Desk")
+
+    def write_messages(self, text):
+        with open(os.path.join(self.desk, "messages.txt"), "w", encoding="utf-8") as f:
+            f.write(text)
+
+    def get(self, now=NOW):
+        return mcp.build_desk_messages(now=now, paths=self.paths)
+
+    def propose(self, args, answer=None, wait=1.0):
+        """Proposes; `answer(request)` returns the app's result payload (None: no answer)."""
+        ticks = [0.0]
+
+        def clock():
+            return ticks[0]
+
+        def sleep(seconds):
+            ticks[0] += seconds
+            if answer is None or not os.path.exists(self.paths.desk_request):
+                return
+            with open(self.paths.desk_request, encoding="utf-8") as f:
+                req = json.load(f)
+            res = answer(req)
+            if res is not None:
+                self.fx.write_json(mcp.DESK_RESULT_FILE, {"id": req["id"], "completed_at": iso(NOW), "result": res})
+
+        return mcp.build_propose_desk_messages(args, now=NOW, paths=self.paths, wait=wait, poll=0.25,
+                                               sleep=sleep, clock=clock)
+
+    def request(self):
+        with open(self.paths.desk_request, encoding="utf-8") as f:
+            return json.load(f)
+
+    # -- reading
+
+    def test_paths_stay_in_the_test_folder(self):
+        self.assertEqual(self.paths.messages, os.path.join(self.fx.dir, "Desk", "messages.txt"))
+        self.assertTrue(self.paths.desk_request.startswith(self.fx.support))
+
+    def test_missing_file(self):
+        r = self.get()
+        self.assertEqual((r["status"], r["file_found"], r["lines"], r["today"]), ("ok", False, [], None))
+        self.assertEqual(r["rotate"], "daily")
+        self.assertFalse(r["pinned"])
+        self.assertIn("settings_note", r)
+
+    def test_lines_and_today_follow_the_most_specific_pool(self):
+        # NOW is Sunday 2026-07-26 (UTC clock in these tests).
+        self.write_messages("# header\nkeep building.\n{ink:#fff} also plain\nSun: {glow} rest.\n\n\n")
+        r = self.get()
+        self.assertEqual(r["lines"], ["# header", "keep building.", "{ink:#fff} also plain", "Sun: {glow} rest."])
+        self.assertEqual(r["today"], "{glow} rest.")
+        self.write_messages("Sun: rest.\n07-26: {write} today only.\n")
+        self.assertEqual(self.get()["today"], "{write} today only.")
+        self.write_messages("Mon: monday.\na\nb\nc\n")
+        # Plain pool, rotated by the day number like MessageEngine.pick.
+        self.assertEqual(self.get()["today"], ["a", "b", "c"][NOW.date().toordinal() % 3])
+
+    def test_hourly_rotation_and_pin_from_the_state_file(self):
+        self.write_messages("a\nb\nc\n")
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 1, "pinned": False, "rotate": "hourly"})
+        r = self.get()
+        self.assertEqual(r["rotate"], "hourly")
+        self.assertNotIn("settings_note", r)
+        self.assertEqual(r["today"], ["a", "b", "c"][(NOW.date().toordinal() * 24 + NOW.hour) % 3])
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 1, "pinned": True,
+                                                 "pinned_line": "{shimmer} pinned.", "rotate": "daily"})
+        r = self.get()
+        self.assertTrue(r["pinned"])
+        self.assertEqual(r["today"], "{shimmer} pinned.")
+
+    def test_unknown_state_schema_reads_as_defaults(self):
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 9, "pinned": True, "rotate": "hourly"})
+        r = self.get()
+        self.assertFalse(r["pinned"])
+        self.assertEqual(r["rotate"], "daily")
+
+    def test_not_utf8_is_refused(self):
+        with open(os.path.join(self.desk, "messages.txt"), "wb") as f:
+            f.write(b"\xff\xfe bad")
+        self.assertEqual(self.get()["reason"], "not_utf8")
+
+    def test_reading_needs_no_sharing(self):
+        self.write_messages("hello.\n")
+        self.assertFalse(os.path.exists(self.paths.access))
+        self.assertEqual(self.get()["lines"], ["hello."])
+
+    # -- the checks
+
+    def test_good_lines_pass(self):
+        good = ["keep building.", "Mon: one thing at a time.", "10-31: {ink:#ff7518,#6b2fa0} {write} boo.",
+                "{ink:#ff2a6d,#05d9e8} {glow} hello", "{size:0.5}{noglow} small.", "{SHIMMER} loud", "# a note",
+                "", "Note: a colon in a plain line.", "02-29: leap.", "{ink:fff} three digits.", "x" * 120,
+                "hello {glow} mid-line braces are text", "ünïcödé ✨ fine."]
+        self.assertEqual(mcp.validate_desk_lines(good), [])
+
+    def test_bad_lines_are_named(self):
+        cases = {
+            "x" * 121: "121 characters",
+            "tab\there": "control character",
+            "line\nbreak": "control character",
+            "sep arator": "control character",
+            "13-01: no such month": "not a date",
+            "1-5: short date": "not a date",
+            "02-30: no such day": "not a date",
+            "Monday: long name": "write the day as Mon",
+            "mon: lowercase": "write the day as Mon",
+            "Mon:   ": "prefix but no text",
+            "{blink} hi": "unknown effect {blink}",
+            "{ink:#zzzzzz} hi": "not hex",
+            "{ink:} hi": "1 to 4 hex colors",
+            "{ink:#111,#222,#333,#444,#555} hi": "at most 4",
+            "{size:3} big": "0.5 to 2",
+            "{size:big} big": "0.5 to 2",
+            "{glow:yes} hi": "takes no value",
+            "{glow hi": "not closed",
+            "{glow} {write}": "no text",
+            "\ud800 lone surrogate": "UTF-8",
+        }
+        for line, want in cases.items():
+            reasons = mcp.validate_desk_lines([line])
+            self.assertEqual(len(reasons), 1, line)
+            self.assertIn("line 1", reasons[0])
+            self.assertIn(want, reasons[0], line)
+
+    def test_counts_and_types(self):
+        self.assertIn("61 lines", mcp.validate_desk_lines(["a"] * 61)[0])
+        self.assertEqual(mcp.validate_desk_lines(["a"] * 60), [])
+        self.assertIn("list", mcp.validate_desk_lines([])[0])
+        self.assertIn("list", mcp.validate_desk_lines("a")[0])
+        self.assertIn("not a string", mcp.validate_desk_lines([3])[0])
+        self.assertIn("no message line", mcp.validate_desk_lines(["# only", ""])[0])
+
+    # -- proposing
+
+    def test_a_refusal_writes_nothing(self):
+        before = sorted(os.listdir(self.fx.support))
+        for args in ({"lines": ["{blink} x"]}, {"lines": ["ok"], "mode": "merge"}, {"lines": ["ok"], "note": "a\nb"},
+                     {"lines": ["ok"], "path": "/etc"}, {}, None):
+            r = self.propose(args)
+            self.assertEqual(r["status"], "rejected")
+            self.assertTrue(r["reasons"])
+        self.assertEqual(sorted(os.listdir(self.fx.support)), before)
+        self.assertFalse(os.path.exists(os.path.join(self.desk, "messages.txt")))
+
+    def test_the_request_file_and_a_pending_answer(self):
+        seen = []
+
+        def app(req):
+            seen.append(req)
+            return {"status": "pending_approval"}
+
+        r = self.propose({"lines": ["  {glow} hi.  ", "Fri: showtime."], "mode": "replace", "note": " for fridays "}, app)
+        self.assertEqual(r["status"], "pending_approval")
+        req = seen[0]
+        self.assertEqual(r["request_id"], req["id"])
+        self.assertEqual(req["schema_version"], 1)
+        self.assertEqual(req["lines"], ["{glow} hi.", "Fri: showtime."])
+        self.assertEqual((req["mode"], req["note"]), ("replace", "for fridays"))
+        self.assertTrue(mcp.parse(req["requested_at"]))
+        self.assertEqual(os.stat(self.paths.desk_request).st_mode & 0o777, 0o600)
+        self.assertFalse(os.path.exists(self.paths.desk_request + ".tmp"))
+        self.assertFalse(os.path.exists(os.path.join(self.desk, "messages.txt")))   # never the list itself
+
+    def test_applied_and_rejected_answers_pass_through(self):
+        r = self.propose({"lines": ["a."]}, lambda req: {"status": "applied", "mode": "add", "lines_added": 1,
+                                                         "lines_skipped": 0, "extra": "dropped"})
+        self.assertEqual((r["status"], r["lines_added"], r["mode"]), ("applied", 1, "add"))
+        self.assertNotIn("extra", r)
+        r = self.propose({"lines": ["b."]}, lambda req: {"status": "rejected", "reasons": ["line 1 is bad"]})
+        self.assertEqual(r["reasons"], ["line 1 is bad"])
+
+    def test_another_requests_result_is_not_taken(self):
+        self.fx.write_json(mcp.DESK_RESULT_FILE, {"id": "someone-else", "result": {"status": "applied"}})
+        r = self.propose({"lines": ["a."]}, answer=lambda req: None, wait=1.0)
+        self.assertEqual((r["status"], r["reason"]), ("queued", "app_not_responding"))
+        self.assertTrue(os.path.exists(self.paths.desk_request))   # left for the app to pick up
+
+    def test_the_support_folder_is_created(self):
+        shutil.rmtree(self.fx.support)
+        r = self.propose({"lines": ["a."]}, wait=0)
+        self.assertEqual(r["status"], "queued")
+        self.assertTrue(os.path.isfile(self.paths.desk_request))
+
+    def test_over_stdio(self):
+        self.write_messages("hello.\n")
+        env = dict(os.environ, SANDUHR_SUPPORT_DIR=self.fx.support)
+        import subprocess
+        msgs = [{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "get_desk_messages"}},
+                {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                 "params": {"name": "propose_desk_messages", "arguments": {"lines": ["{nope} x"]}}}]
+        out = subprocess.run([sys.executable, SERVER], input="\n".join(json.dumps(m) for m in msgs) + "\n",
+                             capture_output=True, text=True, env=env, timeout=30)
+        self.assertEqual(out.stderr, "")
+        frames = [json.loads(x) for x in out.stdout.splitlines()]
+        got = json.loads(frames[0]["result"]["content"][0]["text"])
+        self.assertEqual(got["lines"], ["hello."])
+        refused = json.loads(frames[1]["result"]["content"][0]["text"])
+        self.assertEqual(refused["status"], "rejected")
+        self.assertFalse(os.path.exists(self.paths.desk_request))
+
+    def test_descriptions_teach_the_syntax_and_effects(self):
+        tools = {t["name"]: t["description"] for t in mcp.TOOLS}
+        for name in ("get_desk_messages", "propose_desk_messages"):
+            for word in ("Mon:", "MM-DD", "# ", "rotate", "pinned", "{ink:", "{glow}", "{noglow}", "{size:",
+                         "{write}", "{shimmer}", "40 characters"):
+                self.assertIn(word, tools[name], (name, word))
+        self.assertIn("never writes messages.txt", tools["propose_desk_messages"])
 
 
 class ProjectNames(unittest.TestCase):

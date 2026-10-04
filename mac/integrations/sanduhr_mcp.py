@@ -12,6 +12,9 @@ tools the same way on either machine:
   get_usage_history          daily tokens from Sanduhr's record (the vault), and the
                              meters' daily peaks from their history
   ping                       health: snapshot, sharing summary, the tools on this Mac
+  get_desk_messages          the Desk's messages.txt lines, the pin and rotation, today's line
+  propose_desk_messages      suggests Desk message lines; Sanduhr asks the user (or applies them
+                             when the user lets Claude change the messages directly)
 
 What each tool may read is decided per account in Sanduhr (Settings, Accounts, Data, Share
 with Claude) and handed over in ~/Library/Application Support/Sanduhr/mcp-access.json. No
@@ -20,10 +23,14 @@ not exist here. Meters: get_usage and the meter history. Meters and activity: al
 burn, model and record tools for the account's linked Claude Code folder, with project
 names as the account chose (Hidden returns the record's short code, never a name).
 
-Read-only: opens snapshot.json, mcp-access.json, the history files and vault folders it
-names, and the session logs under a folder it names. Never reads Sanduhr's settings, the
-Keychain or account names; never calls claude.ai or anything else on the network; never
-writes a file; never logs. No tool takes a path. Failures are typed results
+Reads snapshot.json, mcp-access.json, the history files and vault folders it names, the
+session logs under a folder it names, Desk's messages.txt and desk-messages-state.json (the pin
+and rotation, written by Sanduhr). Desk messages are not gated by Share with Claude: they are on
+the desktop already, and a proposal only asks (Sanduhr checks it again and the user approves,
+unless they chose to let Claude change the messages directly). Never reads Sanduhr's settings,
+the Keychain or account names; never calls claude.ai or anything else on the network; never
+logs. The one file it writes is desk-messages-request.json (propose_desk_messages), atomically;
+it never writes messages.txt. No tool takes a path. Failures are typed results
 (status/reason/remedy), never protocol errors. Python 3.9 standard library only.
 
 publish_usage is dropped on the Mac (nothing leaves this Mac); propose_theme is not on Mac.
@@ -33,9 +40,11 @@ import json
 import os
 import re
 import sys
+import time
+import uuid
 from datetime import datetime, timedelta, timezone
 
-SERVER_VERSION = "0.2.0-mac"
+SERVER_VERSION = "0.3.0-mac"
 PROTOCOL_VERSION = "2025-06-18"
 SCHEMA_VERSION = 1
 ACCESS_SCHEMA_VERSION = 1
@@ -92,6 +101,41 @@ REMEDY_NO_ACTIVITY = (
     "No account shares Claude Code activity from a folder Sanduhr reads. In " + SETTINGS_PLACE +
     ": link the account's Claude Code folder, set Claude Code activity to Live only or Keep a "
     "record, and Share with Claude to Meters and activity.")
+
+DESK_SYNTAX = (
+    "messages.txt syntax, one line each: a plain line shows on any day; 'Mon: text' only on that "
+    "weekday (Mon Tue Wed Thu Fri Sat Sun, exactly so); '10-31: text' only on that date (MM-DD); "
+    "'# text' is a comment and blank lines are ignored. The most specific pool that has lines wins "
+    "(today's date, else today's weekday, else the plain lines); within it Desk rotates once a day "
+    "or once an hour (rotate, the user's choice), steady in between. Pinning one line is a user "
+    "setting (pinned): while pinned the list is not shown, so say so before proposing. ")
+DESK_EFFECTS = (
+    "Effects: tags at the start of the text, after any prefix, in any order, each in braces: "
+    "{ink:#ff2a6d,#05d9e8} this line's ink, 1 to 4 hex colors (2 or more make a left-to-right "
+    "gradient); {glow} / {noglow} turn the soft glow on or off for this line; {size:1.3} scales "
+    "the line from 0.5 to 2 times the Desk's message size; {write} draws the line in, left to right "
+    "like handwriting, once when it first appears; {shimmer} sends a slow light sweep across it "
+    "every few seconds. Examples: '{ink:#ffd08a} showtime.', 'Fri: {ink:#ff2a6d,#05d9e8} {glow} "
+    "ship it.', '10-31: {ink:#ff7518,#6b2fa0} {write} happy halloween.', '{size:0.8} {noglow} "
+    "breathe.'. Good taste: short lines (handwriting reads best under about 40 characters, two "
+    "lines at most on screen), lowercase and a period suit the hand, {write} and {shimmer} "
+    "sparingly (a few lines, not every line), gradients with 2 or 3 colors that sit near each "
+    "other, sizes near 1. Reduce Motion shows {write} at once and skips {shimmer}. ")
+DESK_GUIDE_READ = (
+    "Read the user's Desk messages: the handwritten line Sanduhr draws on the macOS desktop, picked "
+    "from ~/Library/Application Support/Desk/messages.txt. Returns every raw line of the file "
+    "(comments and effects included), whether one line is pinned, the rotation (daily or hourly) "
+    "and today: the raw line the Desk shows now. Call this before propose_desk_messages to match "
+    "the user's voice and to avoid repeats. " + DESK_SYNTAX + DESK_EFFECTS)
+DESK_GUIDE_PROPOSE = (
+    "Suggest lines for the user's Desk messages. Sanduhr checks them and, unless the user lets "
+    "Claude change the messages directly, shows them as a suggestion to Add, Review or Dismiss: "
+    "pending_approval means the user decides, applied means they are in the list now, rejected "
+    "comes with reasons to fix. This server never writes messages.txt. Limits: 1 to 60 lines, "
+    "120 characters each, no control characters or line breaks inside a line, at least one line "
+    "that is not a comment; prefixes and effects must parse. mode add appends (default), replace "
+    "swaps the whole list (the user's previous list is kept as messages.txt.previous). Read the "
+    "current list first with get_desk_messages. " + DESK_SYNTAX + DESK_EFFECTS)
 
 READ_ONLY = {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False}
 NO_ARGS = {"type": "object", "properties": {}, "additionalProperties": False}
@@ -179,8 +223,45 @@ TOOLS = [
         "inputSchema": NO_ARGS,
         "annotations": READ_ONLY,
     },
+    {
+        "name": "get_desk_messages",
+        "description": DESK_GUIDE_READ,
+        "inputSchema": NO_ARGS,
+        "annotations": READ_ONLY,
+    },
+    {
+        "name": "propose_desk_messages",
+        "description": DESK_GUIDE_PROPOSE,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "lines": {"type": "array", "items": {"type": "string", "maxLength": 120},
+                          "minItems": 1, "maxItems": 60,
+                          "description": "The lines, exactly as they would sit in messages.txt (prefix first, then effects, then the text)."},
+                "mode": {"type": "string", "enum": ["add", "replace"],
+                         "description": "add appends the lines (lines already in the list are skipped); replace swaps the whole list for them (the comment block at the top of the file stays). Default add."},
+                "note": {"type": "string", "maxLength": 300,
+                         "description": "One short sentence for the user on why these lines (shown beside the suggestion)."},
+            },
+            "required": ["lines"],
+            "additionalProperties": False,
+        },
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False,
+                        "openWorldHint": False},
+    },
 ]
 TOOL_NAMES = [t["name"] for t in TOOLS]
+# The Desk messages handoff (item 54). The app mirrors these names (DeskMessageHandoff); a test on
+# each side pins them.
+DESK_REQUEST_FILE = "desk-messages-request.json"
+DESK_RESULT_FILE = "desk-messages-result.json"
+DESK_STATE_FILE = "desk-messages-state.json"
+DESK_MAX_LINES = 60
+DESK_MAX_LINE_CHARS = 120
+DESK_MAX_NOTE_CHARS = 300
+DESK_MAX_FILE_BYTES = 256 * 1024
+DESK_WAIT_SECONDS = 10.0
+DESK_POLL_SECONDS = 0.25
 TOOLS_NOT_ON_MAC = {
     "publish_usage": "dropped on Mac: nothing leaves this Mac",
     "propose_theme": "not on Mac",
@@ -191,13 +272,20 @@ class Paths:
     """Where the server reads. SANDUHR_SUPPORT_DIR (tests, a test folder) moves everything;
     SANDUHR_SNAPSHOT moves the snapshot alone, as before."""
 
-    def __init__(self, support_dir=None, snapshot=None):
+    def __init__(self, support_dir=None, snapshot=None, desk_dir=None):
         self.support_dir = support_dir or os.environ.get("SANDUHR_SUPPORT_DIR") or os.path.expanduser(
             "~/Library/Application Support/Sanduhr")
         self.snapshot = snapshot or os.environ.get("SANDUHR_SNAPSHOT") or os.path.join(
             self.support_dir, "snapshot.json")
         self.access = os.path.join(self.support_dir, "mcp-access.json")
         self.vault = os.path.join(self.support_dir, "vault")
+        # Desk's folder sits beside Sanduhr's (Application Support/Desk), so a test folder moves
+        # it too and a test never reaches the real messages.txt.
+        self.desk_dir = desk_dir or os.path.join(os.path.dirname(os.path.abspath(self.support_dir)), "Desk")
+        self.messages = os.path.join(self.desk_dir, "messages.txt")
+        self.desk_state = os.path.join(self.support_dir, DESK_STATE_FILE)
+        self.desk_request = os.path.join(self.support_dir, DESK_REQUEST_FILE)
+        self.desk_result = os.path.join(self.support_dir, DESK_RESULT_FILE)
 
     def history_file(self, name):
         return os.path.join(self.support_dir, name)
@@ -918,6 +1006,289 @@ def build_ping(now=None, paths=None):
     }
 
 
+# -- Desk messages (item 54) -------------------------------------------------------------------
+#
+# The same grammar as the app's MessageEngine and MessageMarkup (Desk/Message.swift,
+# Desk/MessageEffects.swift). The app is the authority: it checks every request again before
+# anything reaches messages.txt.
+
+WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+WEEKDAY_LOOKALIKES = {w.lower() for w in WEEKDAYS} | {
+    "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
+    "tues", "thur", "thurs"}
+DATE_TAG_RE = re.compile(r"^\d{2}-\d{2}$")
+DATE_LIKE_RE = re.compile(r"^\d{1,2}-\d{1,2}$")
+HEX_RE = re.compile(r"^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+SIZE_RE = re.compile(r"^\d+(?:\.\d+)?$")
+EFFECT_NAMES = "ink, glow, noglow, size, write, shimmer"
+DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+ROTATIONS = ("daily", "hourly")
+
+
+def is_control(c):
+    o = ord(c)
+    return o < 0x20 or 0x7F <= o <= 0x9F or o in (0x2028, 0x2029)
+
+
+def split_prefix(line):
+    """(kind, tag, body) for a stripped message line: kind is "date", "weekday" or "plain".
+    A line whose first colon follows something that is neither a date nor a weekday is plain."""
+    colon = line.find(":")
+    if colon >= 0:
+        tag = line[:colon].strip()
+        body = line[colon + 1:].strip()
+        if DATE_TAG_RE.match(tag):
+            return "date", tag, body
+        if tag in WEEKDAYS:
+            return "weekday", tag, body
+    return "plain", None, line
+
+
+def parse_effect(tag):
+    """(name, value) for one tag's inside, or an error string."""
+    name, sep, value = tag.partition(":")
+    name = name.strip().lower()
+    value = value.strip()
+    if name in ("glow", "noglow", "write", "shimmer"):
+        if sep:
+            return "{%s} takes no value" % name
+        return name, None
+    if name == "ink":
+        colors = [c.strip() for c in value.split(",")] if sep else []
+        if not colors or any(not c for c in colors):
+            return "{ink:...} needs 1 to 4 hex colors, like {ink:#ff2a6d,#05d9e8}"
+        if len(colors) > 4:
+            return "{ink:...} takes at most 4 colors"
+        bad = [c for c in colors if not HEX_RE.match(c)]
+        if bad:
+            return "{ink:...} has a color that is not hex (#rgb or #rrggbb)"
+        return name, colors
+    if name == "size":
+        if not sep or not SIZE_RE.match(value) or not 0.5 <= float(value) <= 2:
+            return "{size:...} needs a number from 0.5 to 2, like {size:1.3}"
+        return name, float(value)
+    return "unknown effect {%s}; known: %s" % (name[:20], EFFECT_NAMES)
+
+
+def parse_effects(body):
+    """(effects, text, error): the tags at the start of body, strictly. error is None when every
+    tag parsed and some text follows."""
+    effects = {}
+    rest = body.lstrip()
+    while rest.startswith("{"):
+        end = rest.find("}")
+        if end < 0:
+            return effects, rest, "an effect tag is not closed with }"
+        parsed = parse_effect(rest[1:end])
+        if isinstance(parsed, str):
+            return effects, rest, parsed
+        name, value = parsed
+        if name in ("glow", "noglow"):
+            effects["glow"] = name == "glow"
+        else:
+            effects[name] = True if value is None else value
+        rest = rest[end + 1:].lstrip()
+    if not rest:
+        return effects, rest, "the line has effects but no text"
+    return effects, rest, None
+
+
+def check_desk_line(line):
+    """None for a good line, else why not (the line number is added by the caller)."""
+    if not isinstance(line, str):
+        return "is not a string"
+    try:
+        line.encode("utf-8")
+    except UnicodeEncodeError:
+        return "is not valid UTF-8"
+    if any(is_control(c) for c in line):
+        return "has a control character or a line break"
+    text = line.strip()
+    if len(text) > DESK_MAX_LINE_CHARS:
+        return "is %d characters; the limit is %d" % (len(text), DESK_MAX_LINE_CHARS)
+    if not text or text.startswith("#"):
+        return None
+    colon = text.find(":")
+    if colon >= 0:
+        tag = text[:colon].strip()
+        if DATE_LIKE_RE.match(tag):
+            month, day = (int(x) for x in tag.split("-"))
+            if not DATE_TAG_RE.match(tag) or not 1 <= month <= 12 or not 1 <= day <= DAYS_IN_MONTH[month - 1]:
+                return "starts with '%s:', which is not a date; write MM-DD, like 10-31" % tag
+        elif tag.lower() in WEEKDAY_LOOKALIKES and tag not in WEEKDAYS:
+            return "starts with '%s:'; write the day as Mon, Tue, Wed, Thu, Fri, Sat or Sun" % tag[:12]
+    kind, _, body = split_prefix(text)
+    if kind != "plain" and not body:
+        return "has a prefix but no text"
+    _, _, error = parse_effects(body)
+    return error
+
+
+def is_message_line(line):
+    text = line.strip() if isinstance(line, str) else ""
+    return bool(text) and not text.startswith("#")
+
+
+def validate_desk_lines(lines):
+    """The reasons a proposal is refused, [] when it may go to the app."""
+    if not isinstance(lines, list) or not lines:
+        return ["lines must be a list of 1 to %d strings" % DESK_MAX_LINES]
+    reasons = []
+    if len(lines) > DESK_MAX_LINES:
+        reasons.append("%d lines; the limit is %d" % (len(lines), DESK_MAX_LINES))
+    for i, line in enumerate(lines[:DESK_MAX_LINES * 2], 1):
+        why = check_desk_line(line)
+        if why:
+            reasons.append("line %d %s" % (i, why))
+    if not reasons and not any(is_message_line(x) for x in lines):
+        reasons.append("no message line: every line is blank or a # comment")
+    return reasons[:20]
+
+
+def pick_desk_line(text, now, hourly):
+    """MessageEngine.pick: the line Desk shows at `now` (local time), raw, or None."""
+    today = now.strftime("%m-%d")
+    weekday = WEEKDAYS[(now.isoweekday()) % 7]
+    dated, daily, plain = [], [], []
+    for raw in text.splitlines():
+        line = raw.strip(" \t")
+        if not line or line.startswith("#"):
+            continue
+        kind, tag, body = split_prefix(line)
+        if kind == "date":
+            if tag == today and body:
+                dated.append(body)
+            continue
+        if kind == "weekday":
+            if tag == weekday and body:
+                daily.append(body)
+            continue
+        plain.append(line)
+    pool = dated or daily or plain
+    if not pool:
+        return None
+    day_index = now.date().toordinal()
+    slot = day_index * 24 + now.hour if hourly else day_index
+    return pool[slot % len(pool)]
+
+
+def read_desk_state(paths):
+    """The app's note of the user's settings (pinned, rotation), or the defaults."""
+    doc = read_json(paths.desk_state)
+    state = {"known": False, "pinned": False, "pinned_line": None, "rotate": "daily"}
+    if isinstance(doc, dict) and doc.get("schema_version") == 1:
+        state["known"] = True
+        state["pinned"] = doc.get("pinned") is True
+        line = doc.get("pinned_line")
+        state["pinned_line"] = line if state["pinned"] and isinstance(line, str) else None
+        if doc.get("rotate") in ROTATIONS:
+            state["rotate"] = doc["rotate"]
+    return state
+
+
+def build_desk_messages(now=None, paths=None):
+    now = now or datetime.now(timezone.utc)
+    paths = paths or Paths()
+    state = read_desk_state(paths)
+    out = {"status": "ok", "file_found": False, "lines": [], "pinned": state["pinned"],
+           "rotate": state["rotate"], "today": None,
+           "limits": {"lines_per_proposal": DESK_MAX_LINES, "characters_per_line": DESK_MAX_LINE_CHARS}}
+    if not state["known"]:
+        out["settings_note"] = "Sanduhr has not reported the pin and rotation yet; shown as the defaults."
+    try:
+        with open(paths.messages, "rb") as f:
+            data = f.read(DESK_MAX_FILE_BYTES + 1)
+    except FileNotFoundError:
+        out["today"] = state["pinned_line"]
+        return out
+    except OSError:
+        return no_data("unreadable", "Desk's messages.txt could not be read.")
+    if len(data) > DESK_MAX_FILE_BYTES:
+        return no_data("too_large", "Desk's messages.txt is larger than 256 KB; it is not read.")
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        return no_data("not_utf8", "Desk's messages.txt is not UTF-8; it is not read.")
+    lines = text.splitlines()
+    while lines and not lines[-1].strip():
+        lines.pop()
+    out["file_found"] = True
+    out["lines"] = lines
+    if state["pinned"]:
+        out["today"] = state["pinned_line"]
+    else:
+        local = now.astimezone()
+        out["today"] = pick_desk_line(text, local, state["rotate"] == "hourly")
+    return out
+
+
+def read_desk_result(path, request_id):
+    doc = read_json(path)
+    if isinstance(doc, dict) and doc.get("id") == request_id and isinstance(doc.get("result"), dict):
+        return doc["result"]
+    return None
+
+
+def build_propose_desk_messages(args, now=None, paths=None, wait=DESK_WAIT_SECONDS, poll=DESK_POLL_SECONDS,
+                                sleep=time.sleep, clock=time.monotonic):
+    """Checks the lines here (instant refusals, no file written), then hands a clean proposal to
+    the app through desk-messages-request.json and waits briefly for its answer. Never writes
+    messages.txt."""
+    now = now or datetime.now(timezone.utc)
+    paths = paths or Paths()
+    args = args if isinstance(args, dict) else {}
+    unknown = sorted(k for k in args if k not in ("lines", "mode", "note"))
+    mode = args.get("mode", "add")
+    note = args.get("note")
+    reasons = []
+    if unknown:
+        reasons.append("unknown argument(s): " + ", ".join(k[:20] for k in unknown[:5]))
+    if mode not in ("add", "replace"):
+        reasons.append("mode must be add or replace")
+    if note is not None:
+        if not isinstance(note, str):
+            reasons.append("note must be a string")
+        elif len(note) > DESK_MAX_NOTE_CHARS or any(is_control(c) for c in note):
+            reasons.append("note must be one line of at most %d characters" % DESK_MAX_NOTE_CHARS)
+        else:
+            try:
+                note.encode("utf-8")
+            except UnicodeEncodeError:
+                reasons.append("note is not valid UTF-8")
+    reasons += validate_desk_lines(args.get("lines"))
+    if reasons:
+        return {"status": "rejected", "reasons": reasons}
+
+    request_id = uuid.uuid4().hex
+    request = {"schema_version": 1, "id": request_id, "requested_at": iso_o(now),
+               "lines": [x.strip() for x in args["lines"]], "mode": mode,
+               "note": note.strip() if isinstance(note, str) and note.strip() else None}
+    try:
+        os.makedirs(paths.support_dir, mode=0o700, exist_ok=True)
+        tmp = paths.desk_request + ".tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(request, f, ensure_ascii=False)
+        os.replace(tmp, paths.desk_request)   # atomic: the app never reads half a file
+    except OSError as e:
+        return {"status": "error", "reason": "request_write_failed",
+                "remedy": "Could not queue the request (%s)." % type(e).__name__}
+
+    deadline = clock() + wait
+    while True:
+        res = read_desk_result(paths.desk_result, request_id)
+        if res is not None:
+            out = {k: res[k] for k in ("status", "reasons", "lines_added", "lines_skipped", "mode") if k in res}
+            out["request_id"] = request_id
+            return out
+        if clock() >= deadline:
+            break
+        sleep(poll)
+    return {"status": "queued", "reason": "app_not_responding", "request_id": request_id,
+            "remedy": "Sanduhr did not answer within %d seconds. Start Sanduhr: it picks the request up "
+                      "within ten minutes of when it was made and shows it as a suggestion." % int(wait)}
+
+
 # -- protocol ----------------------------------------------------------------------------
 
 def write(frame):
@@ -948,6 +1319,10 @@ def call_tool(name, args):
         return build_history(window_arg(args, 30))
     if name == "ping":
         return build_ping()
+    if name == "get_desk_messages":
+        return build_desk_messages()
+    if name == "propose_desk_messages":
+        return build_propose_desk_messages(args)
     return None
 
 
