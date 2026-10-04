@@ -130,7 +130,7 @@ enum DebugLink {
         case "glow":
             guard let arg else { return .success(.glow(.alert)) }
             guard let kind = NotchGlowEvent.Kind(rawValue: arg.lowercased()) else {
-                return bad("glow needs arg=alert, meeting or camera")
+                return bad("glow needs arg=alert, meeting, camera, claude-waiting or claude-done")
             }
             return .success(.glow(kind))
         case "theme":

@@ -128,11 +128,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// estedesk:// and sanduhr:// links (Option+J joins the next meeting, …/settings opens
     /// Sanduhr Settings). sanduhr://debug/… goes to the smoke tools' hooks, which ignore it
-    /// unless they are switched on (DebugGate).
+    /// unless they are switched on (DebugGate). sanduhr://claude-code?event=… comes from Claude
+    /// Code's hooks (item 51) and is public: it carries only an event, and anything else on that
+    /// host is dropped.
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
             if DebugLink.isDebug(url) {
                 DebugHooks.handle(url, app: self)
+            } else if ClaudeCodeLink.isClaudeCode(url) {
+                if let event = ClaudeCodeLink.event(url) { NotchGlowController.shared.claudeCode(event) }
             } else if ["estedesk", "sanduhr"].contains(url.scheme ?? "") {
                 DeskController.shared.handle(url)
             }

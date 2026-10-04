@@ -141,7 +141,7 @@ struct NotchGlowRulesTests {
         #expect(NotchGlowEvent.alert.kind == .alert)
         #expect(NotchGlowEvent.meetingSoon(id: "x").kind == .meeting)
         #expect(NotchGlowEvent.cameraLightOn.kind == .camera)
-        #expect(NotchGlowEvent.Kind.allCases.map(\.rawValue) == ["alert", "meeting", "camera"])
+        #expect(NotchGlowEvent.Kind.allCases.map(\.rawValue) == ["alert", "meeting", "camera", "claude-waiting", "claude-done"])
     }
 }
 

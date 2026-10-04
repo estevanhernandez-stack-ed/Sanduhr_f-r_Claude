@@ -81,7 +81,7 @@ struct DebugLinkTests {
         #expect(r.error?.hasPrefix("unknown action: explode") == true)
         #expect(parse("sanduhr://debug/action?name=desk").error == "desk needs arg=on or arg=off")
         #expect(parse("sanduhr://debug/action?name=camera-light").error == "camera-light needs arg=on or arg=off")
-        #expect(parse("sanduhr://debug/action?name=glow&arg=sound").error == "glow needs arg=alert, meeting or camera")
+        #expect(parse("sanduhr://debug/action?name=glow&arg=sound").error == "glow needs arg=alert, meeting, camera, claude-waiting or claude-done")
         #expect(parse("sanduhr://debug/action?name=usage&arg=ledger").error == "usage needs arg=overview, trends or sessions")
         #expect(parse("sanduhr://debug/action?name=theme").error == "theme needs arg=<theme id>")
         // Only cycling: no hook adds, renames, signs out or removes an account.
