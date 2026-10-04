@@ -49,6 +49,18 @@ struct CCDayBurn: Equatable, Sendable {
     var byTier: [String: Int64] = [:]
 }
 
+/// One local day of a Claude Code home as the live reader sees it (`CCLogReader.days`): the
+/// total, its input and output, and the tokens by raw cwd (`""` without one), skill and raw model.
+/// Held in memory for the Claude Usage page only; never stored.
+struct CCLiveDay: Equatable, Sendable {
+    var total: Int64 = 0
+    var input: Int64 = 0
+    var output: Int64 = 0
+    var byCwd: [String: Int64] = [:]
+    var bySkill: [String: Int64] = [:]
+    var byModel: [String: Int64] = [:]
+}
+
 /// What one pass over the logs since a moment found: the badge's numbers.
 struct CCBurnSince: Equatable, Sendable {
     /// Tokens by raw model string.
@@ -418,6 +430,31 @@ final class CCLogReader: @unchecked Sendable {
             }
             out.byProject[project, default: 0] += t
             if let tier = Self.tierForModel(ev.model) { out.byTier[tier, default: 0] += t }
+        }
+        return out
+    }
+
+    /// Every local day from `from` on, in one pass (the Claude Usage page's live source, Windows
+    /// `AggregateForLocalCcTab` kept per day so live days compose with the record's closed days):
+    /// files modified since `from`'s midnight, events with a timestamp and tokens. Projects stay
+    /// raw cwds (`""` without one) for the page to name under the account's choice.
+    func days(from: CCLocalDay, calendar: Calendar = .current) -> [CCLocalDay: CCLiveDay] {
+        var out: [CCLocalDay: CCLiveDay] = [:]
+        forEachEvent(modifiedSince: from.start(in: calendar)) { ev in
+            guard let ts = ev.timestamp else { return }
+            let t = ev.tokens
+            guard t > 0 else { return }
+            let day = CCLocalDay(ts, calendar: calendar)
+            guard day >= from else { return }
+            var d = out[day] ?? CCLiveDay()
+            d.total += t
+            d.input += ev.inputTokens
+            d.output += ev.outputTokens
+            d.byCwd[ev.cwd ?? "", default: 0] += t
+            if let skill = ev.skill, !skill.isEmpty { d.bySkill[skill, default: 0] += t }
+            let model = ev.model.flatMap { $0.isEmpty ? nil : $0 } ?? "<none>"
+            d.byModel[model, default: 0] += t
+            out[day] = d
         }
         return out
     }
