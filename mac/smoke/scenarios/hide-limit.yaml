@@ -6,6 +6,8 @@
 name: Hide a special limit
 needs: [desk, credentials]
 steps:
+  # Start from the limit shown, whatever the user chose; the run puts their choice back.
+  - defaults: { domain: desk, key: meterShow.iguana_necktie, type: bool, value: true }
   - expect_state: { hidden_limits: [], meters.0.tier: five_hour }
   - defaults: { domain: desk, key: meterShow.iguana_necktie, type: bool, value: false }
   - expect_state: { hidden_limits: [iguana_necktie], meters.0.tier: five_hour, meters.1.tier: seven_day }
