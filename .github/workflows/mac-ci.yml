@@ -52,6 +52,9 @@ jobs:
       # No separate swift build: swift test builds everything it runs.
       - name: Test
         run: swift test
+      # The Claude Code integrations (the MCP server): standard-library unittest, seconds.
+      - name: Test integrations
+        run: python3 -m unittest discover -s integrations/tests -v
       # The release build ships to Intel and Apple silicon Macs; v2.0.4 went out Intel-only.
       # Ad-hoc signed: this proves the build, it is not a distributable artifact.
       - name: Build universal release

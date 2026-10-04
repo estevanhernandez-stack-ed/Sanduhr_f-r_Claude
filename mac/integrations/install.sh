@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Install Sanduhr's Claude Code integrations on this Mac:
 #   - the statusline segment  (5h 42% | wk 18% | wk resets Thu 3p)
-#   - the sanduhr MCP server  (get_usage, ping) for Claude Code
-# Both only read ~/Library/Application Support/Sanduhr/snapshot.json, which Sanduhr
-# writes after every fetch. Neither touches claude.ai or the session key.
+#   - the sanduhr MCP server  (get_usage, get_local_burn_by_project, get_model_usage,
+#                             get_usage_history, ping) for Claude Code
+# The statusline reads only ~/Library/Application Support/Sanduhr/snapshot.json, which Sanduhr
+# writes after every fetch. The MCP server reads only what each account shares with Claude
+# (Settings, Accounts, Data), as Sanduhr lists it in mcp-access.json beside the snapshot.
+# Neither touches claude.ai, the network or the session key.
 #   bash mac/integrations/install.sh            install or update
 #   bash mac/integrations/install.sh --remove   unregister the MCP server, delete the copies
 set -eu
