@@ -2,7 +2,9 @@
 
 ## Unreleased (mac)
 
-- **Themes describe themselves.** Hover a theme in Settings, Widget, Themes to see a line on its look. Your own themes can carry one too: add a `"description"` to the theme file.
+## v2.3.4-mac — 2026-10-03
+
+- **Themes describe themselves.** Hover a theme in Settings, Widget, Themes to see a line on its look. Your own themes can carry one too: add a `"description"` to the theme file. Tooltips across Sanduhr also come up a little sooner.
 - **Test the notch glow.** Settings, Desk, Notch, Glow has a Test Glow button that glows the notch once, whatever the switches say, so you can see the look before turning any of them on.
 - **The right meters when your login has more than one organization.** Sanduhr tracked whichever organization claude.ai listed first, so a login with, say, a Max subscription and an API organization could show the API one's usage, or none. It now picks the organization with your Claude subscription, the same way the Windows app does.
 - **The notch glow traces only what you can see.** The strip under the camera lives on the desktop layer, so an app window across the top of the screen hides it. The glow used to outline the hidden strip anyway, a halo around nothing. Now, when a window covers the strip as a glow starts, the glow hugs the wings alone; with the strip in view it goes around wings and strip as before.
