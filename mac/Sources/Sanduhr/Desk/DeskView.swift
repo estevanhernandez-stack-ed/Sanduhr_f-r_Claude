@@ -404,6 +404,7 @@ private struct AccountLead: View {
     var body: some View {
         Text(label)
             .underline(hovering)
+            .contentTransition(.opacity)
             .contentShape(Rectangle())
             .onGlobalFrame { model.accountFrame = $0 }
             .onDisappear { model.accountFrame = .zero }

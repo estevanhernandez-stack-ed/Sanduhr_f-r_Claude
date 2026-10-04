@@ -54,6 +54,8 @@ private struct AccountChip: View {
                 Text(chip.text)
                     .font(.app(size: 10, weight: .medium, design: .rounded))
                     .lineLimit(1)
+                    // A switch's name change crossfades (AccountSwitchFade.nameAnimation).
+                    .contentTransition(.opacity)
                 if chip.otherInUse {
                     Circle().fill(palette.accent).frame(width: 5, height: 5)
                 }

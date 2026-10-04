@@ -270,8 +270,8 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   Change the picker in Settings: the submenu checks the new choice next time. The widget's
   two-finger menu and Desk's clock menu have no Menu Bar Shows. Put back Whichever is higher.
 - [ ] Graceful switch: two signed-in accounts, the widget and the Desk meters and Claude line in
-  view. Click the chip: the cards fade out (about a quarter of a second), the widget keeps its
-  height, then the other account's cards fade in where they were; the Desk meters and line do
+  view. Click the chip: the cards fade out gently (about 0.6 s since item 41), the widget keeps
+  its height, then the other account's cards fade in where they were; the Desk meters and line do
   the same, the notch shows no numbers in between, and the menu bar percent clears at once and
   comes back with the new account's. At no point does anything flash blank or show the old
   numbers at full strength after the switch. On a slow network (Network Link Conditioner, or
@@ -279,7 +279,10 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   the empty cards and "switching account…" on the Desk line (on the meters when the line is not
   in the layout); `snapshot.json` is gone as soon as you click. Two accounts with a different
   number of limits: the widget settles to its new height once, as the new cards fade in.
-- [ ] Reduce motion (System Settings, Accessibility, Display): a switch swaps the cards and Desk
-  meters with no fade; the widget still keeps its height while it waits.
+- [ ] Calm handoff (item 41): watch the chip and the Desk line's name through a switch. The old
+  name stays while the old numbers fade out, then crossfades to the new name once they are gone;
+  the new numbers come in after. The new name never sits over the old numbers.
+- [ ] Reduce motion (System Settings, Accessibility, Display): a switch swaps the cards, the Desk
+  meters and the name with no fade; the widget still keeps its height while it waits.
 - [ ] Switching to an account with no key: the old cards fade out and "Signed out — sign in"
   shows; the Desk shows the sign-in line.

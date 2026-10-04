@@ -128,6 +128,9 @@ final class UsageViewModel {
     private(set) var switchVeil = false
     /// The faint "Switching account…" while a switch's fetch outlasts the fade.
     private(set) var switchNote = false
+    /// The departing account's name, kept on the chip and the Desk line until the old numbers
+    /// have faded out (AccountSwitchFade.NameHold).
+    private(set) var nameHold = AccountSwitchFade.NameHold()
     /// The old account's numbers and history, held only as the veiled layout; nil outside a switch.
     @ObservationIgnored private var departingUsage: UsageResponse?
     @ObservationIgnored private var departingHistory: HistoryStore.History?
@@ -347,7 +350,7 @@ final class UsageViewModel {
         let wasActive = label == KeychainStore.accounts.active
         let result = KeychainStore.remove(label: label)
         follower.forget(label)
-        if wasActive { showActiveAccount() } else { reloadAccounts() }
+        if wasActive { showActiveAccount(leaving: accountLabel) } else { reloadAccounts() }
         refreshInUse()
         return result
     }
@@ -416,7 +419,7 @@ final class UsageViewModel {
 
     /// The chip in the title area, nil with fewer than two accounts.
     var accountChip: AccountChipText? {
-        guard let label = accountLabel else { return nil }
+        guard let label = shownAccountLabel else { return nil }
         return AccountChipText(text: label, otherInUse: !accountsInUse.isEmpty)
     }
 
@@ -426,6 +429,10 @@ final class UsageViewModel {
         guard showsAccounts, let active = activeAccount else { return nil }
         return followNote ? "\(active) (in use)" : active
     }
+
+    /// The name the chip and the Desk line show: `accountLabel`, except during a switch's fade
+    /// out, when the departing account's name stays until its numbers are gone.
+    var shownAccountLabel: String? { nameHold.shown(active: accountLabel) }
 
     // MARK: Following
 
@@ -483,10 +490,12 @@ final class UsageViewModel {
     /// and the minute of "(in use)", a manual one pauses following.
     private func switchAccount(to label: String, automatic: Bool) {
         let accounts = KeychainStore.accounts
+        // The name as it showed before anything changes (the follow note included).
+        let leaving = accountLabel
         guard label != accounts.active, (try? accounts.setActive(label)) != nil else { return }
         if automatic { follower.automaticSwitch() } else { follower.manualSwitch(to: label) }
         showFollowNote(automatic)
-        showActiveAccount()
+        showActiveAccount(leaving: leaving)
         refreshInUse()
     }
 
@@ -499,11 +508,12 @@ final class UsageViewModel {
 
     /// After the active account changed: nothing of the old account stays on screen or in
     /// snapshot.json, then the new one is fetched, or shown signed out when it has no key.
-    /// The old account's meters fade out (AccountSwitchFade) while the numbers themselves go at once.
-    private func showActiveAccount() {
+    /// The old account's meters fade out (AccountSwitchFade) while the numbers themselves go at once;
+    /// `leaving`, the name the chip showed, stays up until they are gone.
+    private func showActiveAccount(leaving: String?) {
         let reduceMotion = AccountSwitchFade.reduceMotion
         withAnimation(AccountSwitchFade.outAnimation(reduceMotion: reduceMotion)) {
-            beginSwitchVeil()
+            beginSwitchVeil(leaving: leaving, reduceMotion: reduceMotion)
             SnapshotWriter.delete()
             stopFetching()
             Notifier.shared.resetForSwitch()
@@ -523,20 +533,24 @@ final class UsageViewModel {
         }
     }
 
-    /// Starts a switch's crossfade: the shown numbers are kept as the veiled layout. A second
-    /// switch during the first keeps the first one's layout and clock.
-    private func beginSwitchVeil() {
+    /// Starts a switch's crossfade: the shown numbers are kept as the veiled layout and the
+    /// departing name stays up. A second switch during the first keeps the first one's layout,
+    /// name and clock.
+    private func beginSwitchVeil(leaving: String?, reduceMotion: Bool) {
         if !switchVeil {
             departingUsage = usage
             departingHistory = history
             switchStartedAt = Date()
             switchVeil = true
+            nameHold.begin(leaving: leaving, reduceMotion: reduceMotion)
         }
         switchNote = false
         switchNoteTask?.cancel()
         switchNoteTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(AccountSwitchFade.noteDelay * 1_000_000_000))
             guard let self, !Task.isCancelled, self.switchVeil else { return }
+            // The old numbers are gone: the name crosses over to the new account.
+            self.releaseName()
             if self.status == .switching {
                 // The fetch outlasts the fade: the faint note.
                 withAnimation(AccountSwitchFade.inAnimation(reduceMotion: AccountSwitchFade.reduceMotion)) {
@@ -550,11 +564,22 @@ final class UsageViewModel {
         }
     }
 
+    /// The departing name gives way to the active one, crossfading on the chip.
+    private func releaseName() {
+        guard nameHold.holding else { return }
+        withAnimation(AccountSwitchFade.nameAnimation(reduceMotion: AccountSwitchFade.reduceMotion)) {
+            nameHold.release()
+            onUsageUpdate?()
+        }
+    }
+
     /// Ends the crossfade: the new numbers (or the sign-in or error line) fade in.
     private func endSwitchVeil() {
         guard switchVeil else { return }
         switchNoteTask?.cancel()
         switchNoteTask = nil
+        // The answer waited out the fade out (waitOutSwitchFade), so the old numbers are gone.
+        releaseName()
         withAnimation(AccountSwitchFade.inAnimation(reduceMotion: AccountSwitchFade.reduceMotion)) {
             switchVeil = false
             switchNote = false
