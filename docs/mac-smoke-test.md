@@ -465,3 +465,59 @@ Support/Sanduhr/mcp-access.json`.
   "com.626labs.sanduhr"'` while changing choices shows no label or path.
 - [ ] Clean up: Share Off, unlink and `rm -rf ~/.claude-smoketest`; `bash
   mac/integrations/install.sh --remove` if the server was registered only for this test.
+
+## 19. The Claude Usage page (item 48)
+
+Use the test folder from section 16 (`~/.claude-smoketest`, `cc_line` as there), linked to a test
+or throwaway account, never a real folder: the page shows project names, so screenshots come from
+this folder only. A second helper writes a line on an earlier day:
+
+```sh
+cc_line_at() {   # UTC timestamp, model, input, output, project
+  mkdir -p ~/.claude-smoketest/projects/"$5"
+  printf '{"type":"assistant","timestamp":"%s","message":{"model":"%s","usage":{"input_tokens":%s,"output_tokens":%s}},"cwd":"/tmp/%s"}\n' \
+    "$1" "$2" "$3" "$4" "$5" >> ~/.claude-smoketest/projects/"$5"/past.jsonl
+}
+cc_line_at "$(date -u -v-3d +%Y-%m-%dT10:00:00.000Z)" claude-sonnet-4-6 4000 1000 api
+cc_line_at "$(date -u -v-10d +%Y-%m-%dT10:00:00.000Z)" claude-opus-4-1 20000 0 web
+```
+
+- [ ] `smoke/smoke run usage-page` and `smoke/smoke run settings-sections` pass; the snapshots
+  show each tab. Tools, Claude Usage… in the widget's menu, the menu bar menu and a Desk meter's
+  two-finger menu each open Settings at Claude Usage; `state.yaml` shows `usage_page: {open: true,
+  tab: overview}` and nothing else about the page.
+- [ ] Activity Not tracked: Overview says to choose a folder and activity, with Data Settings…,
+  which opens Accounts on that account scrolled to Data. Trends and Sessions say they come from
+  the record, with the same button.
+- [ ] Live only: Overview's status line says Live only; Today shows the `cc_line` tokens with sent
+  and received; the strip has bars 3 and 10 days back; Projects lists `demo`, `api`, `web`.
+  Trends and Sessions still ask for a record. No folder appears under `vault/`.
+- [ ] Keep a record, refresh: the status line goes; the strip's old days now come from the
+  record (`rm ~/.claude-smoketest/projects/api/past.jsonl`, wait a minute: the bar 3 days back
+  stays). Days before the record's coverage are dotted ("no record"), never empty bars. Today
+  grows with each `cc_line` within a minute.
+- [ ] Trends: 4/12/26 weeks; the current week is hatched; weeks before the record began are
+  dotted, never zero bars; the footer reads "History kept since <today>" and the first-day note
+  shows. Top projects match Overview's.
+- [ ] Sessions: 7d by default; three rows (`demo`, `api`, `web`), the `web` one shows "—" under
+  7d and moves to the top under All when sorted by tokens. Today/Yesterday change the column and
+  its header ("Tokens (Today) ▼"). Each header sorts, a second click flips the glyph. Clicking a
+  row shows the wall-clock span, each day with its models, and `Record: .claude-smoketest`;
+  a refresh keeps it open and the scroll where it was.
+- [ ] Export CSV… to the Desktop: the file opens in Numbers with the header `session,root,
+  project,first_seen_utc,last_seen_utc,tokens_in_scope,tokens_total,models`, the rows in the
+  order shown and `.claude-smoketest` as root. Nothing is written until you click Save.
+- [ ] Names Hidden, then a new `cc_line` into `projects/demo2/session.jsonl`: Overview and
+  Sessions show its `p-` code and the caption explaining codes; nothing on the page or in the
+  CSV reads `demo2`.
+- [ ] Two accounts: the picker shows both; picking the other shows its own folder's numbers
+  (or the setup note); the Records list doesn't change.
+- [ ] Records on this Mac lists the test folder's record with its size, oldest day ("since
+  …", 10 days back), the account and "recording". Unlink the folder (Keep It when asked): the
+  row reads "Not linked to an account (<8 hex>)". Show in Finder selects `vault/<id>`. Erase…
+  names it as not linked; Erase Record: the row and `vault/<id>/` are gone and stay gone after
+  two refreshes. Link and record again, then Erase… on the linked row: the confirmation says the
+  account switches to Live only first; after it, Data shows Live only and the folder is gone.
+- [ ] Console (`log stream --predicate 'subsystem == "com.626labs.sanduhr"'`) shows no label,
+  path, project or number from the page. Then `rm -rf ~/.claude-smoketest ~/Desktop/sanduhr-sessions-*.csv`
+  and unlink it.

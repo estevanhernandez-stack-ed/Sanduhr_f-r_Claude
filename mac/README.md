@@ -138,11 +138,35 @@ with the label. The notch stays as it is. A switch never needs a relaunch: the m
   a link, the account list or the active account lands, atomically (a temp file renamed over it,
   mode 0600) and only when its bytes change. The Project names picker is enabled for Keep a record
   or Meters and activity.
+- **The Claude Usage page (item 48).** A Settings section under Accounts (`SettingsSection.usage`;
+  Tools, Claude Usage… in every menu opens it), chosen over a separate window because the choices
+  that decide what it can show are in Accounts, Data one row up, and Settings is already the one
+  window every menu, Option+S and the notch open. One account at a time (the active one, a picker
+  with two or more), three tabs. Overview: `CCLogReader.days` (one pass, per local day) for the
+  live side, the vault's rollups for closed days. The hot-day rule: days before the local date of
+  the record's last finished pass come from the record, that day and later from the live reader,
+  never both; a pass older than 15 minutes (three cycles) or none at all is degraded mode, the
+  whole 30 days live with a status line, and a page that finds yesterday still hot asks for one
+  pass. Live only reads the live side alone. Trends: `VaultReader.readWeeks` and `topProjects`
+  over 4, 12 or 26 weeks; a week without tokens and with an uncovered day (before `meta.since`,
+  or a gap in `covered`) is drawn with a dot texture, never as a zero bar, and the current week
+  is hatched. Sessions: `readSessions` rows keyed `root|uuid`, scoped tokens from each session's
+  `by_day` for Today, Yesterday, 7d (default) or All, sorted with a typed comparator, rows
+  expanded by id, in a `List` that owns its scrolling; Export CSV… sends the rows as shown
+  through `VaultLedgerCsv` to an `NSSavePanel` file (root = the folder's name). Project names are
+  whatever the record holds, and live days are named under the account's choice (`p-` codes for
+  Hidden), never resolved back. Records on this Mac (`VaultStewardship`) lists every
+  `vault/<id>` folder with its size, oldest day and linked account, or none; Erase… goes through
+  `VaultService.erase(id:)`, after switching a still-recording account to Live only. The models
+  (`UsagePage.swift`, `UsagePageLoader.swift`) are pure and tested on synthetic vaults; a 6,000-session
+  record reads, sorts, rescopes and exports in well under a second. Reloads follow each ingest
+  cycle (`VaultService.onCycleEnd`), each refresh, and every minute on Overview.
 - **Readers.** `snapshot.json` names the active account by `account_ref` (first 4 bytes of the
   SHA-256 of the label, as on Windows) and is deleted at once on a switch; `state.yaml` has
   `account_ref`, `accounts_count`, `history_days`, `data` (the active account's choices and
   `folder_linked`), `local_activity` (`reading`, and `events` counted since the last refresh),
-  `vault` (`recording`, `months`, `last_ingest_ok`), `follow` and `follow_paused`. Labels and folder paths never go into a log,
+  `vault` (`recording`, `months`, `last_ingest_ok`), `usage_page` (`open`, `tab`), `follow` and
+  `follow_paused`. Labels and folder paths never go into a log,
   `snapshot.json` or `state.yaml`.
 
 #### Following the account in use
