@@ -341,8 +341,12 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: the band matches the widget's numbers; nothing draws when Sanduhr has no snapshot; install and remove round-trip.
   Verify: the mod's tests (as the user's mods test theirs); the installer's Swift tests on temp folders; by hand in Claude Code with a test folder.
 
-- [ ] **51. "Claude needs you" on the notch**
+- [x] **51. "Claude needs you" on the notch**
   Spec ref: session 2026-10-04 (the user's agent-replies mod suggested it; chosen second of three)
   What to build: Claude Code hooks (`Notification`: waiting on you, permission or input; `Stop`: a turn finished) that tell Sanduhr through a public URL (`sanduhr://claude-code?event=waiting|done`, no debug gate, events only, no content), installed and removed per folder from Settings, Integrations with exact undo like the other integrations; Sanduhr glows the notch (Glow switches: "When Claude Code is waiting on you", "When Claude Code finishes", off by default), rate-limited, skipped while a terminal app is frontmost (an option), and works around the plain notch or the island as the other glows do; screens without a notch get the glow at the top center like the camera light.
   Acceptance: a waiting session glows the notch within a second; nothing glows when the switches are off or the folder has no hooks; remove round-trips.
   Verify: swift-testing (URL parsing, rate limit, frontmost rule, installer round trips on temp folders); by hand with Claude Code in a test folder.
+
+- [ ] **52. Spike: now playing on the Mac**
+  Spec ref: session 2026-10-04 (the user's Windows-only now-playing mod; chosen third, as a spike)
+  What to find out: what a non-sandboxed, Developer ID app can read about the current song on macOS 26 (and 14–15) without private-entitlement tricks that break on updates: the system now-playing info (MediaRemote and its 15.4+ restrictions, any public replacement), AppleScript/Scripting Bridge for Music and Spotify (and the Automation permission prompt), browser players (YouTube Music in Chrome/Safari) through any of those; title, artist, position, duration, play state, and controls. Deliverable: a short findings doc with a recommendation (ship, ship partial, or don't) and a throwaway probe under the scratchpad, never in the app.

@@ -624,6 +624,8 @@ S=~/Library/Application\ Support/Sanduhr/integrations
 
 ## 22. The notch glows when Claude Code needs you (item 51)
 
+A `sanduhr://` link goes to the default app for the scheme. With a dev build and an installed copy on the same Mac, a hook (or a plain `open`) can reach or launch the installed copy: aim tests at the dev build with `open -g -a <dev Sanduhr.app> 'sanduhr://claude-code?event=waiting'`. One copy, as users have, has no such issue.
+
 Use a test folder, never your real `~/.claude*`. The `say` hook stands for a hook of your own:
 
 ```sh
