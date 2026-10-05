@@ -577,13 +577,15 @@ and Estevan Hernandez: it is not covered by the MIT license. Its license is in
 ## What's New
 
 After Sanduhr updates, a What's New window shows once, a moment after the widget and Desk are up:
-a card for each big feature since the version you last saw (newest first, at most 8), each with a
-symbol or a small live preview and a Show me button that opens the right page of Settings. A
+one header for the releases it covers ("New in 2.4.0 – 2.6.0"), then a card for each big feature
+since the version you last saw (newest first, at most 8), each with a symbol or a small live
+preview and a Show me button that opens the right page of Settings. A
 fresh install never shows it (onboarding covers that), and while onboarding is up it waits for a
 later launch. Tick **Don't show after updates** in the window to stop the automatic showing;
 Settings, About has **What's New…** any time, as do the menu bar, widget and Desk clock menus.
 The cards live in `Sources/Sanduhr/Models/WhatsNewCards.swift`, one array per release: a release
-adds its own array and nothing else changes. The last version seen is the `whatsNewLastSeen`
+adds its own array and nothing else changes. Related features share a card, which sits with the
+newest release it covers and lists every release it spans; it shows when any of them is new. The last version seen is the `whatsNewLastSeen`
 default (`defaults write com.626labs.sanduhr whatsNewLastSeen 2.3.4` fakes an update).
 
 ## Files

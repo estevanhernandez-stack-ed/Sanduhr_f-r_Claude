@@ -14,10 +14,14 @@ final class WhatsNewWindowController {
 
     func close() { window?.close() }
 
-    /// Shows `cards`, or every card up to this version (What's New… in About and the menus).
-    func show(_ cards: [WhatsNewCard]? = nil) {
-        let shown = cards ?? WhatsNew.all(current: AppInfo.current.version)
-        let root = WhatsNewView(cards: shown, close: { [weak self] in self?.close() })
+    /// Shows `cards`, the ones missed since `lastSeen`, or every card up to this version (What's
+    /// New… in About and the menus), under one header for the releases they cover.
+    func show(_ cards: [WhatsNewCard]? = nil, lastSeen: String? = nil) {
+        let current = AppInfo.current.version
+        let shown = cards ?? WhatsNew.all(current: current)
+        let range = WhatsNew.rangeLabel(shown, lastSeen: cards == nil ? nil : lastSeen, current: current)
+        let root = WhatsNewView(cards: shown, range: range ?? "Version \(current)",
+                                close: { [weak self] in self?.close() })
         if let window {
             window.contentView = NSHostingView(rootView: root)
         } else {
@@ -50,6 +54,8 @@ struct WhatsNewView: View {
     static let hideTitle = "Don't show after updates"
 
     let cards: [WhatsNewCard]
+    /// "New in 2.4.0 – 2.6.0": the releases the cards cover, once for the window.
+    let range: String
     let close: () -> Void
     @AppStorage(WhatsNew.hideKey) private var hideAfterUpdates = false
 
@@ -72,7 +78,7 @@ struct WhatsNewView: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(Self.title).font(.title2.bold())
-                Text("Version \(AppInfo.current.version)").foregroundStyle(.secondary)
+                Text(range).foregroundStyle(.secondary)
             }
             Spacer()
         }
@@ -112,7 +118,7 @@ struct WhatsNewView: View {
     }
 }
 
-/// One card: the art, the release, the title, a sentence or two and Show me.
+/// One card: the art, the title, a sentence or two and Show me. The releases are in the header.
 struct WhatsNewCardView: View {
     let card: WhatsNewCard
     let showMe: () -> Void
@@ -124,9 +130,6 @@ struct WhatsNewCardView: View {
                 .frame(height: 96)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
-            Text(card.versionLabel)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
             Text(card.title)
                 .font(.headline)
                 .fixedSize(horizontal: false, vertical: true)
@@ -170,7 +173,6 @@ struct WhatsNewPreviewView: View {
     var body: some View {
         switch preview {
         case .deskMessage: deskMessage
-        case .theme: theme
         case .font: font
         case .nowPlaying: nowPlaying
         case .menuBar: menuBar
@@ -186,14 +188,6 @@ struct WhatsNewPreviewView: View {
                             baseSize: 30, inkSpec: "9ad7ff", globalGlow: true, alignment: .center,
                             paused: false, lineLimit: 1)
         }
-    }
-
-    /// A built-in theme as the gallery draws it.
-    private var theme: some View {
-        let t = ThemeRegistry.theme(id: "aurora") ?? ThemeRegistry.default
-        return ThemeCard(item: ThemeGalleryItem(theme: t, isCurrent: false, isUser: false))
-            .frame(width: 130)
-            .padding(.top, 2)
     }
 
     /// EsteFont 26, both weights.

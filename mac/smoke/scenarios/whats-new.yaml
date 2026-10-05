@@ -7,6 +7,13 @@ steps:
   - expect:
       window: whats-new
       contains: { text: "/What.s New in Sanduhr/" }
+  # One header for the releases shown, "New in 2.4.0 – <this version>"; no per-card version line.
+  - expect:
+      window: whats-new
+      contains: { text: "/^New in 2\\.4\\.0( . [0-9.]+)?$/" }
+  - expect:
+      window: whats-new
+      missing: { text: "/^New in [0-9]+\\.[0-9]+$/" }
   - expect:
       window: whats-new
       contains: { text: Show me }

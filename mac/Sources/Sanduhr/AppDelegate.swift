@@ -145,13 +145,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// launch. The version is recorded as the window opens, so it shows once even if Sanduhr quits.
     private func showWhatsNewIfUpdated(fresh: Bool) {
         let current = AppInfo.current.version
+        let lastSeen = WhatsNew.lastSeen()
         let decision = WhatsNew.atLaunch(
-            lastSeen: WhatsNew.lastSeen(), current: current, fresh: fresh,
+            lastSeen: lastSeen, current: current, fresh: fresh,
             onboarding: !KeychainStore.exists(account: KeychainAccount.sessionKey), hidden: WhatsNew.hidden())
         if decision.record { WhatsNew.record(current) }
         guard !decision.show.isEmpty else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            MainActor.assumeIsolated { WhatsNewWindowController.shared.show(decision.show) }
+            MainActor.assumeIsolated { WhatsNewWindowController.shared.show(decision.show, lastSeen: lastSeen) }
         }
     }
 

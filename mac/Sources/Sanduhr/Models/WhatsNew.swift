@@ -1,7 +1,7 @@
 import Foundation
 
 /// What a card draws above its title: an SF Symbol, or one of a few small live previews drawn by
-/// WhatsNewWindow (the Desk message line, a theme card, the font, the notch wing, the menu bar).
+/// WhatsNewWindow (the Desk message line, the font, the notch wing, the menu bar).
 enum WhatsNewArt: Equatable {
     case symbol(String)
     case preview(WhatsNewPreview)
@@ -9,13 +9,14 @@ enum WhatsNewArt: Equatable {
 
 /// The live previews a card can ask for, by id.
 enum WhatsNewPreview: String, Equatable {
-    case deskMessage, theme, font, nowPlaying, menuBar
+    case deskMessage, font, nowPlaying, menuBar
 }
 
-/// One highlight of a release: what changed, in a sentence or two, and where "Show me" goes.
+/// One highlight: what changed, in a sentence or two, and where "Show me" goes. A card may cover
+/// features of more than one release; it sits with the newest of them in the table.
 struct WhatsNewCard: Equatable, Identifiable {
-    /// The release that brought it ("2.6.0").
-    let version: String
+    /// Every release it covers ("2.6.0"), newest first.
+    let versions: [String]
     /// Unique across the table, for SwiftUI and the tests.
     let id: String
     let title: String
@@ -24,12 +25,24 @@ struct WhatsNewCard: Equatable, Identifiable {
     /// The Settings page "Show me" opens.
     let destination: SettingsSection
 
-    /// "New in 2.6": the release, without a trailing ".0".
-    var versionLabel: String {
-        let parts = version.split(separator: ".")
-        let shown = parts.count == 3 && parts[2] == "0" ? parts.prefix(2) : parts[...]
-        return "New in " + shown.joined(separator: ".")
+    init(versions: [String], id: String, title: String, body: String, art: WhatsNewArt,
+         destination: SettingsSection) {
+        self.versions = versions.sorted { WhatsNew.compare($0, $1) == .orderedDescending }
+        self.id = id
+        self.title = title
+        self.body = body
+        self.art = art
+        self.destination = destination
     }
+
+    /// A card of one release.
+    init(version: String, id: String, title: String, body: String, art: WhatsNewArt,
+         destination: SettingsSection) {
+        self.init(versions: [version], id: id, title: title, body: body, art: art, destination: destination)
+    }
+
+    /// The newest release it covers.
+    var version: String { versions.first ?? "" }
 }
 
 /// What's New after an update (item 57): the release highlights, which of them to show, and the
@@ -46,21 +59,39 @@ enum WhatsNew {
     // MARK: Which cards
 
     /// The cards of releases newer than `lastSeen`, up to and including `current`, newest release
-    /// first and in table order within one, at most `limit`. `lastSeen` nil (an update from a
-    /// version before What's New) counts every release up to `current`.
+    /// first and in table order within one, at most `limit`. A card counts when any release it
+    /// covers does, and sorts by the newest of those. `lastSeen` nil (an update from a version
+    /// before What's New) counts every release up to `current`.
     static func cards(lastSeen: String?, current: String, limit: Int? = cap,
                       table: [WhatsNewCard] = WhatsNew.table) -> [WhatsNewCard] {
-        let picked = table.filter { card in
-            guard compare(card.version, current) != .orderedDescending else { return false }
-            guard let lastSeen else { return true }
-            return compare(card.version, lastSeen) == .orderedDescending
+        let picked = table.compactMap { card -> (card: WhatsNewCard, newest: String)? in
+            guard let newest = shown(card, lastSeen: lastSeen, current: current).first else { return nil }
+            return (card, newest)
         }
         let newestFirst = picked.enumerated().sorted { a, b in
-            let order = compare(a.element.version, b.element.version)
+            let order = compare(a.element.newest, b.element.newest)
             return order == .orderedSame ? a.offset < b.offset : order == .orderedDescending
-        }.map(\.element)
+        }.map(\.element.card)
         guard let limit else { return newestFirst }
         return Array(newestFirst.prefix(max(0, limit)))
+    }
+
+    /// The releases of `card` newer than `lastSeen` and not past `current`, newest first.
+    static func shown(_ card: WhatsNewCard, lastSeen: String?, current: String) -> [String] {
+        card.versions.filter { v in
+            guard compare(v, current) != .orderedDescending else { return false }
+            guard let lastSeen else { return true }
+            return compare(v, lastSeen) == .orderedDescending
+        }
+    }
+
+    /// The window's one header line for `cards`: "New in 2.4.0 – 2.6.0", from the oldest release
+    /// they show to `current`, or "New in 2.6.0" when that is the only one. Nil with no cards.
+    static func rangeLabel(_ cards: [WhatsNewCard], lastSeen: String?, current: String) -> String? {
+        let versions = cards.flatMap { shown($0, lastSeen: lastSeen, current: current) }
+        guard let oldest = versions.min(by: { compare($0, $1) == .orderedAscending }) else { return nil }
+        if compare(oldest, current) == .orderedSame { return "New in \(current)" }
+        return "New in \(oldest) \u{2013} \(current)"
     }
 
     /// Every card up to `current`, newest first, for What's New… in About and the menus.
