@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **Fixed: the widget's theme strip lost its theme name.** On macOS 26 it read "Theme:" with the arrow in front and no name; it shows "Theme: Obsidian ⌄" again.
+
 ## v2.6.0-mac — 2026-10-04
 
 - **What's New after an update.** After Sanduhr updates, a What's New window shows once, a moment after the widget and Desk are up: one header for the releases it covers ("New in 2.4.0 – 2.6.0", or just "New in 2.6.0" for one), then a card for each big feature since the version you last saw (newest first, at most 8), each with a symbol or a small live preview (the Desk message writing itself in, EsteFont 26, a notch wing, the menu bar) and a Show me button that closes the window and opens the right page of Settings. This update's eight cards cover what arrived since 2.4, related features sharing a card: now playing, Claude writing your Desk messages and themes, the Dock-aware Desk, EsteFont 26, the Claude Usage page, the Claude Code integrations (the notch glow included), more than one account (following included), and the menu bar with limits that come and go. A fresh install never shows it (onboarding covers that), and while onboarding is up it waits for a later launch. Tick Don't show after updates to stop the automatic showing; Settings, About has What's New… any time, and so do the menu bar, widget and Desk clock menus, under Check for Updates….
