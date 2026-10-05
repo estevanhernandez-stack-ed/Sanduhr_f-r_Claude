@@ -878,3 +878,33 @@ Desktop & Dock, and put them back at the end. After each step, `mac/smoke/smoke 
   `inset: 0`. Move the Dock to the Desk's screen (bottom edge there): the stack moves up. With
   auto-hide, the Dock coming up on the other screen moves nothing on the Desk's.
 - [ ] Put your Dock settings back as they were.
+
+## 27. EsteFont 26, built in (item 58)
+
+Use a Mac or a user account where EsteFont 26 is not installed. On your own account, turn the
+installed copies off instead: Font Book, select EsteFont 26 (and any older EsteFont), Edit,
+Disable (or right-click, Deactivate), and turn them back on at the end. Never delete your fonts.
+Quit Sanduhr first and open the build afterwards, so it starts with the font switched off.
+
+- [ ] The built app has both faces: `ls Sanduhr.app/Contents/Resources/Fonts` lists
+  `EsteFont26-Regular.ttf` and `EsteFont26-Bold.ttf`, and `codesign --verify --strict
+  Sanduhr.app` is quiet (`build.sh` also fails without them).
+- [ ] Fresh install (a new user account, or `defaults delete com.626labs.sanduhr` and
+  `defaults delete com.626labs.sanduhr.desk` on a test account only): the Desk's clock, date,
+  meters and message draw in EsteFont 26, the time in Bold. Settings, Desk, Look shows Desk font
+  EsteFont 26.
+- [ ] Font Book still shows EsteFont 26 off (or absent): Sanduhr did not install it. TextEdit's
+  font list does not have it.
+- [ ] Both pickers list EsteFont 26 first, under System: Settings, Desk, Look (Desk font and
+  Message font) and Settings, Widget, Look. Pick it for the widget: the cards draw in it, the
+  semibold lines in Bold. Use System Font brings the widget back.
+- [ ] Match Desk with the Desk on EsteFont 26: the widget draws in EsteFont 26.
+- [ ] Pick another Desk font, quit and reopen: it stays. Pick System: the Desk draws in the system
+  font after a relaunch too.
+- [ ] A saved font that is gone: `defaults write com.626labs.sanduhr.desk font "No Such Font"`,
+  relaunch: the Desk draws in EsteFont 26 and the picker shows EsteFont 26.
+- [ ] Upgrade from the previous build with no Desk font picked: the Desk keeps the system font
+  (`defaults read com.626labs.sanduhr.desk font` prints an empty line).
+- [ ] Settings, About shows "Handwriting: EsteFont 26 by Estevan Hernandez"; Third-Party Notices
+  opens with an EsteFont 26 section (copyright and license).
+- [ ] Turn your EsteFont copies back on in Font Book.

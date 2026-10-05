@@ -550,6 +550,30 @@ switch and "Arrange on the Notch…" / "Arrange on the Desk…").
 - **Privacy.** Titles and artists stay in memory: never on disk, in a log or in `state.yaml`
   (`now_playing: {enabled, placed, source, state}` only). No network.
 
+## Fonts
+
+The Desk draws in **EsteFont 26** (Regular and Bold), the author's handwriting, which ships inside
+the app: `mac/Resources/Fonts/EsteFont26-Regular.ttf` and `EsteFont26-Bold.ttf`, copied by
+`build.sh` to `Sanduhr.app/Contents/Resources/Fonts/` and sealed by the signature (the build fails if
+either is missing or unsealed). At launch Sanduhr registers both for its own process only
+(`CTFontManagerRegisterFontsForURL`, `.process` scope), so nothing is installed on the Mac and other
+apps never see it; a copy already installed in Font Book simply draws instead.
+
+- **The Desk** (desk preference `font`): a new install draws in EsteFont 26. A Desk an earlier version
+  ran with no font picked keeps the system font (`""`, written once at upgrade; `fontDefaultSettled`
+  marks it done). A picked font stays picked; one that is no longer installed (the standalone apps'
+  EsteFont 2.1 on a Mac without it, say) draws in EsteFont 26 instead (`DeskFont.resolve`). The clock's
+  time uses the Bold face.
+- **The widget** (`UserDefaults` `fontFamily`) keeps its theme fonts (the system font) unless you pick
+  one; EsteFont 26 is first in the list, and its semibold and bold text draws in the Bold face. Match
+  Desk draws in the Desk's font, EsteFont 26 included.
+- Both font pickers (Settings, Desk, Look and Settings, Widget, Look) list EsteFont 26 first, after
+  System.
+
+EsteFont 26 is © 2009-2026 Estevan Hernandez / 626Labs LLC and licensed only for use by 626Labs LLC
+and Estevan Hernandez: it is not covered by the MIT license. Its license is in
+`THIRD-PARTY-NOTICES.txt`; Settings, About credits it.
+
 ## Files
 
 - `sessionKey:{label}` + `cf_clearance:{label}` per account → the Keychain, service `com.626labs.sanduhr` (release builds), or `~/Library/Application Support/Sanduhr/credentials.json` (mode `0600`, dev builds); see First run and Accounts above
@@ -563,7 +587,8 @@ switch and "Arrange on the Notch…" / "Arrange on the Desk…").
 - Claude Code integrations (items 49 to 51) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json` (the notch glow hooks in its `hooks`), with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed, hooks_installed}`
 - Window position → `UserDefaults` (`windowFrame`)
 - Now playing (items 53, 53b) → where it shows is the desk preferences `notchLeft`, `notchRight`, `notchStrip` and the `nowPlaying` word in `layout`; the rest is `nowPlayingHidePaused`, `nowPlayingAskApps` and `nowPlayingExcluded` (bundle ids switched off). Item 53's `nowPlaying` and `nowPlayingDesk` are read once by the upgrade (`nowPlayingPlacementUpgraded`); what plays stays in memory
-- Third-party notices (Sparkle, mediaremote-adapter) → `Sanduhr.app/Contents/Resources/THIRD-PARTY-NOTICES.txt`, from `mac/THIRD-PARTY-NOTICES.txt`; Settings, About opens it
+- EsteFont 26 → `Sanduhr.app/Contents/Resources/Fonts/`, from `mac/Resources/Fonts/` (see Fonts); the Desk's choice in the desk preference `font`
+- Third-party notices (Sparkle, mediaremote-adapter, EsteFont 26) → `Sanduhr.app/Contents/Resources/THIRD-PARTY-NOTICES.txt`, from `mac/THIRD-PARTY-NOTICES.txt`; Settings, About opens it
 
 ## Controls
 
@@ -595,4 +620,5 @@ switch and "Arrange on the Notch…" / "Arrange on the Desk…").
 ## License
 
 MIT. Python original by [626Labs LLC](https://626labs.dev). Third-party code: Sparkle (MIT) and
-mediaremote-adapter (BSD-3-Clause), with their licenses in `THIRD-PARTY-NOTICES.txt`.
+mediaremote-adapter (BSD-3-Clause), with their licenses in `THIRD-PARTY-NOTICES.txt`. The bundled
+EsteFont 26 is proprietary (626Labs LLC), not MIT; its license is in the same file.
