@@ -574,6 +574,18 @@ EsteFont 26 is © 2009-2026 Estevan Hernandez / 626Labs LLC and licensed only fo
 and Estevan Hernandez: it is not covered by the MIT license. Its license is in
 `THIRD-PARTY-NOTICES.txt`; Settings, About credits it.
 
+## What's New
+
+After Sanduhr updates, a What's New window shows once, a moment after the widget and Desk are up:
+a card for each big feature since the version you last saw (newest first, at most 8), each with a
+symbol or a small live preview and a Show me button that opens the right page of Settings. A
+fresh install never shows it (onboarding covers that), and while onboarding is up it waits for a
+later launch. Tick **Don't show after updates** in the window to stop the automatic showing;
+Settings, About has **What's New…** any time, as do the menu bar, widget and Desk clock menus.
+The cards live in `Sources/Sanduhr/Models/WhatsNewCards.swift`, one array per release: a release
+adds its own array and nothing else changes. The last version seen is the `whatsNewLastSeen`
+default (`defaults write com.626labs.sanduhr whatsNewLastSeen 2.3.4` fakes an update).
+
 ## Files
 
 - `sessionKey:{label}` + `cf_clearance:{label}` per account → the Keychain, service `com.626labs.sanduhr` (release builds), or `~/Library/Application Support/Sanduhr/credentials.json` (mode `0600`, dev builds); see First run and Accounts above

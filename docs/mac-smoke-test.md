@@ -48,7 +48,7 @@ Fresh-install and migration checks stay manual.
 
 - [ ] Cards fill in after the first fetch (sign in via Settings, Accounts if the key is gone).
 - [ ] Left-click the menu bar hourglass hides the widget; again shows it. Hidden survives a relaunch.
-- [ ] Right-click opens the status menu: Hide (or Show) Widget; Tools: Deep Work, Pacing Calculators, Cooldown Snake; Refresh, Settings…, Check for Updates…; Quit Sanduhr für Claude. Two-finger click on the widget lists the same items in the same order (always Hide Widget there). Check for Updates… from the widget's menu opens Sparkle's check.
+- [ ] Right-click opens the status menu: Hide (or Show) Widget; Tools: Deep Work, Pacing Calculators, Cooldown Snake; Refresh, Settings…, Check for Updates…, What's New…; Quit Sanduhr für Claude. Two-finger click on the widget lists the same items in the same order (always Hide Widget there). Check for Updates… from the widget's menu opens Sparkle's check.
 - [ ] Refresh updates the footer time; `~/Library/Application Support/Sanduhr/snapshot.json` has a new `captured_at`.
 - [ ] Gear on the widget opens Sanduhr Settings. Widget, Look: pick a font and subtle mode, the widget changes as you pick. Themes: Reload lists the installed user themes. Switch a theme on the widget's strip, toggle compact (panel resizes, top edge stays put), open the focus timer and close it.
 - [ ] Warning bars: Settings, Desk, Meters, drop the weekly "At" slider below its percent with a "more than" shorter than its reset. The widget's weekly card turns red at once (bar and percent) with a steady glow in the theme's accent around the bar and a warning triangle before the percent in the theme's text color, and the Desk meter does the same in the Desk ink (triangle included); with VoiceOver on, the warning card and meter read "<n>%, nearly full", the others just the percent; the session card stays as it was. Pick Match Desk: the widget's glow takes the Desk ink. Turn the weekly "Warn when nearly full" off: both go back at once. Put the settings back (weekly: on, 90%, 1 day) and the theme you had.
@@ -908,3 +908,38 @@ Quit Sanduhr first and open the build afterwards, so it starts with the font swi
 - [ ] Settings, About shows "Handwriting: EsteFont 26 by Estevan Hernandez"; Third-Party Notices
   opens with an EsteFont 26 section (copyright and license).
 - [ ] Turn your EsteFont copies back on in Font Book.
+
+## 28. What's New after an update (item 57)
+
+Fake an older version with the switch below; never on a fresh test account's first launch (that
+one records the version and shows nothing). Quit Sanduhr before each `defaults` command and open
+the build afterwards.
+
+- [ ] Update from an older build: `defaults write com.626labs.sanduhr whatsNewLastSeen 2.3.4`,
+  open the build. About two seconds after the widget and Desk are up, a window "What's New in
+  Sanduhr" shows the cards of every release since, newest first, at most 8 (from 2.3.4 to 2.6.0:
+  the five 2.6 cards, then three of 2.5). Each card has its art (a symbol, or a live preview: the
+  Desk message writing itself in, a theme card, EsteFont 26, a notch wing, the menu bar), "New
+  in 2.x", a title, a sentence or two and Show me. `smoke/smoke state` shows `whats_new:
+  { last_seen: <this version>, pending: 0, open: true }`.
+- [ ] Show me on each card closes the window and opens Settings at its page: Now playing at Now
+  Playing, Desk messages at Message, themes at Themes, the Dock at Layout, EsteFont 26 at Desk,
+  Look, Claude Usage at Claude Usage, integrations at Integrations, the notch glow at Notch,
+  accounts and following at Accounts, the menu bar at General, hidden limits at Meters.
+- [ ] Quit and open again: no window (`defaults read com.626labs.sanduhr whatsNewLastSeen` prints
+  this version).
+- [ ] Settings, About, What's New…: the window opens with every card up to this version, and again
+  from What's New… in the menu bar item's menu, the widget's two-finger menu and the Desk clock's
+  menu (under Check for Updates…). Done (or Return) closes it.
+- [ ] Don't show after updates: tick it, quit, `defaults write com.626labs.sanduhr whatsNewLastSeen
+  2.3.4`, open: no window, and `whatsNewLastSeen` is this version again; About's What's New… still
+  opens it. Untick it.
+- [ ] Onboarding first: on a test account with no session key and an older `whatsNewLastSeen`, the
+  onboarding sheet shows and What's New does not; it shows on a later launch after signing in.
+- [ ] Fresh install (test account only): `defaults delete com.626labs.sanduhr` and `defaults
+  delete com.626labs.sanduhr.desk`, open: onboarding, no What's New, and `whatsNewLastSeen` is
+  this version.
+- [ ] `smoke/smoke run scenarios/whats-new.yaml` passes (opens it, reads the title, Show me and the
+  switch, closes it).
+- [ ] Put `whatsNewLastSeen` back to this version: `defaults write com.626labs.sanduhr
+  whatsNewLastSeen <version>`.
