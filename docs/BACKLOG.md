@@ -87,3 +87,28 @@ Update, in the same session the fix lands:
   tradeoff and its now-met precondition to revert.
 - `mac/release.sh:9-10,47-54` — confirms Developer ID signing + notarization are
   live today, closing the stated blocker to real Keychain.
+
+## #3 — New user walkthrough (Mac first, Windows after)
+
+Raised 2026-10-05. A new install today gets the Welcome sheet (paste the `sessionKey`) and then a
+widget, and nothing points at the rest: the Desk, the notch wings and glow, the menu bar, accounts,
+the Claude Usage page, the integrations, themes. What's New (2.6.0) covers what changed for people
+who updated; nothing covers what exists for people who just arrived.
+
+Shape to spec:
+
+- After the first successful sign-in, a short skippable walkthrough: four to six steps, each
+  pointing at the real thing on screen (the widget, a Desk corner, the notch, the menu bar icon)
+  with a sentence and a Show me / Next, plus "Set this up later" that leaves everything off.
+- Choices made along the way are real settings: Desk on or off, the notch wings, the menu bar
+  readout, a theme or Match Desk. Defaults stay what they are when skipped.
+- Reuse What's New's card table and Show me routing where it fits; the walkthrough is data, so
+  later features add a step without code.
+- Reopen any time: Settings, About and the Help menu ("Take the Tour…").
+- Never during the Welcome sheet; never again after it finishes or is skipped (a defaults flag),
+  and updates never show it (What's New handles those).
+- Accessibility: keyboard through every step, VoiceOver labels, Reduce Motion respected.
+- Windows parity as its own item once the Mac version settles.
+
+Open questions: whether the walkthrough also offers the MCP integrations (likely a last, optional
+step), and whether a demo mode (made-up numbers until real usage arrives) helps the first minute.
