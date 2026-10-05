@@ -206,7 +206,7 @@ final class NowPlayingController {
         }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: Self.perl)
-        p.arguments = [paths.script, paths.framework, paths.testClient, "test"]
+        p.arguments = AdapterWatchdog.arguments([paths.script, paths.framework, paths.testClient, "test"])
         p.standardOutput = FileHandle.nullDevice
         p.standardError = FileHandle.nullDevice
         p.terminationHandler = { [weak self] process in
@@ -247,7 +247,8 @@ final class NowPlayingController {
         let gen = generation
         let p = Process()
         p.executableURL = URL(fileURLWithPath: Self.perl)
-        p.arguments = [paths.script, paths.framework, "stream", "--no-artwork", "--micros"]
+        p.arguments = AdapterWatchdog.arguments(
+            [paths.script, paths.framework, "stream", "--no-artwork", "--micros"])
         let out = Pipe()
         p.standardOutput = out
         p.standardError = FileHandle.nullDevice

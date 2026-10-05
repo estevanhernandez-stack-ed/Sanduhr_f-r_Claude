@@ -258,6 +258,36 @@ struct NowPlayingSupervisor: Equatable {
     mutating func reset() { quickExits = 0 }
 }
 
+/// Runs the adapter under a small Perl watchdog, so it never outlives Sanduhr. A normal quit
+/// terminates it, but a crash or a force quit left the adapter running for good (seen
+/// 2026-10-05). The watchdog forks the adapter under `/usr/bin/perl` (MediaRemote still sees an
+/// Apple-signed host), passes its exit status through, stops it when terminated, and stops it
+/// within two seconds of Sanduhr going away (its parent changes). Output goes straight from the
+/// adapter to Sanduhr's pipe.
+enum AdapterWatchdog {
+    static let script = """
+        use POSIX ();
+        my $parent = getppid();
+        my $child = fork();
+        exit 70 unless defined $child;
+        if ($child == 0) { exec('/usr/bin/perl', @ARGV) or POSIX::_exit(71); }
+        my $stop = sub { kill 'TERM', $child; exit 0 };
+        $SIG{TERM} = $SIG{INT} = $SIG{HUP} = $stop;
+        $SIG{CHLD} = sub {
+            if (waitpid($child, POSIX::WNOHANG()) == $child) {
+                exit(POSIX::WIFEXITED($?) ? POSIX::WEXITSTATUS($?) : 128 + POSIX::WTERMSIG($?));
+            }
+        };
+        while (1) { sleep 2; $stop->() if getppid() != $parent; }
+        """
+
+    /// `/usr/bin/perl` arguments that run `adapterArguments` (the adapter script and its
+    /// arguments) under the watchdog.
+    static func arguments(_ adapterArguments: [String]) -> [String] {
+        ["-e", script] + adapterArguments
+    }
+}
+
 /// The Now Playing settings that decide whether a track shows (UserDefaults.desk). Where it shows
 /// is NowPlayingPlacement's: the notch choices and the Desk layout.
 struct NowPlayingPrefs: Equatable {
