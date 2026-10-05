@@ -54,6 +54,10 @@ desk_frames:
     frame: [52, 898, 260, 22]
 desk_frames_ok: true
 desk_frames_problem: null
+dock:
+  side: bottom
+  autohide: false
+  inset: 0
 alerts:
   enabled: false
   session_line: 80
@@ -118,3 +122,8 @@ follow: false
 follow_paused: false
 version: "2.1.0"
 build: "3"
+whats_new:
+  last_seen: "2.1.0"
+  pending: 0
+  open: false
+  hide_after_updates: false

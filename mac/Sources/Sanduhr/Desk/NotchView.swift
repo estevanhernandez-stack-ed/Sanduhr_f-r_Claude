@@ -19,7 +19,9 @@ struct NotchView: View {
     @AppStorage(DeskController.notchKey, store: .desk) private var enabled = false
     @AppStorage("notchWings", store: .desk) private var wings = 36.0
     @AppStorage("notchChin", store: .desk) private var chin = 26.0
-    @AppStorage("font", store: .desk) private var font = ""
+    @AppStorage("font", store: .desk) private var savedFont: String?
+    /// The Desk font as drawn: EsteFont 26 unless a font was picked (DeskFont, item 58).
+    private var font: String { DeskFont.resolve(saved: savedFont) }
     @AppStorage("notchChinText", store: .desk) private var showChinText = false
     @AppStorage("notchTextColor", store: .desk) private var textColor = "ffffff"
     @AppStorage("notchText", store: .desk) private var wingText = true
@@ -31,6 +33,8 @@ struct NotchView: View {
         // Extra height 0 means no strip under the camera at all: just the wings.
         if enabled, chin > 0, let notch = model.notchRect {
             let height = notch.height + chin
+            // Read here so a track change redraws at once, not at the next 15-second tick.
+            let _ = model.nowPlaying
             TimelineView(.periodic(from: .now, by: 15)) { context in
                 // Same widths as the wings above, so the strip and the wings stay one shape
                 // even when a wing grows to fit its text.
@@ -42,16 +46,20 @@ struct NotchView: View {
                         .fill(Color.black)
                     if showChinText, let line = stripContent.text(
                         at: .strip, meetings: model.meetings, meters: model.claudeCompact,
-                        message: model.message, now: context.date) {
-                        Text(line)
-                            .font(.custom(font, size: max(11, chin * 0.55)))
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .minimumScaleFactor(0.7)
-                            .foregroundStyle(LinearGradient.ink(textColor))
-                            .opacity(0.85)
-                            .padding(.horizontal, 18)
-                            .frame(height: chin)
+                        message: model.message, nowPlaying: model.nowPlaying, now: context.date) {
+                        if stripContent == .nowPlaying {
+                            stripNowPlaying(line, width: notch.width + w.left + w.right)
+                        } else {
+                            Text(line)
+                                .font(.custom(font, size: stripSize))
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .minimumScaleFactor(0.7)
+                                .foregroundStyle(LinearGradient.ink(textColor))
+                                .opacity(0.85)
+                                .padding(.horizontal, 18)
+                                .frame(height: chin)
+                        }
                     }
                 }
                 .frame(width: notch.width + w.left + w.right, height: height)
@@ -60,6 +68,39 @@ struct NotchView: View {
             .position(x: notch.midX, y: height / 2)
             .allowsHitTesting(false)
         }
+    }
+
+    private var stripSize: CGFloat { max(11, chin * 0.55) }
+
+    /// Now playing under the camera: the whole line, scrolling once when it doesn't fit, and while
+    /// paused a Next button at its trailing end (item 53b). Both take clicks like the Desk line
+    /// (DeskController: the text plays or pauses, the button skips, a two-finger click opens the
+    /// menu), found by the frames they report.
+    private func stripNowPlaying(_ line: String, width: CGFloat) -> some View {
+        let state = model.nowPlaying?.state
+        let room = NowPlayingWingLayout.textRoom(.strip, width: width, state: state, size: stripSize)
+        return HStack(spacing: NowPlayingWingLayout.stripSpacing) {
+            ScrollOnceText(text: line, trackKey: NowPlayingScroll.trackKey(model.nowPlaying),
+                           scrolls: NowPlayingScroll.scrolls(model.nowPlaying),
+                           textWidth: NotchWingsView.textWidth(line, stripSize, font), room: room,
+                           font: .custom(font, size: stripSize))
+                .foregroundStyle(LinearGradient.ink(textColor))
+                .opacity(0.85)
+                .frame(height: chin)
+                .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
+                .onGlobalFrame { model.stripFrame = $0 }
+            if NowPlayingWingLayout.nextSide(.strip, state: state) != nil {
+                Image(systemName: "forward.end.fill")
+                    .font(.system(size: stripSize * 0.8, weight: .semibold))
+                    .foregroundStyle(LinearGradient.ink(textColor))
+                    .opacity(0.85)
+                    .frame(width: NowPlayingWingLayout.nextWidth(stripSize), height: chin)
+                    .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
+                    .onGlobalFrame { model.stripNextFrame = $0 }
+                    .accessibilityLabel("Next")
+            }
+        }
+        .frame(width: max(0, width - NowPlayingWingLayout.stripPadding * 2))
     }
 }
 
@@ -106,12 +147,16 @@ struct NotchWingsView: View {
     @AppStorage("notchWings", store: .desk) private var wings = 36.0
     @AppStorage("notchText", store: .desk) private var showText = true
     @AppStorage("notchTextColor", store: .desk) private var textColor = "ffffff"
-    @AppStorage("font", store: .desk) private var font = ""
+    @AppStorage("font", store: .desk) private var savedFont: String?
+    /// The Desk font as drawn: EsteFont 26 unless a font was picked (DeskFont, item 58).
+    private var font: String { DeskFont.resolve(saved: savedFont) }
     @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
     @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
 
     var body: some View {
         if enabled {
+            // Read here so a track change redraws at once, not at the next 15-second tick.
+            let _ = model.nowPlaying
             TimelineView(.periodic(from: .now, by: 15)) { context in
                 let w = Self.layout(model: model, now: context.date, wings: wings, showText: showText,
                                     left: leftContent, right: rightContent,
@@ -123,20 +168,110 @@ struct NotchWingsView: View {
                         IslandShape(flare: 8, radius: min(10, barHeight * 0.3))
                             .fill(Color.black)
                         HStack(spacing: 0) {
-                            label(left, size).frame(width: max(0, wingL - 10), alignment: .trailing)
+                            wing(left, size, leftContent, place: .left, width: wingL).frame(width: max(0, wingL - 10), alignment: .trailing)
                             Color.clear.frame(width: notchWidth + 20)
-                            label(right, size).frame(width: max(0, wingR - 10), alignment: .leading)
+                            wing(right, size, rightContent, place: .right, width: wingR).frame(width: max(0, wingR - 10), alignment: .leading)
                         }
                     }
                     .frame(width: notchWidth + wingL + wingR, height: barHeight)
-                    .offset(x: (wingR - wingL) / 2)
                     .contentShape(Rectangle())
                     .onTapGesture { DeskController.shared.showSettings() }
                     .help("Sanduhr Settings")
+                    // Last, so the island's click area moves with its drawing: an offset before
+                    // contentShape left the click area at the unshifted place, so the far end of
+                    // the wider wing (a paused Next button) drew where nothing took the click.
+                    .offset(x: (wingR - wingL) / 2)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
             }
         }
+    }
+
+    /// One wing's text. Now playing takes its own clicks: a click plays or pauses, a two-finger
+    /// click opens Previous, Play/Pause, Next and Now Playing Settings…; the rest of the island
+    /// still opens Settings. A title too long for the wing scrolls through once (item 53b).
+    @ViewBuilder
+    private func wing(_ text: String?, _ size: CGFloat, _ content: NotchContent, place: NotchContent.Place,
+                      width: CGFloat) -> some View {
+        if content == .nowPlaying, let text {
+            nowPlayingWing(text, size, place: place, width: width)
+        } else {
+            label(text, size)
+        }
+    }
+
+    /// Now playing in a wing: the title, scrolling once when it doesn't fit (item 53b), and while
+    /// paused a Next button at the wing's outer edge (item 53b). The title keeps its beginning
+    /// visible; a click on it plays or pauses, a click on the button skips. Both carry the
+    /// two-finger menu.
+    private func nowPlayingWing(_ text: String, _ size: CGFloat, place: NotchContent.Place, width: CGFloat) -> some View {
+        let state = model.nowPlaying?.state
+        let side = NowPlayingWingLayout.nextSide(place, state: state)
+        let room = NowPlayingWingLayout.textRoom(place, width: width, state: state, size: size)
+        let parts = NowPlayingText.splitGlyph(text)
+        let glyphGap = size * 0.3
+        let glyphWidth = parts.glyph.map { Self.textWidth($0, size, font) + glyphGap } ?? 0
+        let titleRoom = max(0, room - glyphWidth)
+        return HStack(spacing: 0) {
+            if side == .leading {
+                nextButton(size)
+                Spacer(minLength: NowPlayingWingLayout.wingSpacing)
+            } else if place == .left {
+                Spacer(minLength: 0)
+            }
+            // The play-state glyph stays put at the wing's inner end; only the title scrolls.
+            HStack(spacing: glyphGap) {
+                if let glyph = parts.glyph {
+                    Text(glyph).font(.custom(font, size: size)).fixedSize()
+                }
+                ScrollOnceText(text: parts.rest, trackKey: NowPlayingScroll.trackKey(model.nowPlaying),
+                               scrolls: NowPlayingScroll.scrolls(model.nowPlaying),
+                               textWidth: Self.textWidth(parts.rest, size, font), room: titleRoom,
+                               font: .custom(font, size: size))
+            }
+                .foregroundStyle(LinearGradient.ink(textColor))
+                .opacity(0.88)
+                .frame(maxHeight: .infinity)
+                .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
+                .contentShape(Rectangle())
+                .onTapGesture { NowPlayingController.shared.togglePlayPause() }
+                .help(state == .paused ? "Play. Two-finger click for more." : "Play or pause. Two-finger click for more.")
+            if side == .trailing {
+                Spacer(minLength: NowPlayingWingLayout.wingSpacing)
+                nextButton(size)
+            } else if place == .right {
+                Spacer(minLength: 0)
+            }
+        }
+        .frame(width: max(0, width - NowPlayingWingLayout.wingInsets))
+        .padding(place == .left ? .leading : .trailing, NowPlayingWingLayout.outerInset)
+        // The whole wing is now playing's: a click in the gaps beside the title or Next lands here
+        // and does nothing, instead of reaching the island's tap that opens Settings.
+        .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
+        .contentShape(Rectangle())
+        .onTapGesture {}
+        .contextMenu { NowPlayingMenuItems() }
+    }
+
+    /// The paused wing's Next button: its own click area, the wing's height.
+    private func nextButton(_ size: CGFloat) -> some View {
+        Image(systemName: "forward.end.fill")
+            .font(.system(size: size * 0.8, weight: .semibold))
+            .foregroundStyle(LinearGradient.ink(textColor))
+            .opacity(0.88)
+            .frame(width: NowPlayingWingLayout.nextWidth(size))
+            .frame(maxHeight: .infinity)
+            // contentShape only routes clicks inside SwiftUI; the window server gives this
+            // transparent window a click only where a pixel is drawn, so a click between the
+            // glyph's strokes (or beside it, past the island's black) fell through to the menu
+            // bar. The faint plate draws a pixel under the whole button (DeskPointerMenu).
+            .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
+            .contentShape(Rectangle())
+            .onTapGesture { NowPlayingController.shared.next() }
+            .help("Next")
+            .accessibilityElement()
+            .accessibilityLabel("Next")
+            .accessibilityAddTraits(.isButton)
     }
 
     private func label(_ text: String?, _ size: CGFloat) -> some View {
@@ -157,18 +292,28 @@ struct NotchWingsView: View {
         let left = showText ? text(leftContent, at: .left, model: model, now: now) : nil
         let right = showText ? text(rightContent, at: .right, model: model, now: now) : nil
         let size = max(10, notchHeight * 0.42)
-        return Layout(left: min(maxWings, max(wings, width(left, size, font) + 22)),
-                      right: min(maxWings, max(wings, width(right, size, font) + 22)),
+        let state = model.nowPlaying?.state
+        func wingWidth(_ text: String?, _ content: NotchContent, _ place: NotchContent.Place) -> CGFloat {
+            // A paused now playing also makes room for its Next button (item 53b).
+            NowPlayingWingLayout.wingWidth(
+                textWidth: textWidth(text, size, font), place: place,
+                state: content == .nowPlaying && text != nil ? state : nil,
+                size: size, minimum: wings, maximum: maxWings)
+        }
+        return Layout(left: wingWidth(left, leftContent, .left),
+                      right: wingWidth(right, rightContent, .right),
                       leftText: left, rightText: right, size: size)
     }
 
     private static func text(_ content: NotchContent, at place: NotchContent.Place,
                              model: DeskModel, now: Date) -> String? {
         content.text(at: place, meetings: model.meetings, meters: model.claudeCompact,
-                     message: model.message, now: now)
+                     message: model.message, nowPlaying: model.nowPlaying, now: now)
     }
 
-    private static func width(_ text: String?, _ size: CGFloat, _ font: String) -> CGFloat {
+    /// The text's width in the notch font: what the wings grow by and what a now playing title
+    /// scrolls against.
+    static func textWidth(_ text: String?, _ size: CGFloat, _ font: String) -> CGFloat {
         guard let text, !text.isEmpty else { return 0 }
         // The setting holds a family name; measure with that family's regular face.
         let nsFont = NSFontManager.shared.font(withFamily: font, traits: [], weight: 5, size: size)
@@ -178,4 +323,17 @@ struct NotchWingsView: View {
 
     /// Widest a wing can get, so the window never needs resizing.
     static let maxWings: CGFloat = 180
+}
+
+/// The now playing menu as SwiftUI items, for the notch wings' context menu (the Desk uses
+/// NowPlayingController.menu(), an NSMenu, from its event monitors).
+struct NowPlayingMenuItems: View {
+    var body: some View {
+        let controller = NowPlayingController.shared
+        Button("Previous") { controller.previous() }
+        Button(controller.state == .playing ? "Pause" : "Play") { controller.togglePlayPause() }
+        Button("Next") { controller.next() }
+        Divider()
+        Button("Now Playing Settings…") { DeskController.shared.showSettings(.nowPlaying) }
+    }
 }

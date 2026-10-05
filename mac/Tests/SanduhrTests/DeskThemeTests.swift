@@ -80,9 +80,14 @@ struct DeskThemeTests {
     }
 
     @Test func deskLookDefaultsMatchDesk() {
-        #expect(DeskLook.read(desk([:])) == DeskLook(font: "", ink: "ffffff", shadow: true))
-        let look = DeskLook.read(desk(["font": "EsteFont", "inkColor": "ff0000", "inkShadow": false]))
+        // No font saved: EsteFont 26, the Desk's default since item 58.
+        #expect(DeskLook.read(desk([:])) == DeskLook(font: "EsteFont 26", ink: "ffffff", shadow: true))
+        #expect(DeskLook.read(desk(["font": ""])).font == "")
+        let look = DeskLook.read(desk(["font": "EsteFont", "inkColor": "ff0000", "inkShadow": false]),
+                                 available: { _ in true })
         #expect(look == DeskLook(font: "EsteFont", ink: "ff0000", shadow: false))
+        // A saved font that is no longer installed: EsteFont 26.
+        #expect(DeskLook.read(desk(["font": "Gone Font"]), available: { _ in false }).font == "EsteFont 26")
     }
 
     @Test func matchDeskResolvesFromDeskSettings() {

@@ -26,6 +26,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // EsteFont 26 (item 58), from Contents/Resources/Fonts, for this process only: before any
+        // view draws, so the Desk and the widget find it on a Mac that never had it installed.
+        BundledFonts.register()
         NSApp.setActivationPolicy(.accessory)
         // Tooltips (the theme gallery's descriptions, the widget's buttons) come up a little
         // sooner than AppKit's default of about a second. Registered, so a defaults write wins.
@@ -37,6 +40,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // A brand-new install starts with Desk on and the widget hidden while Desk is on, once it
         // has signed in. Decided once, before the panel shows and before DeskMigration marks the suite.
         let firstRun = DeskFirstRun.run()
+        // Before DeskMigration marks the suite: an earlier version's Desk with no font picked keeps
+        // the system font; a new install draws in EsteFont 26.
+        DeskFont.keepExistingDefault()
 
         // Build widget panel.
         let hosting = NSHostingController(rootView: RootView(vm: viewModel))
@@ -116,14 +122,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Desk: the desktop layer and the notch, when switched on (Settings, General, Surfaces).
         DeskMigration.run()
+        // Item 53's Now Playing switch becomes a place in the Desk layout, once (item 53b).
+        NowPlayingPlacement.upgrade(UserDefaults.desk)
         DeskController.shared.apply()
         // The camera light watches the cameras while its switch is on, with or without Desk.
         CameraLightController.shared.apply()
         // The notch glow checks for meetings a minute out while its meetings switch is on.
         NotchGlowController.shared.apply()
+        // Claude's suggested Desk messages (item 54): watches for propose_desk_messages' requests.
+        DeskMessageHandoff.shared.startForApp()
+        // Claude's suggested themes (item 55): propose_theme's requests, on the same folder watch.
+        ThemeProposalHandoff.shared.startForApp(vm: viewModel)
         // Claude Code integrations (item 49): where they are installed, this version's scripts
         // replace the last one's (a new stamped folder, the link swapped). No install, no write.
         Task.detached(priority: .utility) { IntegrationScripts.standard.refreshIfInstalled() }
+        showWhatsNewIfUpdated(fresh: firstRun == .fresh)
+    }
+
+    /// What's New after an update (item 57): the cards of the releases since the last one seen,
+    /// once, a moment after the widget and Desk are up. A fresh install's first launch only
+    /// records the version; while onboarding is up (no session key) the cards wait for a later
+    /// launch. The version is recorded as the window opens, so it shows once even if Sanduhr quits.
+    private func showWhatsNewIfUpdated(fresh: Bool) {
+        let current = AppInfo.current.version
+        let lastSeen = WhatsNew.lastSeen()
+        let decision = WhatsNew.atLaunch(
+            lastSeen: lastSeen, current: current, fresh: fresh,
+            onboarding: !KeychainStore.exists(account: KeychainAccount.sessionKey), hidden: WhatsNew.hidden())
+        if decision.record { WhatsNew.record(current) }
+        guard !decision.show.isEmpty else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            MainActor.assumeIsolated { WhatsNewWindowController.shared.show(decision.show, lastSeen: lastSeen) }
+        }
     }
 
     /// estedesk:// and sanduhr:// links (Option+J joins the next meeting, …/settings opens
@@ -196,6 +226,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             frame.size.height = fit
             panel.setFrame(frame, display: true, animate: true)
         }
+    }
+
+    /// Now playing's adapter runs as a child process (item 53): it goes when Sanduhr quits.
+    func applicationWillTerminate(_ notification: Notification) {
+        NowPlayingController.shared.shutdown()
     }
 
     // LSUIElement apps never get this called, but set it false anyway.
@@ -479,6 +514,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .refresh: refreshNow()
         case .settings: SettingsWindowController.shared.show()
         case .checkForUpdates: updaterController.checkForUpdates(nil)
+        case .whatsNew: WhatsNewWindowController.shared.show()
         case .quit: NSApp.terminate(nil)
         }
     }

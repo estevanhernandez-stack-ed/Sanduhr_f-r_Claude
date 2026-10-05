@@ -9,12 +9,13 @@ import AppKit
 /// Settings live in the com.626labs.sanduhr.desk defaults domain:
 ///   defaults write com.626labs.sanduhr.desk layout "message:tl clock:bl claude:bl meetings:bl"
 ///       widgets: clock (time and date), claude (Sanduhr line), meters (a bar per limit),
-///                meetings, message
+///                nowPlaying (what plays, item 53b), meetings, message
 ///       slots:   tl tr bl br; leave a widget out to hide it
-///   defaults write com.626labs.sanduhr.desk font "EsteFont"       (any installed font family)
+///   defaults write com.626labs.sanduhr.desk font "EsteFont 26"    (any installed font family; EsteFont 26 ships in the app and is the default)
 ///   defaults write com.626labs.sanduhr.desk timeSize -float 112    (clock size; the rest scales from it)
 ///   defaults write com.626labs.sanduhr.desk messageSize -float 84
 ///   defaults write com.626labs.sanduhr.desk messageColor 9ad7ff    (hex, or "5b8cff,a86bff" for a gradient)
+///   defaults write com.626labs.sanduhr.desk messageGlow -bool false (no glow; a line's {glow} still glows)
 ///   defaults write com.626labs.sanduhr.desk message "text"         (pin one line; see Message.swift)
 ///   defaults write com.626labs.sanduhr.desk left -float 52         (edge margins in points;
 ///   defaults write com.626labs.sanduhr.desk right -float 52         top is measured below the menu bar)
@@ -29,7 +30,9 @@ struct DeskView: View {
     var model: DeskModel
 
     @AppStorage("layout", store: .desk) private var layout = "message:tl clock:bl claude:bl meetings:bl"
-    @AppStorage("font", store: .desk) private var font = ""
+    @AppStorage("font", store: .desk) private var savedFont: String?
+    /// The Desk font as drawn: EsteFont 26 unless a font was picked (DeskFont, item 58).
+    private var font: String { DeskFont.resolve(saved: savedFont) }
     @AppStorage("messageFont", store: .desk) private var messageFont = ""
     @AppStorage("left", store: .desk) private var left = 52.0
     @AppStorage("right", store: .desk) private var right = 52.0
@@ -38,11 +41,12 @@ struct DeskView: View {
     @AppStorage("timeSize", store: .desk) private var timeSize = 112.0
     @AppStorage("messageSize", store: .desk) private var messageSize = 84.0
     @AppStorage("messageColor", store: .desk) private var messageColor = "9ad7ff"
+    @AppStorage(DeskMessageLook.glowKey, store: .desk) private var messageGlow = true
     @AppStorage("showMeetings", store: .desk) private var showMeetings = true
     @AppStorage("showClaude", store: .desk) private var showClaude = true
     @AppStorage("inkColor", store: .desk) private var ink = "ffffff"
 
-    enum Widget: String { case clock, claude, meters, meetings, message }
+    enum Widget: String { case clock, claude, meters, nowPlaying, meetings, message }
     enum Slot: String { case tl, tr, bl, br }
 
     private var inset: CGFloat { timeSize * 0.18 }
@@ -77,17 +81,18 @@ struct DeskView: View {
             // shadows draw inside those boxes, clipping them. Inner breathing room fixes that;
             // the outer padding gives it back so the margins still mean the visible edge.
             .padding(inset)
-            .padding(.leading, max(0, left - inset))
-            .padding(.trailing, max(0, right - inset))
+            // The Dock's side moves in by its reach (item 56), so nothing sits under it.
+            .padding(.leading, max(0, left + model.dockInsets.left - inset))
+            .padding(.trailing, max(0, right + model.dockInsets.right - inset))
             .padding(.top, max(0, model.topInset + top - inset))
-            .padding(.bottom, max(0, bottom - inset))
+            .padding(.bottom, max(0, bottom + model.dockInsets.bottom - inset))
         }
         NotchView(model: model)
         }
     }
 
     private func column(top: [Widget], bottom: [Widget], alignment: HorizontalAlignment) -> some View {
-        VStack(alignment: alignment, spacing: 10) {
+        VStack(alignment: alignment, spacing: DeskNowPlaying.columnSpacing) {
             ForEach(top, id: \.self) { view(for: $0, alignment: alignment) }
             Spacer(minLength: 32)
             ForEach(bottom, id: \.self) { view(for: $0, alignment: alignment) }
@@ -101,16 +106,29 @@ struct DeskView: View {
         case .clock: clock(alignment: alignment).deskInk()
         case .claude: claude.deskInk()
         case .meters: meters(alignment: alignment).deskInk()
+        case .nowPlaying: nowPlaying(alignment: alignment).deskInk()
         case .meetings: meetings(alignment: alignment).deskInk()
         case .message: message(alignment: alignment)
+        }
+    }
+
+    /// The now playing element (item 53b): "▶ Title · Artist" over its position bar while a track
+    /// shows, nothing otherwise. Padded so its click area stays clear of its neighbours'.
+    @ViewBuilder
+    private func nowPlaying(alignment: HorizontalAlignment) -> some View {
+        if let info = model.nowPlaying {
+            DeskNowPlayingLine(info: info, model: model, ink: ink, font: font, size: timeSize * 0.17,
+                               width: timeSize * 3.2, alignment: alignment)
+                .padding(.vertical, DeskNowPlaying.padding)
         }
     }
 
     private func clock(alignment: HorizontalAlignment) -> some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             VStack(alignment: alignment, spacing: 2) {
+                // The time is the Desk's heading: EsteFont 26 draws it in its Bold face.
                 Text(Self.format(context.date, "h:mm"))
-                    .font(.custom(font, size: timeSize))
+                    .font(.custom(BundledFonts.face(font, bold: true), size: timeSize))
                 Text(Self.format(context.date, "EEEE, MMMM d"))
                     .font(.custom(font, size: timeSize * 0.3))
                     .opacity(0.85)
@@ -222,24 +240,15 @@ struct DeskView: View {
         .onGlobalFrame { model.meetingsFrame = $0 }
     }
 
-    /// The handwritten line, drawn the way handwritten.py baked it: colored ink with a soft
-    /// glow in the same color. messageColor takes one hex, or two or more separated by commas
-    /// for a left-to-right gradient (to match Ice's menu bar tint). Two lines at most, then it
-    /// scales down rather than collide.
+    /// The handwritten line with its per-line effects (DeskMessageLine, item 54). messageColor
+    /// takes one hex, or two or more separated by commas for a left-to-right gradient (to match
+    /// Ice's menu bar tint); a line's {ink:…} replaces it for that line.
     @ViewBuilder
     private func message(alignment: HorizontalAlignment) -> some View {
         if let text = model.message {
-            let colors = Color.inkStops(messageColor, fallback: "9ad7ff")
-            let glow = colors[colors.count / 2]
-            Text(text)
-                .font(.custom(messageFont.isEmpty ? font : messageFont, size: messageSize))
-                .multilineTextAlignment(alignment == .trailing ? .trailing : .leading)
-                .lineLimit(2)
-                .minimumScaleFactor(0.4)
-                .foregroundStyle(LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing))
-                .opacity(0.94)
-                .shadow(color: glow.opacity(0.55), radius: messageSize * 0.18)
-                .shadow(color: glow.opacity(0.35), radius: messageSize * 0.18)
+            DeskMessageLine(raw: text, font: messageFont.isEmpty ? font : messageFont, baseSize: messageSize,
+                            inkSpec: messageColor, globalGlow: messageGlow, alignment: alignment,
+                            paused: model.motionPaused)
         }
     }
 
@@ -435,7 +444,7 @@ private struct MeetingRow: View {
     }
 }
 
-private extension View {
+extension View {
     /// Reports this view's frame in global (window) coordinates when it appears and whenever it
     /// moves or resizes, for the clicks DeskController routes by position. Reported straight to
     /// the model, not through a PreferenceKey: on the Desk window the meters' preference reached

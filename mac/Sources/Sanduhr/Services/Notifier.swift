@@ -124,6 +124,63 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
+    // MARK: - Claude's Desk message suggestions (item 54)
+
+    /// A gentle banner for a suggestion, only when MessageSuggestionNotice allows (alerts on, the
+    /// delivery and quiet hours as an alert's), never with a sound. Clicking it opens Settings,
+    /// Message. Without it, the badge on Message is the sign.
+    func suggestDeskMessages(_ p: MessageProposal) {
+        guard MessageSuggestionNotice.banner(AlertSettings(defaults), deskRunning: DeskController.shared.running,
+                                             now: Date()) else { return }
+        let content = UNMutableNotificationContent()
+        content.title = MessageSuggestionNotice.title(p)
+        content.body = p.note ?? "Add, review or dismiss them in Sanduhr Settings, Message."
+        content.sound = nil
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: Self.deskSuggestionPrefix + p.id, content: content, trigger: nil))
+    }
+
+    /// The suggestion was decided: its banner leaves Notification Center.
+    func clearDeskSuggestion(_ p: MessageProposal) {
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [Self.deskSuggestionPrefix + p.id])
+    }
+
+    static let deskSuggestionPrefix = "desk-messages-"
+
+    // MARK: - Claude's theme suggestions (item 55)
+
+    /// The same gentle banner for a suggested theme (MessageSuggestionNotice's rule: alerts on,
+    /// the delivery and quiet hours as an alert's, no sound). Clicking it opens Settings, Themes.
+    func suggestTheme(_ p: ThemeProposal) {
+        guard MessageSuggestionNotice.banner(AlertSettings(defaults), deskRunning: DeskController.shared.running,
+                                             now: Date()) else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Claude suggested a theme: \(p.name)"
+        content.body = p.summary ?? "Save, apply or dismiss it in Sanduhr Settings, Themes."
+        content.sound = nil
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: Self.themeSuggestionPrefix + p.id, content: content, trigger: nil))
+    }
+
+    /// The suggestion was decided: its banner leaves Notification Center.
+    func clearThemeSuggestion(_ p: ThemeProposal) {
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [Self.themeSuggestionPrefix + p.id])
+    }
+
+    static let themeSuggestionPrefix = "theme-suggestion-"
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        let id = response.notification.request.identifier
+        let section: SettingsSection? = id.hasPrefix(Self.deskSuggestionPrefix) ? .message
+            : id.hasPrefix(Self.themeSuggestionPrefix) ? .themes : nil
+        if let section {
+            DispatchQueue.main.async { MainActor.assumeIsolated { SettingsWindowController.shared.show(section) } }
+        }
+        completionHandler()
+    }
+
     // Show banners even while the widget is the active app.
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification,

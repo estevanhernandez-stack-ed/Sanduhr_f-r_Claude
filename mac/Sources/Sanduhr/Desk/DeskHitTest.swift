@@ -13,6 +13,12 @@ struct DeskElement: Equatable {
         case meters
         /// The meeting list as a whole: it holds the rows and the note, and takes no click itself.
         case meetings
+        /// Now playing (item 53): the Desk line (key "desk") or the strip under the camera (key
+        /// "strip"). A click plays or pauses, a two-finger click opens its menu.
+        case nowPlaying = "now_playing"
+        /// The Next button beside the strip's now playing while paused (item 53b, key "strip"):
+        /// a click skips, a two-finger click opens now playing's menu.
+        case nowPlayingNext = "now_playing_next"
     }
 
     var kind: Kind
@@ -29,14 +35,15 @@ struct DeskElement: Equatable {
 /// left clicks and two-finger clicks, so they can never disagree about what the pointer is over.
 enum DeskHitTest {
     /// First match wins, in this order: the small targets sit inside or beside the big ones.
-    static let priority: [DeskElement.Kind] = [.meetingRow, .note, .account, .meterRow, .meters]
+    static let priority: [DeskElement.Kind] = [.meetingRow, .note, .account, .meterRow, .meters, .nowPlayingNext, .nowPlaying]
 
     /// How far past its frame each kind still takes the click, in points (horizontal, vertical):
     /// a little slack, so the gaps between letters and the line above or below still count.
     static func slack(_ kind: DeskElement.Kind) -> CGSize {
         switch kind {
-        case .meetingRow, .note, .meterRow: return CGSize(width: 8, height: 4)
+        case .meetingRow, .note, .meterRow, .nowPlaying: return CGSize(width: 8, height: 4)
         case .account: return CGSize(width: 4, height: 2)
+        case .nowPlayingNext: return CGSize(width: 4, height: 4)
         case .meters, .meetings: return CGSize(width: 8, height: 6)
         }
     }
@@ -62,6 +69,12 @@ enum DeskHitTest {
     /// True when the hit is the meters or one of their rows: the two-finger limit menu.
     static func isMeters(_ element: DeskElement?) -> Bool {
         element?.kind == .meters || element?.kind == .meterRow
+    }
+
+    /// True when a two-finger click on the hit opens a Desk menu: the meters' limit menu or now
+    /// playing's.
+    static func hasMenu(_ element: DeskElement?) -> Bool {
+        isMeters(element) || element?.kind == .nowPlaying || element?.kind == .nowPlayingNext
     }
 }
 
@@ -92,6 +105,15 @@ enum DeskElements {
         var noteFrame: CGRect = .zero
         var meetingsFrame: CGRect = .zero
         var rowFrames: [String: CGRect] = [:]
+        /// The Desk's now playing element is drawn: the layout places it and a track shows.
+        var nowPlayingLine = false
+        var nowPlayingFrame: CGRect = .zero
+        /// The strip under the camera shows now playing (Desk's notch strip).
+        var nowPlayingStrip = false
+        var stripFrame: CGRect = .zero
+        /// The strip's Next button shows (now playing there, paused).
+        var nowPlayingStripNext = false
+        var stripNextFrame: CGRect = .zero
     }
 
     /// Every element DeskView draws, block before its rows, frames as reported (.zero when none
@@ -120,6 +142,15 @@ enum DeskElements {
                     out.append(DeskElement(kind: .meetingRow, key: String(i),
                                            frame: input.rowFrames[row.id] ?? .zero, clickable: row.hasLink))
                 }
+            }
+        }
+        if input.nowPlayingLine {
+            out.append(DeskElement(kind: .nowPlaying, key: "desk", frame: input.nowPlayingFrame))
+        }
+        if input.nowPlayingStrip {
+            out.append(DeskElement(kind: .nowPlaying, key: "strip", frame: input.stripFrame))
+            if input.nowPlayingStripNext {
+                out.append(DeskElement(kind: .nowPlayingNext, key: "strip", frame: input.stripNextFrame))
             }
         }
         return out

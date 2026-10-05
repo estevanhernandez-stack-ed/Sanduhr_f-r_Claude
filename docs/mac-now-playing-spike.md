@@ -105,3 +105,13 @@ Ship as an opt-in Desk feature, off by default:
 
 Needs a song to finish: `run_with_song.sh` in the scratchpad runs every reading probe plus 15 s of
 `stream` and the notification listener.
+
+## Confirmed with a real player (2026-10-04)
+
+YouTube Music in Chrome, on this macOS 26 Mac:
+
+- **Direct MediaRemote from an ordinary process:** nothing (PID 0, no info), as expected.
+- **Hosted in `/usr/bin/perl`, JXA in `osascript`, and mediaremote-adapter `get`:** title, artist, duration, elapsed time, play state and the source app (`com.google.Chrome`).
+- **mediaremote-adapter `stream`:** pushes each change within a second or two: three skips arrived as three new titles, and a pause arrived as `playbackRate: 0`. No polling, no prompt.
+
+Browser players are covered by the system-wide route, as on Windows, so it is the source for the feature (item 53), with the Music/Spotify notifications as the fallback when the adapter's self-test fails.

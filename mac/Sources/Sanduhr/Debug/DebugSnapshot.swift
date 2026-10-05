@@ -19,6 +19,9 @@ struct DebugStateInput {
     var cameraInUse = false
     /// The camera light shows (for the camera, or switched on by hand).
     var cameraLight = false
+    /// Now playing (item 53): the switch, the source the self-test chose, and whether something
+    /// plays. Never a title, an artist or an app.
+    var nowPlaying = NowPlayingDebug()
     var widgetVisible = false
     /// When the widget shows on its own (WidgetVisibility raw value).
     var widgetVisibility = WidgetVisibility.always
@@ -44,6 +47,8 @@ struct DebugStateInput {
     var deskFrames: [DeskElement] = []
     /// DeskFrameCheck's answer for `deskFrames`: nil when the geometry holds.
     var deskFramesProblem: String?
+    /// The Dock as the Desk sees it (item 56): its side, auto-hide, and the inset applied now.
+    var dock = DockDebug()
     var alerts = AlertSettings()
     var lastFetch: Date?
     /// "deep-work", "snake" or nil.
@@ -84,12 +89,58 @@ struct DebugStateInput {
     /// Follow the account I'm using, and whether a manual switch is pausing it. Never labels.
     var follow = false
     var followPaused = false
+    /// Claude's suggestions waiting for the user (items 54, 55): flags only, never their content.
+    var pendingMessages = false
+    var pendingTheme = false
     var menu: [MenuGroup] = []
+    /// What's New (item 57): the last version seen, the cards the next launch would show, the
+    /// window, and Don't show after updates.
+    var whatsNew = WhatsNewDebug()
     var version = ""
     var build = ""
 }
 
+/// state.yaml's `dock:` (item 56): the Dock's side and auto-hide (its own settings, read only),
+/// and how far the Desk's corners on that side are moved in now, in whole points.
+struct DockDebug: Equatable {
+    var side = DockSide.bottom
+    var autohide = false
+    var inset = 0
+}
+
+/// state.yaml's `whats_new:`.
+struct WhatsNewDebug: Equatable {
+    var lastSeen: String?
+    var pending = 0
+    var open = false
+    var hidden = false
+}
+
+/// state.yaml's `now_playing:`.
+struct NowPlayingDebug: Equatable {
+    /// Running: placed somewhere and Desk on.
+    var enabled = false
+    /// Where it is placed (item 53b), never what plays.
+    var placed: [NowPlayingPlacement.Place] = []
+    var source = NowPlayingSource.off
+    var state = NowPlayingState.none
+}
+
 enum DebugState {
+    /// `now_playing:` (items 53, 53b): flags and places only, never what plays.
+    static func nowPlayingYAML(_ n: NowPlayingDebug) -> YAMLNode {
+        .map([YAMLPair("enabled", .bool(n.enabled)),
+              YAMLPair("placed", .list(n.placed.map { .string($0.rawValue) })),
+              YAMLPair("source", .string(n.source.rawValue)),
+              YAMLPair("state", .string(n.state.rawValue))])
+    }
+
+    /// `dock:` (item 56): side, auto-hide and the inset applied now.
+    static func dockYAML(_ d: DockDebug) -> YAMLNode {
+        .map([YAMLPair("side", .string(d.side.rawValue)), YAMLPair("autohide", .bool(d.autohide)),
+              YAMLPair("inset", .int(d.inset))])
+    }
+
     /// `data:` (item 44): the active account's choices, and `folder_linked` instead of the path.
     static func accountDataYAML(_ c: AccountDataChoices) -> YAMLNode {
         .map([YAMLPair("activity", .string(c.activity.rawValue)),
@@ -112,6 +163,18 @@ enum DebugState {
     static func integrationsYAML(mcp: Int, statusline: Int, meters: Int = 0, hooks: Int = 0) -> YAMLNode {
         .map([YAMLPair("mcp_installed", .int(mcp)), YAMLPair("statusline_installed", .int(statusline)),
               YAMLPair("meters_installed", .int(meters)), YAMLPair("hooks_installed", .int(hooks))])
+    }
+
+    /// `pending_suggestions:` (items 54, 55): whether a suggestion from Claude waits, no content.
+    static func pendingSuggestionsYAML(messages: Bool, theme: Bool) -> YAMLNode {
+        .map([YAMLPair("messages", .bool(messages)), YAMLPair("theme", .bool(theme))])
+    }
+
+    /// `whats_new:` (item 57): versions, a count and two flags.
+    static func whatsNewYAML(_ w: WhatsNewDebug) -> YAMLNode {
+        .map([YAMLPair("last_seen", w.lastSeen.map(YAMLNode.string) ?? .null),
+              YAMLPair("pending", .int(w.pending)), YAMLPair("open", .bool(w.open)),
+              YAMLPair("hide_after_updates", .bool(w.hidden))])
     }
 
     /// `vault:` (item 46): flags and a count only.
@@ -137,6 +200,7 @@ enum DebugState {
         pairs.append(("notch_strip", .string(s.notchStrip.rawValue)))
         pairs.append(("camera_in_use", .bool(s.cameraInUse)))
         pairs.append(("camera_light", .bool(s.cameraLight)))
+        pairs.append(("now_playing", nowPlayingYAML(s.nowPlaying)))
         pairs.append(("widget_visible", .bool(s.widgetVisible)))
         pairs.append(("widget_visibility", .string(s.widgetVisibility.rawValue)))
         pairs.append(("menu_bar", .string(s.menuBar.rawValue)))
@@ -158,6 +222,7 @@ enum DebugState {
         pairs.append(("desk_frames", .list(frames)))
         pairs.append(("desk_frames_ok", .bool(s.deskFramesProblem == nil)))
         pairs.append(("desk_frames_problem", s.deskFramesProblem.map(YAMLNode.string) ?? .null))
+        pairs.append(("dock", dockYAML(s.dock)))
         pairs.append(("alerts", alerts(s.alerts)))
         let fetched: YAMLNode = s.lastFetch.map { .string(iso.string(from: $0)) } ?? .null
         pairs.append(("last_fetch", fetched))
@@ -183,10 +248,12 @@ enum DebugState {
         pairs.append(("vault", vaultYAML(s.vault)))
         pairs.append(("integrations", integrationsYAML(mcp: s.mcpInstalled, statusline: s.statuslineInstalled,
                                                                 meters: s.metersInstalled, hooks: s.hooksInstalled)))
+        pairs.append(("pending_suggestions", pendingSuggestionsYAML(messages: s.pendingMessages, theme: s.pendingTheme)))
         pairs.append(("follow", .bool(s.follow)))
         pairs.append(("follow_paused", .bool(s.followPaused)))
         pairs.append(("version", .string(s.version)))
         pairs.append(("build", .string(s.build)))
+        pairs.append(("whats_new", whatsNewYAML(s.whatsNew)))
         return .object(pairs)
     }
     

@@ -36,7 +36,7 @@ struct DeskHitTestTests {
     }
 
     @Test func priorityPutsMeetingRowsFirst() {
-        #expect(DeskHitTest.priority == [.meetingRow, .note, .account, .meterRow, .meters])
+        #expect(DeskHitTest.priority == [.meetingRow, .note, .account, .meterRow, .meters, .nowPlayingNext, .nowPlaying])
         // A row laid over the meters (it should never be, but if it is) takes the click.
         let over = DeskElement(kind: .meetingRow, key: "0", frame: CGRect(x: 60, y: 810, width: 100, height: 20))
         #expect(DeskHitTest.element(at: CGPoint(x: 80, y: 820), in: all + [over]) == over)

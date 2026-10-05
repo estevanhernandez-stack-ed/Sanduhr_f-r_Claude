@@ -117,6 +117,8 @@ enum DebugHooks {
         case .theme(let id): app.viewModel.selectTheme(id: id)
         case .cycleAccount: app.viewModel.cycleAccount()
         case .usage(let tab): SettingsWindowController.shared.show(.usage, usageTab: tab)
+        case .whatsNew(let open):
+            if open { WhatsNewWindowController.shared.show() } else { WhatsNewWindowController.shared.close() }
         }
         settle()
     }
@@ -173,6 +175,7 @@ enum DebugHooks {
             else if w === CameraLightController.shared.window { kind = "camera" }
             else if w === NotchGlowController.shared.window { kind = "glow" }
             else if w === settings { kind = "settings" }
+            else if w === WhatsNewWindowController.shared.window { kind = "whats-new" }
             else if w.isSheet || w.sheetParent != nil { kind = "sheet" }
             else {
                 let cls = String(describing: type(of: w))
@@ -277,6 +280,10 @@ enum DebugHooks {
         s.notchStrip = NotchContent.saved(.strip, in: .desk)
         s.cameraInUse = CameraLightController.shared.cameraInUse
         s.cameraLight = CameraLightController.shared.showing
+        let np = NowPlayingController.shared
+        // A `defaults write` from the smoke runner posts no change notice: read the places now.
+        np.apply()
+        s.nowPlaying = NowPlayingDebug(enabled: np.active, placed: np.placed, source: np.source, state: np.state)
         s.widgetVisible = widgetVisible
         s.widgetVisibility = .saved()
         s.menuBar = .saved()
@@ -299,6 +306,11 @@ enum DebugHooks {
             s.deskFrames = desk.model.elements()
             s.deskFramesProblem = DeskFrameCheck.problem(s.deskFrames, window: size)
         }
+        // A `defaults write com.apple.dock` posts nothing here: read the Dock's settings now.
+        if desk.running { desk.dock.refreshPrefs() }
+        let dockPrefs = desk.running ? desk.dock.prefs : DockFollower.readPrefs()
+        let dockInset = desk.running ? desk.model.dockInsets.amount(on: dockPrefs.side) : 0
+        s.dock = DockDebug(side: dockPrefs.side, autohide: dockPrefs.autohide, inset: Int(dockInset.rounded()))
         s.alerts = AlertSettings(UserDefaults.standard)
         s.lastFetch = vm.lastUpdated
         switch vm.activeTool {
@@ -325,9 +337,13 @@ enum DebugHooks {
             + vm.accountLabels.compactMap { vm.dataChoices(for: $0).folder }
         (s.mcpInstalled, s.statuslineInstalled, s.metersInstalled, s.hooksInstalled)
             = IntegrationInstaller.standard.installedCounts(folders: folders)
+        s.pendingMessages = DeskMessageHandoff.shared.pending != nil
+        s.pendingTheme = ThemeProposalHandoff.shared.pending != nil
         s.follow = vm.followEnabled
         s.followPaused = vm.followPaused
         s.version = info["CFBundleShortVersionString"] as? String ?? ""
+        s.whatsNew = WhatsNewDebug(lastSeen: WhatsNew.lastSeen(), pending: WhatsNew.pending(current: s.version),
+                                   open: WhatsNewWindowController.shared.isOpen, hidden: WhatsNew.hidden())
         s.build = info["CFBundleVersion"] as? String ?? ""
         return s
     }

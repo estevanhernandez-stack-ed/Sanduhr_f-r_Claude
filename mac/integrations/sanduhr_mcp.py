@@ -12,6 +12,11 @@ tools the same way on either machine:
   get_usage_history          daily tokens from Sanduhr's record (the vault), and the
                              meters' daily peaks from their history
   ping                       health: snapshot, sharing summary, the tools on this Mac
+  get_desk_messages          the Desk's messages.txt lines, the pin and rotation, today's line
+  propose_desk_messages      suggests Desk message lines; Sanduhr asks the user (or applies them
+                             when the user lets Claude change the messages directly)
+  propose_theme              suggests a widget color theme; Sanduhr asks the user (or saves and
+                             applies it when the user lets Claude change themes directly)
 
 What each tool may read is decided per account in Sanduhr (Settings, Accounts, Data, Share
 with Claude) and handed over in ~/Library/Application Support/Sanduhr/mcp-access.json. No
@@ -20,22 +25,30 @@ not exist here. Meters: get_usage and the meter history. Meters and activity: al
 burn, model and record tools for the account's linked Claude Code folder, with project
 names as the account chose (Hidden returns the record's short code, never a name).
 
-Read-only: opens snapshot.json, mcp-access.json, the history files and vault folders it
-names, and the session logs under a folder it names. Never reads Sanduhr's settings, the
-Keychain or account names; never calls claude.ai or anything else on the network; never
-writes a file; never logs. No tool takes a path. Failures are typed results
-(status/reason/remedy), never protocol errors. Python 3.9 standard library only.
+Reads snapshot.json, mcp-access.json, the history files and vault folders it names, the
+session logs under a folder it names, Desk's messages.txt and desk-messages-state.json (the pin
+and rotation, written by Sanduhr). Desk messages are not gated by Share with Claude: they are on
+the desktop already, and a proposal only asks (Sanduhr checks it again and the user approves,
+unless they chose to let Claude change the messages directly). Never reads Sanduhr's settings,
+the Keychain or account names; never calls claude.ai or anything else on the network; never
+logs. The files it writes are desk-messages-request.json (propose_desk_messages) and
+theme-request.json (propose_theme), atomically and owner-only; it never writes messages.txt or a
+theme. No tool takes a path. Failures are typed results (status/reason/remedy), never protocol
+errors. Python 3.9 standard library only.
 
-publish_usage is dropped on the Mac (nothing leaves this Mac); propose_theme is not on Mac.
+publish_usage is dropped on the Mac (nothing leaves this Mac).
 """
 import hashlib
 import json
+import math
 import os
 import re
 import sys
+import time
+import uuid
 from datetime import datetime, timedelta, timezone
 
-SERVER_VERSION = "0.2.0-mac"
+SERVER_VERSION = "0.4.0-mac"
 PROTOCOL_VERSION = "2025-06-18"
 SCHEMA_VERSION = 1
 ACCESS_SCHEMA_VERSION = 1
@@ -92,6 +105,84 @@ REMEDY_NO_ACTIVITY = (
     "No account shares Claude Code activity from a folder Sanduhr reads. In " + SETTINGS_PLACE +
     ": link the account's Claude Code folder, set Claude Code activity to Live only or Keep a "
     "record, and Share with Claude to Meters and activity.")
+
+DESK_SYNTAX = (
+    "messages.txt syntax, one line each: a plain line shows on any day; 'Mon: text' only on that "
+    "weekday (Mon Tue Wed Thu Fri Sat Sun, exactly so); '10-31: text' only on that date (MM-DD); "
+    "'# text' is a comment and blank lines are ignored. The most specific pool that has lines wins "
+    "(today's date, else today's weekday, else the plain lines); within it Desk rotates once a day "
+    "or once an hour (rotate, the user's choice), steady in between. Pinning one line is a user "
+    "setting (pinned): while pinned the list is not shown, so say so before proposing. ")
+DESK_EFFECTS = (
+    "Effects: tags at the start of the text, after any prefix, in any order, each in braces: "
+    "{ink:#ff2a6d,#05d9e8} this line's ink, 1 to 4 hex colors (2 or more make a left-to-right "
+    "gradient); {glow} / {noglow} turn the soft glow on or off for this line; {size:1.3} scales "
+    "the line from 0.5 to 2 times the Desk's message size; {write} draws the line in, left to right "
+    "like handwriting, once when it first appears; {shimmer} sends a slow light sweep across it "
+    "every few seconds. Examples: '{ink:#ffd08a} showtime.', 'Fri: {ink:#ff2a6d,#05d9e8} {glow} "
+    "ship it.', '10-31: {ink:#ff7518,#6b2fa0} {write} happy halloween.', '{size:0.8} {noglow} "
+    "breathe.'. Good taste: short lines (handwriting reads best under about 40 characters, two "
+    "lines at most on screen), lowercase and a period suit the hand, {write} and {shimmer} "
+    "sparingly (a few lines, not every line), gradients with 2 or 3 colors that sit near each "
+    "other, sizes near 1. Reduce Motion shows {write} at once and skips {shimmer}. ")
+DESK_GUIDE_READ = (
+    "Read the user's Desk messages: the handwritten line Sanduhr draws on the macOS desktop, picked "
+    "from ~/Library/Application Support/Desk/messages.txt. Returns every raw line of the file "
+    "(comments and effects included), whether one line is pinned, the rotation (daily or hourly) "
+    "and today: the raw line the Desk shows now. Call this before propose_desk_messages to match "
+    "the user's voice and to avoid repeats. " + DESK_SYNTAX + DESK_EFFECTS)
+DESK_GUIDE_PROPOSE = (
+    "Suggest lines for the user's Desk messages. Sanduhr checks them and, unless the user lets "
+    "Claude change the messages directly, shows them as a suggestion to Add, Review or Dismiss: "
+    "pending_approval means the user decides, applied means they are in the list now, rejected "
+    "comes with reasons to fix. This server never writes messages.txt. Limits: 1 to 60 lines, "
+    "120 characters each, no control characters or line breaks inside a line, at least one line "
+    "that is not a comment; prefixes and effects must parse. mode add appends (default), replace "
+    "swaps the whole list (the user's previous list is kept as messages.txt.previous). Read the "
+    "current list first with get_desk_messages. " + DESK_SYNTAX + DESK_EFFECTS)
+
+THEME_GUIDE = (
+    "Give the Sanduhr widget a new color theme. Call when the user asks for a theme, a new look, or "
+    "colors from an image, a palette, or a vibe. The theme object uses the snake_case fields of "
+    "docs/themes/template.json. Required: name (1 to 24 characters; the theme strip shows about "
+    "12, so keep it short and Title Case) and fourteen colors, each '#rrggbb' (a hash and six hex "
+    "digits; no '#fff', no alpha): bg (window background, the darkest shade), glass (card fill), "
+    "glass_on_mica (the card as it sits over the desktop's blur, usually a touch darker than glass), "
+    "title_bg, footer_bg, border, bar_bg (the empty part of a bar), text, text_secondary, text_dim, "
+    "text_muted (one hue, each darker than the last), accent (the brand color: the top strip, the "
+    "readout's glow), sparkline (the history line, the accent's hue) and pace_marker (the tick that "
+    "says where usage should be by now). Optional: description (one line, up to 200 characters, "
+    "shown when the user hovers the theme in Settings; say what the look is), and the glass dials: "
+    "glass_alpha (0 to 1, readable at 0.7 to 0.9), border_alpha (0 to 1, 0.2 to 0.6 is subtle), "
+    "border_tint ('#rrggbb' in the accent's hue, or null for the plain border), accent_bloom "
+    "({blur: 0 to 20, alpha: 0 to 1}, 3 to 8 and 0.25 to 0.65 read well), inner_highlight "
+    "({color: '#rrggbb', alpha: 0.15 to 0.30} or null), card_corner_radius (0 to 24, default 10), "
+    "breath_period_ms (500 to 20000, the bar's slow breathing, default 2800), ghost_alpha (0 to 1, "
+    "the pace ghost tick), opts_out_of_mica (true makes the cards opaque; then set glass_alpha 1) "
+    "and monospace_font (any string gives monospaced numbers). What makes a good theme, measured "
+    "by the lint: a dark base (bg, glass and glass_on_mica luminance under 0.25: light glass does "
+    "not layer); text at 4.5:1 or better on the card (glass_on_mica at glass_alpha over a mid-gray "
+    "desktop) and text_secondary at 3:1; the text ramp one hue at decreasing luminance; one accent "
+    "hue shared by accent, sparkline and border_tint; a pace_marker distinct from the accent that "
+    "stands out on the green bar fill (#4ade80) and on bar_bg by brightness (1.4:1) or by hue (60 "
+    "degrees apart; a complementary hue works). The usage bars themselves stay green, yellow, "
+    "orange and red. On the Mac the widget can also wear the built-in Match Desk theme (no glass, "
+    "the Desk's own font and ink), and the Desk draws its meters in its own ink on the wallpaper "
+    "beside the widget: a theme whose accent and text sit well next to the user's Desk ink reads "
+    "as one desktop, and Match Desk itself cannot be replaced. A theme is checked here first: "
+    "status rejected with findings (level, field, message) means fix the named fields and call "
+    "again, nothing was written; warnings ride along with a theme that goes through. Then Sanduhr "
+    "asks the user, who sees a preview card with the description and chooses Save, Save and Apply "
+    "or Dismiss: pending_approval means the user decides (the result arrives later; do not "
+    "propose the same theme again). When the user lets Claude change themes directly, Sanduhr saves "
+    "it to its themes folder and applies it at once (apply: false saves without switching): "
+    "applied or saved, with key, previous_key (the theme in use before, so the user can go back) "
+    "and saved_path. A built-in's name (Obsidian, Aurora, Ember, Mint, 626 Labs, Matrix, Blueprint, "
+    "Match Desk) is refused: pick another name or pass save_as. A theme whose key is taken by a "
+    "different theme of the user's is saved under the next free key (ocean-2) and the result names "
+    "renamed_from; the user's own theme is never overwritten. queued means Sanduhr did not answer: "
+    "it is not running, and picks the request up within ten minutes. This server never writes a "
+    "theme itself.")
 
 READ_ONLY = {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False}
 NO_ARGS = {"type": "object", "properties": {}, "additionalProperties": False}
@@ -179,25 +270,96 @@ TOOLS = [
         "inputSchema": NO_ARGS,
         "annotations": READ_ONLY,
     },
+    {
+        "name": "get_desk_messages",
+        "description": DESK_GUIDE_READ,
+        "inputSchema": NO_ARGS,
+        "annotations": READ_ONLY,
+    },
+    {
+        "name": "propose_desk_messages",
+        "description": DESK_GUIDE_PROPOSE,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "lines": {"type": "array", "items": {"type": "string", "maxLength": 120},
+                          "minItems": 1, "maxItems": 60,
+                          "description": "The lines, exactly as they would sit in messages.txt (prefix first, then effects, then the text)."},
+                "mode": {"type": "string", "enum": ["add", "replace"],
+                         "description": "add appends the lines (lines already in the list are skipped); replace swaps the whole list for them (the comment block at the top of the file stays). Default add."},
+                "note": {"type": "string", "maxLength": 300,
+                         "description": "One short sentence for the user on why these lines (shown beside the suggestion)."},
+            },
+            "required": ["lines"],
+            "additionalProperties": False,
+        },
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False,
+                        "openWorldHint": False},
+    },
+    {
+        "name": "propose_theme",
+        "description": THEME_GUIDE,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "theme": {"type": "object",
+                          "description": "The theme JSON: name, the fourteen #rrggbb colors, optional description and dials (docs/themes/template.json)."},
+                "save_as": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,39}$",
+                            "description": "File key under the themes folder. Default: the name, slugged."},
+                "apply": {"type": "boolean", "description": "Apply after saving. Default true."},
+            },
+            "required": ["theme"],
+            "additionalProperties": False,
+        },
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False,
+                        "openWorldHint": False},
+    },
 ]
 TOOL_NAMES = [t["name"] for t in TOOLS]
+# The Desk messages handoff (item 54). The app mirrors these names (DeskMessageHandoff); a test on
+# each side pins them.
+DESK_REQUEST_FILE = "desk-messages-request.json"
+DESK_RESULT_FILE = "desk-messages-result.json"
+DESK_STATE_FILE = "desk-messages-state.json"
+DESK_MAX_LINES = 60
+DESK_MAX_LINE_CHARS = 120
+DESK_MAX_NOTE_CHARS = 300
+DESK_MAX_FILE_BYTES = 256 * 1024
+DESK_WAIT_SECONDS = 10.0
+DESK_POLL_SECONDS = 0.25
 TOOLS_NOT_ON_MAC = {
     "publish_usage": "dropped on Mac: nothing leaves this Mac",
-    "propose_theme": "not on Mac",
 }
+# The theme handoff (item 55): the Windows propose_theme's file names, mirrored by the app
+# (ThemeProposal); a test on each side pins them.
+THEME_REQUEST_FILE = "theme-request.json"
+THEME_RESULT_FILE = "theme-result.json"
+THEME_WAIT_SECONDS = 10.0
+THEME_MAX_BYTES = 16 * 1024
+# The widget's compiled-in themes (ThemeRegistry.builtIn): a proposal never takes their key.
+BUILT_IN_THEME_IDS = ["obsidian", "aurora", "ember", "mint", "626-labs", "matrix", "blueprint", "match-desk"]
 
 
 class Paths:
     """Where the server reads. SANDUHR_SUPPORT_DIR (tests, a test folder) moves everything;
     SANDUHR_SNAPSHOT moves the snapshot alone, as before."""
 
-    def __init__(self, support_dir=None, snapshot=None):
+    def __init__(self, support_dir=None, snapshot=None, desk_dir=None):
         self.support_dir = support_dir or os.environ.get("SANDUHR_SUPPORT_DIR") or os.path.expanduser(
             "~/Library/Application Support/Sanduhr")
         self.snapshot = snapshot or os.environ.get("SANDUHR_SNAPSHOT") or os.path.join(
             self.support_dir, "snapshot.json")
         self.access = os.path.join(self.support_dir, "mcp-access.json")
         self.vault = os.path.join(self.support_dir, "vault")
+        # Desk's folder sits beside Sanduhr's (Application Support/Desk), so a test folder moves
+        # it too and a test never reaches the real messages.txt.
+        self.desk_dir = desk_dir or os.path.join(os.path.dirname(os.path.abspath(self.support_dir)), "Desk")
+        self.messages = os.path.join(self.desk_dir, "messages.txt")
+        self.desk_state = os.path.join(self.support_dir, DESK_STATE_FILE)
+        self.desk_request = os.path.join(self.support_dir, DESK_REQUEST_FILE)
+        self.desk_result = os.path.join(self.support_dir, DESK_RESULT_FILE)
+        self.theme_request = os.path.join(self.support_dir, THEME_REQUEST_FILE)
+        self.theme_result = os.path.join(self.support_dir, THEME_RESULT_FILE)
 
     def history_file(self, name):
         return os.path.join(self.support_dir, name)
@@ -918,6 +1080,637 @@ def build_ping(now=None, paths=None):
     }
 
 
+# -- Desk messages (item 54) -------------------------------------------------------------------
+#
+# The same grammar as the app's MessageEngine and MessageMarkup (Desk/Message.swift,
+# Desk/MessageEffects.swift). The app is the authority: it checks every request again before
+# anything reaches messages.txt.
+
+WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+WEEKDAY_LOOKALIKES = {w.lower() for w in WEEKDAYS} | {
+    "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
+    "tues", "thur", "thurs"}
+DATE_TAG_RE = re.compile(r"^\d{2}-\d{2}$")
+DATE_LIKE_RE = re.compile(r"^\d{1,2}-\d{1,2}$")
+HEX_RE = re.compile(r"^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+SIZE_RE = re.compile(r"^\d+(?:\.\d+)?$")
+EFFECT_NAMES = "ink, glow, noglow, size, write, shimmer"
+DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+ROTATIONS = ("daily", "hourly")
+
+
+def is_control(c):
+    o = ord(c)
+    return o < 0x20 or 0x7F <= o <= 0x9F or o in (0x2028, 0x2029)
+
+
+def split_prefix(line):
+    """(kind, tag, body) for a stripped message line: kind is "date", "weekday" or "plain".
+    A line whose first colon follows something that is neither a date nor a weekday is plain."""
+    colon = line.find(":")
+    if colon >= 0:
+        tag = line[:colon].strip()
+        body = line[colon + 1:].strip()
+        if DATE_TAG_RE.match(tag):
+            return "date", tag, body
+        if tag in WEEKDAYS:
+            return "weekday", tag, body
+    return "plain", None, line
+
+
+def parse_effect(tag):
+    """(name, value) for one tag's inside, or an error string."""
+    name, sep, value = tag.partition(":")
+    name = name.strip().lower()
+    value = value.strip()
+    if name in ("glow", "noglow", "write", "shimmer"):
+        if sep:
+            return "{%s} takes no value" % name
+        return name, None
+    if name == "ink":
+        colors = [c.strip() for c in value.split(",")] if sep else []
+        if not colors or any(not c for c in colors):
+            return "{ink:...} needs 1 to 4 hex colors, like {ink:#ff2a6d,#05d9e8}"
+        if len(colors) > 4:
+            return "{ink:...} takes at most 4 colors"
+        bad = [c for c in colors if not HEX_RE.match(c)]
+        if bad:
+            return "{ink:...} has a color that is not hex (#rgb or #rrggbb)"
+        return name, colors
+    if name == "size":
+        if not sep or not SIZE_RE.match(value) or not 0.5 <= float(value) <= 2:
+            return "{size:...} needs a number from 0.5 to 2, like {size:1.3}"
+        return name, float(value)
+    return "unknown effect {%s}; known: %s" % (name[:20], EFFECT_NAMES)
+
+
+def parse_effects(body):
+    """(effects, text, error): the tags at the start of body, strictly. error is None when every
+    tag parsed and some text follows."""
+    effects = {}
+    rest = body.lstrip()
+    while rest.startswith("{"):
+        end = rest.find("}")
+        if end < 0:
+            return effects, rest, "an effect tag is not closed with }"
+        parsed = parse_effect(rest[1:end])
+        if isinstance(parsed, str):
+            return effects, rest, parsed
+        name, value = parsed
+        if name in ("glow", "noglow"):
+            effects["glow"] = name == "glow"
+        else:
+            effects[name] = True if value is None else value
+        rest = rest[end + 1:].lstrip()
+    if not rest:
+        return effects, rest, "the line has effects but no text"
+    return effects, rest, None
+
+
+def check_desk_line(line):
+    """None for a good line, else why not (the line number is added by the caller)."""
+    if not isinstance(line, str):
+        return "is not a string"
+    try:
+        line.encode("utf-8")
+    except UnicodeEncodeError:
+        return "is not valid UTF-8"
+    if any(is_control(c) for c in line):
+        return "has a control character or a line break"
+    text = line.strip()
+    if len(text) > DESK_MAX_LINE_CHARS:
+        return "is %d characters; the limit is %d" % (len(text), DESK_MAX_LINE_CHARS)
+    if not text or text.startswith("#"):
+        return None
+    colon = text.find(":")
+    if colon >= 0:
+        tag = text[:colon].strip()
+        if DATE_LIKE_RE.match(tag):
+            month, day = (int(x) for x in tag.split("-"))
+            if not DATE_TAG_RE.match(tag) or not 1 <= month <= 12 or not 1 <= day <= DAYS_IN_MONTH[month - 1]:
+                return "starts with '%s:', which is not a date; write MM-DD, like 10-31" % tag
+        elif tag.lower() in WEEKDAY_LOOKALIKES and tag not in WEEKDAYS:
+            return "starts with '%s:'; write the day as Mon, Tue, Wed, Thu, Fri, Sat or Sun" % tag[:12]
+    kind, _, body = split_prefix(text)
+    if kind != "plain" and not body:
+        return "has a prefix but no text"
+    _, _, error = parse_effects(body)
+    return error
+
+
+def is_message_line(line):
+    text = line.strip() if isinstance(line, str) else ""
+    return bool(text) and not text.startswith("#")
+
+
+def validate_desk_lines(lines):
+    """The reasons a proposal is refused, [] when it may go to the app."""
+    if not isinstance(lines, list) or not lines:
+        return ["lines must be a list of 1 to %d strings" % DESK_MAX_LINES]
+    reasons = []
+    if len(lines) > DESK_MAX_LINES:
+        reasons.append("%d lines; the limit is %d" % (len(lines), DESK_MAX_LINES))
+    for i, line in enumerate(lines[:DESK_MAX_LINES * 2], 1):
+        why = check_desk_line(line)
+        if why:
+            reasons.append("line %d %s" % (i, why))
+    if not reasons and not any(is_message_line(x) for x in lines):
+        reasons.append("no message line: every line is blank or a # comment")
+    return reasons[:20]
+
+
+def pick_desk_line(text, now, hourly):
+    """MessageEngine.pick: the line Desk shows at `now` (local time), raw, or None."""
+    today = now.strftime("%m-%d")
+    weekday = WEEKDAYS[(now.isoweekday()) % 7]
+    dated, daily, plain = [], [], []
+    for raw in text.splitlines():
+        line = raw.strip(" \t")
+        if not line or line.startswith("#"):
+            continue
+        kind, tag, body = split_prefix(line)
+        if kind == "date":
+            if tag == today and body:
+                dated.append(body)
+            continue
+        if kind == "weekday":
+            if tag == weekday and body:
+                daily.append(body)
+            continue
+        plain.append(line)
+    pool = dated or daily or plain
+    if not pool:
+        return None
+    day_index = now.date().toordinal()
+    slot = day_index * 24 + now.hour if hourly else day_index
+    return pool[slot % len(pool)]
+
+
+def read_desk_state(paths):
+    """The app's note of the user's settings (pinned, rotation), or the defaults."""
+    doc = read_json(paths.desk_state)
+    state = {"known": False, "pinned": False, "pinned_line": None, "rotate": "daily"}
+    if isinstance(doc, dict) and doc.get("schema_version") == 1:
+        state["known"] = True
+        state["pinned"] = doc.get("pinned") is True
+        line = doc.get("pinned_line")
+        state["pinned_line"] = line if state["pinned"] and isinstance(line, str) else None
+        if doc.get("rotate") in ROTATIONS:
+            state["rotate"] = doc["rotate"]
+    return state
+
+
+def build_desk_messages(now=None, paths=None):
+    now = now or datetime.now(timezone.utc)
+    paths = paths or Paths()
+    state = read_desk_state(paths)
+    out = {"status": "ok", "file_found": False, "lines": [], "pinned": state["pinned"],
+           "rotate": state["rotate"], "today": None,
+           "limits": {"lines_per_proposal": DESK_MAX_LINES, "characters_per_line": DESK_MAX_LINE_CHARS}}
+    if not state["known"]:
+        out["settings_note"] = "Sanduhr has not reported the pin and rotation yet; shown as the defaults."
+    try:
+        with open(paths.messages, "rb") as f:
+            data = f.read(DESK_MAX_FILE_BYTES + 1)
+    except FileNotFoundError:
+        out["today"] = state["pinned_line"]
+        return out
+    except OSError:
+        return no_data("unreadable", "Desk's messages.txt could not be read.")
+    if len(data) > DESK_MAX_FILE_BYTES:
+        return no_data("too_large", "Desk's messages.txt is larger than 256 KB; it is not read.")
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        return no_data("not_utf8", "Desk's messages.txt is not UTF-8; it is not read.")
+    lines = text.splitlines()
+    while lines and not lines[-1].strip():
+        lines.pop()
+    out["file_found"] = True
+    out["lines"] = lines
+    if state["pinned"]:
+        out["today"] = state["pinned_line"]
+    else:
+        local = now.astimezone()
+        out["today"] = pick_desk_line(text, local, state["rotate"] == "hourly")
+    return out
+
+
+def read_desk_result(path, request_id):
+    doc = read_json(path)
+    if isinstance(doc, dict) and doc.get("id") == request_id and isinstance(doc.get("result"), dict):
+        return doc["result"]
+    return None
+
+
+def build_propose_desk_messages(args, now=None, paths=None, wait=DESK_WAIT_SECONDS, poll=DESK_POLL_SECONDS,
+                                sleep=time.sleep, clock=time.monotonic):
+    """Checks the lines here (instant refusals, no file written), then hands a clean proposal to
+    the app through desk-messages-request.json and waits briefly for its answer. Never writes
+    messages.txt."""
+    now = now or datetime.now(timezone.utc)
+    paths = paths or Paths()
+    args = args if isinstance(args, dict) else {}
+    unknown = sorted(k for k in args if k not in ("lines", "mode", "note"))
+    mode = args.get("mode", "add")
+    note = args.get("note")
+    reasons = []
+    if unknown:
+        reasons.append("unknown argument(s): " + ", ".join(k[:20] for k in unknown[:5]))
+    if mode not in ("add", "replace"):
+        reasons.append("mode must be add or replace")
+    if note is not None:
+        if not isinstance(note, str):
+            reasons.append("note must be a string")
+        elif len(note) > DESK_MAX_NOTE_CHARS or any(is_control(c) for c in note):
+            reasons.append("note must be one line of at most %d characters" % DESK_MAX_NOTE_CHARS)
+        else:
+            try:
+                note.encode("utf-8")
+            except UnicodeEncodeError:
+                reasons.append("note is not valid UTF-8")
+    reasons += validate_desk_lines(args.get("lines"))
+    if reasons:
+        return {"status": "rejected", "reasons": reasons}
+
+    request_id = uuid.uuid4().hex
+    request = {"schema_version": 1, "id": request_id, "requested_at": iso_o(now),
+               "lines": [x.strip() for x in args["lines"]], "mode": mode,
+               "note": note.strip() if isinstance(note, str) and note.strip() else None}
+    try:
+        os.makedirs(paths.support_dir, mode=0o700, exist_ok=True)
+        tmp = paths.desk_request + ".tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(request, f, ensure_ascii=False)
+        os.replace(tmp, paths.desk_request)   # atomic: the app never reads half a file
+    except OSError as e:
+        return {"status": "error", "reason": "request_write_failed",
+                "remedy": "Could not queue the request (%s)." % type(e).__name__}
+
+    deadline = clock() + wait
+    while True:
+        res = read_desk_result(paths.desk_result, request_id)
+        if res is not None:
+            out = {k: res[k] for k in ("status", "reasons", "lines_added", "lines_skipped", "mode") if k in res}
+            out["request_id"] = request_id
+            return out
+        if clock() >= deadline:
+            break
+        sleep(poll)
+    return {"status": "queued", "reason": "app_not_responding", "request_id": request_id,
+            "remedy": "Sanduhr did not answer within %d seconds. Start Sanduhr: it picks the request up "
+                      "within ten minutes of when it was made and shows it as a suggestion." % int(wait)}
+
+
+# -- propose_theme (item 55) -------------------------------------------------------------------
+#
+# A port of the Windows ThemeLint (windows-dotnet/src/Sanduhr.Core/ThemeLint.cs): the same rules,
+# thresholds and wording, plus the Mac's own fields (description, ghost_alpha, monospace_font) and
+# a type check on opts_out_of_mica. The app runs the same lint again (Services/ThemeLint.swift) and
+# is the authority.
+
+THEME_MAX_NAME = 24
+THEME_MAX_DESCRIPTION = 200
+THEME_DARK_BASE_MAX_LUMINANCE = 0.25
+THEME_TEXT_CONTRAST_MIN = 4.5
+THEME_TEXT_SECONDARY_CONTRAST_MIN = 3.0
+THEME_PACE_MARKER_CONTRAST_MIN = 1.4
+THEME_PACE_MARKER_HUE_MIN = 60
+THEME_HUE_TOLERANCE = 30
+THEME_HUE_SATURATION_FLOOR = 0.15
+THEME_DESKTOP = (0x80 / 255.0, 0x80 / 255.0, 0x80 / 255.0)
+THEME_BAR_FILL_GREEN = "#4ade80"
+THEME_COLOR_FIELDS = [
+    "bg", "glass", "glass_on_mica", "title_bg", "border",
+    "text", "text_secondary", "text_dim", "text_muted",
+    "accent", "bar_bg", "footer_bg", "pace_marker", "sparkline",
+]
+THEME_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
+HEX6_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def theme_hex(s):
+    """'#rrggbb' to (r, g, b) in 0..1, or None."""
+    if not isinstance(s, str) or not HEX6_RE.match(s):
+        return None
+    return tuple(int(s[i:i + 2], 16) / 255.0 for i in (1, 3, 5))
+
+
+def luminance(c):
+    def lin(v):
+        return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+    return 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2])
+
+
+def contrast(l1, l2):
+    hi, lo = max(l1, l2), min(l1, l2)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def composite(top, alpha, under):
+    alpha = min(1.0, max(0.0, alpha))
+    return tuple(t * alpha + u * (1 - alpha) for t, u in zip(top, under))
+
+
+def saturation(c):
+    mx, mn = max(c), min(c)
+    return 0.0 if mx <= 0 else (mx - mn) / mx
+
+
+def hue(c):
+    r, g, b = c
+    mx, mn = max(c), min(c)
+    d = mx - mn
+    if d <= 0:
+        return 0.0
+    if mx == r:
+        h = math.fmod((g - b) / d, 6)
+    elif mx == g:
+        h = (b - r) / d + 2
+    else:
+        h = (r - g) / d + 4
+    h *= 60
+    return h + 360 if h < 0 else h
+
+
+def hue_distance(a, b):
+    """Degrees between two hues, or None when either color is too gray to have one."""
+    if saturation(a) < THEME_HUE_SATURATION_FLOOR or saturation(b) < THEME_HUE_SATURATION_FLOOR:
+        return None
+    d = abs(hue(a) - hue(b)) % 360
+    return 360 - d if d > 180 else d
+
+
+def fmt(v, places):
+    """.NET's '0.0' / '0.00': fixed places, half away from zero."""
+    q = 10 ** places
+    r = math.floor(abs(v) * q + 0.5) / q
+    return "%s%.*f" % ("-" if v < 0 and r else "", places, r)
+
+
+def fmt_trim(v, places):
+    """.NET's '0.##' / '0.###': up to `places`, trailing zeros dropped."""
+    t = fmt(v, places)
+    if "." in t:
+        t = t.rstrip("0").rstrip(".")
+    return t
+
+
+def describe_json(v):
+    if v is None:
+        return "null"
+    if isinstance(v, str):
+        return '"%s"' % v
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, dict):
+        return "an object"
+    if isinstance(v, list):
+        return "an array"
+    return json.dumps(v)
+
+
+def is_number(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def lint_theme(data):
+    """Findings for a theme dict: [{level, field, message}]. Errors block it; warnings ride along."""
+    findings = []
+
+    def err(field, message):
+        findings.append({"level": "error", "field": field, "message": message})
+
+    def warn(field, message):
+        findings.append({"level": "warning", "field": field, "message": message})
+
+    def check_range(o, key, lo, hi, fallback, label=None):
+        label = label or key
+        if key not in o or o[key] is None:
+            return fallback
+        v = o[key]
+        if not is_number(v):
+            err(label, "%s must be a number between %s and %s, got %s." % (label, fmt_trim(lo, 2), fmt_trim(hi, 2), describe_json(v)))
+            return fallback
+        if v != v or v < lo or v > hi:
+            err(label, "%s must be between %s and %s, got %s." % (label, fmt_trim(lo, 2), fmt_trim(hi, 2), fmt_trim(v, 3)))
+            return fallback
+        return float(v)
+
+    def check_optional_hex(o, key, label=None):
+        label = label or key
+        if key not in o or o[key] is None:
+            return
+        if theme_hex(o[key]) is None:
+            err(label, "%s must be a #rrggbb color or null, got %s." % (label, describe_json(o[key])))
+
+    if not isinstance(data, dict):
+        return [{"level": "error", "field": "json", "message": "Theme JSON must be an object."}]
+
+    name = data.get("name")
+    if not isinstance(name, str):
+        err("name", "name is required (1 to 12 characters, Title Case).")
+    elif not name.strip():
+        err("name", "name must not be empty.")
+    elif len(name) > THEME_MAX_NAME:
+        err("name", "name is %d characters; the strip shows 12, %d is the limit." % (len(name), THEME_MAX_NAME))
+    elif any(is_control(c) for c in name):
+        err("name", "name must be one line with no control characters.")
+
+    colors = {}
+    for field in THEME_COLOR_FIELDS:
+        if field not in data or data[field] is None:
+            err(field, "%s is required (a #rrggbb color)." % field)
+            continue
+        rgb = theme_hex(data[field])
+        if rgb is None:
+            err(field, "%s must be a #rrggbb color (six hex digits), got %s." % (field, describe_json(data[field])))
+            continue
+        colors[field] = rgb
+
+    glass_alpha = check_range(data, "glass_alpha", 0, 1, 0.80)
+    check_range(data, "border_alpha", 0, 1, 0.40)
+    check_optional_hex(data, "border_tint")
+    if data.get("accent_bloom") is not None:
+        ab = data["accent_bloom"]
+        if isinstance(ab, dict):
+            check_range(ab, "blur", 0, 20, 4, "accent_bloom.blur")
+            check_range(ab, "alpha", 0, 1, 0.45, "accent_bloom.alpha")
+        else:
+            err("accent_bloom", 'accent_bloom must be an object {"blur": 3-8, "alpha": 0.25-0.65}.')
+    if data.get("inner_highlight") is not None:
+        ih = data["inner_highlight"]
+        if isinstance(ih, dict):
+            if ih.get("color") is None:
+                err("inner_highlight.color", "inner_highlight needs a color (#rrggbb) or the whole field set to null.")
+            else:
+                check_optional_hex(ih, "color", "inner_highlight.color")
+            check_range(ih, "alpha", 0, 1, 0.20, "inner_highlight.alpha")
+        else:
+            err("inner_highlight", 'inner_highlight must be {"color": "#rrggbb", "alpha": 0.15-0.30} or null.')
+    check_range(data, "card_corner_radius", 0, 24, 10)
+    check_range(data, "breath_period_ms", 500, 20000, 4000)
+    # The Mac's own fields.
+    check_range(data, "ghost_alpha", 0, 1, 1.0)
+    desc = data.get("description")
+    if desc is not None:
+        if not isinstance(desc, str) or len(desc) > THEME_MAX_DESCRIPTION or any(is_control(c) for c in desc):
+            err("description", "description must be one line of at most %d characters, or null." % THEME_MAX_DESCRIPTION)
+    mono = data.get("monospace_font")
+    if mono is not None and not isinstance(mono, str):
+        err("monospace_font", "monospace_font must be a string (any value turns on monospaced numbers) or null.")
+    oom = data.get("opts_out_of_mica")
+    if oom is not None and not isinstance(oom, bool):
+        err("opts_out_of_mica", "opts_out_of_mica must be true or false, got %s." % describe_json(oom))
+    opts_out = oom is True
+
+    if any(f["level"] == "error" for f in findings):
+        return findings
+
+    for field in ("bg", "glass", "glass_on_mica"):
+        lum = luminance(colors[field])
+        if lum > THEME_DARK_BASE_MAX_LUMINANCE:
+            warn(field, "%s is light (luminance %s, keep it under %s); translucent glass layering does not work on light surfaces."
+                 % (field, fmt(lum, 2), fmt(THEME_DARK_BASE_MAX_LUMINANCE, 2)))
+
+    card = composite(colors["glass_on_mica"], 1.0 if opts_out else glass_alpha, THEME_DESKTOP)
+    card_l = luminance(card)
+    ratio = contrast(luminance(colors["text"]), card_l)
+    if ratio < THEME_TEXT_CONTRAST_MIN:
+        warn("text", "text reads at %s:1 on the card (needs %s:1); pick a brighter text or a darker glass_on_mica."
+             % (fmt(ratio, 1), fmt(THEME_TEXT_CONTRAST_MIN, 1)))
+    ratio2 = contrast(luminance(colors["text_secondary"]), card_l)
+    if ratio2 < THEME_TEXT_SECONDARY_CONTRAST_MIN:
+        warn("text_secondary", "text_secondary reads at %s:1 on the card (needs %s:1)."
+             % (fmt(ratio2, 1), fmt(THEME_TEXT_SECONDARY_CONTRAST_MIN, 1)))
+
+    ramp = ["text", "text_secondary", "text_dim", "text_muted"]
+    for i in range(1, len(ramp)):
+        if luminance(colors[ramp[i]]) >= luminance(colors[ramp[i - 1]]):
+            warn(ramp[i], "%s is not darker than %s; the text ramp is one hue at decreasing luminance." % (ramp[i], ramp[i - 1]))
+    for i in range(1, len(ramp)):
+        d = hue_distance(colors["text"], colors[ramp[i]])
+        if d is not None and d > THEME_HUE_TOLERANCE:
+            warn(ramp[i], "%s is a different hue from text (%s degrees apart); keep the ramp monochrome." % (ramp[i], fmt(d, 0)))
+
+    green = theme_hex(THEME_BAR_FILL_GREEN)
+    marker = colors["pace_marker"]
+    hidden_green = (contrast(luminance(marker), luminance(green)) < THEME_PACE_MARKER_CONTRAST_MIN
+                    and (hue_distance(marker, green) or 0) < THEME_PACE_MARKER_HUE_MIN)
+    hidden_bar = (contrast(luminance(marker), luminance(colors["bar_bg"])) < THEME_PACE_MARKER_CONTRAST_MIN
+                  and (hue_distance(marker, colors["bar_bg"]) or 0) < THEME_PACE_MARKER_HUE_MIN)
+    if hidden_green or hidden_bar:
+        warn("pace_marker", "pace_marker disappears on the %s; it should stand out on every fill by brightness or by a complementary hue."
+             % ("green bar fill" if hidden_green else "empty bar"))
+
+    sd = hue_distance(colors["accent"], colors["sparkline"])
+    if sd is not None and sd > THEME_HUE_TOLERANCE:
+        warn("sparkline", "sparkline is a different hue from accent (%s degrees apart); one accent hue reads as one brand." % fmt(sd, 0))
+    tint = theme_hex(data.get("border_tint"))
+    if tint is not None:
+        td = hue_distance(colors["accent"], tint)
+        if td is not None and td > THEME_HUE_TOLERANCE:
+            warn("border_tint", "border_tint is a different hue from accent (%s degrees apart); tint borders with the accent or leave it null." % fmt(td, 0))
+
+    if opts_out and glass_alpha < 1.0:
+        warn("glass_alpha", "opts_out_of_mica is true, so set glass_alpha to 1.0; cards render translucent on non-Mica fallbacks otherwise.")
+    return findings
+
+
+def theme_slug(name):
+    """Display name to file key (ThemeHandoff.Slugify): lowercase ASCII letters and digits, runs of
+    anything else one hyphen, at most 40; 'theme' when nothing survives."""
+    out = []
+    pending = False
+    for c in name.strip().lower():
+        if ("a" <= c <= "z") or ("0" <= c <= "9"):
+            if pending and out:
+                out.append("-")
+            pending = False
+            out.append(c)
+        else:
+            pending = True
+    s = "".join(out)
+    if len(s) > 40:
+        s = s[:40].rstrip("-")
+    return s or "theme"
+
+
+THEME_RESULT_FIELDS = ("status", "reason", "remedy", "key", "name", "previous_key", "saved_path",
+                       "renamed_from", "findings")
+
+
+def theme_refusal(reason, remedy, findings=None):
+    out = {"status": "rejected", "reason": reason, "remedy": remedy}
+    if findings is not None:
+        out["findings"] = findings
+    return out
+
+
+def build_propose_theme(args, now=None, paths=None, wait=THEME_WAIT_SECONDS, poll=DESK_POLL_SECONDS,
+                        sleep=time.sleep, clock=time.monotonic):
+    """Lints the theme here (an instant refusal writes nothing), then hands it to the app through
+    theme-request.json and waits briefly for theme-result.json. Never writes a theme."""
+    now = now or datetime.now(timezone.utc)
+    paths = paths or Paths()
+    args = args if isinstance(args, dict) else {}
+    unknown = sorted(k for k in args if k not in ("theme", "save_as", "apply"))
+    if unknown:
+        return theme_refusal("invalid_params", "Unknown argument(s): " + ", ".join(k[:20] for k in unknown[:5]) +
+                             ". propose_theme takes theme, save_as and apply.")
+    theme = args.get("theme")
+    if not isinstance(theme, dict):
+        return theme_refusal("invalid_params", "theme must be an object: the theme JSON per docs/themes/template.json.")
+    save_as = args.get("save_as")
+    if save_as is not None and (not isinstance(save_as, str) or not THEME_KEY_RE.match(save_as)):
+        return theme_refusal("invalid_params", "save_as must be 1-40 lowercase letters, digits or hyphens, not starting "
+                                               "with a hyphen (omit it to slug the name).")
+    apply = args.get("apply", True)
+    if not isinstance(apply, bool):
+        return theme_refusal("invalid_params", "apply must be true or false.")
+    if len(json.dumps(theme, ensure_ascii=False).encode("utf-8")) > THEME_MAX_BYTES:
+        return theme_refusal("invalid_params", "theme is larger than %d KB; send only the theme's fields." % (THEME_MAX_BYTES // 1024))
+
+    findings = lint_theme(theme)
+    if any(f["level"] == "error" for f in findings):
+        return theme_refusal("invalid_theme", "Fix the fields named in findings and call again.", findings)
+    key = save_as or theme_slug(theme["name"])
+    if key in BUILT_IN_THEME_IDS:
+        return theme_refusal("reserved_name", "'%s' is a built-in theme; pick another name or pass save_as." % key, findings)
+
+    request_id = uuid.uuid4().hex
+    request = {"schema_version": 1, "id": request_id, "requested_at": iso_o(now), "theme": theme,
+               "save_as": save_as, "apply": apply}
+    try:
+        os.makedirs(paths.support_dir, mode=0o700, exist_ok=True)
+        tmp = paths.theme_request + ".tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(request, f, ensure_ascii=False)
+        os.replace(tmp, paths.theme_request)   # atomic: the app never reads half a file
+    except OSError as e:
+        return {"status": "error", "reason": "request_write_failed",
+                "remedy": "Could not queue the request (%s)." % type(e).__name__}
+
+    deadline = clock() + wait
+    while True:
+        res = read_desk_result(paths.theme_result, request_id)
+        if res is not None:
+            out = {k: res[k] for k in THEME_RESULT_FIELDS if k in res}
+            out["request_id"] = request_id
+            if "findings" not in out:
+                out["findings"] = findings
+            return out
+        if clock() >= deadline:
+            break
+        sleep(poll)
+    return {"status": "queued", "reason": "app_not_responding", "request_id": request_id, "name": theme["name"],
+            "findings": findings,
+            "remedy": "Sanduhr did not answer within %d seconds. Start Sanduhr: it picks the request up within "
+                      "ten minutes of when it was made." % int(wait)}
+
+
 # -- protocol ----------------------------------------------------------------------------
 
 def write(frame):
@@ -948,6 +1741,12 @@ def call_tool(name, args):
         return build_history(window_arg(args, 30))
     if name == "ping":
         return build_ping()
+    if name == "get_desk_messages":
+        return build_desk_messages()
+    if name == "propose_desk_messages":
+        return build_propose_desk_messages(args)
+    if name == "propose_theme":
+        return build_propose_theme(args)
     return None
 
 

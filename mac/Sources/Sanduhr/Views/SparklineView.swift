@@ -12,7 +12,7 @@ struct SparklineView: View {
     let color: Color
     var mode: Mode = .horizon
 
-    enum Mode { case line, horizon }
+    enum Mode { case line, horizon, level }
 
     /// Match Desk draws the line: with no card behind it, a horizon chart of a meter that sat high
     /// reads as a solid block of the ink. Every other theme keeps the horizon chart.
@@ -20,12 +20,24 @@ struct SparklineView: View {
         themeID == DeskThemeMapping.id ? .line : .horizon
     }
 
+    /// Readings within this many percentage points of each other count as steady.
+    static let steadySpread: Double = 2
+
+    /// What actually draws. A horizon chart fills each column up to its value, so a meter that sat
+    /// still near the top drew a solid slab (the weekly limit at 96% for days, 2026-10-04): with
+    /// nothing to compare, steady readings draw a thin line at their level instead.
+    static func drawn(_ mode: Mode, values: [Double]) -> Mode {
+        guard mode == .horizon, let mn = values.min(), let mx = values.max() else { return mode }
+        return mx - mn < steadySpread ? .level : mode
+    }
+
     var body: some View {
         Canvas { ctx, size in
             guard values.count >= 2, size.width > 10, size.height > 4 else { return }
-            switch mode {
+            switch Self.drawn(mode, values: values) {
             case .line:    paintLine(ctx: ctx, size: size)
             case .horizon: paintHorizon(ctx: ctx, size: size)
+            case .level:   paintLevel(ctx: ctx, size: size)
             }
         }
     }
@@ -57,6 +69,22 @@ struct SparklineView: View {
         ctx.stroke(path,
                    with: .color(color),
                    style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+    }
+
+    // MARK: - Level (steady readings)
+
+    /// A thin line across the width at the readings' level on the same 0–100 scale as the horizon
+    /// chart, with a soft wash under it so it still reads as the chart's family.
+    private func paintLevel(ctx: GraphicsContext, size: CGSize) {
+        let level = min(100, max(0, values.reduce(0, +) / Double(values.count)))
+        let y = size.height - CGFloat(level / 100) * (size.height - 2) - 1
+        var wash = Path()
+        wash.addRect(CGRect(x: 0, y: y, width: size.width, height: size.height - y))
+        ctx.fill(wash, with: .color(color.opacity(0.12)))
+        var line = Path()
+        line.move(to: CGPoint(x: 0, y: y))
+        line.addLine(to: CGPoint(x: size.width, y: y))
+        ctx.stroke(line, with: .color(color.opacity(0.85)), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
     }
 
     // MARK: - Horizon mode (4-band Heer/Tufte chart)

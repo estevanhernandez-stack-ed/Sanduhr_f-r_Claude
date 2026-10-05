@@ -13,8 +13,9 @@ struct DeskLook: Equatable {
     var ink: String = "ffffff"
     var shadow: Bool = true
 
-    static func read(_ defaults: DefaultsStore) -> DeskLook {
-        DeskLook(font: defaults.object(forKey: fontKey) as? String ?? "",
+    /// The font as the Desk draws it (DeskFont: EsteFont 26 unless one was picked and is installed).
+    static func read(_ defaults: DefaultsStore, available: (String) -> Bool = DeskFont.isAvailable) -> DeskLook {
+        DeskLook(font: DeskFont.resolve(defaults, available: available),
                  ink: defaults.object(forKey: inkKey) as? String ?? "ffffff",
                  shadow: defaults.object(forKey: shadowKey) as? Bool ?? true)
     }

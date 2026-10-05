@@ -48,7 +48,7 @@ Fresh-install and migration checks stay manual.
 
 - [ ] Cards fill in after the first fetch (sign in via Settings, Accounts if the key is gone).
 - [ ] Left-click the menu bar hourglass hides the widget; again shows it. Hidden survives a relaunch.
-- [ ] Right-click opens the status menu: Hide (or Show) Widget; Tools: Deep Work, Pacing Calculators, Cooldown Snake; Refresh, Settings…, Check for Updates…; Quit Sanduhr für Claude. Two-finger click on the widget lists the same items in the same order (always Hide Widget there). Check for Updates… from the widget's menu opens Sparkle's check.
+- [ ] Right-click opens the status menu: Hide (or Show) Widget; Tools: Deep Work, Pacing Calculators, Cooldown Snake; Refresh, Settings…, Check for Updates…, What's New…; Quit Sanduhr für Claude. Two-finger click on the widget lists the same items in the same order (always Hide Widget there). Check for Updates… from the widget's menu opens Sparkle's check.
 - [ ] Refresh updates the footer time; `~/Library/Application Support/Sanduhr/snapshot.json` has a new `captured_at`.
 - [ ] Gear on the widget opens Sanduhr Settings. Widget, Look: pick a font and subtle mode, the widget changes as you pick. Themes: Reload lists the installed user themes. Switch a theme on the widget's strip, toggle compact (panel resizes, top edge stays put), open the focus timer and close it.
 - [ ] Warning bars: Settings, Desk, Meters, drop the weekly "At" slider below its percent with a "more than" shorter than its reset. The widget's weekly card turns red at once (bar and percent) with a steady glow in the theme's accent around the bar and a warning triangle before the percent in the theme's text color, and the Desk meter does the same in the Desk ink (triangle included); with VoiceOver on, the warning card and meter read "<n>%, nearly full", the others just the percent; the session card stays as it was. Pick Match Desk: the widget's glow takes the Desk ink. Turn the weekly "Warn when nearly full" off: both go back at once. Put the settings back (weekly: on, 90%, 1 day) and the theme you had.
@@ -440,8 +440,8 @@ Support/Sanduhr/mcp-access.json`.
 
 - [ ] Share Off on every account: `jq . "$F"` shows `"accounts": []`. `get_usage` answers
   `no_data` / `not_shared` with a remedy naming Settings > Accounts > Data; `ping` shows
-  `sharing.access_file: "ok"`, `accounts_shared: 0`, `tools_available` with five tools and
-  `tools_not_on_mac` naming `publish_usage` and `propose_theme`.
+  `sharing.access_file: "ok"`, `accounts_shared: 0`, `tools_available` with eight tools and
+  `tools_not_on_mac` naming `publish_usage`.
 - [ ] Meters on the active account: the file lists it with `share: "meters"`, its
   `account_ref` (as in `snapshot.json`), `history_file`, and no `names`, `vault_id` or
   `live_folder`; `ls -l "$F"` shows `-rw-------`. `get_usage` shows the widget's percentages
@@ -550,7 +550,7 @@ S=~/Library/Application\ Support/Sanduhr/integrations
   `diff /tmp/st-claude.json ~/.claude-smoketest/.claude.json.sanduhr-backup` is empty; `ls -l
   "$S"` shows `current -> <12 hex>` and that folder holds both scripts.
 - [ ] `CLAUDE_CONFIG_DIR=~/.claude-smoketest claude` then `/mcp`: sanduhr is connected; "call
-  the sanduhr ping tool" answers with `0.2.0-mac`.
+  the sanduhr ping tool" answers with `0.3.0-mac`.
 - [ ] Statusline, Install…: the sheet shows `echo mine` as the statusline it would replace;
   Not Now changes nothing (`diff /tmp/st-settings.json ~/.claude-smoketest/settings.json`
   is empty). Replace and Install: Installed; `"model"` is still there; the Claude Code session
@@ -675,3 +675,273 @@ cp ~/.claude-smoketest/settings.json /tmp/st-hooks.json
 - [ ] `state.yaml` shows `hooks_installed` with the count, `glow_claude_waiting` and
   `glow_claude_done`, and no path. Clean up: Remove, then `rm -f /tmp/st-hooks.json` (and
   `rm -rf ~/.claude-smoketest` once the other sections are done).
+
+## 23. Now playing (items 53, 53b)
+
+Desk on. Have YouTube Music open in Chrome (or Safari) and Music with a song queued; start and stop
+playback yourself. Never put titles in a bug report: `state.yaml` carries only flags.
+
+- [ ] `lipo -archs mac/Sanduhr.app/Contents/Frameworks/MediaRemoteAdapter.framework/Versions/A/MediaRemoteAdapter`
+  and `lipo -archs mac/Sanduhr.app/Contents/Helpers/MediaRemoteAdapterTestClient` print
+  `x86_64 arm64`; `codesign --verify --strict mac/Sanduhr.app` passes.
+- [ ] Placed nowhere by default: Settings, Desk, Now Playing has no on/off switch and reads Source:
+  Not placed anywhere, with "Arrange on the Notch…" and "Arrange on the Desk…" (each opens that
+  page); `pgrep -fl mediaremote-adapter` finds nothing; `state.yaml` shows
+  `now_playing: {enabled: false, placed: [], source: off, state: none}`. Settings, Notch lists Now
+  playing as a choice for both wings and the strip; Settings, Layout lists Now playing as Hidden.
+- [ ] Pick Now playing for the right wing (island on): that alone starts it. Source reads Checking…
+  for a moment, then Adapter working; one `perl … mediaremote-adapter.pl … stream` process runs
+  (`pgrep -fl mediaremote-adapter`); `state.yaml` `placed: [wing_right]`, `enabled: true`. Put Now
+  playing in Layout at Bottom left too: `placed: [wing_right, desk]`.
+- [ ] Play in YouTube Music: within two seconds the right wing shows "▶ Title · Artist" and the Desk
+  shows the line with a position bar in its corner (under the meters when they share it), the bar
+  moving about once a second. `state.yaml`: `source: adapter`, `state: playing`, no title anywhere.
+- [ ] A long title (longer than the wing's 180 points): the wing grows to its limit and the text
+  rests at its beginning with a soft fade at the clipped end, then after about a second scrolls
+  through once, slowly (about 30 points a second, easing in and out), rests at the end, glides back
+  and stays at the beginning. It never starts again for the same track; the next track (or picking
+  the wing again) scrolls once more. A short title never moves. With System Settings,
+  Accessibility, Display, Reduce motion on, nothing scrolls: the beginning shows, faded at the end.
+  The strip (Notch, Text under the camera, Now playing) does the same when the line is too long for
+  it.
+- [ ] Pause in the browser: the glyph turns to a pause sign and the bar stops within two seconds; a
+  Next button (⏭) appears at the wing's outer edge (the right wing's right end, the left wing's left
+  end), the title still starting at its beginning. Pausing does not scroll the title. Click the
+  button: the next track plays and the button goes. Pause again and click the title: it plays and
+  the button goes. Skip twice: each new title shows without the wing blinking empty in between.
+- [ ] With the strip on Now playing and paused, the strip shows ⏭ at its end; `state.yaml` lists a
+  `now_playing_next` `strip` frame beside the `now_playing` `strip` one and `desk_frames_ok: true`;
+  a click on ⏭ skips, a click on the title plays.
+- [ ] Click the wing: playback pauses; click again: it plays. Two-finger click the wing: Previous,
+  Pause, Next, Now Playing Settings…; Next and Previous skip; the last item opens this page.
+  The rest of the island still opens Settings on a click.
+- [ ] The Desk line: a click plays or pauses (pointing hand on hover); a two-finger click opens the
+  same menu and the Finder's desktop menu never opens there; `state.yaml` lists a `now_playing`
+  `desk` frame and `desk_frames_ok: true`. With the strip on Now playing (Notch, Text under the
+  camera), the strip shows the whole title and takes the same clicks (a `now_playing` `strip` frame).
+- [ ] Stop the browser tab and play in Music: the wing and the line follow Music within two seconds.
+  Settings, Apps lists Chrome and Music; switch Chrome off and play in the browser: nothing shows
+  (the wing goes back to plain black); switch it back on.
+- [ ] Hide while paused on: pausing hides the wing and the line; playing brings them back. With
+  nothing playing at all, neither shows and no timer ticks (the line is gone).
+- [ ] Move Now playing to Hidden in Layout: the line goes, the wing stays and it keeps running. Then
+  set the right wing back to Claude meters: `placed: []`, the Source reads Not placed anywhere and
+  `pgrep -fl mediaremote-adapter` finds nothing within a second. Place it again, then switch Desk off:
+  the same. Quit Sanduhr while it runs: no `perl` process is left behind.
+- [ ] Upgrade from item 53's switch: quit, `defaults write com.626labs.sanduhr.desk nowPlaying -bool
+  true`, `defaults write com.626labs.sanduhr.desk layout "message:tl clock:bl meters:bl meetings:bl"`
+  and `defaults delete com.626labs.sanduhr.desk nowPlayingPlacementUpgraded`, then open Sanduhr:
+  `layout` reads `message:tl clock:bl meters:bl nowPlaying:bl meetings:bl` and the line sits under
+  the meters. Move it to Hidden and relaunch: it stays hidden.
+- [ ] Fallback: quit, then `open -n --env SANDUHR_NOWPLAYING_TEST=fail mac/Sanduhr.app`. Source
+  reads "Fallback (Music and Spotify only): the system now playing isn't available on this macOS";
+  no adapter process runs; no prompt appears. Play, pause or skip in Music: the wing follows from the
+  next change. The browser player shows nothing (expected). Clicks still play and pause.
+- [ ] Still on the fallback, switch Ask Music and Spotify directly on with Music open: macOS asks
+  once whether Sanduhr may control Music; Allow, and the current track shows without waiting for a
+  change. With Music quit the switch launches nothing. Switch it off again and reset the grant with
+  `tccutil reset AppleEvents com.626labs.sanduhr` if you want the prompt back.
+- [ ] Sleep the Mac while now playing runs and wake it: Source settles on Adapter working again and
+  the wing follows the next change.
+- [ ] Settings, About: "Now playing uses mediaremote-adapter by Jonas van den Berg (BSD-3-Clause)"
+  links to its GitHub page; Third-Party Notices opens the text with the adapter's and Sparkle's
+  licenses. Console (`log stream --predicate 'subsystem == "com.626labs.sanduhr" AND category ==
+  "nowplaying"'`) shows only on/off, test and stream lines, never a title.
+
+## 24. Claude writes your Desk messages (item 54)
+
+Desk on with the message in a corner. Back up the list first and put it back at the end:
+`M=~/Library/Application\ Support/Desk/messages.txt; cp "$M" /tmp/messages.txt.mine`. Settings,
+Alerts on (Banner) for the notification step. The probe below calls the installed server the way
+Claude Code does, one stdio round trip per call (`S=~/Library/Application\
+Support/Sanduhr/integrations/current/sanduhr_mcp.py`, or `mac/integrations/sanduhr_mcp.py`):
+
+```sh
+mcp() { printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"$1\",\"arguments\":${2:-{\}}}}" \
+  | python3 "$S" | python3 -c 'import json,sys; print(json.dumps(json.loads(json.loads(sys.stdin.read())["result"]["content"][0]["text"]), indent=1, ensure_ascii=False))'; }
+```
+
+- [ ] `mcp get_desk_messages`: `lines` match `cat "$M"` (comments included), `today` is the line
+  the Desk shows, `pinned: false`, `rotate: "daily"`. Pin a line in Settings, Message: within a
+  second `jq . ~/Library/Application\ Support/Sanduhr/desk-messages-state.json` shows
+  `pinned: true` with the line, and `get_desk_messages` returns it as `today`. Unpin; Every hour
+  makes `rotate: "hourly"`; back to Once a day.
+- [ ] A bad proposal is refused at once and writes nothing:
+  `mcp propose_desk_messages '{"lines":["{blink} hi","Monday: x","13-40: y"]}'` lists three reasons
+  (line 1 unknown effect, line 2 write the day as Mon, line 3 not a date); no
+  `desk-messages-request.json` appears in the Sanduhr folder.
+- [ ] Approve: `mcp propose_desk_messages '{"lines":["{ink:#ff2a6d,#05d9e8} {glow} {write} hello there.","{shimmer} {size:0.8} keep going."],"note":"two for the week"}'`
+  answers `pending_approval` within a second. A quiet banner "Claude suggested 2 Desk messages"
+  (body "two for the week", no sound) shows; clicking it opens Settings, Message. The sidebar's
+  Message has a badge; the page shows the banner with the note, Dismiss, Review… and Add. Review…
+  draws both lines on a dark card: the first writes itself in, left to right, in a pink-to-cyan
+  gradient with a glow; the second, smaller, gets a light sweep every 8 seconds. Add: the badge
+  and banner go, the editor shows the two lines at the end of the list, `messages.txt.previous`
+  holds the list as it was, and `jq .result ~/Library/Application\ Support/Sanduhr/desk-messages-result.json`
+  reads `applied` with `lines_added: 2`. Propose the same lines again and Add: `lines_skipped: 2`.
+- [ ] Dismiss: propose one line, Dismiss: the list is unchanged and the result reads `rejected`
+  with `dismissed by the user`. With unsaved edits in the editor, Add is disabled ("Save or reload
+  your edits first").
+- [ ] Replace: propose with `"mode":"replace"`: the banner and Review say "to replace your list";
+  after Replace the comment block at the top of the file is still there, every old line is gone
+  and `messages.txt.previous` has them.
+- [ ] Apply directly: Settings, Message, "Let Claude change the messages directly" on. Propose a
+  line: the answer is `applied`, no banner, no badge; the editor reloads with it.
+- [ ] Alerts off (Settings, Alerts): a proposal shows only the badge and the page's banner, no
+  notification.
+- [ ] The effects on the Desk: pin each of these in turn (Pin one line): `{write} hello.` draws in
+  over about a second and a half, once; `{shimmer} hi.` sweeps every 8 seconds; `{ink:#ffd08a}
+  {noglow} {size:1.5} big.` is gold, larger, without glow; `{blink} {glow} odd.` shows the text
+  `{blink} {glow} odd.` as written. Settings, Desk, Look, "Glow around the message" off: lines
+  lose the glow except a `{glow}` line. With Reduce motion on, `{write}` shows at once and nothing
+  shimmers. With a `{shimmer}` line showing and Activity Monitor on Sanduhr: CPU is 0.0 between
+  sweeps and with the Desk covered by a full-screen window (the sweep pauses); a plain line costs
+  nothing at any time.
+- [ ] Quit Sanduhr and propose: the answer is `queued` / `app_not_responding` after about ten
+  seconds; open Sanduhr within ten minutes and the suggestion appears. One older than ten minutes
+  is dropped. `log show --last 5m --predicate 'subsystem == "com.626labs.sanduhr"'` holds no
+  message text. Put the list back: `cp /tmp/messages.txt.mine "$M"`.
+
+## 25. Claude proposes themes (item 55)
+
+The `mcp` probe from section 24. Alerts on (Banner). Note the theme in use, and keep a copy of the
+themes folder: `T=~/Library/Application\ Support/Sanduhr/themes; cp -R "$T" /tmp/themes.mine`.
+`G='"glass":"#14262e","glass_on_mica":"#10222a","title_bg":"#0c1c22","border":"#1f3a44","footer_bg":"#081418","bar_bg":"#12303a","text":"#e6f4f1","text_secondary":"#a9cfc8","text_dim":"#6f9a93","text_muted":"#4f7a73","accent":"#2dd4bf","pace_marker":"#fb7185","sparkline":"#2dd4bf"'`.
+
+- [ ] A broken theme is refused at once and writes nothing:
+  `mcp propose_theme '{"theme":{"name":"Broken","bg":"#fff"}}'` answers `rejected` /
+  `invalid_theme` with `findings` naming `bg` (`#rrggbb`) and every missing color; no
+  `theme-request.json` appears. `{"theme":{"name":"Obsidian",'"$G"',"bg":"#0b1418"}}` answers
+  `reserved_name`.
+- [ ] Approve: `mcp propose_theme '{"theme":{"name":"Tidepool","description":"Deep teal glass with a coral pace tick.","bg":"#0b1418",'"$G"'}}'`
+  answers `pending_approval` within a second with `key: "tidepool"`. A quiet banner "Claude
+  suggested a theme: Tidepool" shows (body: the description); clicking it opens Settings, Themes.
+  The sidebar's Themes has a badge; the page's banner shows a teal card like the gallery's, the name,
+  the description, Dismiss, Save and Save and Apply. Save and Apply: the widget turns teal, the card
+  appears in the gallery marked as yours with the description in its tooltip, the badge goes, and
+  `jq .result ~/Library/Application\ Support/Sanduhr/theme-result.json` reads `applied`,
+  `previous_key` the theme you had and `saved_path` ending `tidepool.json`. Pick your old theme
+  again in the gallery.
+- [ ] Save only: propose it again with `"save_as":"tidepool-calm","apply":false` and click Save: the
+  file appears, the widget keeps its theme, the result reads `saved`.
+- [ ] Collision: `tidepool.json` from the step above is now one of your themes. Propose Tidepool
+  with a changed `accent` (`"accent":"#38bdf8","sparkline":"#38bdf8"`): the banner says it
+  is saved as `tidepool-2.json`; after Save, `tidepool.json` is unchanged and the result names
+  `renamed_from: "tidepool"`. Proposing the very same theme as `tidepool` again says "You already
+  have this theme" and adds no file.
+- [ ] Warnings ride along: propose with `"text":"#5a5a5a"`: `pending_approval` with a `text`
+  warning in `findings`; the banner shows "1 design note" with the message on hover. Dismiss: the
+  result reads `rejected` / `dismissed`, no file is written.
+- [ ] Apply directly: Settings, Widget, Themes, "Let Claude change themes directly" on. Propose a
+  new theme: the answer is `applied` at once, no banner, no badge, the widget changes. With
+  `"apply":false`: `saved` and the widget stays.
+- [ ] Match Desk: with Match Desk in use, a proposal with `apply` true moves the widget off Match
+  Desk to the new theme; `previous_key` reads `match-desk`, and clicking Match Desk in the gallery
+  brings the Desk's ink back.
+- [ ] Quit Sanduhr and propose: `queued` / `app_not_responding` after about ten seconds; open
+  Sanduhr within ten minutes and the suggestion appears. `log show --last 5m --predicate
+  'subsystem == "com.626labs.sanduhr"'` holds no theme name. `state.yaml` shows
+  `pending_suggestions: {messages: false, theme: true}` while one waits. Put the folder back:
+  `rm -rf "$T" && cp -R /tmp/themes.mine "$T"`.
+
+## 26. Desk items move clear of the Dock (item 56)
+
+Desk on with something in a bottom corner (the standard layout: clock, meters, meetings at `bl`;
+add `nowPlaying:br` to have the right side too). Note your Dock settings in System Settings,
+Desktop & Dock, and put them back at the end. After each step, `mac/smoke/smoke snap` and read
+`dock:` and `desk_frames_ok` in its `state.yaml` (see `mac/smoke/README.md`).
+
+- [ ] Dock shown, at the bottom: the bottom-left stack sits above the Dock with the usual gap,
+  nothing under it. `dock: {side: bottom, autohide: false, inset: N}`, N the Dock's height (about
+  60 to 90), and `desk_frames_ok: true`. Make the Dock larger and smaller with the Size slider: the
+  stack follows within a second.
+- [ ] Dock shown, on the left: the left column (top and bottom) moves right of the Dock, the right
+  column stays; `side: left`. On the right: the right column moves; `side: right`. The message at
+  the top moves with its column; nothing at the top goes under the menu bar.
+- [ ] Auto-hide on (bottom): the stack rests at the screen edge margin (`inset: 0`). Move the
+  pointer to the bottom edge and rest it there: the stack starts up together with the Dock, not
+  after it (the Dock's own delay, `defaults read com.apple.dock autohide-delay`, 0.5 s when unset),
+  and rises as fast as the Dock does (`autohide-time-modifier` scales it, about half a second when
+  unset); `inset` reads the Dock's height while it shows. Move away and the stack drops in step
+  with the Dock. Rest the pointer a few points above the edge, short of where the Dock reacts:
+  nothing moves, or the stack comes up and drops back within about half a second and stays down.
+  Meeting rows and the meters' two-finger menu work while the Dock is up; `desk_frames_ok`
+  stays true during and after.
+- [ ] Auto-hide on the left and on the right: the same, sideways.
+- [ ] Reduce Motion on (Accessibility, Display): the stack jumps instead of gliding.
+- [ ] No cost away from the Dock: with the pointer in the middle of the screen for a minute,
+  Activity Monitor shows Sanduhr at 0.0 % CPU (as before this item).
+- [ ] Mission Control with the pointer in the middle: the Dock shows there and the Desk is not
+  visible, nothing moves; afterwards the stack is back at the edge. A full-screen app: the Desk is
+  not shown there; leave it and the Desk is where it was.
+- [ ] Two screens, Dock shown at the bottom of the other screen: the Desk's screen keeps
+  `inset: 0`. Move the Dock to the Desk's screen (bottom edge there): the stack moves up. With
+  auto-hide, the Dock coming up on the other screen moves nothing on the Desk's.
+- [ ] Put your Dock settings back as they were.
+
+## 27. EsteFont 26, built in (item 58)
+
+Use a Mac or a user account where EsteFont 26 is not installed. On your own account, turn the
+installed copies off instead: Font Book, select EsteFont 26 (and any older EsteFont), Edit,
+Disable (or right-click, Deactivate), and turn them back on at the end. Never delete your fonts.
+Quit Sanduhr first and open the build afterwards, so it starts with the font switched off.
+
+- [ ] The built app has both faces: `ls Sanduhr.app/Contents/Resources/Fonts` lists
+  `EsteFont26-Regular.ttf` and `EsteFont26-Bold.ttf`, and `codesign --verify --strict
+  Sanduhr.app` is quiet (`build.sh` also fails without them).
+- [ ] Fresh install (a new user account, or `defaults delete com.626labs.sanduhr` and
+  `defaults delete com.626labs.sanduhr.desk` on a test account only): the Desk's clock, date,
+  meters and message draw in EsteFont 26, the time in Bold. Settings, Desk, Look shows Desk font
+  EsteFont 26.
+- [ ] Font Book still shows EsteFont 26 off (or absent): Sanduhr did not install it. TextEdit's
+  font list does not have it.
+- [ ] Both pickers list EsteFont 26 first, under System: Settings, Desk, Look (Desk font and
+  Message font) and Settings, Widget, Look. Pick it for the widget: the cards draw in it, the
+  semibold lines in Bold. Use System Font brings the widget back.
+- [ ] Match Desk with the Desk on EsteFont 26: the widget draws in EsteFont 26.
+- [ ] Pick another Desk font, quit and reopen: it stays. Pick System: the Desk draws in the system
+  font after a relaunch too.
+- [ ] A saved font that is gone: `defaults write com.626labs.sanduhr.desk font "No Such Font"`,
+  relaunch: the Desk draws in EsteFont 26 and the picker shows EsteFont 26.
+- [ ] Upgrade from the previous build with no Desk font picked: the Desk keeps the system font
+  (`defaults read com.626labs.sanduhr.desk font` prints an empty line).
+- [ ] Settings, About shows "Handwriting: EsteFont 26 by Estevan Hernandez"; Third-Party Notices
+  opens with an EsteFont 26 section (copyright and license).
+- [ ] Turn your EsteFont copies back on in Font Book.
+
+## 28. What's New after an update (item 57)
+
+Fake an older version with the switch below; never on a fresh test account's first launch (that
+one records the version and shows nothing). Quit Sanduhr before each `defaults` command and open
+the build afterwards.
+
+- [ ] Update from an older build: `defaults write com.626labs.sanduhr whatsNewLastSeen 2.3.4`,
+  open the build. About two seconds after the widget and Desk are up, a window "What's New in
+  Sanduhr" shows the cards of every release since, newest first, at most 8 (from 2.3.4 to 2.6.0:
+  all eight, four of 2.6, two of 2.5, two of 2.4) under one header line, "New in 2.4.0 – 2.6.0"
+  (from 2.5.0: "New in 2.6.0"); no card has its own version line. Each card has its art (a symbol,
+  or a live preview: the Desk message writing itself in, EsteFont 26, a notch wing, the menu bar),
+  a title, a sentence or two and Show me. `smoke/smoke state` shows `whats_new:
+  { last_seen: <this version>, pending: 0, open: true }`.
+- [ ] Show me on each card closes the window and opens Settings at its page: Now playing at Now
+  Playing, Claude's messages and themes at Message, the Dock at Layout, EsteFont 26 at Desk, Look,
+  Claude Usage at Claude Usage, integrations at Integrations, accounts at Accounts, the menu bar
+  and limits at General.
+- [ ] Quit and open again: no window (`defaults read com.626labs.sanduhr whatsNewLastSeen` prints
+  this version).
+- [ ] Settings, About, What's New…: the window opens with every card up to this version under
+  "New in 2.4.0 – <this version>", and again
+  from What's New… in the menu bar item's menu, the widget's two-finger menu and the Desk clock's
+  menu (under Check for Updates…). Done (or Return) closes it.
+- [ ] Don't show after updates: tick it, quit, `defaults write com.626labs.sanduhr whatsNewLastSeen
+  2.3.4`, open: no window, and `whatsNewLastSeen` is this version again; About's What's New… still
+  opens it. Untick it.
+- [ ] Onboarding first: on a test account with no session key and an older `whatsNewLastSeen`, the
+  onboarding sheet shows and What's New does not; it shows on a later launch after signing in.
+- [ ] Fresh install (test account only): `defaults delete com.626labs.sanduhr` and `defaults
+  delete com.626labs.sanduhr.desk`, open: onboarding, no What's New, and `whatsNewLastSeen` is
+  this version.
+- [ ] `smoke/smoke run scenarios/whats-new.yaml` passes (opens it, reads the title, Show me and the
+  switch, closes it).
+- [ ] Put `whatsNewLastSeen` back to this version: `defaults write com.626labs.sanduhr
+  whatsNewLastSeen <version>`.

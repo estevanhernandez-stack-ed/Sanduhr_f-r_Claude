@@ -544,8 +544,9 @@ class ActivityLevel(Base):
             "meters_and_activity": 1, "activity_read": 1, "records_shared": 1, "active_account": "activity"})
         self.assertEqual(p["cc_roots_consented"], [ref("Home")])
         self.assertEqual(p["tools_available"],
-                         ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping"])
-        self.assertEqual(sorted(p["tools_not_on_mac"]), ["propose_theme", "publish_usage"])
+                         ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
+                          "get_desk_messages", "propose_desk_messages", "propose_theme"])
+        self.assertEqual(sorted(p["tools_not_on_mac"]), ["publish_usage"])
         text = json.dumps(p)
         for secret in ("Home", "Work", ".claude-personal", VAULT_A):
             self.assertNotIn(secret, text)
@@ -603,8 +604,24 @@ class Protocol(Base):
         )
         self.assertEqual([f.get("id") for f in frames], [1, 2, 3, 4, 5, 6])
         names = [t["name"] for t in frames[1]["result"]["tools"]]
-        self.assertEqual(names, ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping"])
+        self.assertEqual(names, ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
+                                 "get_desk_messages", "propose_desk_messages", "propose_theme"])
         for t in frames[1]["result"]["tools"]:
+            if t["name"] == "propose_desk_messages":
+                # The one tool that asks for a change: not read-only, never destructive, no path.
+                self.assertFalse(t["annotations"]["readOnlyHint"])
+                self.assertFalse(t["annotations"]["destructiveHint"])
+                self.assertEqual(sorted(t["inputSchema"]["properties"]), ["lines", "mode", "note"])
+                self.assertFalse(t["inputSchema"]["additionalProperties"])
+                continue
+            if t["name"] == "propose_theme":
+                # The Windows tool's inputs, no path.
+                self.assertFalse(t["annotations"]["readOnlyHint"])
+                self.assertFalse(t["annotations"]["destructiveHint"])
+                self.assertEqual(sorted(t["inputSchema"]["properties"]), ["apply", "save_as", "theme"])
+                self.assertEqual(t["inputSchema"]["required"], ["theme"])
+                self.assertFalse(t["inputSchema"]["additionalProperties"])
+                continue
             self.assertTrue(t["annotations"]["readOnlyHint"])
             # No free-form argument: closed integer enums and booleans only.
             for prop in t["inputSchema"]["properties"].values():
@@ -619,7 +636,7 @@ class Protocol(Base):
         hist = json.loads(frames[5]["result"]["content"][0]["text"])
         self.assertEqual(hist["reason"], "missing")
 
-    def test_the_server_never_writes(self):
+    def test_the_server_never_writes_without_a_good_proposal(self):
         self.fx.access(entry("Home", "activity", names="names", vault_id=VAULT_A))
         before = sorted(os.listdir(self.fx.support))
         self.run_server(*[{"jsonrpc": "2.0", "id": i, "method": "tools/call", "params": {"name": n}}
@@ -641,6 +658,524 @@ class LocalDays(Base):
         finally:
             os.environ["TZ"] = "UTC"
             time.tzset()
+
+
+class DeskMessages(Base):
+    """get_desk_messages and propose_desk_messages (item 54): a temp Desk folder beside the temp
+    Sanduhr folder, never the real messages.txt; the app's answer is played by a fake sleep."""
+
+    def setUp(self):
+        super().setUp()
+        self.desk = self.fx.folder("Desk")
+
+    def write_messages(self, text):
+        with open(os.path.join(self.desk, "messages.txt"), "w", encoding="utf-8") as f:
+            f.write(text)
+
+    def get(self, now=NOW):
+        return mcp.build_desk_messages(now=now, paths=self.paths)
+
+    def propose(self, args, answer=None, wait=1.0):
+        """Proposes; `answer(request)` returns the app's result payload (None: no answer)."""
+        ticks = [0.0]
+
+        def clock():
+            return ticks[0]
+
+        def sleep(seconds):
+            ticks[0] += seconds
+            if answer is None or not os.path.exists(self.paths.desk_request):
+                return
+            with open(self.paths.desk_request, encoding="utf-8") as f:
+                req = json.load(f)
+            res = answer(req)
+            if res is not None:
+                self.fx.write_json(mcp.DESK_RESULT_FILE, {"id": req["id"], "completed_at": iso(NOW), "result": res})
+
+        return mcp.build_propose_desk_messages(args, now=NOW, paths=self.paths, wait=wait, poll=0.25,
+                                               sleep=sleep, clock=clock)
+
+    def request(self):
+        with open(self.paths.desk_request, encoding="utf-8") as f:
+            return json.load(f)
+
+    # -- reading
+
+    def test_paths_stay_in_the_test_folder(self):
+        self.assertEqual(self.paths.messages, os.path.join(self.fx.dir, "Desk", "messages.txt"))
+        self.assertTrue(self.paths.desk_request.startswith(self.fx.support))
+
+    def test_missing_file(self):
+        r = self.get()
+        self.assertEqual((r["status"], r["file_found"], r["lines"], r["today"]), ("ok", False, [], None))
+        self.assertEqual(r["rotate"], "daily")
+        self.assertFalse(r["pinned"])
+        self.assertIn("settings_note", r)
+
+    def test_lines_and_today_follow_the_most_specific_pool(self):
+        # NOW is Sunday 2026-07-26 (UTC clock in these tests).
+        self.write_messages("# header\nkeep building.\n{ink:#fff} also plain\nSun: {glow} rest.\n\n\n")
+        r = self.get()
+        self.assertEqual(r["lines"], ["# header", "keep building.", "{ink:#fff} also plain", "Sun: {glow} rest."])
+        self.assertEqual(r["today"], "{glow} rest.")
+        self.write_messages("Sun: rest.\n07-26: {write} today only.\n")
+        self.assertEqual(self.get()["today"], "{write} today only.")
+        self.write_messages("Mon: monday.\na\nb\nc\n")
+        # Plain pool, rotated by the day number like MessageEngine.pick.
+        self.assertEqual(self.get()["today"], ["a", "b", "c"][NOW.date().toordinal() % 3])
+
+    def test_hourly_rotation_and_pin_from_the_state_file(self):
+        self.write_messages("a\nb\nc\n")
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 1, "pinned": False, "rotate": "hourly"})
+        r = self.get()
+        self.assertEqual(r["rotate"], "hourly")
+        self.assertNotIn("settings_note", r)
+        self.assertEqual(r["today"], ["a", "b", "c"][(NOW.date().toordinal() * 24 + NOW.hour) % 3])
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 1, "pinned": True,
+                                                 "pinned_line": "{shimmer} pinned.", "rotate": "daily"})
+        r = self.get()
+        self.assertTrue(r["pinned"])
+        self.assertEqual(r["today"], "{shimmer} pinned.")
+
+    def test_unknown_state_schema_reads_as_defaults(self):
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 9, "pinned": True, "rotate": "hourly"})
+        r = self.get()
+        self.assertFalse(r["pinned"])
+        self.assertEqual(r["rotate"], "daily")
+
+    def test_not_utf8_is_refused(self):
+        with open(os.path.join(self.desk, "messages.txt"), "wb") as f:
+            f.write(b"\xff\xfe bad")
+        self.assertEqual(self.get()["reason"], "not_utf8")
+
+    def test_reading_needs_no_sharing(self):
+        self.write_messages("hello.\n")
+        self.assertFalse(os.path.exists(self.paths.access))
+        self.assertEqual(self.get()["lines"], ["hello."])
+
+    # -- the checks
+
+    def test_good_lines_pass(self):
+        good = ["keep building.", "Mon: one thing at a time.", "10-31: {ink:#ff7518,#6b2fa0} {write} boo.",
+                "{ink:#ff2a6d,#05d9e8} {glow} hello", "{size:0.5}{noglow} small.", "{SHIMMER} loud", "# a note",
+                "", "Note: a colon in a plain line.", "02-29: leap.", "{ink:fff} three digits.", "x" * 120,
+                "hello {glow} mid-line braces are text", "ünïcödé ✨ fine."]
+        self.assertEqual(mcp.validate_desk_lines(good), [])
+
+    def test_bad_lines_are_named(self):
+        cases = {
+            "x" * 121: "121 characters",
+            "tab\there": "control character",
+            "line\nbreak": "control character",
+            "sep arator": "control character",
+            "13-01: no such month": "not a date",
+            "1-5: short date": "not a date",
+            "02-30: no such day": "not a date",
+            "Monday: long name": "write the day as Mon",
+            "mon: lowercase": "write the day as Mon",
+            "Mon:   ": "prefix but no text",
+            "{blink} hi": "unknown effect {blink}",
+            "{ink:#zzzzzz} hi": "not hex",
+            "{ink:} hi": "1 to 4 hex colors",
+            "{ink:#111,#222,#333,#444,#555} hi": "at most 4",
+            "{size:3} big": "0.5 to 2",
+            "{size:big} big": "0.5 to 2",
+            "{glow:yes} hi": "takes no value",
+            "{glow hi": "not closed",
+            "{glow} {write}": "no text",
+            "\ud800 lone surrogate": "UTF-8",
+        }
+        for line, want in cases.items():
+            reasons = mcp.validate_desk_lines([line])
+            self.assertEqual(len(reasons), 1, line)
+            self.assertIn("line 1", reasons[0])
+            self.assertIn(want, reasons[0], line)
+
+    def test_counts_and_types(self):
+        self.assertIn("61 lines", mcp.validate_desk_lines(["a"] * 61)[0])
+        self.assertEqual(mcp.validate_desk_lines(["a"] * 60), [])
+        self.assertIn("list", mcp.validate_desk_lines([])[0])
+        self.assertIn("list", mcp.validate_desk_lines("a")[0])
+        self.assertIn("not a string", mcp.validate_desk_lines([3])[0])
+        self.assertIn("no message line", mcp.validate_desk_lines(["# only", ""])[0])
+
+    # -- proposing
+
+    def test_a_refusal_writes_nothing(self):
+        before = sorted(os.listdir(self.fx.support))
+        for args in ({"lines": ["{blink} x"]}, {"lines": ["ok"], "mode": "merge"}, {"lines": ["ok"], "note": "a\nb"},
+                     {"lines": ["ok"], "path": "/etc"}, {}, None):
+            r = self.propose(args)
+            self.assertEqual(r["status"], "rejected")
+            self.assertTrue(r["reasons"])
+        self.assertEqual(sorted(os.listdir(self.fx.support)), before)
+        self.assertFalse(os.path.exists(os.path.join(self.desk, "messages.txt")))
+
+    def test_the_request_file_and_a_pending_answer(self):
+        seen = []
+
+        def app(req):
+            seen.append(req)
+            return {"status": "pending_approval"}
+
+        r = self.propose({"lines": ["  {glow} hi.  ", "Fri: showtime."], "mode": "replace", "note": " for fridays "}, app)
+        self.assertEqual(r["status"], "pending_approval")
+        req = seen[0]
+        self.assertEqual(r["request_id"], req["id"])
+        self.assertEqual(req["schema_version"], 1)
+        self.assertEqual(req["lines"], ["{glow} hi.", "Fri: showtime."])
+        self.assertEqual((req["mode"], req["note"]), ("replace", "for fridays"))
+        self.assertTrue(mcp.parse(req["requested_at"]))
+        self.assertEqual(os.stat(self.paths.desk_request).st_mode & 0o777, 0o600)
+        self.assertFalse(os.path.exists(self.paths.desk_request + ".tmp"))
+        self.assertFalse(os.path.exists(os.path.join(self.desk, "messages.txt")))   # never the list itself
+
+    def test_applied_and_rejected_answers_pass_through(self):
+        r = self.propose({"lines": ["a."]}, lambda req: {"status": "applied", "mode": "add", "lines_added": 1,
+                                                         "lines_skipped": 0, "extra": "dropped"})
+        self.assertEqual((r["status"], r["lines_added"], r["mode"]), ("applied", 1, "add"))
+        self.assertNotIn("extra", r)
+        r = self.propose({"lines": ["b."]}, lambda req: {"status": "rejected", "reasons": ["line 1 is bad"]})
+        self.assertEqual(r["reasons"], ["line 1 is bad"])
+
+    def test_another_requests_result_is_not_taken(self):
+        self.fx.write_json(mcp.DESK_RESULT_FILE, {"id": "someone-else", "result": {"status": "applied"}})
+        r = self.propose({"lines": ["a."]}, answer=lambda req: None, wait=1.0)
+        self.assertEqual((r["status"], r["reason"]), ("queued", "app_not_responding"))
+        self.assertTrue(os.path.exists(self.paths.desk_request))   # left for the app to pick up
+
+    def test_the_support_folder_is_created(self):
+        shutil.rmtree(self.fx.support)
+        r = self.propose({"lines": ["a."]}, wait=0)
+        self.assertEqual(r["status"], "queued")
+        self.assertTrue(os.path.isfile(self.paths.desk_request))
+
+    def test_over_stdio(self):
+        self.write_messages("hello.\n")
+        env = dict(os.environ, SANDUHR_SUPPORT_DIR=self.fx.support)
+        import subprocess
+        msgs = [{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "get_desk_messages"}},
+                {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                 "params": {"name": "propose_desk_messages", "arguments": {"lines": ["{nope} x"]}}}]
+        out = subprocess.run([sys.executable, SERVER], input="\n".join(json.dumps(m) for m in msgs) + "\n",
+                             capture_output=True, text=True, env=env, timeout=30)
+        self.assertEqual(out.stderr, "")
+        frames = [json.loads(x) for x in out.stdout.splitlines()]
+        got = json.loads(frames[0]["result"]["content"][0]["text"])
+        self.assertEqual(got["lines"], ["hello."])
+        refused = json.loads(frames[1]["result"]["content"][0]["text"])
+        self.assertEqual(refused["status"], "rejected")
+        self.assertFalse(os.path.exists(self.paths.desk_request))
+
+    def test_descriptions_teach_the_syntax_and_effects(self):
+        tools = {t["name"]: t["description"] for t in mcp.TOOLS}
+        for name in ("get_desk_messages", "propose_desk_messages"):
+            for word in ("Mon:", "MM-DD", "# ", "rotate", "pinned", "{ink:", "{glow}", "{noglow}", "{size:",
+                         "{write}", "{shimmer}", "40 characters"):
+                self.assertIn(word, tools[name], (name, word))
+        self.assertIn("never writes messages.txt", tools["propose_desk_messages"])
+
+
+BUILTIN_THEMES = os.path.join(FIXTURES, "theme-builtins.json")
+
+
+def clean_theme():
+    """A clean theme (Obsidian's values), as the Windows ThemeLintTests' Clean()."""
+    return {
+        "name": "Test",
+        "bg": "#0d0d0d", "glass": "#1c1c1c", "glass_on_mica": "#1a1a1c",
+        "title_bg": "#161616", "border": "#333333", "footer_bg": "#111111", "bar_bg": "#2a2a2a",
+        "text": "#e8e4dc", "text_secondary": "#b8b4ac", "text_dim": "#777777", "text_muted": "#555555",
+        "accent": "#6c63ff", "pace_marker": "#ff6b6b", "sparkline": "#6c63ff",
+        "glass_alpha": 0.85, "border_alpha": 0.30,
+    }
+
+
+def fields(findings, level):
+    return [f["field"] for f in findings if f["level"] == level]
+
+
+class ThemeLint(unittest.TestCase):
+    """The Windows ThemeLintTests' cases, against the Python port (item 55)."""
+
+    def lint(self, theme):
+        return mcp.lint_theme(theme)
+
+    def test_every_built_in_lints_with_no_findings(self):
+        with open(BUILTIN_THEMES, encoding="utf-8") as f:
+            builtins = json.load(f)
+        keys = [k for k in builtins if not k.startswith("_")]
+        self.assertEqual(sorted(keys), sorted(k for k in mcp.BUILT_IN_THEME_IDS if k != "match-desk"))
+        for key in keys:
+            self.assertEqual(self.lint(builtins[key]), [], key)
+
+    def test_clean_theme_is_ok(self):
+        self.assertEqual(self.lint(clean_theme()), [])
+
+    def test_not_an_object(self):
+        r = self.lint([1, 2])
+        self.assertEqual([f["field"] for f in r], ["json"])
+
+    def test_missing_required_color(self):
+        j = clean_theme()
+        del j["pace_marker"]
+        self.assertIn("pace_marker", fields(self.lint(j), "error"))
+
+    def test_malformed_hex_names_the_accepted_form(self):
+        for bad in ("#fff", "#ff00ff80", "ff00ff", "#gg0000", "red"):
+            j = clean_theme()
+            j["accent"] = bad
+            errors = [f for f in self.lint(j) if f["level"] == "error"]
+            self.assertEqual([f["field"] for f in errors], ["accent"], bad)
+            self.assertIn("#rrggbb", errors[0]["message"])
+
+    def test_non_string_color_is_an_error(self):
+        j = clean_theme()
+        j["bg"] = 12
+        self.assertIn("bg", fields(self.lint(j), "error"))
+
+    def test_dial_out_of_range(self):
+        for field, value in (("glass_alpha", 1.5), ("border_alpha", -0.1), ("card_corner_radius", 99),
+                             ("breath_period_ms", 10), ("ghost_alpha", 2), ("glass_alpha", True), ("glass_alpha", "0.8")):
+            j = clean_theme()
+            j[field] = value
+            self.assertIn(field, fields(self.lint(j), "error"), (field, value))
+
+    def test_nested_dials_use_dotted_names(self):
+        j = clean_theme()
+        j["accent_bloom"] = {"blur": 40, "alpha": 0.5}
+        j["inner_highlight"] = {"color": "nope", "alpha": 0.2}
+        errors = fields(self.lint(j), "error")
+        self.assertIn("accent_bloom.blur", errors)
+        self.assertIn("inner_highlight.color", errors)
+        j = clean_theme()
+        j["accent_bloom"] = 3
+        j["inner_highlight"] = {"alpha": 0.2}
+        errors = fields(self.lint(j), "error")
+        self.assertIn("accent_bloom", errors)
+        self.assertIn("inner_highlight.color", errors)
+
+    def test_name_rules(self):
+        j = clean_theme()
+        for name in ("", "   ", "x" * 25, None, 7, "two\nlines"):
+            j["name"] = name
+            self.assertIn("name", fields(self.lint(j), "error"), name)
+        del j["name"]
+        self.assertIn("name", fields(self.lint(j), "error"))
+        j["name"] = "x" * 24
+        self.assertEqual(self.lint(j), [])
+
+    def test_present_nulls_are_fine(self):
+        j = clean_theme()
+        j.update({"border_tint": None, "inner_highlight": None, "accent_bloom": None, "description": None,
+                  "monospace_font": None})
+        self.assertEqual(self.lint(j), [])
+
+    def test_mac_fields(self):
+        j = clean_theme()
+        j.update({"description": "Night sea glass.", "ghost_alpha": 0.6, "monospace_font": "SF Mono"})
+        self.assertEqual(self.lint(j), [])
+        for field, value in (("description", "x" * 201), ("description", "a\nb"), ("description", 3),
+                             ("monospace_font", True), ("opts_out_of_mica", "yes")):
+            j = clean_theme()
+            j[field] = value
+            self.assertIn(field, fields(self.lint(j), "error"), (field, value))
+
+    def test_light_base_warns_and_still_passes(self):
+        j = clean_theme()
+        j["glass_on_mica"] = "#f0f0f0"
+        j["glass"] = "#f0f0f0"
+        r = self.lint(j)
+        self.assertEqual(fields(r, "error"), [])
+        self.assertIn("glass_on_mica", fields(r, "warning"))
+        self.assertIn("glass", fields(r, "warning"))
+        self.assertNotIn("bg", fields(r, "warning"))
+
+    def test_low_text_contrast_names_the_ratio(self):
+        j = clean_theme()
+        j["text"] = "#5a5a5a"
+        text = [f for f in self.lint(j) if f["field"] == "text"]
+        self.assertEqual(len(text), 1)
+        self.assertIn(":1", text[0]["message"])
+        self.assertIn("4.5", text[0]["message"])
+
+    def test_text_ramp_descends_and_shares_a_hue(self):
+        j = clean_theme()
+        j["text_dim"] = "#ffffff"
+        self.assertIn("text_dim", fields(self.lint(j), "warning"))
+        j = clean_theme()
+        j.update({"text": "#ffb0b0", "text_secondary": "#b0ffb0", "text_dim": "#802020", "text_muted": "#501010"})
+        self.assertIn("text_secondary", fields(self.lint(j), "warning"))
+        g = clean_theme()
+        g.update({"text": "#eeeeee", "text_secondary": "#bbbbbb", "text_dim": "#777777", "text_muted": "#555555"})
+        self.assertNotIn("text_secondary", fields(self.lint(g), "warning"))
+
+    def test_pace_marker_on_the_green_fill(self):
+        j = clean_theme()
+        j["pace_marker"] = "#4ade80"
+        self.assertIn("pace_marker", fields(self.lint(j), "warning"))
+        j["pace_marker"] = "#fbbf24"
+        self.assertNotIn("pace_marker", fields(self.lint(j), "warning"))
+
+    def test_sparkline_and_border_tint_share_the_accent_hue(self):
+        j = clean_theme()
+        j["sparkline"] = "#ff8800"
+        j["border_tint"] = "#00ff88"
+        r = fields(self.lint(j), "warning")
+        self.assertIn("sparkline", r)
+        self.assertIn("border_tint", r)
+
+    def test_mica_opt_out_with_translucent_glass(self):
+        j = clean_theme()
+        j["opts_out_of_mica"] = True
+        self.assertIn("glass_alpha", fields(self.lint(j), "warning"))
+        j["glass_alpha"] = 1.0
+        self.assertNotIn("glass_alpha", fields(self.lint(j), "warning"))
+
+    def test_finding_shape(self):
+        j = clean_theme()
+        del j["bg"]
+        one = self.lint(j)[0]
+        self.assertEqual((one["level"], one["field"]), ("error", "bg"))
+        self.assertTrue(one["message"])
+
+    def test_color_math(self):
+        white, black = mcp.theme_hex("#ffffff"), mcp.theme_hex("#000000")
+        red, green = mcp.theme_hex("#ff0000"), mcp.theme_hex("#00ff00")
+        self.assertAlmostEqual(mcp.luminance(white), 1.0, 3)
+        self.assertAlmostEqual(mcp.contrast(mcp.luminance(white), mcp.luminance(black)), 21.0, 1)
+        self.assertAlmostEqual(mcp.hue(red), 0, 1)
+        self.assertAlmostEqual(mcp.hue(green), 120, 1)
+        self.assertAlmostEqual(mcp.hue_distance(red, green), 120, 1)
+        self.assertIsNone(mcp.hue_distance(red, black))
+        self.assertAlmostEqual(mcp.composite(black, 0.5, white)[0], 0.5, 3)
+
+    def test_slug(self):
+        self.assertEqual(mcp.theme_slug("  Sunset Neon! "), "sunset-neon")
+        self.assertEqual(mcp.theme_slug("Café Noir"), "caf-noir")
+        self.assertEqual(mcp.theme_slug("!!!"), "theme")
+        self.assertEqual(len(mcp.theme_slug("a" * 50)), 40)
+
+
+class ProposeTheme(Base):
+    """propose_theme (item 55): the Windows ToolLogicThemeTests' cases on a temp folder; the app's
+    answer is played by a fake sleep."""
+
+    def propose(self, args, answer=None, wait=1.0):
+        ticks = [0.0]
+
+        def clock():
+            return ticks[0]
+
+        def sleep(seconds):
+            ticks[0] += seconds
+            if answer is None or not os.path.exists(self.paths.theme_request):
+                return
+            with open(self.paths.theme_request, encoding="utf-8") as f:
+                req = json.load(f)
+            res = answer(req)
+            if res is not None:
+                self.fx.write_json(mcp.THEME_RESULT_FILE, {"id": req["id"], "completed_at": iso(NOW), "result": res})
+
+        return mcp.build_propose_theme(args, now=NOW, paths=self.paths, wait=wait, poll=0.25, sleep=sleep, clock=clock)
+
+    def test_paths_stay_in_the_test_folder(self):
+        self.assertEqual(self.paths.theme_request, os.path.join(self.fx.support, "theme-request.json"))
+        self.assertEqual(self.paths.theme_result, os.path.join(self.fx.support, "theme-result.json"))
+
+    def test_broken_theme_is_rejected_with_findings_and_writes_nothing(self):
+        before = sorted(os.listdir(self.fx.support))
+        bad = clean_theme()
+        del bad["accent"]
+        r = self.propose({"theme": bad})
+        self.assertEqual((r["status"], r["reason"]), ("rejected", "invalid_theme"))
+        self.assertIn("accent", fields(r["findings"], "error"))
+        self.assertEqual(sorted(os.listdir(self.fx.support)), before)
+
+    def test_bad_arguments_are_typed_invalid_params(self):
+        before = sorted(os.listdir(self.fx.support))
+        for args in ({}, None, {"theme": "x"}, {"theme": clean_theme(), "save_as": "Bad Key"},
+                     {"theme": clean_theme(), "save_as": "-x"}, {"theme": clean_theme(), "save_as": "a" * 41},
+                     {"theme": clean_theme(), "apply": "yes"}, {"theme": clean_theme(), "path": "/etc"},
+                     {"theme": dict(clean_theme(), padding="x" * 20000)}):
+            r = self.propose(args)
+            self.assertEqual((r["status"], r["reason"]), ("rejected", "invalid_params"), args and list(args))
+            self.assertTrue(r["remedy"])
+        self.assertEqual(sorted(os.listdir(self.fx.support)), before)
+
+    def test_a_built_in_name_is_reserved(self):
+        for args in ({"theme": dict(clean_theme(), name="Obsidian")}, {"theme": dict(clean_theme(), name="Match Desk")},
+                     {"theme": clean_theme(), "save_as": "626-labs"}):
+            r = self.propose(args)
+            self.assertEqual((r["status"], r["reason"]), ("rejected", "reserved_name"))
+        self.assertFalse(os.path.exists(self.paths.theme_request))
+        # save_as frees a built-in's display name.
+        r = self.propose({"theme": dict(clean_theme(), name="Obsidian"), "save_as": "my-obsidian"}, wait=0)
+        self.assertEqual(r["status"], "queued")
+
+    def test_the_request_file_and_a_pending_answer(self):
+        seen = []
+
+        def app(req):
+            seen.append(req)
+            return {"status": "pending_approval", "key": "test", "name": "Test"}
+
+        theme = dict(clean_theme(), description="Quiet graphite.")
+        r = self.propose({"theme": theme, "save_as": "graphite", "apply": False}, app)
+        self.assertEqual(r["status"], "pending_approval")
+        self.assertEqual(r["request_id"], seen[0]["id"])
+        self.assertEqual(r["findings"], [])   # the server's lint rides along when the app sends none
+        req = seen[0]
+        self.assertEqual((req["schema_version"], req["save_as"], req["apply"]), (1, "graphite", False))
+        self.assertEqual(req["theme"], theme)
+        self.assertTrue(mcp.parse(req["requested_at"]))
+        self.assertEqual(os.stat(self.paths.theme_request).st_mode & 0o777, 0o600)
+        self.assertFalse(os.path.exists(self.paths.theme_request + ".tmp"))
+        self.assertFalse(os.path.exists(os.path.join(self.fx.dir, "Sanduhr", "themes")))   # never a theme itself
+
+    def test_applied_answers_pass_through(self):
+        r = self.propose({"theme": clean_theme()}, lambda req: {
+            "status": "applied", "key": "test-2", "name": "Test", "previous_key": "obsidian",
+            "saved_path": "/x/test-2.json", "renamed_from": "test", "findings": [], "extra": "dropped"})
+        self.assertEqual((r["status"], r["key"], r["previous_key"], r["renamed_from"]),
+                         ("applied", "test-2", "obsidian", "test"))
+        self.assertNotIn("extra", r)
+        self.assertTrue(self.propose({"theme": clean_theme(), "apply": False},
+                                     lambda req: {"status": "saved", "key": "test"})["status"] == "saved")
+
+    def test_warnings_do_not_block_but_travel(self):
+        j = clean_theme()
+        j["text"] = "#5a5a5a"
+        r = self.propose({"theme": j}, wait=0)
+        self.assertEqual(r["status"], "queued")
+        self.assertIn("text", fields(r["findings"], "warning"))
+
+    def test_silent_app_returns_queued_and_leaves_the_request(self):
+        self.fx.write_json(mcp.THEME_RESULT_FILE, {"id": "someone-else", "result": {"status": "applied"}})
+        r = self.propose({"theme": clean_theme()}, answer=lambda req: None)
+        self.assertEqual((r["status"], r["reason"], r["name"]), ("queued", "app_not_responding", "Test"))
+        self.assertTrue(os.path.exists(self.paths.theme_request))
+
+    def test_over_stdio(self):
+        env = dict(os.environ, SANDUHR_SUPPORT_DIR=self.fx.support)
+        import subprocess
+        msgs = [{"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                 "params": {"name": "propose_theme", "arguments": {"theme": {"name": "Broken"}}}}]
+        out = subprocess.run([sys.executable, SERVER], input="\n".join(json.dumps(m) for m in msgs) + "\n",
+                             capture_output=True, text=True, env=env, timeout=30)
+        self.assertEqual(out.stderr, "")
+        refused = json.loads(json.loads(out.stdout.splitlines()[0])["result"]["content"][0]["text"])
+        self.assertEqual((refused["status"], refused["reason"]), ("rejected", "invalid_theme"))
+        self.assertEqual(len(fields(refused["findings"], "error")), 14)
+        self.assertFalse(os.path.exists(self.paths.theme_request))
+
+    def test_description_teaches_the_fields_and_the_rules(self):
+        d = next(t["description"] for t in mcp.TOOLS if t["name"] == "propose_theme")
+        for word in mcp.THEME_COLOR_FIELDS + ["name", "description", "glass_alpha", "border_alpha", "border_tint",
+                                             "accent_bloom", "inner_highlight", "#rrggbb", "4.5:1", "pace_marker",
+                                             "Match Desk", "Save and Apply", "pending_approval", "applied", "saved",
+                                             "rejected", "queued", "renamed_from", "previous_key", "never writes"]:
+            self.assertIn(word, d, word)
 
 
 class ProjectNames(unittest.TestCase):

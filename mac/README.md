@@ -348,8 +348,9 @@ Outdated, and Update moves it to the app's copy.
 
 The server (`sanduhr_mcp.py`) speaks the Windows `sanduhr-mcp` protocol with the same tool names
 and result shapes: `get_usage`, `get_local_burn_by_project`, `get_model_usage`,
-`get_usage_history`, `ping`. `publish_usage` is dropped on the Mac and `propose_theme` is not
-ported. What it may read comes from `mcp-access.json`, which the app writes:
+`get_usage_history`, `ping`, `propose_theme` (below), plus two Mac tools for Desk messages (below).
+`publish_usage` is dropped on the Mac. What it may read comes from
+`mcp-access.json`, which the app writes:
 
 ```json
 { "schema_version": 1,
@@ -373,11 +374,219 @@ that is read (Live only or Keep a record), `vault_id` with `activity` and Keep a
 
 No access file, an unreadable one or another `schema_version` shares nothing (`not_shared`, and
 `ping.sharing.access_file` says why). Hidden returns the record's `p-` code for every project,
-full paths only for Full paths. The server never takes a path argument, never writes, never
-logs and makes no network request. `SANDUHR_SUPPORT_DIR` points it at a test folder.
+full paths only for Full paths. The server never takes a path argument, never logs and makes no
+network request; the files it writes are a Desk message request and a theme request (below). `SANDUHR_SUPPORT_DIR`
+points it at a test folder (and Desk's folder beside it).
+
+**Desk messages from Claude (item 54).** `get_desk_messages` returns `{status, file_found, lines,
+pinned, rotate, today, limits}`: every raw line of Desk's `messages.txt`, whether a line is pinned,
+the rotation and the raw line the Desk shows now. Its description teaches the syntax (plain, `Mon:`,
+`MM-DD:`, `#`, the most specific pool, rotation, pinning) and the effects, with taste tips.
+`propose_desk_messages {lines, mode: add|replace, note?}` checks the lines (1 to 60, 120 characters
+each, no control characters, at least one message line, prefixes and effects must parse; refusals
+come back at once with `reasons` and write nothing), then writes `desk-messages-request.json`
+atomically (mode 0600) and waits up to 10 seconds for the app's `desk-messages-result.json`:
+
+```jsonc
+// request (server → app)
+{ "schema_version": 1, "id": "<32 hex>", "requested_at": "2026-10-04T10:00:00.1234560+00:00",
+  "lines": ["{ink:#ff2a6d,#05d9e8} {glow} hello there."], "mode": "add", "note": "for the week" }
+// result (app → server), rewritten when the user decides
+{ "id": "<same>", "completed_at": "…", "result": { "status": "pending_approval" | "applied" | "rejected",
+  "mode": "add", "reasons": ["…"], "lines_added": 1, "lines_skipped": 0 } }
+```
+
+No answer within the wait is `queued` / `app_not_responding`; the app takes a request up to ten
+minutes old. Neither tool is gated by Share with Claude: the messages are on the desktop already,
+and a proposal only asks. The server never writes `messages.txt`. The app (`DeskMessageHandoff`,
+watching Sanduhr's folder with the themes watcher) checks the request again (`MessageProposal`,
+the server's rules and wording, pinned by a test reading the server's constants), then either
+applies it, with Settings, Message, "Let Claude change the messages directly" on
+(`messageClaudeDirect`, off by default), or holds it as a suggestion: a banner on Settings, Message
+("Claude suggested N lines", the note, Dismiss, Review…, Add or Replace), a badge on Message in the
+sidebar, and a notification without sound only while alerts are on (their delivery and quiet hours;
+`MessageSuggestionNotice`). Add appends and skips lines already in the list; Replace keeps the
+comment block at the top of the file and replaces the rest. Either way the previous file is kept as
+`messages.txt.previous`. A suggestion waits in memory (quitting drops it); a newer one replaces it.
+The app writes `desk-messages-state.json` (`{schema_version, pinned, pinned_line, rotate}`) when
+the pin or rotation changes, for `get_desk_messages`.
+
+**Message effects.** Tags at the start of a line's text, after any prefix, in any order:
+`{ink:#hex,…}` (1 to 4 colors, a gradient from two), `{glow}` / `{noglow}` (over Settings, Desk,
+Look's new "Glow around the message", `messageGlow`), `{size:0.5…2}` (times the message size),
+`{write}` (the line draws itself in, left to right, over 1.5 s when it first appears, once) and
+`{shimmer}` (a light band sweeps across it in 1.6 s every 8 s). `MessageMarkup` parses strictly for
+proposals and leniently on the Desk: an unknown or malformed tag ends the tags and draws, with the
+rest, as plain text; a line of tags alone draws as written. Reduce Motion shows `{write}` at once and
+turns `{shimmer}` off. Cost: a line without `{write}` or `{shimmer}` draws as before (no mask, no
+task); `{write}` is one animation; `{shimmer}` is a task that sleeps between sweeps and stops while
+the Desk is covered (window occlusion), the screens sleep, the screen saver runs or the session is
+switched away (`MessageMotion.paused`).
+
+**Themes from Claude (item 55).** `propose_theme {theme, save_as?, apply?}` is the Windows tool:
+same name, inputs and result shape. `theme` is the theme JSON in `docs/themes/template.json`'s
+snake_case fields (`name`, the fourteen `#rrggbb` colors, optional `description` and the glass
+dials); `save_as` a file key (`^[a-z0-9][a-z0-9-]{0,39}$`, default the name slugged); `apply`
+default true. The description teaches the fields, the dials' ranges, what the lint measures and
+Match Desk. The server lints first (`lint_theme`, a Python copy of the Windows `ThemeLint`, the same
+rules and wording) and refuses a broken theme or a built-in's key at once (`rejected`, `reason`
+`invalid_params` / `invalid_theme` / `reserved_name`, `findings: [{level, field, message}]`),
+writing nothing. A clean theme becomes `theme-request.json` (atomic, mode 0600) and the server
+waits up to 10 seconds for `theme-result.json`:
+
+```jsonc
+// request (server → app)
+{ "schema_version": 1, "id": "<32 hex>", "requested_at": "…", "theme": { "name": "Tidepool", … },
+  "save_as": null, "apply": true }
+// result (app → server), rewritten when the user decides
+{ "id": "<same>", "completed_at": "…", "result": {
+  "status": "applied" | "saved" | "pending_approval" | "rejected" | "error",
+  "reason": "invalid_theme" | "reserved_name" | "dismissed" | "name_taken" | "save_failed" | …,
+  "remedy": "…", "key": "tidepool-2", "name": "Tidepool", "previous_key": "obsidian",
+  "saved_path": "…/themes/tidepool-2.json", "renamed_from": "tidepool", "findings": [ … ] } }
+```
+
+No answer is `queued` / `app_not_responding`; the app takes a request up to ten minutes old. The
+app (`ThemeProposalHandoff`, on the same folder watch as the Desk messages, `HandoffWatch`) lints
+again with `ThemeLint` (the Swift port; errors refuse, warnings ride along) and refuses a built-in's
+key (`ThemeRegistry.builtIn`, Match Desk included). With Settings, Widget, Themes, "Let Claude
+change themes directly" on (`themeClaudeDirect`, off by default) it saves and applies as asked;
+otherwise the Themes page shows "Claude suggested a theme" with the theme's gallery card, its name
+and description, the lint's notes (hover), and Dismiss, Save, Save and Apply; Themes in the sidebar
+gets a badge and a notification posts as for Desk messages. **A user theme is never overwritten:**
+when the key's file holds a different theme the next free key is used (`tidepool-2`, up to `-99`)
+and the result names `renamed_from`; a file already holding the same theme is reused. A partial
+`accent_bloom` or `inner_highlight` gets the Windows defaults and `breath_period_ms` a whole number,
+so the Mac's loader reads what Windows reads. `glass_on_mica` is required here as on Windows, though
+a hand-written Mac theme may leave it out. The theme's name and description are never logged.
 
 Tests: `python3 -m unittest discover -s mac/integrations/tests` (also a Mac CI step), over temp
-folders: each sharing level, no access file, hidden names, and the Windows MCP tests' cases.
+folders: each sharing level, no access file, hidden names, and the Windows MCP tests' cases. The
+two lints share `mac/Tests/SanduhrTests/Fixtures/theme-builtins.json`, the built-ins they must pass
+clean.
+
+## Desk and the Dock
+
+Desk's corners stay clear of the Dock on the Desk's screen (item 56, `DockFollower`, the pure
+pieces in `DockClearance.swift`). The Dock's own settings are read, never written: `com.apple.dock`
+`orientation` (no key is bottom), `autohide`, `tilesize`, `autohide-delay`. A bottom Dock moves the
+bottom corners up (`bl`, `br`); a side Dock moves its whole column in (`tl` and `bl` on the left,
+`tr` and `br` on the right). The Dock's reach is added to the corner margins (`left`, `right`,
+`bottom`), so the usual margin is kept from the Dock's edge instead of the screen's.
+
+- **Always shown.** The reach is the screen's `visibleFrame` against its `frame` on the Dock's side
+  (the menu bar never counts), read whenever the screen parameters change (the Dock moving,
+  resizing, starting or stopping to hide, a screen coming or going) and when the Dock's settings
+  change (`com.apple.dock.prefchanged` where macOS posts it, plus every app switch and Space change).
+  On two screens only the Desk's screen counts: a Dock on the other one moves nothing.
+- **Auto-hiding.** Items rest at the edge. When the Dock comes up they slide clear of it in
+  0.25 s (ease in and out, about as long as the Dock's own slide) and settle back when it hides;
+  with Reduce Motion they jump. Whether the Dock shows comes from `CGWindowListCopyWindowInfo`:
+  the on-screen windows owned by the Dock process (`com.apple.dock`) at the Dock's window layer
+  (`CGWindowLevelForKey(.dockWindow)`, 20) that cover the Desk's screen. Bounds and the on-screen
+  flag only, so no Screen Recording permission. A window shaped like a strip gives the Dock's
+  depth; on macOS 26 the Dock draws in one window as large as the screen, which only says that the
+  Dock shows, and the depth is then the always-shown reach last seen at the same tile size, else an
+  estimate from `tilesize` (tiles, shelf and gap, rounded up, so it errs clear of the Dock).
+  The slide is `DockSlide`: hidden, showing, shown, hiding.
+- **Cost.** Nothing polls while the pointer is away from the Dock. The window list is read only on
+  the Desk's close pointer watch (the 50 ms timer that already runs near Desk blocks), which also
+  runs while the pointer is in the Dock's trigger zone (its screen edge, 6 points deep) and while
+  the Dock has not hidden again (`DockWatch`): every tick while the pointer moves in the zone or
+  within the Dock's delay plus a second of resting there, every fourth tick once the pointer leaves
+  a shown Dock, and not at all once the Dock is hidden and the pointer is away.
+- **Missed on purpose.** A Dock that comes up without the pointer near it (Mission Control, App
+  Exposé, a keyboard shortcut) is followed once the pointer comes near; one that comes and goes
+  without the pointer near the edge is missed. Full-screen Spaces don't show the Desk, so nothing
+  there is affected.
+- **Click areas** move with the items: the frames are reported as the layout moves, so
+  `DeskHitTest` and `desk_frames` follow and `desk_frames_ok` holds during and after the slide.
+  `state.yaml` has `dock: {side, autohide, inset}`, `inset` the points applied now.
+
+## Now playing
+
+Now playing (items 53, 53b) shows what plays on the Mac, in any app that publishes now playing
+(Music, Spotify, Pandora, browser players such as YouTube Music): "▶ Title · Artist" wherever it is
+placed, like the rest of Desk: a notch wing or the strip under the camera (pick Now playing in
+Settings, Notch) and the `nowPlaying` element in Settings, Desk, Layout (a line with a position bar,
+in a corner like the other elements; off by default). There is no switch: it runs while it is placed
+somewhere and Desk is on (`NowPlayingPlacement`). Click it to play or pause; two-finger click for
+Previous, Play/Pause, Next and Now Playing Settings…. It hides when nothing plays, optionally while
+paused, and for apps switched off on the Now Playing page (which also has the source, the AppleScript
+switch and "Arrange on the Notch…" / "Arrange on the Desk…").
+
+- **Long titles.** A title that doesn't fit its wing (or the strip) scrolls through once when a new
+  track starts or the place first shows it: 1.2 s at the beginning, 30 pt/s with ease in and out
+  until its end clears the 12 pt fade, 1.0 s at the end, 0.6 s back, then it rests at the beginning.
+  It never loops, and never moves with Reduce Motion (`NowPlayingScroll`).
+- **While paused** a wing shows a Next button at its outer edge (away from the camera) and the strip
+  at its end; the title keeps its beginning visible. The title plays, the button skips
+  (`NowPlayingWingLayout`; the strip's button is the `now_playing_next` Desk element).
+- **Upgrading from item 53's switch.** Once at launch, a saved `nowPlaying` on with `nowPlayingDesk`
+  on (its default) and no now playing in the layout puts `nowPlaying` right after the meters' word in
+  the layout (the Claude line's when the meters are off the desktop), where the line used to sit.
+  The old keys are ignored after that (`nowPlayingPlacementUpgraded` marks it done).
+
+- **Source.** macOS 15.4 and later answer the MediaRemote "now playing" calls only for Apple-signed
+  processes, so Sanduhr bundles [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter)
+  (BSD-3, vendored unchanged in `Vendor/mediaremote-adapter/`, built by
+  `scripts/build-mediaremote-adapter.sh`) and runs its script with `/usr/bin/perl`: `test` once at
+  start and after a wake, then `stream --no-artwork --micros` as a child process, restarted with a
+  growing wait if it exits and given up after four quick exits in a row. The findings behind this are
+  in `docs/mac-now-playing-spike.md`.
+- **Fallback.** When `test` fails (or the stream keeps dying), Music's and Spotify's distributed
+  notifications (`com.apple.Music.playerInfo`, `com.spotify.client.PlaybackStateChanged`): no prompt,
+  but only those two apps and only from their next change. "Ask Music and Spotify directly" adds
+  AppleScript to the running ones when the fallback starts (the Automation prompt, once per app; the
+  app's `com.apple.security.automation.apple-events` entitlement and `NSAppleEventsUsageDescription`
+  exist for this). The page's Source line says Adapter working, Fallback (Music and Spotify only) or
+  Off. Force the fallback with `open -n --env SANDUHR_NOWPLAYING_TEST=fail mac/Sanduhr.app`.
+- **Controls** go from Sanduhr's own process through `MRMediaRemoteSendCommand` (not gated).
+- **In the bundle:** `Contents/Frameworks/MediaRemoteAdapter.framework`,
+  `Contents/Helpers/MediaRemoteAdapterTestClient`, `Contents/Resources/NowPlaying/mediaremote-adapter.pl`,
+  all universal. Release builds sign the helper, then the framework, then the app (Developer ID,
+  hardened runtime, timestamp); CI checks their architectures and the release workflow their
+  signatures.
+- **Privacy.** Titles and artists stay in memory: never on disk, in a log or in `state.yaml`
+  (`now_playing: {enabled, placed, source, state}` only). No network.
+
+## Fonts
+
+The Desk draws in **EsteFont 26** (Regular and Bold), the author's handwriting, which ships inside
+the app: `mac/Resources/Fonts/EsteFont26-Regular.ttf` and `EsteFont26-Bold.ttf`, copied by
+`build.sh` to `Sanduhr.app/Contents/Resources/Fonts/` and sealed by the signature (the build fails if
+either is missing or unsealed). At launch Sanduhr registers both for its own process only
+(`CTFontManagerRegisterFontsForURL`, `.process` scope), so nothing is installed on the Mac and other
+apps never see it; a copy already installed in Font Book simply draws instead.
+
+- **The Desk** (desk preference `font`): a new install draws in EsteFont 26. A Desk an earlier version
+  ran with no font picked keeps the system font (`""`, written once at upgrade; `fontDefaultSettled`
+  marks it done). A picked font stays picked; one that is no longer installed (the standalone apps'
+  EsteFont 2.1 on a Mac without it, say) draws in EsteFont 26 instead (`DeskFont.resolve`). The clock's
+  time uses the Bold face.
+- **The widget** (`UserDefaults` `fontFamily`) keeps its theme fonts (the system font) unless you pick
+  one; EsteFont 26 is first in the list, and its semibold and bold text draws in the Bold face. Match
+  Desk draws in the Desk's font, EsteFont 26 included.
+- Both font pickers (Settings, Desk, Look and Settings, Widget, Look) list EsteFont 26 first, after
+  System.
+
+EsteFont 26 is © 2009-2026 Estevan Hernandez / 626Labs LLC and licensed only for use by 626Labs LLC
+and Estevan Hernandez: it is not covered by the MIT license. Its license is in
+`THIRD-PARTY-NOTICES.txt`; Settings, About credits it.
+
+## What's New
+
+After Sanduhr updates, a What's New window shows once, a moment after the widget and Desk are up:
+one header for the releases it covers ("New in 2.4.0 – 2.6.0"), then a card for each big feature
+since the version you last saw (newest first, at most 8), each with a symbol or a small live
+preview and a Show me button that opens the right page of Settings. A
+fresh install never shows it (onboarding covers that), and while onboarding is up it waits for a
+later launch. Tick **Don't show after updates** in the window to stop the automatic showing;
+Settings, About has **What's New…** any time, as do the menu bar, widget and Desk clock menus.
+The cards live in `Sources/Sanduhr/Models/WhatsNewCards.swift`, one array per release: a release
+adds its own array and nothing else changes. Related features share a card, which sits with the
+newest release it covers and lists every release it spans; it shows when any of them is new. The last version seen is the `whatsNewLastSeen`
+default (`defaults write com.626labs.sanduhr whatsNewLastSeen 2.3.4` fakes an update).
 
 ## Files
 
@@ -387,8 +596,13 @@ folders: each sharing level, no access file, hidden names, and the Windows MCP t
 - Meter history → `~/Library/Application Support/Sanduhr/history.{label}.json`, one per account, the Windows format. Each reading is kept 30 days (and at most 8640 points per limit, Windows' cap), trimmed when the next one is written; the sparklines draw the last 24 points (about 2 hours). Settings, Accounts, Meter history: Off stops recording an account (`UserDefaults` `meterHistoryOff`, the labels switched off) and offers to erase its file; Remove Account deletes it. `state.yaml` shows the active account's `history_days` (30, or 0 when off)
 - Data choices per account (Claude Code folder, activity, project names, Share with Claude) → `UserDefaults` (`accountData`); the linked folder's path stays there, never in `state.yaml`
 - What the MCP server may read → `~/Library/Application Support/Sanduhr/mcp-access.json` (mode 0600; see Claude Code integrations)
+- Themes from Claude (item 55) → `theme-request.json` (server) and `theme-result.json` (app), mode 0600 in `~/Library/Application Support/Sanduhr/`; a saved theme in `themes/<key>.json`; the opt-in in `UserDefaults` (`themeClaudeDirect`)
+- Desk messages from Claude (item 54) → `desk-messages-request.json` (server), `desk-messages-result.json` and `desk-messages-state.json` (app), all mode 0600 in `~/Library/Application Support/Sanduhr/`; the previous list in `~/Library/Application Support/Desk/messages.txt.previous`; the opt-in in the desk preference `messageClaudeDirect`, the glow in `messageGlow`
 - Claude Code integrations (items 49 to 51) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json` (the notch glow hooks in its `hooks`), with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed, hooks_installed}`
 - Window position → `UserDefaults` (`windowFrame`)
+- Now playing (items 53, 53b) → where it shows is the desk preferences `notchLeft`, `notchRight`, `notchStrip` and the `nowPlaying` word in `layout`; the rest is `nowPlayingHidePaused`, `nowPlayingAskApps` and `nowPlayingExcluded` (bundle ids switched off). Item 53's `nowPlaying` and `nowPlayingDesk` are read once by the upgrade (`nowPlayingPlacementUpgraded`); what plays stays in memory
+- EsteFont 26 → `Sanduhr.app/Contents/Resources/Fonts/`, from `mac/Resources/Fonts/` (see Fonts); the Desk's choice in the desk preference `font`
+- Third-party notices (Sparkle, mediaremote-adapter, EsteFont 26) → `Sanduhr.app/Contents/Resources/THIRD-PARTY-NOTICES.txt`, from `mac/THIRD-PARTY-NOTICES.txt`; Settings, About opens it
 
 ## Controls
 
@@ -411,9 +625,14 @@ folders: each sharing level, no access file, hidden names, and the Windows MCP t
 | Two-finger click a tier card | Accounts, Hide (temporary limits), Stop warnings, Hidden Limits, Meter Settings, then the widget menu |
 | Click a Desk meter          | Nothing: the meters are passive, clicks there do nothing |
 | Two-finger click a Desk meter | Show or Hide Widget, then the same limit menu |
+| Click now playing (notch or Desk) | Play or pause (item 53) |
+| Click Next on a paused wing or strip | Next track (item 53b) |
+| Two-finger click now playing | Previous, Play/Pause, Next, Now Playing Settings… |
 | Right-click the hourglass   | The widget menu plus Menu Bar Shows (Session, Weekly, Whichever is higher, Rotate) |
 | **×**                       | Hide the widget (Desk keeps running) |
 
 ## License
 
-MIT. Python original by [626Labs LLC](https://626labs.dev).
+MIT. Python original by [626Labs LLC](https://626labs.dev). Third-party code: Sparkle (MIT) and
+mediaremote-adapter (BSD-3-Clause), with their licenses in `THIRD-PARTY-NOTICES.txt`. The bundled
+EsteFont 26 is proprietary (626Labs LLC), not MIT; its license is in the same file.

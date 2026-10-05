@@ -38,7 +38,7 @@ struct UpdatesSection: View {
     }
 }
 
-/// Settings, Sanduhr, About: who made it, which version, where to read more.
+/// Settings, Sanduhr, About: who made it, which version, what's new, where to read more.
 struct AboutSection: View {
     private let info = AppInfo.current
 
@@ -59,6 +59,9 @@ struct AboutSection: View {
                 .padding(.vertical, 4)
                 Text(AppInfo.independence)
                     .font(.callout).foregroundStyle(.secondary)
+                // Item 57: the release highlights, any time, whatever Don't show after updates says.
+                Button("What's New…") { WhatsNewWindowController.shared.show() }
+                    .help("What arrived in this version and the ones before it")
             }
             Section("Links") {
                 HStack {
@@ -70,6 +73,13 @@ struct AboutSection: View {
             }
             Section {
                 Link("Updates by Sparkle", destination: AboutLinks.sparkle)
+                Link("Now playing uses mediaremote-adapter by Jonas van den Berg (BSD-3-Clause)",
+                     destination: AboutLinks.mediaRemoteAdapter)
+                Text(AppInfo.fontCredit)
+                if let notices = AboutLinks.thirdPartyNotices() {
+                    Button("Third-Party Notices") { NSWorkspace.shared.open(notices) }
+                        .help("The licenses of Sparkle, mediaremote-adapter and EsteFont 26")
+                }
                 if !info.copyright.isEmpty {
                     Text(info.copyright).font(.caption).foregroundStyle(.secondary)
                 }

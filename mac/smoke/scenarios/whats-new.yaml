@@ -1,0 +1,25 @@
+# docs/mac-smoke-test.md section 28: What's New (item 57) opens from its hook as About and the
+# menus open it, shows its cards, and closes. Records nothing: whatsNewLastSeen stays as it was.
+name: What's New window
+steps:
+  - do: whats-new
+  - expect_state: { whats_new.open: true }
+  - expect:
+      window: whats-new
+      contains: { text: "/What.s New in Sanduhr/" }
+  # One header for the releases shown, "New in 2.4.0 – <this version>"; no per-card version line.
+  - expect:
+      window: whats-new
+      contains: { text: "/^New in 2\\.4\\.0( . [0-9.]+)?$/" }
+  - expect:
+      window: whats-new
+      missing: { text: "/^New in [0-9]+\\.[0-9]+$/" }
+  - expect:
+      window: whats-new
+      contains: { text: Show me }
+  - expect:
+      window: whats-new
+      contains: { text: "/Don.t show after updates/" }
+  - snap: whats-new
+  - do: close-whats-new
+  - expect_state: { whats_new.open: false }

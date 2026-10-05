@@ -11,7 +11,9 @@ With the Sanduhr MCP server installed (Settings ▸ Claude Usage ▸ Install MCP
 server…), skip the paste step: tell Claude Code "make me a Sanduhr theme from
 this image" and it calls the `propose_theme` tool with the JSON below. The
 widget lints the palette, saves it, applies it, and names the theme that was
-active before. A rejected palette comes back with the fields to fix.
+active before. A rejected palette comes back with the fields to fix. On the Mac
+the theme waits in Settings, Widget, Themes for you to save, apply or dismiss,
+unless "Let Claude change themes directly" is on.
 
 The design rules below are measured, not just asked for: `bg`, `glass` and
 `glass_on_mica` must keep relative luminance under 0.25; `text` needs 4.5:1

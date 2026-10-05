@@ -24,6 +24,8 @@ struct AppInfo: Equatable {
     static let tagline = "Pacing for your Claude subscription: the widget, Desk and the notch."
     /// Store and trademark requirement: on every surface that names Claude.
     static let independence = "Independent third-party tool. Not affiliated with Anthropic. Requires an active Claude Pro / Team / Enterprise subscription."
+    /// About's credit for the bundled handwriting font (item 58).
+    static let fontCredit = "Handwriting: EsteFont 26 by Estevan Hernandez"
 }
 
 /// A link button on Settings, About.
@@ -43,6 +45,12 @@ enum AboutLinks {
     /// The MIT license file at the repo root.
     static let license = URL(string: repo + "/blob/main/LICENSE")!
     static let sparkle = URL(string: "https://sparkle-project.org")!
+    /// Now playing's source (item 53), credited in About and Settings, Desk, Now Playing.
+    static let mediaRemoteAdapter = URL(string: "https://github.com/ungive/mediaremote-adapter")!
+    /// The third-party notices bundled in the app (mac/THIRD-PARTY-NOTICES.txt), nil when missing.
+    static func thirdPartyNotices(_ bundle: Bundle = .main) -> URL? {
+        bundle.url(forResource: "THIRD-PARTY-NOTICES", withExtension: "txt")
+    }
 
     /// The release page of a Mac version (tagged `v<version>-mac`); the releases list when the
     /// version is unknown or would not make a URL.

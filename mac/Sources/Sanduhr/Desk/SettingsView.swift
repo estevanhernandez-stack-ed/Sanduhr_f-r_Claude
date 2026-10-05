@@ -27,7 +27,7 @@ struct DeskLayoutSection: View {
                         ForEach(Self.slots, id: \.key) { Text($0.name).tag($0.key) }
                     }
                 }
-                Text("Pieces in the same corner stack in this order. The top and bottom of a side share a column, so they never overlap.")
+                Text("Pieces in the same corner stack in this order. The top and bottom of a side share a column, so they never overlap. Now playing shows only while something plays; its other settings are in Now Playing.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Margins") {
@@ -48,14 +48,15 @@ struct DeskLayoutSection: View {
 }
 
 /// The layout string the Layout section edits ("message:tl clock:bl claude:bl meetings:bl"), kept
-/// apart from the view so it tests without AppKit. DeskView reads the same string.
+/// apart from the view so it tests without AppKit. DeskView reads the same string. Now playing
+/// (item 53b) is an element like the others, off unless placed.
 enum DeskLayout {
     /// The layout DeskView draws when none is saved.
     static let standard = "message:tl clock:bl claude:bl meetings:bl"
 
     static let widgets: [(key: String, name: String)] = [
         ("message", "Message"), ("clock", "Clock and date"), ("claude", "Claude line"),
-        ("meters", "Claude meters (bars)"), ("meetings", "Meetings"),
+        ("meters", "Claude meters (bars)"), ("nowPlaying", "Now playing"), ("meetings", "Meetings"),
     ]
 
     /// Widget to slot. Words without exactly one colon are skipped; a repeated widget keeps its last slot.
@@ -99,15 +100,22 @@ enum DeskLayout {
 // MARK: - Look
 
 struct DeskLookSection: View {
-    @AppStorage("font", store: .desk) private var font = ""
+    @AppStorage("font", store: .desk) private var savedFont: String?
     @AppStorage("messageFont", store: .desk) private var messageFont = ""
     @AppStorage("timeSize", store: .desk) private var timeSize = 112.0
     @AppStorage("messageSize", store: .desk) private var messageSize = 84.0
     @AppStorage("messageColor", store: .desk) private var messageColor = "9ad7ff"
+    @AppStorage(DeskMessageLook.glowKey, store: .desk) private var messageGlow = true
     @AppStorage("inkColor", store: .desk) private var inkColor = "ffffff"
     @AppStorage("inkShadow", store: .desk) private var inkShadow = true
     @AppStorage("notchTextColor", store: .desk) private var notchTextColor = "ffffff"
     @State private var families: [String] = []
+
+    /// The Desk font as drawn (EsteFont 26 until one is picked, or when the picked one is gone);
+    /// picking writes it.
+    private var font: Binding<String> {
+        Binding(get: { DeskFont.resolve(saved: savedFont) }, set: { savedFont = $0 })
+    }
 
     static let presets: [(name: String, value: String)] = [
         ("Ice gradient", "8f5bd6,3a63e0,33fdff"),
@@ -120,7 +128,7 @@ struct DeskLookSection: View {
     var body: some View {
         Form {
             Section("Fonts") {
-                Picker("Desk font", selection: $font) {
+                Picker("Desk font", selection: font) {
                     Text("System").tag("")
                     Divider()
                     ForEach(families, id: \.self) { Text($0).tag($0) }
@@ -137,6 +145,7 @@ struct DeskLookSection: View {
             }
             Section("Colors (one hex, or several with commas for a gradient)") {
                 ColorRow(title: "Message", value: $messageColor)
+                Toggle("Glow around the message ({glow} and {noglow} change one line)", isOn: $messageGlow)
                 ColorRow(title: "Clock, date, meetings, Claude", value: $inkColor)
                 Toggle("Drop shadow under the clock text", isOn: $inkShadow)
                 ColorRow(title: "Notch text", value: $notchTextColor)
@@ -144,10 +153,8 @@ struct DeskLookSection: View {
         }
         .formStyle(.grouped)
         .onAppear {
-            families = NSFontManager.shared.availableFontFamilies.sorted {
-                $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
-            }
-            if !font.isEmpty, !families.contains(font) { families.insert(font, at: 0) }
+            // EsteFont 26 first: it ships inside Sanduhr (item 58).
+            families = DeskFont.pickerFamilies(installed: NSFontManager.shared.availableFontFamilies)
         }
     }
 }
@@ -278,15 +285,55 @@ private struct MeterWarningGroup: View {
 
 struct DeskMessageSection: View {
     var model: DeskModel
+    var handoff = DeskMessageHandoff.shared
     @AppStorage("message", store: .desk) private var pinned = ""
     @AppStorage("messageRotate", store: .desk) private var rotate = "daily"
+    @AppStorage(DeskMessageHandoff.directKey, store: .desk) private var claudeDirect = false
     @State private var text = ""
     @State private var saved = true
+    /// messages.txt changed under unsaved edits (Claude's lines were added): offer to reload.
+    @State private var fileChanged = false
+    @State private var reviewing = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("One line per message. \"Mon: text\" only on Mondays, \"10-31: text\" only on that date, # for notes.")
+            if let proposal = handoff.pending {
+                MessageSuggestionBanner(proposal: proposal, canAdd: saved,
+                                        review: { reviewing = true },
+                                        add: { handoff.approve() },
+                                        dismiss: { handoff.dismiss() })
+            }
+            Text("One line per message. \"Mon: text\" only on Mondays, \"10-31: text\" only on that date, # for notes. Effects go first: {ink:#ff2a6d,#05d9e8} {glow} {noglow} {size:1.2} {write} {shimmer}.")
                 .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            editor
+            Picker("Change", selection: $rotate) {
+                Text("Once a day").tag("daily")
+                Text("Every hour").tag("hourly")
+            }
+            .pickerStyle(.segmented)
+            TextField("Pin one line instead (leave empty to use the list)", text: $pinned)
+                .onChange(of: pinned) { _, _ in model.message = MessageEngine.current() }
+            claudeSwitch
+        }
+        .padding(.top, 8)
+        .onAppear(perform: load)
+        .onChange(of: rotate) { _, _ in model.message = MessageEngine.current() }
+        .onChange(of: handoff.revision) { _, _ in
+            if saved { load() } else { fileChanged = true }
+        }
+        .sheet(isPresented: $reviewing) {
+            if let proposal = handoff.pending {
+                MessageSuggestionReview(proposal: proposal, canAdd: saved,
+                                        add: { reviewing = false; handoff.approve() },
+                                        dismiss: { reviewing = false; handoff.dismiss() },
+                                        close: { reviewing = false })
+            }
+        }
+    }
+
+    private var editor: some View {
+        VStack(alignment: .leading, spacing: 10) {
             TextEditor(text: $text)
                 .font(.system(size: 12, design: .monospaced))
                 .frame(minHeight: 170)
@@ -299,28 +346,153 @@ struct DeskMessageSection: View {
                 Text(saved ? "Today: \(MessageEngine.current() ?? "nothing")" : "Unsaved")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 Spacer()
+                if fileChanged {
+                    Text("The file changed").font(.caption).foregroundStyle(.secondary)
+                    Button("Reload") { load() }
+                        .help("Shows messages.txt as it is now; your unsaved edits are dropped.")
+                }
             }
-            Picker("Change", selection: $rotate) {
-                Text("Once a day").tag("daily")
-                Text("Every hour").tag("hourly")
-            }
-            .pickerStyle(.segmented)
-            TextField("Pin one line instead (leave empty to use the list)", text: $pinned)
-                .onChange(of: pinned) { _, _ in model.message = MessageEngine.current() }
         }
-        .padding(.top, 8)
-        .onAppear {
-            MessageEngine.ensureFile()
-            text = (try? String(contentsOf: MessageEngine.fileURL, encoding: .utf8)) ?? ""
+    }
+
+    private var claudeSwitch: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle("Let Claude change the messages directly", isOn: $claudeDirect)
+            Text(claudeDirect
+                 ? "Lines Claude proposes with the Sanduhr MCP server go into the list at once. The list before each change is kept as messages.txt.previous."
+                 : "Lines Claude proposes with the Sanduhr MCP server wait here for you to add, review or dismiss.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.top, 6)
+    }
+
+    private func load() {
+        MessageEngine.ensureFile()
+        text = (try? String(contentsOf: MessageEngine.fileURL, encoding: .utf8)) ?? ""
+        saved = true
+        fileChanged = false
+        // Assigning the text can mark it unsaved a moment later (onChange); it is not.
+        DispatchQueue.main.async {
             saved = true
+            fileChanged = false
         }
-        .onChange(of: rotate) { _, _ in model.message = MessageEngine.current() }
     }
 
     private func save() {
         try? text.write(to: MessageEngine.fileURL, atomically: true, encoding: .utf8)
         model.message = MessageEngine.current()
         saved = true
+        fileChanged = false
+    }
+}
+
+/// "Claude suggested N lines" over Settings, Message: the note, Add, Review and Dismiss.
+private struct MessageSuggestionBanner: View {
+    let proposal: MessageProposal
+    /// False while the editor has unsaved edits: Add would write under them.
+    let canAdd: Bool
+    let review: () -> Void
+    let add: () -> Void
+    let dismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Image(systemName: "sparkles").foregroundStyle(.tint)
+                Text(MessageSuggestionReview.headline(proposal)).font(.headline)
+                Spacer()
+                Button("Dismiss", action: dismiss)
+                Button("Review…", action: review)
+                Button(proposal.mode == .replace ? "Replace" : "Add", action: add)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!canAdd)
+                    .help(canAdd ? "" : "Save or reload your edits first.")
+            }
+            if let note = proposal.note {
+                Text(note).font(.callout).foregroundStyle(.secondary).lineLimit(3)
+            }
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.08)))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.accentColor.opacity(0.25)))
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// Review: every suggested line drawn as the Desk would draw it, effects included (a {write}
+/// line writes itself in, a {shimmer} line shimmers), on a dark card.
+struct MessageSuggestionReview: View {
+    let proposal: MessageProposal
+    let canAdd: Bool
+    let add: () -> Void
+    let dismiss: () -> Void
+    let close: () -> Void
+
+    @AppStorage("font", store: .desk) private var savedFont: String?
+    private var font: String { DeskFont.resolve(saved: savedFont) }
+    @AppStorage("messageFont", store: .desk) private var messageFont = ""
+    @AppStorage("messageColor", store: .desk) private var messageColor = "9ad7ff"
+    @AppStorage(DeskMessageLook.glowKey, store: .desk) private var messageGlow = true
+
+    static func headline(_ p: MessageProposal) -> String {
+        let n = p.messageLines.count
+        let lines = "\(n) line\(n == 1 ? "" : "s")"
+        return p.mode == .replace ? "Claude suggested \(lines) to replace your list" : "Claude suggested \(lines)"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(Self.headline(proposal)).font(.title3.weight(.semibold))
+            if let note = proposal.note { Text(note).foregroundStyle(.secondary) }
+            if proposal.mode == .replace {
+                Text("Replace keeps the notes at the top of messages.txt and swaps every other line for these. Your list now is kept as messages.txt.previous.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    ForEach(Array(proposal.lines.enumerated()), id: \.offset) { _, line in
+                        row(line)
+                    }
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.85)))
+            .frame(minHeight: 220)
+            buttons
+        }
+        .padding(20)
+        .frame(width: 560, height: 480)
+    }
+
+    @ViewBuilder
+    private func row(_ line: String) -> some View {
+        if MessageProposal.isMessageLine(line) {
+            let split = MessageEngine.splitPrefix(line)
+            VStack(alignment: .leading, spacing: 2) {
+                if split.kind != .plain {
+                    Text(split.kind == .date ? "only on \(split.tag)" : "only on \(split.tag)days")
+                        .font(.caption2).foregroundStyle(.white.opacity(0.55))
+                }
+                DeskMessageLine(raw: split.body, font: messageFont.isEmpty ? font : messageFont, baseSize: 30,
+                                inkSpec: messageColor, globalGlow: messageGlow, alignment: .leading, paused: false)
+            }
+        } else if !line.trimmingCharacters(in: .whitespaces).isEmpty {
+            Text(line).font(.system(size: 11, design: .monospaced)).foregroundStyle(.white.opacity(0.5))
+        }
+    }
+
+    private var buttons: some View {
+        HStack {
+            Button("Dismiss", action: dismiss)
+            Spacer()
+            Button("Close", action: close).keyboardShortcut(.cancelAction)
+            Button(proposal.mode == .replace ? "Replace" : "Add", action: add)
+                .keyboardShortcut(.defaultAction)
+                .disabled(!canAdd)
+        }
     }
 }
 

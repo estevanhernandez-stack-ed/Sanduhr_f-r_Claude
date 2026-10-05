@@ -26,6 +26,10 @@ final class DeskController: NSObject, NSMenuDelegate {
     private(set) var wingsWindow: NSWindow?
     private var wingsTimer: Timer?
     let model = DeskModel()
+    /// Keeps the corners clear of the Dock (item 56).
+    let dock = DockFollower()
+    /// The pointer was near a Desk block at the last mouse-through check.
+    private var nearBlocks = false
     private let hotKeys = DeskHotKeys()
 
     var enabled: Bool { UserDefaults.desk.bool(forKey: Self.enabledKey) }
@@ -38,6 +42,8 @@ final class DeskController: NSObject, NSMenuDelegate {
     func apply() {
         if enabled, !running { start() }
         if !enabled, running { stop() }
+        // Now playing runs only while Desk does (and its own switch is on).
+        NowPlayingController.shared.apply()
         let previous = appliedEnabled
         appliedEnabled = enabled
         if let previous, previous != enabled {
@@ -51,6 +57,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         for id in ["com.estevan.desk", "com.626labs.sanduhrdesk"] {
             NSRunningApplication.runningApplications(withBundleIdentifier: id).forEach { $0.terminate() }
         }
+        dock.apply = { [weak self] insets, animation in self?.applyDock(insets, animation: animation) }
+        dock.start()
         buildWindow()
         // The clock menu is off by default: Sanduhr owns the menu bar, meetings join from the
         // desktop or Option+J. `defaults write com.626labs.sanduhr.desk menuIcon -bool true` brings it back.
@@ -72,9 +80,66 @@ final class DeskController: NSObject, NSMenuDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(otherAppActivated),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
+        watchVisibility()
     }
 
-    @objc private func otherAppActivated() { updateMouseThrough() }
+    @objc private func otherAppActivated() {
+        // Back from System Settings, Desktop & Dock: the Dock may have moved or stopped hiding.
+        dock.refreshPrefs()
+        updateMouseThrough()
+    }
+
+    /// The Dock's reach changed (DockFollower): the corners move, sliding with the auto-hiding
+    /// Dock (no slide with Reduce Motion, which DockFollower passes as no animation).
+    private func applyDock(_ insets: DockInsets, animation: Animation?) {
+        guard model.dockInsets != insets else { return }
+        if let animation {
+            withAnimation(animation) { model.dockInsets = insets }
+        } else {
+            model.dockInsets = insets
+        }
+    }
+
+    // MARK: Out of sight (item 54: the message's {shimmer} rests)
+
+    private var screensAsleep = false
+    private var screenSaver = false
+    private var sessionAway = false
+    private static let screenSaverStarted = Notification.Name("com.apple.screensaver.didstart")
+    private static let screenSaverStopped = Notification.Name("com.apple.screensaver.didstop")
+
+    private func watchVisibility() {
+        let ws = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.screensDidSleepNotification, NSWorkspace.screensDidWakeNotification,
+                     NSWorkspace.sessionDidResignActiveNotification, NSWorkspace.sessionDidBecomeActiveNotification] {
+            ws.addObserver(self, selector: #selector(visibilityEvent(_:)), name: name, object: nil)
+        }
+        let dist = DistributedNotificationCenter.default()
+        dist.addObserver(self, selector: #selector(visibilityEvent(_:)), name: Self.screenSaverStarted, object: nil)
+        dist.addObserver(self, selector: #selector(visibilityEvent(_:)), name: Self.screenSaverStopped, object: nil)
+    }
+
+    @objc private func visibilityEvent(_ note: Notification) {
+        switch note.name {
+        case NSWorkspace.screensDidSleepNotification: screensAsleep = true
+        case NSWorkspace.screensDidWakeNotification: screensAsleep = false
+        case NSWorkspace.sessionDidResignActiveNotification: sessionAway = true
+        case NSWorkspace.sessionDidBecomeActiveNotification: sessionAway = false
+        case Self.screenSaverStarted: screenSaver = true
+        case Self.screenSaverStopped: screenSaver = false
+        default: break
+        }
+        updateMotion()
+    }
+
+    @objc private func occlusionChanged() { updateMotion() }
+
+    private func updateMotion() {
+        let visible = window.map { $0.occlusionState.contains(.visible) } ?? false
+        let paused = MessageMotion.paused(deskVisible: visible, screensAsleep: screensAsleep,
+                                          screenSaver: screenSaver, sessionAway: sessionAway)
+        if model.motionPaused != paused { model.motionPaused = paused }
+    }
 
     @objc private func appBecameActive() {
         recheckCalendar()
@@ -102,11 +167,16 @@ final class DeskController: NSObject, NSMenuDelegate {
         mouseMonitors = []
         watchApproach(false)
         model.onHitAreasChange = nil
+        dock.stop()
+        dock.apply = nil
+        model.dockInsets = DockInsets()
         setMenuIcon(false)
         model.stop()
         applyHotKeys()
         NotificationCenter.default.removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
+        DistributedNotificationCenter.default().removeObserver(self)
+        screensAsleep = false; screenSaver = false; sessionAway = false
     }
 
     /// Called when Desk starts or stops and when the shortcuts switch flips.
@@ -129,6 +199,9 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// One transparent, click-through window covering the main screen, above the desktop
     /// icons and below every app window.
     private func buildWindow() {
+        if let old = window {
+            NotificationCenter.default.removeObserver(self, name: NSWindow.didChangeOcclusionStateNotification, object: old)
+        }
         window?.close()
         guard let screen = NSScreen.main else { return }
         let w = NSWindow(contentRect: screen.frame, styleMask: [.borderless],
@@ -145,11 +218,16 @@ final class DeskController: NSObject, NSMenuDelegate {
         w.ignoresMouseEvents = true
         model.topInset = screen.frame.maxY - screen.visibleFrame.maxY
         model.notchRect = screen.cameraNotch
+        dock.screenChanged(screen)
         buildWingsWindow(on: screen)
         w.contentView = FirstClickHostingView(rootView: DeskView(model: model))
         w.setFrame(screen.frame, display: true)
         w.orderFront(nil)
         window = w
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(occlusionChanged),
+            name: NSWindow.didChangeOcclusionStateNotification, object: w)
+        updateMotion()
         // A pointer already resting near the Desk is watched from the start, before any movement;
         // once the frames arrive (onHitAreasChange) it takes the mouse over a click area.
         updateMouseThrough()
@@ -192,6 +270,7 @@ final class DeskController: NSObject, NSMenuDelegate {
     }
 
     @objc private func spaceChanged() {
+        dock.refreshPrefs()
         wingsWindow?.orderFrontRegardless()
         updateMouseThrough()
     }
@@ -254,16 +333,16 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// window covers the meters or that app opened its own menu (DeskPointerMenu.fallbackOpens).
     /// The window then takes the mouse, so the next click reaches Desk directly.
     private func limitMenuAfterMissedClick() {
-        guard DeskHitTest.isMeters(elementUnderPointer()), !Self.appWindowCoversPointer() else { return }
+        guard DeskHitTest.hasMenu(elementUnderPointer()), !Self.appWindowCoversPointer() else { return }
         updateMouseThrough()
         DispatchQueue.main.asyncAfter(deadline: .now() + DeskPointerMenu.fallbackDelay) { [weak self] in
             guard let self, let w = self.window, let view = w.contentView else { return }
             let hit = self.elementUnderPointer()
-            guard DeskPointerMenu.fallbackOpens(overMeters: DeskHitTest.isMeters(hit),
+            guard DeskPointerMenu.fallbackOpens(overMeters: DeskHitTest.hasMenu(hit),
                                                 appWindowCovers: Self.appWindowCoversPointer(),
                                                 otherMenuOpen: Self.otherAppMenuOpen()) else { return }
             let at = view.convert(w.mouseLocationOutsideOfEventStream, from: nil)
-            self.limitMenu(for: hit).popUp(positioning: nil, at: at, in: view)
+            self.menu(for: hit).popUp(positioning: nil, at: at, in: view)
         }
     }
 
@@ -286,11 +365,17 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     /// A two-finger click on the meters opens the limit menu for the row under the pointer
     /// (LimitMenu): Accounts, Hide, the warnings item, Meter Settings…, then the shared menu.
+    /// On now playing (the Desk line or the strip under the camera), its menu instead.
     private func limitMenuUnderPointer(_ event: NSEvent) -> Bool {
         let hit = elementUnderPointer()
-        guard let view = window?.contentView, DeskHitTest.isMeters(hit) else { return false }
-        NSMenu.popUpContextMenu(limitMenu(for: hit), with: event, for: view)
+        guard let view = window?.contentView, DeskHitTest.hasMenu(hit) else { return false }
+        NSMenu.popUpContextMenu(menu(for: hit), with: event, for: view)
         return true
+    }
+
+    /// The two-finger menu for a hit: now playing's, or the limit menu on the meters.
+    private func menu(for hit: DeskElement?) -> NSMenu {
+        hit?.kind == .nowPlaying ? NowPlayingController.shared.menu() : limitMenu(for: hit)
     }
 
     /// The limit menu for a hit on the meters: that row's limit, or none beside the rows.
@@ -347,6 +432,10 @@ final class DeskController: NSObject, NSMenuDelegate {
         case .account:
             // Event monitors run on the main thread.
             MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.viewModel.cycleAccount() }
+        case .nowPlaying:
+            NowPlayingController.shared.togglePlayPause()
+        case .nowPlayingNext:
+            NowPlayingController.shared.next()
         case .meters, .meterRow:
             // The window holds the mouse over the meters so a two-finger click reaches the limit
             // menu; a plain click is swallowed there, so nothing reacts to it.
@@ -383,17 +472,28 @@ final class DeskController: NSObject, NSMenuDelegate {
         }
         let over = DeskHitTest.element(at: point, in: model.elements()) != nil
         if w.ignoresMouseEvents == over { w.ignoresMouseEvents = !over }
-        let blocks = [model.metersFrame, model.accountFrame, model.noteFrame, model.meetingsFrame]
-        watchApproach(DeskPointerWatch.near(point, frames: blocks))
+        let blocks = [model.metersFrame, model.accountFrame, model.noteFrame, model.meetingsFrame,
+                      model.nowPlayingFrame, model.stripFrame, model.stripNextFrame]
+        nearBlocks = DeskPointerWatch.near(point, frames: blocks)
+        // The auto-hiding Dock's edge (item 56) runs the same watch, which reads the window list.
+        watchApproach(nearBlocks || dock.wantsWatch(pointer: point, size: w.frame.size))
     }
 
     /// The close watch's tick: a pointer that has not moved since the last tick needs nothing
-    /// (layout changes arrive through onHitAreasChange), so a resting pointer costs one read.
+    /// for the click areas (layout changes arrive through onHitAreasChange), so a resting pointer
+    /// costs one read. Near the auto-hiding Dock's edge the tick also looks for the Dock
+    /// (DockFollower, DockWatch), and the watch stops once neither needs it.
     private func watchTick() {
         let p = NSEvent.mouseLocation
-        guard p != lastWatchedPointer else { return }
-        lastWatchedPointer = p
-        updateMouseThrough()
+        let moved = p != lastWatchedPointer
+        if moved {
+            lastWatchedPointer = p
+            updateMouseThrough()
+        }
+        guard approachTimer != nil, let w = window else { return }
+        let point = pointerInWindow()
+        dock.tick(pointer: point, size: w.frame.size, moved: moved)
+        if !nearBlocks, !dock.wantsWatch(pointer: point, size: w.frame.size) { watchApproach(false) }
     }
 
     /// Starts the close watch when `on` and none runs, stops it when off. Common run loop modes,
@@ -460,10 +560,11 @@ final class DeskController: NSObject, NSMenuDelegate {
         addStandardItems(to: menu)
     }
 
-    /// Option+S, …/settings links and the notch island: the one Settings window.
-    func showSettings() {
+    /// Option+S, …/settings links and the notch island: the one Settings window, at `section`
+    /// when given.
+    func showSettings(_ section: SettingsSection? = nil) {
         // Hotkeys, links and taps all arrive on the main thread.
-        MainActor.assumeIsolated { SettingsWindowController.shared.show() }
+        MainActor.assumeIsolated { SettingsWindowController.shared.show(section) }
     }
 
     /// Settings' "Desk menu in the menu bar" switch.

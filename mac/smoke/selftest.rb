@@ -62,6 +62,8 @@ class FakeApp
       s['settings_open'] = true
       s['settings_section'] = 'usage'
       s['usage_page'] = { 'open' => true, 'tab' => arg || 'overview' }
+    when 'whats-new' then (s['whats_new'] ||= {})['open'] = true
+    when 'close-whats-new' then (s['whats_new'] ||= {})['open'] = false
     when 'theme' then s['theme'] = arg
     when 'account' then s['account_ref'] = s['account_ref'] == '104ab921' ? '0f1e2d3c' : '104ab921'
     when 'tool'
@@ -115,6 +117,12 @@ check('desk frames are [x, y, w, h] in whole points',
       state['desk_frames'].all? { |f| f['frame'].length == 4 && f['frame'].all? { |n| n.is_a?(Integer) } })
 check('desk frames carry no labels or titles',
       state['desk_frames'].all? { |f| (f.keys - %w[kind key clickable frame]).empty? })
+# Item 56: the Dock as the Desk sees it; its side, auto-hide and the inset applied now.
+# Item 57: What's New, a version, a count and two flags; nothing pending once seen.
+eq('whats new seen in the fixture', state['whats_new'],
+   { 'last_seen' => '2.1.0', 'pending' => 0, 'open' => false, 'hide_after_updates' => false })
+eq('dock at the bottom, shown, nothing applied in the fixture', state['dock'],
+   { 'side' => 'bottom', 'autohide' => false, 'inset' => 0 })
 app_acct = FakeApp.new
 app_acct.action('account', 'next')
 check('account next changes account_ref', app_acct.state_now['account_ref'] != state['account_ref'])
@@ -214,6 +222,10 @@ eq('a tool closes on a widget shown after the desk switch',
    Restore.plan(base.merge('widget_visible' => true),
                 base.merge('desk_enabled' => false, 'widget_visible' => true, 'active_tool' => 'snake')),
    [%w[desk on], ['show-widget', nil], %w[tool snake], ['show-widget', nil]])
+eq('close What\'s New opened by the scenario',
+   Restore.plan(base, base.merge('whats_new' => { 'open' => true })), [['close-whats-new', nil]])
+eq('What\'s New left open stays open', Restore.plan(base.merge('whats_new' => { 'open' => true }),
+                                                    base.merge('whats_new' => { 'open' => true })), [])
 eq('close settings opened by the scenario', Restore.plan(base, base.merge('settings_open' => true)), [['close-settings', nil]])
 eq('reopen settings at its section',
    Restore.plan(base.merge('settings_open' => true, 'settings_section' => 'alerts'),
@@ -302,7 +314,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage]
+    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end

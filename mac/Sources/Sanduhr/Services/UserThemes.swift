@@ -114,6 +114,14 @@ enum UserThemes {
         reload()
     }
 
+    /// A theme file's bytes as the widget would load them under `id`, nil when the loader would
+    /// skip the file. Claude's theme proposals (item 55) preview and check with it.
+    static func decodeTheme(_ data: Data, id: String) -> Theme? {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return (try? decoder.decode(ThemeDTO.self, from: data))?.toTheme(id: id)
+    }
+
     /// "Sunset Neon" → "sunset-neon". Matches Windows `_slugify`.
     static func slugify(_ name: String) -> String {
         let lowered = name.lowercased()

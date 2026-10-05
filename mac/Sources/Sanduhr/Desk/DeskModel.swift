@@ -73,12 +73,22 @@ final class DeskModel {
     var switchNote = false
     /// Today's line from MessageEngine (messages.txt), or nil when there is none.
     var message: String?
+    /// Nobody can see the Desk (covered, screens asleep, screen saver, session switched away):
+    /// the message's {shimmer} rests (MessageMotion). Set by DeskController.
+    var motionPaused = false
     /// Height of the menu bar strip at the top of the screen, so top slots sit below it.
     var topInset: CGFloat = 0
+    /// How far the Dock reaches into the screen on each side (item 56, DockFollower): the Desk's
+    /// corners on that side sit this much further in. Changes with an animation while an
+    /// auto-hiding Dock comes and goes.
+    var dockInsets = DockInsets()
     /// The camera notch in window coordinates (top-left origin), or nil on screens without one.
     var notchRect: CGRect?
     /// The Claude meters, short enough for the notch: "5h 7%  wk 63%".
     var claudeCompact: String?
+    /// What plays, after Now Playing's hide rules (NowPlayingController), nil for nothing to show.
+    /// In memory only.
+    var nowPlaying: NowPlayingInfo?
     /// Where the meeting list sits in the window (SwiftUI global coordinates, top-left origin).
     /// The app delegate lets clicks through everywhere except here, so the rows can be clicked.
     @ObservationIgnored var meetingsFrame: CGRect = .zero { didSet { if meetingsFrame != oldValue { onHitAreasChange?() } } }
@@ -95,6 +105,13 @@ final class DeskModel {
     /// Where the account label at the start of the claude line sits, same coordinates, or .zero
     /// with one account or no line. A click here switches to the next account.
     @ObservationIgnored var accountFrame: CGRect = .zero { didSet { if accountFrame != oldValue { onHitAreasChange?() } } }
+    /// Where the Desk's now playing line sits, same coordinates. A click plays or pauses.
+    @ObservationIgnored var nowPlayingFrame: CGRect = .zero { didSet { if nowPlayingFrame != oldValue { onHitAreasChange?() } } }
+    /// Where the text in the strip under the camera sits, same coordinates (clickable while it
+    /// shows now playing).
+    @ObservationIgnored var stripFrame: CGRect = .zero { didSet { if stripFrame != oldValue { onHitAreasChange?() } } }
+    /// Where the strip's Next button sits while paused (item 53b), same coordinates. A click skips.
+    @ObservationIgnored var stripNextFrame: CGRect = .zero { didSet { if stripNextFrame != oldValue { onHitAreasChange?() } } }
     /// Called when a clickable piece moves or comes and goes (DeskController takes the mouse there).
     @ObservationIgnored var onHitAreasChange: (() -> Void)?
     /// Alert pulses so far, per limit (Settings, Alerts, Where alerts show). A meter row pulses
@@ -343,6 +360,16 @@ final class DeskModel {
         input.noteFrame = noteFrame
         input.meetingsFrame = meetingsFrame
         input.rowFrames = rowFrames
+        input.nowPlayingLine = input.placed.contains(NowPlayingPlacement.widget) && nowPlaying != nil
+        input.nowPlayingFrame = nowPlayingFrame
+        input.nowPlayingStrip = DeskNowPlaying.stripShows(
+            notch: desk.bool(forKey: DeskController.notchKey), hasNotch: notchRect != nil,
+            chin: desk.object(forKey: "notchChin") as? Double ?? 26,
+            chinText: desk.bool(forKey: "notchChinText"),
+            strip: NotchContent.saved(.strip, in: desk), hasTrack: nowPlaying != nil)
+        input.stripFrame = stripFrame
+        input.nowPlayingStripNext = NowPlayingWingLayout.showsNext(nowPlaying?.state)
+        input.stripNextFrame = stripNextFrame
         return DeskElements.build(input)
     }
 

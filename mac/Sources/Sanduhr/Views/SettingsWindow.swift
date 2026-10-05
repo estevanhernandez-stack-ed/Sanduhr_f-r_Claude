@@ -8,7 +8,7 @@ import SwiftUI
 /// scenarios and state.yaml's `settings_section` keep working unchanged.
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general, alerts, credentials, usage, integrations
-    case deskLayout, deskLook, deskMeters, message, notch
+    case deskLayout, deskLook, deskMeters, message, notch, nowPlaying
     case widgetLook, themes, pacing
     case updates, about
 
@@ -26,6 +26,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .deskMeters: "Meters"
         case .message: "Message"
         case .notch: "Notch"
+        case .nowPlaying: "Now Playing"
         case .widgetLook: "Look"
         case .themes: "Themes"
         case .pacing: "Pacing & Focus"
@@ -46,6 +47,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .deskMeters: "gauge.with.dots.needle.67percent"
         case .message: "text.quote"
         case .notch: "rectangle.topthird.inset.filled"
+        case .nowPlaying: "music.note"
         case .widgetLook: "textformat"
         case .themes: "paintpalette"
         case .pacing: "speedometer"
@@ -60,7 +62,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     /// Claude, and its consent points back at Accounts.
     static let groups: [(header: String?, sections: [SettingsSection])] = [
         (nil, [.general, .alerts, .credentials, .usage, .integrations]),
-        ("Desk", [.deskLayout, .deskLook, .deskMeters, .message, .notch]),
+        ("Desk", [.deskLayout, .deskLook, .deskMeters, .message, .notch, .nowPlaying]),
         ("Widget", [.widgetLook, .themes, .pacing]),
         ("Sanduhr", [.updates, .about]),
     ]
@@ -156,7 +158,31 @@ struct SettingsRoot: View {
 
     private func rows(_ sections: [SettingsSection]) -> some View {
         ForEach(sections) { s in
-            Label(s.title, systemImage: s.symbol).tag(s)
+            // A drawn dot rather than List's .badge: with a badge showing, the sidebar stopped
+            // taking clicks (2026-10-04). The row stays a plain Label, tagged for selection.
+            HStack(spacing: 6) {
+                Label(s.title, systemImage: s.symbol)
+                Spacer(minLength: 0)
+                if Self.badge(s) > 0 {
+                    Text("\(Self.badge(s))")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(Color.accentColor))
+                        .accessibilityLabel("Suggestion waiting")
+                }
+            }
+            .tag(s)
+        }
+    }
+
+    /// A suggestion from Claude waits on Message (item 54) or Themes (item 55).
+    @MainActor static func badge(_ s: SettingsSection) -> Int {
+        switch s {
+        case .message: DeskMessageHandoff.shared.pending != nil ? 1 : 0
+        case .themes: ThemeProposalHandoff.shared.pending != nil ? 1 : 0
+        default: 0
         }
     }
 
@@ -169,6 +195,7 @@ struct SettingsRoot: View {
         case .deskMeters: DeskMetersSection(model: deskModel)
         case .message: DeskMessageSection(model: deskModel).padding(20)
         case .notch: DeskNotchSection()
+        case .nowPlaying: NowPlayingSection()
         case .updates: UpdatesSection(updates: updates)
         case .about: AboutSection()
         case .credentials: AccountsSettings(vm: vm, navigation: navigation)

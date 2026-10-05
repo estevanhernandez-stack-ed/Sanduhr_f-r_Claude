@@ -1,0 +1,127 @@
+import SwiftUI
+
+/// The handwritten line with its effects (item 54), on the Desk and in Settings, Message's review
+/// of a suggestion. Drawn the way handwritten.py baked it: colored ink, a soft glow in the same
+/// color, two lines at most, scaling down rather than colliding.
+///
+/// Cost: a line without `{write}` or `{shimmer}` is plain text, no mask, no task that wakes.
+/// `{write}` is one 1.5 s animation when the line first shows (a mask whose width animates).
+/// `{shimmer}` is a task that sleeps 6.4 s, sweeps for 1.6 s and sleeps again; it does not run
+/// with Reduce Motion or while `paused` (the Desk is covered, the screens sleep, the session is
+/// switched away), so nothing wakes while nobody can see it.
+struct DeskMessageLine: View {
+    /// The line's text as picked (prefix gone, tags still on).
+    let raw: String
+    let font: String
+    let baseSize: CGFloat
+    /// Settings, Desk, Look's message color: one hex or a comma list.
+    let inkSpec: String
+    /// Settings, Desk, Look's glow switch.
+    let globalGlow: Bool
+    let alignment: HorizontalAlignment
+    let paused: Bool
+    var lineLimit = 2
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var reveal: CGFloat = 0
+    @State private var sweep: CGFloat = 0
+
+    var body: some View {
+        let parsed = MessageMarkup.parse(raw)
+        let effects = parsed.effects
+        let size = MessageMotion.size(effects, base: baseSize)
+        let colors = Color.inkStops(MessageMotion.inkSpec(effects, global: inkSpec), fallback: "9ad7ff")
+        let glow = colors[colors.count / 2]
+        let glows = MessageMotion.glows(effects, global: globalGlow)
+        let writes = MessageMotion.animatesWrite(effects, reduceMotion: reduceMotion)
+        let shimmers = MessageMotion.shimmers(effects, reduceMotion: reduceMotion, paused: paused)
+        styled(parsed.text, size: size)
+            .foregroundStyle(LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing))
+            .overlay { if shimmers { shimmerBand.mask(styled(parsed.text, size: size)) } }
+            .modifier(RevealMask(progress: writes ? reveal : 1, overhang: size * 0.4, active: writes))
+            .opacity(0.94)
+            .shadow(color: glow.opacity(glows ? 0.55 : 0), radius: glows ? size * 0.18 : 0)
+            .shadow(color: glow.opacity(glows ? 0.35 : 0), radius: glows ? size * 0.18 : 0)
+            .task(id: raw) { await write(writes) }
+            .task(id: shimmers) { await shimmer(shimmers) }
+    }
+
+    private func styled(_ text: String, size: CGFloat) -> some View {
+        Text(text)
+            .font(.custom(font, size: size))
+            .multilineTextAlignment(alignment == .trailing ? .trailing : .leading)
+            .lineLimit(lineLimit)
+            .minimumScaleFactor(0.4)
+    }
+
+    /// A soft band of light, off to the left at rest, across the line while `sweep` runs to 1.
+    private var shimmerBand: some View {
+        GeometryReader { geo in
+            let band = max(1, geo.size.width * MessageMotion.shimmerBand)
+            LinearGradient(colors: [.white.opacity(0), .white.opacity(0.7), .white.opacity(0)],
+                           startPoint: .leading, endPoint: .trailing)
+                .frame(width: band, height: geo.size.height)
+                .offset(x: -band + (geo.size.width + band) * sweep)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    /// `{write}`: from nothing to the whole line, once per line that appears.
+    private func write(_ animates: Bool) async {
+        guard animates else { return }
+        var snap = Transaction()
+        snap.disablesAnimations = true
+        withTransaction(snap) { reveal = 0 }
+        do { try await Task.sleep(for: .milliseconds(60)) } catch { return }
+        withAnimation(.easeInOut(duration: MessageMotion.writeDuration)) { reveal = 1 }
+    }
+
+    /// `{shimmer}`: wait, sweep, back to rest unseen, until cancelled (the line changed, the Desk
+    /// was covered, Reduce Motion came on).
+    private func shimmer(_ runs: Bool) async {
+        var snap = Transaction()
+        snap.disablesAnimations = true
+        withTransaction(snap) { sweep = 0 }
+        guard runs else { return }
+        let rest = MessageMotion.shimmerPeriod - MessageMotion.shimmerSweep
+        while !Task.isCancelled {
+            do { try await Task.sleep(for: .seconds(rest)) } catch { return }
+            withAnimation(.easeInOut(duration: MessageMotion.shimmerSweep)) { sweep = 1 }
+            do { try await Task.sleep(for: .seconds(MessageMotion.shimmerSweep)) } catch { return }
+            withTransaction(snap) { sweep = 0 }
+        }
+    }
+}
+
+/// `{write}`'s mask: a rectangle growing from the left edge, reaching past the text's box on
+/// every side by `overhang`, so handwritten strokes and the glow are never cut once it is whole.
+private struct RevealMask: ViewModifier {
+    let progress: CGFloat
+    let overhang: CGFloat
+    let active: Bool
+
+    func body(content: Content) -> some View {
+        if active {
+            content.mask(RevealShape(progress: progress, overhang: overhang))
+        } else {
+            content
+        }
+    }
+}
+
+private struct RevealShape: Shape {
+    var progress: CGFloat
+    let overhang: CGFloat
+
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let full = rect.width + overhang * 2
+        return Path(CGRect(x: rect.minX - overhang, y: rect.minY - overhang,
+                           width: full * max(0, min(1, progress)), height: rect.height + overhang * 2))
+    }
+}
