@@ -41,10 +41,13 @@ enum DebugAction: Equatable {
     case cycleAccount
     /// Settings at the Claude Usage page (item 48), on a tab. Reads only; erases nothing.
     case usage(UsageTab)
+    /// The What's New window (item 57) with every card up to this version, as About opens it, or
+    /// closed. Records nothing: the last-seen version is left as it was.
+    case whatsNew(Bool)
 
     static let names = ["show-widget", "hide-widget", "settings", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
-                        "theme", "account", "usage"]
+                        "theme", "account", "usage", "whats-new", "close-whats-new"]
 }
 
 enum DebugCommand: Equatable {
@@ -145,6 +148,8 @@ enum DebugLink {
                 return bad("usage needs arg=overview, trends or sessions")
             }
             return .success(.usage(tab))
+        case "whats-new": return .success(.whatsNew(true))
+        case "close-whats-new": return .success(.whatsNew(false))
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }

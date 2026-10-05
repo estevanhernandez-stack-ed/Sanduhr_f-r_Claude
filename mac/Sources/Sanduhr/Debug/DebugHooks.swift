@@ -117,6 +117,8 @@ enum DebugHooks {
         case .theme(let id): app.viewModel.selectTheme(id: id)
         case .cycleAccount: app.viewModel.cycleAccount()
         case .usage(let tab): SettingsWindowController.shared.show(.usage, usageTab: tab)
+        case .whatsNew(let open):
+            if open { WhatsNewWindowController.shared.show() } else { WhatsNewWindowController.shared.close() }
         }
         settle()
     }
@@ -173,6 +175,7 @@ enum DebugHooks {
             else if w === CameraLightController.shared.window { kind = "camera" }
             else if w === NotchGlowController.shared.window { kind = "glow" }
             else if w === settings { kind = "settings" }
+            else if w === WhatsNewWindowController.shared.window { kind = "whats-new" }
             else if w.isSheet || w.sheetParent != nil { kind = "sheet" }
             else {
                 let cls = String(describing: type(of: w))
@@ -339,6 +342,8 @@ enum DebugHooks {
         s.follow = vm.followEnabled
         s.followPaused = vm.followPaused
         s.version = info["CFBundleShortVersionString"] as? String ?? ""
+        s.whatsNew = WhatsNewDebug(lastSeen: WhatsNew.lastSeen(), pending: WhatsNew.pending(current: s.version),
+                                   open: WhatsNewWindowController.shared.isOpen, hidden: WhatsNew.hidden())
         s.build = info["CFBundleVersion"] as? String ?? ""
         return s
     }

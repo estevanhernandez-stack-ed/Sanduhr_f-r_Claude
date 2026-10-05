@@ -122,3 +122,8 @@ follow: false
 follow_paused: false
 version: "2.1.0"
 build: "3"
+whats_new:
+  last_seen: "2.1.0"
+  pending: 0
+  open: false
+  hide_after_updates: false

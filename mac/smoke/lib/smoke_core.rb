@@ -299,7 +299,15 @@ module Smoke
       elsif after['settings_open']
         steps << ['close-settings', nil]
       end
+      # The What's New window (item 57) a scenario opened goes.
+      if !dig_open(before) && dig_open(after)
+        steps << ['close-whats-new', nil]
+      end
       steps
+    end
+
+    def dig_open(state)
+      state['whats_new'].is_a?(Hash) && state['whats_new']['open'] == true
     end
   end
 

@@ -93,6 +93,9 @@ struct DebugStateInput {
     var pendingMessages = false
     var pendingTheme = false
     var menu: [MenuGroup] = []
+    /// What's New (item 57): the last version seen, the cards the next launch would show, the
+    /// window, and Don't show after updates.
+    var whatsNew = WhatsNewDebug()
     var version = ""
     var build = ""
 }
@@ -103,6 +106,14 @@ struct DockDebug: Equatable {
     var side = DockSide.bottom
     var autohide = false
     var inset = 0
+}
+
+/// state.yaml's `whats_new:`.
+struct WhatsNewDebug: Equatable {
+    var lastSeen: String?
+    var pending = 0
+    var open = false
+    var hidden = false
 }
 
 /// state.yaml's `now_playing:`.
@@ -157,6 +168,13 @@ enum DebugState {
     /// `pending_suggestions:` (items 54, 55): whether a suggestion from Claude waits, no content.
     static func pendingSuggestionsYAML(messages: Bool, theme: Bool) -> YAMLNode {
         .map([YAMLPair("messages", .bool(messages)), YAMLPair("theme", .bool(theme))])
+    }
+
+    /// `whats_new:` (item 57): versions, a count and two flags.
+    static func whatsNewYAML(_ w: WhatsNewDebug) -> YAMLNode {
+        .map([YAMLPair("last_seen", w.lastSeen.map(YAMLNode.string) ?? .null),
+              YAMLPair("pending", .int(w.pending)), YAMLPair("open", .bool(w.open)),
+              YAMLPair("hide_after_updates", .bool(w.hidden))])
     }
 
     /// `vault:` (item 46): flags and a count only.
@@ -235,6 +253,7 @@ enum DebugState {
         pairs.append(("follow_paused", .bool(s.followPaused)))
         pairs.append(("version", .string(s.version)))
         pairs.append(("build", .string(s.build)))
+        pairs.append(("whats_new", whatsNewYAML(s.whatsNew)))
         return .object(pairs)
     }
     

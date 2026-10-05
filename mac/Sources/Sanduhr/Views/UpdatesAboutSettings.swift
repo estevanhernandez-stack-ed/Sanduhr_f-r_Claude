@@ -38,7 +38,7 @@ struct UpdatesSection: View {
     }
 }
 
-/// Settings, Sanduhr, About: who made it, which version, where to read more.
+/// Settings, Sanduhr, About: who made it, which version, what's new, where to read more.
 struct AboutSection: View {
     private let info = AppInfo.current
 
@@ -59,6 +59,9 @@ struct AboutSection: View {
                 .padding(.vertical, 4)
                 Text(AppInfo.independence)
                     .font(.callout).foregroundStyle(.secondary)
+                // Item 57: the release highlights, any time, whatever Don't show after updates says.
+                Button("What's New…") { WhatsNewWindowController.shared.show() }
+                    .help("What arrived in this version and the ones before it")
             }
             Section("Links") {
                 HStack {

@@ -72,6 +72,9 @@ struct DebugLinkTests {
         #expect(parse("sanduhr://debug/action?name=usage&arg=Sessions").command == .action(.usage(.sessions), dir: nil))
         #expect(parse("sanduhr://debug/action?name=usage&arg=trends").command == .action(.usage(.trends), dir: nil))
         #expect(parse("sanduhr://debug/action?name=settings&arg=usage").command == .action(.settings(.usage), dir: nil))
+        // Item 57: open or close What's New; nothing is recorded as seen.
+        #expect(parse("sanduhr://debug/action?name=whats-new").command == .action(.whatsNew(true), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=close-whats-new").command == .action(.whatsNew(false), dir: nil))
     }
 
     @Test func badActionsKeepTheDirForTheError() {
@@ -273,7 +276,7 @@ struct DebugStateTests {
                          "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "dock", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
                          "glow_camera", "glow_claude_waiting", "glow_claude_done", "theme", "menu", "credentials_store", "account_ref", "accounts_count", "history_days", "data",
-                         "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "version", "build"])
+                         "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "version", "build", "whats_new"])
         #expect(yaml.contains("settings_section: notch\nusage_page:\n  open: false\n  tab: overview\nmeters:"))
         #expect(yaml.contains("widget_visible: true\nwidget_visibility: whileDeskOff\nmenu_bar: rotate\nsettings_open: true\n"))
         #expect(yaml.contains("notch_left: meetingOrTime\nnotch_right: message\nnotch_strip: meetingOrMeters\ncamera_in_use: false\ncamera_light: true\nnow_playing:\n"))
@@ -294,7 +297,7 @@ struct DebugStateTests {
         #expect(yaml.contains("    pace: null\n"))
         #expect(yaml.contains("last_fetch: \"1970-01-01T00:00:00Z\"\n"))
         #expect(yaml.contains("credentials_store: file\naccount_ref: null\naccounts_count: 0\nhistory_days: 30\ndata:\n  activity: \"off\"\n  names: names\n  share: \"off\"\n  folder_linked: false\nlocal_activity:\n  reading: false\n  events: 0\nvault:\n  recording: false\n  months: 0\n  last_ingest_ok: false\nintegrations:\n  mcp_installed: 0\n  statusline_installed: 0\n  meters_installed: 0\n  hooks_installed: 0\npending_suggestions:\n  messages: false\n  theme: false\nfollow: false\nfollow_paused: false\nversion: \"2.1.0\"\n"))
-        #expect(yaml.contains("version: \"2.1.0\"\nbuild: \"3\"\n"))
+        #expect(yaml.contains("version: \"2.1.0\"\nbuild: \"3\"\nwhats_new:\n  last_seen: null\n  pending: 0\n  open: false\n  hide_after_updates: false\n"))
         #expect(yaml.contains("""
           - header: Tools
             items:
