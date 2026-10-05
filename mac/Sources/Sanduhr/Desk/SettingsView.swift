@@ -100,7 +100,7 @@ enum DeskLayout {
 // MARK: - Look
 
 struct DeskLookSection: View {
-    @AppStorage("font", store: .desk) private var font = ""
+    @AppStorage("font", store: .desk) private var savedFont: String?
     @AppStorage("messageFont", store: .desk) private var messageFont = ""
     @AppStorage("timeSize", store: .desk) private var timeSize = 112.0
     @AppStorage("messageSize", store: .desk) private var messageSize = 84.0
@@ -110,6 +110,12 @@ struct DeskLookSection: View {
     @AppStorage("inkShadow", store: .desk) private var inkShadow = true
     @AppStorage("notchTextColor", store: .desk) private var notchTextColor = "ffffff"
     @State private var families: [String] = []
+
+    /// The Desk font as drawn (EsteFont 26 until one is picked, or when the picked one is gone);
+    /// picking writes it.
+    private var font: Binding<String> {
+        Binding(get: { DeskFont.resolve(saved: savedFont) }, set: { savedFont = $0 })
+    }
 
     static let presets: [(name: String, value: String)] = [
         ("Ice gradient", "8f5bd6,3a63e0,33fdff"),
@@ -122,7 +128,7 @@ struct DeskLookSection: View {
     var body: some View {
         Form {
             Section("Fonts") {
-                Picker("Desk font", selection: $font) {
+                Picker("Desk font", selection: font) {
                     Text("System").tag("")
                     Divider()
                     ForEach(families, id: \.self) { Text($0).tag($0) }
@@ -147,10 +153,8 @@ struct DeskLookSection: View {
         }
         .formStyle(.grouped)
         .onAppear {
-            families = NSFontManager.shared.availableFontFamilies.sorted {
-                $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
-            }
-            if !font.isEmpty, !families.contains(font) { families.insert(font, at: 0) }
+            // EsteFont 26 first: it ships inside Sanduhr (item 58).
+            families = DeskFont.pickerFamilies(installed: NSFontManager.shared.availableFontFamilies)
         }
     }
 }
@@ -425,7 +429,8 @@ struct MessageSuggestionReview: View {
     let dismiss: () -> Void
     let close: () -> Void
 
-    @AppStorage("font", store: .desk) private var font = ""
+    @AppStorage("font", store: .desk) private var savedFont: String?
+    private var font: String { DeskFont.resolve(saved: savedFont) }
     @AppStorage("messageFont", store: .desk) private var messageFont = ""
     @AppStorage("messageColor", store: .desk) private var messageColor = "9ad7ff"
     @AppStorage(DeskMessageLook.glowKey, store: .desk) private var messageGlow = true

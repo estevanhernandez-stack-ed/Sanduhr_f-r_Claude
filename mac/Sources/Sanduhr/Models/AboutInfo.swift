@@ -24,6 +24,8 @@ struct AppInfo: Equatable {
     static let tagline = "Pacing for your Claude subscription: the widget, Desk and the notch."
     /// Store and trademark requirement: on every surface that names Claude.
     static let independence = "Independent third-party tool. Not affiliated with Anthropic. Requires an active Claude Pro / Team / Enterprise subscription."
+    /// About's credit for the bundled handwriting font (item 58).
+    static let fontCredit = "Handwriting: EsteFont 26 by Estevan Hernandez"
 }
 
 /// A link button on Settings, About.

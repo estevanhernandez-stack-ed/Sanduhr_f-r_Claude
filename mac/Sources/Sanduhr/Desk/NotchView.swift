@@ -19,7 +19,9 @@ struct NotchView: View {
     @AppStorage(DeskController.notchKey, store: .desk) private var enabled = false
     @AppStorage("notchWings", store: .desk) private var wings = 36.0
     @AppStorage("notchChin", store: .desk) private var chin = 26.0
-    @AppStorage("font", store: .desk) private var font = ""
+    @AppStorage("font", store: .desk) private var savedFont: String?
+    /// The Desk font as drawn: EsteFont 26 unless a font was picked (DeskFont, item 58).
+    private var font: String { DeskFont.resolve(saved: savedFont) }
     @AppStorage("notchChinText", store: .desk) private var showChinText = false
     @AppStorage("notchTextColor", store: .desk) private var textColor = "ffffff"
     @AppStorage("notchText", store: .desk) private var wingText = true
@@ -145,7 +147,9 @@ struct NotchWingsView: View {
     @AppStorage("notchWings", store: .desk) private var wings = 36.0
     @AppStorage("notchText", store: .desk) private var showText = true
     @AppStorage("notchTextColor", store: .desk) private var textColor = "ffffff"
-    @AppStorage("font", store: .desk) private var font = ""
+    @AppStorage("font", store: .desk) private var savedFont: String?
+    /// The Desk font as drawn: EsteFont 26 unless a font was picked (DeskFont, item 58).
+    private var font: String { DeskFont.resolve(saved: savedFont) }
     @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
     @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
 

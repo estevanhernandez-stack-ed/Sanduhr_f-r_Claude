@@ -5,6 +5,19 @@ Sanduhr für Claude is MIT-licensed (LICENSE at the root of the repository). It 
 following third-party software, under their own licenses.
 
 
+EsteFont 26
+-----------
+
+The Desk's handwriting is EsteFont 26 by Estevan Hernandez, Regular and Bold, bundled as
+Fonts/EsteFont26-Regular.ttf and Fonts/EsteFont26-Bold.ttf and loaded for Sanduhr only (it is
+not installed on the Mac). It is not covered by Sanduhr's MIT license.
+
+Copyright (c) 2009-2026 Estevan Hernandez / 626Labs LLC. All rights reserved.
+
+Proprietary. Licensed only for use by 626Labs LLC and Estevan Hernandez. No redistribution,
+resale or modification without written permission from 626Labs LLC.
+
+
 mediaremote-adapter
 -------------------
 

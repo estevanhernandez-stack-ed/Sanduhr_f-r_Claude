@@ -72,9 +72,10 @@ struct AboutSection: View {
                 Link("Updates by Sparkle", destination: AboutLinks.sparkle)
                 Link("Now playing uses mediaremote-adapter by Jonas van den Berg (BSD-3-Clause)",
                      destination: AboutLinks.mediaRemoteAdapter)
+                Text(AppInfo.fontCredit)
                 if let notices = AboutLinks.thirdPartyNotices() {
                     Button("Third-Party Notices") { NSWorkspace.shared.open(notices) }
-                        .help("The licenses of Sparkle and mediaremote-adapter")
+                        .help("The licenses of Sparkle, mediaremote-adapter and EsteFont 26")
                 }
                 if !info.copyright.isEmpty {
                     Text(info.copyright).font(.caption).foregroundStyle(.secondary)

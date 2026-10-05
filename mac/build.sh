@@ -116,8 +116,17 @@ cp -R "$ADAPTER_OUT/MediaRemoteAdapter.framework" "$APP/Contents/Frameworks/"
 mkdir -p "$APP/Contents/Helpers" "$APP/Contents/Resources/NowPlaying"
 install -m 0755 "$ADAPTER_OUT/MediaRemoteAdapterTestClient" "$APP/Contents/Helpers/MediaRemoteAdapterTestClient"
 install -m 0644 Vendor/mediaremote-adapter/bin/mediaremote-adapter.pl "$APP/Contents/Resources/NowPlaying/mediaremote-adapter.pl"
-# The third-party notices (Sparkle, mediaremote-adapter), opened from Settings, About.
+# The third-party notices (Sparkle, mediaremote-adapter, EsteFont 26), opened from Settings, About.
 install -m 0644 THIRD-PARTY-NOTICES.txt "$APP/Contents/Resources/THIRD-PARTY-NOTICES.txt"
+# EsteFont 26 (item 58): registered for Sanduhr's process at launch (BundledFonts), sealed by the
+# signature as resources. Nothing is installed on the Mac.
+echo "→ Bundling EsteFont 26..."
+FONTS=(EsteFont26-Regular.ttf EsteFont26-Bold.ttf)
+mkdir -p "$APP/Contents/Resources/Fonts"
+for font in "${FONTS[@]}"; do
+    [[ -f "Resources/Fonts/$font" ]] || { echo "✗ Resources/Fonts/$font is missing" >&2; exit 1; }
+    install -m 0644 "Resources/Fonts/$font" "$APP/Contents/Resources/Fonts/$font"
+done
 
 # Release builds get a Developer ID signature + hardened runtime so they can
 # be notarized and run anywhere. Debug builds get an ad-hoc signature for
@@ -178,6 +187,14 @@ else
         "$APP"
 fi
 codesign --verify --strict --verbose=2 "$APP"
+# Both faces made it into the signed app, unchanged (the signature seals them).
+for font in "${FONTS[@]}"; do
+    cmp -s "Resources/Fonts/$font" "$APP/Contents/Resources/Fonts/$font" \
+        || { echo "✗ $APP is missing Fonts/$font" >&2; exit 1; }
+    grep -q "Resources/Fonts/$font" "$APP/Contents/_CodeSignature/CodeResources" \
+        || { echo "✗ Fonts/$font is not sealed by the signature" >&2; exit 1; }
+done
+echo "→ Fonts: ${FONTS[*]}"
 
 if $UNIVERSAL; then
     ARCHS="$(lipo -archs "$APP/Contents/MacOS/Sanduhr")"

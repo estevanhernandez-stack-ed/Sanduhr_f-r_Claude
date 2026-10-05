@@ -331,7 +331,9 @@ struct NotchGlowView: View {
     @AppStorage("notchWings", store: .desk) private var wings = 36.0
     @AppStorage("notchChin", store: .desk) private var savedChin = 26.0
     @AppStorage("notchText", store: .desk) private var showText = true
-    @AppStorage("font", store: .desk) private var font = ""
+    @AppStorage("font", store: .desk) private var savedFont: String?
+    /// The Desk font as drawn: EsteFont 26 unless a font was picked (DeskFont, item 58).
+    private var font: String { DeskFont.resolve(saved: savedFont) }
     @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
     @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
 
@@ -521,7 +523,7 @@ final class NotchGlowController {
                 ?? NotchContent.Place.left.fallback,
             right: d.string(forKey: NotchContent.Place.right.key).flatMap(NotchContent.init(rawValue:))
                 ?? NotchContent.Place.right.fallback,
-            font: d.string(forKey: "font") ?? "", notchHeight: notch.height)
+            font: DeskFont.resolve(d), notchHeight: notch.height)
         guard let screen, let primary = NSScreen.screens.first,
               let local = NotchGlowLayout.stripRect(notch: notch, barHeight: barHeight, chin: chin,
                                                     left: w.left, right: w.right),

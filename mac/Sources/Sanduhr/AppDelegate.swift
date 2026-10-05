@@ -26,6 +26,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // EsteFont 26 (item 58), from Contents/Resources/Fonts, for this process only: before any
+        // view draws, so the Desk and the widget find it on a Mac that never had it installed.
+        BundledFonts.register()
         NSApp.setActivationPolicy(.accessory)
         // Tooltips (the theme gallery's descriptions, the widget's buttons) come up a little
         // sooner than AppKit's default of about a second. Registered, so a defaults write wins.
@@ -37,6 +40,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // A brand-new install starts with Desk on and the widget hidden while Desk is on, once it
         // has signed in. Decided once, before the panel shows and before DeskMigration marks the suite.
         let firstRun = DeskFirstRun.run()
+        // Before DeskMigration marks the suite: an earlier version's Desk with no font picked keeps
+        // the system font; a new install draws in EsteFont 26.
+        DeskFont.keepExistingDefault()
 
         // Build widget panel.
         let hosting = NSHostingController(rootView: RootView(vm: viewModel))

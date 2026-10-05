@@ -11,7 +11,7 @@ import AppKit
 ///       widgets: clock (time and date), claude (Sanduhr line), meters (a bar per limit),
 ///                nowPlaying (what plays, item 53b), meetings, message
 ///       slots:   tl tr bl br; leave a widget out to hide it
-///   defaults write com.626labs.sanduhr.desk font "EsteFont"       (any installed font family)
+///   defaults write com.626labs.sanduhr.desk font "EsteFont 26"    (any installed font family; EsteFont 26 ships in the app and is the default)
 ///   defaults write com.626labs.sanduhr.desk timeSize -float 112    (clock size; the rest scales from it)
 ///   defaults write com.626labs.sanduhr.desk messageSize -float 84
 ///   defaults write com.626labs.sanduhr.desk messageColor 9ad7ff    (hex, or "5b8cff,a86bff" for a gradient)
@@ -30,7 +30,9 @@ struct DeskView: View {
     var model: DeskModel
 
     @AppStorage("layout", store: .desk) private var layout = "message:tl clock:bl claude:bl meetings:bl"
-    @AppStorage("font", store: .desk) private var font = ""
+    @AppStorage("font", store: .desk) private var savedFont: String?
+    /// The Desk font as drawn: EsteFont 26 unless a font was picked (DeskFont, item 58).
+    private var font: String { DeskFont.resolve(saved: savedFont) }
     @AppStorage("messageFont", store: .desk) private var messageFont = ""
     @AppStorage("left", store: .desk) private var left = 52.0
     @AppStorage("right", store: .desk) private var right = 52.0
@@ -124,8 +126,9 @@ struct DeskView: View {
     private func clock(alignment: HorizontalAlignment) -> some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             VStack(alignment: alignment, spacing: 2) {
+                // The time is the Desk's heading: EsteFont 26 draws it in its Bold face.
                 Text(Self.format(context.date, "h:mm"))
-                    .font(.custom(font, size: timeSize))
+                    .font(.custom(BundledFonts.face(font, bold: true), size: timeSize))
                 Text(Self.format(context.date, "EEEE, MMMM d"))
                     .font(.custom(font, size: timeSize * 0.3))
                     .opacity(0.85)
