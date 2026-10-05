@@ -41,7 +41,11 @@ struct ThemeStripView: View {
                 }
                 .contentShape(Rectangle())
             }
-            .menuStyle(.borderlessButton)
+            // A button-style menu with a plain button draws the label as laid out. The
+            // borderless style kept only its first image and text on macOS 26, so the
+            // strip read "Theme:" with the chevron in front and no theme name.
+            .menuStyle(.button)
+            .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
             .id(vm.userThemesTick)
