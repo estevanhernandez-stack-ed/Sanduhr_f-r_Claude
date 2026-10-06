@@ -1,0 +1,94 @@
+{
+  "name": "sanduhr-time",
+  "displayName": "Sanduhr Time",
+  "description": "Local-first coding time tracker that separates your time from Claude's.",
+  "version": "0.1.0",
+  "publisher": "626labs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude.git",
+    "directory": "vscode"
+  },
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "extensionKind": [
+    "ui"
+  ],
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Sanduhr Time",
+      "properties": {
+        "sanduhrTime.idleMinutes": {
+          "type": "number",
+          "default": 15,
+          "description": "Minutes of inactivity after which a stretch of editor time ends."
+        },
+        "sanduhrTime.compareWakaTime": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a daily side-by-side comparison with WakaTime when wakatime-cli is installed."
+        },
+        "sanduhrTime.dataDir": {
+          "type": "string",
+          "default": "",
+          "description": "Folder for Sanduhr Time data. Empty uses SANDUHR_TIME_DIR or the default under the home folder."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "sanduhrTime.openPanel",
+        "title": "Sanduhr Time: Open Panel"
+      },
+      {
+        "command": "sanduhrTime.toggleStreamerMode",
+        "title": "Sanduhr Time: Toggle Streamer Mode"
+      },
+      {
+        "command": "sanduhrTime.mergeNow",
+        "title": "Sanduhr Time: Merge Now"
+      },
+      {
+        "command": "sanduhrTime.compareNow",
+        "title": "Sanduhr Time: Compare With WakaTime Now"
+      },
+      {
+        "command": "sanduhrTime.revealData",
+        "title": "Sanduhr Time: Reveal Data Folder"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "pretest": "npm run lint",
+    "lint": "eslint src scripts",
+    "test": "vitest --run --config vitest.config.ts --root ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "20.x",
+    "@types/vscode": "1.80.0",
+    "@vscode/test-electron": "^2.3.8",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "eslint": "^9.39.1",
+    "ts-loader": "^9.5.4",
+    "typescript": "~5.8.2",
+    "typescript-eslint": "^8.48.0",
+    "vitest": "^3.2.4",
+    "webpack": "^5.103.0",
+    "webpack-cli": "^6.0.1"
+  }
+}

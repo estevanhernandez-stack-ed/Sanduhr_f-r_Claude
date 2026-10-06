@@ -1,0 +1,38 @@
+name: VS Code extension CI
+
+on:
+  push:
+    paths:
+      - "vscode/**"
+      - ".github/workflows/vscode-ci.yml"
+  pull_request:
+    paths:
+      - "vscode/**"
+      - ".github/workflows/vscode-ci.yml"
+
+defaults:
+  run:
+    working-directory: vscode
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: vscode/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm test
+      - name: Public-repo check
+        run: node scripts/check-public.mjs
+      - name: Package
+        run: npx @vscode/vsce@4.0.0 package --no-dependencies

@@ -1,0 +1,313 @@
+/* Sanduhr Time panel. Theme variables only, so dark, light and high-contrast all work. */
+:root {
+  --st-you: var(--vscode-charts-blue, #3794ff);
+  --st-claude: var(--vscode-charts-yellow, var(--vscode-charts-orange, #d18616));
+  --st-both: var(--vscode-charts-purple, #b180d7);
+  --st-border: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  --st-muted: var(--vscode-descriptionForeground, rgba(128, 128, 128, 0.9));
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size, 13px);
+  line-height: 1.45;
+}
+
+#app {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px 28px 32px;
+}
+
+.muted {
+  color: var(--st-muted);
+}
+
+/* Headline */
+.headline {
+  padding-bottom: 14px;
+  border-bottom: 3px solid var(--st-both);
+  margin-bottom: 22px;
+}
+
+.headline-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.eyebrow {
+  margin: 0 0 2px;
+  color: var(--st-muted);
+  font-size: 0.85em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.headline-total {
+  margin: 0;
+  font-size: 2.6em;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.headline-total small {
+  font-size: 0.4em;
+  font-weight: 400;
+  color: var(--st-muted);
+  margin-left: 8px;
+}
+
+.split {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.split li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.swatch.you,
+.seg.you {
+  background: var(--st-you);
+}
+
+.swatch.claude,
+.seg.claude {
+  background: var(--st-claude);
+}
+
+.swatch.both,
+.seg.both {
+  background: var(--st-both);
+}
+
+/* Stacked bars */
+.bar {
+  display: flex;
+  height: 12px;
+  margin-top: 12px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--vscode-foreground) 12%, transparent);
+  border: 1px solid var(--st-border);
+}
+
+.bar.thin {
+  height: 8px;
+  margin-top: 8px;
+}
+
+.seg {
+  height: 100%;
+  min-width: 0;
+}
+
+/* Sections */
+h2 {
+  margin: 28px 0 10px;
+  font-size: 0.85em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--st-muted);
+}
+
+/* Seven-day strip */
+.strip {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.day {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: center;
+  padding: 6px 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.day.today {
+  border-color: var(--st-both);
+}
+
+.day-col {
+  height: 64px;
+  display: flex;
+  flex-direction: column-reverse;
+  margin: 0 auto;
+  width: 60%;
+  min-width: 14px;
+}
+
+.day-col .stack {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border-radius: 2px;
+  overflow: hidden;
+  border: 1px solid var(--st-border);
+}
+
+.day-col .stack.zero {
+  border-style: dashed;
+  height: 2px;
+}
+
+.day-total {
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.day-label {
+  font-size: 0.85em;
+  color: var(--st-muted);
+}
+
+/* Project rows */
+.projects {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.project {
+  padding: 14px 0;
+  border-top: 1px solid var(--st-border);
+}
+
+.project:last-child {
+  border-bottom: 1px solid var(--st-border);
+}
+
+.project-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.project-name {
+  font-weight: 600;
+  font-size: 1.1em;
+  word-break: break-word;
+}
+
+.pill {
+  font-size: 0.78em;
+  padding: 1px 7px;
+  border-radius: 9px;
+  border: 1px solid var(--st-border);
+  color: var(--st-muted);
+}
+
+.project-total {
+  margin-left: auto;
+  font-weight: 600;
+  font-size: 1.1em;
+}
+
+.project-meta {
+  display: flex;
+  gap: 6px 18px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  color: var(--st-muted);
+}
+
+.project-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* Controls */
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  background: var(--vscode-button-secondaryBackground, transparent);
+  border: 1px solid var(--vscode-button-border, var(--st-border));
+  border-radius: 2px;
+  padding: 3px 10px;
+}
+
+button:hover {
+  background: var(--vscode-button-secondaryHoverBackground, var(--vscode-toolbar-hoverBackground));
+}
+
+button.primary {
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+}
+
+button.primary:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+}
+
+/* Notes */
+.note {
+  margin: 18px 0 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--st-claude);
+  background: color-mix(in srgb, var(--vscode-foreground) 6%, transparent);
+}
+
+.note.error {
+  border-left-color: var(--vscode-errorForeground, #f14c4c);
+}
+
+.empty {
+  margin: 28px 0;
+  padding: 20px;
+  border: 1px dashed var(--st-border);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.footer {
+  margin-top: 36px;
+  padding-top: 12px;
+  border-top: 1px solid var(--st-border);
+  color: var(--st-muted);
+  font-size: 0.85em;
+}
