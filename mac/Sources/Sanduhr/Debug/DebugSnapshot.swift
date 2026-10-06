@@ -22,6 +22,12 @@ struct DebugStateInput {
     /// Now playing (item 53): the switch, the source the self-test chose, and whether something
     /// plays. Never a title, an artist or an app.
     var nowPlaying = NowPlayingDebug()
+    /// What a notch place on Now playing shows while there is no line (Settings, Desk, Now
+    /// Playing, When nothing is playing).
+    var nowPlayingIdle = NowPlayingIdle.automatic
+    /// What each notch place shows now (NotchContent.effective): the saved choice, or the When
+    /// nothing is playing choice while a place on Now playing has nothing to show.
+    var notchShows = NotchShowsDebug()
     var widgetVisible = false
     /// When the widget shows on its own (WidgetVisibility raw value).
     var widgetVisibility = WidgetVisibility.always
@@ -130,6 +136,13 @@ struct TourDebug: Equatable {
     var pending = false
 }
 
+/// state.yaml's `notch_shows:`: each place's effective content, never its text.
+struct NotchShowsDebug: Equatable {
+    var left = NotchContent.Place.left.fallback
+    var right = NotchContent.Place.right.fallback
+    var strip = NotchContent.Place.strip.fallback
+}
+
 /// state.yaml's `now_playing:`.
 struct NowPlayingDebug: Equatable {
     /// Running: placed somewhere and Desk on.
@@ -147,6 +160,12 @@ enum DebugState {
               YAMLPair("placed", .list(n.placed.map { .string($0.rawValue) })),
               YAMLPair("source", .string(n.source.rawValue)),
               YAMLPair("state", .string(n.state.rawValue))])
+    }
+
+    /// `notch_shows:`: what each notch place shows now, as a NotchContent raw value.
+    static func notchShowsYAML(_ n: NotchShowsDebug) -> YAMLNode {
+        .map([YAMLPair("left", .string(n.left.rawValue)), YAMLPair("right", .string(n.right.rawValue)),
+              YAMLPair("strip", .string(n.strip.rawValue))])
     }
 
     /// `dock:` (item 56): side, auto-hide and the inset applied now.
@@ -222,6 +241,8 @@ enum DebugState {
         pairs.append(("camera_in_use", .bool(s.cameraInUse)))
         pairs.append(("camera_light", .bool(s.cameraLight)))
         pairs.append(("now_playing", nowPlayingYAML(s.nowPlaying)))
+        pairs.append(("now_playing_idle", .string(s.nowPlayingIdle.rawValue)))
+        pairs.append(("notch_shows", notchShowsYAML(s.notchShows)))
         pairs.append(("widget_visible", .bool(s.widgetVisible)))
         pairs.append(("widget_visibility", .string(s.widgetVisibility.rawValue)))
         pairs.append(("menu_bar", .string(s.menuBar.rawValue)))

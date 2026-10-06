@@ -720,10 +720,26 @@ playback yourself. Never put titles in a bug report: `state.yaml` carries only f
   `desk` frame and `desk_frames_ok: true`. With the strip on Now playing (Notch, Text under the
   camera), the strip shows the whole title and takes the same clicks (a `now_playing` `strip` frame).
 - [ ] Stop the browser tab and play in Music: the wing and the line follow Music within two seconds.
-  Settings, Apps lists Chrome and Music; switch Chrome off and play in the browser: nothing shows
-  (the wing goes back to plain black); switch it back on.
-- [ ] Hide while paused on: pausing hides the wing and the line; playing brings them back. With
-  nothing playing at all, neither shows and no timer ticks (the line is gone).
+  Settings, Apps lists Chrome and Music; switch Chrome off and play in the browser: the wing shows
+  its stand-in (When nothing is playing, below), never the browser's title; switch it back on.
+- [ ] Hide while paused on: pausing hides the line and puts the wing's stand-in in its place
+  (When nothing is playing, below); playing brings both back. With nothing playing at all, the line
+  is gone and no timer ticks.
+- [ ] When nothing is playing. Right wing and the strip (Text under the camera on) on Now playing,
+  nothing playing. Settings, Desk, Now Playing has "When nothing is playing" reading "What that spot
+  shows by default", with its caption naming the wings and the strip and saying the Desk line simply
+  hides. The right wing shows the Claude meters, sized like the meters (no gap for ⏭), and the strip
+  the next meeting or the meters; `state.yaml` `now_playing_idle: automatic`,
+  `notch_shows: {left: …, right: meters, strip: meetingOrMeters}`, still `placed: [wing_right, strip]`
+  and `enabled: true`, and `desk_frames` has no `now_playing` `strip` frame. A click on the right wing
+  opens Settings (not play or pause); a two-finger click there shows no now playing menu. Settings,
+  Notch shows "When nothing plays: Claude meters (its default)." under Right wing and "When nothing
+  plays: Next meeting, or the Claude meters (its default)." under Under the camera; Change… opens the
+  Now Playing page. Pick Time: both show the time at once and the captions read "When nothing plays:
+  Time."; `now_playing_idle: time`. Play something: within two seconds both show the track again
+  (`notch_shows` back to `nowPlaying`) with their clicks; pause with Hide while paused on: the time
+  comes back. Pick Nothing: with nothing playing both go plain black, as before this choice. Put it
+  back on "What that spot shows by default".
 - [ ] Move Now playing to Hidden in Layout: the line goes, the wing stays and it keeps running. Then
   set the right wing back to Claude meters: `placed: []`, the Source reads Not placed anywhere and
   `pgrep -fl mediaremote-adapter` finds nothing within a second. Place it again, then switch Desk off:

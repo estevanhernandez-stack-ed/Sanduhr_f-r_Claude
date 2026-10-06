@@ -442,7 +442,7 @@ struct NowPlayingDebugTests {
         var s = DebugStateInput()
         s.nowPlaying = NowPlayingDebug(enabled: true, placed: [.wingRight, .desk], source: .adapter, state: .playing)
         let yaml = YAMLEmitter.emit(DebugState.yaml(s))
-        #expect(yaml.contains("camera_light: false\nnow_playing:\n  enabled: true\n  placed:\n    - wing_right\n    - desk\n  source: adapter\n  state: playing\nwidget_visible:"))
+        #expect(yaml.contains("camera_light: false\nnow_playing:\n  enabled: true\n  placed:\n    - wing_right\n    - desk\n  source: adapter\n  state: playing\nnow_playing_idle: automatic\n"))
         let off = YAMLEmitter.emit(DebugState.yaml(DebugStateInput()))
         #expect(off.contains("now_playing:\n  enabled: false\n  placed: []\n  source: \"off\"\n  state: none\n"))
     }

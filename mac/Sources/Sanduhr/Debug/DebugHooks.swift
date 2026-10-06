@@ -287,6 +287,12 @@ enum DebugHooks {
         // A `defaults write` from the smoke runner posts no change notice: read the places now.
         np.apply()
         s.nowPlaying = NowPlayingDebug(enabled: np.active, placed: np.placed, source: np.source, state: np.state)
+        s.nowPlayingIdle = .saved(in: .desk)
+        let playing = desk.model.nowPlaying
+        s.notchShows = NotchShowsDebug(
+            left: NotchContent.effective(s.notchLeft, at: .left, nowPlaying: playing, idle: s.nowPlayingIdle),
+            right: NotchContent.effective(s.notchRight, at: .right, nowPlaying: playing, idle: s.nowPlayingIdle),
+            strip: NotchContent.effective(s.notchStrip, at: .strip, nowPlaying: playing, idle: s.nowPlayingIdle))
         s.widgetVisible = widgetVisible
         s.widgetVisibility = .saved()
         s.menuBar = .saved()

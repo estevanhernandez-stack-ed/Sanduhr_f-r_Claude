@@ -521,10 +521,13 @@ struct DeskNotchSection: View {
             Section("Text") {
                 Toggle("Text beside the camera", isOn: $wingText)
                 contentPicker("Left wing", $left).disabled(!wingText)
+                if left == .nowPlaying { NowPlayingIdleCaption(place: .left).disabled(!wingText) }
                 contentPicker("Right wing", $right).disabled(!wingText)
+                if right == .nowPlaying { NowPlayingIdleCaption(place: .right).disabled(!wingText) }
                 Toggle("Text under the camera too (desktop only)", isOn: $chinText)
                     .disabled(chin == 0)
                 contentPicker("Under the camera", $strip).disabled(!chinText || chin == 0)
+                if strip == .nowPlaying { NowPlayingIdleCaption(place: .strip).disabled(!chinText || chin == 0) }
                 Text("Nothing leaves that part plain black. A wing grows to fit its text.")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -557,6 +560,23 @@ struct DeskNotchSection: View {
         Picker(title, selection: selection) {
             ForEach(NotchContent.allCases) { Text($0.label).tag($0) }
         }
+    }
+}
+
+/// Under a notch place set to Now playing: what it shows when nothing plays, and a link to the
+/// choice on the Now Playing page. Its own view so the Notch page's body stays small.
+private struct NowPlayingIdleCaption: View {
+    let place: NotchContent.Place
+    @AppStorage(NowPlayingIdle.key, store: .desk) private var idle = NowPlayingIdle.automatic
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(idle.caption(at: place))
+            Button("Change…") { SettingsWindowController.shared.show(.nowPlaying) }
+                .buttonStyle(.link)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 }
 

@@ -277,7 +277,7 @@ struct DebugStateTests {
         let keys = yaml.split(separator: "\n").filter { !$0.hasPrefix(" ") && !$0.hasPrefix("-") }
             .map { String($0.split(separator: ":")[0]) }
         #expect(keys == ["desk_enabled", "desk_running", "layout", "notch", "has_notch",
-                         "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "now_playing", "widget_visible", "widget_visibility",
+                         "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "now_playing", "now_playing_idle", "notch_shows", "widget_visible", "widget_visibility",
                          "menu_bar", "settings_open", "settings_section", "usage_page", "meters", "widget_warnings", "hidden_limits",
                          "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "dock", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",

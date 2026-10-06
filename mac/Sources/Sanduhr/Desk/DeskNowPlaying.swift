@@ -4,7 +4,9 @@ import AppKit
 /// Where now playing (item 53) shows on the Desk, decided from the same settings DeskView reads.
 enum DeskNowPlaying {
     /// True when the strip under the camera shows now playing text (NotchView): the island on,
-    /// a notch, a strip, its text on, its choice Now playing, and a track to show.
+    /// a notch, a strip, its text on, its choice Now playing, and a track to show. `strip` is the
+    /// effective content (NotchContent.effective): with no line it is the When nothing is playing
+    /// choice, so the strip takes no now playing clicks.
     static func stripShows(notch: Bool, hasNotch: Bool, chin: Double, chinText: Bool,
                            strip: NotchContent, hasTrack: Bool) -> Bool {
         notch && hasNotch && chin > 0 && chinText && strip == .nowPlaying && hasTrack

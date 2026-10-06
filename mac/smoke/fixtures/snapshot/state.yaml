@@ -8,6 +8,11 @@ notch_right: meters
 notch_strip: meetingOrMeters
 camera_in_use: false
 camera_light: false
+now_playing_idle: automatic
+notch_shows:
+  left: meetingOrTime
+  right: meters
+  strip: meetingOrMeters
 widget_visible: true
 widget_visibility: always
 menu_bar: higher

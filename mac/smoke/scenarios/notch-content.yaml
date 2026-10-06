@@ -7,6 +7,11 @@ steps:
   - defaults: { domain: desk, key: notchRight, type: string, value: message }
   - defaults: { domain: desk, key: notchStrip, type: string, value: nothing }
   - expect_state: { notch_right: message, notch_strip: nothing }
+  # When nothing is playing: a strip on Now playing stands in with the chosen content when
+  # nothing plays (notch_shows), and with a track it shows now playing again.
+  - defaults: { domain: desk, key: nowPlayingIdle, type: string, value: time }
+  - defaults: { domain: desk, key: notchStrip, type: string, value: nowPlaying }
+  - expect_state: { now_playing_idle: time, notch_strip: nowPlaying, notch_shows.strip: "/^(time|nowPlaying)$/" }
   - do: settings
     arg: notch
   - expect:
