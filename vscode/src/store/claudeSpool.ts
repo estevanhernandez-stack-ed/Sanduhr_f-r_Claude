@@ -15,7 +15,7 @@ export function localDate(ms: number): string {
 
 const fileFor = (dir: string, date: string): string => path.join(claudeDir(dir), `${date}.jsonl`);
 
-function endsWithNewline(file: string): boolean {
+export function endsWithNewline(file: string): boolean {
   let fd: number;
   try {
     fd = fs.openSync(file, 'r');
