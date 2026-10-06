@@ -174,6 +174,18 @@ describe('message handling', () => {
     expect(fake.webview.posted).toEqual([]);
   });
 
+  it('ignores mask and reroll for anything that is not a project key', async () => {
+    const { fake } = make();
+    for (const key of ['constructor', '__proto__', 'toString', '', '../x', 'ABCDEF', '0123456789abcdef0']) {
+      await fake.webview.fireMessage({ type: 'mask', key, masked: true });
+      await fake.webview.fireMessage({ type: 'reroll', key });
+    }
+    expect(calls).toEqual([]);
+    await fake.webview.fireMessage({ type: 'reroll', key: 'none' });
+    await fake.webview.fireMessage({ type: 'mask', key: '0123456789abcdef', masked: true });
+    expect(calls.filter((c) => c.startsWith('reroll') || c.startsWith('mask'))).toHaveLength(2);
+  });
+
   it('a failing write posts an error and skips the merge', async () => {
     const c = controller();
     c.setMasked = async () => {

@@ -61,6 +61,9 @@ export interface PanelDeps {
   compare?: () => Promise<CompareInput | undefined>;
 }
 
+/** A project key is 16 hex characters or `none`. Anything else (`constructor`, `__proto__`) never reaches the alias store. */
+const isKey = (k: unknown): k is string => typeof k === 'string' && /^(?:[0-9a-f]{1,16}|none)$/.test(k);
+
 function isMessage(m: unknown): m is PanelMessage {
   if (!m || typeof m !== 'object') return false;
   const o = m as Record<string, unknown>;
@@ -70,9 +73,9 @@ function isMessage(m: unknown): m is PanelMessage {
     case 'toggleStreamer':
       return true;
     case 'mask':
-      return typeof o.key === 'string' && typeof o.masked === 'boolean';
+      return isKey(o.key) && typeof o.masked === 'boolean';
     case 'reroll':
-      return typeof o.key === 'string';
+      return isKey(o.key);
     default:
       return false;
   }
