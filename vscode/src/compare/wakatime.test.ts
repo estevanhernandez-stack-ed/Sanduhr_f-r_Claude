@@ -222,19 +222,37 @@ describe('Comparison', () => {
     expect(await c.provider()).toEqual({ wakatimeSeconds: 3600 });
   });
 
-  it('runs once per day: later updates the same day do nothing', async () => {
-    const { c, runs } = make();
+  it('is gated hourly: 30 minutes apart runs once, 61 minutes apart runs twice', async () => {
+    const { c, runs, setNow } = make();
     await c.onDayUpdated(day(TODAY, 1, 1));
+    setNow(NOW + 30 * 60_000);
     await c.onDayUpdated(day(TODAY, 2, 2));
     expect(runs).toHaveLength(1);
-    expect(readCompareLines(dir)).toHaveLength(1);
+    setNow(NOW + 61 * 60_000);
+    await c.onDayUpdated(day(TODAY, 3, 3));
+    expect(runs).toHaveLength(2);
+    expect(readCompareLines(dir)).toHaveLength(2);
   });
 
-  it('survives a restart: a fresh service sees the day already compared', async () => {
+  it('latest picks the newest line for the date', async () => {
+    let secs = 100;
+    const { c, setNow } = make({ run: async () => ({ seconds: secs }) });
+    await c.onDayUpdated(day(TODAY, 1, 1));
+    secs = 200;
+    setNow(NOW + 61 * 60_000);
+    await c.onDayUpdated(day(TODAY, 1, 1));
+    expect(c.latest(TODAY)?.wakatimeSeconds).toBe(200);
+    expect(await c.provider()).toEqual({ wakatimeSeconds: 200 });
+  });
+
+  it('survives a restart: a fresh service sees a line under an hour old', async () => {
     await make().c.onDayUpdated(day(TODAY, 1, 1));
     const second = make();
     await second.c.onDayUpdated(day(TODAY, 1, 1));
     expect(second.runs).toHaveLength(0);
+    second.setNow(NOW + 61 * 60_000);
+    await second.c.onDayUpdated(day(TODAY, 1, 1));
+    expect(second.runs).toHaveLength(1);
   });
 
   it('runs again on the next local day', async () => {
@@ -272,23 +290,27 @@ describe('Comparison', () => {
     expect(await c.provider()).toBeUndefined();
   });
 
-  it('logs a failed run once and does not retry the same day', async () => {
+  it('logs a failed run once and retries at the next hourly window', async () => {
     let n = 0;
-    const { c, errors } = make({
+    const { c, errors, setNow } = make({
       run: async () => {
         n++;
         return { error: 'timed out after 15000 ms' };
       },
     });
     await c.onDayUpdated(day(TODAY, 1, 1));
+    setNow(NOW + 30 * 60_000);
     await c.onDayUpdated(day(TODAY, 2, 2));
     expect(n).toBe(1);
+    setNow(NOW + 61 * 60_000);
+    await c.onDayUpdated(day(TODAY, 2, 2));
+    expect(n).toBe(2);
     expect(errors).toEqual(['timed out after 15000 ms']);
     expect(readCompareLines(dir)).toHaveLength(0);
     expect(await c.provider()).toBeUndefined();
   });
 
-  it('compareNow bypasses the once-a-day gate', async () => {
+  it('compareNow bypasses the hourly gate', async () => {
     const { c, runs } = make();
     await c.onDayUpdated(day(TODAY, 1, 1));
     expect(await c.compareNow()).toEqual({ seconds: 3600 });

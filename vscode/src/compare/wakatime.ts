@@ -1,5 +1,5 @@
 /**
- * WakaTime side-by-side comparison. Once per local day, after the first successful merge, it
+ * WakaTime side-by-side comparison. At most once an hour, triggered by a merge of today's record, it
  * runs `wakatime-cli --today`, and appends WakaTime's total next to our editor time to
  * `state/wakatime-compare.jsonl`. The panel reads the latest line. Everything that touches the
  * outside world (the CLI, the clock, the setting) is injected so tests need no real CLI.
@@ -20,6 +20,8 @@ import type { DayRecord } from '../types';
 
 export const COMPARE_FILE = 'wakatime-compare.jsonl';
 export const RUN_TIMEOUT_MS = 15_000;
+/** Minimum gap between runs for the same day. */
+export const MIN_INTERVAL_MS = 60 * 60 * 1000;
 
 export interface CompareLine {
   date: string;
@@ -271,19 +273,20 @@ export interface ComparisonDeps {
 }
 
 export class Comparison {
-  private doneDate: string | undefined;
+  /** Epoch ms of the last attempt (success or failure) and the date it was for. */
+  private lastAttempt: { date: string; at: number } | undefined;
   private inFlight = false;
   private lastError: string | undefined;
 
   constructor(private readonly deps: ComparisonDeps) {}
 
-  /** Hook for `api.onDayUpdated`: runs the comparison for today's record, once per local day. */
+  /** Hook for `api.onDayUpdated`: runs the comparison for today's record when the last run for today is over an hour old. */
   async onDayUpdated(record: DayRecord): Promise<void> {
     if (record.date !== localDate(this.deps.now())) return;
     await this.run(false);
   }
 
-  /** The `sanduhrTime.compareNow` command: ignore the once-a-day gate (still honors the setting and the CLI). */
+  /** The `sanduhrTime.compareNow` command: ignore the hourly gate (still honors the setting and the CLI). */
   async compareNow(): Promise<RunResult | undefined> {
     return this.run(true);
   }
@@ -314,20 +317,17 @@ export class Comparison {
     const d = this.deps;
     if (!d.enabled() || this.inFlight) return undefined;
     const date = localDate(d.now());
-    if (!force && (this.doneDate === date || this.latest(date) !== undefined)) {
-      this.doneDate = date;
-      return undefined;
-    }
+    if (!force && !this.due(date)) return undefined;
     const cli = this.cliPath();
     if (!cli) return undefined;
 
     this.inFlight = true;
+    this.lastAttempt = { date, at: d.now() };
     try {
       const result = await (d.run ?? ((p) => runToday(p)))(cli);
       if ('error' in result) {
         this.fail(result.error);
-        // A failed run is not retried until tomorrow, so a broken CLI is not spawned every tick.
-        if (!force) this.doneDate = date;
+        // The attempt time is kept, so a broken CLI is retried at the next hourly window, not every tick.
         return result;
       }
       const today = await d.getToday();
@@ -337,15 +337,22 @@ export class Comparison {
         oursEditorSeconds: today ? Math.round((today.totals.youMs + today.totals.bothMs) / 1000) : 0,
         at: new Date(d.now()).toISOString(),
       });
-      this.doneDate = date;
       return result;
     } catch (err) {
       this.fail(err instanceof Error ? err.message : String(err));
-      if (!force) this.doneDate = date;
       return undefined;
     } finally {
       this.inFlight = false;
     }
+  }
+
+  /** True when no attempt for `date` (this process) or recorded line (any window) is under an hour old. */
+  private due(date: string): boolean {
+    const now = this.deps.now();
+    if (this.lastAttempt?.date === date && now - this.lastAttempt.at < MIN_INTERVAL_MS) return false;
+    const last = this.latest(date);
+    const at = last ? Date.parse(last.at) : NaN;
+    return !(Number.isFinite(at) && now - at < MIN_INTERVAL_MS);
   }
 
   private fail(message: string): void {

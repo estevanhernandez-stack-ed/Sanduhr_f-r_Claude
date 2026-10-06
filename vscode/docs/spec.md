@@ -149,7 +149,7 @@ PRD ref: `prd.md > Seeing it`, `prd.md > WakaTime side by side`.
 ### WakaTime comparison (`src/compare/wakatime.ts`)
 PRD ref: `prd.md > WakaTime side by side`.
 - Locate `wakatime-cli` in `~/.wakatime/` (platform-specific file name) or on PATH. If missing, the feature is hidden.
-- Once per day after the first merge, run `wakatime-cli --today --output raw-json` (fall back to plain `--today` and parse `Xh Ym`) with a 15-second timeout; append `{ date, wakatimeSeconds, oursEditorSeconds, at }` to `state/wakatime-compare.jsonl`.
+- At most once an hour, triggered by a merge of today's record (the first merge of the day can land with little tracked, so a once-a-day run would compare too early), run `wakatime-cli --today --output raw-json` (fall back to plain `--today` and parse `Xh Ym`) with a 15-second timeout; a failed run logs once per distinct message and waits for the next hourly window. Append each run `{ date, wakatimeSeconds, oursEditorSeconds, at }` to `state/wakatime-compare.jsonl`.
 - Setting `sanduhrTime.compareWakaTime` (default true).
 
 ### Settings and commands (`package.json` contributes)
@@ -295,6 +295,6 @@ Plus in the Sanduhr repo: `.github/workflows/vscode-ci.yml` (paths `vscode/**`: 
 
 ## Open Issues
 - **Reload detection:** answered by the spike, first.
-- **`wakatime-cli` flags:** whether `--output raw-json` is supported with `--today` is verified when that item is built; the plain-text fallback covers it.
+- **`wakatime-cli` flags:** supported (verified against wakatime-cli 2.26): `--today --output raw-json` gives `data.grand_total.total_seconds`; plain `--today` prints `2 hrs 32 mins` and covers the fallback.
 - **Machine label:** `os.hostname()` lowercased; the dashboard shows it per machine. It names the machine on the 626 dashboard (private), never in public files.
 - **Self-review:** an adversarial review found 2 blockers and 10 majors, all applied; see `process-notes.md > /spec`.
