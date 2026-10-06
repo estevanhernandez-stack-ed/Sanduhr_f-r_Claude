@@ -1,6 +1,8 @@
 # Backlog
 
-## #1 — Sign Out must actually purge stored credentials, both platforms (next Store push blocker)
+## #1 — Sign Out must actually purge stored credentials, both platforms (shipped)
+
+**Shipped.** Mac: Sign Out in Settings purges the account's Keychain items and the legacy file (2.3.3, PR #106; per-account slots in 2.4.0; a dev build never touches release items, `ace2f57`). Windows: Sign Out already removed the account's Credential Manager targets through `AccountStore.RemoveAccount`. Kept below for the record.
 
 Uninstall cannot do this on either channel — this is architectural, not a gap
 that gets fixed by adding an uninstall hook:
@@ -38,7 +40,9 @@ already deletes the right Credential Manager targets on Windows. Work needed:
    mac/README.md, docs/store/product-features.md to say so honestly); now the
    code needs the same bar macOS is missing.
 
-## #2 — macOS: migrate credential storage from plaintext JSON to the system Keychain
+## #2 — macOS: migrate credential storage from plaintext JSON to the system Keychain (shipped)
+
+**Shipped in 2.3.2** (PR #100): credentials live in the Keychain under `com.626labs.sanduhr`, the plaintext file migrates in and is removed; docs updated in `259c20b`. Kept below for the record.
 
 `mac/Sources/Sanduhr/Services/KeychainStore.swift:1-87` (type name is a holdover —
 it does not call any Keychain API; grepped `SecItemAdd|SecItemCopyMatching|SecItemDelete|import Security`,
@@ -57,6 +61,8 @@ The precondition to revert to real Keychain has been met; the code hasn't been
 changed back.
 
 ## On ship (both items above)
+
+This repo's docs were updated with 2.3.2 (`259c20b`). Still to confirm: the Sanduhr subsection of the 626labs.dev privacy page describes the fixed behavior.
 
 Update, in the same session the fix lands:
 
