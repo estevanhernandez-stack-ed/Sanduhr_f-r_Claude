@@ -3,7 +3,7 @@
 Autonomous `/onboard` run, 2026-10-06. Every value comes from the builder's unified profile or the approved design (`docs/design.md`); defaults are marked.
 
 ## Who They Are
-Este (Estevan Hernandez), 626 Labs, Fort Worth. A builder who architects and ships through AI agents: about 25 Vibe Cartographer cycles, six Microsoft Store apps, Claude Code plugins, desktop utilities. Sanduhr für Claude is one of the shipped apps. This project gives Sanduhr its coding-time half and retires WakaTime.
+Este, 626 Labs. This project gives Sanduhr its coding-time half and retires WakaTime.
 
 ## Technical Experience
 Experienced. TypeScript, C#, Python, JavaScript, Swift, PowerShell and more; .NET/WPF/WinUI, React, Firebase, VS Code extension work (the 626 Labs extension). Deep AI-agent experience: runs Claude Code as an autonomous build system with subagent delegation and several parallel sessions.
