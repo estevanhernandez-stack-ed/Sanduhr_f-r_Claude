@@ -23,7 +23,7 @@
   Acceptance: A written ruling, with event evidence, on whether a disk reload is identifiable; the recorder rule chosen accordingly.
   Verify: The spike's test run prints the event table for every case; `docs/spike-reload.md` holds it. **Builder checkpoint** (only if the diff-accept path matters to the ruling): one manual accept of a Claude Code diff in a scratch file, with the panel's log open, to confirm it is recorded as typing or not.
 
-- [ ] **3. Core: types, intervals, path hash, data paths, project resolver**
+- [x] **3. Core: types, intervals, path hash, data paths, project resolver**
   Spec ref: `spec.md > Tracker extension > Project resolver`, `spec.md > Tracker extension > Spool writer` (hashPath), `spec.md > Data Model`
   What to build: `src/types.ts`; `src/intervals.ts` (join with gap, lone-event duration, union, intersect, subtract, clip, length); `src/store/hash.ts` (`hashPath`); `src/store/paths.ts` (data dir: setting, `SANDUHR_TIME_DIR`, default `~/.sanduhr/time`); `src/store/state.ts` (installed.json with salt, offsets, the pid-aware lock); `src/project.ts` (git config read without a process, worktree `commondir`, `normalizeRemote`, `projectKey`, path fallback). Tests for each, including worktrees, SSH and HTTPS remote variants, credentials in URLs, no remote, case-folding on Windows, a stale and a live lock.
   Acceptance: `prd.md > Projects and masking` resolver criteria hold; the same file reached through two path spellings hashes identically.
