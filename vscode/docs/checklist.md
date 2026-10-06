@@ -65,7 +65,7 @@
   Acceptance: `prd.md > WakaTime side by side` criteria hold.
   Verify: Tests with a fake CLI for both output forms and a missing CLI; then one real run of the installed `wakatime-cli --today` from a terminal (read-only), to confirm the flag and output shape before trusting the parser.
 
-- [ ] **10. Dashboard: `manage_time` tool and the bulletin coding line**
+- [x] **10. Dashboard: `manage_time` tool and the bulletin coding line**
   Spec ref: `spec.md > The 626 side > manage_time tool`, `spec.md > The 626 side > Bulletin coding line`
   What to build: In a Project-626Labs-1 worktree off `origin/main` on branch `feat/time-publisher`: `mcp-server/src/tools/time.ts` mirroring `usage.ts` (+ tests), registration in `index.ts`, the registry name test, annotations; bulletin `collect.ts` reads `codingTime/{date}` (fenced) and `compose.ts` adds the coding row (+ tests). Run `vars:resolve` if the tool count is templated.
   Acceptance: `prd.md > Publishing to the 626 dashboard` tool and bulletin criteria hold.
