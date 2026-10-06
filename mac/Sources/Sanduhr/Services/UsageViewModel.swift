@@ -872,10 +872,10 @@ final class UsageViewModel {
     private func showFailure(_ error: Error, accountRef ref: String?) {
         switch error as? ClaudeAPI.APIError {
         case .unauthorized?:
-            status = .error("Session expired — click Key", isAuth: true)
+            status = .error("Session expired — sign in again", isAuth: true)
             SnapshotWriter.writeError("session_expired", accountRef: ref)
         case .cloudflareChallenge?:
-            status = .error("Cloudflare — add cf_clearance", isAuth: true)
+            status = .error("Cloudflare check — sign in again", isAuth: true)
             SnapshotWriter.writeError("cloudflare", accountRef: ref)
         case .http(let c)?:
             status = .error("HTTP \(c)", isAuth: false)
