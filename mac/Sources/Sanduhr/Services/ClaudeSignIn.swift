@@ -69,9 +69,9 @@ enum ClaudeSignIn {
         return h == "claude.ai" || h.hasSuffix(".claude.ai")
     }
 
-    /// Google's sign-in pages. Google refuses sign-in inside an app's web view, so the window
-    /// shows its notice here: go back and continue with email instead (a Claude account made with
-    /// Google can sign in by email code).
+    /// Google's sign-in pages. Google refuses sign-in inside an app's web view (a blank page), and
+    /// claude.ai sends an account made with Google here even from Continue with email, so the
+    /// window covers the page with the browser-and-paste steps.
     static func isGoogleSignIn(_ url: URL?) -> Bool {
         guard let host = url?.host?.lowercased() else { return false }
         return host == "accounts.google.com" || host.hasPrefix("accounts.google.")

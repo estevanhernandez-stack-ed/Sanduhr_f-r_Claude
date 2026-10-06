@@ -956,9 +956,10 @@ the installed app starts again.
    Instead**. Paste a Key Instead opens Settings → Accounts.
 2. Sign In to Claude… opens "Sign in to Claude" on claude.ai's login. Sign in with an email
    account: the window closes within two seconds of reaching claude.ai, and the widget fetches.
-3. Again with a Google-created account: choosing Google lands on Google's page and the notice
-   shows; Back to Sign-In Choices returns to claude.ai's login. Continue with email, enter the
-   emailed code in the window: it signs in.
+3. Again with a Google-created account: choosing Google (or Continue with email with its
+   address) lands on Google's page, and the panel "This account signs in with Google" covers the
+   blank page with the browser-and-paste steps. Open claude.ai in Browser opens the default
+   browser; Paste a Key Instead ends the window; Back to Sign-In Choices returns to the login.
 4. Settings → Accounts → Add Account…: with a label, Sign In to Claude… adds the account when
    the window closes; with no label, it says to name the account, and Add Account finishes.
 5. An account's page: **Sign In Again…** replaces its key in place; the page says Signed in.

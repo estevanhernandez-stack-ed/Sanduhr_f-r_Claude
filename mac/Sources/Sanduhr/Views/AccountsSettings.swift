@@ -183,7 +183,7 @@ private struct KeyFields: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Button(hasKey ? "Sign In Again…" : "Sign In to Claude…", action: onSignIn)
-            Text("Opens claude.ai's own sign-in. With a Google account, choose Continue with email.")
+            Text("Opens claude.ai's own sign-in. An account that signs in with Google needs a pasted key: Google doesn't allow sign-in inside apps.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)

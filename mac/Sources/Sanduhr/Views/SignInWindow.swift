@@ -21,10 +21,10 @@ enum SignInResult: Equatable {
 /// failed Cloudflare's human check), so its `cf_clearance` is bound to Safari and is not kept. No
 /// key, cookie value or page content is logged.
 ///
-/// Google refuses sign-in inside an app's web view; when the view lands on Google's sign-in, a
-/// notice offers the way through: back to the sign-in choices, then Continue with email and the
-/// emailed code (a Claude account made with Google signs in by email too). Paste stays as the
-/// way out at the bottom of the window.
+/// Google refuses sign-in inside an app's web view, and claude.ai sends an account made with
+/// Google there even from Continue with email. When the view lands on Google's sign-in, a panel
+/// covers the blank page and leads to the browser and a pasted key. Paste stays as the way out at
+/// the bottom of the window.
 @MainActor
 final class SignInWindowController: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate {
     static let shared = SignInWindowController()
@@ -78,7 +78,11 @@ final class SignInWindowController: NSObject, NSWindowDelegate, WKNavigationDele
         w.title = account.map { "Sign in to Claude: \($0)" } ?? "Sign in to Claude"
         w.isReleasedWhenClosed = false
         w.minSize = NSSize(width: 420, height: 560)
-        w.contentView = NSHostingView(rootView: chrome)
+        let host = NSHostingView(rootView: chrome)
+        // The window keeps the size it opens at: left to SwiftUI, the web view's page height grew
+        // it past the screen (seen on Google's sign-in, 2026-10-05).
+        host.sizingOptions = []
+        w.contentView = host
         w.delegate = self
         w.center()
         window = w
@@ -223,11 +227,12 @@ private struct SignInChrome: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if model.onGoogle { googleNotice }
             ZStack {
                 WebViewHost(webView: webView)
-                    .opacity(model.error == nil ? 1 : 0)
-                if let error = model.error {
+                    .opacity(model.error == nil && !model.onGoogle ? 1 : 0)
+                if model.onGoogle {
+                    googlePanel
+                } else if let error = model.error {
                     errorPanel(error)
                 } else if model.loading {
                     ProgressView("Loading claude.ai…")
@@ -248,23 +253,48 @@ private struct SignInChrome: View {
         }
     }
 
-    private var googleNotice: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Google sign-in doesn't work inside apps")
-                .font(.callout.weight(.semibold))
-            Text("Go back and choose **Continue with email**, using the email of your Google account. Claude sends a code; type it here.")
-                .font(.callout)
+    /// Over Google's sign-in, which shows a blank page inside apps. claude.ai sends an account
+    /// made with Google to Google even from Continue with email (seen 2026-10-05), so the way in
+    /// for those accounts is the browser and a pasted key.
+    private var googlePanel: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("This account signs in with Google")
+                .font(.title3.weight(.semibold))
+            Text("Google doesn't allow sign-in inside apps, so this window can't finish it. Sign in in your browser and paste the session key instead:")
                 .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Button("Back to Sign-In Choices", action: onBack)
-                    .keyboardShortcut(.defaultAction)
-                Button("Paste a Key Instead", action: onPaste)
+            VStack(alignment: .leading, spacing: 6) {
+                step(1, "Open claude.ai in your browser and sign in with Google.")
+                step(2, "Open the developer tools: in Chrome ⌥⌘I, then Application; in Safari, Develop → Show Web Inspector, then Storage.")
+                step(3, "Under Cookies → claude.ai, copy the value of sessionKey.")
+                step(4, "Choose Paste a Key Instead and paste it into the sessionKey field.")
             }
+            .font(.callout)
+            HStack {
+                Button("Open claude.ai in Browser") {
+                    NSWorkspace.shared.open(URL(string: "https://claude.ai")!)
+                }
+                Button("Paste a Key Instead", action: onPaste)
+                    .keyboardShortcut(.defaultAction)
+            }
+            Button("Back to Sign-In Choices", action: onBack)
+                .buttonStyle(.link)
+                .font(.caption)
+            Text("Signed up with email? Go back and choose Continue with email.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.accentColor.opacity(0.12))
+        .padding(22)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(.background)
         .accessibilityElement(children: .contain)
+    }
+
+    private func step(_ n: Int, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("\(n).").monospacedDigit().foregroundStyle(.secondary)
+            Text(text).fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private func errorPanel(_ message: String) -> some View {

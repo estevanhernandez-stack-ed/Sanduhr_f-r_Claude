@@ -21,7 +21,7 @@ struct OnboardingSheet: View {
                 .foregroundStyle(t.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Signed up with Google? Choose **Continue with email** with the same address; Claude sends you a code.")
+            Text("Signed up with Google? Google doesn't allow sign-in inside apps: sign in in your browser and choose **Paste a Key Instead**.")
                 .font(.system(size: 11))
                 .foregroundStyle(t.textDim)
                 .fixedSize(horizontal: false, vertical: true)
