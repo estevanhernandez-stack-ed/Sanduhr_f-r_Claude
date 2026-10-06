@@ -43,6 +43,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Before DeskMigration marks the suite: an earlier version's Desk with no font picked keeps
         // the system font; a new install draws in EsteFont 26.
         DeskFont.keepExistingDefault()
+        // The welcome tour (item 61), decided once, before What's New records its version: pending
+        // only on a fresh install with no key, accounts or What's New; it shows after the first
+        // successful fetch. Reads whether a key exists and how many accounts, never a key.
+        let tour = WelcomeTour.atLaunch(
+            fresh: firstRun == .fresh, hasKey: KeychainStore.exists(account: KeychainAccount.sessionKey),
+            accounts: KeychainStore.accounts.labels.count, lastSeen: WhatsNew.lastSeen())
 
         // Build widget panel.
         let hosting = NSHostingController(rootView: RootView(vm: viewModel))
@@ -91,6 +97,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Remembered for the next launch: has the active account's key fetched (SignInGate)?
             SignInGate.record(fetched: fetched, needsSignIn: vm.status.needsSignIn,
                               account: KeychainStore.accounts.active, in: UserDefaults.standard)
+            // A fresh install's welcome tour, once the first fetch has the user's own numbers.
+            self?.offerTourIfPending(fetched: fetched)
             // The widget showed for sign-in; once the numbers arrive the choice takes over.
             if self?.awaitingSignIn == true, fetched {
                 self?.awaitingSignIn = false
@@ -136,19 +144,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Claude Code integrations (item 49): where they are installed, this version's scripts
         // replace the last one's (a new stamped folder, the link swapped). No install, no write.
         Task.detached(priority: .utility) { IntegrationScripts.standard.refreshIfInstalled() }
-        showWhatsNewIfUpdated(fresh: firstRun == .fresh)
+        showWhatsNewIfUpdated(fresh: firstRun == .fresh, tourPending: tour == .pending)
+    }
+
+    /// The welcome tour has been offered in this launch.
+    private var tourOffered = false
+
+    /// The welcome tour (item 61), a moment after a successful fetch while it is pending, once a
+    /// launch. A launch that ends before Finish or Skip leaves it pending for the next one.
+    private func offerTourIfPending(fetched: Bool) {
+        guard WelcomeTour.showsAfterFetch(state: WelcomeTour.state(), fetched: fetched,
+                                          offeredThisLaunch: tourOffered) else { return }
+        tourOffered = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            MainActor.assumeIsolated { WelcomeTourWindowController.shared.show() }
+        }
     }
 
     /// What's New after an update (item 57): the cards of the releases since the last one seen,
     /// once, a moment after the widget and Desk are up. A fresh install's first launch only
     /// records the version; while onboarding is up (no session key) the cards wait for a later
     /// launch. The version is recorded as the window opens, so it shows once even if Sanduhr quits.
-    private func showWhatsNewIfUpdated(fresh: Bool) {
+    /// Never in a launch with the welcome tour pending: the tour covers it.
+    private func showWhatsNewIfUpdated(fresh: Bool, tourPending: Bool) {
         let current = AppInfo.current.version
         let lastSeen = WhatsNew.lastSeen()
         let decision = WhatsNew.atLaunch(
             lastSeen: lastSeen, current: current, fresh: fresh,
-            onboarding: !KeychainStore.exists(account: KeychainAccount.sessionKey), hidden: WhatsNew.hidden())
+            onboarding: !KeychainStore.exists(account: KeychainAccount.sessionKey), hidden: WhatsNew.hidden(),
+            tour: tourPending)
         if decision.record { WhatsNew.record(current) }
         guard !decision.show.isEmpty else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
@@ -515,6 +539,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .settings: SettingsWindowController.shared.show()
         case .checkForUpdates: updaterController.checkForUpdates(nil)
         case .whatsNew: WhatsNewWindowController.shared.show()
+        case .tour: WelcomeTourWindowController.shared.show()
         case .quit: NSApp.terminate(nil)
         }
     }

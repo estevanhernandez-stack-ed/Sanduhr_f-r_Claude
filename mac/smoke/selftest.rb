@@ -64,6 +64,11 @@ class FakeApp
       s['usage_page'] = { 'open' => true, 'tab' => arg || 'overview' }
     when 'whats-new' then (s['whats_new'] ||= {})['open'] = true
     when 'close-whats-new' then (s['whats_new'] ||= {})['open'] = false
+    when 'tour', 'tour-step'
+      t = (s['tour'] ||= {})
+      t['open'] = true
+      t['step'] = [[(arg || 1).to_i, 1].max, t['steps_shown'].to_i].min
+    when 'close-tour' then (s['tour'] ||= {}).merge!('open' => false, 'step' => 0)
     when 'theme' then s['theme'] = arg
     when 'account' then s['account_ref'] = s['account_ref'] == '104ab921' ? '0f1e2d3c' : '104ab921'
     when 'tool'
@@ -121,6 +126,14 @@ check('desk frames carry no labels or titles',
 # Item 57: What's New, a version, a count and two flags; nothing pending once seen.
 eq('whats new seen in the fixture', state['whats_new'],
    { 'last_seen' => '2.1.0', 'pending' => 0, 'open' => false, 'hide_after_updates' => false })
+# Item 61: the welcome tour, flags and counts; done in the fixture, so it is not pending.
+eq('tour done and closed in the fixture', state['tour'],
+   { 'open' => false, 'step' => 0, 'steps_shown' => 5, 'done' => true, 'pending' => false })
+app_tour = FakeApp.new
+app_tour.action('tour-step', '9')
+eq('tour-step stays within the steps shown', app_tour.state_now['tour']['step'], 5)
+app_tour.action('close-tour')
+eq('close-tour closes', [app_tour.state_now['tour']['open'], app_tour.state_now['tour']['step']], [false, 0])
 eq('dock at the bottom, shown, nothing applied in the fixture', state['dock'],
    { 'side' => 'bottom', 'autohide' => false, 'inset' => 0 })
 app_acct = FakeApp.new
@@ -226,6 +239,10 @@ eq('close What\'s New opened by the scenario',
    Restore.plan(base, base.merge('whats_new' => { 'open' => true })), [['close-whats-new', nil]])
 eq('What\'s New left open stays open', Restore.plan(base.merge('whats_new' => { 'open' => true }),
                                                     base.merge('whats_new' => { 'open' => true })), [])
+eq('close the tour opened by the scenario',
+   Restore.plan(base, base.merge('tour' => { 'open' => true })), [['close-tour', nil]])
+eq('the tour left open stays open', Restore.plan(base.merge('tour' => { 'open' => true }),
+                                                 base.merge('tour' => { 'open' => true })), [])
 eq('close settings opened by the scenario', Restore.plan(base, base.merge('settings_open' => true)), [['close-settings', nil]])
 eq('reopen settings at its section',
    Restore.plan(base.merge('settings_open' => true, 'settings_section' => 'alerts'),
@@ -314,7 +331,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new]
+    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end

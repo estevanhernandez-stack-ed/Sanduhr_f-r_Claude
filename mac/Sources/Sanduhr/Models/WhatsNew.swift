@@ -127,12 +127,15 @@ enum WhatsNew {
 
     /// A fresh install's first launch records the version and shows nothing (onboarding covers
     /// it). While onboarding is up (no session key yet) nothing happens: the cards wait for a
-    /// later launch. Otherwise the missed cards show once and the version is recorded; with Don't
-    /// show after updates on, it is only recorded.
+    /// later launch. While the welcome tour is pending (`tour`, item 61) nothing happens either:
+    /// the tour covers it, and records the version when it is finished or skipped. Otherwise the
+    /// missed cards show once and the version is recorded; with Don't show after updates on, it
+    /// is only recorded.
     static func atLaunch(lastSeen: String?, current: String, fresh: Bool, onboarding: Bool,
-                         hidden: Bool, table: [WhatsNewCard] = WhatsNew.table) -> LaunchDecision {
+                         hidden: Bool, tour: Bool = false,
+                         table: [WhatsNewCard] = WhatsNew.table) -> LaunchDecision {
         if fresh { return LaunchDecision(record: true) }
-        if onboarding { return LaunchDecision() }
+        if onboarding || tour { return LaunchDecision() }
         let missed = cards(lastSeen: lastSeen, current: current, table: table)
         return LaunchDecision(show: hidden ? [] : missed, record: lastSeen != current)
     }

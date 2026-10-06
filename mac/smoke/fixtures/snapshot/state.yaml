@@ -127,3 +127,9 @@ whats_new:
   pending: 0
   open: false
   hide_after_updates: false
+tour:
+  open: false
+  step: 0
+  steps_shown: 5
+  done: true
+  pending: false

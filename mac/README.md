@@ -599,6 +599,24 @@ adds its own array and nothing else changes. Related features share a card, whic
 newest release it covers and lists every release it spans; it shows when any of them is new. The last version seen is the `whatsNewLastSeen`
 default (`defaults write com.626labs.sanduhr whatsNewLastSeen 2.3.4` fakes an update).
 
+## Welcome tour
+
+A fresh install gets a short tour once, after its first sign-in, as soon as the first fetch
+succeeds, so its first card shows your own meters. It uses the What's New window's look, one step
+at a time ("Welcome to Sanduhr", "1 of 5"): your limits and the pace tick, the Desk (with Show the
+Desk and Match Desk switches), the menu bar (with what it shows) and, on a Mac with a notch, the
+notch, more than one account, and Claude Code (the Claude Usage page and Integrations). Choices are
+the real settings, written as you make them; Show me opens the widget or the right Settings page
+and leaves the tour open. Next and Return move on, Back goes back, Skip the Tour (or Escape) closes
+it with every setting as it is, and the last step's Finish ends it. It never installs anything.
+
+It shows once: never after an update, never on a Mac that already had a key, accounts or a What's
+New version when this build first ran, and What's New waits while it is pending. Finishing or
+skipping records `welcomeTourState` (`finished` or `skipped`) and What's New's last-seen version,
+so the next update shows only newer cards. Take the Tour… in Settings, About and the menus opens it
+again any time with the current settings, recording nothing. The cards live in
+`Sources/Sanduhr/Models/WelcomeTourSteps.swift`; a card that needs a feature this Mac lacks hides.
+
 ## Files
 
 - `sessionKey:{label}` + `cf_clearance:{label}` per account → the Keychain, service `com.626labs.sanduhr` (release builds), or `~/Library/Application Support/Sanduhr/credentials.json` (mode `0600`, dev builds); see First run and Accounts above

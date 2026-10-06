@@ -96,6 +96,8 @@ struct DebugStateInput {
     /// What's New (item 57): the last version seen, the cards the next launch would show, the
     /// window, and Don't show after updates.
     var whatsNew = WhatsNewDebug()
+    /// The welcome tour (item 61): the window, its step, how many steps show, and its state.
+    var tour = TourDebug()
     var version = ""
     var build = ""
 }
@@ -114,6 +116,18 @@ struct WhatsNewDebug: Equatable {
     var pending = 0
     var open = false
     var hidden = false
+}
+
+/// state.yaml's `tour:`.
+struct TourDebug: Equatable {
+    var open = false
+    /// 1-based while open, 0 when closed.
+    var step = 0
+    var stepsShown = 0
+    /// Finished or skipped.
+    var done = false
+    /// Waiting for a fresh install's first successful fetch.
+    var pending = false
 }
 
 /// state.yaml's `now_playing:`.
@@ -175,6 +189,13 @@ enum DebugState {
         .map([YAMLPair("last_seen", w.lastSeen.map(YAMLNode.string) ?? .null),
               YAMLPair("pending", .int(w.pending)), YAMLPair("open", .bool(w.open)),
               YAMLPair("hide_after_updates", .bool(w.hidden))])
+    }
+
+    /// `tour:` (item 61): flags and counts.
+    static func tourYAML(_ t: TourDebug) -> YAMLNode {
+        .map([YAMLPair("open", .bool(t.open)), YAMLPair("step", .int(t.step)),
+              YAMLPair("steps_shown", .int(t.stepsShown)), YAMLPair("done", .bool(t.done)),
+              YAMLPair("pending", .bool(t.pending))])
     }
 
     /// `vault:` (item 46): flags and a count only.
@@ -254,6 +275,7 @@ enum DebugState {
         pairs.append(("version", .string(s.version)))
         pairs.append(("build", .string(s.build)))
         pairs.append(("whats_new", whatsNewYAML(s.whatsNew)))
+        pairs.append(("tour", tourYAML(s.tour)))
         return .object(pairs)
     }
     

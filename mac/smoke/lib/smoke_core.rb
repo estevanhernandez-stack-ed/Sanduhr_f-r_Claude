@@ -303,11 +303,15 @@ module Smoke
       if !dig_open(before) && dig_open(after)
         steps << ['close-whats-new', nil]
       end
+      # The welcome tour (item 61) a scenario opened goes, recording nothing.
+      if !dig_open(before, 'tour') && dig_open(after, 'tour')
+        steps << ['close-tour', nil]
+      end
       steps
     end
 
-    def dig_open(state)
-      state['whats_new'].is_a?(Hash) && state['whats_new']['open'] == true
+    def dig_open(state, key = 'whats_new')
+      state[key].is_a?(Hash) && state[key]['open'] == true
     end
   end
 

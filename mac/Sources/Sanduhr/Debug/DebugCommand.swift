@@ -44,10 +44,15 @@ enum DebugAction: Equatable {
     /// The What's New window (item 57) with every card up to this version, as About opens it, or
     /// closed. Records nothing: the last-seen version is left as it was.
     case whatsNew(Bool)
+    /// The welcome tour (item 61) at a step (1-based), as Take the Tour… opens it, or closed.
+    /// Records nothing: the tour's state and What's New's last-seen version stay as they were.
+    case tour(step: Int)
+    case closeTour
 
     static let names = ["show-widget", "hide-widget", "settings", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
-                        "theme", "account", "usage", "whats-new", "close-whats-new"]
+                        "theme", "account", "usage", "whats-new", "close-whats-new",
+                        "tour", "tour-step", "close-tour"]
 }
 
 enum DebugCommand: Equatable {
@@ -150,6 +155,11 @@ enum DebugLink {
             return .success(.usage(tab))
         case "whats-new": return .success(.whatsNew(true))
         case "close-whats-new": return .success(.whatsNew(false))
+        case "tour": return .success(.tour(step: 1))
+        case "tour-step":
+            guard let arg, let n = Int(arg), n >= 1 else { return bad("tour-step needs arg=<step number from 1>") }
+            return .success(.tour(step: n))
+        case "close-tour": return .success(.closeTour)
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }
