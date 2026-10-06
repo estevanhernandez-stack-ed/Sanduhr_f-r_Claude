@@ -917,13 +917,14 @@ the build afterwards.
 
 - [ ] Update from an older build: `defaults write com.626labs.sanduhr whatsNewLastSeen 2.3.4`,
   open the build. About two seconds after the widget and Desk are up, a window "What's New in
-  Sanduhr" shows the cards of every release since, newest first, at most 8 (from 2.3.4 to 2.6.0:
-  all eight, four of 2.6, two of 2.5, two of 2.4) under one header line, "New in 2.4.0 – 2.6.0"
-  (from 2.5.0: "New in 2.6.0"); no card has its own version line. Each card has its art (a symbol,
+  Sanduhr" shows the cards of every release since, newest first, at most 8 (from 2.3.4 to 2.7.0:
+  three of 2.7, three of 2.6, two of 2.5, under "New in 2.5.0 – 2.7.0"; from 2.6.0: sign-in, the
+  tour and now playing, under "New in 2.7.0"); no card has its own version line. Each card has its art (a symbol,
   or a live preview: the Desk message writing itself in, EsteFont 26, a notch wing, the menu bar),
   a title, a sentence or two and Show me. `smoke/smoke state` shows `whats_new:
   { last_seen: <this version>, pending: 0, open: true }`.
-- [ ] Show me on each card closes the window and opens Settings at its page: Now playing at Now
+- [ ] Show me on each card closes the window and opens Settings at its page: sign-in at Accounts,
+  the tour at About (Take the Tour… is there), Now playing at Now
   Playing, Claude's messages and themes at Message, the Dock at Layout, EsteFont 26 at Desk, Look,
   Claude Usage at Claude Usage, integrations at Integrations, accounts at Accounts, the menu bar
   and limits at General.

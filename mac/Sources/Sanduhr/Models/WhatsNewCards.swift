@@ -6,14 +6,27 @@ import Foundation
 /// sentence case, periods. Related features share one card: it sits in the array of the
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
-    static var table: [WhatsNewCard] { release260 + release250 + release240 }
+    static var table: [WhatsNewCard] { release270 + release260 + release250 + release240 }
+
+    static let release270: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.7.0", id: "sign-in",
+            title: "Sign in inside Sanduhr",
+            body: "Sign in to Claude in Sanduhr's own window, with no DevTools and no cookies to copy. An account made with Google gets the steps to paste its key instead.",
+            art: .symbol("person.badge.key"), destination: .credentials),
+        WhatsNewCard(
+            version: "2.7.0", id: "tour",
+            title: "A tour of Sanduhr",
+            body: "A short tour of the widget, the Desk, the menu bar, accounts and Claude Code, with your own numbers. Take it any time from About or the menus.",
+            art: .symbol("map"), destination: .about),
+        WhatsNewCard(
+            versions: ["2.6.0", "2.7.0"], id: "now-playing",
+            title: "Now playing on the notch and the Desk",
+            body: "The song or video playing on your Mac can show on a notch wing or in a Desk corner. Click it to play or pause; when nothing plays, the spot shows your meters or the time.",
+            art: .preview(.nowPlaying), destination: .nowPlaying),
+    ]
 
     static let release260: [WhatsNewCard] = [
-        WhatsNewCard(
-            version: "2.6.0", id: "now-playing",
-            title: "Now playing on the notch and the Desk",
-            body: "The song or video playing on your Mac can show on a notch wing or in a Desk corner. Click it to play or pause.",
-            art: .preview(.nowPlaying), destination: .nowPlaying),
         WhatsNewCard(
             version: "2.6.0", id: "claude-suggests",
             title: "Claude writes your messages and themes",
