@@ -94,7 +94,9 @@ Update, in the same session the fix lands:
 - `mac/release.sh:9-10,47-54` — confirms Developer ID signing + notarization are
   live today, closing the stated blocker to real Keychain.
 
-## #3 — New user walkthrough (Mac first, Windows after)
+## #3 — New user walkthrough (spec'd)
+
+**Spec'd 2026-10-05 as a shared tour on the What's New cards: `docs/welcome-tour-spec.md`** (checklist item 61). The sketch below is kept for the record.
 
 Raised 2026-10-05. A new install today gets the Welcome sheet (paste the `sessionKey`) and then a
 widget, and nothing points at the rest: the Desk, the notch wings and glow, the menu bar, accounts,
