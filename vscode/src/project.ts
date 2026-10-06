@@ -159,6 +159,13 @@ export function clearProjectCache(): void {
   cache.clear();
 }
 
+/** Real names of every project resolved so far, by key (the runner's name source for the merge). */
+export function knownProjectNames(): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const e of cache.values()) out.set(e.key, e.realName);
+  return out;
+}
+
 /**
  * Resolve a file or folder to its project. Root: the nearest `.git` ancestor, else the
  * folder itself. Key and name are cached per root; the branch is read fresh each call

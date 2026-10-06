@@ -73,5 +73,47 @@ export const workspace = {
   fireSave: (e: unknown): void => saveDoc.fire(e),
 };
 
-export const env = { sessionId: 'fixture-session-id' };
-export const commands = {};
+export const env: {
+  sessionId: string;
+  remoteName: string | undefined;
+  openExternal: (uri: unknown) => Promise<boolean>;
+  opened: unknown[];
+} = {
+  sessionId: 'fixture-session-id',
+  remoteName: undefined,
+  opened: [],
+  openExternal: async (uri) => {
+    env.opened.push(uri);
+    return true;
+  },
+};
+
+/** Registered command handlers, by id. Tests call them through `commands.run`. */
+const handlers = new Map<string, (...args: unknown[]) => unknown>();
+export const commands = {
+  registerCommand: (id: string, fn: (...args: unknown[]) => unknown): { dispose: () => void } => {
+    handlers.set(id, fn);
+    return { dispose: () => void handlers.delete(id) };
+  },
+  /** Test hook. */
+  registered: (): string[] => [...handlers.keys()],
+  run: async (id: string, ...args: unknown[]): Promise<unknown> => handlers.get(id)?.(...args),
+};
+
+const configValues = new Map<string, unknown>();
+/** Test hook: set `section.key` for `getConfiguration`. */
+export function setConfig(key: string, value: unknown): void {
+  configValues.set(key, value);
+}
+(workspace as Record<string, unknown>).getConfiguration = (section: string) => ({
+  get: <T>(key: string, fallback?: T): T | undefined => (configValues.get(section + '.' + key) as T | undefined) ?? fallback,
+});
+export const shown: string[] = [];
+(window as Record<string, unknown>).showInformationMessage = async (m: string): Promise<undefined> => {
+  shown.push(m);
+  return undefined;
+};
+(window as Record<string, unknown>).showErrorMessage = async (m: string): Promise<undefined> => {
+  shown.push(m);
+  return undefined;
+};

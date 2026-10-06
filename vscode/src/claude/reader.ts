@@ -37,6 +37,8 @@ export interface ReadPassResult {
   unreadableByDate: Record<string, number>;
   /** Local dates that gained events. */
   touchedDates: string[];
+  /** Distinct Claude Code versions (transcript `version` field) seen this pass, by local date. */
+  versionsByDate: Record<string, string[]>;
 }
 
 /** Short stable id for a transcript file: hash of its real path. */
@@ -192,6 +194,7 @@ function processLines(
   lastCwd: { value?: string },
   unreadable: Record<string, number>,
   lastDate: { value: string },
+  versions: Record<string, Set<string>>,
 ): { events: ClaudeEvent[]; consumed: number } {
   const events: ClaudeEvent[] = [];
   const lines = splitLines(buf);
@@ -231,6 +234,7 @@ function processLines(
       continue;
     }
     if (ms < ctx.installedMs) continue;
+    if (typeof o.version === 'string' && o.version) (versions[date] ??= new Set()).add(o.version);
 
     const prompt = isHumanPrompt(o);
     if (!prompt && !isClaudeActivity(o)) continue;
@@ -274,6 +278,7 @@ export async function readPass(opts: ReadPassOptions): Promise<ReadPassResult> {
   const events: ClaudeEvent[] = [];
   const unreadableByDate: Record<string, number> = {};
   const touched = new Set<string>();
+  const versions: Record<string, Set<string>> = {};
   let budget = maxBytes;
   let more = false;
   let dirty = false;
@@ -347,6 +352,7 @@ export async function readPass(opts: ReadPassOptions): Promise<ReadPassResult> {
         {},
         unreadableByDate,
         { value: ctx.fallbackDate },
+        versions,
       ));
     } finally {
       fs.closeSync(fd);
@@ -369,5 +375,7 @@ export async function readPass(opts: ReadPassOptions): Promise<ReadPassResult> {
   }
 
   if (dirty) writeOffsets(sdir, offsets);
-  return { events, more, unreadableByDate, touchedDates: [...touched].sort() };
+  const versionsByDate: Record<string, string[]> = {};
+  for (const [d, set] of Object.entries(versions)) versionsByDate[d] = [...set].sort();
+  return { events, more, unreadableByDate, touchedDates: [...touched].sort(), versionsByDate };
 }

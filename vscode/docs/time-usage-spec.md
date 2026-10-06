@@ -27,6 +27,7 @@ Everything lives under one **data directory**. Resolution order, first non-empty
   state/installed.json                      install time and salt (section 7)
   state/offsets.json                        transcript read positions (section 7)
   state/merge.lock                          the merge lock (section 7)
+  state/caveats.json                        Claude Code versions and unreadable-line counts per date (section 7)
   state/wakatime-compare.jsonl              optional daily comparison (section 7)
 ```
 
@@ -227,6 +228,8 @@ Every write happens while holding the merge lock (section 7.3) and goes through 
 
 **Fresh-store rule.** A missing `aliases.json` is a fresh, empty store (`streamerMode: false`, no projects) **only when `state/installed.json` is being created in the same activation**, meaning this is the first run on this data directory. In every other case a missing file, like an unparseable one, is an error ("alias store unavailable"), not an empty store. A caller that publishes must then fail closed: publish nothing, or publish aliases only, never real names. Reason: a deleted or corrupted store would otherwise silently unmask every project.
 
+**Project registry.** `realName` is also how windows share names: the first time a window resolves a project it records `{ realName, alias }` here (under the lock), so any window's merge can name a project another window saw. A merge for a project whose name is unknown writes `(unknown project)`.
+
 Naming rule for publishing: a real name may leave the machine only when the project is bound to a dashboard project, `streamerMode` is false and the project is not masked; every other case, and every failure, publishes the alias.
 
 ## 7. The `state/` files
@@ -255,7 +258,15 @@ A map from a transcript file's real path to the position already consumed: `offs
 
 Created with an exclusive create by whoever runs a merge or writes `aliases.json`; `at` is epoch milliseconds, refreshed about every 30 seconds while held. A lock is **stale** only when `at` is more than 2 minutes old **and** the process `pid` is no longer running; a lock whose body cannot be read is judged by the file's age alone. A stale lock is deleted and re-created; a live lock means skip this tick (a merge) or retry for a short while (an alias write). Release removes the lock only if `pid` is still the owner's.
 
-### 7.4 `state/wakatime-compare.jsonl`
+### 7.4 `state/caveats.json`
+
+```json
+{ "2026-06-10": { "versions": ["2.1.5"], "unreadable": 2 } }
+```
+
+Per local date: the distinct Claude Code versions seen in transcript lines (their `version` field) and the running count of unreadable transcript lines. Each reader pass adds to it under the merge lock, so a later merge of the same date still reports earlier passes. A merge writes `versions` into `caveats.claudeCodeVersions` and `unreadable` into `caveats.unreadableTranscriptLines`. Entries older than 90 days are dropped.
+
+### 7.5 `state/wakatime-compare.jsonl`
 
 Optional. One line per day: `{ "date", "wakatimeSeconds", "oursEditorSeconds", "at" }`, appended once a day when a `wakatime-cli` is present.
 

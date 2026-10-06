@@ -353,3 +353,22 @@ describe('claude spool', () => {
     expect(fs.readdirSync(path.join(data, 'claude')).sort()).toEqual(['2026-05-01.jsonl', '2026-06-09.jsonl']);
   });
 });
+
+describe('Claude Code versions', () => {
+  it('collects the distinct transcript versions per local date', async () => {
+    write(main(), [
+      user(0, 'one', { version: '2.1.5' }),
+      assistant(1),
+      user(2, 'two', { version: '2.1.5' }),
+      user(3, 'three', { version: '2.0.9' }),
+    ]);
+    const r = await pass({ installed: oldInstall });
+    expect(r.versionsByDate[localDate(Date.parse(ts(0)))]).toEqual(['2.0.9', '2.1.5']);
+  });
+
+  it('reports none when lines carry no version', async () => {
+    write(main(), [user(0, 'x'), assistant(1)]);
+    const r = await pass({ installed: oldInstall });
+    expect(r.versionsByDate).toEqual({});
+  });
+});

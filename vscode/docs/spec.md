@@ -216,7 +216,7 @@ One `ClaudeEvent` per line: `{ "v":1, "id": <transcript entry uuid, or file hash
 ### State files
 - `state/installed.json` `{ "installedAt": ISO, "salt": hex }`.
 - `state/offsets.json` `{ <path>: { "offset", "size", "mtimeMs" } }`.
-- `state/merge.lock` `{ "pid", "at" }`, `state/wakatime-compare.jsonl`.
+- `state/merge.lock` `{ "pid", "at" }`, `state/caveats.json` `{ <date>: { "versions": [..], "unreadable": n } }`, `state/wakatime-compare.jsonl`.
 
 ### Firestore `codingTime/{date}` (626 side)
 Same shape as `usage/{date}`: `machines` map of publisher payload entries plus `recordedAt`, top-level `totals` summed across machines, `updatedAt`.

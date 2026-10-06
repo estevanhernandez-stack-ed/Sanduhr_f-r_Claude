@@ -47,7 +47,7 @@
   Acceptance: `prd.md > The merged day` criteria hold; every generated fixture day validates.
   Verify: `npm test` green including schema validation.
 
-- [ ] **7. Alias store, merge runner and the public API**
+- [x] **7. Alias store, merge runner and the public API**
   Spec ref: `spec.md > Tracker extension > Alias store`, `spec.md > Tracker extension > Merge runner`, `spec.md > Tracker extension > Public API`
   What to build: `src/store/alias-pool.ts` (about 100 neutral names), `src/store/aliases.ts` (lock-guarded writes, reroll, mask, streamer mode, fail closed), `src/store/days.ts` (atomic writes), `src/runner.ts` (5-minute tick, lock refresh, bounded reader pass, merge set, `onDayUpdated`, close-only flush), `src/api.ts`, wiring in `extension.ts`.
   Acceptance: `prd.md > Projects and masking` alias criteria and `prd.md > Local data and the usage spec` criteria hold; two runners on one data dir never corrupt a file or lose an alias.
