@@ -125,6 +125,7 @@ PRD ref: `prd.md > The merged day`.
 PRD ref: `prd.md > Projects and masking`.
 - `aliases.json`: `{ "v":1, "streamerMode": bool, "projects": { <key>: { "realName", "alias", "masked", "setAt" } } }`.
 - Pool: about 100 neutral two-word names ("Project Kestrel", "Project Basalt"); assignment picks an unused pool name; when exhausted, append a number.
+- The store doubles as the **project name registry**: `aliasFor(key, realName)` records `realName` beside the alias the first time any window resolves a project, so every window's merge can name a project another window saw; a project nobody registered is written as `(unknown project)`.
 - `aliasFor(key)` assigns lazily; `reroll(key)`; `setMasked(key, bool)`; `setStreamerMode(bool)`. Every write happens under the merge lock (UI actions take the lock briefly, retrying for up to 2 seconds) and goes through tmp + rename, so concurrent windows never lose each other's assignments.
 - A missing `aliases.json` is treated as a fresh store **only** when `state/installed.json` is also being created in this activation; otherwise it, like an unparseable file, throws a typed `AliasStoreUnavailable`. Callers that publish fail closed.
 - **Streamer mode masks every project for publishing too**, not only in the panel.
@@ -154,7 +155,7 @@ PRD ref: `prd.md > WakaTime side by side`.
 
 ### Settings and commands (`package.json` contributes)
 - Settings: `sanduhrTime.idleMinutes` (number, 15), `sanduhrTime.compareWakaTime` (bool, true), `sanduhrTime.dataDir` (string, empty = default or `SANDUHR_TIME_DIR`).
-- Commands: `sanduhrTime.openPanel`, `sanduhrTime.toggleStreamerMode`, `sanduhrTime.mergeNow`, `sanduhrTime.revealData`.
+- Commands: `sanduhrTime.openPanel`, `sanduhrTime.toggleStreamerMode`, `sanduhrTime.mergeNow`, `sanduhrTime.compareNow` (runs the WakaTime comparison now, ignoring the hourly gate), `sanduhrTime.revealData`.
 
 ### Public-repo hygiene
 The Sanduhr repo is public, and transcripts carry real paths, repo names and branches, including employer repos.
@@ -168,7 +169,7 @@ The Sanduhr repo is public, and transcripts carry real paths, repo names and bra
 PRD ref: `prd.md > Publishing to the 626 dashboard`.
 - On activate, `vscode.extensions.getExtension('626labs.sanduhr-time')`; absent or API `version` ≠ 1 → do nothing.
 - Every 15 minutes while connected, publish today (debounced on `onDayUpdated`). At activation and after local midnight, publish every day from the last 7 whose `generatedAt` is newer than its last successful publish (tracked in the extension's `globalState`), so a weekend with VS Code closed still reaches the dashboard.
-- **Bindings:** one `manage_projects list` call per session (refreshed hourly). For each project with a `githubRepo.url`, compute `projectKey(normalizeRemote(url))` through the tracker's API, which yields the set of bound keys with their 626 project ids. Matching is by key only, never by name.
+- **Bindings:** one `manage_projects list` call per session (refreshed hourly). For each project with a repo URL (the server's `list` returns it flattened as `repoUrl`; the publisher accepts that or `githubRepo.url`), compute `projectKey(normalizeRemote(url))` through the tracker's API, which yields the set of bound keys with their 626 project ids. Matching is by key only, never by name.
 - **Naming rule per project:** the real name only when the key is bound, `maskState().streamerMode` is false, and the project is not masked. Otherwise the alias. **Any failure means alias:** the list call fails or is denied, the API is missing a function, the key is not found.
 - If `maskState().readable` is false, publish nothing and log one line.
 - The per-machine extension keys must allow `manage_projects` (the extension already calls `findByRepo` for its project binding) and `manage_time`; a denied call behaves as "no bindings", so everything goes out as aliases.
@@ -235,8 +236,7 @@ Sanduhr/vscode/
 ├── CHANGELOG.md
 ├── media/
 │   ├── panel.css            # theme variables, accent bars
-│   ├── panel.js             # renders state posted by the extension
-│   └── icon.png
+│   └── panel.js             # renders state posted by the extension (no icon.png yet: needed before a Marketplace listing)
 ├── src/
 │   ├── extension.ts         # activate: wiring, returns the public API
 │   ├── api.ts               # public API types and factory
@@ -256,12 +256,15 @@ Sanduhr/vscode/
 │   │   ├── claudeSpool.ts   # Claude event spool, de-duplicated reads
 │   │   ├── days.ts          # atomic day writes, reads
 │   │   ├── state.ts         # installed, offsets, lock
+│   │   ├── caveats.ts       # state/caveats.json: per-date versions and unreadable-line counts
 │   │   ├── aliases.ts       # alias store
 │   │   └── alias-pool.ts    # name pool
 │   ├── compare/
 │   │   └── wakatime.ts      # wakatime-cli comparison
 │   ├── ui/
 │   │   ├── statusBar.ts
+│   │   ├── viewModel.ts     # pure panel view model (formatting, fractions, masking)
+│   │   ├── fixtures.ts      # synthetic day records for panel tests and screenshots
 │   │   └── panel.ts         # webview panel, CSP, messages
 │   ├── test/
 │   │   ├── vscodeStub.ts

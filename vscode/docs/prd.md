@@ -106,7 +106,7 @@ A builder who works in VS Code with Claude Code writing much of the code, often 
 ### Epic: WakaTime side by side
 
 - As the builder, I want our totals next to WakaTime's for two weeks so that I can trust the switch.
-  - [ ] Once a day, if `wakatime-cli` is installed, the tracker runs it for today's total and logs it next to ours in `state/wakatime-compare.jsonl`.
+  - [ ] At most once an hour (a once-a-day run compares before the day has anything tracked), if `wakatime-cli` is installed, the tracker runs it for today's total and logs it next to ours in `state/wakatime-compare.jsonl`. A command runs it on demand.
   - [ ] The panel shows WakaTime's total next to our editor time (you only plus both), with the difference.
   - [ ] Without `wakatime-cli`, the comparison is hidden and nothing errors.
   - [ ] A setting turns the comparison off (`sanduhrTime.compareWakaTime`, default on).

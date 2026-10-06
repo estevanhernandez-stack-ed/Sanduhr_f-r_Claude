@@ -44,7 +44,7 @@ The tracker has no 626 code and makes no network calls. The 626 Labs extension r
 | Local store | Spool, day files, alias map, reader offsets, under the data directory. |
 | Public API | `getDays(from, to)`, `getToday()`, `onDayUpdated`. Returned records carry real names and the masked flag; consumers decide what to show or send. |
 | Time panel and status bar | Today's total in the status bar (hover: you, Claude, both). The panel: today and last 7 days, per project, stacked you/Claude/both bars, lines, top languages, a streamer-mode toggle, per-project mask and reroll. |
-| WakaTime comparison | During the side-by-side weeks: once a day, runs the local `wakatime-cli --today` if installed, logs its total next to ours, and the panel shows both. Fair comparison: WakaTime's total against our editor time (you only plus both). |
+| WakaTime comparison | During the side-by-side weeks: at most once an hour, runs the local `wakatime-cli --today` if installed, logs its total next to ours, and the panel shows both. Fair comparison: WakaTime's total against our editor time (you only plus both). |
 
 ## Measurement rules
 
@@ -56,13 +56,13 @@ The tracker has no 626 code and makes no network calls. The 626 Labs extension r
 
 **Per project per day:** both = intersection of your intervals and Claude's; you only and Claude only are the remainders; project total = union. **Day total** = union across projects.
 
-**Lines:** Claude's = added + removed from `structuredPatch`, per file, mapped to the project. Yours = editor content changes, minus any change on the same file within 2 seconds of a Claude edit to it (VS Code reloading the file from disk). Total = yours + Claude's.
+**Lines:** Claude's = added + removed from `structuredPatch`, per file, mapped to the project. Yours = editor content changes, minus any change on the same file within 2 seconds of a Claude edit to it (VS Code reloading the file from disk); the recorder tags most reloads from the event sequence itself and the 2-second rule is the backstop. Total = yours + Claude's.
 
 **Project of a Claude event:** the entry's `cwd`, through the same resolver.
 
 **Day:** local calendar day. Timestamps stored in UTC.
 
-**Risk, first task:** prove that a disk reload of an open file is distinguishable from typing in VS Code's change events. If it is not, your lines fall back to git: working-tree changes not attributable to Claude.
+**Risk, first task (resolved: pass, see `spike-reload.md`):** prove that a disk reload of an open file is distinguishable from typing in VS Code's change events. If it is not, your lines fall back to git: working-tree changes not attributable to Claude.
 
 ## Data and the usage spec
 

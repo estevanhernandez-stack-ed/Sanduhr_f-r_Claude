@@ -61,7 +61,7 @@
 
 - [x] **9. WakaTime side-by-side comparison**
   Spec ref: `spec.md > Tracker extension > WakaTime comparison`
-  What to build: `src/compare/wakatime.ts`: locate `wakatime-cli`, run it once a day with a timeout, parse raw JSON or the `Xh Ym` text, append to `state/wakatime-compare.jsonl`, show it in the panel, honor the setting, hide when missing.
+  What to build: `src/compare/wakatime.ts`: locate `wakatime-cli`, run it at most once an hour with a timeout, parse raw JSON or the `Xh Ym` text, append to `state/wakatime-compare.jsonl`, show it in the panel, honor the setting, hide when missing.
   Acceptance: `prd.md > WakaTime side by side` criteria hold.
   Verify: Tests with a fake CLI for both output forms and a missing CLI; then one real run of the installed `wakatime-cli --today` from a terminal (read-only), to confirm the flag and output shape before trusting the parser.
 
