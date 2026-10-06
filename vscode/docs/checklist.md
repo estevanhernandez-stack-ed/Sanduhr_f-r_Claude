@@ -29,7 +29,7 @@
   Acceptance: `prd.md > Projects and masking` resolver criteria hold; the same file reached through two path spellings hashes identically.
   Verify: `npm test` green with the new suites.
 
-- [ ] **4. Claude reader, homes and the Claude spool**
+- [x] **4. Claude reader, homes and the Claude spool**
   Spec ref: `spec.md > Tracker extension > Claude reader`, `spec.md > Data Model > Claude spool`
   What to build: `src/claude/homes.ts`, `src/claude/reader.ts`, `src/store/claudeSpool.ts`. Prompt rule (human origin only), activity rule, line counting from `+`/`-` hunk lines and `create` content, stream ids per transcript file, first-run start-at-size for old files, bounded reads, partial trailing lines, offset reset on shrink, spool-before-offsets, de-duplication by entry id, unreadable-line counting. Synthetic fixtures: a main session with human prompts, task notifications, peer and meta entries, a compact summary, an Edit and a create Write; a subagent file sharing the parent's sessionId; a malformed line; two homes plus a backup home to skip.
   Acceptance: `prd.md > Claude's work` criteria hold, including machine-written user entries never counting as yours and parallel subagents staying separate streams.
