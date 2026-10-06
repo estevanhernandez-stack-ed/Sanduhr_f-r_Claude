@@ -1,10 +1,13 @@
 import SwiftUI
 
-/// First-run instructions, kicked off when no sessionKey is in the Keychain.
-/// Replaces the Python `messagebox.showinfo` + `simpledialog.askstring` combo.
+/// First run, shown while no sessionKey is saved: sign in to Claude in Sanduhr's own window
+/// (item 62), or paste a key in Settings, Accounts.
 struct OnboardingSheet: View {
     @Bindable var vm: UsageViewModel
-    var onContinue: () -> Void
+    /// Sign In to Claude.
+    var onSignIn: () -> Void
+    /// Paste a key instead: Settings, Accounts.
+    var onPaste: () -> Void
 
     var body: some View {
         let t = vm.theme.palette
@@ -13,36 +16,24 @@ struct OnboardingSheet: View {
                 .font(.title3.bold())
                 .foregroundStyle(t.text)
 
-            Text("To track your Claude usage, paste your `sessionKey` cookie. It's stored in your macOS Keychain — not in a plaintext file.")
+            Text("Sign in to the claude.ai account whose usage you want to watch. Sanduhr keeps only its session key, in your macOS Keychain.")
                 .font(.callout)
                 .foregroundStyle(t.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            VStack(alignment: .leading, spacing: 6) {
-                step(1, "Open claude.ai and sign in.")
-                step(2, "Open DevTools (⌥⌘I).")
-                step(3, "Application → Cookies → claude.ai.")
-                step(4, "Copy the value of the `sessionKey` cookie.")
-                step(5, "Click Continue and paste it.")
-            }
-            .foregroundStyle(t.textDim)
+            Text("Signed up with Google? Google doesn't allow sign-in inside apps: sign in in your browser and choose **Paste a Key Instead**.")
+                .font(.system(size: 11))
+                .foregroundStyle(t.textDim)
+                .fixedSize(horizontal: false, vertical: true)
 
             HStack {
+                Button("Paste a Key Instead", action: onPaste)
                 Spacer()
-                Button("Continue", action: onContinue)
+                Button("Sign In to Claude…", action: onSignIn)
                     .keyboardShortcut(.defaultAction)
             }
         }
         .padding(22)
         .frame(width: 440)
-    }
-
-    @ViewBuilder
-    private func step(_ n: Int, _ text: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text("\(n).")
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
-            Text(text).font(.system(size: 11))
-        }
     }
 }

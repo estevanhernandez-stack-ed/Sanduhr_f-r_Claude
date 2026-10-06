@@ -142,7 +142,22 @@ struct RootView: View {
             }
         }
         .sheet(isPresented: $showOnboarding) {
-            OnboardingSheet(vm: vm, onContinue: {
+            OnboardingSheet(vm: vm, onSignIn: {
+                showOnboarding = false
+                Task {
+                    switch await SignInWindowController.shared.run() {
+                    case .signedIn(let c):
+                        // The first key, as Settings, Accounts saves it: it becomes Personal.
+                        KeychainStore.set(c.sessionKey, account: KeychainAccount.sessionKey)
+                        if let cf = c.cfClearance { KeychainStore.set(cf, account: KeychainAccount.cfClearance) }
+                        vm.credentialsChanged()
+                    case .pasteInstead:
+                        SettingsWindowController.shared.show(.credentials)
+                    case .cancelled:
+                        if !KeychainStore.exists(account: KeychainAccount.sessionKey) { showOnboarding = true }
+                    }
+                }
+            }, onPaste: {
                 showOnboarding = false
                 SettingsWindowController.shared.show(.credentials)
             })

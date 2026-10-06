@@ -21,14 +21,14 @@ actor ClaudeAPI {
             case .cloudflareChallenge: return "Cloudflare challenge — paste your cf_clearance cookie"
             case .http(let c):         return "HTTP \(c)"
             case .invalidResponse:     return "Unexpected response from claude.ai"
-            case .unauthorized:        return "Session expired — click Key"
+            case .unauthorized:        return "Session expired — sign in again"
             }
         }
     }
 
     private static let base = URL(string: "https://claude.ai/api")!
     /// Plausible macOS-Chrome UA to satisfy Cloudflare heuristics.
-    private static let userAgent =
+    static let userAgent =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 

@@ -43,10 +43,21 @@ alias — drag across to install, eject the DMG, done. Uses only `hdiutil` +
 
 ## First run
 
-1. Go to <https://claude.ai>, sign in.
-2. Open DevTools (⌥⌘I) → Application → Cookies → `claude.ai`.
-3. Copy the `sessionKey` value.
-4. In Sanduhr, click **Continue** on the onboarding sheet, then paste the key.
+Click **Sign In to Claude…** on the welcome sheet. Sanduhr opens claude.ai's own sign-in in a
+window of its own; once you're signed in, it keeps the session key and closes the window. The
+window's web view stores nothing: its cookies live in memory for that one sign-in and are gone
+when it closes, and no key, cookie or page is logged.
+
+- **Signed up with Google?** Google refuses sign-in inside apps, and claude.ai sends an account
+  made with Google to Google even from Continue with email, so the window can't finish it. When
+  it lands on Google's sign-in, a panel takes over with the steps: sign in in your browser, copy
+  the `sessionKey` cookie, and paste it (**Open claude.ai in Browser**, **Paste a Key Instead**).
+- **Paste instead:** every sign-in window and the welcome sheet have **Paste a Key Instead**:
+  on claude.ai, open DevTools (⌥⌘I) → Application → Cookies → `claude.ai`, copy `sessionKey`,
+  and paste it in Settings → Accounts.
+- The same window signs in a new account (**Add Account…**, **Sign In to Claude…**) and an
+  account whose session expired (**Sign In Again…** on its page; the widget says "Session
+  expired — sign in again").
 
 Where the key is stored depends on the build:
 

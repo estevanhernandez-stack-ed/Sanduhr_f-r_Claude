@@ -171,15 +171,25 @@ private struct FormNote: View {
     }
 }
 
-/// The session key and cf_clearance fields, write-only. Blank keeps what is saved.
+/// Sign in to Claude (item 62), then the session key and cf_clearance fields, write-only, as the
+/// way to paste instead. Blank keeps what is saved.
 private struct KeyFields: View {
     @Binding var sessionKey: String
     @Binding var cfClearance: String
     let hasKey: Bool
+    /// Opens the sign-in window; the form saves what it captures.
+    var onSignIn: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(hasKey ? "sessionKey (replace)" : "sessionKey (required)")
+            Button(hasKey ? "Sign In Again…" : "Sign In to Claude…", action: onSignIn)
+            Text("Opens claude.ai's own sign-in. An account that signs in with Google needs a pasted key: Google doesn't allow sign-in inside apps.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        VStack(alignment: .leading, spacing: 6) {
+            Text(hasKey ? "Or paste a sessionKey (replace)" : "Or paste a sessionKey")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Text("claude.ai → DevTools (⌥⌘I) → Application → Cookies → sessionKey")
@@ -234,7 +244,8 @@ private struct AccountDetail: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
-            KeyFields(sessionKey: $sessionKey, cfClearance: $cfClearance, hasKey: hasKey)
+            KeyFields(sessionKey: $sessionKey, cfClearance: $cfClearance, hasKey: hasKey,
+                      onSignIn: signIn)
             saveRow
             Divider()
             renameRow
@@ -253,7 +264,7 @@ private struct AccountDetail: View {
             Button("Sign Out", role: .destructive) { signOut() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Its session key is removed from this Mac. The account stays in the list with its usage history and settings; paste a key into it to sign in again.")
+            Text("Its session key is removed from this Mac. The account stays in the list with its usage history and settings; sign in to it again any time.")
         }
         .confirmationDialog("Remove this account?", isPresented: $confirmingRemove,
                             titleVisibility: .visible) {
@@ -283,7 +294,7 @@ private struct AccountDetail: View {
                 .keyboardShortcut(.defaultAction)
                 // A signed-out account needs a key; otherwise blank keeps the current values.
                 .disabled(sessionKey.trimmed.isEmpty && (!hasKey || cfClearance.trimmed.isEmpty))
-            Text(hasKey ? "Signed in" : "Signed out. Paste a sessionKey to sign in again.")
+            Text(hasKey ? "Signed in" : "Signed out. Sign in again, or paste a sessionKey.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -324,6 +335,16 @@ private struct AccountDetail: View {
         noteIsError = error
     }
 
+    /// Sign In Again: what the window captures is saved to this account at once.
+    private func signIn() {
+        Task {
+            guard case .signedIn(let c) = await SignInWindowController.shared.run(account: label) else { return }
+            sessionKey = c.sessionKey
+            cfClearance = c.cfClearance ?? ""
+            save()
+        }
+    }
+
     private func save() {
         let key = sessionKey.trimmed
         let cf = cfClearance.trimmed
@@ -352,7 +373,7 @@ private struct AccountDetail: View {
         sessionKey = ""
         cfClearance = ""
         show(result.succeeded
-             ? "Signed out. Paste a sessionKey to sign in again."
+             ? "Signed out. Sign in again, or paste a sessionKey."
              : "Signed out, but \(result.failures.count) item(s) could not be removed. See Console.",
              error: !result.succeeded)
     }
@@ -390,7 +411,8 @@ private struct AddAccountForm: View {
                     .frame(maxWidth: 220)
                 if let labelProblem { FormNote(text: labelProblem, isError: true) }
             }
-            KeyFields(sessionKey: $sessionKey, cfClearance: $cfClearance, hasKey: false)
+            KeyFields(sessionKey: $sessionKey, cfClearance: $cfClearance, hasKey: false,
+                      onSignIn: signIn)
             Toggle("Make it the active account", isOn: $makeActive)
             HStack {
                 Button("Add Account") { add() }
@@ -400,6 +422,23 @@ private struct AddAccountForm: View {
                 Spacer()
             }
             if let error { FormNote(text: error, isError: true) }
+        }
+    }
+
+    /// Sign In: with a usable label the account is added at once; otherwise the captured key waits
+    /// in the (hidden) field for a name.
+    private func signIn() {
+        Task {
+            let l = label.trimmed
+            guard case .signedIn(let c) = await SignInWindowController.shared.run(account: l.isEmpty ? nil : l)
+            else { return }
+            sessionKey = c.sessionKey
+            cfClearance = c.cfClearance ?? ""
+            if l.isEmpty || labelProblem != nil {
+                error = "Signed in. Give the account a label, then Add Account."
+            } else {
+                add()
+            }
         }
     }
 
@@ -427,11 +466,12 @@ private struct FirstAccountForm: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Paste the session key of the claude.ai account to watch. It becomes your Personal account; you can add more here later.")
+            Text("Sign in to the claude.ai account to watch, or paste its session key. It becomes your Personal account; you can add more here later.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            KeyFields(sessionKey: $sessionKey, cfClearance: $cfClearance, hasKey: false)
+            KeyFields(sessionKey: $sessionKey, cfClearance: $cfClearance, hasKey: false,
+                      onSignIn: signIn)
             HStack {
                 Button("Save") { save() }
                     .keyboardShortcut(.defaultAction)
@@ -439,6 +479,15 @@ private struct FirstAccountForm: View {
                 Spacer()
             }
             Spacer()
+        }
+    }
+
+    private func signIn() {
+        Task {
+            guard case .signedIn(let c) = await SignInWindowController.shared.run() else { return }
+            sessionKey = c.sessionKey
+            cfClearance = c.cfClearance ?? ""
+            save()
         }
     }
 
