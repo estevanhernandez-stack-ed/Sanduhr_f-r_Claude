@@ -17,7 +17,7 @@
   Acceptance: The extension builds, lints and tests clean; `check-public` fails on a planted Windows user-profile path and passes without it.
   Verify: `npm ci && npx tsc --noEmit && npm run lint && npm test && node scripts/check-public.mjs && npm run package` in `vscode/`, all exit 0; `npx @vscode/vsce@4.0.0 package --no-dependencies` produces a `.vsix`.
 
-- [ ] **2. Reload-detection spike**
+- [x] **2. Reload-detection spike**
   Spec ref: `spec.md > Spike: reload detection`
   What to build: A throwaway probe under `vscode/spike/` run in an isolated VS Code downloaded by `@vscode/test-electron` (never the builder's windows) on a scratch folder in the OS temp directory. It opens a saved file and records every `onDidChangeTextDocument` with `isDirty` after the event, `reason`, change counts and sizes, and timing against `onDidSaveTextDocument` and a file-system watcher, for: typing (the `type` command), an external write to the open saved file (what Claude Code's CLI does), an external write while the document is dirty, undo back to saved, and format-on-save. The Claude Code VS Code extension's diff-accept path cannot be driven in an isolated host; record it as untested. Write `docs/spike-reload.md` (shapes and outcomes only) with the ruling: pass, partial or fail, and which recorder rule follows. Delete `spike/` afterwards.
   Acceptance: A written ruling, with event evidence, on whether a disk reload is identifiable; the recorder rule chosen accordingly.
