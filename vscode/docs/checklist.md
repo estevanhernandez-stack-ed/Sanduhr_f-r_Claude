@@ -41,7 +41,7 @@
   Acceptance: `prd.md > Your time` criteria hold; reload-tagged changes carry zero human lines.
   Verify: `npm test` green; a stub-driven test shows no heartbeats while the window is unfocused.
 
-- [ ] **6. Merger, day schema and the usage spec**
+- [x] **6. Merger, day schema and the usage spec**
   Spec ref: `spec.md > Tracker extension > Merger`, `spec.md > Data Model > Day record`
   What to build: `src/merge.ts` (pure) per the spec's rules, `docs/time-day.schema.json`, and `docs/time-usage-spec.md` v1 (every field of spool, Claude spool, day file, aliases and state; `normalizeRemote`, `projectKey` and `hashPath` defined exactly; the fresh-store rule). Tests: overlap union; parallel streams and agent-minutes; the lone-event rule; prompt spans; midnight split with the previous day's tail; project switching; pooled day totals where per-project sums exceed the day total; reload subtraction; languages without prompts. Day outputs validate against the schema in tests.
   Acceptance: `prd.md > The merged day` criteria hold; every generated fixture day validates.

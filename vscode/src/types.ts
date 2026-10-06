@@ -87,7 +87,8 @@ export interface DayTotals {
 export interface ProjectDay extends DayTotals {
   key: string;
   realName: string;
-  alias: string;
+  /** Null until the alias store has assigned one (item 7 fills aliases before merging). */
+  alias: string | null;
   masked: boolean;
   languages: LanguageTime[];
 }
