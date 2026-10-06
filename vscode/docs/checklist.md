@@ -11,7 +11,7 @@
 
 ## Checklist
 
-- [ ] **1. Extension scaffold, CI and the public-repo gate**
+- [x] **1. Extension scaffold, CI and the public-repo gate**
   Spec ref: `spec.md > Stack`, `spec.md > Runtime & Deployment`, `spec.md > Tracker extension > Public-repo hygiene`, `spec.md > File Structure`
   What to build: Under `Sanduhr/vscode/`: `package.json` (name `sanduhr-time`, publisher `626labs`, engine `^1.80.0`, `extensionKind: ["ui"]`, `onStartupFinished`, settings and commands from the spec, scripts mirroring the 626 Labs extension), `tsconfig.json`, `webpack.config.js` (single node bundle), `vitest.config.ts` with a `vscode` stub at `src/test/vscodeStub.ts`, `eslint.config.mjs`, `.vscodeignore`, `.gitignore`, a minimal `src/extension.ts` that activates and returns `{ version: 1 }`, `scripts/check-public.mjs`, and `.github/workflows/vscode-ci.yml` (paths `vscode/**`, Node 20, `npm ci`, typecheck, lint, test, the profile-path check, `vsce package`). `CHANGELOG.md` with 0.1.0 Unreleased.
   Acceptance: The extension builds, lints and tests clean; `check-public` fails on a planted Windows user-profile path and passes without it.
