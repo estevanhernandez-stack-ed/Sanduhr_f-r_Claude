@@ -25,7 +25,9 @@ export function ensureInstalled(
   now: () => Date = () => new Date(),
 ): { installed: InstalledState; isNew: boolean } {
   const file = path.join(dir, INSTALLED);
-  fs.mkdirSync(dir, { recursive: true });
+  // Owner-only: aliases.json holds real project names and offsets.json real paths.
+  // Applies to every directory this call creates (the data root on first run); no-op on Windows.
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const fresh: InstalledState = {
     installedAt: now().toISOString(),
     salt: randomBytes(32).toString('hex'),

@@ -58,7 +58,7 @@ function listJsonl(dir: string, recursive: boolean, out: string[]): void {
     const full = path.join(dir, e.name);
     if (e.isDirectory()) {
       if (recursive) listJsonl(full, true, out);
-    } else if (e.name.endsWith('.jsonl')) {
+    } else if (e.isFile() && e.name.endsWith('.jsonl')) {
       out.push(full);
     }
   }

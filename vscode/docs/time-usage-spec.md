@@ -167,7 +167,7 @@ File: `days/<date>.json`, validated by `time-day.schema.json` (JSON Schema draft
   },
   "projects": [
     {
-      "key": "0123456789abcdef", "realName": "widget", "alias": "Project Kestrel", "masked": false,
+      "key": "<16 hex chars>", "realName": "widget", "alias": "Project Kestrel", "masked": false,
       "youMs": 360000, "claudeMs": 240000, "bothMs": 120000, "totalMs": 720000,
       "agentMs": 480000, "linesYou": 12, "linesClaude": 80,
       "languages": [ { "id": "typescript", "ms": 300000 } ]
@@ -209,7 +209,7 @@ File: `<dataDir>/aliases.json`.
   "v": 1,
   "streamerMode": false,
   "projects": {
-    "0123456789abcdef": { "realName": "widget", "alias": "Project Kestrel", "masked": false, "setAt": "2026-06-10T18:00:00.000Z" }
+    "<16 hex chars>": { "realName": "widget", "alias": "Project Kestrel", "masked": false, "setAt": "2026-06-10T18:00:00.000Z" }
   }
 }
 ```
