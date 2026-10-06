@@ -2,6 +2,7 @@
 
 ## Unreleased (mac)
 
+- **Fixed: the now-playing helper could outlive Sanduhr.** If Sanduhr crashed or was force quit, the small helper that reads what is playing kept running in the background. It now runs under a watchdog that stops it within two seconds of Sanduhr going away; a normal quit stops it at once, as before.
 - **Fixed: the widget's theme strip lost its theme name.** On macOS 26 it read "Theme:" with the arrow in front and no name; it shows "Theme: Obsidian ⌄" again.
 
 ## v2.6.0-mac — 2026-10-04
