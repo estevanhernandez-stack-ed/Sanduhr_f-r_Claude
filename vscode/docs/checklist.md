@@ -35,7 +35,7 @@
   Acceptance: `prd.md > Claude's work` criteria hold, including machine-written user entries never counting as yours and parallel subagents staying separate streams.
   Verify: `npm test` green; a fixture test proves a restart (new reader, same state dir) loses no events and duplicates none.
 
-- [ ] **5. Heartbeat recorder and editor spool**
+- [x] **5. Heartbeat recorder and editor spool**
   Spec ref: `spec.md > Tracker extension > Heartbeat recorder`, `spec.md > Tracker extension > Spool writer`
   What to build: `src/recorder.ts` and `src/store/spool.ts`: focused-window gating, scheme filtering, the four heartbeat kinds, throttle and debounce, line deltas, the reload rule chosen in item 2, multi-root routing, the `(no project)` bucket, buffered flush, 90-day prune, per-window file names with the local date. Tests drive the `vscode` stub's events.
   Acceptance: `prd.md > Your time` criteria hold; reload-tagged changes carry zero human lines.
