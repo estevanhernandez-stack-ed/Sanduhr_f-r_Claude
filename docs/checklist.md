@@ -405,13 +405,13 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: a piece can be moved, reordered and resized on the desktop without opening Settings; Cancel leaves the layout as it was; outside Arrange mode, clicks pass through to the desktop exactly as before.
   Verify: swift-testing for drag-to-anchor resolution and the edit transaction; a smoke action to enter and leave Arrange mode with state keys; by hand.
 
-- [ ] **61. Welcome tour, both apps (shared spec)**
+- [x] **61. Welcome tour, both apps (shared spec)**
   Spec ref: `docs/welcome-tour-spec.md` (2026-10-05: "the thing that made me want a welcome screen was the What's New popups").
   What to build: after the first successful sign-in on a fresh install, a tour in the What's New window's look: five steps of cards with live previews of the user's own data, a choice per step where it fits (Desk on, Match Desk, what the menu bar or tray shows), Show me on each, Skip always visible; shown once, never on update, reopenable from About and the menus. Mac first (it has the card model); Windows builds it with W1 of `docs/windows-port-plan.md`.
   Acceptance: a fresh install signs in and sees the tour once; skipping leaves every setting as it was; choices are real settings; reopening works; steps for missing features hide.
   Verify: swift-testing (steps per platform and features, the shown-once flag, choices, Show me); a fresh-profile smoke scenario; by hand on a fresh macOS user.
 
-- [ ] **62. Embedded sign-in on the Mac, with the Google route**
+- [x] **62. Embedded sign-in on the Mac, with the Google route**
   Spec ref: `docs/windows-port-plan.md` M1 and M2; Windows `SignInWindow`, `SignInCoordinator`, `ReauthRouting`; `docs/usage-api-audit-2026-07-19.md` §4.
   What to build: the real claude.ai login in a `WKWebView` (non-persistent store), the `sessionKey` captured on success into the account's Keychain slot, the store dropped; a notice when the view lands on Google's sign-in ("go back and choose Continue with email; enter the code"); paste as the fallback; used for first sign-in, adding an account and re-sign-in when a key expires. First, the two live checks: a Google-created account signs in by email code with no unlink step, and the code field works in the embedded view.
   Acceptance: an email account signs in without DevTools; a Google account gets the browser-and-paste panel (finding 2026-10-05: claude.ai sends a Google-created account to Google even from Continue with email, so email code is not a route for it); paste still works; nothing from the web view persists after capture.
