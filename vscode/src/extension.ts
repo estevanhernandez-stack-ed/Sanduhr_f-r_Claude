@@ -8,6 +8,8 @@ import { AliasStore } from './store/aliases';
 import { dataDir, stateDir } from './store/paths';
 import { Spool, machineLabel, windowIdFor } from './store/spool';
 import { ensureInstalled } from './store/state';
+import { TimePanel } from './ui/panel';
+import { createStatusBar } from './ui/statusBar';
 import type { DayRecord } from './types';
 
 export type { SanduhrTimeApi } from './api';
@@ -24,7 +26,10 @@ let live: Live | undefined;
 
 interface Context {
   subscriptions: { dispose(): unknown }[];
+  extensionUri?: vscode.Uri;
 }
+
+let timePanel: TimePanel | undefined;
 
 /** The recorder's event sources, backed by the real `vscode` API. */
 function vscodeHost(): RecorderHost {
@@ -44,7 +49,7 @@ interface CommandDeps {
   runner: Runner;
 }
 
-function registerCommands(deps: CommandDeps | undefined, context?: Context): void {
+function registerCommands(deps: CommandDeps | undefined, panel: TimePanel, context?: Context): void {
   const reg = (id: string, fn: () => Promise<void> | void): void => {
     const d = vscode.commands.registerCommand(id, async () => {
       try {
@@ -59,9 +64,7 @@ function registerCommands(deps: CommandDeps | undefined, context?: Context): voi
     void vscode.window.showInformationMessage('Sanduhr Time: local workspaces only.');
   };
 
-  reg('sanduhrTime.openPanel', () => {
-    void vscode.window.showInformationMessage('Sanduhr Time: the panel arrives in the next update.');
-  });
+  reg('sanduhrTime.openPanel', () => panel.open());
   reg('sanduhrTime.mergeNow', async () => {
     if (!deps) return localOnly();
     const r = await deps.runner.mergeNow();
@@ -86,8 +89,11 @@ function registerCommands(deps: CommandDeps | undefined, context?: Context): voi
 export function activate(context?: Context): SanduhrTimeApi {
   // Local windows only: under a remote window the extension records nothing.
   if (vscode.env.remoteName) {
-    registerCommands(undefined, context);
-    return createEmptyApi();
+    const api = createEmptyApi();
+    timePanel = new TimePanel({ api, controller: undefined, extensionUri: context?.extensionUri, remote: true });
+    context?.subscriptions.push(createStatusBar({ api, remote: true }));
+    registerCommands(undefined, timePanel, context);
+    return api;
   }
 
   const config = vscode.workspace.getConfiguration('sanduhrTime');
@@ -127,11 +133,26 @@ export function activate(context?: Context): SanduhrTimeApi {
   runner.start();
 
   live = { recorder, spool, runner, emitter };
-  registerCommands({ dir, store, runner }, context);
-  return createApi({ dir, store, onDayUpdated: emitter.event });
+  const api = createApi({ dir, store, onDayUpdated: emitter.event });
+  timePanel = new TimePanel({
+    api,
+    controller: {
+      setStreamerMode: (on) => store.setStreamerMode(on),
+      setMasked: (key, masked, name) => store.setMasked(key, masked, name),
+      reroll: (key, name) => store.reroll(key, name),
+      mergeNow: () => runner.mergeNow(),
+    },
+    extensionUri: context?.extensionUri,
+    remote: false,
+  });
+  context?.subscriptions.push(createStatusBar({ api, remote: false }));
+  registerCommands({ dir, store, runner }, timePanel, context);
+  return api;
 }
 
 export function deactivate(): void {
+  timePanel?.dispose();
+  timePanel = undefined;
   const l = live;
   live = undefined;
   if (!l) return;

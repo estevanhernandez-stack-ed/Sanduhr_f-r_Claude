@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as vscode from 'vscode';
-import { setConfig, shown } from './test/vscodeStub';
+import { setConfig, shown, statusBarItems, webviewPanels } from './test/vscodeStub';
 import { activate, deactivate } from './extension';
 import { readOffsets } from './store/state';
 
@@ -13,6 +13,8 @@ beforeEach(() => {
   setConfig('sanduhrTime.dataDir', dir);
   (vscode.env as { remoteName: string | undefined }).remoteName = undefined;
   shown.length = 0;
+  statusBarItems.length = 0;
+  webviewPanels.length = 0;
 });
 afterEach(() => {
   deactivate();
@@ -69,7 +71,17 @@ describe('extension', () => {
     await run('sanduhrTime.revealData');
     expect((vscode.env as unknown as { opened: { fsPath: string }[] }).opened.at(-1)?.fsPath).toBe(path.resolve(dir));
     await run('sanduhrTime.openPanel');
-    expect(shown.at(-1)).toMatch(/panel/i);
+    expect(shown.at(-1)).toMatch(/location/); // no extensionUri in the unit context
+  });
+
+  it('openPanel opens the Time panel once and a status bar item is created', async () => {
+    activate({ subscriptions: [], extensionUri: vscode.Uri.file('/fixture/ext') });
+    await (vscode.commands as unknown as { run(id: string): Promise<unknown> }).run('sanduhrTime.openPanel');
+    await (vscode.commands as unknown as { run(id: string): Promise<unknown> }).run('sanduhrTime.openPanel');
+    expect(webviewPanels).toHaveLength(1);
+    expect(webviewPanels[0].title).toBe('Sanduhr Time');
+    expect(statusBarItems).toHaveLength(1);
+    expect(statusBarItems[0].command).toBe('sanduhrTime.openPanel');
   });
 
   it('under a remote window it records nothing and returns the API with empty data', async () => {

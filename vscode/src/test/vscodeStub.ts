@@ -117,3 +117,120 @@ export const shown: string[] = [];
   shown.push(m);
   return undefined;
 };
+
+export enum ViewColumn {
+  Active = -1,
+  One = 1,
+}
+export enum StatusBarAlignment {
+  Left = 1,
+  Right = 2,
+}
+(Uri as Record<string, unknown>).joinPath = (base: { fsPath: string }, ...parts: string[]) => Uri.file([base.fsPath, ...parts].join('/'));
+
+export interface FakeStatusBarItem {
+  alignment: number;
+  priority: number | undefined;
+  text: string;
+  tooltip: string;
+  command: string | undefined;
+  shown: boolean;
+  disposed: boolean;
+  show(): void;
+  hide(): void;
+  dispose(): void;
+}
+export const statusBarItems: FakeStatusBarItem[] = [];
+(window as Record<string, unknown>).createStatusBarItem = (alignment: number, priority?: number): FakeStatusBarItem => {
+  const item: FakeStatusBarItem = {
+    alignment,
+    priority,
+    text: '',
+    tooltip: '',
+    command: undefined,
+    shown: false,
+    disposed: false,
+    show: () => void (item.shown = true),
+    hide: () => void (item.shown = false),
+    dispose: () => void (item.disposed = true),
+  };
+  statusBarItems.push(item);
+  return item;
+};
+
+export interface FakeWebviewPanel {
+  viewType: string;
+  title: string;
+  options: Record<string, unknown>;
+  webview: {
+    html: string;
+    cspSource: string;
+    options: Record<string, unknown>;
+    posted: unknown[];
+    postMessage(m: unknown): Promise<boolean>;
+    asWebviewUri(u: { fsPath: string }): { toString(): string };
+    onDidReceiveMessage(l: (m: unknown) => unknown): { dispose(): void };
+    /** Test hook: deliver a message from the "webview". */
+    fireMessage(m: unknown): Promise<void>;
+  };
+  visible: boolean;
+  disposed: boolean;
+  revealed: number;
+  reveal(): void;
+  onDidDispose(l: () => void): { dispose(): void };
+  onDidChangeViewState(l: (e: unknown) => void): { dispose(): void };
+  dispose(): void;
+  /** Test hooks. */
+  fireViewState(visible: boolean): void;
+}
+export const webviewPanels: FakeWebviewPanel[] = [];
+(window as Record<string, unknown>).createWebviewPanel = (
+  viewType: string,
+  title: string,
+  _column: number,
+  options: Record<string, unknown>,
+): FakeWebviewPanel => {
+  const msg = new EventEmitter<unknown>();
+  const disp = new EventEmitter<void>();
+  const view = new EventEmitter<unknown>();
+  const listeners: Array<(m: unknown) => unknown> = [];
+  const panel: FakeWebviewPanel = {
+    viewType,
+    title,
+    options,
+    visible: true,
+    disposed: false,
+    revealed: 0,
+    webview: {
+      html: '',
+      cspSource: 'https://fixture.vscode-cdn.net',
+      options: {},
+      posted: [],
+      postMessage: async (m) => {
+        panel.webview.posted.push(m);
+        return true;
+      },
+      asWebviewUri: (u) => ({ toString: () => `https://fixture.vscode-cdn.net/${u.fsPath}` }),
+      onDidReceiveMessage: (l) => {
+        listeners.push(l);
+        return msg.event(l as (e: unknown) => void);
+      },
+      fireMessage: async (m) => {
+        for (const l of [...listeners]) await l(m);
+      },
+    },
+    reveal: () => void panel.revealed++,
+    onDidDispose: disp.event as never,
+    onDidChangeViewState: view.event,
+    dispose: () => {
+      panel.disposed = true;
+      disp.fire();
+    },
+    fireViewState: (visible) => {
+      panel.visible = visible;
+      view.fire({ webviewPanel: panel });
+    },
+  };
+  webviewPanels.push(panel);
+  return panel;
+};

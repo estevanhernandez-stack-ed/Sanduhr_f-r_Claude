@@ -53,7 +53,7 @@
   Acceptance: `prd.md > Projects and masking` alias criteria and `prd.md > Local data and the usage spec` criteria hold; two runners on one data dir never corrupt a file or lose an alias.
   Verify: `npm test` green, including a two-runner concurrency test and the missing-store fail-closed test.
 
-- [ ] **8. Status bar and the Time panel**
+- [x] **8. Status bar and the Time panel**
   Spec ref: `spec.md > Tracker extension > Status bar`, `spec.md > Tracker extension > Time panel`
   What to build: `src/ui/statusBar.ts`, `src/ui/panel.ts`, `media/panel.css`, `media/panel.js`: headline split, 7-day strip, per-project rows with stacked bars, lines, languages, mask and reroll, streamer toggle, caveats note, empty first-day state, remote-window state, the trademark disclaimer, strict CSP, theme variables for dark and light.
   Acceptance: `prd.md > Seeing it` criteria hold.
