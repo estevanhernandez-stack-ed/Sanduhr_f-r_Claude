@@ -71,7 +71,7 @@
   Acceptance: `prd.md > Publishing to the 626 dashboard` tool and bulletin criteria hold.
   Verify: `mcp-server` tsc, full vitest; `functions` tsc and bulletin suite; root `vars:check`. **Builder checkpoint:** the agent-key grant (`manage_time` and `manage_projects` on the per-machine extension keys) widens access, so it waits for the builder's go after the tool is deployed.
 
-- [ ] **11. Publisher in the 626 Labs extension**
+- [x] **11. Publisher in the 626 Labs extension**
   Spec ref: `spec.md > The 626 side > Publisher`
   What to build: `vscode-extension/src/timePublisher.ts` with the pure `buildTimePayload(day, maskState, boundKeys)` holding the wall, bindings from `manage_projects list` through the tracker's `projectKey`/`normalizeRemote`, live `maskState()`, the 15-minute and catch-up schedule with `globalState` tracking, fail-closed paths; wiring in `extension.ts`; minor version bump with a changelog entry.
   Acceptance: `prd.md > Publishing to the 626 dashboard` publisher criteria hold: a real name leaves only for a bound, unmasked project with streamer mode off; every failure path publishes aliases or nothing.
