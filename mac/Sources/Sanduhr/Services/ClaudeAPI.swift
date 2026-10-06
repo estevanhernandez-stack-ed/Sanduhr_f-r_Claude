@@ -28,8 +28,6 @@ actor ClaudeAPI {
 
     private static let base = URL(string: "https://claude.ai/api")!
     /// Plausible macOS-Chrome UA to satisfy Cloudflare heuristics.
-    /// Also the sign-in window's (ClaudeSignIn): Cloudflare binds cf_clearance to the user agent that
-    /// earned it, so a clearance captured there only works when replayed under the same one.
     static let userAgent =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"

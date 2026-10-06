@@ -17,8 +17,9 @@ enum SignInResult: Equatable {
 /// claude.ai's real login (email code, Google, Apple) in a `WKWebView` whose cookie store is
 /// non-persistent: it starts empty and is gone when the window closes, so nothing from the web
 /// view stays on this Mac and the only thing kept is the captured key, which the caller saves to
-/// the account's Keychain slot. The view uses Sanduhr's API user agent, because Cloudflare binds
-/// `cf_clearance` to the agent that earned it. No key, cookie value or page content is logged.
+/// the account's Keychain slot. The view presents itself as the Safari it is (a Chrome user agent
+/// failed Cloudflare's human check), so its `cf_clearance` is bound to Safari and is not kept. No
+/// key, cookie value or page content is logged.
 ///
 /// Google refuses sign-in inside an app's web view; when the view lands on Google's sign-in, a
 /// notice offers the way through: back to the sign-in choices, then Continue with email and the
@@ -57,8 +58,9 @@ final class SignInWindowController: NSObject, NSWindowDelegate, WKNavigationDele
     private func open(account: String?) {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
+        config.applicationNameForUserAgent = ClaudeSignIn.applicationName(
+            safariVersion: ClaudeSignIn.installedSafariVersion())
         let web = WKWebView(frame: .zero, configuration: config)
-        web.customUserAgent = ClaudeAPI.userAgent
         web.navigationDelegate = self
         web.uiDelegate = self
         web.setAccessibilityLabel("claude.ai sign-in")
@@ -117,7 +119,9 @@ final class SignInWindowController: NSObject, NSWindowDelegate, WKNavigationDele
         store.getAllCookies { [weak self] cookies in
             let mapped = cookies.map { ClaudeSignIn.Cookie(name: $0.name, value: $0.value, domain: $0.domain) }
             guard let captured = ClaudeSignIn.capture(mapped) else { return }
-            MainActor.assumeIsolated { self?.finish(.signedIn(captured)) }
+            // The key only: this window's cf_clearance is bound to Safari, not the API's agent.
+            let key = ClaudeSignIn.Captured(sessionKey: captured.sessionKey, cfClearance: nil)
+            MainActor.assumeIsolated { self?.finish(.signedIn(key)) }
         }
     }
 

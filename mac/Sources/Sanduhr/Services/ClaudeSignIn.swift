@@ -3,7 +3,8 @@ import Foundation
 /// The embedded "Sign in to Claude" decisions (item 62), kept apart from WebKit so they test
 /// without a browser. Ported from Windows `Sanduhr.Core.ClaudeSignIn`: the window loads
 /// claude.ai's own login, and once a `sessionKey` cookie appears in its throwaway cookie store,
-/// that key (and `cf_clearance`, when Cloudflare set one) becomes the account's credential.
+/// that key becomes the account's credential. `cf_clearance` is not kept: Cloudflare binds it to
+/// the browser that earned it, and the window is Safari while the API calls are not.
 ///
 /// Cookie presence is the signal, not the page: claude.ai signs in on another Anthropic host and
 /// sets the cookie from script without a navigation the window could watch, so the window checks
@@ -17,6 +18,23 @@ enum ClaudeSignIn {
     static let pollInterval: TimeInterval = 1.5
     /// A first page that hasn't loaded by then shows the error and the paste way out.
     static let loadTimeout: TimeInterval = 30
+
+    /// The tail WebKit appends to its user agent so the window reads as the Safari it is. A web view
+    /// that claimed to be Chrome failed Cloudflare's human check every time (2026-10-05): the check
+    /// compares the claimed browser with the engine's behavior. `safariVersion` is the installed
+    /// Safari's (`CFBundleShortVersionString`); nil or empty falls back to `fallbackSafari`.
+    static let fallbackSafari = "18.0"
+    static func applicationName(safariVersion: String?) -> String {
+        let v = safariVersion?.trimmingCharacters(in: .whitespaces) ?? ""
+        let version = v.isEmpty || !v.allSatisfy({ $0.isNumber || $0 == "." }) ? fallbackSafari : v
+        return "Version/\(version) Safari/605.1.15"
+    }
+
+    /// The installed Safari's version, read from its bundle.
+    static func installedSafariVersion() -> String? {
+        Bundle(url: URL(fileURLWithPath: "/Applications/Safari.app"))?
+            .object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+    }
 
     /// What a finished sign-in hands back. Never logged; saved to the Keychain and dropped.
     struct Captured: Equatable, Sendable {

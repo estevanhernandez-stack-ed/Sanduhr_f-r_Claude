@@ -61,4 +61,11 @@ struct ClaudeSignInTests {
             #expect(!ClaudeSignIn.staysInWindow(URL(string: s)), "\(s)")
         }
     }
+
+    @Test func theWindowPresentsItselfAsSafari() {
+        #expect(ClaudeSignIn.applicationName(safariVersion: "26.6.2") == "Version/26.6.2 Safari/605.1.15")
+        #expect(ClaudeSignIn.applicationName(safariVersion: nil) == "Version/18.0 Safari/605.1.15")
+        #expect(ClaudeSignIn.applicationName(safariVersion: " ") == "Version/18.0 Safari/605.1.15")
+        #expect(ClaudeSignIn.applicationName(safariVersion: "26 beta") == "Version/18.0 Safari/605.1.15")
+    }
 }
