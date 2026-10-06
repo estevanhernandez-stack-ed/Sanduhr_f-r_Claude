@@ -18,6 +18,7 @@ struct NowPlayingSection: View {
                 NowPlayingArrangeRow()
             }
             NowPlayingShowSection()
+            NowPlayingIdleSection()
             NowPlayingAppsSection()
             NowPlayingAskSection()
             Section {
@@ -60,8 +61,25 @@ private struct NowPlayingShowSection: View {
     var body: some View {
         Section("Show") {
             Toggle("Hide while paused", isOn: $hidePaused)
-            Text("Nothing shows when nothing plays. While paused, a wing shows a Next button at its outer edge (the strip at its end): click the title to play, the button to skip.")
+            Text("While paused, a wing shows a Next button at its outer edge (the strip at its end): click the title to play, the button to skip.")
                 .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// When nothing is playing: what a notch wing or the strip on Now playing shows in its stead
+/// (NowPlayingIdle, NotchContent.effective).
+private struct NowPlayingIdleSection: View {
+    @AppStorage(NowPlayingIdle.key, store: .desk) private var idle = NowPlayingIdle.automatic
+
+    var body: some View {
+        Section {
+            Picker("When nothing is playing", selection: $idle) {
+                ForEach(NowPlayingIdle.allCases) { Text($0.label).tag($0) }
+            }
+            Text("Applies to the notch wings and the strip under the camera: when nothing plays, while paused with Hide while paused on, or when the app playing is switched off below, that spot shows this instead, and now playing comes back with the next track. By default each spot shows what it shows when Now playing isn't picked there. The Desk line simply hides.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

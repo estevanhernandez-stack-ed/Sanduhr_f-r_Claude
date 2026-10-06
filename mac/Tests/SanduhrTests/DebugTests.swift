@@ -75,6 +75,12 @@ struct DebugLinkTests {
         // Item 57: open or close What's New; nothing is recorded as seen.
         #expect(parse("sanduhr://debug/action?name=whats-new").command == .action(.whatsNew(true), dir: nil))
         #expect(parse("sanduhr://debug/action?name=close-whats-new").command == .action(.whatsNew(false), dir: nil))
+        // Item 61: open the tour at step 1 or a given step, or close it; nothing is recorded.
+        #expect(parse("sanduhr://debug/action?name=tour").command == .action(.tour(step: 1), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=tour-step&arg=3").command == .action(.tour(step: 3), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=close-tour").command == .action(.closeTour, dir: nil))
+        #expect(parse("sanduhr://debug/action?name=tour-step").error == "tour-step needs arg=<step number from 1>")
+        #expect(parse("sanduhr://debug/action?name=tour-step&arg=0").error == "tour-step needs arg=<step number from 1>")
     }
 
     @Test func badActionsKeepTheDirForTheError() {
@@ -271,12 +277,12 @@ struct DebugStateTests {
         let keys = yaml.split(separator: "\n").filter { !$0.hasPrefix(" ") && !$0.hasPrefix("-") }
             .map { String($0.split(separator: ":")[0]) }
         #expect(keys == ["desk_enabled", "desk_running", "layout", "notch", "has_notch",
-                         "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "now_playing", "widget_visible", "widget_visibility",
+                         "notch_left", "notch_right", "notch_strip", "camera_in_use", "camera_light", "now_playing", "now_playing_idle", "notch_shows", "widget_visible", "widget_visibility",
                          "menu_bar", "settings_open", "settings_section", "usage_page", "meters", "widget_warnings", "hidden_limits",
                          "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "dock", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
                          "glow_camera", "glow_claude_waiting", "glow_claude_done", "theme", "menu", "credentials_store", "account_ref", "accounts_count", "history_days", "data",
-                         "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "version", "build", "whats_new"])
+                         "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "version", "build", "whats_new", "tour"])
         #expect(yaml.contains("settings_section: notch\nusage_page:\n  open: false\n  tab: overview\nmeters:"))
         #expect(yaml.contains("widget_visible: true\nwidget_visibility: whileDeskOff\nmenu_bar: rotate\nsettings_open: true\n"))
         #expect(yaml.contains("notch_left: meetingOrTime\nnotch_right: message\nnotch_strip: meetingOrMeters\ncamera_in_use: false\ncamera_light: true\nnow_playing:\n"))
@@ -298,6 +304,7 @@ struct DebugStateTests {
         #expect(yaml.contains("last_fetch: \"1970-01-01T00:00:00Z\"\n"))
         #expect(yaml.contains("credentials_store: file\naccount_ref: null\naccounts_count: 0\nhistory_days: 30\ndata:\n  activity: \"off\"\n  names: names\n  share: \"off\"\n  folder_linked: false\nlocal_activity:\n  reading: false\n  events: 0\nvault:\n  recording: false\n  months: 0\n  last_ingest_ok: false\nintegrations:\n  mcp_installed: 0\n  statusline_installed: 0\n  meters_installed: 0\n  hooks_installed: 0\npending_suggestions:\n  messages: false\n  theme: false\nfollow: false\nfollow_paused: false\nversion: \"2.1.0\"\n"))
         #expect(yaml.contains("version: \"2.1.0\"\nbuild: \"3\"\nwhats_new:\n  last_seen: null\n  pending: 0\n  open: false\n  hide_after_updates: false\n"))
+        #expect(yaml.contains("tour:\n  open: false\n  step: 0\n  steps_shown: 0\n  done: false\n  pending: false\n"))
         #expect(yaml.contains("""
           - header: Tools
             items:

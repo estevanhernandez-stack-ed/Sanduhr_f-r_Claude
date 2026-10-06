@@ -60,8 +60,13 @@ struct AboutSection: View {
                 Text(AppInfo.independence)
                     .font(.callout).foregroundStyle(.secondary)
                 // Item 57: the release highlights, any time, whatever Don't show after updates says.
-                Button("What's New…") { WhatsNewWindowController.shared.show() }
-                    .help("What arrived in this version and the ones before it")
+                // Item 61: the welcome tour, any time, with the current settings.
+                HStack {
+                    Button("What's New…") { WhatsNewWindowController.shared.show() }
+                        .help("What arrived in this version and the ones before it")
+                    Button("Take the Tour…") { WelcomeTourWindowController.shared.show() }
+                        .help("The welcome tour: the meters, the Desk, the menu bar, accounts and Claude Code")
+                }
             }
             Section("Links") {
                 HStack {

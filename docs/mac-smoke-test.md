@@ -720,10 +720,26 @@ playback yourself. Never put titles in a bug report: `state.yaml` carries only f
   `desk` frame and `desk_frames_ok: true`. With the strip on Now playing (Notch, Text under the
   camera), the strip shows the whole title and takes the same clicks (a `now_playing` `strip` frame).
 - [ ] Stop the browser tab and play in Music: the wing and the line follow Music within two seconds.
-  Settings, Apps lists Chrome and Music; switch Chrome off and play in the browser: nothing shows
-  (the wing goes back to plain black); switch it back on.
-- [ ] Hide while paused on: pausing hides the wing and the line; playing brings them back. With
-  nothing playing at all, neither shows and no timer ticks (the line is gone).
+  Settings, Apps lists Chrome and Music; switch Chrome off and play in the browser: the wing shows
+  its stand-in (When nothing is playing, below), never the browser's title; switch it back on.
+- [ ] Hide while paused on: pausing hides the line and puts the wing's stand-in in its place
+  (When nothing is playing, below); playing brings both back. With nothing playing at all, the line
+  is gone and no timer ticks.
+- [ ] When nothing is playing. Right wing and the strip (Text under the camera on) on Now playing,
+  nothing playing. Settings, Desk, Now Playing has "When nothing is playing" reading "What that spot
+  shows by default", with its caption naming the wings and the strip and saying the Desk line simply
+  hides. The right wing shows the Claude meters, sized like the meters (no gap for ⏭), and the strip
+  the next meeting or the meters; `state.yaml` `now_playing_idle: automatic`,
+  `notch_shows: {left: …, right: meters, strip: meetingOrMeters}`, still `placed: [wing_right, strip]`
+  and `enabled: true`, and `desk_frames` has no `now_playing` `strip` frame. A click on the right wing
+  opens Settings (not play or pause); a two-finger click there shows no now playing menu. Settings,
+  Notch shows "When nothing plays: Claude meters (its default)." under Right wing and "When nothing
+  plays: Next meeting, or the Claude meters (its default)." under Under the camera; Change… opens the
+  Now Playing page. Pick Time: both show the time at once and the captions read "When nothing plays:
+  Time."; `now_playing_idle: time`. Play something: within two seconds both show the track again
+  (`notch_shows` back to `nowPlaying`) with their clicks; pause with Hide while paused on: the time
+  comes back. Pick Nothing: with nothing playing both go plain black, as before this choice. Put it
+  back on "What that spot shows by default".
 - [ ] Move Now playing to Hidden in Layout: the line goes, the wing stays and it keeps running. Then
   set the right wing back to Claude meters: `placed: []`, the Source reads Not placed anywhere and
   `pgrep -fl mediaremote-adapter` finds nothing within a second. Place it again, then switch Desk off:
@@ -917,13 +933,14 @@ the build afterwards.
 
 - [ ] Update from an older build: `defaults write com.626labs.sanduhr whatsNewLastSeen 2.3.4`,
   open the build. About two seconds after the widget and Desk are up, a window "What's New in
-  Sanduhr" shows the cards of every release since, newest first, at most 8 (from 2.3.4 to 2.6.0:
-  all eight, four of 2.6, two of 2.5, two of 2.4) under one header line, "New in 2.4.0 – 2.6.0"
-  (from 2.5.0: "New in 2.6.0"); no card has its own version line. Each card has its art (a symbol,
+  Sanduhr" shows the cards of every release since, newest first, at most 8 (from 2.3.4 to 2.7.0:
+  three of 2.7, three of 2.6, two of 2.5, under "New in 2.5.0 – 2.7.0"; from 2.6.0: sign-in, the
+  tour and now playing, under "New in 2.7.0"); no card has its own version line. Each card has its art (a symbol,
   or a live preview: the Desk message writing itself in, EsteFont 26, a notch wing, the menu bar),
   a title, a sentence or two and Show me. `smoke/smoke state` shows `whats_new:
   { last_seen: <this version>, pending: 0, open: true }`.
-- [ ] Show me on each card closes the window and opens Settings at its page: Now playing at Now
+- [ ] Show me on each card closes the window and opens Settings at its page: sign-in at Accounts,
+  the tour at About (Take the Tour… is there), Now playing at Now
   Playing, Claude's messages and themes at Message, the Dock at Layout, EsteFont 26 at Desk, Look,
   Claude Usage at Claude Usage, integrations at Integrations, accounts at Accounts, the menu bar
   and limits at General.
@@ -966,3 +983,48 @@ the installed app starts again.
 6. Close the window without signing in: nothing changes. Unplug the network: the error panel
    offers Try Again and Paste a Key Instead.
 7. Nothing persists: after the window closes, sign in again opens a fresh login (not signed in).
+
+## 30. Welcome tour (item 61)
+
+Needs a fresh state: a fresh macOS user, or a dev build with the defaults domains cleared. Use a
+dev build for the second: it keeps keys in `~/Library/Application Support/Sanduhr/credentials.json`
+(§29), and a Mac that already has a key or accounts never gets the tour, so move that file aside
+first. A release build copies `credentials.json` into the Keychain at its next launch: delete it
+before the installed app starts again. Back up both defaults domains (`defaults export
+com.626labs.sanduhr` and `com.626labs.sanduhr.desk`) and import them afterwards. Quit Sanduhr
+before each `defaults` command.
+
+1. Fresh start: `defaults delete com.626labs.sanduhr`, `defaults delete com.626labs.sanduhr.desk`,
+   open the build. The welcome sheet shows; no tour, no What's New. `smoke/smoke state` shows
+   `tour: { open: false, pending: true, done: false }`.
+2. Sign in (Sign In to Claude… or Paste a Key Instead). About a second after the widget fetches,
+   "Welcome to Sanduhr" opens with "1 of 5" under it and the card "Your limits, paced" showing your
+   own session and weekly bars with the pace tick and the same percents as the widget.
+3. Quit before signing in on a fresh start, open again: still no tour until the first fetch. Turn
+   the network off and sign in: no tour while the fetch fails; it shows once a fetch succeeds.
+4. Next (or Return) steps through: 2 "On your desktop" (a Desk corner with today's date and your
+   meters; Show the Desk and Widget theme: Match Desk), 3 "At a glance" (the menu bar, with Menu bar
+   shows; on a notched Mac a second card "Around the notch" with your numbers on the wings; on a Mac
+   without a notch the menu bar card alone), 4 "More than one account" (the chip), 5 "Claude Code,
+   connected" with Finish and "You can take the tour again from About or the menus." Back returns,
+   and is off on step 1. Tab reaches every control.
+5. Choices are real: Show the Desk turns the Desk on or off at once (Settings, General follows);
+   Match Desk switches the widget to Match Desk, and off goes back to the theme you had; Menu bar
+   shows changes the menu bar at once. Back to a step shows the choice as made.
+6. Show me on each card leaves the tour open: step 1 shows the widget, step 2 opens Settings,
+   Layout, the menu bar card Settings, General, the notch card Settings, Notch, step 4 Settings,
+   Accounts, step 5 Settings, Integrations.
+7. Skip the Tour (or Escape, or the close button) on step 3: the window closes, every setting stays
+   as it is, and `defaults read com.626labs.sanduhr welcomeTourState` prints `skipped`;
+   `whatsNewLastSeen` is this version. Quit and open: no tour, no What's New.
+8. Again from a fresh start, Finish on step 5: `welcomeTourState` is `finished`.
+9. Take the Tour… in Settings, About (beside What's New…), and in the menu bar item's, the widget's
+   and the Desk clock's menus (under What's New…): the tour opens at step 1 with the current
+   settings. Finishing or skipping it changes neither `welcomeTourState` nor `whatsNewLastSeen`.
+10. Never on update: with your own defaults back (or `defaults write com.626labs.sanduhr
+    whatsNewLastSeen 2.3.4` on a Mac that has a key), open the build: What's New shows, no tour,
+    and `welcomeTourState` is `notOffered`.
+11. VoiceOver reads each preview ("Your limits: Session 12%, weekly 40%" and so on). With Reduce
+    Motion on (System Settings, Accessibility, Display), nothing in the previews moves.
+12. `smoke/smoke run scenarios/welcome-tour.yaml` passes (opens the tour, steps 1 to 5 with their
+    step text and titles, closes it; records nothing).

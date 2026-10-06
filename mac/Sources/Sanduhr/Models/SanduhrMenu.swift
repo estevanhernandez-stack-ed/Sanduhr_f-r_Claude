@@ -4,7 +4,7 @@ import Foundation
 /// clock menu all hand these to AppDelegate.perform, so one choice does the same thing from
 /// any of them.
 enum MenuCommand: Int, CaseIterable {
-    case showHide, deepWork, pacing, snake, cameraLight, usage, refresh, settings, checkForUpdates, whatsNew, quit
+    case showHide, deepWork, pacing, snake, cameraLight, usage, refresh, settings, checkForUpdates, whatsNew, tour, quit
 }
 
 /// One item: its title, its Command-key equivalent ("" for none) and whether it shows a checkmark.
@@ -28,7 +28,7 @@ enum SanduhrMenu {
     /// `widgetVisible` picks Show or Hide; `deepWork`, `pacing` and `snake` are the tools'
     /// checkmarks (Deep Work or Cooldown Snake open on the widget, the pacing calculators pinned);
     /// `cameraLight` is the camera light switched on by hand. Claude Usage… opens Settings at the
-    /// Claude Usage page (item 48). What's New… (item 57) reopens the release highlights.
+    /// Claude Usage page (item 48). What's New… (item 57) reopens the release highlights, Take the Tour… (item 61) the welcome tour.
     static func groups(widgetVisible: Bool, deepWork: Bool, pacing: Bool, snake: Bool,
                        cameraLight: Bool = false) -> [MenuGroup] {
         [
@@ -47,6 +47,7 @@ enum SanduhrMenu {
                 MenuEntry(command: .settings, title: "Settings…", key: ","),
                 MenuEntry(command: .checkForUpdates, title: "Check for Updates…"),
                 MenuEntry(command: .whatsNew, title: "What's New…"),
+                MenuEntry(command: .tour, title: "Take the Tour…"),
             ]),
             MenuGroup(entries: [
                 MenuEntry(command: .quit, title: "Quit Sanduhr für Claude", key: "q"),

@@ -20,8 +20,9 @@ enum NotchContent: String, CaseIterable, Identifiable {
     case meters
     /// Today's Desk message line.
     case message
-    /// What plays on the Mac ("▶ Title · Artist", item 53), absent when nothing plays or, with
-    /// Hide while paused, while paused. Choosing it is enough: now playing runs while placed
+    /// What plays on the Mac ("▶ Title · Artist", item 53). When nothing plays or, with Hide
+    /// while paused, while paused, the place shows the When nothing is playing choice instead
+    /// (`effective`, NowPlayingIdle). Choosing it is enough: now playing runs while placed
     /// somewhere (NowPlayingPlacement).
     case nowPlaying
     case nothing
@@ -69,6 +70,23 @@ enum NotchContent: String, CaseIterable, Identifiable {
     /// A saved raw value for `place` as a choice: unset or unknown means the default.
     static func resolve(_ place: Place, raw: String?) -> NotchContent {
         raw.flatMap(NotchContent.init(rawValue:)) ?? place.fallback
+    }
+
+    /// What `place` actually shows. A place on Now playing with no now playing line (nothing
+    /// plays, Hide while paused while paused, the app switched off, now playing unavailable)
+    /// shows the When nothing is playing choice instead, and behaves fully like that content: its
+    /// text, its width, its clicks. Every other choice is itself. The saved choice still places
+    /// now playing (NowPlayingPlacement), so it keeps running and comes back with the next track.
+    static func effective(_ content: NotchContent, at place: Place, hasLine: Bool,
+                          idle: NowPlayingIdle) -> NotchContent {
+        guard content == .nowPlaying, !hasLine else { return content }
+        return idle.content(at: place)
+    }
+
+    /// `effective` with the line taken from what plays.
+    static func effective(_ content: NotchContent, at place: Place, nowPlaying: NowPlayingInfo?,
+                          idle: NowPlayingIdle) -> NotchContent {
+        effective(content, at: place, hasLine: NowPlayingText.line(nowPlaying, at: place) != nil, idle: idle)
     }
 
     /// The text for this choice at `place`, or nil for none (the place stays plain black).
@@ -120,5 +138,51 @@ enum NotchContent: String, CaseIterable, Identifiable {
     private static func nonEmpty(_ s: String?) -> String? {
         guard let s, !s.isEmpty else { return nil }
         return s
+    }
+}
+
+/// What a notch place set to Now playing shows while there is no now playing line (Settings,
+/// Desk, Now Playing, When nothing is playing). Unset or unknown means `automatic`: the place's
+/// own default content (NotchContent.Place.fallback). `nothing` leaves the place plain black, as
+/// before the choice existed. The Desk line has no stand-in: it simply hides.
+///
+///   defaults write com.626labs.sanduhr.desk nowPlayingIdle -string time
+enum NowPlayingIdle: String, CaseIterable, Identifiable {
+    case automatic
+    case meetingOrTime
+    case meetingOrMeters
+    case time
+    case meters
+    case message
+    case nothing
+
+    static let key = "nowPlayingIdle"
+
+    var id: String { rawValue }
+
+    /// The content shown at `place` in now playing's stead.
+    func content(at place: NotchContent.Place) -> NotchContent {
+        self == .automatic ? place.fallback : NotchContent(rawValue: rawValue) ?? place.fallback
+    }
+
+    var label: String {
+        self == .automatic ? "What that spot shows by default"
+            : NotchContent(rawValue: rawValue)?.label ?? rawValue
+    }
+
+    /// The Notch page's line under a place set to Now playing: "When nothing plays: Time."; for
+    /// automatic, the place's own default ("When nothing plays: Claude meters (its default).").
+    func caption(at place: NotchContent.Place) -> String {
+        let shown = content(at: place).label
+        return self == .automatic ? "When nothing plays: \(shown) (its default)." : "When nothing plays: \(shown)."
+    }
+
+    /// A saved raw value as a choice: unset or unknown means automatic.
+    static func resolve(raw: String?) -> NowPlayingIdle {
+        raw.flatMap(NowPlayingIdle.init(rawValue:)) ?? .automatic
+    }
+
+    static func saved(in defaults: UserDefaults) -> NowPlayingIdle {
+        resolve(raw: defaults.string(forKey: key))
     }
 }

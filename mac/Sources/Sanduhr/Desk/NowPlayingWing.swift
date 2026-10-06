@@ -86,6 +86,13 @@ enum NowPlayingWingLayout {
         return place == .left ? .leading : .trailing
     }
 
+    /// The play state a place sizes for: only a place that shows now playing (its effective
+    /// content, NotchContent.effective) with text makes room for Next; a place standing in with
+    /// its When nothing is playing choice sizes like that content.
+    static func sizingState(_ content: NotchContent, hasText: Bool, state: NowPlayingState?) -> NowPlayingState? {
+        content == .nowPlaying && hasText ? state : nil
+    }
+
     /// The extra width a place needs for the button.
     static func nextRoom(_ place: NotchContent.Place, state: NowPlayingState?, size: CGFloat) -> CGFloat {
         guard showsNext(state) else { return 0 }

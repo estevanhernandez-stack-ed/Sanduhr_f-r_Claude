@@ -366,7 +366,9 @@ final class DeskModel {
             notch: desk.bool(forKey: DeskController.notchKey), hasNotch: notchRect != nil,
             chin: desk.object(forKey: "notchChin") as? Double ?? 26,
             chinText: desk.bool(forKey: "notchChinText"),
-            strip: NotchContent.saved(.strip, in: desk), hasTrack: nowPlaying != nil)
+            strip: NotchContent.effective(NotchContent.saved(.strip, in: desk), at: .strip,
+                                          nowPlaying: nowPlaying, idle: NowPlayingIdle.saved(in: desk)),
+            hasTrack: NowPlayingText.line(nowPlaying, at: .strip) != nil)
         input.stripFrame = stripFrame
         input.nowPlayingStripNext = NowPlayingWingLayout.showsNext(nowPlaying?.state)
         input.stripNextFrame = stripNextFrame

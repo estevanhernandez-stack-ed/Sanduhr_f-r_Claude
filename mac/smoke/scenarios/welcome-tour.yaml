@@ -1,0 +1,57 @@
+# docs/mac-smoke-test.md section 30: the welcome tour (item 61) opens from its hook as Take the
+# Tour… opens it, steps through, and closes. Records nothing: welcomeTourState and
+# whatsNewLastSeen stay as they were.
+name: Welcome tour
+steps:
+  - do: tour
+  - expect_state: { tour.open: true, tour.step: 1, tour.steps_shown: 5 }
+  - expect:
+      window: welcome-tour
+      contains: { text: Welcome to Sanduhr }
+  - expect:
+      window: welcome-tour
+      contains: { text: "/^1 of 5$/" }
+  - expect:
+      window: welcome-tour
+      contains: { text: "/Your limits, paced/" }
+  - expect:
+      window: welcome-tour
+      contains: { text: "/Skip the Tour/" }
+  - do: tour-step
+    arg: 2
+  - expect_state: { tour.step: 2 }
+  - expect:
+      window: welcome-tour
+      contains: { text: "/On your desktop/" }
+  - do: tour-step
+    arg: 3
+  - expect_state: { tour.step: 3 }
+  - expect:
+      window: welcome-tour
+      contains: { text: "/^3 of 5$/" }
+  - expect:
+      window: welcome-tour
+      contains: { text: "/At a glance/" }
+  - do: tour-step
+    arg: 4
+  - expect:
+      window: welcome-tour
+      contains: { text: "/More than one account/" }
+  - do: tour-step
+    arg: 5
+  - expect_state: { tour.step: 5 }
+  - expect:
+      window: welcome-tour
+      contains: { text: "/^5 of 5$/" }
+  - expect:
+      window: welcome-tour
+      contains: { text: "/Claude Code, connected/" }
+  - expect:
+      window: welcome-tour
+      contains: { text: "/Finish/" }
+  - expect:
+      window: welcome-tour
+      contains: { text: "/take the tour again/" }
+  - snap: welcome-tour
+  - do: close-tour
+  - expect_state: { tour.open: false }

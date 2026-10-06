@@ -28,6 +28,7 @@ struct NotchView: View {
     @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
     @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
     @AppStorage(NotchContent.Place.strip.key, store: .desk) private var stripContent = NotchContent.Place.strip.fallback
+    @AppStorage(NowPlayingIdle.key, store: .desk) private var idle = NowPlayingIdle.automatic
 
     var body: some View {
         // Extra height 0 means no strip under the camera at all: just the wings.
@@ -40,14 +41,16 @@ struct NotchView: View {
                 // even when a wing grows to fit its text.
                 let w = NotchWingsView.layout(model: model, now: context.date, wings: wings,
                                               showText: wingText, left: leftContent, right: rightContent,
-                                              font: font, notchHeight: notch.height)
+                                              idle: idle, font: font, notchHeight: notch.height)
+                // Now playing with nothing to show stands aside for the When nothing is playing choice.
+                let strip = NotchContent.effective(stripContent, at: .strip, nowPlaying: model.nowPlaying, idle: idle)
                 ZStack(alignment: .bottom) {
                     IslandShape(flare: 8, radius: min(16, chin * 0.7))
                         .fill(Color.black)
-                    if showChinText, let line = stripContent.text(
+                    if showChinText, let line = strip.text(
                         at: .strip, meetings: model.meetings, meters: model.claudeCompact,
                         message: model.message, nowPlaying: model.nowPlaying, now: context.date) {
-                        if stripContent == .nowPlaying {
+                        if strip == .nowPlaying {
                             stripNowPlaying(line, width: notch.width + w.left + w.right)
                         } else {
                             Text(line)
@@ -152,6 +155,7 @@ struct NotchWingsView: View {
     private var font: String { DeskFont.resolve(saved: savedFont) }
     @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
     @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
+    @AppStorage(NowPlayingIdle.key, store: .desk) private var idle = NowPlayingIdle.automatic
 
     var body: some View {
         if enabled {
@@ -159,7 +163,7 @@ struct NotchWingsView: View {
             let _ = model.nowPlaying
             TimelineView(.periodic(from: .now, by: 15)) { context in
                 let w = Self.layout(model: model, now: context.date, wings: wings, showText: showText,
-                                    left: leftContent, right: rightContent,
+                                    left: leftContent, right: rightContent, idle: idle,
                                     font: font, notchHeight: notchHeight)
                 let left = w.leftText, right = w.rightText, size = w.size
                 let wingL = w.left, wingR = w.right
@@ -168,9 +172,9 @@ struct NotchWingsView: View {
                         IslandShape(flare: 8, radius: min(10, barHeight * 0.3))
                             .fill(Color.black)
                         HStack(spacing: 0) {
-                            wing(left, size, leftContent, place: .left, width: wingL).frame(width: max(0, wingL - 10), alignment: .trailing)
+                            wing(left, size, w.leftContent, place: .left, width: wingL).frame(width: max(0, wingL - 10), alignment: .trailing)
                             Color.clear.frame(width: notchWidth + 20)
-                            wing(right, size, rightContent, place: .right, width: wingR).frame(width: max(0, wingR - 10), alignment: .leading)
+                            wing(right, size, w.rightContent, place: .right, width: wingR).frame(width: max(0, wingR - 10), alignment: .leading)
                         }
                     }
                     .frame(width: notchWidth + wingL + wingR, height: barHeight)
@@ -283,12 +287,20 @@ struct NotchWingsView: View {
             .truncationMode(.tail)
     }
 
-    /// Wing widths and texts, shared with the strip under the notch so both draw one shape.
-    struct Layout { let left: CGFloat; let right: CGFloat; let leftText: String?; let rightText: String?; let size: CGFloat }
+    /// Wing widths and texts, shared with the strip under the notch so both draw one shape. The
+    /// contents are what each wing actually shows (NotchContent.effective): a wing on Now playing
+    /// with nothing to show draws, sizes and clicks as its When nothing is playing choice.
+    struct Layout {
+        let left: CGFloat; let right: CGFloat; let leftText: String?; let rightText: String?; let size: CGFloat
+        var leftContent: NotchContent = NotchContent.Place.left.fallback
+        var rightContent: NotchContent = NotchContent.Place.right.fallback
+    }
 
     static func layout(model: DeskModel, now: Date, wings: Double, showText: Bool,
-                       left leftContent: NotchContent, right rightContent: NotchContent,
+                       left savedLeft: NotchContent, right savedRight: NotchContent, idle: NowPlayingIdle,
                        font: String, notchHeight: CGFloat) -> Layout {
+        let leftContent = NotchContent.effective(savedLeft, at: .left, nowPlaying: model.nowPlaying, idle: idle)
+        let rightContent = NotchContent.effective(savedRight, at: .right, nowPlaying: model.nowPlaying, idle: idle)
         let left = showText ? text(leftContent, at: .left, model: model, now: now) : nil
         let right = showText ? text(rightContent, at: .right, model: model, now: now) : nil
         let size = max(10, notchHeight * 0.42)
@@ -297,12 +309,13 @@ struct NotchWingsView: View {
             // A paused now playing also makes room for its Next button (item 53b).
             NowPlayingWingLayout.wingWidth(
                 textWidth: textWidth(text, size, font), place: place,
-                state: content == .nowPlaying && text != nil ? state : nil,
+                state: NowPlayingWingLayout.sizingState(content, hasText: text != nil, state: state),
                 size: size, minimum: wings, maximum: maxWings)
         }
         return Layout(left: wingWidth(left, leftContent, .left),
                       right: wingWidth(right, rightContent, .right),
-                      leftText: left, rightText: right, size: size)
+                      leftText: left, rightText: right, size: size,
+                      leftContent: leftContent, rightContent: rightContent)
     }
 
     private static func text(_ content: NotchContent, at place: NotchContent.Place,

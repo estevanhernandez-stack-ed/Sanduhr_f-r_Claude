@@ -526,6 +526,20 @@ Previous, Play/Pause, Next and Now Playing Settings…. It hides when nothing pl
 paused, and for apps switched off on the Now Playing page (which also has the source, the AppleScript
 switch and "Arrange on the Notch…" / "Arrange on the Desk…").
 
+- **When nothing is playing.** A notch wing or the strip on Now playing doesn't go blank when there
+  is no line (nothing plays, Hide while paused while paused, the app switched off, now playing
+  unavailable): it shows the Now Playing page's "When nothing is playing" choice instead, by default
+  what that spot shows when Now playing isn't picked (left wing: next meeting or the time; right
+  wing: the Claude meters; strip: next meeting or the meters), or any other notch content, or Nothing
+  (plain black, as before). The stand-in behaves fully like that content: its text, its wing width
+  (no Next room), the island's click (Settings) and no now playing click areas. One pure rule,
+  `NotchContent.effective`, decides it for the wings, the strip, `desk_frames` and the glow's
+  outline. The saved choice still places now playing, so it keeps running and the next track takes
+  the spot back. The Desk line has no stand-in; it simply hides. Settings, Notch says what a place on
+  Now playing shows meanwhile ("When nothing plays: Claude meters (its default).").
+  `state.yaml` has `now_playing_idle` and `notch_shows: {left, right, strip}` (each place's
+  effective content, never its text).
+
 - **Long titles.** A title that doesn't fit its wing (or the strip) scrolls through once when a new
   track starts or the place first shows it: 1.2 s at the beginning, 30 pt/s with ease in and out
   until its end clears the 12 pt fade, 1.0 s at the end, 0.6 s back, then it rests at the beginning.
@@ -599,6 +613,24 @@ adds its own array and nothing else changes. Related features share a card, whic
 newest release it covers and lists every release it spans; it shows when any of them is new. The last version seen is the `whatsNewLastSeen`
 default (`defaults write com.626labs.sanduhr whatsNewLastSeen 2.3.4` fakes an update).
 
+## Welcome tour
+
+A fresh install gets a short tour once, after its first sign-in, as soon as the first fetch
+succeeds, so its first card shows your own meters. It uses the What's New window's look, one step
+at a time ("Welcome to Sanduhr", "1 of 5"): your limits and the pace tick, the Desk (with Show the
+Desk and Match Desk switches), the menu bar (with what it shows) and, on a Mac with a notch, the
+notch, more than one account, and Claude Code (the Claude Usage page and Integrations). Choices are
+the real settings, written as you make them; Show me opens the widget or the right Settings page
+and leaves the tour open. Next and Return move on, Back goes back, Skip the Tour (or Escape) closes
+it with every setting as it is, and the last step's Finish ends it. It never installs anything.
+
+It shows once: never after an update, never on a Mac that already had a key, accounts or a What's
+New version when this build first ran, and What's New waits while it is pending. Finishing or
+skipping records `welcomeTourState` (`finished` or `skipped`) and What's New's last-seen version,
+so the next update shows only newer cards. Take the Tour… in Settings, About and the menus opens it
+again any time with the current settings, recording nothing. The cards live in
+`Sources/Sanduhr/Models/WelcomeTourSteps.swift`; a card that needs a feature this Mac lacks hides.
+
 ## Files
 
 - `sessionKey:{label}` + `cf_clearance:{label}` per account → the Keychain, service `com.626labs.sanduhr` (release builds), or `~/Library/Application Support/Sanduhr/credentials.json` (mode `0600`, dev builds); see First run and Accounts above
@@ -611,7 +643,7 @@ default (`defaults write com.626labs.sanduhr whatsNewLastSeen 2.3.4` fakes an up
 - Desk messages from Claude (item 54) → `desk-messages-request.json` (server), `desk-messages-result.json` and `desk-messages-state.json` (app), all mode 0600 in `~/Library/Application Support/Sanduhr/`; the previous list in `~/Library/Application Support/Desk/messages.txt.previous`; the opt-in in the desk preference `messageClaudeDirect`, the glow in `messageGlow`
 - Claude Code integrations (items 49 to 51) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json` (the notch glow hooks in its `hooks`), with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed, hooks_installed}`
 - Window position → `UserDefaults` (`windowFrame`)
-- Now playing (items 53, 53b) → where it shows is the desk preferences `notchLeft`, `notchRight`, `notchStrip` and the `nowPlaying` word in `layout`; the rest is `nowPlayingHidePaused`, `nowPlayingAskApps` and `nowPlayingExcluded` (bundle ids switched off). Item 53's `nowPlaying` and `nowPlayingDesk` are read once by the upgrade (`nowPlayingPlacementUpgraded`); what plays stays in memory
+- Now playing (items 53, 53b) → where it shows is the desk preferences `notchLeft`, `notchRight`, `notchStrip` and the `nowPlaying` word in `layout`; the rest is `nowPlayingHidePaused`, `nowPlayingAskApps`, `nowPlayingExcluded` (bundle ids switched off) and `nowPlayingIdle` (When nothing is playing: `automatic` when unset, or a notch content's raw value). Item 53's `nowPlaying` and `nowPlayingDesk` are read once by the upgrade (`nowPlayingPlacementUpgraded`); what plays stays in memory
 - EsteFont 26 → `Sanduhr.app/Contents/Resources/Fonts/`, from `mac/Resources/Fonts/` (see Fonts); the Desk's choice in the desk preference `font`
 - Third-party notices (Sparkle, mediaremote-adapter, EsteFont 26) → `Sanduhr.app/Contents/Resources/THIRD-PARTY-NOTICES.txt`, from `mac/THIRD-PARTY-NOTICES.txt`; Settings, About opens it
 

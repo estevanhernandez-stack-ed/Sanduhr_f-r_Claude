@@ -336,11 +336,12 @@ struct NotchGlowView: View {
     private var font: String { DeskFont.resolve(saved: savedFont) }
     @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
     @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
+    @AppStorage(NowPlayingIdle.key, store: .desk) private var idle = NowPlayingIdle.automatic
 
     var body: some View {
         // The same widths the wings and the strip use, so the halo hugs the island as drawn.
         let w = NotchWingsView.layout(model: model, now: Date(), wings: wings, showText: showText,
-                                      left: leftContent, right: rightContent,
+                                      left: leftContent, right: rightContent, idle: idle,
                                       font: font, notchHeight: notchHeight)
         let chin = NotchGlowLayout.glowChin(savedChin, stripVisible: stripVisible)
         NotchHaloView(width: notchWidth + w.left + w.right,
@@ -523,6 +524,7 @@ final class NotchGlowController {
                 ?? NotchContent.Place.left.fallback,
             right: d.string(forKey: NotchContent.Place.right.key).flatMap(NotchContent.init(rawValue:))
                 ?? NotchContent.Place.right.fallback,
+            idle: NowPlayingIdle.saved(in: d),
             font: DeskFont.resolve(d), notchHeight: notch.height)
         guard let screen, let primary = NSScreen.screens.first,
               let local = NotchGlowLayout.stripRect(notch: notch, barHeight: barHeight, chin: chin,

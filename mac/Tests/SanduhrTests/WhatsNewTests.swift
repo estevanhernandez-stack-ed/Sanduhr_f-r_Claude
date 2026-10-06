@@ -156,15 +156,19 @@ struct WhatsNewTableTests {
     }
 
     @Test func releasesSinceTwoFour() {
-        #expect(Set(table.map(\.version)) == ["2.4.0", "2.5.0", "2.6.0"])
-        #expect(table.count == 8)
+        let releases: Set<String> = ["2.4.0", "2.5.0", "2.6.0", "2.7.0"]
+        #expect(Set(table.map(\.version)) == releases)
+        #expect(table.count == 10)
+        #expect(table.filter { $0.version == "2.7.0" }.map(\.id) == ["sign-in", "tour", "now-playing"])
         #expect(table.filter { $0.version == "2.6.0" }.map(\.id)
-                == ["now-playing", "claude-suggests", "dock-aware-desk", "estefont"])
+                == ["claude-suggests", "dock-aware-desk", "estefont"])
         #expect(table.filter { $0.version == "2.5.0" }.map(\.id) == ["usage-page", "integrations"])
         #expect(table.filter { $0.version == "2.4.0" }.map(\.id) == ["accounts", "menu-bar"])
+        // Now playing spans 2.6.0 (the feature) and 2.7.0 (what shows when nothing plays).
+        #expect(table.first { $0.id == "now-playing" }?.versions == ["2.7.0", "2.6.0"])
         // A card's releases are all in the table's range, newest (its array's) first.
         for c in table {
-            #expect(!c.versions.isEmpty && c.versions.allSatisfy { ["2.4.0", "2.5.0", "2.6.0"].contains($0) }, "\(c.id)")
+            #expect(!c.versions.isEmpty && c.versions.allSatisfy { releases.contains($0) }, "\(c.id)")
         }
     }
 
@@ -186,6 +190,7 @@ struct WhatsNewTableTests {
     @Test func showMeLandsOnTheRightPage() {
         let dest = Dictionary(uniqueKeysWithValues: table.map { ($0.id, $0.destination) })
         #expect(dest == [
+            "sign-in": .credentials, "tour": .about,
             "now-playing": .nowPlaying, "claude-suggests": .message,
             "dock-aware-desk": .deskLayout, "estefont": .deskLook,
             "usage-page": .usage, "integrations": .integrations,
@@ -195,15 +200,19 @@ struct WhatsNewTableTests {
 
     @Test func updatingFromTwoFiveShowsTwoSixUnderOneHeader() {
         let fromTwoFive = WhatsNew.cards(lastSeen: "2.5.0", current: "2.6.0")
-        #expect(fromTwoFive.map(\.version) == Array(repeating: "2.6.0", count: 4))
+        #expect(fromTwoFive.map(\.id) == ["now-playing", "claude-suggests", "dock-aware-desk", "estefont"])
         #expect(WhatsNew.rangeLabel(fromTwoFive, lastSeen: "2.5.0", current: "2.6.0") == "New in 2.6.0")
-        // From before 2.4: every card fits under the cap, newest first.
-        let fromOld = WhatsNew.cards(lastSeen: "2.3.4", current: "2.6.0")
-        #expect(fromOld.count == 8)
-        #expect(fromOld.first?.version == "2.6.0")
-        #expect(fromOld.last?.version == "2.4.0")
-        #expect(WhatsNew.rangeLabel(fromOld, lastSeen: "2.3.4", current: "2.6.0") == "New in 2.4.0 – 2.6.0")
-        #expect(WhatsNew.rangeLabel(WhatsNew.all(current: "2.6.0"), lastSeen: nil, current: "2.6.0")
-                == "New in 2.4.0 – 2.6.0")
+    }
+
+    @Test func updatingToTwoSeven() {
+        let fromTwoSix = WhatsNew.cards(lastSeen: "2.6.0", current: "2.7.0")
+        #expect(fromTwoSix.map(\.id) == ["sign-in", "tour", "now-playing"])
+        #expect(WhatsNew.rangeLabel(fromTwoSix, lastSeen: "2.6.0", current: "2.7.0") == "New in 2.7.0")
+        // From before 2.4: the cap keeps the newest eight, so 2.4's two cards drop.
+        let fromOld = WhatsNew.cards(lastSeen: "2.3.4", current: "2.7.0")
+        #expect(fromOld.count == WhatsNew.cap)
+        #expect(fromOld.first?.id == "sign-in")
+        #expect(!fromOld.contains { $0.version == "2.4.0" })
+        #expect(WhatsNew.rangeLabel(fromOld, lastSeen: "2.3.4", current: "2.7.0") == "New in 2.5.0 – 2.7.0")
     }
 }
