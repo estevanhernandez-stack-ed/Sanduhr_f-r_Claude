@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { createApi, createEmptyApi, type SanduhrTimeApi } from './api';
 import { knownProjectNames, resolve as resolveProject } from './project';
+import { Comparison } from './compare/wakatime';
 import { Recorder, type RecorderHost } from './recorder';
 import { Runner } from './runner';
 import { AliasStore } from './store/aliases';
@@ -47,6 +48,7 @@ interface CommandDeps {
   dir: string;
   store: AliasStore;
   runner: Runner;
+  comparison: Comparison;
 }
 
 function registerCommands(deps: CommandDeps | undefined, panel: TimePanel, context?: Context): void {
@@ -72,6 +74,17 @@ function registerCommands(deps: CommandDeps | undefined, panel: TimePanel, conte
       r.ran
         ? `Sanduhr Time: merged ${r.merged.length} day(s).`
         : 'Sanduhr Time: another merge is running; try again shortly.',
+    );
+  });
+  reg('sanduhrTime.compareNow', async () => {
+    if (!deps) return localOnly();
+    const r = await deps.comparison.compareNow();
+    void vscode.window.showInformationMessage(
+      r === undefined
+        ? 'Sanduhr Time: WakaTime comparison is off or wakatime-cli was not found.'
+        : 'error' in r
+          ? `Sanduhr Time: WakaTime comparison failed (${r.error}).`
+          : 'Sanduhr Time: WakaTime comparison recorded.',
     );
   });
   reg('sanduhrTime.revealData', async () => {
@@ -134,6 +147,14 @@ export function activate(context?: Context): SanduhrTimeApi {
 
   live = { recorder, spool, runner, emitter };
   const api = createApi({ dir, store, onDayUpdated: emitter.event });
+  const comparison = new Comparison({
+    dir,
+    enabled: () => vscode.workspace.getConfiguration('sanduhrTime').get<boolean>('compareWakaTime') ?? true,
+    now: Date.now,
+    getToday: () => api.getToday(),
+    onError: (m) => console.error('[sanduhr-time] wakatime comparison:', m),
+  });
+  context?.subscriptions.push(emitter.event((d) => void comparison.onDayUpdated(d)));
   timePanel = new TimePanel({
     api,
     controller: {
@@ -144,9 +165,10 @@ export function activate(context?: Context): SanduhrTimeApi {
     },
     extensionUri: context?.extensionUri,
     remote: false,
+    compare: comparison.provider,
   });
   context?.subscriptions.push(createStatusBar({ api, remote: false }));
-  registerCommands({ dir, store, runner }, timePanel, context);
+  registerCommands({ dir, store, runner, comparison }, timePanel, context);
   return api;
 }
 

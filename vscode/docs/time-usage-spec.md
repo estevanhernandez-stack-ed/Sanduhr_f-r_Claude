@@ -268,7 +268,7 @@ Per local date: the distinct Claude Code versions seen in transcript lines (thei
 
 ### 7.5 `state/wakatime-compare.jsonl`
 
-Optional. One line per day: `{ "date", "wakatimeSeconds", "oursEditorSeconds", "at" }`, appended once a day when a `wakatime-cli` is present.
+Optional. One line per day: `{ "date", "wakatimeSeconds", "oursEditorSeconds", "at" }`, appended once a day when a `wakatime-cli` is present. `wakatimeSeconds` is from `wakatime-cli --today --output raw-json` (`data.grand_total.total_seconds`, rounded), falling back to the text form (`2 hrs 32 mins`, minute precision); `oursEditorSeconds` is (`youMs` + `bothMs`) / 1000 from today's day record at the time of the run, rounded. Nothing is appended when the setting is off, the CLI is missing, or the run fails.
 
 ## 8. Day computation (the merger)
 

@@ -58,6 +58,10 @@
         "title": "Sanduhr Time: Merge Now"
       },
       {
+        "command": "sanduhrTime.compareNow",
+        "title": "Sanduhr Time: Compare With WakaTime Now"
+      },
+      {
         "command": "sanduhrTime.revealData",
         "title": "Sanduhr Time: Reveal Data Folder"
       }

@@ -59,7 +59,7 @@
   Acceptance: `prd.md > Seeing it` criteria hold.
   Verify: Unit tests for the view model; then render the panel in the isolated test VS Code from item 2's harness against a synthetic data dir in both a dark and a light theme, capture screenshots, and inspect them.
 
-- [ ] **9. WakaTime side-by-side comparison**
+- [x] **9. WakaTime side-by-side comparison**
   Spec ref: `spec.md > Tracker extension > WakaTime comparison`
   What to build: `src/compare/wakatime.ts`: locate `wakatime-cli`, run it once a day with a timeout, parse raw JSON or the `Xh Ym` text, append to `state/wakatime-compare.jsonl`, show it in the panel, honor the setting, hide when missing.
   Acceptance: `prd.md > WakaTime side by side` criteria hold.

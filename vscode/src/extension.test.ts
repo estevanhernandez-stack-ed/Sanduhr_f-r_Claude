@@ -36,9 +36,10 @@ describe('extension', () => {
     expect(readOffsets(path.join(dir, 'state'))).toEqual({}); // no reader pass has run inside activate
   });
 
-  it('registers the four commands', () => {
+  it('registers the five commands', () => {
     activate(subs());
     expect((vscode.commands as unknown as { registered(): string[] }).registered().sort()).toEqual([
+      'sanduhrTime.compareNow',
       'sanduhrTime.mergeNow',
       'sanduhrTime.openPanel',
       'sanduhrTime.revealData',
