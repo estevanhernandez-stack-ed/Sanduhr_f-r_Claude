@@ -123,12 +123,20 @@ DESK_EFFECTS = (
     "gradient); {glow} / {noglow} turn the soft glow on or off for this line; {size:1.3} scales "
     "the line from 0.5 to 2 times the Desk's message size; {write} draws the line in, left to right "
     "like handwriting, once when it first appears; {shimmer} sends a slow light sweep across it "
-    "every few seconds. Examples: '{ink:#ffd08a} showtime.', 'Fri: {ink:#ff2a6d,#05d9e8} {glow} "
+    "every few seconds; {sweep} runs a three-character light across the line that brightens it "
+    "toward white, once when the line appears, and {sweep:20} every 20 seconds (2 to 3600); "
+    "{font:small-caps} draws the line in a letter style: bold, italic, bold-italic and small-caps "
+    "in the Desk's own handwriting (its Bold face, a slant, capitals at x-height size), sans, mono, "
+    "double-struck, script and fraktur as Unicode math letters (A to Z, a to z and, where the "
+    "style has them, digits; accents and punctuation stay as written) in the system font. "
+    "Examples: '{ink:#ffd08a} showtime.', 'Fri: {ink:#ff2a6d,#05d9e8} {glow} "
     "ship it.', '10-31: {ink:#ff7518,#6b2fa0} {write} happy halloween.', '{size:0.8} {noglow} "
-    "breathe.'. Good taste: short lines (handwriting reads best under about 40 characters, two "
-    "lines at most on screen), lowercase and a period suit the hand, {write} and {shimmer} "
-    "sparingly (a few lines, not every line), gradients with 2 or 3 colors that sit near each "
-    "other, sizes near 1. Reduce Motion shows {write} at once and skips {shimmer}. ")
+    "breathe.', '{font:small-caps} {sweep} showtime.', '{font:script} {sweep:30} good morning.'. "
+    "Good taste: short lines (handwriting reads best under about 40 characters, two "
+    "lines at most on screen), lowercase and a period suit the hand, {write}, {shimmer} and {sweep} "
+    "sparingly (a few lines, not every line, and one of them per line), {font:...} on short "
+    "lines, gradients with 2 or 3 colors that sit near each other, sizes near 1. Reduce Motion "
+    "shows {write} at once and skips {shimmer} and {sweep}. ")
 DESK_GUIDE_READ = (
     "Read the user's Desk messages: the handwritten line Sanduhr draws on the macOS desktop, picked "
     "from ~/Library/Application Support/Desk/messages.txt. Returns every raw line of the file "
@@ -1186,7 +1194,11 @@ DATE_TAG_RE = re.compile(r"^\d{2}-\d{2}$")
 DATE_LIKE_RE = re.compile(r"^\d{1,2}-\d{1,2}$")
 HEX_RE = re.compile(r"^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 SIZE_RE = re.compile(r"^\d+(?:\.\d+)?$")
-EFFECT_NAMES = "ink, glow, noglow, size, write, shimmer"
+EFFECT_NAMES = "ink, glow, noglow, size, write, shimmer, sweep, font"
+# {font:...}'s letter styles, the statusline's names (sanduhr_statusline.py FONTS), in the app's order.
+FONT_STYLES = "bold, italic, bold-italic, sans, mono, double-struck, script, fraktur, small-caps"
+# {sweep:<seconds>}'s period, inclusive.
+SWEEP_PERIOD = (2, 3600)
 DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 ROTATIONS = ("daily", "hourly")
 
@@ -1233,7 +1245,32 @@ def parse_effect(tag):
         if not sep or not SIZE_RE.match(value) or not 0.5 <= float(value) <= 2:
             return "{size:...} needs a number from 0.5 to 2, like {size:1.3}"
         return name, float(value)
+    if name == "font":
+        style = font_style(value) if sep else None
+        if style is None:
+            return "{font:...} needs a letter style: %s" % FONT_STYLES
+        return name, style
+    if name == "sweep":
+        if not sep:
+            return name, None
+        if not SIZE_RE.match(value) or not SWEEP_PERIOD[0] <= float(value) <= SWEEP_PERIOD[1]:
+            return "{sweep:...} takes a period in seconds from 2 to 3600, like {sweep:20}"
+        return name, float(value)
     return "unknown effect {%s}; known: %s" % (name[:20], EFFECT_NAMES)
+
+
+def _style_key(s):
+    return "".join(c for c in s.lower() if c not in " -_")
+
+
+def font_style(value):
+    """The letter style a {font:...} value names (case, spaces, hyphens and underscores
+    ignored, so smallcaps is small-caps), or None."""
+    key = _style_key(value)
+    for name in FONT_STYLES.split(", "):
+        if _style_key(name) == key:
+            return name
+    return None
 
 
 def parse_effects(body):

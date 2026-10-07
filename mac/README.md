@@ -558,13 +558,30 @@ the pin or rotation changes, for `get_desk_messages`.
 `{ink:#hex,…}` (1 to 4 colors, a gradient from two), `{glow}` / `{noglow}` (over Settings, Desk,
 Look's new "Glow around the message", `messageGlow`), `{size:0.5…2}` (times the message size),
 `{write}` (the line draws itself in, left to right, over 1.5 s when it first appears, once) and
-`{shimmer}` (a light band sweeps across it in 1.6 s every 8 s). `MessageMarkup` parses strictly for
+`{shimmer}` (a light band sweeps across it in 1.6 s every 8 s), `{sweep}` (item 65: a light three
+characters wide crosses the line in 1.1 s, brightening each character toward white as it passes,
+the now-playing mod's glow; once, 0.6 s after the line appears, or with `{sweep:<seconds>}` again
+every 2 to 3600 seconds) and `{font:<style>}` (item 65: a letter style, the statusline's names:
+`bold`, `italic`, `bold-italic`, `sans`, `mono`, `double-struck`, `script`, `fraktur`, `small-caps`;
+case, spaces, hyphens and underscores don't matter, so `{font:smallcaps}` works). Bold, italic and
+small caps draw in the line's own font (`MessageTypography`): bold is the family's Bold face from
+`BundledFonts.face` (EsteFont's), or a synthesized weight for a family without one; italic is a
+12-degree slant of the line; small caps are the capitals with lowercase letters drawn as capitals
+at the font's x-height. The other five have no face in any handwriting font, so they draw as
+Unicode math letters (`LetterMap`, a port of the statusline's table with its Letterlike holes such
+as script B and double-struck R; `test_sanduhr_statusline.py` checks the two tables match) in the
+system font: A to Z, a to z and, where the style has them, digits; accents and punctuation stay as
+written, and VoiceOver reads the plain text. The notch shows the message without its tags, with
+its letter style. `MessageMarkup` parses strictly for
 proposals and leniently on the Desk: an unknown or malformed tag ends the tags and draws, with the
 rest, as plain text; a line of tags alone draws as written. Reduce Motion shows `{write}` at once and
-turns `{shimmer}` off. Cost: a line without `{write}` or `{shimmer}` draws as before (no mask, no
-task); `{write}` is one animation; `{shimmer}` is a task that sleeps between sweeps and stops while
-the Desk is covered (window occlusion), the screens sleep, the screen saver runs or the session is
-switched away (`MessageMotion.paused`).
+turns `{shimmer}` and `{sweep}` off. Cost: a line without `{write}`, `{shimmer}` or `{sweep}` draws
+as before (no mask, no task); `{write}` is one animation; `{shimmer}` is a task that sleeps between
+sweeps and stops while the Desk is covered (window occlusion), the screens sleep, the screen saver
+runs or the session is switched away (`MessageMotion.paused`); `{sweep}` draws 30 frames a second
+only during its 1.1 s run, sleeps between runs and rests the same way (a once-only sweep that has
+run does not repeat when the Desk comes back into sight; one that was covered before it ran runs
+then). Settings, Message's Replay sweeps a `{sweep}` line at once.
 
 **Themes from Claude (item 55).** `propose_theme {theme, save_as?, apply?}` is the Windows tool:
 same name, inputs and result shape. `theme` is the theme JSON in `docs/themes/template.json`'s
@@ -607,6 +624,55 @@ Tests: `python3 -m unittest discover -s mac/integrations/tests` (also a Mac CI s
 folders: each sharing level, no access file, hidden names, and the Windows MCP tests' cases. The
 two lints share `mac/Tests/SanduhrTests/Fixtures/theme-builtins.json`, the built-ins they must pass
 clean.
+
+## Mods
+
+Item 64, slice 1: Settings, Mods (under Integrations) lists every mod and plugin each Claude Code
+folder loads, read-only. The folders are the ones Integrations lists: `~/.claude`, the
+`~/.claude-*` folders and `CLAUDE_CONFIG_DIR`'s (`ClaudeCodeFolders.discover`, which now skips
+`*.config-backup-*` copies a config tool leaves beside a home, unless `CLAUDE_CONFIG_DIR` names
+one), the accounts' linked folders and the folders Sanduhr installed into.
+
+**What a folder loads** (`ModInventory.scan`, files only, no CLI): the folders in its
+settings.json's `env.CLAUDE_CODE_PLUGIN_DIRS` (`@inline`; off when `enabledPlugins["<name>@inline"]`
+is false), every plugin in `plugins/installed_plugins.json` or keyed `<name>@<marketplace>` in
+`enabledPlugins` (on only when that key is true; a key without a record, such as a `@synced`
+plugin, is listed without files), plugin folders under `skills/` (`<name>@skills-dir`), and the
+mods a session made under `dev-mods/<session>/` (the session folder itself, or each plugin folder
+in it), which load in that session only. A row shows the name, version (the manifest's, else the
+install record's), description, where it loads from, On, Off, Its session only or Missing (a
+listed folder that isn't there), Mod or Plugin (a mod's `hooks/hooks.json` lists `modules`), and
+what it touches. A `@synced` plugin from claude.ai that no settings file names has no trace on
+disk, so `claude plugin list --json` (not called here) can count more than this page.
+
+**What it touches** comes from the static scan shared with Integrations' status entries
+(`ModStatusEntries.forEachSource`): a mod's source files read as text, never node_modules, hidden
+folders, `.d.ts` files or tests (which name APIs without the mod calling them), at most 400 files
+of 512 KB. Surfaces: a band above the prompt (`AbovePrompt`), a pane (`component: 'Pane'` or
+`ui.open`), a status entry (`ui.status`), toasts (`ui.toast`) and slash commands (`command.run`
+matchers, `command.register`, and any plugin's `commands/*.md`). Capabilities: runs programs
+(`process.run`/`spawn`, a settings-style `"type": "command"` hook, an MCP server), uses the network
+(`http.fetch`, an `"type": "http"` hook) and reads or writes files (`fs.*`). A mod's surfaces are
+drawn in a TerminalPreviewFrame as a sketch (`ModSketch`): blocks stand in for its content, so
+nothing is live text, labeled "Sketch: drawn by the mod in Claude Code".
+
+**Check** runs `claude plugin validate <folder> --json` (`ModCheck`), which reads a plugin without
+running its code; `claude plugin test`, which runs it, is never called. `claude` is the first
+executable on PATH, then `~/.local/bin`, `~/.claude/local`, `/opt/homebrew/bin`, `/usr/local/bin`,
+`~/.npm-global/bin` and `~/.bun/bin`; it runs with its own folder and Homebrew's first on PATH
+(so a node script finds node), from the temp folder, and is stopped after 10 seconds. The JSON
+becomes a risk card (`ModCheckReport`): whether Claude Code would load it, errors and warnings
+with the folder's paths shortened, the hooks and `$` calls, and a risk level with its reasons:
+high for programs, the network, writing files or settings, gating or rewriting what Claude does
+(`tool.*`, `prompt.*`, `session.append`, `agent.*`, `telemetry.*`, `gatingHooks`) and
+secret-looking environment names; medium for reading files or the environment; low otherwise.
+Without `claude` the button is off and the page says why.
+
+Nothing on the page writes: no switch, no edit to any settings file (turning Sanduhr's own mods
+on and off by receipt is slice 2). A summary card (item 68's pattern) counts mods, plugins, how
+many are on, the folders and any missing. state.yaml's `mods_page` holds flags and counts only.
+Tests: `ModsPageTests` (temp folders and the validator's JSON captured as fixtures under
+`Tests/SanduhrTests/Fixtures/mods-validate/`; Check against a stand-in `claude` script).
 
 ## Camera and mic indicators
 
@@ -734,14 +800,53 @@ Installs from before this version show **Outdated**; Install rewrites the Stop e
 link or description. `smoke do watch-test start|wait|pass|fail|clear` drives a made-up watcher
 through the same decoding, whatever the switches say; `scenarios/watchers.yaml` runs it.
 
+## Desk layout
+
+Settings, Desk, Layout places each Desk piece (item 59; the pure pieces in `DeskArrangement.swift`):
+
+- **Eight places.** The four corners, Top center, Bottom center, Middle left and Middle right.
+  The top and bottom of a side share a column with a spacer between them, as before, so a growing
+  meeting list pushes against the message instead of drawing over it. A side's middle sits in the
+  same column, halfway between its top and bottom stacks, so a tall corner pushes it rather than
+  drawing over it. The centers share a column of their own between the sides: while a center has
+  a piece, the sides draw only in the room it leaves (`DeskColumnsLayout`,
+  `DeskAnchorGeometry.columnWidths`, 24 points either side), so a long message at Top left wraps
+  and shrinks instead of running under the meters at Top center. Top center sits below the
+  notch, and below the island's strip while the island draws (`DeskAnchorGeometry.centerDrop`,
+  10 points of room); on a screen without a notch it sits on the top margin like the corners.
+  Margins stay global.
+- **Your order.** The Order list shows each place that has pieces, top to bottom. Drag a piece up
+  or down to reorder it, or onto a piece in another place to move it there; VoiceOver has Move Up
+  and Move Down. Picking a new place for a piece keeps the other pieces' order: it goes before the
+  first piece there that Settings lists after it.
+- **A size per piece.** 60% to 160% in 10% steps, kept when the piece moves. Every piece scales
+  from the clock size in Look, the message from its own size.
+- **The map.** The Layout card (`DeskLayoutMap`) draws the screen with the menu bar, the notch (and
+  the island), the Dock on its edge and each piece outlined at its place, in its order and at its
+  size, live, from the same `DeskArrangement.stacks` call the Desk draws from.
+
+The layout string grows backward compatibly: each word is `widget:anchor`, or `widget:anchor:scale`
+with a size other than 1 (`clock:bl:1.2`), and the pieces at one anchor stack in the string's
+order. An older string (corners only, no sizes) draws exactly as before (pinned by a test against
+the old reader) and is written back unchanged. An anchor this build does not know puts the piece at
+its default (the message top left, the rest bottom left) instead of hiding it; an unreadable size is
+1, a size outside the range is clamped; a widget named twice keeps its last word; a widget word this
+build does not know is dropped on the next change. Older builds skip a word with a size, so going
+back to one hides the sized pieces until they are placed again.
+
+`desk_pieces` in the smoke state lists each drawn piece's `piece`, `anchor`, `order` (its place in
+the stack, 0 at the top) and `scale`; `scenarios/desk-layout.yaml` reorders a corner and moves
+pieces to the new places, checking `desk_frames_ok` each time.
+
 ## Desk and the Dock
 
-Desk's corners stay clear of the Dock on the Desk's screen (item 56, `DockFollower`, the pure
+Desk's pieces stay clear of the Dock on the Desk's screen (item 56, `DockFollower`, the pure
 pieces in `DockClearance.swift`). The Dock's own settings are read, never written: `com.apple.dock`
 `orientation` (no key is bottom), `autohide`, `tilesize`, `autohide-delay`. A bottom Dock moves the
-bottom corners up (`bl`, `br`); a side Dock moves its whole column in (`tl` and `bl` on the left,
-`tr` and `br` on the right). The Dock's reach is added to the corner margins (`left`, `right`,
-`bottom`), so the usual margin is kept from the Dock's edge instead of the screen's.
+bottom places up (`bl`, `bc`, `br`); a side Dock moves its whole column in (`tl`, `ml` and `bl` on
+the left, `tr`, `mr` and `br` on the right). The Dock's reach is added to the margins (`left`,
+`right`, `bottom`) every place sits inside, so the usual margin is kept from the Dock's edge instead
+of the screen's.
 
 - **Always shown.** The reach is the screen's `visibleFrame` against its `frame` on the Dock's side
   (the menu bar never counts), read whenever the screen parameters change (the Dock moving,
@@ -835,27 +940,34 @@ switch and "Arrange on the Notch…" / "Arrange on the Desk…").
 
 ## Fonts
 
-The Desk draws in **EsteFont 26** (Regular and Bold), the author's handwriting, which ships inside
-the app: `mac/Resources/Fonts/EsteFont26-Regular.ttf` and `EsteFont26-Bold.ttf`, copied by
-`build.sh` to `Sanduhr.app/Contents/Resources/Fonts/` and sealed by the signature (the build fails if
-either is missing or unsealed). At launch Sanduhr registers both for its own process only
+The Desk draws in **EsteFont Pro** (Regular and Bold, version 3.000), the author's handwriting,
+which ships inside the app beside its predecessor **EsteFont 26** (Regular and Bold), kept as the
+heritage choice: `mac/Resources/Fonts/EsteFontPro-Regular.ttf`, `EsteFontPro-Bold.ttf`,
+`EsteFont26-Regular.ttf` and `EsteFont26-Bold.ttf`, copied by `build.sh` to
+`Sanduhr.app/Contents/Resources/Fonts/` and sealed by the signature (the build fails if any is
+missing or unsealed). At launch Sanduhr registers all four for its own process only
 (`CTFontManagerRegisterFontsForURL`, `.process` scope), so nothing is installed on the Mac and other
-apps never see it; a copy already installed in Font Book simply draws instead.
+apps never see them; a copy already installed in Font Book simply draws instead. `BundledFonts`
+lists both families; each maps the design's heavier weights (semibold, bold, heavy, black) to its
+Bold face (`BundledFonts.face`, `FontSettings.wantsBold`).
 
-- **The Desk** (desk preference `font`): a new install draws in EsteFont 26. A Desk an earlier version
-  ran with no font picked keeps the system font (`""`, written once at upgrade; `fontDefaultSettled`
-  marks it done). A picked font stays picked; one that is no longer installed (the standalone apps'
-  EsteFont 2.1 on a Mac without it, say) draws in EsteFont 26 instead (`DeskFont.resolve`). The clock's
-  time uses the Bold face.
+- **The Desk** (desk preference `font`): a new install draws in EsteFont Pro. An upgrade keeps the
+  font that was on screen, once each (`DeskFont.keepExistingDefault`): a Desk an earlier version
+  than 2.6.0 ran with no font picked keeps the system font (`""`; `fontDefaultSettled` marks it
+  done), and a Desk 2.6.0 to 2.8.0 ran with no font picked keeps EsteFont 26, the default then
+  (`"EsteFont 26"`; `fontProDefaultSettled` marks it done). A picked font stays picked, EsteFont 26
+  and EsteFont 2.1 included; one that is no longer installed (the standalone apps' EsteFont 2.1 on a
+  Mac without it, say) draws in EsteFont Pro instead (`DeskFont.resolve`). The clock's time uses
+  the Bold face of either bundled family.
 - **The widget** (`UserDefaults` `fontFamily`) keeps its theme fonts (the system font) unless you pick
-  one; EsteFont 26 is first in the list, and its semibold and bold text draws in the Bold face. Match
-  Desk draws in the Desk's font, EsteFont 26 included.
-- Both font pickers (Settings, Desk, Look and Settings, Widget, Look) list EsteFont 26 first, after
-  System.
+  one; with EsteFont Pro or EsteFont 26 picked, its semibold and bold text draws in that family's Bold
+  face. Match Desk draws in the Desk's font, either bundled family included.
+- Both font pickers (Settings, Desk, Look and Settings, Widget, Look) list EsteFont Pro first and
+  EsteFont 26 right after it, after System.
 
-EsteFont 26 is © 2009-2026 Estevan Hernandez / 626Labs LLC and licensed only for use by 626Labs LLC
-and Estevan Hernandez: it is not covered by the MIT license. Its license is in
-`THIRD-PARTY-NOTICES.txt`; Settings, About credits it.
+EsteFont Pro and EsteFont 26 are © 2009-2026 Estevan Hernandez / 626Labs LLC and licensed only for
+use by 626Labs LLC and Estevan Hernandez: they are not covered by the MIT license. Their license is
+in `THIRD-PARTY-NOTICES.txt`; Settings, About credits both.
 
 ## What's New
 
@@ -893,7 +1005,7 @@ again any time with the current settings, recording nothing. The cards live in
 
 Every Settings page that controls something visible opens with a preview card about 160 points
 tall (Notch, Layout, Look, Meters, Message, Now Playing, Widget Look, Pacing & Focus, General,
-Integrations; Themes keeps its gallery). Each card is drawn by the surface's own views, never a
+Integrations; Themes keeps its gallery; Mods has a summary card of its counts). Each card is drawn by the surface's own views, never a
 mock: NotchView, NotchWingsView, NotchGlowView and AVIndicatorBadge for the notch, DeskPiece (the
 Desk's pieces, factored out of DeskView) for Look, Meters, Message and Now Playing,
 WidgetCardStack in WidgetGlass (factored out of RootView) for the widget, MenuBarText and
@@ -903,7 +1015,7 @@ within a frame; their data is a preview `DeskModel` filled from the live one by
 `SurfacePreviewData.fill` (through `DeskModel.update`, so the rows come from the Desk's own
 functions), with sample meters, demo mode's meetings, a sample track and a sample watcher where
 there is no live data yet, named on a "Sample" label. Layout draws `DeskLayoutMap`, a screen-shaped
-map with each piece in its corner and the Dock on its edge. Previews run under
+map with each piece at its place, in its order and at its size, the notch and the Dock on its edge. Previews run under
 `isSurfacePreview`: they take no clicks, report no frames and register no click areas; content is
 scaled to fit, never cropped; Reduce Motion stills them; each has a one-sentence VoiceOver label.
 Nothing captures the screen. `TerminalPreviewFrame` (a dark terminal frame, monospaced, ANSI colors
@@ -924,8 +1036,8 @@ terminal previews. state.yaml's `settings_preview` names the card the open page 
 - Claude Code integrations (items 49 to 51) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json` (the notch glow hooks in its `hooks`), with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed, hooks_installed}`
 - Window position → `UserDefaults` (`windowFrame`)
 - Now playing (items 53, 53b) → where it shows is the desk preferences `notchLeft`, `notchRight`, `notchStrip` and the `nowPlaying` word in `layout`; the rest is `nowPlayingHidePaused`, `nowPlayingAskApps`, `nowPlayingExcluded` (bundle ids switched off) and `nowPlayingIdle` (When nothing is playing: `automatic` when unset, or a notch content's raw value). Item 53's `nowPlaying` and `nowPlayingDesk` are read once by the upgrade (`nowPlayingPlacementUpgraded`); what plays stays in memory
-- EsteFont 26 → `Sanduhr.app/Contents/Resources/Fonts/`, from `mac/Resources/Fonts/` (see Fonts); the Desk's choice in the desk preference `font`
-- Third-party notices (Sparkle, mediaremote-adapter, EsteFont 26) → `Sanduhr.app/Contents/Resources/THIRD-PARTY-NOTICES.txt`, from `mac/THIRD-PARTY-NOTICES.txt`; Settings, About opens it
+- EsteFont Pro and EsteFont 26 → `Sanduhr.app/Contents/Resources/Fonts/`, from `mac/Resources/Fonts/` (see Fonts); the Desk's choice in the desk preference `font`
+- Third-party notices (Sparkle, mediaremote-adapter, EsteFont Pro, EsteFont 26) → `Sanduhr.app/Contents/Resources/THIRD-PARTY-NOTICES.txt`, from `mac/THIRD-PARTY-NOTICES.txt`; Settings, About opens it
 
 ## Controls
 
@@ -958,4 +1070,4 @@ terminal previews. state.yaml's `settings_preview` names the card the open page 
 
 MIT. Python original by [626Labs LLC](https://626labs.dev). Third-party code: Sparkle (MIT) and
 mediaremote-adapter (BSD-3-Clause), with their licenses in `THIRD-PARTY-NOTICES.txt`. The bundled
-EsteFont 26 is proprietary (626Labs LLC), not MIT; its license is in the same file.
+EsteFont Pro and EsteFont 26 are proprietary (626Labs LLC), not MIT; their license is in the same file.

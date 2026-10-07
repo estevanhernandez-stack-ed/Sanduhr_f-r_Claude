@@ -1,6 +1,23 @@
 desk_enabled: true
 desk_running: true
 layout: "message:tl clock:bl meters:bl meetings:bl"
+desk_pieces:
+  - piece: message
+    anchor: tl
+    order: 0
+    scale: 1
+  - piece: clock
+    anchor: bl
+    order: 0
+    scale: 1
+  - piece: meters
+    anchor: bl
+    order: 1
+    scale: 1
+  - piece: meetings
+    anchor: bl
+    order: 2
+    scale: 1
 notch: false
 has_notch: true
 notch_left: meetingOrTime
@@ -149,3 +166,13 @@ av_indicators:
   camera: false
   mic: false
   shown: none
+mods_page:
+  open: false
+  loaded: false
+  folders: 0
+  mods: 0
+  plugins: 0
+  enabled: 0
+  missing: 0
+  checked: 0
+  cli: false

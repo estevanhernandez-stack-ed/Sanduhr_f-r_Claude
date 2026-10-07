@@ -1,0 +1,45 @@
+# Item 59: the order within an anchor is yours, and pieces sit at the new anchors at their own size.
+# state.yaml's desk_pieces lists each drawn piece with its anchor, its place in that anchor's stack
+# (0 at the top) and its size, read from the same layout string the Desk draws. Reordering the
+# bottom left corner (the meetings above the meters, the clock last) and then moving pieces to the
+# top center, the middle right and the bottom center at a size, then a full Top left beside a Top
+# center piece, must keep every click area sound (desk_frames_ok). The layout is put back afterwards.
+name: Desk layout reorders a corner and keeps sound click areas
+needs: [desk, credentials]
+steps:
+  - defaults: { domain: desk, key: layout, type: string, value: "message:tl clock:bl meters:bl meetings:bl" }
+  - expect_state:
+      desk_pieces[piece=clock].order: 0
+      desk_pieces[piece=meters].order: 1
+      desk_pieces[piece=meetings].order: 2
+      desk_frames_ok: true
+  - defaults: { domain: desk, key: layout, type: string, value: "message:tl meetings:bl meters:bl clock:bl" }
+  - expect_state:
+      desk_pieces[piece=meetings].order: 0
+      desk_pieces[piece=meters].order: 1
+      desk_pieces[piece=clock].order: 2
+      desk_pieces[piece=clock].anchor: bl
+      desk_frames_ok: true
+      desk_frames_problem: null
+  - expect_state:
+      desk_frames[kind=meters].frame.2: "/^[1-9]\\d*$/"
+  - snap: desk-layout-reordered
+  - defaults: { domain: desk, key: layout, type: string, value: "message:tc clock:bl meters:mr:1.2 meetings:bc" }
+  - expect_state:
+      desk_pieces[piece=message].anchor: tc
+      desk_pieces[piece=meters].anchor: mr
+      desk_pieces[piece=meters].scale: 1.2
+      desk_pieces[piece=meetings].anchor: bc
+      desk_frames_ok: true
+      desk_frames_problem: null
+  - snap: desk-layout-anchors
+  # A side never reaches a center piece: the message and the meetings at Top left, the meters at
+  # Top center. The side draws only in the room the center column leaves, so the meetings' and the
+  # meters' click areas stay apart.
+  - defaults: { domain: desk, key: layout, type: string, value: "message:tl meetings:tl meters:tc clock:bl" }
+  - expect_state:
+      desk_pieces[piece=meetings].anchor: tl
+      desk_pieces[piece=meters].anchor: tc
+      desk_frames_ok: true
+      desk_frames_problem: null
+  - snap: desk-layout-side-and-center

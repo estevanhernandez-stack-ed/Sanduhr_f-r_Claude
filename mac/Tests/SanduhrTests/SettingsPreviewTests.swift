@@ -27,6 +27,9 @@ struct SettingsPreviewTests {
         #expect(SettingsPreviewKind.of(.pacing) == .widget)
         #expect(SettingsPreviewKind.of(.general) == .menuBar)
         #expect(SettingsPreviewKind.of(.integrations) == .integrations)
+        // Item 64: the Mods page's summary card, all real counts, never sample data.
+        #expect(SettingsPreviewKind.of(.mods) == .mods)
+        #expect(SettingsPreviewKind.mods.relevantSamples.isEmpty)
         // Themes has its gallery; the rest draw nothing on screen.
         for s in [SettingsSection.themes, .alerts, .credentials, .usage, .updates, .about] {
             #expect(SettingsPreviewKind.of(s) == nil)
@@ -186,18 +189,37 @@ struct SettingsPreviewTests {
 
     @Test func layoutMapPlacesWhatTheDeskDraws() {
         let layout = "message:tl clock:bl claude:bl meters:br meetings:bl nowPlaying:tr"
-        let corners = DeskLayoutMap.corners(layout: layout, showMeetings: true, showClaude: true)
-        #expect(corners[.tl] == ["Message"])
-        #expect(corners[.bl] == ["Clock and date", "Claude line", "Meetings"])
-        #expect(corners[.br] == ["Claude meters (bars)"])
-        #expect(corners[.tr] == ["Now playing"])
+        let names = { (pieces: [DeskLayoutMap.Piece]?) in pieces?.map(\.name) }
+        let corners = DeskLayoutMap.anchors(layout: layout, showMeetings: true, showClaude: true)
+        #expect(names(corners[.tl]) == ["Message"])
+        #expect(names(corners[.bl]) == ["Clock and date", "Claude line", "Meetings"])
+        #expect(names(corners[.br]) == ["Claude meters (bars)"])
+        #expect(names(corners[.tr]) == ["Now playing"])
         // The same pieces DeskLayout.placed says DeskView draws, whatever the switches.
         for (meetings, claude) in [(true, false), (false, true), (false, false)] {
-            let map = DeskLayoutMap.corners(layout: layout, showMeetings: meetings, showClaude: claude)
-            let names = Set(map.values.flatMap { $0 })
+            let map = DeskLayoutMap.anchors(layout: layout, showMeetings: meetings, showClaude: claude)
+            let names = Set(map.values.flatMap { $0.map(\.name) })
             let placed = DeskLayout.placed(layout, showMeetings: meetings, showClaude: claude)
             let expected = Set(DeskLayout.widgets.filter { placed.contains($0.key) }.map(\.name))
             #expect(names == expected)
+        }
+    }
+
+    /// Item 59: the map shows the new anchors, your order and each piece's size, live from the
+    /// same string DeskView draws (DeskArrangement.stacks).
+    @Test func layoutMapShowsAnchorsOrderAndSizes() {
+        let layout = "meetings:bl clock:bl:1.4 message:tc:0.6 meters:mr nowPlaying:bc watchers:ml"
+        let map = DeskLayoutMap.anchors(layout: layout, showMeetings: true, showClaude: true)
+        #expect(map[.bl] == [DeskLayoutMap.Piece(name: "Meetings", scale: 1),
+                             DeskLayoutMap.Piece(name: "Clock and date", scale: 1.4)])
+        #expect(map[.tc] == [DeskLayoutMap.Piece(name: "Message", scale: 0.6)])
+        #expect(map[.mr]?.map(\.name) == ["Claude meters (bars)"])
+        #expect(map[.bc]?.map(\.name) == ["Now playing"])
+        #expect(map[.ml]?.map(\.name) == ["Watchers"])
+        let desk = DeskArrangement(layout).stacks()
+        for anchor in DeskAnchor.allCases {
+            #expect(map[anchor]?.map(\.scale) == desk[anchor]?.map(\.scale))
+            #expect(map[anchor]?.count == desk[anchor]?.count)
         }
     }
 
@@ -226,6 +248,9 @@ struct SettingsPreviewTests {
     @Test func replayOnlyForMovingLines() {
         #expect(DeskMessagePreview.replays("{write} ship it"))
         #expect(DeskMessagePreview.replays("{shimmer} ship it"))
+        #expect(DeskMessagePreview.replays("{sweep} ship it"))
+        #expect(DeskMessagePreview.replays("{sweep:20} {font:bold} ship it"))
+        #expect(!DeskMessagePreview.replays("{font:smallcaps} ship it"))
         #expect(!DeskMessagePreview.replays("{glow} ship it"))
         #expect(!DeskMessagePreview.replays(nil))
         #expect(DeskMessagePreview.spoken("{write} ship it").hasSuffix("ship it"))

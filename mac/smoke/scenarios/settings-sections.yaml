@@ -36,6 +36,15 @@ steps:
       contains: { text: "/Sample/" }
   - snap: preview-integrations
   - do: settings
+    arg: mods
+  # Item 64: the Mods page only reads (no switch, no edit); its summary card counts real mods,
+  # so it never carries the Sample label.
+  - expect_state: { settings_section: mods, settings_preview: mods, mods_page.open: true }
+  - expect:
+      window: settings
+      contains: { text: "/Mods and plugins/" }
+  - snap: preview-mods
+  - do: settings
     arg: deskLayout
   - expect_state: { settings_section: deskLayout, settings_preview: layout }
   - snap: preview-layout

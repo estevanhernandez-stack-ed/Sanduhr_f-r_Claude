@@ -110,9 +110,9 @@ struct DockInsetTests {
     }
 
     @Test func cornersForEachSide() {
-        #expect(DockGeometry.corners(for: .bottom) == [.bl, .br])
-        #expect(DockGeometry.corners(for: .left) == [.tl, .bl])
-        #expect(DockGeometry.corners(for: .right) == [.tr, .br])
+        #expect(DockGeometry.anchors(for: .bottom) == [.bl, .bc, .br])
+        #expect(DockGeometry.anchors(for: .left) == [.tl, .ml, .bl])
+        #expect(DockGeometry.anchors(for: .right) == [.tr, .mr, .br])
     }
 
     @Test func insetsBySide() {

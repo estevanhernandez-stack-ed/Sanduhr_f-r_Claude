@@ -26,7 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // EsteFont 26 (item 58), from Contents/Resources/Fonts, for this process only: before any
+        // EsteFont Pro and EsteFont 26, from Contents/Resources/Fonts, for this process only: before any
         // view draws, so the Desk and the widget find it on a Mac that never had it installed.
         BundledFonts.register()
         NSApp.setActivationPolicy(.accessory)
@@ -41,7 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // has signed in. Decided once, before the panel shows and before DeskMigration marks the suite.
         let firstRun = DeskFirstRun.run()
         // Before DeskMigration marks the suite: an earlier version's Desk with no font picked keeps
-        // the system font; a new install draws in EsteFont 26.
+        // the system font, one that drew in EsteFont 26 keeps it; a new install draws in EsteFont Pro.
         DeskFont.keepExistingDefault()
         // The welcome tour (item 61), decided once, before What's New records its version: pending
         // only on a fresh install with no key, accounts or What's New; it shows after the first

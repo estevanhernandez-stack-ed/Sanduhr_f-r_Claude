@@ -129,6 +129,11 @@ eq('no temporary limit in the fixture', state['temporary_limits'], [])
 # Item 39: silencing a limit from its menu shows here; the session warns only once switched on.
 eq('only the session silenced by default', state['silenced_limits'], ['five_hour'])
 # Item 41: the Desk's click areas, checked in the app; kinds and keys only, never labels or titles.
+# Item 59: each drawn piece's anchor, place in its stack and size, in the layout's order.
+eq('desk pieces follow the layout', state['desk_pieces'].map { |p| [p['piece'], p['anchor'], p['order']] },
+   [['message', 'tl', 0], ['clock', 'bl', 0], ['meters', 'bl', 1], ['meetings', 'bl', 2]])
+eq('desk pieces at size 1 in the fixture', state['desk_pieces'].map { |p| p['scale'] }.uniq, [1])
+eq('select a piece by name', State.dig(state, 'desk_pieces[piece=meters].order'), [true, 1])
 eq('desk frames ok in the fixture', [state['desk_frames_ok'], state['desk_frames_problem']], [true, nil])
 eq('desk frame kinds', state['desk_frames'].map { |f| f['kind'] }, %w[meters meter_row meter_row meetings])
 check('desk frames are [x, y, w, h] in whole points',
@@ -289,6 +294,11 @@ eq('a camera in use before is left alone',
    Restore.plan(base.merge('av_indicators' => { 'camera' => true }), base.merge('av_indicators' => { 'camera' => true })), [])
 eq('av indicators state is two booleans and a place', state['av_indicators'],
    { 'camera' => false, 'mic' => false, 'shown' => 'none' })
+# Item 64: the Mods page, flags and counts only: never a mod's name, a path or a report.
+eq('mods page keys', state['mods_page'].keys,
+   %w[open loaded folders mods plugins enabled missing checked cli])
+check('mods page holds only flags and counts',
+      state['mods_page'].values.all? { |v| v == true || v == false || v.is_a?(Integer) })
 app_av = FakeApp.new
 app_av.action('av-test', 'mic on')
 eq('av-test fakes the mic', app_av.state_now['av_indicators']['mic'], true)

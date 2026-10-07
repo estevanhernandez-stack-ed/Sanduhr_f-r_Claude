@@ -83,7 +83,7 @@ struct AboutSection: View {
                 Text(AppInfo.fontCredit)
                 if let notices = AboutLinks.thirdPartyNotices() {
                     Button("Third-Party Notices") { NSWorkspace.shared.open(notices) }
-                        .help("The licenses of Sparkle, mediaremote-adapter and EsteFont 26")
+                        .help("The licenses of Sparkle, mediaremote-adapter, EsteFont Pro and EsteFont 26")
                 }
                 if !info.copyright.isEmpty {
                     Text(info.copyright).font(.caption).foregroundStyle(.secondary)

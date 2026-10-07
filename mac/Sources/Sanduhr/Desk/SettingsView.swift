@@ -15,19 +15,18 @@ struct DeskLayoutSection: View {
     @AppStorage("top", store: .desk) private var top = 40.0
     @AppStorage("bottom", store: .desk) private var bottom = 60.0
 
-    static let slots: [(key: String, name: String)] = [
-        ("tl", "Top left"), ("tr", "Top right"), ("bl", "Bottom left"), ("br", "Bottom right"), ("", "Hidden"),
-    ]
-
     var body: some View {
         Form {
             Section("Where each piece sits") {
                 ForEach(DeskLayout.widgets, id: \.key) { w in
-                    Picker(w.name, selection: slotBinding(w.key)) {
-                        ForEach(Self.slots, id: \.key) { Text($0.name).tag($0.key) }
-                    }
+                    DeskPlaceRow(widget: w.key, name: w.name, layout: $layout)
                 }
-                Text("Pieces in the same corner stack in this order. The top and bottom of a side share a column, so they never overlap. Now playing shows only while something plays; its other settings are in Now Playing. Watchers show only while there is one; they are switched on in Integrations.")
+                Text("Eight places: the four corners, the top and bottom centers, and the middle of each side. Top center sits below the notch. Size scales a piece from 60% to 160%; the message starts from its own size in Look. Now playing shows only while something plays; its other settings are in Now Playing. Watchers show only while there is one; they are switched on in Integrations.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section("Order") {
+                DeskOrderList(layout: $layout)
+                Text("Pieces in the same place stack top to bottom in this order. Drag a piece up or down to reorder it, or onto a piece in another place to move it there. The top, middle and bottom of a side share a column, and a side keeps clear of the centers, so places never overlap.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Margins") {
@@ -39,17 +38,123 @@ struct DeskLayoutSection: View {
         }
         .formStyle(.grouped)
     }
+}
 
-    private func slotBinding(_ widget: String) -> Binding<String> {
+/// One piece's row in Layout: where it sits (or Hidden) and its size.
+private struct DeskPlaceRow: View {
+    let widget: String
+    let name: String
+    @Binding var layout: String
+
+    var body: some View {
+        let placed = DeskArrangement(layout).placement(widget)
+        LabeledContent(name) {
+            HStack(spacing: 8) {
+                Picker("\(name) place", selection: anchor) {
+                    ForEach(DeskAnchor.allCases, id: \.self) { Text($0.name).tag($0.rawValue) }
+                    Divider()
+                    Text("Hidden").tag("")
+                }
+                .labelsHidden()
+                .fixedSize()
+                Picker("\(name) size", selection: scale) {
+                    ForEach(DeskArrangement.scaleSteps, id: \.self) { Text(DeskPlaceRow.percent($0)).tag($0) }
+                }
+                .labelsHidden()
+                .fixedSize()
+                .disabled(placed == nil)
+            }
+        }
+    }
+
+    /// "120%".
+    static func percent(_ scale: Double) -> String { "\(Int((scale * 100).rounded()))%" }
+
+    private var anchor: Binding<String> {
         Binding(
-            get: { DeskLayout.parse(layout)[widget] ?? "" },
+            get: { DeskArrangement(layout).placement(widget)?.anchor.rawValue ?? "" },
             set: { layout = DeskLayout.placing(widget, in: $0, layout: layout) })
+    }
+
+    private var scale: Binding<Double> {
+        Binding(
+            get: { DeskArrangement(layout).placement(widget)?.scale ?? 1 },
+            set: { value in
+                var a = DeskArrangement(layout)
+                a.setScale(widget, value)
+                layout = a.string
+            })
+    }
+}
+
+/// Layout's Order list: each place that has pieces, its pieces top to bottom. A piece drags
+/// onto another to take its place (DeskArrangement.move); VoiceOver gets Move Up and Move Down.
+private struct DeskOrderList: View {
+    @Binding var layout: String
+
+    var body: some View {
+        let a = DeskArrangement(layout)
+        let anchors = DeskAnchor.allCases.filter { !a.stack($0).isEmpty }
+        if anchors.isEmpty {
+            Text("Nothing is placed on the Desk.").foregroundStyle(.secondary)
+        }
+        ForEach(anchors, id: \.self) { anchor in
+            VStack(alignment: .leading, spacing: 4) {
+                Text(anchor.name).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                ForEach(a.stack(anchor), id: \.widget) { p in
+                    DeskOrderRow(placement: p, layout: $layout)
+                }
+            }
+        }
+    }
+}
+
+private struct DeskOrderRow: View {
+    let placement: DeskPlacement
+    @Binding var layout: String
+    @State private var targeted = false
+
+    private var name: String {
+        DeskLayout.widgets.first { $0.key == placement.widget }?.name ?? placement.widget
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "line.3.horizontal").foregroundStyle(.secondary)
+            Text(name)
+            Spacer()
+            if placement.scale != 1 {
+                Text(DeskPlaceRow.percent(placement.scale)).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 3)
+        .padding(.horizontal, 6)
+        .background(RoundedRectangle(cornerRadius: 5)
+            .fill(Color.accentColor.opacity(targeted ? 0.25 : 0.06)))
+        .contentShape(Rectangle())
+        .draggable(placement.widget) { Text(name).padding(4) }
+        .dropDestination(for: String.self) { items, _ in
+            guard let dragged = items.first else { return false }
+            change { $0.move(dragged, onto: placement.widget) }
+            return true
+        } isTargeted: { targeted = $0 }
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Drag to reorder")
+        .accessibilityAction(named: "Move Up") { change { $0.move(placement.widget, by: -1) } }
+        .accessibilityAction(named: "Move Down") { change { $0.move(placement.widget, by: 1) } }
+    }
+
+    private func change(_ edit: (inout DeskArrangement) -> Void) {
+        var a = DeskArrangement(layout)
+        edit(&a)
+        layout = a.string
     }
 }
 
 /// The layout string the Layout section edits ("message:tl clock:bl claude:bl meetings:bl"), kept
 /// apart from the view so it tests without AppKit. DeskView reads the same string. Now playing
-/// (item 53b) is an element like the others, off unless placed.
+/// (item 53b) is an element like the others, off unless placed. The string itself (anchors,
+/// order, sizes) is DeskArrangement (item 59); these are the shortcuts the rest of the app uses.
 enum DeskLayout {
     /// The layout DeskView draws when none is saved.
     static let standard = "message:tl clock:bl claude:bl meetings:bl"
@@ -60,41 +165,26 @@ enum DeskLayout {
         ("meetings", "Meetings"),
     ]
 
-    /// Widget to slot. Words without exactly one colon are skipped; a repeated widget keeps its last slot.
+    /// Widget to anchor word, for the widgets this build knows. A repeated widget keeps its last
+    /// word; an anchor this build does not know reads as the piece's default (DeskArrangement).
     static func parse(_ s: String) -> [String: String] {
         var out: [String: String] = [:]
-        for item in s.split(separator: " ") {
-            let bits = item.split(separator: ":").map(String.init)
-            if bits.count == 2 { out[bits[0]] = bits[1] }
-        }
+        for p in DeskArrangement(s).pieces { out[p.widget] = p.anchor.rawValue }
         return out
     }
 
-    /// The corners DeskView knows.
-    static let slots: Set<String> = ["tl", "tr", "bl", "br"]
-
-    /// The widgets DeskView draws for `layout`: known widgets in a known corner, less the
-    /// meetings with the older showMeetings switch off and the claude line and meters with
-    /// showClaude off (DeskView.placement).
+    /// The widgets DeskView draws for `layout`, less the meetings with the older showMeetings
+    /// switch off and the claude line and meters with showClaude off.
     static func placed(_ layout: String, showMeetings: Bool = true, showClaude: Bool = true) -> Set<String> {
-        let known = Set(widgets.map(\.key))
-        var out: Set<String> = []
-        for item in layout.split(separator: " ") {
-            let bits = item.split(separator: ":").map(String.init)
-            guard bits.count == 2, known.contains(bits[0]), slots.contains(bits[1]) else { continue }
-            if bits[0] == "meetings" && !showMeetings { continue }
-            if (bits[0] == "claude" || bits[0] == "meters") && !showClaude { continue }
-            out.insert(bits[0])
-        }
-        return out
+        Set(DeskArrangement(layout).shown(showMeetings: showMeetings, showClaude: showClaude).map(\.widget))
     }
 
-    /// The layout with `widget` moved to `slot` ("" hides it), rewritten in the canonical widget
-    /// order, which is also the stacking order within a corner.
+    /// The layout with `widget` moved to the anchor `slot` ("" hides it). The rest keep their
+    /// order and sizes (DeskArrangement.place).
     static func placing(_ widget: String, in slot: String, layout: String) -> String {
-        var map = parse(layout)
-        map[widget] = slot.isEmpty ? nil : slot
-        return widgets.compactMap { w in map[w.key].map { "\(w.key):\($0)" } }.joined(separator: " ")
+        var a = DeskArrangement(layout)
+        a.place(widget, at: DeskAnchor(rawValue: slot))
+        return a.string
     }
 }
 
@@ -112,7 +202,7 @@ struct DeskLookSection: View {
     @AppStorage("notchTextColor", store: .desk) private var notchTextColor = "ffffff"
     @State private var families: [String] = []
 
-    /// The Desk font as drawn (EsteFont 26 until one is picked, or when the picked one is gone);
+    /// The Desk font as drawn (EsteFont Pro until one is picked, or when the picked one is gone);
     /// picking writes it.
     private var font: Binding<String> {
         Binding(get: { DeskFont.resolve(saved: savedFont) }, set: { savedFont = $0 })
@@ -154,7 +244,7 @@ struct DeskLookSection: View {
         }
         .formStyle(.grouped)
         .onAppear {
-            // EsteFont 26 first: it ships inside Sanduhr (item 58).
+            // EsteFont Pro, then EsteFont 26, first: they ship inside Sanduhr.
             families = DeskFont.pickerFamilies(installed: NSFontManager.shared.availableFontFamilies)
         }
     }

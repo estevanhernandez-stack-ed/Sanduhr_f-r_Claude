@@ -80,7 +80,9 @@ struct DeskElementsTests {
 
     @Test func placedFollowsTheLayoutAndTheOlderSwitches() {
         #expect(DeskLayout.placed(DeskLayout.standard) == ["message", "clock", "claude", "meetings"])
-        #expect(DeskLayout.placed("meters:xx weather:bl clock:tl:x meetings:br") == ["meetings"])
+        // Item 59: an unknown anchor falls back to the piece's default and an unreadable size is
+        // 1, so neither hides a piece; an unknown widget still does.
+        #expect(DeskLayout.placed("meters:xx weather:bl clock:tl:x meetings:br") == ["meters", "clock", "meetings"])
         #expect(DeskLayout.placed("claude:bl meters:bl meetings:br", showMeetings: false, showClaude: true)
                 == ["claude", "meters"])
         #expect(DeskLayout.placed("claude:bl meters:bl meetings:br", showMeetings: true, showClaude: false)
