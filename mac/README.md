@@ -734,14 +734,49 @@ Installs from before this version show **Outdated**; Install rewrites the Stop e
 link or description. `smoke do watch-test start|wait|pass|fail|clear` drives a made-up watcher
 through the same decoding, whatever the switches say; `scenarios/watchers.yaml` runs it.
 
+## Desk layout
+
+Settings, Desk, Layout places each Desk piece (item 59; the pure pieces in `DeskArrangement.swift`):
+
+- **Eight places.** The four corners, Top center, Bottom center, Middle left and Middle right.
+  The top and bottom of a side share a column with a spacer between them, as before, so a growing
+  meeting list pushes against the message instead of drawing over it. A side's middle is centered
+  on its column's height; the centers share a column of their own. Top center sits below the
+  notch, and below the island's strip while the island draws (`DeskAnchorGeometry.centerDrop`,
+  10 points of room); on a screen without a notch it sits on the top margin like the corners.
+  Margins stay global.
+- **Your order.** The Order list shows each place that has pieces, top to bottom. Drag a piece up
+  or down to reorder it, or onto a piece in another place to move it there; VoiceOver has Move Up
+  and Move Down. Picking a new place for a piece keeps the other pieces' order: it goes before the
+  first piece there that Settings lists after it.
+- **A size per piece.** 60% to 160% in 10% steps, kept when the piece moves. Every piece scales
+  from the clock size in Look, the message from its own size.
+- **The map.** The Layout card (`DeskLayoutMap`) draws the screen with the menu bar, the notch (and
+  the island), the Dock on its edge and each piece outlined at its place, in its order and at its
+  size, live, from the same `DeskArrangement.stacks` call the Desk draws from.
+
+The layout string grows backward compatibly: each word is `widget:anchor`, or `widget:anchor:scale`
+with a size other than 1 (`clock:bl:1.2`), and the pieces at one anchor stack in the string's
+order. An older string (corners only, no sizes) draws exactly as before (pinned by a test against
+the old reader) and is written back unchanged. An anchor this build does not know puts the piece at
+its default (the message top left, the rest bottom left) instead of hiding it; an unreadable size is
+1, a size outside the range is clamped; a widget named twice keeps its last word; a widget word this
+build does not know is dropped on the next change. Older builds skip a word with a size, so going
+back to one hides the sized pieces until they are placed again.
+
+`desk_pieces` in the smoke state lists each drawn piece's `piece`, `anchor`, `order` (its place in
+the stack, 0 at the top) and `scale`; `scenarios/desk-layout.yaml` reorders a corner and moves
+pieces to the new places, checking `desk_frames_ok` each time.
+
 ## Desk and the Dock
 
-Desk's corners stay clear of the Dock on the Desk's screen (item 56, `DockFollower`, the pure
+Desk's pieces stay clear of the Dock on the Desk's screen (item 56, `DockFollower`, the pure
 pieces in `DockClearance.swift`). The Dock's own settings are read, never written: `com.apple.dock`
 `orientation` (no key is bottom), `autohide`, `tilesize`, `autohide-delay`. A bottom Dock moves the
-bottom corners up (`bl`, `br`); a side Dock moves its whole column in (`tl` and `bl` on the left,
-`tr` and `br` on the right). The Dock's reach is added to the corner margins (`left`, `right`,
-`bottom`), so the usual margin is kept from the Dock's edge instead of the screen's.
+bottom places up (`bl`, `bc`, `br`); a side Dock moves its whole column in (`tl`, `ml` and `bl` on
+the left, `tr`, `mr` and `br` on the right). The Dock's reach is added to the margins (`left`,
+`right`, `bottom`) every place sits inside, so the usual margin is kept from the Dock's edge instead
+of the screen's.
 
 - **Always shown.** The reach is the screen's `visibleFrame` against its `frame` on the Dock's side
   (the menu bar never counts), read whenever the screen parameters change (the Dock moving,
@@ -903,7 +938,7 @@ within a frame; their data is a preview `DeskModel` filled from the live one by
 `SurfacePreviewData.fill` (through `DeskModel.update`, so the rows come from the Desk's own
 functions), with sample meters, demo mode's meetings, a sample track and a sample watcher where
 there is no live data yet, named on a "Sample" label. Layout draws `DeskLayoutMap`, a screen-shaped
-map with each piece in its corner and the Dock on its edge. Previews run under
+map with each piece at its place, in its order and at its size, the notch and the Dock on its edge. Previews run under
 `isSurfacePreview`: they take no clicks, report no frames and register no click areas; content is
 scaled to fit, never cropped; Reduce Motion stills them; each has a one-sentence VoiceOver label.
 Nothing captures the screen. `TerminalPreviewFrame` (a dark terminal frame, monospaced, ANSI colors

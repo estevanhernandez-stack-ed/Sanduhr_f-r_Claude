@@ -1223,3 +1223,42 @@ Desk on. Go pane by pane; each card sits at the top, about 160 points tall, and 
 12. `smoke/smoke state` shows `settings_preview` (`notch`, `layout`, `look`, `meters`, `message`,
     `nowPlaying`, `widget`, `menuBar`, `integrations`, or null). `smoke/smoke run
     scenarios/settings-sections.yaml` snaps each pane with its card.
+
+## 34. Desk layout: more places, your order, a size per piece (item 59)
+
+Desk on, Settings, Desk, Layout open. Note the `layout` string first (`defaults read
+com.626labs.sanduhr.desk layout`) to put it back at the end.
+
+1. **An existing layout looks identical.** Before updating, screenshot the Desk; after, compare:
+   every piece sits where it sat, in the same order, at the same size. The `layout` string is
+   unchanged until you change something.
+2. **Eight places.** Each piece's place menu lists Top left, Top center, Top right, Middle left,
+   Middle right, Bottom left, Bottom center, Bottom right and Hidden. Put the clock at each in turn:
+   it moves live, and the map card shows it there. Middle left and right sit halfway down their
+   side; Bottom center rests on the bottom margin.
+3. **Top center and the notch.** On a notched Mac, put the message at Top center and set Top (below
+   the menu bar) to 0: the message sits just below the notch. Turn the notch island on with some
+   extra height: it moves below the island's strip. On a plain screen (an external display) it sits
+   on the top margin like the corners. The map draws the notch (and the island) at the top.
+4. **Your order.** With the clock, the meters and the meetings at Bottom left, the Order list shows
+   Bottom left with the three. Drag Meetings onto Clock: the meetings move above the clock on the
+   Desk and the map. Drag Clock onto Meters, below it: it lands below the meters. Drag a piece onto a piece in
+   another place: it moves there, just above that piece. With VoiceOver, Move Up and Move Down on a
+   row do the same. Picking a new place for one piece leaves the others' order alone.
+5. **A size per piece.** Set the clock's size to 160%: the clock (time and date) grows, nothing
+   else does, and the pieces stacked with it move to make room. 60% shrinks it. Set the
+   message's size to 140%: it grows from its own size in Look. The map's outlines grow and shrink
+   with them. Hide a piece: its size menu greys out.
+6. **The Dock.** With the Dock always shown at the bottom, pieces at Bottom center sit clear of it,
+   like the corners. Move the Dock to the left: Middle left moves in with Top left and Bottom left.
+   An auto-hiding Dock lifts Bottom center with the corners.
+7. **Clicks.** Put the meters at Middle right and the meetings at Top center: a two-finger click on
+   the meters opens their menu, a meeting row with a link opens it, and clicks elsewhere still reach
+   the Finder.
+8. **A hand-edited string.** `defaults write com.626labs.sanduhr.desk layout "message:zz clock:bl:1.4
+   meters:bl"`: the message shows top left (an unknown place falls back to its default, never
+   blank), the clock at 140%.
+9. `smoke/smoke state` shows `desk_pieces` (piece, anchor, order, scale) matching the Desk.
+   `smoke/smoke run scenarios/desk-layout.yaml` reorders Bottom left, then moves pieces to Top
+   center, Middle right (at 120%) and Bottom center, with `desk_frames_ok: true` each time.
+10. Put the `layout` string back.
