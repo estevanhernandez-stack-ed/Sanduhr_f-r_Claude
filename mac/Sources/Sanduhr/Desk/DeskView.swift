@@ -349,13 +349,25 @@ struct DeskPiece: View {
     /// The handwritten line with its per-line effects (DeskMessageLine, item 54). messageColor
     /// takes one hex, or two or more separated by commas for a left-to-right gradient (to match
     /// Ice's menu bar tint); a line's {ink:…} replaces it for that line.
+    /// On a date with its own lines (item 69) those stack above the usual line, each with its own
+    /// effects (DeskMessageStack).
     @ViewBuilder
     private var message: some View {
-        if let text = model.message {
-            DeskMessageLine(raw: text, font: messageFont.isEmpty ? font : messageFont, baseSize: messageSize,
-                            inkSpec: messageColor, globalGlow: messageGlow, alignment: alignment,
-                            paused: model.motionPaused, sweepFirst: sweepFirst)
+        if !model.specialMessages.isEmpty || model.message != nil {
+            VStack(alignment: alignment, spacing: messageSize * DeskMessageStack.spacing) {
+                let hasUsual = model.message != nil
+                ForEach(Array(model.specialMessages.enumerated()), id: \.offset) { _, text in
+                    line(text, size: messageSize * (hasUsual ? DeskMessageStack.specialScale : 1))
+                }
+                if let text = model.message { line(text, size: messageSize) }
+            }
         }
+    }
+
+    private func line(_ text: String, size: Double) -> some View {
+        DeskMessageLine(raw: text, font: messageFont.isEmpty ? font : messageFont, baseSize: size,
+                        inkSpec: messageColor, globalGlow: messageGlow, alignment: alignment,
+                        paused: model.motionPaused, sweepFirst: sweepFirst)
     }
 
     private static func format(_ date: Date, _ pattern: String) -> String {

@@ -409,9 +409,11 @@ struct MessageEditorModelTests {
         var input = DebugStateInput()
         input.messageEditor = s
         let yaml = YAMLEmitter.emit(DebugState.yaml(input))
-        #expect(yaml.contains("message_editor:\n  open: true\n  mode: list\n  rows: 17\n  styled: 12\n  raw: 5\n  notes: 3\n  unsaved: true\n  added: \"Fri: {ink:#ff7e5f,#feb47b,#ffd86f} {font:script} {sweep} ship it.\""))
+        #expect(yaml.contains("message_editor:\n  open: true\n  mode: list\n  rows: 17\n  styled: 12\n  raw: 5\n  notes: 3\n  unsaved: true\n  today_special: 0\n  added: \"Fri: {ink:#ff7e5f,#feb47b,#ffd86f} {font:script} {sweep} ship it.\""))
+        input.messageEditor = MessageEditorDebug(todaySpecial: 2)
+        #expect(YAMLEmitter.emit(DebugState.yaml(input)).contains("  today_special: 2\n"))
         input.messageEditor = MessageEditorDebug()
-        #expect(YAMLEmitter.emit(DebugState.yaml(input)).contains("message_editor:\n  open: false\n  mode: list\n  rows: 0\n  styled: 0\n  raw: 0\n  notes: 0\n  unsaved: false\n  added: null"))
+        #expect(YAMLEmitter.emit(DebugState.yaml(input)).contains("message_editor:\n  open: false\n  mode: list\n  rows: 0\n  styled: 0\n  raw: 0\n  notes: 0\n  unsaved: false\n  today_special: 0\n  added: null"))
     }
 
     @Test func debugActionParses() {
@@ -421,5 +423,66 @@ struct MessageEditorModelTests {
             Issue.record("message-editor has no save"); return
         }
         #expect(DebugAction.names.contains("message-editor"))
+    }
+}
+
+@Suite("Message editor: what each row does")
+struct MessageRowNoteTests {
+    private func notes(_ text: String, mix: Bool = false) -> [String] {
+        let doc = MessageDocument(parsing: text)
+        return doc.messageRows.map { doc.note(for: $0, mix: mix) }
+    }
+
+    @Test func dateRows() {
+        #expect(notes("10-31: boo.") == ["October 31 · shows above the day's message"])
+        #expect(notes("03-14: Sam.\n03-14: Alex.\n04-01: joke.") == [
+            "March 14 · shows above the day's message · with 1 other that day",
+            "March 14 · shows above the day's message · with 1 other that day",
+            "April 1 · shows above the day's message",
+        ])
+        let four = (1...4).map { "03-14: \($0)" }.joined(separator: "\n")
+        #expect(notes(four).first == "March 14 · shows above the day's message · with 3 others that day · 3 at a time, taking turns hourly")
+    }
+
+    @Test func weekdayRows() {
+        #expect(notes("Fri: a.\nFri: b.\nFri: c.\nkeep.").first == "Fridays · takes turns with 2 others")
+        #expect(notes("Fri: a.\nkeep.").first == "Fridays · shows instead of the every-day lines")
+        #expect(notes("Fri: a.\nkeep.", mix: true).first == "Fridays · mixes with every-day lines")
+        #expect(notes("Fri: a.\nFri: b.", mix: true).first == "Fridays · takes turns with 1 other · mixes with every-day lines")
+    }
+
+    @Test func everyDayRows() {
+        #expect(notes("keep.") == ["Every day"])
+        #expect(notes("keep.\ngo.").first == "Every day · takes turns with 1 other")
+        #expect(notes("keep.\nFri: a.").first == "Every day · steps aside on days with their own line")
+        #expect(notes("keep.\ngo.\nship.\nMon: a.").first == "Every day · takes turns with 2 others · steps aside on days with their own line")
+        #expect(notes("keep.\nFri: a.", mix: true).first == "Every day · mixes in on days with their own line")
+        // A date line is not a day with its own line: it adds, it doesn't replace.
+        #expect(notes("keep.\n10-31: boo.").first == "Every day")
+    }
+
+    @Test func rawAndEmptyRows() {
+        #expect(notes("{blink} hi\n{blink} ho").first == "Every day · takes turns with 1 other")
+        #expect(notes("13-01: no.") == ["As written · never shows"])
+        var doc = MessageDocument(parsing: "keep.")
+        doc.add()
+        #expect(doc.note(for: doc.rows[1], mix: false) == "Shows once it has text")
+        #expect(doc.note(for: doc.rows[0], mix: false) == "Every day")
+    }
+
+    @Test func stateFileCarriesTheMixSwitch() throws {
+        let on = try #require(JSONSerialization.jsonObject(
+            with: MessageProposal.stateJSON(pinned: nil, rotate: "daily", mixDaily: true)) as? [String: Any])
+        #expect(on["mix_daily"] as? Bool == true)
+        let off = try #require(JSONSerialization.jsonObject(
+            with: MessageProposal.stateJSON(pinned: nil, rotate: "daily")) as? [String: Any])
+        #expect(off["mix_daily"] as? Bool == false)
+        #expect(MessageEngine.mixKey == "messageMixDaily")
+    }
+
+    @Test func todayLine() {
+        #expect(MessageEditorBar.todayText(MessageEngine.Today()) == "Today: nothing")
+        #expect(MessageEditorBar.todayText(MessageEngine.Today(special: ["{glow} happy birthday, Sam."], usual: "{write} keep."))
+                == "Today: happy birthday, Sam. / keep.")
     }
 }

@@ -184,4 +184,5 @@ message_editor:
   raw: 0
   notes: 4
   unsaved: false
+  today_special: 0
   added: null

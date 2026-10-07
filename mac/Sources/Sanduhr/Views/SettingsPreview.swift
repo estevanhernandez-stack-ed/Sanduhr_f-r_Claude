@@ -219,9 +219,12 @@ enum SurfacePreviewData {
             if preview.calendarNote != nil { preview.calendarNote = nil }
             samples.insert(.meetings)
         }
-        let message = live.message ?? DeskModel.demoMessage
-        if live.message == nil { samples.insert(.message) }
+        // Item 69: a date's own lines count as the user's message too.
+        let hasOwn = live.message != nil || !live.specialMessages.isEmpty
+        let message = hasOwn ? live.message : DeskModel.demoMessage
+        if !hasOwn { samples.insert(.message) }
         if preview.message != message { preview.message = message }
+        if preview.specialMessages != live.specialMessages { preview.specialMessages = live.specialMessages }
         let track = live.nowPlaying ?? sampleTrack(.playing, now: now)
         if live.nowPlaying == nil { samples.insert(.track) }
         if preview.nowPlaying?.itemID != track.itemID || preview.nowPlaying?.state != track.state
@@ -254,6 +257,7 @@ struct PreviewLiveKey: Equatable {
     var signIn: Bool
     var message: String?
     var meetings: [String]
+    var specials: [String]
     var note: String?
     var track: NowPlayingInfo?
     var watchers: [Watcher]
@@ -265,6 +269,7 @@ struct PreviewLiveKey: Equatable {
         meters = m.meters
         signIn = m.signInNeeded
         message = m.message
+        specials = m.specialMessages
         meetings = m.meetings.map(\.id)
         note = m.calendarNote
         track = m.nowPlaying

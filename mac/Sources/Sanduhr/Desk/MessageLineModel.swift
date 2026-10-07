@@ -447,3 +447,60 @@ enum MessageLineModel {
         return look
     }
 }
+
+// MARK: - What happens to a row (item 69)
+
+extension MessageDocument {
+    /// When a row shows, for its note and the counts; nil for one that never shows (no text yet, or
+    /// a date that isn't one).
+    static func when(of row: MessageRow) -> MessageWhen? {
+        guard let body = row.deskBody, !body.isEmpty else { return nil }
+        switch row.content {
+        case .line(let l): return l.when
+        case .raw(let s):
+            let split = MessageEngine.splitPrefix(s.trimmingCharacters(in: .whitespaces))
+            switch split.kind {
+            case .plain: return .everyDay
+            case .weekday: return .weekday(split.tag)
+            case .date: return MessageWhen.date(split.tag)
+            }
+        case .comment, .blank: return nil
+        }
+    }
+
+    /// The row's note: when it shows and what it does to the day's other lines, as
+    /// MessageEngine.today picks them. `mix` is Settings, Message's mix switch.
+    func note(for row: MessageRow, mix: Bool) -> String {
+        guard let when = Self.when(of: row) else {
+            return row.line == nil ? "As written · never shows" : "Shows once it has text"
+        }
+        let all = rows.compactMap(Self.when(of:))
+        let others = all.filter { $0 == when }.count - 1
+        let hasWeekdays = all.contains { if case .weekday = $0 { true } else { false } }
+        var parts = [when.label]
+        switch when {
+        case .date:
+            parts.append("shows above the day's message")
+            if others > 0 { parts.append("with \(Self.others(others)) that day") }
+            if others + 1 > MessageEngine.maxSpecial {
+                parts.append("\(MessageEngine.maxSpecial) at a time, taking turns hourly")
+            }
+        case .weekday:
+            if others > 0 { parts.append("takes turns with \(Self.others(others))") }
+            if mix {
+                parts.append("mixes with every-day lines")
+            } else if others == 0 {
+                parts.append("shows instead of the every-day lines")
+            }
+        case .everyDay:
+            if others > 0 { parts.append("takes turns with \(Self.others(others))") }
+            if hasWeekdays {
+                parts.append(mix ? "mixes in on days with their own line" : "steps aside on days with their own line")
+            }
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// "1 other", "3 others".
+    static func others(_ n: Int) -> String { n == 1 ? "1 other" : "\(n) others" }
+}

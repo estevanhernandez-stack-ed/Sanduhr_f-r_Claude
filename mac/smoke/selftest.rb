@@ -314,7 +314,7 @@ eq('mods page keys', state['mods_page'].keys,
 check('mods page holds only flags and counts',
       state['mods_page'].values.all? { |v| v == true || v == false || v.is_a?(Integer) })
 # Item 69: Settings, Message's editor, counts and flags; `added` only ever the smoke's own line.
-eq('message editor keys', state['message_editor'].keys, %w[open mode rows styled raw notes unsaved added])
+eq('message editor keys', state['message_editor'].keys, %w[open mode rows styled raw notes unsaved today_special added])
 eq('message editor in the fixture: the starter file, nothing unsaved',
    state['message_editor'].values_at('rows', 'styled', 'raw', 'notes', 'unsaved', 'added'), [3, 3, 0, 4, false, nil])
 eq('lines a scenario added are reverted',

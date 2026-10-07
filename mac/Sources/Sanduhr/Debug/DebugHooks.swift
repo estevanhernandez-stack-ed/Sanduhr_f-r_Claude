@@ -324,6 +324,7 @@ enum DebugHooks {
         s.modsPage = ModsPageDebug(open: settings.isOpen && settings.section == .mods, loaded: mods.loaded,
                                    counts: mods.counts, checked: mods.checks.count, cli: mods.claude != nil)
         s.messageEditor = settings.messageEditor.debugState(open: settings.isOpen && settings.section == .message)
+        s.messageEditor.todaySpecial = desk.model.specialMessages.count
         // A `defaults write` from the smoke runner posts no change notice here: apply the saved
         // warning settings before reporting, as Desk's minute refresh and the widget's countdown
         // tick would.

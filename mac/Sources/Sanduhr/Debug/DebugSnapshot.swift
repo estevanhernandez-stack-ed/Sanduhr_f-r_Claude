@@ -295,7 +295,7 @@ enum DebugState {
     static func messageEditorYAML(_ m: MessageEditorDebug) -> YAMLNode {
         .map([YAMLPair("open", .bool(m.open)), YAMLPair("mode", .string(m.mode)), YAMLPair("rows", .int(m.rows)),
               YAMLPair("styled", .int(m.styled)), YAMLPair("raw", .int(m.raw)), YAMLPair("notes", .int(m.notes)),
-              YAMLPair("unsaved", .bool(m.unsaved)), YAMLPair("added", m.added.map(YAMLNode.string) ?? .null)])
+              YAMLPair("unsaved", .bool(m.unsaved)), YAMLPair("today_special", .int(m.todaySpecial)), YAMLPair("added", m.added.map(YAMLNode.string) ?? .null)])
     }
 
     /// `mods_page:` (item 64): flags and counts only.

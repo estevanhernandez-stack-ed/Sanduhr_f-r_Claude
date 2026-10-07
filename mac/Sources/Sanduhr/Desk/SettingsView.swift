@@ -420,7 +420,7 @@ struct DeskMessageSection: View {
 
     /// The Desk picks today's line again.
     private func refreshDesk() {
-        model.message = MessageEngine.current()
+        model.refreshMessage()
     }
 }
 

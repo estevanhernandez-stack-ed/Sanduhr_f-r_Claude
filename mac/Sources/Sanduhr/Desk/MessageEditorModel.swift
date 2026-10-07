@@ -126,6 +126,8 @@ struct MessageEditorDebug: Equatable {
     var raw = 0
     var notes = 0
     var unsaved = false
+    /// How many date lines the Desk draws above the usual line today (item 69); never their text.
+    var todaySpecial = 0
     /// Only the smoke's own line (`message-editor add`), never one of the user's.
     var added: String?
 }

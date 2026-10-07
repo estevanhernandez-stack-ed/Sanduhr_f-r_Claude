@@ -12,6 +12,7 @@ struct MessageEditorBar: View {
     @Bindable var editor: MessageEditorModel
     let saved: () -> Void
     @AppStorage("messageRotate", store: .desk) private var rotate = "daily"
+    @AppStorage(MessageEngine.mixKey, store: .desk) private var mix = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -31,6 +32,9 @@ struct MessageEditorBar: View {
                       ? "The file itself, tags and all; your edits carry over."
                       : "Back to the rows; your edits carry over.")
             }
+            Toggle("Mix every-day lines in on days with their own line", isOn: $mix)
+                .help("Off: on a day with its own lines (Fridays), only those show. On: they take turns with the every-day lines.")
+                .onChange(of: mix) { _, _ in saved() }
             HStack {
                 Button("Save") { if editor.save() { saved() } }
                     .keyboardShortcut("s", modifiers: .command)
@@ -38,7 +42,7 @@ struct MessageEditorBar: View {
                 Button("Revert") { editor.load() }
                     .disabled(!editor.unsaved)
                     .help("Drops your unsaved edits and shows messages.txt as it is.")
-                Text(editor.unsaved ? "Unsaved changes" : "Today: \(MessageEngine.current().map { MessageMarkup.parse($0).text } ?? "nothing")")
+                Text(editor.unsaved ? "Unsaved changes" : Self.todayText(MessageEngine.today()))
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 Spacer()
                 if editor.fileChanged {
@@ -48,6 +52,13 @@ struct MessageEditorBar: View {
                 }
             }
         }
+    }
+
+    /// "Today: happy birthday, Sam. / keep building.": everything the Desk draws today, the date's
+    /// own lines first.
+    static func todayText(_ today: MessageEngine.Today) -> String {
+        let lines = today.lines.map { MessageMarkup.parse($0).text }
+        return "Today: " + (lines.isEmpty ? "nothing" : lines.joined(separator: " / "))
     }
 }
 
@@ -102,6 +113,7 @@ private struct MessageRowView: View {
     @Binding var pinned: String
     let pinChanged: () -> Void
     @State private var targeted = false
+    @AppStorage(MessageEngine.mixKey, store: .desk) private var mix = false
 
     private var open: Bool { editor.expanded == row.id && row.line != nil }
 
@@ -139,7 +151,7 @@ private struct MessageRowView: View {
                 .help("Drag to reorder")
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
-                Text(row.line?.when.label ?? "As written").font(.caption).foregroundStyle(.secondary)
+                Text(editor.document.note(for: row, mix: mix)).font(.caption).foregroundStyle(.secondary)
                 MessageRowPreview(line: row.deskBody)
             }
             pinButton
@@ -457,8 +469,8 @@ struct MessageTextEditorPane: View {
 /// The grammar, beside the text: prefixes, notes and every tag.
 struct MessageTagReference: View {
     static let entries: [(tag: String, meaning: String)] = [
-        ("Mon: text", "only on Mondays (Mon to Sun)"),
-        ("10-31: text", "only on that date"),
+        ("Mon: text", "on Mondays, instead of every-day lines (Mon to Sun)"),
+        ("10-31: text", "on that date, above the day's line; several all show"),
         ("# note", "a note; the Desk skips it"),
         ("{ink:#ff2a6d,#05d9e8}", "1 to 4 colors; two or more make a gradient"),
         ("{glow} {noglow}", "the glow on or off"),

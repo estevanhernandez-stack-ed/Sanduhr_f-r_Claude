@@ -145,6 +145,15 @@ struct DeskMessageLine: View {
     }
 }
 
+/// A date's own lines stacked above the day's usual line (item 69).
+enum DeskMessageStack {
+    /// The special lines' size against the message size while the usual line shows under them,
+    /// so the day's line stays the anchor; alone they draw at the full size.
+    static let specialScale: Double = 0.8
+    /// The gap between lines, as a share of the message size.
+    static let spacing: Double = 0.12
+}
+
 /// What restarts `{sweep}`: a new line, or the light being allowed to run or not.
 private struct SweepKey: Equatable {
     let raw: String

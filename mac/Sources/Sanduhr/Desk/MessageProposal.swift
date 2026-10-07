@@ -217,13 +217,15 @@ struct MessageProposal: Equatable, Identifiable {
 
     /// desk-messages-state.json: what get_desk_messages reports about the user's settings. The
     /// pinned line is written only while one is pinned; it is on the desktop already.
-    static func stateJSON(pinned: String?, rotate: String) -> Data {
+    /// `mix_daily` (item 69): every-day lines take turns with a weekday's own lines.
+    static func stateJSON(pinned: String?, rotate: String, mixDaily: Bool = false) -> Data {
         let line = pinned.flatMap { $0.isEmpty ? nil : $0 }
         let root: [String: Any] = [
             "schema_version": 1,
             "pinned": line != nil,
             "pinned_line": line ?? NSNull(),
             "rotate": rotate == "hourly" ? "hourly" : "daily",
+            "mix_daily": mixDaily,
         ]
         return (try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])) ?? Data()
     }

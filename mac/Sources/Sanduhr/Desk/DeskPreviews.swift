@@ -242,8 +242,8 @@ struct DeskMessagePreview: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        SettingsPreviewCard(kind: .message, label: Self.spoken(preview.message), samples: samples,
-                            accessory: Self.replays(preview.message) ? AnyView(replayButton) : nil) {
+        SettingsPreviewCard(kind: .message, label: Self.spoken(Self.lines(preview)), samples: samples,
+                            accessory: Self.lines(preview).contains(where: { Self.replays($0) }) ? AnyView(replayButton) : nil) {
             DeskPiece(widget: .message, model: preview, alignment: .leading, sweepFirst: replay > 0)
                 .id(replay)
                 .frame(maxWidth: messageSize * 9, alignment: .leading)
@@ -264,6 +264,14 @@ struct DeskMessagePreview: View {
         guard let raw else { return false }
         let e = MessageMarkup.parse(raw).effects
         return e.write || e.shimmer || e.sweep
+    }
+
+    /// What the piece draws: the date's own lines, then the usual one (item 69).
+    static func lines(_ m: DeskModel) -> [String] { m.specialMessages + [m.message].compactMap { $0 } }
+
+    static func spoken(_ lines: [String]) -> String {
+        guard !lines.isEmpty else { return "No message today." }
+        return "Today's message as the Desk draws it: " + lines.map { MessageMarkup.parse($0).text }.joined(separator: " / ")
     }
 
     static func spoken(_ raw: String?) -> String {

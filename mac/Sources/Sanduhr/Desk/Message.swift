@@ -7,17 +7,29 @@ import Foundation
 /// Lines come from ~/Library/Application Support/Desk/messages.txt (created on first run):
 ///   keep building.                 any day
 ///   Mon: one thing at a time.      only on Mondays (Mon Tue Wed Thu Fri Sat Sun)
-///   10-31: happy halloween.        only on that date (MM-DD); beats weekday and plain lines
+///   10-31: happy halloween.        on that date (MM-DD), above the day's usual line
 ///   # a comment                    ignored, as are blank lines
 ///   {ink:#ff2a6d,#05d9e8} {glow} hi   effects at the start of the text (MessageEffects.swift)
-/// The most specific pool that has lines wins; within it the pick rotates once a day
-/// (defaults write com.626labs.sanduhr.desk messageRotate hourly for every hour), steady in between.
+///
+/// Each day shows its usual line and, on a date with its own lines, those too (item 69):
+/// - The usual line: today's weekday lines if there are any, else the plain lines. With
+///   `messageMixDaily` on, the weekday lines and the plain lines take turns together instead.
+///   Plain lines rotate by day; a weekday's lines rotate by week (that weekday comes round once a
+///   week, so stepping by day would stall on a pool whose size shares a factor with 7).
+/// - Special lines: every line for today's date shows, stacked above the usual line, up to
+///   `maxSpecial`; more than that take turns hourly, `maxSpecial` at a time.
+/// `messageRotate hourly` turns every pool hourly, steady within the hour.
 /// defaults write com.626labs.sanduhr.desk message "text" pins one line and skips the file.
 enum MessageEngine {
     static var fileURL: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Desk/messages.txt")
     }
+
+    /// Settings, Message: "Mix every-day lines in on days with their own line", off by default.
+    static let mixKey = "messageMixDaily"
+    /// Lines for one date shown at once.
+    static let maxSpecial = 3
 
     static let starter = """
     # Desk messages. One per line; Desk picks one a day.
@@ -38,11 +50,29 @@ enum MessageEngine {
         try? (starter + "\n").write(to: url, atomically: true, encoding: .utf8)
     }
 
-    static func current(now: Date = Date()) -> String? {
+    /// What the Desk draws today: the date's special lines (tags on, prefix gone) and the usual
+    /// line. A pinned line is the usual line and the file is not read.
+    struct Today: Equatable {
+        var special: [String] = []
+        var usual: String?
+
+        /// Special lines first, then the usual one.
+        var lines: [String] { special + [usual].compactMap { $0 } }
+        /// For places with room for one line: the first special line, else the usual one.
+        var first: String? { special.first ?? usual }
+    }
+
+    static func today(now: Date = Date()) -> Today {
         let d = UserDefaults.desk
-        if let pinned = d.string(forKey: "message"), !pinned.isEmpty { return pinned }
-        guard let text = try? String(contentsOf: fileURL, encoding: .utf8) else { return nil }
-        return pick(from: text, now: now, hourly: d.string(forKey: "messageRotate") == "hourly")
+        if let pinned = d.string(forKey: "message"), !pinned.isEmpty { return Today(usual: pinned) }
+        guard let text = try? String(contentsOf: fileURL, encoding: .utf8) else { return Today() }
+        return today(from: text, now: now, hourly: d.string(forKey: "messageRotate") == "hourly",
+                     mix: d.bool(forKey: mixKey))
+    }
+
+    /// The usual line (or the pin); `today(now:)` has the special lines too.
+    static func current(now: Date = Date()) -> String? {
+        today(now: now).usual
     }
 
     static let weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -62,26 +92,66 @@ enum MessageEngine {
         return (.plain, "", line)
     }
 
-    static func pick(from text: String, now: Date, hourly: Bool, calendar: Calendar = .current) -> String? {
-        let comps = calendar.dateComponents([.month, .day, .weekday, .hour], from: now)
-        let today = String(format: "%02d-%02d", comps.month ?? 0, comps.day ?? 0)
-        let weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][((comps.weekday ?? 1) - 1) % 7]
+    /// The file's message lines, sorted into pools by prefix.
+    struct Pools: Equatable {
+        /// Date lines by "MM-DD", in file order.
+        var dated: [String: [String]] = [:]
+        /// Weekday lines by "Mon" to "Sun", in file order.
+        var weekday: [String: [String]] = [:]
+        var plain: [String] = []
+    }
 
-        var dated: [String] = [], daily: [String] = [], plain: [String] = []
+    static func pools(_ text: String) -> Pools {
+        var p = Pools()
         for raw in text.components(separatedBy: .newlines) {
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line.isEmpty || line.hasPrefix("#") { continue }
             let split = splitPrefix(line)
             switch split.kind {
-            case .date: if split.tag == today, !split.body.isEmpty { dated.append(split.body) }
-            case .weekday: if split.tag == weekday, !split.body.isEmpty { daily.append(split.body) }
-            case .plain: plain.append(line)
+            case .date: if !split.body.isEmpty { p.dated[split.tag, default: []].append(split.body) }
+            case .weekday: if !split.body.isEmpty { p.weekday[split.tag, default: []].append(split.body) }
+            case .plain: p.plain.append(line)
             }
         }
-        let pool = !dated.isEmpty ? dated : (!daily.isEmpty ? daily : plain)
-        guard !pool.isEmpty else { return nil }
+        return p
+    }
+
+    static func today(from text: String, now: Date, hourly: Bool, mix: Bool = false,
+                      calendar: Calendar = .current) -> Today {
+        let p = pools(text)
+        let comps = calendar.dateComponents([.month, .day, .weekday, .hour], from: now)
+        let date = String(format: "%02d-%02d", comps.month ?? 0, comps.day ?? 0)
+        let weekday = weekdays[((comps.weekday ?? 1) - 1) % 7]
+        let hour = comps.hour ?? 0
         let dayIndex = calendar.ordinality(of: .day, in: .era, for: now) ?? 0
-        let slot = hourly ? dayIndex * 24 + (comps.hour ?? 0) : dayIndex
-        return pool[slot % pool.count]
+        let weekIndex = dayIndex / 7
+        func turn(_ pool: [String], _ step: Int) -> String? {
+            guard !pool.isEmpty else { return nil }
+            let slot = hourly ? step * 24 + hour : step
+            return pool[slot % pool.count]
+        }
+        let days = p.weekday[weekday] ?? []
+        let usual: String?
+        if days.isEmpty {
+            usual = turn(p.plain, dayIndex)
+        } else {
+            usual = turn(mix ? days + p.plain : days, weekIndex)
+        }
+        let year = calendar.component(.year, from: now)
+        return Today(special: special(p.dated[date] ?? [], year: year, hour: hour), usual: usual)
+    }
+
+    /// A date's lines: all of them up to `maxSpecial`; past that, `maxSpecial` at a time, the
+    /// window moving on each hour (and each year), wrapping round the list.
+    static func special(_ lines: [String], year: Int, hour: Int) -> [String] {
+        guard lines.count > maxSpecial else { return lines }
+        let start = ((year * 24 + hour) * maxSpecial) % lines.count
+        return (0..<maxSpecial).map { lines[(start + $0) % lines.count] }
+    }
+
+    /// The usual line (the Desk's single-line pick before item 69).
+    static func pick(from text: String, now: Date, hourly: Bool, mix: Bool = false,
+                     calendar: Calendar = .current) -> String? {
+        today(from: text, now: now, hourly: hourly, mix: mix, calendar: calendar).usual
     }
 }

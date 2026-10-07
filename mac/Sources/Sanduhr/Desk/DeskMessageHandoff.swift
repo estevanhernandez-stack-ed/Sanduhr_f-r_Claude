@@ -158,10 +158,10 @@ final class DeskMessageHandoff {
         HandoffFiles.writeOwnerOnly(data, to: paths.result)
     }
 
-    /// desk-messages-state.json, for get_desk_messages: rewritten only when the pin or the
-    /// rotation changed.
-    func writeState(pinned: String?, rotate: String) {
-        let data = MessageProposal.stateJSON(pinned: pinned, rotate: rotate)
+    /// desk-messages-state.json, for get_desk_messages: rewritten only when the pin, the
+    /// rotation or the mix switch changed.
+    func writeState(pinned: String?, rotate: String, mixDaily: Bool = false) {
+        let data = MessageProposal.stateJSON(pinned: pinned, rotate: rotate, mixDaily: mixDaily)
         guard data != lastState else { return }
         lastState = data
         HandoffFiles.writeOwnerOnly(data, to: paths.state)
@@ -176,7 +176,7 @@ extension DeskMessageHandoff {
     func startForApp() {
         onApplied = {
             let model = DeskController.shared.model
-            if !model.demo { model.message = MessageEngine.current() }
+            if !model.demo { model.refreshMessage() }
         }
         onSuggestion = { Notifier.shared.suggestDeskMessages($0) }
         onDecided = { Notifier.shared.clearDeskSuggestion($0) }
@@ -190,6 +190,7 @@ extension DeskMessageHandoff {
 
     func reportSettings() {
         let d = UserDefaults.desk
-        writeState(pinned: d.string(forKey: "message"), rotate: d.string(forKey: "messageRotate") ?? "daily")
+        writeState(pinned: d.string(forKey: "message"), rotate: d.string(forKey: "messageRotate") ?? "daily",
+                   mixDaily: d.bool(forKey: MessageEngine.mixKey))
     }
 }
