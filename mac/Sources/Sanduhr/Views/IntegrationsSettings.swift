@@ -8,6 +8,8 @@ struct IntegrationFolderState: Identifiable, Equatable {
     var statusline: IntegrationStatus
     var meters: IntegrationStatus
     var hooks: IntegrationStatus = .notInstalled
+    /// The statusline is Sanduhr's combined with the user's own (item 63).
+    var statuslineCombined = false
     var id: String { path }
 
     func status(_ kind: IntegrationKind) -> IntegrationStatus {
@@ -51,7 +53,8 @@ final class IntegrationsModel {
                 IntegrationFolderState(path: $0, mcp: installer.status(.mcp, folder: $0),
                                        statusline: installer.status(.statusline, folder: $0),
                                        meters: installer.status(.meters, folder: $0),
-                                       hooks: installer.status(.hooks, folder: $0))
+                                       hooks: installer.status(.hooks, folder: $0),
+                                       statuslineCombined: installer.isCombined(folder: $0))
             }
             return (states, PythonFinder.find())
         }.value
@@ -72,6 +75,41 @@ final class IntegrationsModel {
 
     func configDisplay(_ kind: IntegrationKind, folder: String) -> String {
         display(IntegrationInstaller.standard.configFile(kind, folder: folder))
+    }
+
+    /// The user's statusline run once against sample statusline JSON and split into segments,
+    /// with Sanduhr's, for the sheet's chips (item 63b). Nil when it couldn't run (no python3,
+    /// a build without the scripts).
+    func inspectStatusline(chain: String, input: Data? = nil) async -> StatuslineInspection? {
+        guard let python = pythonPath else { return nil }
+        return await Task.detached(priority: .userInitiated) { () -> StatuslineInspection? in
+            guard let args = IntegrationInstaller.standard.inspectArguments(chain: chain),
+                  let text = StatuslinePreview.run(python: python, arguments: args, input: input) else { return nil }
+            return StatuslineInspection.decode(text)
+        }.value
+    }
+
+    /// What the combined line prints with these picks, from the user's output (their command
+    /// doesn't run again), for the sheet's live preview. Nil when it couldn't run.
+    func composeStatusline(theirs: String, join: StatuslineJoin, selection: StatuslineSelection,
+                           input: Data? = nil) async -> String? {
+        guard let python = pythonPath else { return nil }
+        return await Task.detached(priority: .userInitiated) { () -> String? in
+            guard let args = IntegrationInstaller.standard.composeArguments(theirs: theirs, join: join, selection: selection) else { return nil }
+            return StatuslinePreview.run(python: python, arguments: args, input: input)
+        }.value
+    }
+
+    /// The input for Test with live data: Sanduhr's current numbers and the folder's latest
+    /// session (item 63b).
+    func liveStatuslineInput(folder: String) async -> StatuslineLiveInput.Result {
+        await Task.detached(priority: .userInitiated) { StatuslineLiveInput.build(folder: folder) }.value
+    }
+
+    /// The mods `folder` loads that draw status entries in Claude Code's status area (item 63b).
+    func modStatusEntries(folder: String) async -> [ModStatusEntry] {
+        let home = self.home
+        return await Task.detached(priority: .userInitiated) { ModStatusEntries.scan(folder: folder, home: home) }.value
     }
 
     /// Someone else's entry under Sanduhr's key, for the consent sheet.
@@ -98,8 +136,10 @@ final class IntegrationsModel {
     }
 
     /// Installs (or updates) `kind` in `folder`. With `replaceOther`, someone else's entry is
-    /// replaced (the consent sheet asked). Returns the other entry when one turned up unasked.
-    func install(_ kind: IntegrationKind, folder: String, replaceOther: Bool, linked: [String]) async -> String? {
+    /// replaced (the consent sheet asked); with `combine`, someone else's statusline is kept and
+    /// shown with Sanduhr's (item 63). Returns the other entry when one turned up unasked.
+    func install(_ kind: IntegrationKind, folder: String, replaceOther: Bool, combine: StatuslineJoin? = nil,
+                 selection: StatuslineSelection = StatuslineSelection(), linked: [String]) async -> String? {
         // The mod runs inside Claude Code: no python3 needed.
         // The mod and the hooks run inside Claude Code: no python3 needed.
         guard let python = kind.needsPython ? pythonPath : (pythonPath ?? "") else { return nil }
@@ -108,7 +148,8 @@ final class IntegrationsModel {
         let outcome = await Task.detached(priority: .userInitiated) { () -> Result<IntegrationInstaller.Outcome, IntegrationInstaller.Failure> in
             do {
                 return .success(try IntegrationInstaller.standard.install(kind, folder: folder, python: python,
-                                                                         replaceOther: replaceOther))
+                                                                         replaceOther: replaceOther, combine: combine,
+                                                                         selection: selection))
             } catch let f as IntegrationInstaller.Failure {
                 return .failure(f)
             } catch {
@@ -118,7 +159,9 @@ final class IntegrationsModel {
         await load(linked: linked)
         switch outcome {
         case .success(.installed):
-            note = ("\(kind.title) installed for \(display(folder)). Claude Code sessions started from now on use it.", false)
+            let what = combine != nil && kind == .statusline
+                ? "Statusline combined with yours" : "\(kind.title) installed"
+            note = ("\(what) for \(display(folder)). Claude Code sessions started from now on use it.", false)
             return nil
         case .success(.needsReplaceConsent(let other)):
             return other
@@ -200,7 +243,7 @@ struct IntegrationsSettings: View {
         .task { await model.load(linked: linked) }
         .sheet(item: $consent) { c in
             IntegrationConsentSheet(consent: c, vm: vm, model: model,
-                                    install: { confirm(c) },
+                                    install: { join, selection in confirm(c, combine: join, selection: selection) },
                                     openAccounts: {
                                         consent = nil
                                         navigation.selection = .credentials
@@ -223,7 +266,7 @@ struct IntegrationsSettings: View {
         ForEach(model.folders) { f in
             IntegrationFolderBox(folder: f, model: model, owner: vm.account(linkedTo: f.path),
                                  install: { kind in ask(kind, folder: f.path) },
-                                 update: { kind in Task { await run(kind, folder: f.path, replace: false) } },
+                                 update: { kind in Task { await run(kind, folder: f.path, replace: false, combine: nil) } },
                                  remove: { kind in Task { await model.remove(kind, folder: f.path, linked: linked) } })
         }
     }
@@ -235,13 +278,18 @@ struct IntegrationsSettings: View {
         consent = IntegrationConsent(kind: kind, folder: folder, other: model.otherEntry(kind, folder: folder))
     }
 
-    private func confirm(_ c: IntegrationConsent) {
+    private func confirm(_ c: IntegrationConsent, combine: StatuslineJoin?, selection: StatuslineSelection) {
         consent = nil
-        Task { await run(c.kind, folder: c.folder, replace: c.other != nil) }
+        Task {
+            await run(c.kind, folder: c.folder, replace: c.other != nil && combine == nil, combine: combine,
+                      selection: selection)
+        }
     }
 
-    private func run(_ kind: IntegrationKind, folder: String, replace: Bool) async {
-        if let other = await model.install(kind, folder: folder, replaceOther: replace, linked: linked) {
+    private func run(_ kind: IntegrationKind, folder: String, replace: Bool, combine: StatuslineJoin?,
+                     selection: StatuslineSelection = StatuslineSelection()) async {
+        if let other = await model.install(kind, folder: folder, replaceOther: replace, combine: combine,
+                                           selection: selection, linked: linked) {
             consent = IntegrationConsent(kind: kind, folder: folder, other: other)
         }
     }
@@ -326,6 +374,7 @@ private struct IntegrationFolderBox: View {
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(IntegrationKind.allCases, id: \.self) { kind in
                     IntegrationRow(kind: kind, status: folder.status(kind),
+                                   combined: kind == .statusline && folder.statuslineCombined,
                                    file: model.configDisplay(kind, folder: folder.path),
                                    enabled: model.canRun(kind),
                                    install: { install(kind) }, update: { update(kind) },
@@ -347,6 +396,8 @@ private struct IntegrationFolderBox: View {
 private struct IntegrationRow: View {
     let kind: IntegrationKind
     let status: IntegrationStatus
+    /// The statusline is combined with the user's own (item 63).
+    var combined = false
     let file: String
     let enabled: Bool
     let install: () -> Void
@@ -364,7 +415,7 @@ private struct IntegrationRow: View {
 
     private var statusText: some View {
         let (text, color): (String, Color) = switch status {
-        case .installed: ("Installed", Color.hex("4ade80"))
+        case .installed: (combined ? "Combined with your statusline" : "Installed", Color.hex("4ade80"))
         case .outdated: ("Outdated", .orange)
         case .notInstalled: ("Not installed", .secondary)
         case .other: (kind == .statusline ? "Another statusline is set" : "Another sanduhr entry is set", .secondary)
@@ -405,50 +456,69 @@ private struct IntegrationConsentSheet: View {
     let consent: IntegrationConsent
     var vm: UsageViewModel
     var model: IntegrationsModel
-    let install: () -> Void
+    /// Install; a join combines someone else's statusline with Sanduhr's (item 63), keeping the
+    /// segments picked (item 63b).
+    let install: (StatuslineJoin?, StatuslineSelection) -> Void
     let openAccounts: () -> Void
     let openNotch: () -> Void
     let cancel: () -> Void
+    @State private var join: StatuslineJoin = .line
+    @State private var selection = StatuslineSelection()
+
+    /// The statusline sheet when one is already set: Combine, Replace or Cancel.
+    private var offersCombine: Bool { consent.kind == .statusline && consent.other != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(Self.headline(consent.kind))
-                .font(.headline)
-            if consent.kind == .mcp {
-                MCPConsentBody(vm: vm, folder: model.display(consent.folder), openAccounts: openAccounts)
-            } else if consent.kind == .meters {
-                MetersConsentBody(folder: model.display(consent.folder))
-            } else if consent.kind == .hooks {
-                HooksConsentBody(folder: model.display(consent.folder), openNotch: openNotch)
-            } else {
-                Text("Claude Code sessions using \(model.display(consent.folder)) show the active account's session and weekly meters under the prompt, read from the numbers Sanduhr saves on this Mac. Claude Code shows the line to you; it isn't added to the conversation.")
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if let other = consent.other {
-                Text("\(model.display(consent.folder)) already has \(consent.kind == .statusline ? "a statusline" : "an MCP server named sanduhr"):")
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(other)
-                    .font(.caption.monospaced())
-                    .lineLimit(3)
-                    .padding(6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.12)))
-                Text("Installing replaces it. Sanduhr keeps it and puts it back when you remove Sanduhr's.")
-                    .fixedSize(horizontal: false, vertical: true)
+            header
+            if offersCombine, let other = consent.other {
+                CombineChoice(other: other, folder: model.display(consent.folder), folderPath: consent.folder,
+                              model: model, join: $join,
+                              selection: $selection)
+            } else if let other = consent.other {
+                ReplaceNotice(other: other, folder: model.display(consent.folder), kind: consent.kind)
             }
             Text(writes)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Spacer()
+            buttons
+        }
+        .padding(20)
+        .frame(width: offersCombine ? 600 : 460)
+    }
+
+    @ViewBuilder
+    private var header: some View {
+        Text(Self.headline(consent.kind))
+            .font(.headline)
+        if consent.kind == .mcp {
+            MCPConsentBody(vm: vm, folder: model.display(consent.folder), openAccounts: openAccounts)
+        } else if consent.kind == .meters {
+            MetersConsentBody(folder: model.display(consent.folder))
+        } else if consent.kind == .hooks {
+            HooksConsentBody(folder: model.display(consent.folder), openNotch: openNotch)
+        } else {
+            Text("Claude Code sessions using \(model.display(consent.folder)) show the active account's session and weekly meters under the prompt, read from the numbers Sanduhr saves on this Mac. Claude Code shows the line to you; it isn't added to the conversation.")
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private var buttons: some View {
+        HStack {
+            Spacer()
+            if offersCombine {
+                Button("Cancel", role: .cancel, action: cancel).keyboardShortcut(.cancelAction)
+                Button("Replace") { install(nil, StatuslineSelection()) }
+                Button("Combine") { install(join, selection) }
+                    .keyboardShortcut(.defaultAction)
+            } else {
                 Button("Not Now", role: .cancel, action: cancel).keyboardShortcut(.cancelAction)
-                Button(consent.other == nil ? "Install" : "Replace and Install", action: install)
+                Button(consent.other == nil ? "Install" : "Replace and Install") { install(nil, StatuslineSelection()) }
                     .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(20)
-        .frame(width: 460)
     }
 
     static func headline(_ kind: IntegrationKind) -> String {
@@ -469,7 +539,41 @@ private struct IntegrationConsentSheet: View {
         if consent.kind == .meters {
             return "Sanduhr adds its mod's folder to \(consent.kind.keyPath) in \(file), keeping any folders already listed, and keeps a copy of the file as it was, with .sanduhr-backup added to its name. Remove takes out only that folder."
         }
+        if offersCombine {
+            return "Either way Sanduhr sets \(consent.kind.keyPath) in \(file), keeping your line's padding, refresh interval and vim setting, and keeps a copy of the file as it was, with .sanduhr-backup added to its name. Remove puts your statusline back exactly as it is now."
+        }
         return "Sanduhr sets \(consent.kind.keyPath) in \(file) and keeps a copy of the file as it was, with .sanduhr-backup added to its name. Remove takes the entry out again."
+    }
+}
+
+/// Someone else's entry the install replaces (the MCP server named sanduhr).
+private struct ReplaceNotice: View {
+    let other: String
+    let folder: String
+    let kind: IntegrationKind
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("\(folder) already has \(kind == .statusline ? "a statusline" : "an MCP server named sanduhr"):")
+                .fixedSize(horizontal: false, vertical: true)
+            OtherCommandBox(text: other)
+            Text("Installing replaces it. Sanduhr keeps it and puts it back when you remove Sanduhr's.")
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// The other entry's text, set off in a box.
+struct OtherCommandBox: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.caption.monospaced())
+            .lineLimit(3)
+            .padding(6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.12)))
     }
 }
 
