@@ -497,7 +497,8 @@ Outdated, and Update moves it to the app's copy.
 
 The server (`sanduhr_mcp.py`) speaks the Windows `sanduhr-mcp` protocol with the same tool names
 and result shapes: `get_usage`, `get_local_burn_by_project`, `get_model_usage`,
-`get_usage_history`, `ping`, `propose_theme` (below), plus two Mac tools for Desk messages (below).
+`get_usage_history`, `ping`, `propose_theme` (below), plus two Mac tools for Desk messages (below),
+the watcher tools and `propose_now_playing_looks` (Now playing, below).
 `publish_usage` is dropped on the Mac. What it may read comes from
 `mcp-access.json`, which the app writes:
 
@@ -696,6 +697,17 @@ and the result names `renamed_from`; a file already holding the same theme is re
 `accent_bloom` or `inner_highlight` gets the Windows defaults and `breath_period_ms` a whole number,
 so the Mac's loader reads what Windows reads. `glass_on_mica` is required here as on Windows, though
 a hand-written Mac theme may leave it out. The theme's name and description are never logged.
+
+**Themes with a title style (item 65d).** A theme may carry `title_ink` (2 to 4 `#rrggbb` stops,
+the widget title's gradient left to right) and `title_style` (a letter style by the `{font:…}`
+names: `bold`, `italic`, `bold-italic`, `small-caps` drawn by the widget font, `sans`, `mono`,
+`double-struck`, `script`, `fraktur` as Unicode letters in the system font). `TitleBarView` draws
+the title through `ThemeTitleText`; without them it draws as before, in `text`, semibold. Both
+lints check the shape (an error names the field) and each stop's contrast on the card, as for
+`text` (a warning at under 4.5:1, "title_ink stop 2 reads at 2.1:1 on the card"). A hand-written
+file with a value the widget can't draw (one stop, a style it doesn't know) still loads, with the
+title as before. `propose_theme` passes them through; `docs/themes/template.json` lists both as
+`null` and `docs/themes/AGENT_PROMPT.md` explains them.
 
 Tests: `python3 -m unittest discover -s mac/integrations/tests` (also a Mac CI step), over temp
 folders: each sharing level, no access file, hidden names, and the Windows MCP tests' cases. The
@@ -984,6 +996,33 @@ switch and "Arrange on the Notch…" / "Arrange on the Desk…").
   Now playing shows meanwhile ("When nothing plays: Claude meters (its default).").
   `state.yaml` has `now_playing_idle` and `notch_shows: {left, right, strip}` (each place's
   effective content, never its text).
+
+- **Style what's playing (item 65c).** A switch on the Now Playing page, off by default. On, each
+  song draws in its own gradient and letter style on the notch wings, the strip and the Desk line
+  (its position bar too). A song without a saved look wears one seeded from a hash of its app,
+  title and artist (FNV-1a, so the same song looks the same on every launch): one of the eight
+  named palettes (`MessagePalette`: synthwave, sunset, ocean, aurora, ember, bubblegum, toxic,
+  gold) and small caps, italic, bold or bold italic (`NowPlayingLooks.seedStyles`, the styles the
+  hand font draws itself). Resolved looks are cached per song in memory only
+  (`NowPlayingLookStore`, keyed by app, title and artist, at most 200, never on disk). The play
+  glyph stays plain; a styled title is measured as drawn (`MessageTypography.width`), so a wing
+  grows and scrolls for it as for a plain one.
+  Looks come from Claude: `propose_now_playing_looks {looks: [{artist, title, colors, font?,
+  mood?}]}`, 1 to 50 looks, artist up to 100 and title up to 200 characters on one line, 2 to 4
+  hex colors each 3:1 or better on black (the notch), a `{font:…}` style name, a mood of at most 3
+  words and 40 characters. The server checks them (`rejected` with reasons, writing nothing),
+  writes `now-playing-looks-request.json` (atomic, 0600) and waits up to 10 seconds for
+  `now-playing-looks-result.json` (`{status: pending_approval | applied | rejected, reasons?,
+  looks_saved?, style_on}`; no answer is `queued`). The app checks again with the same rules and
+  wording (`NowPlayingLookProposal`; a test on each side pins them) and either saves at once ("Let
+  Claude style songs directly", off by default) or shows "Claude suggested looks for N songs" at
+  the top of the page's Looks section, each song drawn in its look with its mood, with Save and
+  Dismiss (a newer suggestion replaces a waiting one, which is answered `rejected`). Saved looks
+  go to `now-playing-looks.json` (owner-only, `{schema_version: 1, looks: [...]}`, at most 500,
+  the oldest dropped) and match by artist and title, ignoring case and extra spaces, in any app.
+  This file is the only place a song name is kept: the user's own approved data. **Clear Looks…**
+  deletes it. The server never reads what is playing. Desk preferences: `nowPlayingStyle`,
+  `nowPlayingLooksClaudeDirect`.
 
 - **Long titles.** A title that doesn't fit its wing (or the strip) scrolls through once when a new
   track starts or the place first shows it: 1.2 s at the beginning, 30 pt/s with ease in and out
