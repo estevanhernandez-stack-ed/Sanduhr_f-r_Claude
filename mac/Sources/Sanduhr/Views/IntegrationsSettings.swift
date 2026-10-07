@@ -204,7 +204,7 @@ final class IntegrationsModel {
 /// Settings, Integrations (item 49): install or remove Sanduhr's MCP server and statusline for
 /// each Claude Code folder. Sits under Claude Usage in the first group: like the Data section,
 /// it is about what Claude Code and Claude get from Sanduhr, and its consent points at the
-/// accounts' Share with Claude choices.
+/// accounts' Share with your agents choices.
 struct IntegrationsSettings: View {
     var vm: UsageViewModel
     @Bindable var navigation: SettingsNavigation
@@ -299,7 +299,7 @@ private struct IntegrationsIntro: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Claude Code").font(.headline)
-            Text("The MCP server lets Claude Code ask Sanduhr about your usage, as each account's Share with Claude choice allows. The statusline shows the active account's meters under Claude Code's prompt; the meters mod draws them as bars above it. The notch glow hooks let Claude Code tell Sanduhr when a session waits on you or finishes, so the notch can glow. Each is installed per Claude Code folder: Sanduhr adds one entry to that folder's settings, keeps a backup of the file beside it, and Remove takes the entry out again. Nothing leaves this Mac.")
+            Text("The MCP server lets Claude Code ask Sanduhr about your usage, as each account's Share with your agents choice allows. The statusline shows the active account's meters under Claude Code's prompt; the meters mod draws them as bars above it. The notch glow hooks let Claude Code tell Sanduhr when a session waits on you or finishes, so the notch can glow. Each is installed per Claude Code folder: Sanduhr adds one entry to that folder's settings, keeps a backup of the file beside it, and Remove takes the entry out again. Nothing leaves this Mac.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -629,7 +629,7 @@ private struct MCPConsentBody: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Claude Code sessions using \(folder) can call Sanduhr's tools. What they read follows each account's Share with Claude choice, and answers become part of those conversations:")
+            Text("Claude Code sessions using \(folder) can call Sanduhr's tools. What they read follows each account's Share with your agents choice, and answers become part of those conversations:")
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 3) {
                 ForEach(vm.accountLabels, id: \.self) { label in
