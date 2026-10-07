@@ -479,20 +479,33 @@ private struct IntegrationConsentSheet: View {
     /// The statusline sheet when one is already set: Combine, Replace or Cancel.
     private var offersCombine: Bool { consent.kind == .statusline && consent.other != nil }
 
+    /// The sheet's content scrolls above its buttons, so a tall Combine picker never pushes them
+    /// off the screen (2026-10-07). About 220 points stay for the title bar and the buttons.
+    static var maxContentHeight: CGFloat {
+        max(260, (NSScreen.main?.visibleFrame.height ?? 800) - 220)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            header
-            if offersCombine, let other = consent.other {
-                CombineChoice(other: other, folder: model.display(consent.folder), folderPath: consent.folder,
-                              model: model, join: $join,
-                              selection: $selection)
-            } else if let other = consent.other {
-                ReplaceNotice(other: other, folder: model.display(consent.folder), kind: consent.kind)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    header
+                    if offersCombine, let other = consent.other {
+                        CombineChoice(other: other, folder: model.display(consent.folder), folderPath: consent.folder,
+                                      model: model, join: $join,
+                                      selection: $selection)
+                    } else if let other = consent.other {
+                        ReplaceNotice(other: other, folder: model.display(consent.folder), kind: consent.kind)
+                    }
+                    Text(writes)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Text(writes)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            .frame(maxHeight: Self.maxContentHeight)
+            .fixedSize(horizontal: false, vertical: true)
             buttons
         }
         .padding(20)

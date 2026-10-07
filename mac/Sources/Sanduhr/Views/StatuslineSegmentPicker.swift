@@ -25,6 +25,8 @@ struct CombineChoice: View {
         let ran: Bool
     }
 
+    @AppStorage("combineShowsHelp") private var showHelp = false
+
     private var duplicates: [StatuslineDuplicate] {
         chips.map { StatuslineDuplicate.find($0, mods: mods ?? []) } ?? []
     }
@@ -34,8 +36,15 @@ struct CombineChoice: View {
             Text("\(folder) already has a statusline:")
                 .fixedSize(horizontal: false, vertical: true)
             OtherCommandBox(text: other)
-            Text("Combine keeps it: Sanduhr runs your statusline first, then adds its meters. If yours is slow (over 1.5 seconds) or fails, Sanduhr's meters still show. Replace shows only Sanduhr's line. Either way, Remove puts yours back.")
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .firstTextBaseline) {
+                Text("Combine keeps yours and adds Sanduhr's meters. Remove puts yours back.")
+                    .fixedSize(horizontal: false, vertical: true)
+                    .help("Sanduhr runs your statusline first, then adds its meters. If yours is slow (over 1.5 seconds) or fails, Sanduhr's meters still show. Replace shows only Sanduhr's line. Either way, Remove puts yours back.")
+                Spacer(minLength: 8)
+                Toggle("Show explanations", isOn: $showHelp)
+                    .toggleStyle(.checkbox)
+                    .font(.caption)
+            }
             picker
             JoinRowPicker(join: $join)
             ModChips(mods: mods, badges: Badges(duplicates, mods: mods ?? []))
@@ -45,6 +54,7 @@ struct CombineChoice: View {
                            input: live?.input.data, mods: (mods ?? []).filter(\.drawsStatus), model: model)
             LiveTestRow(live: live, busy: loading, enabled: chips != nil, test: testLive)
         }
+        .environment(\.combineShowsHelp, showHelp)
         .task(id: other) {
             loading = true
             chips = await model.inspectStatusline(chain: other).map(StatuslineChips.init)
@@ -108,6 +118,27 @@ struct Badges {
 }
 
 /// A caption under a control.
+/// "Show explanations" in the Combine sheet (2026-10-07: the sheet was all text). Off, the
+/// explanations step aside and each control's tooltip carries them.
+private struct ShowHelpKey: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+    var combineShowsHelp: Bool {
+        get { self[ShowHelpKey.self] }
+        set { self[ShowHelpKey.self] = newValue }
+    }
+}
+
+/// An explanation that shows only with Show explanations on.
+private struct HelpCaption: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    @Environment(\.combineShowsHelp) private var shows
+
+    var body: some View {
+        if shows { Caption(text) }
+    }
+}
+
 private struct Caption: View {
     let text: String
     init(_ text: String) { self.text = text }
@@ -128,7 +159,7 @@ private struct SegmentChips: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Caption("Click a segment to keep or drop it; the brush (or its menu) styles it. Yours are named by what they show and matched by how they start, so one that comes and goes (a git branch outside a repository) doesn't move the others.")
+            HelpCaption("Click a segment to keep or drop it; the brush (or its menu) styles it. Yours are named by what they show and matched by how they start, so one that comes and goes (a git branch outside a repository) doesn't move the others.")
             ForEach(chips.lineIndices, id: \.self) { line in
                 LineChips(chips: chips, line: line, badges: badges, change: change)
             }
@@ -138,7 +169,7 @@ private struct SegmentChips: View {
                     get: { chips.keepNew },
                     set: { on in change { $0.keepNew = on } }))
                     .help("Keep segments yours shows later: what happens to a segment Sanduhr hasn't seen yet.")
-                Caption("When your statusline shows a segment that isn't here now, on keeps it and off leaves it out.")
+                HelpCaption("When your statusline shows a segment that isn't here now, on keeps it and off leaves it out.")
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text("Sanduhr's").font(.caption.weight(.medium))
@@ -181,7 +212,7 @@ private struct LineChips: View {
                     .font(.caption.weight(.medium))
                 separatorMenu
             }
-            Caption("How Sanduhr reads your line into segments: the separator it found, or one you choose. It changes the chips; your line reads the same until you drop a segment or choose Join with.")
+            HelpCaption("How Sanduhr reads your line into segments: the separator it found, or one you choose. It changes the chips; your line reads the same until you drop a segment or choose Join with.")
             ChipFlow {
                 ForEach(chips.chips(line: line)) { chip in
                     SegmentChip(chip: chip, help: help(chip), badge: badges.text(.theirs(chip.key)),
@@ -237,7 +268,7 @@ private struct JoinWithPicker: View {
                 .fixedSize()
                 .help("Join with: what goes between the segments that remain, in your part and Sanduhr's. " + PowerlineGlyph.explanation)
             }
-            Caption("The glyph between segments in the final line. Same as yours keeps your own separators.")
+            HelpCaption("The glyph between segments in the final line. Same as yours keeps your own separators.")
         }
     }
 }
@@ -254,7 +285,7 @@ private struct JoinRowPicker: View {
             }
             .pickerStyle(.segmented)
             .help("Sanduhr's meters: where Sanduhr's segments go next to yours.")
-            Caption("Own row: your line, then Sanduhr's under it. Same row: Sanduhr's after yours, moving to its own row when the terminal is too narrow.")
+            HelpCaption("Own row: your line, then Sanduhr's under it. Same row: Sanduhr's after yours, moving to its own row when the terminal is too narrow.")
         }
     }
 }
@@ -428,7 +459,7 @@ private struct ModChips: View {
                     ChipFlow {
                         ForEach(mods) { mod in ModChip(mod: mod, badge: badges.text(.mod(mod.path))) }
                     }
-                    Caption("Claude Code draws these mods' status entries in its status area, beside the statusline, so Combine can't keep, drop or style them. To hide one, use the mod's own settings (/config in Claude Code) or turn the mod off for this folder; the Mods page will have a switch for each.")
+                    HelpCaption("Claude Code draws these mods' status entries in its status area, beside the statusline, so Combine can't keep, drop or style them. To hide one, use the mod's own settings (/config in Claude Code) or turn the mod off for this folder; the Mods page will have a switch for each.")
                 }
             }
         }
@@ -552,7 +583,7 @@ private struct CombinePreview: View {
             if !mods.isEmpty {
                 Text("Claude Code's status area").font(.caption.weight(.medium))
                 Terminal(text: mods.map { "\u{26A0} \($0.name): …" }.joined(separator: "\n"), placeholder: "")
-                Caption("Mods draw these themselves, so only their names stand in: their text is known only inside a session.")
+                HelpCaption("Mods draw these themselves, so only their names stand in: their text is known only inside a session.")
             }
         }
         .task(id: Key(theirs: theirs, join: join, selection: selection, input: input)) {
