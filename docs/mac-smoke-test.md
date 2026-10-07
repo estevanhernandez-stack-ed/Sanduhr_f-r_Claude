@@ -1319,7 +1319,7 @@ to `~/modtest/meters` and give `~/.claude-modtest/settings.json`
    folders, and missing when one is; "Read-only: nothing here turns a mod on or off." No Sample
    label. VoiceOver reads it as one sentence with the counts.
 2. One box per Claude Code folder, its path on top. `~/.claude-modtest` lists **sanduhr-meters**
-   (0.1.0, Mod, On, its description, "Plugin folder list (CLAUDE_CODE_PLUGIN_DIRS)" and the path),
+   (0.2.0, Mod, On, its description, "Plugin folder list (CLAUDE_CODE_PLUGIN_DIRS)" and the path),
    "Draws: band above the prompt, toasts", "Its code reads or writes files." in orange, and a
    terminal frame titled Claude Code with a cyan band right above the `>` prompt and a toast line,
    captioned "Sketch: drawn by the mod in Claude Code" (blocks only, no numbers). **gone** reads
@@ -1331,7 +1331,7 @@ to `~/modtest/meters` and give `~/.claude-modtest/settings.json`
    plugin with `commands/*.md` shows "slash commands (/name)".
 5. **Check** on sanduhr-meters: within a few seconds an amber card, "Medium risk · Claude Code
    would load it", "Reads files: $.fs.read", "Reads environment variables: APPDATA, HOME, OS,
-   SANDUHR_SNAPSHOT", the hooks and calls, and "From claude plugin validate, which read the files
+   SANDUHR_BAND, SANDUHR_SNAPSHOT", the hooks and calls, and "From claude plugin validate, which read the files
    without running them." `ps` never shows a `claude plugin test`.
 6. Break the copy's manifest (`"version": 3`) and Check again: a red card, "Claude Code would
    refuse it (1 error)", "Error: version: Invalid input…", with no absolute path in it.
@@ -1422,3 +1422,49 @@ its `shasum`.
     `get_desk_messages` reports `special_mode` and `special_seconds`. Set Stack again.
 
 Put your list back: `cp ~/messages.txt.bak ~/Library/Application\ Support/Desk/messages.txt`.
+
+## 37. The animated band and watchers above the prompt (items 65f, 66)
+
+Use a throwaway Claude Code folder (`mkdir -p ~/.claude-bandtest/projects`), never your real
+settings, and remove it afterwards. Install the meters mod and the statusline for it in Settings,
+Integrations. For the Combine steps give it a statusline of its own first
+(`{"statusLine": {"type": "command", "command": "echo mine"}}` in its `settings.json`).
+
+1. Nothing set: `ls ~/Library/Application\ Support/Sanduhr/band.json` finds no file. Settings,
+   Integrations, Watchers shows **Show watchers above the prompt**, off, under the Notch… and Desk
+   Layout… row, with its caption about band.json.
+2. Install the statusline: the sheet offers Combine. Open a Sanduhr chip's **Style…**: the caption
+   ends "the meters mod's band above the prompt draws Sanduhr's segments in this look and moves it
+   (sweep, shimmer, glow)". Give Session a two-stop gradient, Script letters and Bold.
+3. Under Join with, tick **Show Sanduhr's meters above the prompt instead (animated)**: its caption
+   says your segments stay and Sanduhr's move to the band, and the preview shows only `mine`.
+   Combine. `jq -r .statusLine.command ~/.claude-bandtest/settings.json` ends in `--band`;
+   `band.json` now exists, `stat -f %Lp` prints 600, and it holds `meters.styles.session` with the
+   ink, `"font":"script"` and `"bold":true`, and no `watchers` key.
+4. `CLAUDE_CONFIG_DIR=~/.claude-bandtest claude`: the statusline reads `mine` only; above the
+   prompt the band reads `𝒮ℯ𝓈𝓈𝒾ℴ𝓃` in the gradient, bold, then the bar, percent and reset. Nothing
+   moves while the numbers sit still.
+5. Sweep: when a limit crosses 50, 75 or 90% (keep working, or use an account near a line), within
+   30 seconds of the widget's next fetch a white light runs across that bar and its percent once,
+   about a second, then the band rests.
+6. Glow and shimmer: a limit at 90% or more with a day left (weekly) shows ⚠ and its percent glows
+   every 4 seconds; a session within ten minutes of its reset shimmers its reset words every 4
+   seconds. Turn on Reduce Motion (System Settings, Accessibility, Display): `band.json` says
+   `"reduce_motion":true` within a second and the band stops moving; off again, it moves. The
+   mod's Motion option set to off (Claude Code's `/config`) keeps it still too.
+7. Turn **Show watchers above the prompt** on and **Let agents show watchers** on, then
+   `smoke/smoke do watch-test start`: within 2 seconds a row under the meters reads `● Smoke
+   watcher 0s 0/10`, the time counting each second. `watch-test wait`: `◉`, amber, pulsing every 4
+   seconds. `watch-test pass`: a green ✓ that fades toward grey, gone within 6 seconds.
+   `watch-test fail` (after a new start): a red ⚠ and a red title that stays.
+8. `band.json` holds the agent watcher's title, short, state, done, total and times only; with
+   **Show Claude Code's background work** on and a background shell running in a session, its row
+   reads `● background shell` and its entry is `{"kind":"shell","source":"automatic","state":
+   "running"}`: `grep -c` for the shell's description in `band.json` is 0.
+9. A narrow terminal (under 60 columns) shows the short title (`smoke`); a short band folds extra
+   watchers into "+N more".
+10. Quit Sanduhr: `band.json` keeps the looks and `"watchers":[]`; the rows go within 2 seconds.
+    Turn the watchers switch off and Replace the statusline: `band.json` is deleted.
+11. Junk: write `{` into `band.json` while Sanduhr is quit: the band draws the meters as before,
+    no rows, nothing logged.
+12. Clean up: Remove both integrations, delete `~/.claude-bandtest`.
