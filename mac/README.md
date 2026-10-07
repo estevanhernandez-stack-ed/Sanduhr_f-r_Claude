@@ -608,6 +608,55 @@ folders: each sharing level, no access file, hidden names, and the Windows MCP t
 two lints share `mac/Tests/SanduhrTests/Fixtures/theme-builtins.json`, the built-ins they must pass
 clean.
 
+## Mods
+
+Item 64, slice 1: Settings, Mods (under Integrations) lists every mod and plugin each Claude Code
+folder loads, read-only. The folders are the ones Integrations lists: `~/.claude`, the
+`~/.claude-*` folders and `CLAUDE_CONFIG_DIR`'s (`ClaudeCodeFolders.discover`, which now skips
+`*.config-backup-*` copies a config tool leaves beside a home, unless `CLAUDE_CONFIG_DIR` names
+one), the accounts' linked folders and the folders Sanduhr installed into.
+
+**What a folder loads** (`ModInventory.scan`, files only, no CLI): the folders in its
+settings.json's `env.CLAUDE_CODE_PLUGIN_DIRS` (`@inline`; off when `enabledPlugins["<name>@inline"]`
+is false), every plugin in `plugins/installed_plugins.json` or keyed `<name>@<marketplace>` in
+`enabledPlugins` (on only when that key is true; a key without a record, such as a `@synced`
+plugin, is listed without files), plugin folders under `skills/` (`<name>@skills-dir`), and the
+mods a session made under `dev-mods/<session>/` (the session folder itself, or each plugin folder
+in it), which load in that session only. A row shows the name, version (the manifest's, else the
+install record's), description, where it loads from, On, Off, Its session only or Missing (a
+listed folder that isn't there), Mod or Plugin (a mod's `hooks/hooks.json` lists `modules`), and
+what it touches. A `@synced` plugin from claude.ai that no settings file names has no trace on
+disk, so `claude plugin list --json` (not called here) can count more than this page.
+
+**What it touches** comes from the static scan shared with Integrations' status entries
+(`ModStatusEntries.forEachSource`): a mod's source files read as text, never node_modules, hidden
+folders, `.d.ts` files or tests (which name APIs without the mod calling them), at most 400 files
+of 512 KB. Surfaces: a band above the prompt (`AbovePrompt`), a pane (`component: 'Pane'` or
+`ui.open`), a status entry (`ui.status`), toasts (`ui.toast`) and slash commands (`command.run`
+matchers, `command.register`, and any plugin's `commands/*.md`). Capabilities: runs programs
+(`process.run`/`spawn`, a settings-style `"type": "command"` hook, an MCP server), uses the network
+(`http.fetch`, an `"type": "http"` hook) and reads or writes files (`fs.*`). A mod's surfaces are
+drawn in a TerminalPreviewFrame as a sketch (`ModSketch`): blocks stand in for its content, so
+nothing is live text, labeled "Sketch: drawn by the mod in Claude Code".
+
+**Check** runs `claude plugin validate <folder> --json` (`ModCheck`), which reads a plugin without
+running its code; `claude plugin test`, which runs it, is never called. `claude` is the first
+executable on PATH, then `~/.local/bin`, `~/.claude/local`, `/opt/homebrew/bin`, `/usr/local/bin`,
+`~/.npm-global/bin` and `~/.bun/bin`; it runs with its own folder and Homebrew's first on PATH
+(so a node script finds node), from the temp folder, and is stopped after 10 seconds. The JSON
+becomes a risk card (`ModCheckReport`): whether Claude Code would load it, errors and warnings
+with the folder's paths shortened, the hooks and `$` calls, and a risk level with its reasons:
+high for programs, the network, writing files or settings, gating or rewriting what Claude does
+(`tool.*`, `prompt.*`, `session.append`, `agent.*`, `telemetry.*`, `gatingHooks`) and
+secret-looking environment names; medium for reading files or the environment; low otherwise.
+Without `claude` the button is off and the page says why.
+
+Nothing on the page writes: no switch, no edit to any settings file (turning Sanduhr's own mods
+on and off by receipt is slice 2). A summary card (item 68's pattern) counts mods, plugins, how
+many are on, the folders and any missing. state.yaml's `mods_page` holds flags and counts only.
+Tests: `ModsPageTests` (temp folders and the validator's JSON captured as fixtures under
+`Tests/SanduhrTests/Fixtures/mods-validate/`; Check against a stand-in `claude` script).
+
 ## Camera and mic indicators
 
 Item 67. Indicators only, read-only: a red recording dot while any app uses a camera, and an
@@ -893,7 +942,7 @@ again any time with the current settings, recording nothing. The cards live in
 
 Every Settings page that controls something visible opens with a preview card about 160 points
 tall (Notch, Layout, Look, Meters, Message, Now Playing, Widget Look, Pacing & Focus, General,
-Integrations; Themes keeps its gallery). Each card is drawn by the surface's own views, never a
+Integrations; Themes keeps its gallery; Mods has a summary card of its counts). Each card is drawn by the surface's own views, never a
 mock: NotchView, NotchWingsView, NotchGlowView and AVIndicatorBadge for the notch, DeskPiece (the
 Desk's pieces, factored out of DeskView) for Look, Meters, Message and Now Playing,
 WidgetCardStack in WidgetGlass (factored out of RootView) for the widget, MenuBarText and
