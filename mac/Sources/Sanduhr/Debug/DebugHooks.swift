@@ -280,6 +280,9 @@ enum DebugHooks {
         s.deskEnabled = desk.enabled
         s.deskRunning = desk.running
         s.layout = UserDefaults.desk.string(forKey: "layout")
+        s.deskPieces = DeskArrangement(s.layout ?? DeskLayout.standard).shown(
+            showMeetings: UserDefaults.desk.object(forKey: "showMeetings") as? Bool ?? true,
+            showClaude: UserDefaults.desk.object(forKey: "showClaude") as? Bool ?? true)
         s.notch = UserDefaults.desk.bool(forKey: DeskController.notchKey)
         s.hasNotch = desk.wingsWindow != nil
         s.notchLeft = NotchContent.saved(.left, in: .desk)

@@ -7,6 +7,8 @@ struct DebugStateInput {
     var deskRunning = false
     /// The Desk layout string as saved, nil when never set.
     var layout: String?
+    /// The pieces the Desk draws from it (item 59), in order: each anchor's stack top to bottom.
+    var deskPieces: [DeskPlacement] = []
     /// The notch switch.
     var notch = false
     /// This screen has a camera notch and Desk built the island's window for it.
@@ -196,6 +198,19 @@ enum DebugState {
               YAMLPair("strip", .string(n.strip.rawValue))])
     }
 
+    /// `desk_pieces:` (item 59): each drawn piece's widget word, anchor, place in its anchor's
+    /// stack (0 at the top) and size.
+    static func deskPiecesYAML(_ pieces: [DeskPlacement]) -> YAMLNode {
+        var order: [DeskAnchor: Int] = [:]
+        let items: [YAMLNode] = pieces.map { p in
+            let n = order[p.anchor, default: 0]
+            order[p.anchor] = n + 1
+            return .map([YAMLPair("piece", .string(p.widget)), YAMLPair("anchor", .string(p.anchor.rawValue)),
+                         YAMLPair("order", .int(n)), YAMLPair("scale", .double(p.scale))])
+        }
+        return .list(items)
+    }
+
     /// `dock:` (item 56): side, auto-hide and the inset applied now.
     static func dockYAML(_ d: DockDebug) -> YAMLNode {
         .map([YAMLPair("side", .string(d.side.rawValue)), YAMLPair("autohide", .bool(d.autohide)),
@@ -276,6 +291,7 @@ enum DebugState {
         pairs.append(("desk_enabled", .bool(s.deskEnabled)))
         pairs.append(("desk_running", .bool(s.deskRunning)))
         pairs.append(("layout", s.layout.map(YAMLNode.string) ?? .null))
+        pairs.append(("desk_pieces", deskPiecesYAML(s.deskPieces)))
         pairs.append(("notch", .bool(s.notch)))
         pairs.append(("has_notch", .bool(s.hasNotch)))
         pairs.append(("notch_left", .string(s.notchLeft.rawValue)))

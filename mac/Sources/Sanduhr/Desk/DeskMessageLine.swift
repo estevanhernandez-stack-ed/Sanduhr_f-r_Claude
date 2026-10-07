@@ -64,7 +64,7 @@ struct DeskMessageLine: View {
     private func styled(_ plan: MessageTypography.Plan, size: CGFloat, color: ((Int) -> Color?)? = nil) -> some View {
         MessageTypography.text(plan, size: size, color: color)
             .font(MessageTypography.font(plan, size: size))
-            .multilineTextAlignment(alignment == .trailing ? .trailing : .leading)
+            .multilineTextAlignment(alignment.deskText)
             .lineLimit(lineLimit)
             .minimumScaleFactor(0.4)
     }

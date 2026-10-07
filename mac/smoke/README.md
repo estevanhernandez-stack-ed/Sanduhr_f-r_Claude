@@ -55,7 +55,10 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
     `AXHostingView`. With VoiceOver on, the full tree appears, switch values included.
   Switch on/off values are therefore not in the text nodes: check them in `state.yaml`. The
   `text` match field checks a node's label and value.
-- **state.yaml**: `desk_enabled`, `desk_running`, `layout`, `notch`, `has_notch`,
+- **state.yaml**: `desk_enabled`, `desk_running`, `layout`, `desk_pieces` (item 59: each piece the Desk
+  draws, in the layout's order: `piece`, the widget word; `anchor`, `tl`, `tc`, `tr`, `ml`, `mr`, `bl`,
+  `bc` or `br`; `order`, its place in that anchor's stack, 0 at the top; `scale`, its size, 0.6 to 1.6),
+  `notch`, `has_notch`,
   `notch_left`, `notch_right`, `notch_strip` (what each place on the island shows, a
   `NotchContent` raw value such as `meetingOrTime`, `meters` or `nothing`; the default when unset),
   `camera_in_use` (an app is using a camera; only watched while the camera light switch is on),

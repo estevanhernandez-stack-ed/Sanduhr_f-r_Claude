@@ -112,13 +112,13 @@ enum DockGeometry {
         return .on(prefs.side, reserved(frame: frame, visible: visible).amount(on: prefs.side))
     }
 
-    /// The Desk corners a Dock on `side` pushes: the two on that edge. A side Dock moves its
-    /// whole column, the two corners sharing that margin.
-    static func corners(for side: DockSide) -> Set<DeskView.Slot> {
+    /// The Desk anchors a Dock on `side` pushes: the three on that edge (item 59 added the
+    /// centers and middles). A side Dock moves its whole column, every anchor sharing that margin.
+    static func anchors(for side: DockSide) -> Set<DeskAnchor> {
         switch side {
-        case .bottom: return [.bl, .br]
-        case .left: return [.tl, .bl]
-        case .right: return [.tr, .br]
+        case .bottom: return [.bl, .bc, .br]
+        case .left: return [.tl, .ml, .bl]
+        case .right: return [.tr, .mr, .br]
         }
     }
 
