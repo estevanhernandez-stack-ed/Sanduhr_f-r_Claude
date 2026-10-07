@@ -113,10 +113,22 @@ REMEDY_NO_ACTIVITY = (
 DESK_SYNTAX = (
     "messages.txt syntax, one line each: a plain line shows on any day; 'Mon: text' only on that "
     "weekday (Mon Tue Wed Thu Fri Sat Sun, exactly so); '10-31: text' only on that date (MM-DD); "
-    "'# text' is a comment and blank lines are ignored. The most specific pool that has lines wins "
-    "(today's date, else today's weekday, else the plain lines); within it Desk rotates once a day "
-    "or once an hour (rotate, the user's choice), steady in between. Pinning one line is a user "
-    "setting (pinned): while pinned the list is not shown, so say so before proposing. ")
+    "'# text' is a comment and blank lines are ignored. Each day the Desk shows one usual line: "
+    "today's weekday lines if there are any (they replace the plain lines that day, unless the "
+    "user's mix_daily switch is on, which lets the plain lines take turns with them), else the "
+    "plain lines; it rotates through them once a day (a weekday's lines once a week) or once an "
+    "hour (rotate, the user's choice), steady in between. Date lines are special days: they do not "
+    "replace the usual line, they add to it, drawn above it, and every line for that date shows "
+    "(two birthdays on one date both show; more than 3 take turns hourly, 3 at a time). So "
+    "birthdays, anniversaries and holidays are date lines, one per person or occasion, short and "
+    "friendly, like '03-14: {ink:#ff7e5f,#feb47b} happy birthday, Sam.'; the user's everyday line "
+    "still shows under them. Pinning one line is a user setting (pinned): the pinned line replaces "
+    "the usual line every day, so weekday and plain lines don't show while it is pinned (say so "
+    "before proposing them), but date lines still stack above the pinned line, so birthdays and "
+    "holidays show either way. The user's On special days setting (special_mode) decides how the date's "
+    "lines share the Desk with the usual line: stack (all at once, the date's lines on top), turns "
+    "(one at a time, crossfading) or scroll (one at a time, gliding up like a slow ticker), each "
+    "line shown for special_seconds. ")
 DESK_EFFECTS = (
     "Effects: tags at the start of the text, after any prefix, in any order, each in braces: "
     "{ink:#ff2a6d,#05d9e8} this line's ink, 1 to 4 hex colors (2 or more make a left-to-right "
@@ -140,8 +152,10 @@ DESK_EFFECTS = (
 DESK_GUIDE_READ = (
     "Read the user's Desk messages: the handwritten line Sanduhr draws on the macOS desktop, picked "
     "from ~/Library/Application Support/Desk/messages.txt. Returns every raw line of the file "
-    "(comments and effects included), whether one line is pinned, the rotation (daily or hourly) "
-    "and today: the raw line the Desk shows now. Call this before propose_desk_messages to match "
+    "(comments and effects included), whether one line is pinned, the rotation (daily or hourly), "
+    "mix_daily (whether plain lines take turns with a weekday's own lines), "
+    "today: the usual raw line the Desk shows now, and today_special: the date lines it shows above "
+    "it today (empty on most days). Call this before propose_desk_messages to match "
     "the user's voice and to avoid repeats. " + DESK_SYNTAX + DESK_EFFECTS)
 DESK_GUIDE_PROPOSE = (
     "Suggest lines for the user's Desk messages. Sanduhr checks them and, unless the user lets "
@@ -150,8 +164,10 @@ DESK_GUIDE_PROPOSE = (
     "comes with reasons to fix. This server never writes messages.txt. Limits: 1 to 60 lines, "
     "120 characters each, no control characters or line breaks inside a line, at least one line "
     "that is not a comment; prefixes and effects must parse. mode add appends (default), replace "
-    "swaps the whole list (the user's previous list is kept as messages.txt.previous). Read the "
-    "current list first with get_desk_messages. " + DESK_SYNTAX + DESK_EFFECTS)
+    "swaps the whole list (the user's previous list is kept as messages.txt.previous); to add "
+    "birthdays, anniversaries or holidays use mode add with one date line each (MM-DD:), never "
+    "replace, so the user's own lines stay. Read the current list first with get_desk_messages. "
+    + DESK_SYNTAX + DESK_EFFECTS)
 
 THEME_GUIDE = (
     "Give the Sanduhr widget a new color theme. Call when the user asks for a theme, a new look, or "
@@ -1348,8 +1364,17 @@ def validate_desk_lines(lines):
     return reasons[:20]
 
 
-def pick_desk_line(text, now, hourly):
-    """MessageEngine.pick: the line Desk shows at `now` (local time), raw, or None."""
+DESK_MAX_SPECIAL = 3
+DESK_SPECIAL_MODES = ("stack", "turns", "scroll")
+DESK_SPECIAL_SECONDS = (5, 10, 30, 60, 300)
+
+
+def desk_today(text, now, hourly, mix=False, pinned=None):
+    """MessageEngine.today: (special, usual) at `now` (local time), raw bodies. A pinned line is the
+    usual line; the date's lines still stack above it. Otherwise the usual line is
+    today's weekday pool if it has lines (with the plain lines too when `mix`), else the plain
+    pool; plain rotates by day, a weekday pool by week. Every line for today's date is special,
+    up to 3; more take turns hourly, 3 at a time."""
     today = now.strftime("%m-%d")
     weekday = WEEKDAYS[(now.isoweekday()) % 7]
     dated, daily, plain = [], [], []
@@ -1367,18 +1392,37 @@ def pick_desk_line(text, now, hourly):
                 daily.append(body)
             continue
         plain.append(line)
-    pool = dated or daily or plain
-    if not pool:
-        return None
     day_index = now.date().toordinal()
-    slot = day_index * 24 + now.hour if hourly else day_index
-    return pool[slot % len(pool)]
+
+    def turn(pool, step):
+        if not pool:
+            return None
+        slot = step * 24 + now.hour if hourly else step
+        return pool[slot % len(pool)]
+
+    if pinned:
+        usual = pinned
+    elif daily:
+        usual = turn(daily + plain if mix else daily, day_index // 7)
+    else:
+        usual = turn(plain, day_index)
+    special = dated
+    if len(dated) > DESK_MAX_SPECIAL:
+        start = ((now.year * 24 + now.hour) * DESK_MAX_SPECIAL) % len(dated)
+        special = [dated[(start + i) % len(dated)] for i in range(DESK_MAX_SPECIAL)]
+    return special, usual
+
+
+def pick_desk_line(text, now, hourly, mix=False):
+    """MessageEngine.pick: the usual line Desk shows at `now` (local time), raw, or None."""
+    return desk_today(text, now, hourly, mix)[1]
 
 
 def read_desk_state(paths):
-    """The app's note of the user's settings (pinned, rotation), or the defaults."""
+    """The app's note of the user's settings (pinned, rotation, mix_daily), or the defaults."""
     doc = read_json(paths.desk_state)
-    state = {"known": False, "pinned": False, "pinned_line": None, "rotate": "daily"}
+    state = {"known": False, "pinned": False, "pinned_line": None, "rotate": "daily", "mix_daily": False,
+             "special_mode": "stack", "special_seconds": 10}
     if isinstance(doc, dict) and doc.get("schema_version") == 1:
         state["known"] = True
         state["pinned"] = doc.get("pinned") is True
@@ -1386,6 +1430,11 @@ def read_desk_state(paths):
         state["pinned_line"] = line if state["pinned"] and isinstance(line, str) else None
         if doc.get("rotate") in ROTATIONS:
             state["rotate"] = doc["rotate"]
+        state["mix_daily"] = doc.get("mix_daily") is True
+        if doc.get("special_mode") in DESK_SPECIAL_MODES:
+            state["special_mode"] = doc["special_mode"]
+        if doc.get("special_seconds") in DESK_SPECIAL_SECONDS:
+            state["special_seconds"] = doc["special_seconds"]
     return state
 
 
@@ -1394,7 +1443,8 @@ def build_desk_messages(now=None, paths=None):
     paths = paths or Paths()
     state = read_desk_state(paths)
     out = {"status": "ok", "file_found": False, "lines": [], "pinned": state["pinned"],
-           "rotate": state["rotate"], "today": None,
+           "rotate": state["rotate"], "mix_daily": state["mix_daily"],
+           "special_mode": state["special_mode"], "special_seconds": state["special_seconds"], "today": None, "today_special": [],
            "limits": {"lines_per_proposal": DESK_MAX_LINES, "characters_per_line": DESK_MAX_LINE_CHARS}}
     if not state["known"]:
         out["settings_note"] = "Sanduhr has not reported the pin and rotation yet; shown as the defaults."
@@ -1417,11 +1467,9 @@ def build_desk_messages(now=None, paths=None):
         lines.pop()
     out["file_found"] = True
     out["lines"] = lines
-    if state["pinned"]:
-        out["today"] = state["pinned_line"]
-    else:
-        local = now.astimezone()
-        out["today"] = pick_desk_line(text, local, state["rotate"] == "hourly")
+    local = now.astimezone()
+    out["today_special"], out["today"] = desk_today(text, local, state["rotate"] == "hourly", state["mix_daily"],
+                                                    pinned=state["pinned_line"] if state["pinned"] else None)
     return out
 
 

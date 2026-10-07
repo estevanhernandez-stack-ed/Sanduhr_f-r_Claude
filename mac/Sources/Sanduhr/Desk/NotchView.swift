@@ -57,7 +57,7 @@ struct NotchView: View {
                         stripIndicators
                     } else if showChinText, let line = strip.text(
                         at: .strip, meetings: model.meetings, meters: model.claudeCompact,
-                        message: model.message, nowPlaying: model.nowPlaying, watchers: model.watchers,
+                        message: model.oneLineMessage, nowPlaying: model.nowPlaying, watchers: model.watchers,
                         watcherIntro: model.watcherIntroUntil != nil, now: context.date) {
                         if strip == .nowPlaying {
                             stripNowPlaying(line, width: width)
@@ -86,7 +86,7 @@ struct NotchView: View {
     private var stripSize: CGFloat { max(11, chin * 0.55) }
 
     private func styledLine(_ line: String, content: NotchContent, size: CGFloat) -> some View {
-        NotchMessageText.line(line, content: content, message: model.message, font: font, size: size)
+        NotchMessageText.line(line, content: content, message: model.oneLineMessage, font: font, size: size)
     }
 
     /// The camera and mic indicators under the camera (item 67), centered. Their clicks come
@@ -388,7 +388,7 @@ struct NotchWingsView: View {
     }
 
     private func styledLine(_ line: String, content: NotchContent, size: CGFloat) -> some View {
-        NotchMessageText.line(line, content: content, message: model.message, font: font, size: size)
+        NotchMessageText.line(line, content: content, message: model.oneLineMessage, font: font, size: size)
     }
 
     private func label(_ text: String?, _ size: CGFloat, content: NotchContent) -> some View {
@@ -453,7 +453,7 @@ struct NotchWingsView: View {
     private static func text(_ content: NotchContent, at place: NotchContent.Place,
                              model: DeskModel, now: Date) -> String? {
         content.text(at: place, meetings: model.meetings, meters: model.claudeCompact,
-                     message: model.message, nowPlaying: model.nowPlaying, watchers: model.watchers,
+                     message: model.oneLineMessage, nowPlaying: model.nowPlaying, watchers: model.watchers,
                      watcherIntro: model.watcherIntroUntil != nil, now: now)
     }
 

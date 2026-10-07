@@ -114,6 +114,8 @@ struct DebugStateInput {
     var avIndicators = AVIndicatorsDebug()
     /// The Mods page (item 64): open, read, and counts only, never a name or a path.
     var modsPage = ModsPageDebug()
+    /// Settings, Message's editor (item 69): counts and flags, never a line of the user's.
+    var messageEditor = MessageEditorDebug()
     var version = ""
     var build = ""
 }
@@ -288,6 +290,14 @@ enum DebugState {
               YAMLPair("shown", .string(a.shown))])
     }
 
+    /// `message_editor:` (item 69): the view, row counts and flags; `added` is only the smoke's own
+    /// line from `message-editor add`.
+    static func messageEditorYAML(_ m: MessageEditorDebug) -> YAMLNode {
+        .map([YAMLPair("open", .bool(m.open)), YAMLPair("mode", .string(m.mode)), YAMLPair("rows", .int(m.rows)),
+              YAMLPair("styled", .int(m.styled)), YAMLPair("raw", .int(m.raw)), YAMLPair("notes", .int(m.notes)),
+              YAMLPair("unsaved", .bool(m.unsaved)), YAMLPair("today_special", .int(m.todaySpecial)), YAMLPair("added", m.added.map(YAMLNode.string) ?? .null)])
+    }
+
     /// `mods_page:` (item 64): flags and counts only.
     static func modsPageYAML(_ m: ModsPageDebug) -> YAMLNode {
         .map([YAMLPair("open", .bool(m.open)), YAMLPair("loaded", .bool(m.loaded)),
@@ -383,6 +393,7 @@ enum DebugState {
         // Item 68: which preview card the open Settings section shows (SettingsPreviewKind).
         pairs.append(("settings_preview", s.settingsPreview.map { .string($0.rawValue) } ?? .null))
         pairs.append(("mods_page", modsPageYAML(s.modsPage)))
+        pairs.append(("message_editor", messageEditorYAML(s.messageEditor)))
         return .object(pairs)
     }
     

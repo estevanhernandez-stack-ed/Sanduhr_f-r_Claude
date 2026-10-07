@@ -37,10 +37,100 @@ struct MessagePickTests {
         #expect(pick(text, date(2026, 10, 6)) == "keep building.")
     }
 
-    @Test func dateBeatsWeekdayAndPlain() {
+    /// Item 69: a date's lines add to the day; they no longer replace its usual line.
+    @Test func dateAddsAboveTheDaysLine() {
         let text = "keep building.\nSat: rest.\n10-31: happy halloween."
-        #expect(pick(text, date(2026, 10, 31)) == "happy halloween.")
+        #expect(pick(text, date(2026, 10, 31)) == "rest.")
+        let today = MessageEngine.today(from: text, now: date(2026, 10, 31), hourly: false, calendar: cal)
+        #expect(today == MessageEngine.Today(special: ["happy halloween."], usual: "rest."))
+        #expect(today.lines == ["happy halloween.", "rest."])
+        #expect(today.first == "happy halloween.")
         #expect(pick(text, date(2026, 10, 24)) == "rest.")
+        #expect(MessageEngine.today(from: text, now: date(2026, 10, 24), hourly: false, calendar: cal).special == [])
+        // A date line alone still shows.
+        let alone = MessageEngine.today(from: "10-31: boo.", now: date(2026, 10, 31), hourly: false, calendar: cal)
+        #expect(alone == MessageEngine.Today(special: ["boo."], usual: nil))
+        #expect(alone.first == "boo.")
+    }
+
+    /// The owner's scenario: a pinned "Good vibes only" and a loved one's birthday. The pin
+    /// replaces the usual line only; the date's lines still stack above it.
+    @Test func aPinnedLineKeepsSpecialDays() {
+        let one = "keep.\nSat: rest.\n03-14: happy birthday, Sam."
+        let t = MessageEngine.today(from: one, now: date(2026, 3, 14), hourly: false, pinned: "Good vibes only", calendar: cal)
+        #expect(t == MessageEngine.Today(special: ["happy birthday, Sam."], usual: "Good vibes only"))
+        #expect(t.lines == ["happy birthday, Sam.", "Good vibes only"])
+        // Other days: the pin alone, the weekday line stays hidden.
+        #expect(MessageEngine.today(from: one, now: date(2026, 3, 21), hourly: false, pinned: "Good vibes only", calendar: cal)
+                == MessageEngine.Today(usual: "Good vibes only"))
+        let four = "keep.\n" + (0..<4).map { "03-14: b\($0)" }.joined(separator: "\n")
+        var seen = Set<String>()
+        for hour in 0..<24 {
+            let day = MessageEngine.today(from: four, now: date(2026, 3, 14, hour: hour), hourly: false,
+                                          pinned: "Good vibes only", calendar: cal)
+            #expect(day.special.count == 3)
+            #expect(day.usual == "Good vibes only")
+            seen.formUnion(day.special)
+        }
+        #expect(seen == ["b0", "b1", "b2", "b3"])
+    }
+
+    @Test func everyLineForADateShowsUpToThree() {
+        let two = "good vibes only.\n03-14: happy birthday, Sam.\n03-14: happy birthday, Alex."
+        let t = MessageEngine.today(from: two, now: date(2026, 3, 14), hourly: false, calendar: cal)
+        #expect(t.special == ["happy birthday, Sam.", "happy birthday, Alex."])
+        #expect(t.usual == "good vibes only.")
+        let three = (1...3).map { "03-14: \($0)" }.joined(separator: "\n")
+        #expect(MessageEngine.today(from: three, now: date(2026, 3, 14), hourly: false, calendar: cal).special == ["1", "2", "3"])
+    }
+
+    @Test func moreThanThreeForADateTakeTurnsHourly() {
+        for n in 4...8 {
+            let text = (0..<n).map { "03-14: \($0)" }.joined(separator: "\n")
+            var seen = Set<String>()
+            for hour in 0..<24 {
+                let special = MessageEngine.today(from: text, now: date(2026, 3, 14, hour: hour), hourly: false, calendar: cal).special
+                #expect(special.count == MessageEngine.maxSpecial)
+                #expect(Set(special).count == MessageEngine.maxSpecial, "n=\(n) hour=\(hour)")
+                seen.formUnion(special)
+                // Steady within the hour.
+                #expect(MessageEngine.today(from: text, now: cal.date(byAdding: .minute, value: 30, to: date(2026, 3, 14, hour: hour))!,
+                                            hourly: false, calendar: cal).special == special)
+            }
+            #expect(seen.count == n, "every line shows within the day, n=\(n)")
+        }
+    }
+
+    /// Item 69's bug: seven Friday lines always showed the same one (the day index steps by 7).
+    @Test func everyWeekdayLineComesRound() {
+        for n in 1...8 {
+            let text = "plain.\n" + (0..<n).map { "Fri: f\($0)" }.joined(separator: "\n")
+            let fridays = (0..<n).map { date(2026, 10, 9 + 7 * $0) }
+            let picks = Set(fridays.compactMap { pick(text, $0) })
+            #expect(picks == Set((0..<n).map { "f\($0)" }), "n=\(n)")
+            // Hourly: every line within one Friday.
+            let hours = Set((0..<24).compactMap { pick(text, date(2026, 10, 9, hour: $0), hourly: true) })
+            #expect(hours == Set((0..<n).map { "f\($0)" }), "hourly n=\(n)")
+        }
+    }
+
+    @Test func everyPlainLineComesRound() {
+        for n in 1...8 {
+            let text = (0..<n).map { "p\($0)" }.joined(separator: "\n")
+            let picks = Set((0..<n).compactMap { pick(text, date(2026, 10, 1 + $0)) })
+            #expect(picks.count == n, "n=\(n)")
+        }
+    }
+
+    @Test func mixSwitchPutsEveryDayLinesInTheWeekdaysTurns() {
+        let text = "a\nb\nFri: f"
+        let fridays = (0..<3).map { date(2026, 10, 9 + 7 * $0) }
+        #expect(Set(fridays.compactMap { pick(text, $0) }) == ["f"])
+        let mixed = Set(fridays.compactMap { MessageEngine.pick(from: text, now: $0, hourly: false, mix: true, calendar: cal) })
+        #expect(mixed == ["f", "a", "b"])
+        // Other days are unchanged by the switch.
+        #expect(MessageEngine.pick(from: text, now: date(2026, 10, 6), hourly: false, mix: true, calendar: cal)
+                == pick(text, date(2026, 10, 6)))
     }
 
     @Test func tagsForOtherDaysNeverFallThroughToPlain() {

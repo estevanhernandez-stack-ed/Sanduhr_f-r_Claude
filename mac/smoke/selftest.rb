@@ -56,7 +56,21 @@ class FakeApp
       s['pulse_count'] = s['pulse_count'].to_i + 1 if name == 'pulse'
     when 'show-widget' then s['widget_visible'] = true
     when 'hide-widget' then s['widget_visible'] = false
-    when 'settings' then s['settings_open'] = true; s['settings_section'] = arg if arg
+    when 'settings'
+      s['settings_open'] = true
+      s['settings_section'] = arg if arg
+      s['settings_preview'] = arg if %w[message].include?(arg)
+      (s['message_editor'] ||= {})['open'] = (s['settings_section'] == 'message')
+    when 'message-editor'
+      e = (s['message_editor'] ||= {})
+      if arg == 'add'
+        s['settings_open'] = true
+        s['settings_section'] = s['settings_preview'] = 'message'
+        e.merge!('open' => true, 'rows' => e['rows'].to_i + 1, 'styled' => e['styled'].to_i + 1, 'unsaved' => true,
+                 'added' => 'Fri: {ink:#ff7e5f,#feb47b,#ffd86f} {font:script} {sweep} ship it.')
+      elsif arg == 'revert' && e['added']
+        e.merge!('rows' => e['rows'].to_i - 1, 'styled' => e['styled'].to_i - 1, 'unsaved' => false, 'added' => nil)
+      end
     when 'close-settings' then s['settings_open'] = false
     when 'usage'
       s['settings_open'] = true
@@ -299,6 +313,21 @@ eq('mods page keys', state['mods_page'].keys,
    %w[open loaded folders mods plugins enabled missing checked cli])
 check('mods page holds only flags and counts',
       state['mods_page'].values.all? { |v| v == true || v == false || v.is_a?(Integer) })
+# Item 69: Settings, Message's editor, counts and flags; `added` only ever the smoke's own line.
+eq('message editor keys', state['message_editor'].keys, %w[open mode rows styled raw notes unsaved today_special added])
+eq('message editor in the fixture: the starter file, nothing unsaved',
+   state['message_editor'].values_at('rows', 'styled', 'raw', 'notes', 'unsaved', 'added'), [3, 3, 0, 4, false, nil])
+eq('lines a scenario added are reverted',
+   Restore.plan(base, base.merge('message_editor' => { 'unsaved' => true })), [%w[message-editor revert]])
+eq('edits unsaved before are left alone',
+   Restore.plan(base.merge('message_editor' => { 'unsaved' => true }), base.merge('message_editor' => { 'unsaved' => true })), [])
+app_me = FakeApp.new('settings_open' => false, 'settings_section' => 'general')
+r = Runner.new(app_me, MemoryDefaults.new, File.join(Smoke::OUT, '.selftest-me'), io: StringIO.new, settle: 0, poll: 0.01, within: 0.05)
+    .run_file(File.join(Smoke::SCENARIOS, 'message-editor.yaml'))
+eq('message editor scenario passes', [r['status'], r['reason']], ['pass', nil])
+eq('message editor scenario adds, reverts, then closes Settings', app_me.actions,
+   ['settings message', 'message-editor add', 'message-editor revert', 'close-settings'])
+FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-me'))
 app_av = FakeApp.new
 app_av.action('av-test', 'mic on')
 eq('av-test fakes the mic', app_av.state_now['av_indicators']['mic'], true)
@@ -375,7 +404,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test]
+    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end

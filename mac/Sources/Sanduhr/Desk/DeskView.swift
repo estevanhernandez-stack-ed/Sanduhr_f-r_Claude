@@ -207,6 +207,7 @@ struct DeskPiece: View {
     @AppStorage("messageColor", store: .desk) private var messageColor = "9ad7ff"
     @AppStorage(DeskMessageLook.glowKey, store: .desk) private var messageGlow = true
     @AppStorage("inkColor", store: .desk) private var ink = "ffffff"
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         switch widget {
@@ -349,13 +350,48 @@ struct DeskPiece: View {
     /// The handwritten line with its per-line effects (DeskMessageLine, item 54). messageColor
     /// takes one hex, or two or more separated by commas for a left-to-right gradient (to match
     /// Ice's menu bar tint); a line's {ink:…} replaces it for that line.
+    /// On a date with its own lines (item 69) those stack above the usual line, each with its own
+    /// effects (DeskMessageStack), or take turns with it, one at a time (Take turns, Scroll).
     @ViewBuilder
     private var message: some View {
-        if let text = model.message {
-            DeskMessageLine(raw: text, font: messageFont.isEmpty ? font : messageFont, baseSize: messageSize,
-                            inkSpec: messageColor, globalGlow: messageGlow, alignment: alignment,
-                            paused: model.motionPaused, sweepFirst: sweepFirst)
+        if model.cycling {
+            turns
+        } else if !model.specialMessages.isEmpty || model.message != nil {
+            VStack(alignment: alignment, spacing: messageSize * DeskMessageStack.spacing) {
+                let hasUsual = model.message != nil
+                ForEach(Array(model.specialMessages.enumerated()), id: \.offset) { _, text in
+                    line(text, size: messageSize * (hasUsual ? DeskMessageStack.specialScale : 1))
+                }
+                if let text = model.message { line(text, size: messageSize) }
+            }
         }
+    }
+
+    /// Take turns and Scroll: one line at a time, each at the full message size (its own {size:}
+    /// still applies). Every line is laid out unseen underneath, so the piece keeps the height and
+    /// width of the biggest and nothing around it moves; the line showing comes in by a crossfade,
+    /// glides up (Scroll), or simply swaps with Reduce Motion. A new line is a new view, so its
+    /// {write} plays each time it comes in.
+    private var turns: some View {
+        let lines = model.messageLines
+        let change = MessageSpecialMode.change(model.specialMode, reduceMotion: reduceMotion)
+        return ZStack(alignment: Alignment(horizontal: alignment, vertical: .center)) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, text in
+                line(text, size: messageSize, paused: true).hidden()
+            }
+            if let current = model.cycleLine {
+                line(current, size: messageSize)
+                    .id(model.cycleIndex)
+                    .transition(DeskMessageStack.transition(change))
+            }
+        }
+        .animation(DeskMessageStack.animation(change), value: model.cycleIndex)
+    }
+
+    private func line(_ text: String, size: Double, paused: Bool? = nil) -> some View {
+        DeskMessageLine(raw: text, font: messageFont.isEmpty ? font : messageFont, baseSize: size,
+                        inkSpec: messageColor, globalGlow: messageGlow, alignment: alignment,
+                        paused: paused ?? model.motionPaused, sweepFirst: sweepFirst)
     }
 
     private static func format(_ date: Date, _ pattern: String) -> String {

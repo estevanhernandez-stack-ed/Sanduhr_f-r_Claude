@@ -731,8 +731,12 @@ class DeskMessages(Base):
         r = self.get()
         self.assertEqual(r["lines"], ["# header", "keep building.", "{ink:#fff} also plain", "Sun: {glow} rest."])
         self.assertEqual(r["today"], "{glow} rest.")
-        self.write_messages("Sun: rest.\n07-26: {write} today only.\n")
-        self.assertEqual(self.get()["today"], "{write} today only.")
+        self.assertEqual(r["today_special"], [])
+        # Item 69: a date line adds above the day's line; it no longer replaces it.
+        self.write_messages("Sun: rest.\n07-26: {write} today only.\n07-26: and Sam's birthday.\n")
+        r = self.get()
+        self.assertEqual(r["today"], "rest.")
+        self.assertEqual(r["today_special"], ["{write} today only.", "and Sam's birthday."])
         self.write_messages("Mon: monday.\na\nb\nc\n")
         # Plain pool, rotated by the day number like MessageEngine.pick.
         self.assertEqual(self.get()["today"], ["a", "b", "c"][NOW.date().toordinal() % 3])
@@ -749,6 +753,66 @@ class DeskMessages(Base):
         r = self.get()
         self.assertTrue(r["pinned"])
         self.assertEqual(r["today"], "{shimmer} pinned.")
+
+    def test_weekday_lines_rotate_by_week_and_mix(self):
+        # Item 69: seven Friday lines used to show the same one every Friday.
+        for n in range(1, 9):
+            text = "plain.\n" + "\n".join("Fri: f%d" % i for i in range(n))
+            fridays = [datetime(2026, 10, 9, 12) + timedelta(days=7 * i) for i in range(n)]
+            self.assertEqual({mcp.pick_desk_line(text, d, False) for d in fridays},
+                             {"f%d" % i for i in range(n)}, n)
+            hours = {mcp.pick_desk_line(text, datetime(2026, 10, 9, h), True) for h in range(24)}
+            self.assertEqual(hours, {"f%d" % i for i in range(n)}, n)
+        text = "a\nb\nFri: f\n"
+        fridays = [datetime(2026, 10, 9, 12) + timedelta(days=7 * i) for i in range(3)]
+        self.assertEqual({mcp.pick_desk_line(text, d, False) for d in fridays}, {"f"})
+        self.assertEqual({mcp.pick_desk_line(text, d, False, mix=True) for d in fridays}, {"f", "a", "b"})
+        self.write_messages("a\nb\nSun: s\n")
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 1, "pinned": False, "rotate": "daily", "mix_daily": True})
+        r = self.get()
+        self.assertTrue(r["mix_daily"])
+        self.assertEqual(r["today"], ["s", "a", "b"][(NOW.date().toordinal() // 7) % 3])
+
+    def test_more_than_three_for_a_date_take_turns_hourly(self):
+        for n in range(4, 9):
+            text = "keep.\n" + "\n".join("03-14: %d" % i for i in range(n))
+            seen = set()
+            for h in range(24):
+                special, usual = mcp.desk_today(text, datetime(2026, 3, 14, h), False)
+                self.assertEqual((len(special), len(set(special)), usual), (3, 3, "keep."))
+                seen.update(special)
+            self.assertEqual(seen, {str(i) for i in range(n)}, n)
+        self.assertEqual(mcp.desk_today("03-14: a\n03-14: b\n", datetime(2026, 3, 14, 9), False), (["a", "b"], None))
+
+    def test_a_pinned_line_keeps_special_days(self):
+        # NOW is 2026-07-26: a pinned line replaces the usual line; date lines still stack above it.
+        self.write_messages("keep.\nSun: rest.\n07-26: happy birthday, Sam.\n")
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 1, "pinned": True,
+                                                 "pinned_line": "Good vibes only", "rotate": "daily"})
+        r = self.get()
+        self.assertEqual((r["today"], r["today_special"]), ("Good vibes only", ["happy birthday, Sam."]))
+        self.write_messages("keep.\n" + "\n".join("07-26: b%d" % i for i in range(4)) + "\n")
+        r = self.get()
+        self.assertEqual(r["today"], "Good vibes only")
+        self.assertEqual(len(r["today_special"]), 3)
+        seen = set()
+        for h in range(24):
+            special, usual = mcp.desk_today("keep.\n" + "\n".join("07-26: b%d" % i for i in range(4)),
+                                            datetime(2026, 7, 26, h), False, pinned="Good vibes only")
+            self.assertEqual((len(special), usual), (3, "Good vibes only"))
+            seen.update(special)
+        self.assertEqual(seen, {"b0", "b1", "b2", "b3"})
+
+    def test_on_special_days_setting_is_reported(self):
+        r = self.get()
+        self.assertEqual((r["special_mode"], r["special_seconds"]), ("stack", 10))
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 1, "pinned": False, "rotate": "daily",
+                                                 "special_mode": "scroll", "special_seconds": 60})
+        r = self.get()
+        self.assertEqual((r["special_mode"], r["special_seconds"]), ("scroll", 60))
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 1, "special_mode": "ticker", "special_seconds": 7})
+        r = self.get()
+        self.assertEqual((r["special_mode"], r["special_seconds"]), ("stack", 10))
 
     def test_unknown_state_schema_reads_as_defaults(self):
         self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 9, "pinned": True, "rotate": "hourly"})
@@ -914,6 +978,15 @@ class DeskMessages(Base):
                          "skips {shimmer} and {sweep}"):
                 self.assertIn(word, tools[name], (name, word))
         self.assertIn("never writes messages.txt", tools["propose_desk_messages"])
+        # Item 69: special days add to the day; Claude learns the birthday form.
+        for name in ("get_desk_messages", "propose_desk_messages"):
+            for word in ("birthdays, anniversaries and holidays are date lines", "they add to it",
+                         "two birthdays on one date both show", "happy birthday, Sam.", "mix_daily",
+                         "date lines still stack above the pinned line", "On special days setting (special_mode)",
+                         "special_seconds"):
+                self.assertIn(word, tools[name], (name, word))
+        self.assertIn("today_special", tools["get_desk_messages"])
+        self.assertIn("use mode add with one date line each", tools["propose_desk_messages"])
 
 
 BUILTIN_THEMES = os.path.join(FIXTURES, "theme-builtins.json")

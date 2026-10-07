@@ -522,9 +522,11 @@ network request; the files it writes are a Desk message request and a theme requ
 points it at a test folder (and Desk's folder beside it).
 
 **Desk messages from Claude (item 54).** `get_desk_messages` returns `{status, file_found, lines,
-pinned, rotate, today, limits}`: every raw line of Desk's `messages.txt`, whether a line is pinned,
-the rotation and the raw line the Desk shows now. Its description teaches the syntax (plain, `Mon:`,
-`MM-DD:`, `#`, the most specific pool, rotation, pinning) and the effects, with taste tips.
+pinned, rotate, mix_daily, special_mode, special_seconds, today, today_special, limits}`: every raw line of Desk's `messages.txt`,
+whether a line is pinned, the rotation, the mix switch, the usual raw line the Desk shows now and the
+date lines it shows above it today. Its description teaches the syntax (plain, `Mon:`, `MM-DD:`,
+`#`, which line shows when, rotation, pinning; that birthdays, anniversaries and holidays are date
+lines that add to the day, one per person, added with mode add) and the effects, with taste tips.
 `propose_desk_messages {lines, mode: add|replace, note?}` checks the lines (1 to 60, 120 characters
 each, no control characters, at least one message line, prefixes and effects must parse; refusals
 come back at once with `reasons` and write nothing), then writes `desk-messages-request.json`
@@ -551,8 +553,44 @@ sidebar, and a notification without sound only while alerts are on (their delive
 `MessageSuggestionNotice`). Add appends and skips lines already in the list; Replace keeps the
 comment block at the top of the file and replaces the rest. Either way the previous file is kept as
 `messages.txt.previous`. A suggestion waits in memory (quitting drops it); a newer one replaces it.
-The app writes `desk-messages-state.json` (`{schema_version, pinned, pinned_line, rotate}`) when
-the pin or rotation changes, for `get_desk_messages`.
+The app writes `desk-messages-state.json` (`{schema_version, pinned, pinned_line, rotate,
+mix_daily, special_mode, special_seconds}`) when the pin, the rotation, the mix switch or On special
+days changes, for `get_desk_messages`, which reports them.
+
+**Which lines show (item 69).** Each day the Desk draws one usual line and, on a date with its own
+lines, those too (`MessageEngine.today`). The usual line comes from today's weekday lines when there
+are any, else from the plain lines; with Settings, Message's "Mix every-day lines in on days with
+their own line" (`messageMixDaily`, off by default) the weekday lines and the plain lines take
+turns together. Plain lines rotate by day; a weekday's lines rotate by week (they used to step by
+day, which comes round to a weekday every 7, so seven Friday lines always showed the same one).
+Date lines (`MM-DD:`) no longer replace the usual line: every line for today's date shows, stacked
+above it, each with its own effects; more than 3 take turns hourly, 3 at a time. Hourly rotation
+keeps hour steps within each pool. The message piece draws the date's lines at 0.8 times the
+message size (full size when no usual line shows) with a gap of 0.12 times the message size
+between lines (`DeskMessageStack`). Places with room for one line (the notch's Message choice)
+show the first date line, else the usual one. A pinned line replaces the usual line only: the
+date's lines still stack above it, so a pinned "good vibes only" and a birthday both show.
+`get_desk_messages` mirrors the rules (`desk_today`).
+
+**On special days (item 69).** Settings, Message's bar has "On special days": **Stack** (the
+default, as above), **Take turns** or **Scroll** (`messageSpecialMode` `stack`, `turns`, `scroll`),
+and, unless Stack, "Each line shows for" 5 s, 10 s (default), 30 s, 1 min or 5 min
+(`messageSpecialSeconds`). Take turns and Scroll show one line at a time at the full message size
+(a line's own `{size:}` still applies), cycling through the date's lines and then the usual line.
+The line showing is decided by the clock alone (`MessageSpecialMode.index`: the seconds since 1970
+divided by the time each line shows, modulo the number of lines), so the Desk, the notch's Message
+and the previews show the same line at the same moment. `DeskModel.updateCycle` sets the index and
+waits with one one-shot timer for the next change; while the Desk can't be seen (covered, screens
+asleep, screen saver, session away: `motionPaused`, as `{shimmer}` rests) it holds the line and
+schedules nothing, and on return it jumps to the clock's line. On a day without date lines, or with
+a date line and no usual line, nothing cycles and nothing is scheduled. Every line is laid out
+unseen underneath the one showing, so the piece keeps the size of the biggest and nothing around it
+moves. Take turns crossfades in 0.4 s. Scroll is a slow ticker: the new line glides up in from below
+by its own height while the old one glides up out of view, both fading as they move, in 0.8 s, so
+one line is visible at a time. With Reduce Motion both swap at once. Each line that comes in is a new
+view, so its `{write}` plays again; `{shimmer}` and `{sweep}` run as on a single line. The Message
+preview card shows the chosen mode live, with a sample date line ("Sample: special day") until today
+has one. "Today:" lists the lines in cycle order.
 
 **Message effects.** Tags at the start of a line's text, after any prefix, in any order:
 `{ink:#hex,…}` (1 to 4 colors, a gradient from two), `{glow}` / `{noglow}` (over Settings, Desk,
@@ -582,6 +620,39 @@ runs or the session is switched away (`MessageMotion.paused`); `{sweep}` draws 3
 only during its 1.1 s run, sleeps between runs and rests the same way (a once-only sweep that has
 run does not repeat when the Desk comes back into sight; one that was covered before it ran runs
 then). Settings, Message's Replay sweeps a `{sweep}` line at once.
+
+**The Message editor (item 69).** Settings, Message is a list of lines, each a row with the line
+drawn as the Desk draws it (`MessageRowPreview`: `DeskMessageLine` at 22 points on the preview
+wallpaper, in the Desk's message font, color and glow; Reduce Motion stills it as it does the
+Desk). A row's Edit opens its controls: **When** (Every day, Monday to Sunday, or A date as a month
+and a day menu, written as `Mon:` or `10-31:`), **Text** (plain, no tags), **Color** (As the Desk,
+One color, or a Gradient of 2 to 4 color wells, and a Palette menu with the now-playing mod's
+synthwave, sunset, ocean, aurora, ember, bubblegum, toxic and gold), **Glow** (On, Off, As the
+Desk), **Size** (0.5 to 2 times, in 0.05 steps), **Letters** (As written and the nine letter
+styles) and **Motion** (None, Write in, Shimmer, Sweep), each with a one-line tooltip. The controls
+write the existing tags only, in the order ink, glow, size, font, motion: Fridays, "ship it." in a
+sunset gradient in script with a sweep is `Fri: {ink:#ff7e5f,#feb47b,#ffd86f} {font:script}
+{sweep} ship it.` Rows have Pin (today's line stays: the pin holds the row's tags and text),
+Duplicate, Move Up, Move Down and Delete (the row's menu; VoiceOver has Move Up and Move Down too),
+and drag to reorder. Add Line, the rotation (Once a day, Every hour), the mix switch, Save
+(Command-S) and Revert sit above the list, with "Today:" naming everything the Desk draws today
+(the date's lines, then the usual one, joined by " / "). Each row's note says what happens to it
+(`MessageDocument.note`): "October 31 · shows above the day's message" (plus "· with N others that
+day", and "· 3 at a time, taking turns hourly" past three), "Fridays · takes turns with N others"
+or "Fridays · shows instead of the every-day lines" ("· mixes with every-day lines" with the switch
+on), "Every day · takes turns with N others · steps aside on days with their own line" ("· mixes in
+on days with their own line" with the switch on). **Edit as text…** shows the file itself with the tag reference beside it and the
+free pin field; Edit as a list goes back. Both views edit one document (`MessageEditorModel`), and
+switching carries unsaved edits across. `MessageLineModel` reads the file into rows: a styled row
+(when, text, look) for each line the controls can represent; a raw row, shown as written and kept
+verbatim, for one they can't (a tag Sanduhr doesn't know or that is malformed, two motions on one
+line, a date that isn't one, a prefix with nothing after it); comments and blank lines are kept in
+place and not listed. Each row writes the line it was read from, byte for byte, until it is changed,
+so an unchanged file saves back exactly (CRLF endings and a missing final newline included) and a
+changed row rewrites only its own line; a new line with no text is left out. A row whose text the
+Desk would read differently (it starts with `{` or `#`, or like a day on an Every day line) says so
+under it. Claude's suggestion card stays at the top of the page, and **Ask Claude** below the list
+has a copyable example prompt and the "Let Claude change the messages directly" switch.
 
 **Themes from Claude (item 55).** `propose_theme {theme, save_as?, apply?}` is the Windows tool:
 same name, inputs and result shape. `theme` is the theme JSON in `docs/themes/template.json`'s

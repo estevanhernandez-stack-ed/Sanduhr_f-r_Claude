@@ -1330,3 +1330,83 @@ to `~/modtest/meters` and give `~/.claude-modtest/settings.json`
 9. Nothing changed: `shasum` of every settings.json listed is the same before and after.
 10. `smoke/smoke state` shows `mods_page` (`open`, `loaded`, `folders`, `mods`, `plugins`,
     `enabled`, `missing`, `checked`, `cli`): flags and counts only, never a name or a path.
+
+## 36. A Message editor anyone can use (item 69)
+
+Back up your list first and put it back at the end:
+`cp ~/Library/Application\ Support/Desk/messages.txt ~/messages.txt.bak`. Then replace it with a
+hand-written test file holding a note, a blank line, `  Mon:   one thing.`,
+`Fri:{ink:#FF2A6D,#05d9e8}  {glow}   showtime.`, `{blink} unknown.`, `{write} {shimmer} two motions.`
+and `keep building.` (CRLF endings in one copy of the test, no final newline in another), and note
+its `shasum`.
+
+1. Settings, Message: Claude's card (when a suggestion waits) on top, then Once a day / Every hour,
+   **Edit as text…**, Save and Revert (both off), "Today: …", and one row per message line, each
+   with its day ("Every day", "Mondays", "Fridays") over the line drawn as the Desk draws it, in
+   the Desk's font, color, glow and effects. The note and blank line are not rows; "Notes (#) and
+   blank lines in the file stay where they are." The `{blink}` and two-motion lines show as written
+   in monospace with "Kept as written…", and their previews draw them as the Desk does.
+2. Save stays off. Switch to Edit as text… and back: still nothing unsaved, and `shasum` is
+   unchanged, CRLF and the missing final newline included.
+3. **Add Line**: a new row opens its controls. Set When to Friday, Text "ship it.", Color Gradient,
+   Palette sunset, Letters Script, Motion Sweep: the row's picture changes with each, and no brace
+   shows anywhere. Save: the file's last line is
+   `Fri: {ink:#ff7e5f,#feb47b,#ffd86f} {font:script} {sweep} ship it.` and every other line is
+   unchanged (`diff` against a copy of the test file shows one added line).
+4. Each control's tooltip is one line. Size slides 0.5× to 2× in 0.05 steps; Glow On, Off, As the
+   Desk write `{glow}`, `{noglow}`, nothing; One color shows one well, Gradient two with Add Color up
+   to four and a minus on each beyond two; When, A date shows Month and Day menus and writes `MM-DD:`.
+5. Change only the Fridays row's glow to Off and Save: only that line changes in the file, rewritten
+   as `Fri: {ink:#ff2a6d,#05d9e8} {noglow} showtime.`; the odd spacing of the other lines stays.
+6. A row's menu: Duplicate puts a copy right below; Move Up and Move Down step past other lines
+   (notes keep their place); Delete removes only that line. Drag a row by its handle onto another:
+   it lands there. Each reaches the file only on Save; Revert drops them.
+7. Pin on a row: "Pinned: the Desk shows … every day; special days still show above it." above the list, the Desk shows that line,
+   the pin is filled; Unpin (or Pin again) gives the list back.
+8. Type `#1 fan` as an Every day line's text: the row warns that the Desk reads it as a note; add a
+   glow and the warning goes. `{x} hi`, and `Mon: hi` on an Every day line, warn too.
+9. **Edit as text…**: the file with the tag reference beside it (every tag, the font names) and the
+   pin field. Type a line there, switch back to the list: it is a row; edit a row, switch to text:
+   the change is there. Unsaved edits survive the switches; Save from either view writes them.
+10. With unsaved edits, have Claude suggest lines (`propose_desk_messages`): the card's Add is off;
+    Save, then Add: the list reloads with Claude's lines. With "Let Claude change the messages
+    directly" on and unsaved edits, "The file changed" and Reload show instead.
+11. **Ask Claude**: the example prompt and Copy ("Copied"); the pasteboard holds the prompt.
+12. Keyboard only (Full Keyboard Access on): Tab reaches every control, Pin, the row menu, Edit,
+    Add Line and Save. VoiceOver reads each control by name (When, Text, Color, Color 1 of 3, Glow,
+    Size with "1.2 times", Letters, Motion), each preview as "Preview: <text>", and offers Move Up
+    and Move Down on a row. With Reduce Motion on, the row previews hold still.
+13. `smoke/smoke run scenarios/message-editor.yaml` passes: it adds the smoke's own line unsaved and
+    reverts it; `messages.txt` is untouched (`shasum`). `smoke/smoke state` shows `message_editor`
+    (`open`, `mode`, `rows`, `styled`, `raw`, `notes`, `unsaved`, `today_special`, `added`): counts and flags, never
+    one of your lines.
+14. **Special days add.** Add two lines for today's date (`MM-DD: happy birthday, Sam.` and
+    `MM-DD: happy birthday, Alex.`) and Save: the Desk draws both, a little smaller, stacked above
+    the day's usual line, each with its own effects; the Message preview shows the same stack;
+    "Today:" reads "Today: happy birthday, Sam. / happy birthday, Alex. / <usual line>". Their rows
+    read "<Month day> · shows above the day's message · with 1 other that day". The notch's
+    Message shows "happy birthday, Sam.". `smoke/smoke state` shows `message_editor.today_special: 2`.
+    Add two more for today: three show, and the set changes on the hour. Pin a "Good vibes only"
+    line: the date's lines still stack above it ("Today: … / Good vibes only"); Unpin.
+15. **Weekday lines.** Rows read "Fridays · takes turns with N others" (or "· shows instead of the
+    every-day lines" for one) and the every-day rows "Every day · … · steps aside on days with their
+    own line". Switch on "Mix every-day lines in on days with their own line": the notes change to
+    "· mixes with every-day lines" and "· mixes in on days with their own line", and
+    `get_desk_messages` reports `mix_daily: true`. Switch it off again.
+16. **Claude.** `get_desk_messages` returns `today` (the usual line) and `today_special` (the
+    date lines). Ask Claude Code to add birthdays for the year: it proposes `MM-DD:` lines with
+    mode add, one per person.
+17. **On special days.** With the two birthday lines for today in place: the bar's "On special
+    days" reads Stack and no timing menu shows. Pick **Take turns**: "Each line shows for" appears
+    (5 s, 10 s, 30 s, 1 min, 5 min; 10 s chosen). Pick 5 s: the Desk shows one line at a time,
+    Sam, then Alex, then the usual line, crossfading (about 0.4 s), the piece never changing size
+    and nothing beside it moving; the notch's Message shows the same line at the same moment; the
+    Message preview card does the same. A `{write}` line writes itself in each time it comes round.
+    Pick **Scroll**: each line glides up out of view as the next glides up in, one visible at a
+    time. Turn on Reduce Motion: both swap at once with no fade or glide. Cover the Desk with a
+    window for 20 s and uncover it: the line didn't advance while covered and then jumps to the
+    current one. Remove today's date lines: nothing cycles, the usual line stays. Without a date
+    line today the preview card shows a sample birthday and "Sample: … special day".
+    `get_desk_messages` reports `special_mode` and `special_seconds`. Set Stack again.
+
+Put your list back: `cp ~/messages.txt.bak ~/Library/Application\ Support/Desk/messages.txt`.

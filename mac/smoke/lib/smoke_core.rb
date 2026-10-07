@@ -317,11 +317,20 @@ module Smoke
       if watcher_count(before).zero? && watcher_count(after).positive?
         steps << ['watch-test', 'clear']
       end
+      # Lines a scenario added in Settings, Message's editor (item 69) go, unsaved as they were;
+      # edits that were unsaved before are left alone.
+      if !editor_unsaved(before) && editor_unsaved(after)
+        steps << ['message-editor', 'revert']
+      end
       steps
     end
 
     def av_flag(state, which)
       state['av_indicators'].is_a?(Hash) && state['av_indicators'][which] == true
+    end
+
+    def editor_unsaved(state)
+      state['message_editor'].is_a?(Hash) && state['message_editor']['unsaved'] == true
     end
 
     def watcher_count(state)

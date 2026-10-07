@@ -88,6 +88,8 @@ final class SettingsWindowController {
     var usageTab: UsageTab { navigation.usageTab }
     /// The Mods page's state (state.yaml `mods_page`).
     var modsPage: ModsPageModel { navigation.modsPage }
+    /// Settings, Message's editor (state.yaml `message_editor`, the debug hooks' `message-editor`).
+    var messageEditor: MessageEditorModel { navigation.messageEditor }
 
     func close() { window?.close() }
 
@@ -147,6 +149,8 @@ final class SettingsNavigation {
     let usagePage = UsagePageModel()
     /// The Mods page's state (item 64), kept while the window lives.
     let modsPage = ModsPageModel()
+    /// Settings, Message's line editor (item 69), kept while the window lives.
+    let messageEditor = MessageEditorModel()
 }
 
 /// Sidebar on the left, the selected section on the right.
@@ -220,7 +224,7 @@ struct SettingsRoot: View {
         case .deskLayout: DeskLayoutSection().withPreview { DeskLayoutPreview(live: deskModel) }
         case .deskLook: DeskLookSection().withPreview { DeskLookPreview(live: deskModel) }
         case .deskMeters: DeskMetersSection(model: deskModel).withPreview { DeskMetersPreview(live: deskModel) }
-        case .message: DeskMessageSection(model: deskModel).padding(20).withPreview { DeskMessagePreview(live: deskModel) }
+        case .message: DeskMessageSection(model: deskModel, editor: navigation.messageEditor).withPreview { DeskMessagePreview(live: deskModel) }
         case .notch: DeskNotchSection().withPreview { NotchPreview(live: deskModel) }
         case .nowPlaying: NowPlayingSection().withPreview { NowPlayingPreview(live: deskModel) }
         case .updates: UpdatesSection(updates: updates)

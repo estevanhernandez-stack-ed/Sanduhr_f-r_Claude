@@ -145,6 +145,34 @@ struct DeskMessageLine: View {
     }
 }
 
+/// A date's own lines stacked above the day's usual line (item 69).
+enum DeskMessageStack {
+    /// The special lines' size against the message size while the usual line shows under them,
+    /// so the day's line stays the anchor; alone they draw at the full size.
+    static let specialScale: Double = 0.8
+    /// The gap between lines, as a share of the message size.
+    static let spacing: Double = 0.12
+
+    /// Take turns: a crossfade. Scroll: the new line glides up in from below as the old one glides
+    /// up out of view, each fading at the edge. Reduce Motion: no transition.
+    static func transition(_ change: MessageSpecialMode.Change) -> AnyTransition {
+        switch change {
+        case .none: .identity
+        case .crossfade: .opacity
+        case .scroll: .asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
+                                  removal: .move(edge: .top).combined(with: .opacity))
+        }
+    }
+
+    static func animation(_ change: MessageSpecialMode.Change) -> Animation? {
+        switch change {
+        case .none: nil
+        case .crossfade: .easeInOut(duration: MessageSpecialMode.fade)
+        case .scroll: .easeInOut(duration: MessageSpecialMode.glide)
+        }
+    }
+}
+
 /// What restarts `{sweep}`: a new line, or the light being allowed to run or not.
 private struct SweepKey: Equatable {
     let raw: String
