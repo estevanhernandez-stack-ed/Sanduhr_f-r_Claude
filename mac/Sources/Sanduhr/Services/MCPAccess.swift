@@ -26,7 +26,7 @@ struct MCPAccessEntry: Equatable, Sendable {
 }
 
 /// `~/Library/Application Support/Sanduhr/mcp-access.json` (item 47): how the MCP server learns
-/// each account's Share with Claude choice without reading the app's defaults, the Keychain or
+/// each account's Share with your agents choice without reading the app's defaults, the Keychain or
 /// any label. The app rewrites it whenever choices, links, accounts or the active account
 /// change; the server reads it on every call and shares nothing without it.
 ///
