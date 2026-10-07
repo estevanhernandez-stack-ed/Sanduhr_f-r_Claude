@@ -688,7 +688,7 @@ S=~/Library/Application\ Support/Sanduhr/integrations
 
 ## 22. The notch glows when Claude Code needs you (item 51)
 
-A `sanduhr://` link goes to the default app for the scheme. With a dev build and an installed copy on the same Mac, a hook (or a plain `open`) can reach or launch the installed copy: aim tests at the dev build with `open -g -a <dev Sanduhr.app> 'sanduhr://claude-code?event=waiting'`. One copy, as users have, has no such issue.
+The installed hooks post a Darwin notification (`/usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.waiting` or `.done`): every running Sanduhr hears it, a dev build too, and nothing is ever launched. A `sanduhr://` link, which the steps below also use, goes to the default app for the scheme and can launch the installed copy: aim link tests at the dev build with `open -g -a <dev Sanduhr.app> 'sanduhr://claude-code?event=waiting'`.
 
 Use a test folder, never your real `~/.claude*`. The `say` hook stands for a hook of your own:
 
@@ -720,8 +720,14 @@ cp ~/.claude-smoketest/settings.json /tmp/st-hooks.json
   there opens the Notch page. Install: Installed;
   `jq '.hooks.Stop | length, .[0].hooks[0].command' ~/.claude-smoketest/settings.json` prints 2
   and `"say done"`, and `jq '.hooks.Notification[0]' ~/.claude-smoketest/settings.json` shows the
-  matcher `permission_prompt|idle_prompt|elicitation_dialog` and the `open -g
-  'sanduhr://claude-code?event=waiting'` command with `"async": true`.
+  matcher `permission_prompt|idle_prompt|elicitation_dialog` and the
+  `/usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.waiting || true` command with
+  `"async": true`. `/usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.waiting` from a script
+  glows like the link.
+- [ ] Outdated: put an earlier version's command back,
+  `jq '.hooks.Notification[0].hooks[0].command = "/usr/bin/pgrep -xq Sanduhr && /usr/bin/open -g '"'"'sanduhr://claude-code?event=waiting'"'"' || true"' ~/.claude-smoketest/settings.json > /tmp/st-old.json && mv /tmp/st-old.json ~/.claude-smoketest/settings.json`:
+  the row reads Outdated. Install: Installed, and
+  `grep -c 'sanduhr://' ~/.claude-smoketest/settings.json` prints 0.
 - [ ] With Claude Code: both switches on, "Not while a terminal is in front" on.
   `CLAUDE_CONFIG_DIR=~/.claude-smoketest claude` in a scratch folder, ask for something that needs
   a permission (`create a file x.txt`), and switch to Finder before it asks: the notch glows
@@ -729,7 +735,10 @@ cp ~/.claude-smoketest/settings.json /tmp/st-hooks.json
   second glow (unless within 5 seconds of the first). With the terminal in front: no glow, and
   you hear "done" from your own hook every turn. Claude Code never waits on the hooks and shows
   no hook error.
-- [ ] Quit Sanduhr and finish a turn: Sanduhr is not launched. Open it again.
+- [ ] Quit Sanduhr; finish a Claude Code turn: Sanduhr does not start (`pgrep -x Sanduhr` finds
+  nothing), and no `watch-stop-*` file appears in `~/Library/Application Support/Sanduhr`. With a
+  dev build running and the installed copy quit, a turn glows the dev build's notch and the
+  installed copy stays quit. Open it again.
 - [ ] No notch (an external display alone, or a Mac without one): the waiting command glows a
   soft halo around a notch-wide spot at the top center of the main screen; `state.yaml` shows
   `glow_shape: top`.
@@ -1124,14 +1133,17 @@ Watchers; in Settings, Desk, Layout put Watchers in the top right corner.
    an update brings it back.
 7. Background work: Settings, Integrations shows the notch glow hooks as **Outdated** for a folder
    installed before this version; Install updates it (`jq -r '.hooks.Stop[0].hooks[0].command'
-   ~/.claude-smoketest/settings.json` names `watchers.json` and `osascript`). Turn **Show Claude
+   ~/.claude-smoketest/settings.json` names `watchers.json`, `osascript` and
+   `notifyutil -p com.626labs.sanduhr.claude-code.done`, and no `sanduhr://`). Turn **Show Claude
    Code's background work** on. In the session ask for `sleep 120` in the background (or a
    background subagent): when the turn ends a watcher with the task's description and "background
    shell" shows; nothing named `watch-stop-*` stays in Sanduhr's folder, and
    `log show --last 5m --predicate 'process == "Sanduhr"' | grep -i sleep` finds nothing. When the
    task finishes and Claude's next turn ends, it ends as finished and fades.
 8. Switch background work off: its watchers go, and the next Stop writes no file at all (watch
-   the folder with `ls` during a turn). The item 51 glow still works with either switch.
+   the folder with `ls` during a turn). The item 51 glow still works with either switch. Switch
+   it back on and quit Sanduhr; finish a Claude Code turn: Sanduhr does not start and no
+   `watch-stop-*` file is written. Open Sanduhr: no old background watcher appears.
 9. Work tagging: in Settings, Accounts, Data, link `~/.claude-smoketest` to an account and turn
    **Work account** on. Start a watcher from that folder: `smoke/smoke do demo on` hides it (the
    wing shows its default), `demo off` brings it back. One flagged `work: true` from any folder
