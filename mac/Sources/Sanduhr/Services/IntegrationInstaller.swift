@@ -197,9 +197,42 @@ struct IntegrationInstaller {
     /// The command a hook runs: open Sanduhr's link in the background, only while Sanduhr runs
     /// (`open` would otherwise launch it after every turn), and always exit 0 so Claude Code
     /// never reports a hook error. `open -g` returns at once and never brings Sanduhr forward.
+    ///
+    /// The Stop hook also hands Sanduhr the session's background work (item 66), and only while
+    /// "Show Claude Code's background work" is on (watchers.json says `"background":true`; Sanduhr
+    /// writes it): `stopTasksScript` reads the hook's input and drops a small report into
+    /// Sanduhr's folder, which the app reads and deletes at once. The glow link is opened either
+    /// way, so the item 51 glow behaves as before.
     static func hookCommand(_ event: ClaudeCodeEvent) -> String {
-        "/usr/bin/pgrep -xq Sanduhr && /usr/bin/open -g '\(ClaudeCodeLink.url(event))' || true"
+        let open = "/usr/bin/open -g '\(ClaudeCodeLink.url(event))'"
+        guard event == .done else { return "/usr/bin/pgrep -xq Sanduhr && \(open) || true" }
+        return "/usr/bin/pgrep -xq Sanduhr && { d=\"$HOME/Library/Application Support/Sanduhr\"; "
+            + "/usr/bin/grep -qs '\"background\":true' \"$d/\(WatcherStore.switchFile)\" && "
+            + "/usr/bin/osascript -l JavaScript -e '\(stopTasksScript)' \"$d\" >/dev/null 2>&1; \(open); } || true"
     }
+
+    /// The Stop hook's report (item 66), JavaScript for Automation (`osascript`, on every Mac;
+    /// python3 may not be). Run with Sanduhr's folder as its one argument and the hook's input on
+    /// stdin, it keeps only the session id, the folder Claude Code runs with (CLAUDE_CONFIG_DIR,
+    /// for the work tag) and, per background task (at most 20), its id, type, status, description
+    /// (clipped to 120 characters) and workflow name. Never the shell command, never
+    /// `last_assistant_message`, never the transcript path. Written owner-only to a hidden
+    /// temporary name and renamed to `watch-stop-<ms>-<uuid>.json`, so the app never reads half a
+    /// file. No single quotes: it sits in single quotes in the command.
+    static let stopTasksScript = "function run(argv){ObjC.import(\"Foundation\");var d=argv[0];"
+        + "var i=$.NSFileHandle.fileHandleWithStandardInput.readDataToEndOfFile;"
+        + "var j=JSON.parse(ObjC.unwrap($.NSString.alloc.initWithDataEncoding(i,4)));"
+        + "var s=function(v,n){return typeof v===\"string\"?v.slice(0,n):null};"
+        + "var t=(Array.isArray(j.background_tasks)?j.background_tasks:[])"
+        + ".filter(function(x){return x&&typeof x===\"object\"}).slice(0,20)"
+        + ".map(function(x){return{id:s(x.id,64),type:s(x.type,20),status:s(x.status,20),"
+        + "description:s(x.description,120),name:s(x.name,60)}});"
+        + "var e=ObjC.unwrap($.NSProcessInfo.processInfo.environment.objectForKey(\"CLAUDE_CONFIG_DIR\"));"
+        + "var o={schema_version:1,session:s(j.session_id,64),folder:typeof e===\"string\"?e:null,tasks:t};"
+        + "var n=Date.now()+\"-\"+ObjC.unwrap($.NSUUID.UUID.UUIDString);var f=$.NSFileManager.defaultManager;"
+        + "var p=d+\"/.\(WatcherStore.stopPrefix)\"+n+\".tmp\";"
+        + "if(f.createFileAtPathContentsAttributes(p,$(JSON.stringify(o)).dataUsingEncoding(4),"
+        + "$({NSFilePosixPermissions:384}))){f.moveItemAtPathToPathError(p,d+\"/\(WatcherStore.stopPrefix)\"+n+\".json\",null)}}"
 
     /// Sanduhr's entry in one event's list: a matcher group with one command hook, in the
     /// background (`async`) with a short timeout. `Notification` matches only the waiting kinds.

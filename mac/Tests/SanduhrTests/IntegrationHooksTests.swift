@@ -8,7 +8,18 @@ import Testing
 @Suite("Integration installer, notch glow hooks")
 struct IntegrationHooksTests {
     private let waitingCommand = "/usr/bin/pgrep -xq Sanduhr && /usr/bin/open -g 'sanduhr://claude-code?event=waiting' || true"
-    private let doneCommand = "/usr/bin/pgrep -xq Sanduhr && /usr/bin/open -g 'sanduhr://claude-code?event=done' || true"
+    /// Item 66: the Stop hook also hands over the background work while watchers.json allows it.
+    private let doneCommand = "/usr/bin/pgrep -xq Sanduhr && { d=\"$HOME/Library/Application Support/Sanduhr\"; "
+        + "/usr/bin/grep -qs '\"background\":true' \"$d/watchers.json\" && "
+        + "/usr/bin/osascript -l JavaScript -e '" + IntegrationInstaller.stopTasksScript + "' \"$d\" >/dev/null 2>&1; "
+        + "/usr/bin/open -g 'sanduhr://claude-code?event=done'; } || true"
+    /// Item 51's Stop command, as installs before item 66 hold it.
+    private let item51DoneCommand = "/usr/bin/pgrep -xq Sanduhr && /usr/bin/open -g 'sanduhr://claude-code?event=done' || true"
+    /// The Stop command as it sits inside a JSON string in the file.
+    private var doneJSON: String {
+        let quoted = String(decoding: JSONEdit.quoted(doneCommand), as: UTF8.self)
+        return String(quoted.dropFirst().dropLast())
+    }
 
     private func hooks(_ r: IntegrationRig, _ relative: String) -> [String: Any] {
         r.json(relative)["hooks"] as? [String: Any] ?? [:]
@@ -56,7 +67,7 @@ struct IntegrationHooksTests {
                     "hooks": [
                       {
                         "type": "command",
-                        "command": "\(doneCommand)",
+                        "command": "\(doneJSON)",
                         "async": true,
                         "timeout": 5
                       }
@@ -137,7 +148,7 @@ struct IntegrationHooksTests {
         try roundTrip(#"{"hooks":{"Notification":[{"hooks":[{"type":"command","command":"afplay x.aiff"}]}]},"model":"opus"}"#)
         try roundTrip(#"{"model":"opus"}"#) { r, _ in
             let w = waitingCommand
-            #expect(r.text(".claude/settings.json") == #"{"model":"opus","hooks":{"Notification":[{"matcher":"permission_prompt|idle_prompt|elicitation_dialog","hooks":[{"type":"command","command":""# + w + #"","async":true,"timeout":5}]}],"Stop":[{"hooks":[{"type":"command","command":""# + doneCommand + #"","async":true,"timeout":5}]}]}}"#)
+            #expect(r.text(".claude/settings.json") == #"{"model":"opus","hooks":{"Notification":[{"matcher":"permission_prompt|idle_prompt|elicitation_dialog","hooks":[{"type":"command","command":""# + w + #"","async":true,"timeout":5}]}],"Stop":[{"hooks":[{"type":"command","command":""# + doneJSON + #"","async":true,"timeout":5}]}]}}"#)
         }
         try roundTrip("{\"hooks\":{\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"a\"}]}, {\"hooks\":[{\"type\":\"command\",\"command\":\"b\"}]}]}}\n")
     }
@@ -215,6 +226,85 @@ struct IntegrationHooksTests {
         let left = after["Stop"] as? [[String: Any]] ?? []
         #expect(left.count == 1)
         #expect(((left[0]["hooks"] as? [[String: Any]])?.first?["command"] as? String) == "say done")
+    }
+
+    /// Item 66: an item 51 install is outdated (its Stop command hands over no background work);
+    /// Install rewrites only the Stop command, the Notification entry stays byte for byte, and
+    /// Remove still takes everything out.
+    @Test func anItem51InstallIsOutdatedAndInstallUpdatesTheStopHook() throws {
+        let r = IntegrationRig()
+        defer { r.cleanUp() }
+        r.home.dir(".claude/projects")
+        let item51 = """
+        {
+          "hooks": {
+            "Notification": [
+              {
+                "matcher": "permission_prompt|idle_prompt|elicitation_dialog",
+                "hooks": [
+                  {
+                    "type": "command",
+                    "command": "\(waitingCommand)",
+                    "async": true,
+                    "timeout": 5
+                  }
+                ]
+              }
+            ],
+            "Stop": [
+              {
+                "hooks": [
+                  {
+                    "type": "command",
+                    "command": "\(item51DoneCommand)",
+                    "async": true,
+                    "timeout": 5
+                  }
+                ]
+              }
+            ]
+          }
+        }
+
+        """
+        r.home.file(".claude/settings.json", item51)
+        let folder = r.home.at(".claude")
+        #expect(r.installer.status(.hooks, folder: folder) == .outdated)
+        try r.installer.install(.hooks, folder: folder, python: "")
+        #expect(r.installer.status(.hooks, folder: folder) == .installed)
+        #expect(r.text(".claude/settings.json") == item51.replacingOccurrences(of: item51DoneCommand, with: doneJSON))
+        let stop = hooks(r, ".claude/settings.json")["Stop"] as? [[String: Any]] ?? []
+        #expect(((stop[0]["hooks"] as? [[String: Any]])?.first?["command"] as? String) == doneCommand)
+    }
+
+    /// The Stop command's shape (item 66): the glow link is always opened; the report needs
+    /// Sanduhr running and the background switch; no single quote inside the script.
+    @Test func theStopCommandHandsOverBackgroundWorkOnlyWithTheSwitch() {
+        let stop = IntegrationInstaller.hookCommand(.done)
+        #expect(stop.hasPrefix("/usr/bin/pgrep -xq Sanduhr && {"))
+        #expect(stop.hasSuffix("/usr/bin/open -g 'sanduhr://claude-code?event=done'; } || true"))
+        #expect(stop.contains("/usr/bin/grep -qs '\"background\":true' \"$d/\(WatcherStore.switchFile)\" && /usr/bin/osascript"))
+        #expect(!IntegrationInstaller.stopTasksScript.contains("'"))
+        #expect(!IntegrationInstaller.stopTasksScript.contains("command"))
+        #expect(!IntegrationInstaller.stopTasksScript.contains("last_assistant_message"))
+        #expect(!IntegrationInstaller.stopTasksScript.contains("transcript"))
+        // Both commands parse as shell (checked only: `sh -n` runs nothing).
+        for event in ClaudeCodeEvent.allCases {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/bin/sh")
+            p.arguments = ["-n", "-c", IntegrationInstaller.hookCommand(event)]
+            p.standardError = FileHandle.nullDevice
+            try? p.run()
+            p.waitUntilExit()
+            #expect(p.terminationStatus == 0, "\(event)")
+        }
+        // The waiting hook is item 51's, unchanged.
+        #expect(IntegrationInstaller.hookCommand(.waiting) == waitingCommand)
+        // The switch text the hook matches is exactly what Sanduhr writes.
+        let on = String(decoding: WatcherStore.switchesJSON(agents: false, background: true), as: UTF8.self)
+        #expect(on == #"{"agents":false,"background":true,"schema_version":1}"#)
+        let off = String(decoding: WatcherStore.switchesJSON(agents: true, background: false), as: UTF8.self)
+        #expect(!off.contains(#""background":true"#))
     }
 
     @Test func installTwiceThenRemoveIsStillByteForByte() throws {

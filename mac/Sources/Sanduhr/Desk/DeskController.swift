@@ -375,7 +375,10 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     /// The two-finger menu for a hit: now playing's, or the limit menu on the meters.
     private func menu(for hit: DeskElement?) -> NSMenu {
-        hit?.kind == .nowPlaying ? NowPlayingController.shared.menu() : limitMenu(for: hit)
+        if hit?.kind == .watcher {
+            return WatcherMenu.menu(for: DeskHitTest.watcher(hit, in: model.watchers)?.id)
+        }
+        return hit?.kind == .nowPlaying ? NowPlayingController.shared.menu() : limitMenu(for: hit)
     }
 
     /// The limit menu for a hit on the meters: that row's limit, or none beside the rows.
@@ -436,6 +439,10 @@ final class DeskController: NSObject, NSMenuDelegate {
             NowPlayingController.shared.togglePlayPause()
         case .nowPlayingNext:
             NowPlayingController.shared.next()
+        case .watcher:
+            // Its link, https only; a watcher without one takes the click and does nothing (the
+            // window holds the mouse there for the two-finger menu).
+            WatcherMenu.open(DeskHitTest.watcher(hit, in: model.watchers))
         case .meters, .meterRow:
             // The window holds the mouse over the meters so a two-finger click reaches the limit
             // menu; a plain click is swallowed there, so nothing reacts to it.
@@ -473,7 +480,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         let over = DeskHitTest.element(at: point, in: model.elements()) != nil
         if w.ignoresMouseEvents == over { w.ignoresMouseEvents = !over }
         let blocks = [model.metersFrame, model.accountFrame, model.noteFrame, model.meetingsFrame,
-                      model.nowPlayingFrame, model.stripFrame, model.stripNextFrame]
+                      model.nowPlayingFrame, model.stripFrame, model.stripNextFrame,
+                      model.watchersFrame, model.stripWatcherFrame]
         nearBlocks = DeskPointerWatch.near(point, frames: blocks)
         // The auto-hiding Dock's edge (item 56) runs the same watch, which reads the window list.
         watchApproach(nearBlocks || dock.wantsWatch(pointer: point, size: w.frame.size))

@@ -89,6 +89,18 @@ final class DeskModel {
     /// What plays, after Now Playing's hide rules (NowPlayingController), nil for nothing to show.
     /// In memory only.
     var nowPlaying: NowPlayingInfo?
+    /// The watchers that show (item 66), most urgent first: every watcher but the work ones while
+    /// demo mode is on (WatcherBoard.shown). In memory only. Set by WatcherStore.
+    var watchers: [Watcher] = []
+    /// Every watcher, before the demo filter.
+    @ObservationIgnored private(set) var allWatchers: [Watcher] = []
+    /// Each Desk watcher row's frame (SwiftUI global coordinates), keyed by watcher id: a click
+    /// opens its link, a two-finger click opens the watcher menu.
+    @ObservationIgnored var watcherRowFrames: [String: CGRect] = [:]
+    /// The Desk's watcher stack as a whole, or .zero when it is not drawn (the pointer watch).
+    @ObservationIgnored var watchersFrame: CGRect = .zero { didSet { if watchersFrame != oldValue { onHitAreasChange?() } } }
+    /// Where the strip under the camera draws the watcher line, same coordinates.
+    @ObservationIgnored var stripWatcherFrame: CGRect = .zero { didSet { if stripWatcherFrame != oldValue { onHitAreasChange?() } } }
     /// Where the meeting list sits in the window (SwiftUI global coordinates, top-left origin).
     /// The app delegate lets clicks through everywhere except here, so the rows can be clicked.
     @ObservationIgnored var meetingsFrame: CGRect = .zero { didSet { if meetingsFrame != oldValue { onHitAreasChange?() } } }
@@ -226,8 +238,17 @@ final class DeskModel {
     /// message timer leave these alone. Nothing is written to the calendar or to defaults.
     @ObservationIgnored private(set) var demo = false
 
+    /// The watchers, most urgent first (WatcherStore); the work ones hide while demo mode is on.
+    func setWatchers(_ all: [Watcher]) {
+        allWatchers = all
+        let shown = WatcherBoard.shown(all, demo: demo)
+        if shown != watchers { watchers = shown }
+        onHitAreasChange?()
+    }
+
     func setDemo(_ on: Bool, now: Date = Date()) {
         demo = on
+        setWatchers(allWatchers)
         if on {
             meetings = Self.demoMeetings(now: now)
             message = "ship small. ship often. sleep anyway."
@@ -362,16 +383,24 @@ final class DeskModel {
         input.rowFrames = rowFrames
         input.nowPlayingLine = input.placed.contains(NowPlayingPlacement.widget) && nowPlaying != nil
         input.nowPlayingFrame = nowPlayingFrame
+        let strip = NotchContent.effective(NotchContent.saved(.strip, in: desk), at: .strip,
+                                           nowPlaying: nowPlaying, idle: NowPlayingIdle.saved(in: desk),
+                                           watchers: watchers)
+        let notch = desk.bool(forKey: DeskController.notchKey)
+        let chin = desk.object(forKey: "notchChin") as? Double ?? 26
+        let chinText = desk.bool(forKey: "notchChinText")
         input.nowPlayingStrip = DeskNowPlaying.stripShows(
-            notch: desk.bool(forKey: DeskController.notchKey), hasNotch: notchRect != nil,
-            chin: desk.object(forKey: "notchChin") as? Double ?? 26,
-            chinText: desk.bool(forKey: "notchChinText"),
-            strip: NotchContent.effective(NotchContent.saved(.strip, in: desk), at: .strip,
-                                          nowPlaying: nowPlaying, idle: NowPlayingIdle.saved(in: desk)),
-            hasTrack: NowPlayingText.line(nowPlaying, at: .strip) != nil)
+            notch: notch, hasNotch: notchRect != nil, chin: chin, chinText: chinText,
+            strip: strip, hasTrack: NowPlayingText.line(nowPlaying, at: .strip) != nil)
         input.stripFrame = stripFrame
         input.nowPlayingStripNext = NowPlayingWingLayout.showsNext(nowPlaying?.state)
         input.stripNextFrame = stripNextFrame
+        if input.placed.contains(WatcherPlacement.widget) {
+            input.watcherRows = watchers.prefix(WatcherPlacement.deskRows).map(\.id)
+        }
+        input.watcherRowFrames = watcherRowFrames
+        input.watcherStrip = notch && notchRect != nil && chin > 0 && chinText && strip == .watchers
+        input.stripWatcherFrame = stripWatcherFrame
         return DeskElements.build(input)
     }
 

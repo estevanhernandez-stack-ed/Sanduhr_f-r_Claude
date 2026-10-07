@@ -138,3 +138,9 @@ tour:
   steps_shown: 5
   done: true
   pending: false
+watchers:
+  count: 0
+  states: []
+  placements: []
+  agents: false
+  background: false

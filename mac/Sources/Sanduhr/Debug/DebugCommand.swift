@@ -48,11 +48,18 @@ enum DebugAction: Equatable {
     /// Records nothing: the tour's state and What's New's last-seen version stay as they were.
     case tour(step: Int)
     case closeTour
+    /// A made-up watcher (item 66), whatever the Watchers switches say: start puts one up, wait
+    /// sets it waiting on you, pass and fail end it, clear dismisses every watcher.
+    case watchTest(WatchTest)
+
+    enum WatchTest: String, CaseIterable {
+        case start, wait, pass, fail, clear
+    }
 
     static let names = ["show-widget", "hide-widget", "settings", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
                         "theme", "account", "usage", "whats-new", "close-whats-new",
-                        "tour", "tour-step", "close-tour"]
+                        "tour", "tour-step", "close-tour", "watch-test"]
 }
 
 enum DebugCommand: Equatable {
@@ -160,6 +167,11 @@ enum DebugLink {
             guard let arg, let n = Int(arg), n >= 1 else { return bad("tour-step needs arg=<step number from 1>") }
             return .success(.tour(step: n))
         case "close-tour": return .success(.closeTour)
+        case "watch-test":
+            guard let test = arg.flatMap({ DebugAction.WatchTest(rawValue: $0.lowercased()) }) else {
+                return bad("watch-test needs arg=start, wait, pass, fail or clear")
+            }
+            return .success(.watchTest(test))
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }

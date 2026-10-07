@@ -1,0 +1,41 @@
+{
+  "session_id": "6f1d2c3b-0a9e-4b8c-9d7e-112233445566",
+  "transcript_path": "/Users/someone/.claude/projects/-Users-someone-app/6f1d2c3b-0a9e-4b8c-9d7e-112233445566.jsonl",
+  "cwd": "/Users/someone/app",
+  "permission_mode": "default",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false,
+  "last_assistant_message": "SECRET-CONVERSATION: the tests are running in the background.",
+  "background_tasks": [
+    {
+      "id": "bash_1",
+      "type": "shell",
+      "status": "running",
+      "description": "Run the full test suite",
+      "command": "SECRET_TOKEN=abc123 npm test -- --runInBand"
+    },
+    {
+      "id": "agent_7",
+      "type": "subagent",
+      "status": "running",
+      "description": "Review the auth changes",
+      "agent_type": "code-reviewer"
+    },
+    {
+      "id": "mon_2",
+      "type": "monitor",
+      "status": "pending",
+      "description": "Watch the deploy log",
+      "server": "logs",
+      "tool": "tail"
+    },
+    {
+      "id": "wf_3",
+      "type": "workflow",
+      "status": "running",
+      "description": "",
+      "name": "release-train"
+    }
+  ],
+  "session_crons": []
+}

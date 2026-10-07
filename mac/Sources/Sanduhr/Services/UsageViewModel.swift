@@ -443,6 +443,12 @@ final class UsageViewModel {
         reloadAccounts()
     }
 
+    /// Settings, Accounts, Data: Work account (item 66). Watchers from its folder hide in demo mode.
+    func setWork(_ value: Bool, for label: String) {
+        AccountData.setWork(value, for: label, in: KeychainStore.accounts.defaults)
+        reloadAccounts()
+    }
+
     // MARK: The record (item 46)
 
     /// Whether Sanduhr holds a record of the folder (any account's, kept until erased).

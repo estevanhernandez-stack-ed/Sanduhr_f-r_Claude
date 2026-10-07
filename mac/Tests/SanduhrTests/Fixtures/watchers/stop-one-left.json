@@ -1,0 +1,17 @@
+{
+  "session_id": "6f1d2c3b-0a9e-4b8c-9d7e-112233445566",
+  "transcript_path": "/Users/someone/.claude/projects/-Users-someone-app/6f1d2c3b-0a9e-4b8c-9d7e-112233445566.jsonl",
+  "cwd": "/Users/someone/app",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false,
+  "last_assistant_message": "SECRET-CONVERSATION: one task is still going.",
+  "background_tasks": [
+    {
+      "id": "bash_1",
+      "type": "shell",
+      "status": "running",
+      "description": "Run the full test suite... [+40 chars]",
+      "command": "SECRET_TOKEN=abc123 npm test -- --runInBand"
+    }
+  ]
+}

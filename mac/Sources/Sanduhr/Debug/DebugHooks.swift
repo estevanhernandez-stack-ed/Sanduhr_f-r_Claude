@@ -121,6 +121,7 @@ enum DebugHooks {
             if open { WhatsNewWindowController.shared.show() } else { WhatsNewWindowController.shared.close() }
         case .tour(let step): WelcomeTourWindowController.shared.show(step: step - 1)
         case .closeTour: WelcomeTourWindowController.shared.close()
+        case .watchTest(let test): WatcherStore.shared.debug(test)
         }
         settle()
     }
@@ -290,9 +291,12 @@ enum DebugHooks {
         s.nowPlayingIdle = .saved(in: .desk)
         let playing = desk.model.nowPlaying
         s.notchShows = NotchShowsDebug(
-            left: NotchContent.effective(s.notchLeft, at: .left, nowPlaying: playing, idle: s.nowPlayingIdle),
-            right: NotchContent.effective(s.notchRight, at: .right, nowPlaying: playing, idle: s.nowPlayingIdle),
-            strip: NotchContent.effective(s.notchStrip, at: .strip, nowPlaying: playing, idle: s.nowPlayingIdle))
+            left: NotchContent.effective(s.notchLeft, at: .left, nowPlaying: playing, idle: s.nowPlayingIdle,
+                                         watchers: desk.model.watchers),
+            right: NotchContent.effective(s.notchRight, at: .right, nowPlaying: playing, idle: s.nowPlayingIdle,
+                                          watchers: desk.model.watchers),
+            strip: NotchContent.effective(s.notchStrip, at: .strip, nowPlaying: playing, idle: s.nowPlayingIdle,
+                                          watchers: desk.model.watchers))
         s.widgetVisible = widgetVisible
         s.widgetVisibility = .saved()
         s.menuBar = .saved()
@@ -358,6 +362,11 @@ enum DebugHooks {
                            stepsShown: WelcomeTour.steps(features: WelcomeTourWindowController.features()).count,
                            done: WelcomeTour.done(), pending: WelcomeTour.state() == .pending)
         s.build = info["CFBundleVersion"] as? String ?? ""
+        let shown = desk.model.watchers
+        s.watchers = WatchersDebug(count: shown.count, states: shown.map(\.state),
+                                   placements: WatcherPlacement.places(in: .desk),
+                                   agents: UserDefaults.standard.bool(forKey: WatcherStore.agentsKey),
+                                   background: UserDefaults.standard.bool(forKey: WatcherStore.backgroundKey))
         return s
     }
 }

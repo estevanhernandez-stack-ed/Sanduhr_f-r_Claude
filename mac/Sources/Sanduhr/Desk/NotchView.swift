@@ -34,8 +34,9 @@ struct NotchView: View {
         // Extra height 0 means no strip under the camera at all: just the wings.
         if enabled, chin > 0, let notch = model.notchRect {
             let height = notch.height + chin
-            // Read here so a track change redraws at once, not at the next 15-second tick.
+            // Read here so a track change (or a watcher) redraws at once, not at the next 15-second tick.
             let _ = model.nowPlaying
+            let _ = model.watchers
             TimelineView(.periodic(from: .now, by: 15)) { context in
                 // Same widths as the wings above, so the strip and the wings stay one shape
                 // even when a wing grows to fit its text.
@@ -43,15 +44,19 @@ struct NotchView: View {
                                               showText: wingText, left: leftContent, right: rightContent,
                                               idle: idle, font: font, notchHeight: notch.height)
                 // Now playing with nothing to show stands aside for the When nothing is playing choice.
-                let strip = NotchContent.effective(stripContent, at: .strip, nowPlaying: model.nowPlaying, idle: idle)
+                let strip = NotchContent.effective(stripContent, at: .strip, nowPlaying: model.nowPlaying, idle: idle,
+                                                   watchers: model.watchers)
                 ZStack(alignment: .bottom) {
                     IslandShape(flare: 8, radius: min(16, chin * 0.7))
                         .fill(Color.black)
                     if showChinText, let line = strip.text(
                         at: .strip, meetings: model.meetings, meters: model.claudeCompact,
-                        message: model.message, nowPlaying: model.nowPlaying, now: context.date) {
+                        message: model.message, nowPlaying: model.nowPlaying, watchers: model.watchers,
+                        now: context.date) {
                         if strip == .nowPlaying {
                             stripNowPlaying(line, width: notch.width + w.left + w.right)
+                        } else if strip == .watchers {
+                            stripWatcher(line)
                         } else {
                             Text(line)
                                 .font(.custom(font, size: stripSize))
@@ -74,6 +79,19 @@ struct NotchView: View {
     }
 
     private var stripSize: CGFloat { max(11, chin * 0.55) }
+
+    /// The most urgent watcher under the camera (item 66). Its clicks come through DeskHitTest by
+    /// the frame it reports: a click opens the link, a two-finger click the watcher menu.
+    private func stripWatcher(_ line: String) -> some View {
+        NotchWatcherLine(text: line, state: model.watchers.first?.state ?? .running, size: stripSize,
+                         font: font, ink: textColor)
+            .frame(height: chin)
+            .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
+            .onGlobalFrame { model.stripWatcherFrame = $0 }
+            .padding(.horizontal, 18)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(model.watchers.first.map { WatcherText.spoken($0, now: Date()) } ?? line)
+    }
 
     /// Now playing under the camera: the whole line, scrolling once when it doesn't fit, and while
     /// paused a Next button at its trailing end (item 53b). Both take clicks like the Desk line
@@ -159,8 +177,9 @@ struct NotchWingsView: View {
 
     var body: some View {
         if enabled {
-            // Read here so a track change redraws at once, not at the next 15-second tick.
+            // Read here so a track change (or a watcher) redraws at once, not at the next 15-second tick.
             let _ = model.nowPlaying
+            let _ = model.watchers
             TimelineView(.periodic(from: .now, by: 15)) { context in
                 let w = Self.layout(model: model, now: context.date, wings: wings, showText: showText,
                                     left: leftContent, right: rightContent, idle: idle,
@@ -199,6 +218,8 @@ struct NotchWingsView: View {
                       width: CGFloat) -> some View {
         if content == .nowPlaying, let text {
             nowPlayingWing(text, size, place: place, width: width)
+        } else if content == .watchers, let text {
+            watcherWing(text, size, place: place)
         } else {
             label(text, size)
         }
@@ -257,6 +278,26 @@ struct NotchWingsView: View {
         .contextMenu { NowPlayingMenuItems() }
     }
 
+    /// The most urgent watcher in a wing (item 66): a click opens its link (https only), a
+    /// two-finger click opens Dismiss, Dismiss All and Watcher Settings…. The whole wing takes the
+    /// click, so a watcher without a link never opens Settings by accident.
+    private func watcherWing(_ text: String, _ size: CGFloat, place: NotchContent.Place) -> some View {
+        let top = model.watchers.first
+        return HStack(spacing: 0) {
+            if place == .left { Spacer(minLength: 0) }
+            NotchWatcherLine(text: text, state: top?.state ?? .running, size: size, font: font, ink: textColor)
+            if place == .right { Spacer(minLength: 0) }
+        }
+        .frame(maxHeight: .infinity)
+        .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
+        .contentShape(Rectangle())
+        .onTapGesture { WatcherMenu.open(top) }
+        .contextMenu { WatcherMenuItems(id: top?.id) }
+        .help(top?.link != nil ? "Open. Two-finger click for more." : "Two-finger click for more.")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(top.map { WatcherText.spoken($0, now: Date()) } ?? text)
+    }
+
     /// The paused wing's Next button: its own click area, the wing's height.
     private func nextButton(_ size: CGFloat) -> some View {
         Image(systemName: "forward.end.fill")
@@ -299,16 +340,20 @@ struct NotchWingsView: View {
     static func layout(model: DeskModel, now: Date, wings: Double, showText: Bool,
                        left savedLeft: NotchContent, right savedRight: NotchContent, idle: NowPlayingIdle,
                        font: String, notchHeight: CGFloat) -> Layout {
-        let leftContent = NotchContent.effective(savedLeft, at: .left, nowPlaying: model.nowPlaying, idle: idle)
-        let rightContent = NotchContent.effective(savedRight, at: .right, nowPlaying: model.nowPlaying, idle: idle)
+        let leftContent = NotchContent.effective(savedLeft, at: .left, nowPlaying: model.nowPlaying, idle: idle,
+                                                 watchers: model.watchers)
+        let rightContent = NotchContent.effective(savedRight, at: .right, nowPlaying: model.nowPlaying, idle: idle,
+                                                  watchers: model.watchers)
         let left = showText ? text(leftContent, at: .left, model: model, now: now) : nil
         let right = showText ? text(rightContent, at: .right, model: model, now: now) : nil
         let size = max(10, notchHeight * 0.42)
         let state = model.nowPlaying?.state
         func wingWidth(_ text: String?, _ content: NotchContent, _ place: NotchContent.Place) -> CGFloat {
             // A paused now playing also makes room for its Next button (item 53b).
-            NowPlayingWingLayout.wingWidth(
-                textWidth: textWidth(text, size, font), place: place,
+            // A watcher also makes room for its dot (item 66).
+            let dot = content == .watchers && text != nil ? WatcherLook.dotRoom(size) : 0
+            return NowPlayingWingLayout.wingWidth(
+                textWidth: textWidth(text, size, font) + dot, place: place,
                 state: NowPlayingWingLayout.sizingState(content, hasText: text != nil, state: state),
                 size: size, minimum: wings, maximum: maxWings)
         }
@@ -321,7 +366,7 @@ struct NotchWingsView: View {
     private static func text(_ content: NotchContent, at place: NotchContent.Place,
                              model: DeskModel, now: Date) -> String? {
         content.text(at: place, meetings: model.meetings, meters: model.claudeCompact,
-                     message: model.message, nowPlaying: model.nowPlaying, now: now)
+                     message: model.message, nowPlaying: model.nowPlaying, watchers: model.watchers, now: now)
     }
 
     /// The text's width in the notch font: what the wings grow by and what a now playing title

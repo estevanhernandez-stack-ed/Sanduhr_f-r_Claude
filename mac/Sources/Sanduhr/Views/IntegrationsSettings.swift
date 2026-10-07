@@ -178,6 +178,10 @@ struct IntegrationsSettings: View {
                 PythonRow(model: model, reload: reload)
                 folderList
                 GlowHint(openNotch: { navigation.selection = .notch })
+                Divider()
+                WatcherSettings(openNotch: { navigation.selection = .notch },
+                                openLayout: { navigation.selection = .deskLayout })
+                Divider()
                 Button("Add Folder…") {
                     model.choose()
                     reload()
@@ -494,7 +498,11 @@ private struct HooksConsentBody: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Claude Code sessions using \(folder) tell Sanduhr when they wait on you (a permission prompt or a question) and when a turn finishes, so the notch can glow.")
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Claude Code tells Sanduhr only that it is waiting or finished, by opening a sanduhr:// link that carries that one word. Nothing about the conversation, the project or the folder is sent, and nothing leaves this Mac. While Sanduhr isn't running, the hooks do nothing.")
+            Text("Claude Code tells Sanduhr only that it is waiting or finished, by opening a sanduhr:// link that carries that one word. Nothing about the conversation or the project is sent, and nothing leaves this Mac. While Sanduhr isn't running, the hooks do nothing.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Only with Watchers, Show Claude Code's background work on: when a turn finishes, the hook also hands Sanduhr the session's background tasks (each one's kind, status and short description, and the Claude Code folder), never a command. Sanduhr reads that and deletes it at once.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

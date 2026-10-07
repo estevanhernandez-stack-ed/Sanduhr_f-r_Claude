@@ -27,7 +27,7 @@ struct DeskLayoutSection: View {
                         ForEach(Self.slots, id: \.key) { Text($0.name).tag($0.key) }
                     }
                 }
-                Text("Pieces in the same corner stack in this order. The top and bottom of a side share a column, so they never overlap. Now playing shows only while something plays; its other settings are in Now Playing.")
+                Text("Pieces in the same corner stack in this order. The top and bottom of a side share a column, so they never overlap. Now playing shows only while something plays; its other settings are in Now Playing. Watchers show only while there is one; they are switched on in Integrations.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Margins") {
@@ -56,7 +56,8 @@ enum DeskLayout {
 
     static let widgets: [(key: String, name: String)] = [
         ("message", "Message"), ("clock", "Clock and date"), ("claude", "Claude line"),
-        ("meters", "Claude meters (bars)"), ("nowPlaying", "Now playing"), ("meetings", "Meetings"),
+        ("meters", "Claude meters (bars)"), ("nowPlaying", "Now playing"), ("watchers", "Watchers"),
+        ("meetings", "Meetings"),
     ]
 
     /// Widget to slot. Words without exactly one colon are skipped; a repeated widget keeps its last slot.
@@ -528,7 +529,7 @@ struct DeskNotchSection: View {
                     .disabled(chin == 0)
                 contentPicker("Under the camera", $strip).disabled(!chinText || chin == 0)
                 if strip == .nowPlaying { NowPlayingIdleCaption(place: .strip).disabled(!chinText || chin == 0) }
-                Text("Nothing leaves that part plain black. A wing grows to fit its text.")
+                Text("Nothing leaves that part plain black. A wing grows to fit its text. Watchers show the most urgent watcher while there is one (switched on in Integrations), else that place's default.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             .disabled(!enabled)

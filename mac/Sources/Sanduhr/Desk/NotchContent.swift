@@ -25,6 +25,9 @@ enum NotchContent: String, CaseIterable, Identifiable {
     /// (`effective`, NowPlayingIdle). Choosing it is enough: now playing runs while placed
     /// somewhere (NowPlayingPlacement).
     case nowPlaying
+    /// The most urgent watcher with a count of the rest ("deploy · 4m · 3/10 +2", item 66). With
+    /// no watcher the place shows its own default (`effective`), as now playing stands aside.
+    case watchers
     case nothing
 
     var id: String { rawValue }
@@ -37,6 +40,7 @@ enum NotchContent: String, CaseIterable, Identifiable {
         case .meters: "Claude meters"
         case .message: "Message"
         case .nowPlaying: "Now playing"
+        case .watchers: "Watchers"
         case .nothing: "Nothing"
         }
     }
@@ -77,23 +81,27 @@ enum NotchContent: String, CaseIterable, Identifiable {
     /// shows the When nothing is playing choice instead, and behaves fully like that content: its
     /// text, its width, its clicks. Every other choice is itself. The saved choice still places
     /// now playing (NowPlayingPlacement), so it keeps running and comes back with the next track.
+    /// A place on Watchers with no watcher to show (item 66) shows the place's own default.
     static func effective(_ content: NotchContent, at place: Place, hasLine: Bool,
-                          idle: NowPlayingIdle) -> NotchContent {
+                          idle: NowPlayingIdle, hasWatcher: Bool = false) -> NotchContent {
+        if content == .watchers { return hasWatcher ? .watchers : place.fallback }
         guard content == .nowPlaying, !hasLine else { return content }
         return idle.content(at: place)
     }
 
-    /// `effective` with the line taken from what plays.
+    /// `effective` with the line taken from what plays and the watchers that show.
     static func effective(_ content: NotchContent, at place: Place, nowPlaying: NowPlayingInfo?,
-                          idle: NowPlayingIdle) -> NotchContent {
-        effective(content, at: place, hasLine: NowPlayingText.line(nowPlaying, at: place) != nil, idle: idle)
+                          idle: NowPlayingIdle, watchers: [Watcher] = []) -> NotchContent {
+        effective(content, at: place, hasLine: NowPlayingText.line(nowPlaying, at: place) != nil, idle: idle,
+                  hasWatcher: !watchers.isEmpty)
     }
 
     /// The text for this choice at `place`, or nil for none (the place stays plain black).
     /// The wings are short of room, so their meeting line clips long titles; the strip has the
     /// width under the camera and keeps them whole.
     func text(at place: Place, meetings: [Meeting], meters: String?, message: String?,
-              nowPlaying: NowPlayingInfo? = nil, now: Date, timeZone: TimeZone = .current) -> String? {
+              nowPlaying: NowPlayingInfo? = nil, watchers: [Watcher] = [], now: Date,
+              timeZone: TimeZone = .current) -> String? {
         switch self {
         case .meetingOrTime:
             return Self.meeting(meetings, place: place, now: now) ?? Self.time(now, timeZone)
@@ -107,6 +115,8 @@ enum NotchContent: String, CaseIterable, Identifiable {
             return Self.nonEmpty(message?.trimmingCharacters(in: .whitespacesAndNewlines))
         case .nowPlaying:
             return NowPlayingText.line(nowPlaying, at: place)
+        case .watchers:
+            return WatcherText.notchLine(watchers, at: place, now: now)
         case .nothing:
             return nil
         }

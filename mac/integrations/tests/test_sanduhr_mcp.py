@@ -545,7 +545,9 @@ class ActivityLevel(Base):
         self.assertEqual(p["cc_roots_consented"], [ref("Home")])
         self.assertEqual(p["tools_available"],
                          ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
-                          "get_desk_messages", "propose_desk_messages", "propose_theme"])
+                          "get_desk_messages", "propose_desk_messages", "propose_theme",
+                          "watch_start", "watch_update", "watch_end"])
+        self.assertFalse(p["watchers_allowed"])
         self.assertEqual(sorted(p["tools_not_on_mac"]), ["publish_usage"])
         text = json.dumps(p)
         for secret in ("Home", "Work", ".claude-personal", VAULT_A):
@@ -605,7 +607,8 @@ class Protocol(Base):
         self.assertEqual([f.get("id") for f in frames], [1, 2, 3, 4, 5, 6])
         names = [t["name"] for t in frames[1]["result"]["tools"]]
         self.assertEqual(names, ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
-                                 "get_desk_messages", "propose_desk_messages", "propose_theme"])
+                                 "get_desk_messages", "propose_desk_messages", "propose_theme",
+                                 "watch_start", "watch_update", "watch_end"])
         for t in frames[1]["result"]["tools"]:
             if t["name"] == "propose_desk_messages":
                 # The one tool that asks for a change: not read-only, never destructive, no path.
@@ -613,6 +616,16 @@ class Protocol(Base):
                 self.assertFalse(t["annotations"]["destructiveHint"])
                 self.assertEqual(sorted(t["inputSchema"]["properties"]), ["lines", "mode", "note"])
                 self.assertFalse(t["inputSchema"]["additionalProperties"])
+                continue
+            if t["name"].startswith("watch_"):
+                # Item 66: they change what Sanduhr shows, never destructive, no path, closed shapes.
+                self.assertFalse(t["annotations"]["readOnlyHint"])
+                self.assertFalse(t["annotations"]["destructiveHint"])
+                self.assertFalse(t["inputSchema"]["additionalProperties"])
+                self.assertEqual(sorted(t["inputSchema"]["properties"]),
+                                 {"watch_start": ["link", "title", "total", "work"],
+                                  "watch_update": ["done", "id", "note", "state"],
+                                  "watch_end": ["id", "note", "result"]}[t["name"]])
                 continue
             if t["name"] == "propose_theme":
                 # The Windows tool's inputs, no path.
@@ -1055,6 +1068,136 @@ class ThemeLint(unittest.TestCase):
         self.assertEqual(mcp.theme_slug("Café Noir"), "caf-noir")
         self.assertEqual(mcp.theme_slug("!!!"), "theme")
         self.assertEqual(len(mcp.theme_slug("a" * 50)), 40)
+
+
+class Watchers(Base):
+    """watch_start, watch_update, watch_end (item 66): checked here, refused while Sanduhr's switch
+    is off, handed over as request files the app reads and deletes."""
+
+    def setUp(self):
+        super().setUp()
+        mcp.WATCH_STARTED.clear()
+        mcp.WATCH_ENDED.clear()
+        self.env = {"CLAUDE_CONFIG_DIR": os.path.join(self.fx.dir, ".claude-work")}
+
+    def switch(self, agents=True, background=False):
+        self.fx.write_json("watchers.json", {"agents": agents, "background": background, "schema_version": 1})
+
+    def requests(self):
+        names = sorted(n for n in os.listdir(self.fx.support) if n.startswith("watch-request-"))
+        out = []
+        for n in names:
+            self.assertTrue(n.endswith(".json"))
+            path = os.path.join(self.fx.support, n)
+            self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
+            with open(path, encoding="utf-8") as f:
+                out.append(json.load(f))
+        return out
+
+    def start(self, args):
+        return mcp.build_watch_start(args, now=NOW, paths=self.paths, env=self.env)
+
+    def test_file_names_match_the_app(self):
+        self.assertEqual(mcp.WATCH_SWITCH_FILE, "watchers.json")
+        self.assertEqual(mcp.WATCH_REQUEST_PREFIX, "watch-request-")
+        self.assertEqual((mcp.WATCH_MAX_TITLE, mcp.WATCH_MAX_NOTE), (80, 140))
+
+    def test_refused_while_the_switch_is_off_and_nothing_is_written(self):
+        before = sorted(os.listdir(self.fx.support))
+        for switch in (None, {"agents": False, "background": True, "schema_version": 1},
+                       {"agents": True, "schema_version": 2}, {"agents": "yes", "schema_version": 1}):
+            if switch is not None:
+                self.fx.write_json("watchers.json", switch)
+                before = sorted(os.listdir(self.fx.support))
+            r = self.start({"title": "CI on main"})
+            self.assertEqual((r["status"], r["reason"]), ("rejected", "watchers_off"))
+            self.assertIn("Let agents show watchers", r["remedy"])
+            self.assertEqual(sorted(os.listdir(self.fx.support)), before)
+        self.assertFalse(mcp.build_ping(now=NOW, paths=self.paths)["watchers_allowed"])
+
+    def test_start_update_end_hand_over_requests_in_order(self):
+        self.switch()
+        self.assertTrue(mcp.build_ping(now=NOW, paths=self.paths)["watchers_allowed"])
+        r = self.start({"title": "  CI on main ", "link": "https://github.com/o/r/actions/runs/1", "total": 12})
+        self.assertEqual(r["status"], "ok")
+        wid = r["id"]
+        self.assertRegex(wid, r"^w[0-9a-f]{12}$")
+        u = mcp.build_watch_update({"id": wid, "done": 3, "note": "lint passed", "state": "waiting"},
+                                   now=NOW, paths=self.paths)
+        self.assertEqual(u, {"status": "ok", "id": wid})
+        e = mcp.build_watch_end({"id": wid, "result": "failed", "note": "2 checks failed"}, now=NOW, paths=self.paths)
+        self.assertEqual(e, {"status": "ok", "id": wid})
+        reqs = self.requests()
+        self.assertEqual([q["op"] for q in reqs], ["start", "update", "end"])
+        self.assertEqual(reqs[0], {"schema_version": 1, "op": "start", "id": wid, "requested_at": mcp.iso_o(NOW),
+                                   "title": "CI on main", "link": "https://github.com/o/r/actions/runs/1",
+                                   "total": 12, "work": False, "folder": self.env["CLAUDE_CONFIG_DIR"]})
+        self.assertEqual((reqs[1]["done"], reqs[1]["note"], reqs[1]["state"]), (3, "lint passed", "waiting"))
+        self.assertEqual((reqs[2]["result"], reqs[2]["note"]), ("failed", "2 checks failed"))
+        # No temporary file is left behind.
+        self.assertEqual([n for n in os.listdir(self.fx.support) if n.endswith(".tmp")], [])
+        # An ended watcher takes no more updates.
+        again = mcp.build_watch_update({"id": wid, "done": 4}, now=NOW, paths=self.paths)
+        self.assertEqual(again["reason"], "ended")
+
+    def test_work_flag_and_default_folder(self):
+        self.switch()
+        r = mcp.build_watch_start({"title": "Deploy", "work": True}, now=NOW, paths=self.paths, env={})
+        self.assertEqual(r["status"], "ok")
+        req = self.requests()[0]
+        self.assertTrue(req["work"])
+        self.assertEqual(req["folder"], os.path.expanduser("~/.claude"))
+        self.assertNotIn("link", req)
+        self.assertNotIn("total", req)
+
+    def test_bad_arguments_are_refused_and_write_nothing(self):
+        self.switch()
+        before = sorted(os.listdir(self.fx.support))
+        for args in ({}, None, {"title": ""}, {"title": "   "}, {"title": "x" * 81}, {"title": "two\nlines"},
+                     {"title": 5}, {"title": "ok", "link": "http://example.com"},
+                     {"title": "ok", "link": "javascript:alert(1)"}, {"title": "ok", "link": "https://u:p@example.com"},
+                     {"title": "ok", "link": "https://" + "a" * 2048}, {"title": "ok", "total": 0},
+                     {"title": "ok", "total": 1000001}, {"title": "ok", "total": True}, {"title": "ok", "total": 2.5},
+                     {"title": "ok", "work": "yes"}, {"title": "ok", "path": "/etc"}):
+            r = self.start(args)
+            self.assertEqual((r["status"], r["reason"]), ("rejected", "invalid_params"), args)
+        self.assertEqual(sorted(os.listdir(self.fx.support)), before)
+
+    def test_update_and_end_need_a_started_id(self):
+        self.switch()
+        wid = self.start({"title": "Build", "total": 4})["id"]
+        n = len(self.requests())
+        for args, reason in (({"done": 1}, "invalid_params"), ({"id": "nope"}, "invalid_params"),
+                             ({"id": "w000000000000"}, "unknown_id"),
+                             ({"id": wid, "state": "done"}, "invalid_params"),
+                             ({"id": wid, "done": -1}, "invalid_params"),
+                             ({"id": wid, "note": "y" * 141}, "invalid_params"),
+                             ({"id": wid, "extra": 1}, "invalid_params")):
+            r = mcp.build_watch_update(args, now=NOW, paths=self.paths)
+            self.assertEqual(r["reason"], reason, args)
+        for args in ({"id": wid}, {"id": wid, "result": "finished"}, {"id": wid, "result": "passed", "note": 3}):
+            self.assertEqual(mcp.build_watch_end(args, now=NOW, paths=self.paths)["reason"], "invalid_params")
+        self.assertEqual(len(self.requests()), n)
+
+    def test_turning_the_switch_off_refuses_updates_too(self):
+        self.switch()
+        wid = self.start({"title": "Build"})["id"]
+        self.switch(agents=False)
+        r = mcp.build_watch_update({"id": wid, "done": 1}, now=NOW, paths=self.paths)
+        self.assertEqual(r["reason"], "watchers_off")
+
+    def test_over_stdio(self):
+        self.switch()
+        env = dict(os.environ, SANDUHR_SUPPORT_DIR=self.fx.support, CLAUDE_CONFIG_DIR=self.env["CLAUDE_CONFIG_DIR"])
+        import subprocess
+        msgs = [{"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                 "params": {"name": "watch_start", "arguments": {"title": "CI", "total": 2}}}]
+        out = subprocess.run([sys.executable, SERVER], input="\n".join(json.dumps(m) for m in msgs) + "\n",
+                             capture_output=True, text=True, env=env, timeout=30)
+        self.assertEqual(out.stderr, "")
+        res = json.loads(json.loads(out.stdout.splitlines()[0])["result"]["content"][0]["text"])
+        self.assertEqual(res["status"], "ok")
+        self.assertEqual(self.requests()[0]["folder"], self.env["CLAUDE_CONFIG_DIR"])
 
 
 class ProposeTheme(Base):

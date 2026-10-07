@@ -49,6 +49,8 @@ struct AccountDataChoices: Equatable, Sendable {
     var names: ProjectNamesChoice = .names
     var share: ShareChoice = .off
     var folder: String?
+    /// Marked as a work account (item 66): watchers from its linked folder hide in demo mode.
+    var work = false
 
     /// The spec's defaults: nothing linked, nothing tracked, names, nothing shared.
     static let defaults = AccountDataChoices()
@@ -56,7 +58,7 @@ struct AccountDataChoices: Equatable, Sendable {
 
 /// The per-account data choices (item 44), in the registry's defaults under `accountData`:
 /// `{label: {"activity": "off|live|record", "names": "names|hidden|full",
-/// "share": "off|meters|activity", "folder": "/abs/path"}}`. A missing account, field or an
+/// "share": "off|meters|activity", "folder": "/abs/path", "work": "true"}}`. A missing account, field or an
 /// unknown value reads as the default. Follows renames and removals like `MeterHistory`.
 ///
 /// Link rules: an account links at most one folder and a folder at most one account.
@@ -68,6 +70,7 @@ enum AccountData {
         static let names = "names"
         static let share = "share"
         static let folder = "folder"
+        static let work = "work"
     }
 
     /// The label the choices are kept under: the account, or Personal while a launch runs on the
@@ -91,6 +94,7 @@ enum AccountData {
         if let v = raw[Field.names].flatMap(ProjectNamesChoice.init(rawValue:)) { c.names = v }
         if let v = raw[Field.share].flatMap(ShareChoice.init(rawValue:)) { c.share = v }
         if let f = raw[Field.folder], !f.isEmpty { c.folder = f }
+        if raw[Field.work] == "true" { c.work = true }
         return c
     }
 
@@ -111,6 +115,7 @@ enum AccountData {
             var raw = [Field.activity: c.activity.rawValue, Field.names: c.names.rawValue,
                        Field.share: c.share.rawValue]
             if let f = c.folder { raw[Field.folder] = f }
+            if c.work { raw[Field.work] = "true" }
             everything[name] = raw
         }
         write(everything, in: store)
@@ -131,6 +136,12 @@ enum AccountData {
     static func setShare(_ v: ShareChoice, for account: String?, in s: DefaultsStore) {
         var c = choices(for: account, in: s)
         c.share = v
+        store(c, for: account, in: s)
+    }
+
+    static func setWork(_ v: Bool, for account: String?, in s: DefaultsStore) {
+        var c = choices(for: account, in: s)
+        c.work = v
         store(c, for: account, in: s)
     }
 

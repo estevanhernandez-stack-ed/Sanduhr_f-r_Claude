@@ -9,7 +9,7 @@ import AppKit
 /// Settings live in the com.626labs.sanduhr.desk defaults domain:
 ///   defaults write com.626labs.sanduhr.desk layout "message:tl clock:bl claude:bl meetings:bl"
 ///       widgets: clock (time and date), claude (Sanduhr line), meters (a bar per limit),
-///                nowPlaying (what plays, item 53b), meetings, message
+///                nowPlaying (what plays, item 53b), watchers (item 66), meetings, message
 ///       slots:   tl tr bl br; leave a widget out to hide it
 ///   defaults write com.626labs.sanduhr.desk font "EsteFont 26"    (any installed font family; EsteFont 26 ships in the app and is the default)
 ///   defaults write com.626labs.sanduhr.desk timeSize -float 112    (clock size; the rest scales from it)
@@ -46,7 +46,7 @@ struct DeskView: View {
     @AppStorage("showClaude", store: .desk) private var showClaude = true
     @AppStorage("inkColor", store: .desk) private var ink = "ffffff"
 
-    enum Widget: String { case clock, claude, meters, nowPlaying, meetings, message }
+    enum Widget: String { case clock, claude, meters, nowPlaying, watchers, meetings, message }
     enum Slot: String { case tl, tr, bl, br }
 
     private var inset: CGFloat { timeSize * 0.18 }
@@ -107,6 +107,7 @@ struct DeskView: View {
         case .claude: claude.deskInk()
         case .meters: meters(alignment: alignment).deskInk()
         case .nowPlaying: nowPlaying(alignment: alignment).deskInk()
+        case .watchers: DeskWatchers(model: model, font: font, size: timeSize * 0.17, alignment: alignment).deskInk()
         case .meetings: meetings(alignment: alignment).deskInk()
         case .message: message(alignment: alignment)
         }
