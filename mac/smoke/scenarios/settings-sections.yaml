@@ -1,12 +1,14 @@
-# docs/mac-smoke-test.md section 4: every Settings section opens in the one window.
+# docs/mac-smoke-test.md section 4: every Settings section opens in the one window. Item 68
+# (section 33): each section that controls something visible shows its preview card, snapped.
 name: Every Settings section opens
 steps:
   - do: settings
     arg: general
-  - expect_state: { settings_open: true, settings_section: general }
+  - expect_state: { settings_open: true, settings_section: general, settings_preview: menuBar }
+  - snap: preview-general
   - do: settings
     arg: alerts
-  - expect_state: { settings_section: alerts }
+  - expect_state: { settings_section: alerts, settings_preview: null }
   - do: settings
     arg: credentials
   # Item 36: the section kept its raw value and is now the Accounts page. Its caption names the
@@ -23,35 +25,53 @@ steps:
   - do: settings
     arg: integrations
   # Item 49: install and remove happen only by hand on a test folder (docs/mac-smoke-test.md);
-  # the page opening installs nothing.
-  - expect_state: { settings_section: integrations }
+  # the page opening installs nothing. Item 68: its statusline preview always runs on sample
+  # input, so its card always carries the Sample label.
+  - expect_state: { settings_section: integrations, settings_preview: integrations }
   - expect:
       window: settings
       contains: { text: "/MCP server/" }
+  - expect:
+      window: settings
+      contains: { text: "/Sample/" }
+  - snap: preview-integrations
   - do: settings
     arg: deskLayout
-  - expect_state: { settings_section: deskLayout }
+  - expect_state: { settings_section: deskLayout, settings_preview: layout }
+  - snap: preview-layout
   - do: settings
     arg: deskLook
-  - expect_state: { settings_section: deskLook }
+  - expect_state: { settings_section: deskLook, settings_preview: look }
+  - snap: preview-look
   - do: settings
     arg: deskMeters
-  - expect_state: { settings_section: deskMeters }
+  - expect_state: { settings_section: deskMeters, settings_preview: meters }
+  - snap: preview-meters
   - do: settings
     arg: message
-  - expect_state: { settings_section: message }
+  - expect_state: { settings_section: message, settings_preview: message }
+  - snap: preview-message
   - do: settings
     arg: notch
-  - expect_state: { settings_section: notch }
+  - expect_state: { settings_section: notch, settings_preview: notch }
+  - expect:
+      window: settings
+      contains: { text: Test Glow }
+  - snap: preview-notch
+  - do: settings
+    arg: nowPlaying
+  - expect_state: { settings_section: nowPlaying, settings_preview: nowPlaying }
+  - snap: preview-now-playing
   - do: settings
     arg: widgetLook
-  - expect_state: { settings_section: widgetLook }
+  - expect_state: { settings_section: widgetLook, settings_preview: widget }
+  - snap: preview-widget-look
   - do: settings
     arg: themes
-  - expect_state: { settings_section: themes }
+  - expect_state: { settings_section: themes, settings_preview: null }
   - do: settings
     arg: pacing
-  - expect_state: { settings_section: pacing }
+  - expect_state: { settings_section: pacing, settings_preview: widget }
   - expect:
       window: settings
       contains: { text: Pacing & Focus }
