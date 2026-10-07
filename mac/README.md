@@ -259,6 +259,32 @@ existing python3, scripts current), Outdated (Sanduhr's entry naming other scrip
 install.sh's copies, or a missing python3: Update rewrites it), Not installed, someone else's
 entry, or not valid JSON.
 
+**Combine with your statusline (item 63).** Claude Code has one `statusLine` and no way to
+compose two, so when a folder already has one, the sheet offers Combine (the default), Replace or
+Cancel. Combine writes a wrapper command:
+
+```
+<python> '<…/current/sanduhr_statusline.py>' --chain-b64 <base64 of your command> --join line|same [--padding <n>]
+```
+
+The script reads Claude Code's stdin JSON once and runs your command through `/bin/sh -c` with the
+same bytes and environment, in its own process group, within 1.5 s (64 KiB of output kept); it
+kills the group on timeout and when Claude Code cancels it (SIGTERM/SIGINT), and sets
+`SANDUHR_CHAIN_DEPTH` so a combined line never chains again. `line` prints your rows, then
+Sanduhr's on its own row; `same` appends `ESC[0m │ <segment>` to your last row and falls back to
+`line` when that would not fit `COLUMNS − padding − 20` (escapes stripped, wide characters counted
+as two). Your command hanging or failing never blanks Sanduhr's segment, a non-zero exit keeps
+your output, the script always exits 0, and reasons go only to stderr (`claude --debug`). With a
+dead or missing snapshot, the segment falls back on stdin's `rate_limits`, marked `*`
+(`5h 23%* | wk 41%*`). The new value carries your `padding`, `refreshInterval` and
+`hideVimModeIndicator` (Replace now does too). `isOurStatusline` accepts exactly that flag
+grammar and nothing looser; an existing Sanduhr command, alone or combined (any seat or version),
+is unwrapped to the innermost command of yours. The receipt gains `mode` (`replace` or
+`combine`, optional so older receipts read); Update rebuilds the command from its shape, and
+Remove puts back the exact bytes of your old `statusLine` as before. The sheet's preview runs the
+combined command once per join against the documented sample statusline JSON (made-up numbers)
+and draws the ANSI; the row reads "Combined with your statusline".
+
 **Scripts.** `build.sh` copies both into `Sanduhr.app/Contents/Resources/integrations/`.
 `IntegrationScripts` copies them to `integrations/<stamp>/` (12 hex of a SHA-256 over the
 scripts' names and bytes) and points the symlink `integrations/current` at it with one

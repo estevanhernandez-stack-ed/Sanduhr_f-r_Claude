@@ -551,10 +551,28 @@ S=~/Library/Application\ Support/Sanduhr/integrations
   "$S"` shows `current -> <12 hex>` and that folder holds both scripts.
 - [ ] `CLAUDE_CONFIG_DIR=~/.claude-smoketest claude` then `/mcp`: sanduhr is connected; "call
   the sanduhr ping tool" answers with `0.3.0-mac`.
-- [ ] Statusline, Install…: the sheet shows `echo mine` as the statusline it would replace;
-  Not Now changes nothing (`diff /tmp/st-settings.json ~/.claude-smoketest/settings.json`
-  is empty). Replace and Install: Installed; `"model"` is still there; the Claude Code session
-  above shows the meters under the prompt after its next refresh.
+- [ ] Statusline, Install…: the sheet shows `echo mine` as the statusline already set, with
+  Combine (default), Replace and Cancel, and a preview of both joins; Cancel changes nothing
+  (`diff /tmp/st-settings.json ~/.claude-smoketest/settings.json` is empty). Install… again,
+  Replace: Installed; `"model"` is still there; the Claude Code session above shows the meters
+  under the prompt after its next refresh.
+- [ ] Combine (item 63): Remove the statusline (the diff is empty again), then Install…. The
+  preview shows `mine` then the meters on their own row, and `mine │ 5h …` on one row (meters
+  from the widget, or `5h 23%* | wk 41%*` from the sample data while the widget is stopped).
+  Pick the same-row join, Combine: the row reads "Combined with your statusline"; `jq -r
+  .statusLine.command ~/.claude-smoketest/settings.json` ends in `--chain-b64 ZWNobyBtaW5l
+  --join same`; the session shows `mine │ 5h 42% | wk 18% …` after its next refresh.
+- [ ] A slow and a failing line: `printf '{\n  "model": "opus",\n  "statusLine": {"type":
+  "command", "command": "sleep 5; echo slow", "padding": 1, "refreshInterval": 5}\n}\n' >
+  ~/.claude-smoketest/settings.json; cp ~/.claude-smoketest/settings.json /tmp/st-slow.json`,
+  Install…, Combine (own row). `padding` and `refreshInterval` are still there; the session's
+  statusline shows the meters alone within about 1.5 s of each refresh, and `pgrep -f "sleep 5"`
+  is empty two seconds later. Repeat with `"command": "echo oops; exit 2"`: `oops` and the
+  meters both show. A powerline-style line of your own (a copy, in this test folder) on the same
+  row: no color bleeds into Sanduhr's segment, and in a narrow terminal it moves to its own row.
+- [ ] Remove: `diff /tmp/st-slow.json ~/.claude-smoketest/settings.json` is empty (siblings
+  included). Put the `echo mine` file back (`cp /tmp/st-settings.json
+  ~/.claude-smoketest/settings.json`) and Install…, Replace again for the next step.
 - [ ] Remove both: `diff /tmp/st-claude.json ~/.claude-smoketest/.claude.json` and `diff
   /tmp/st-settings.json ~/.claude-smoketest/settings.json` are empty (the `echo mine` statusline
   is back), the `.sanduhr-backup` files are gone, and with nothing installed anywhere `"$S"`

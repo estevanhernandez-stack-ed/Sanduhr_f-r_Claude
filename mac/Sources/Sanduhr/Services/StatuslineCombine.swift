@@ -1,0 +1,208 @@
+import Foundation
+
+/// How Sanduhr's statusline went into a folder that already had one (item 63).
+enum StatuslineMode: String, Codable, Sendable {
+    /// Sanduhr's line took the user's place; Remove puts theirs back.
+    case replace
+    /// Sanduhr's command runs the user's first and prints both.
+    case combine
+}
+
+/// Where Sanduhr's segment goes in a combined statusline.
+enum StatuslineJoin: String, Codable, CaseIterable, Sendable {
+    /// The user's rows, then Sanduhr's on a row of its own.
+    case line
+    /// Appended to the user's last row, after an SGR reset (`line` when it would not fit).
+    case same
+}
+
+/// Sanduhr's statusline command taken apart: `<python> <…/sanduhr_statusline.py>`, optionally
+/// followed by exactly `--chain-b64 <base64> --join line|same [--padding <n>]`.
+struct StatuslineCommand: Equatable, Sendable {
+    /// `<python> <script>`, as written.
+    var base: String
+    /// The chained command (decoded), nil for Sanduhr's line alone.
+    var chain: String?
+    var join: StatuslineJoin?
+    var padding: Int?
+}
+
+extension IntegrationInstaller {
+    /// The keys of the user's `statusLine` object Sanduhr's value carries over (their padding,
+    /// refresh and vim choices still apply to the line that shows).
+    static let statuslineSiblingKeys = ["padding", "refreshInterval", "hideVimModeIndicator"]
+
+    /// How many Sanduhr commands deep an unwrap goes before giving up.
+    static let unwrapLimit = 16
+
+    /// Sanduhr's statusline command, alone or combined with `chain`.
+    static func statuslineCommand(python: String, script: String, chain: String? = nil,
+                                  join: StatuslineJoin = .line, padding: Int? = nil) -> String {
+        let base = "\(shellQuoted(python)) \(shellQuoted(script))"
+        guard let chain else { return base }
+        var c = "\(base) --chain-b64 \(Data(chain.utf8).base64EncodedString()) --join \(join.rawValue)"
+        if let padding, padding > 0, padding <= 999 { c += " --padding \(padding)" }
+        return c
+    }
+
+    /// `command` taken apart when it is Sanduhr's, nil when it is anyone else's. Sanduhr's line
+    /// alone is a command that is only `<python> <…/sanduhr_statusline.py>` (no `;`, `&`, a pipe,
+    /// a substitution or a newline); combined, that is followed by exactly the runner's flags in
+    /// order, the payload valid base64 of a non-blank UTF-8 command. Nothing looser: a command
+    /// of the user's that merely calls the script stays theirs.
+    static func parseStatusline(_ command: String) -> StatuslineCommand? {
+        let c = command.trimmingCharacters(in: .whitespaces)
+        if [";", "&", "|", "$(", "`", "\n", "\r"].contains(where: { c.contains($0) }) { return nil }
+        if isPlainStatusline(c) { return StatuslineCommand(base: c) }
+        var words = c.components(separatedBy: " ")
+        var padding: Int?
+        if words.count >= 2, words[words.count - 2] == "--padding" {
+            let n = words[words.count - 1]
+            guard (1...3).contains(n.count), n.allSatisfy({ $0.isASCII && $0.isNumber }) else { return nil }
+            padding = Int(n)
+            words.removeLast(2)
+        }
+        guard words.count >= 5, words[words.count - 4] == "--chain-b64", words[words.count - 2] == "--join",
+              let join = StatuslineJoin(rawValue: words[words.count - 1]) else { return nil }
+        let payload = words[words.count - 3]
+        let alphabet = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
+        guard !payload.isEmpty, payload.count % 4 == 0, payload.unicodeScalars.allSatisfy(alphabet.contains),
+              !payload.dropLast(2).contains("="),
+              let data = Data(base64Encoded: payload), let chain = String(data: data, encoding: .utf8),
+              !chain.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let base = words.dropLast(4).joined(separator: " ")
+        guard isPlainStatusline(base) else { return nil }
+        return StatuslineCommand(base: base, chain: chain, join: join, padding: padding)
+    }
+
+    /// Only `<python> <…/sanduhr_statusline.py>` (the rule before Combine).
+    private static func isPlainStatusline(_ c: String) -> Bool {
+        let name = IntegrationScripts.statuslineScript
+        return c.hasSuffix(name) || c.hasSuffix(name + "'") || c.hasSuffix(name + "\"")
+    }
+
+    /// The user's own command inside `command`: itself when it isn't Sanduhr's, the innermost
+    /// foreign command when it is Sanduhr's combined with something (of any seat or version),
+    /// nil when it is only Sanduhr's line (there is nothing of theirs to keep).
+    static func innermostForeign(_ command: String) -> String? {
+        var c = command
+        for _ in 0..<unwrapLimit {
+            guard let parsed = parseStatusline(c) else { return c }
+            guard let chain = parsed.chain else { return nil }
+            c = chain
+        }
+        return nil
+    }
+
+    /// The members of the user's `statusLine` Sanduhr's value keeps: `padding` and
+    /// `refreshInterval` when they are whole numbers, `hideVimModeIndicator` when a boolean.
+    static func carriedSiblings(_ existing: Any?) -> [JSONEdit.Pair] {
+        guard let o = existing as? [String: Any] else { return [] }
+        var out: [JSONEdit.Pair] = []
+        for key in statuslineSiblingKeys {
+            guard let n = o[key] as? NSNumber else { continue }
+            let isBool = CFGetTypeID(n) == CFBooleanGetTypeID()
+            if key == "hideVimModeIndicator" {
+                if isBool { out.append(JSONEdit.Pair(key, .bool(n.boolValue))) }
+            } else if !isBool, let i = Int(exactly: n.doubleValue) {
+                out.append(JSONEdit.Pair(key, .int(i)))
+            }
+        }
+        return out
+    }
+
+    /// Sanduhr's `statusLine` value: its command (combined with `chain` when given) and the
+    /// carried members.
+    func statuslineEntry(python: String, chain: String?, join: StatuslineJoin, siblings: [JSONEdit.Pair]) -> JSONEdit.Value {
+        let padding: Int? = siblings.first { $0.key == "padding" }.flatMap {
+            if case .int(let n) = $0.value { return n }
+            return nil
+        }
+        let command = Self.statuslineCommand(python: python, script: scripts.installedPath(IntegrationScripts.statuslineScript),
+                                             chain: chain, join: join, padding: padding)
+        return .object([JSONEdit.Pair("type", .string("command")), JSONEdit.Pair("command", .string(command))] + siblings)
+    }
+
+    /// The folder's statusline is Sanduhr's combined with the user's own.
+    func isCombined(folder: String) -> Bool {
+        let file = configFile(.statusline, folder: folder)
+        guard let data = FileManager.default.contents(atPath: file), let root = try? JSONEdit.root(data),
+              let o = root[Self.statusLineKey] as? [String: Any], let command = o["command"] as? String else { return false }
+        return Self.parseStatusline(command)?.chain != nil
+    }
+
+    /// The arguments that run the combined command once for the preview, with the app's own
+    /// copy of the script (the installed one may not be there yet). Nil without the script.
+    func previewArguments(chain: String, join: StatuslineJoin) -> [String]? {
+        guard let source = scripts.source?.appendingPathComponent(IntegrationScripts.statuslineScript).path,
+              FileManager.default.fileExists(atPath: source) else { return nil }
+        return [source, "--chain-b64", Data(chain.utf8).base64EncodedString(), "--join", join.rawValue]
+    }
+}
+
+/// Runs the combined statusline once against sample statusline JSON for the "other statusline"
+/// sheet (item 63). The JSON is the shape Claude Code documents, with made-up numbers: no real
+/// session's data goes in. The user's command runs as Claude Code would run it.
+enum StatuslinePreview {
+    /// The docs' sample statusline input, trimmed, with resets an hour and three days out.
+    static func sampleJSON(now: Date = Date()) -> Data {
+        let t = Int(now.timeIntervalSince1970)
+        let sample: [String: Any] = [
+            "cwd": "/home/user/project",
+            "session_id": "abc123",
+            "session_name": "my-session",
+            "transcript_path": "/path/to/transcript.jsonl",
+            "model": ["id": "claude-opus-5-5", "display_name": "Opus"],
+            "workspace": ["current_dir": "/home/user/project", "project_dir": "/home/user/project", "added_dirs": [String]()],
+            "version": "2.1.292",
+            "output_style": ["name": "default"],
+            "cost": ["total_cost_usd": 0.01234, "total_duration_ms": 45000, "total_api_duration_ms": 2300,
+                     "total_lines_added": 156, "total_lines_removed": 23],
+            "context_window": ["total_input_tokens": 15500, "total_output_tokens": 1200, "context_window_size": 200000,
+                               "used_percentage": 8, "remaining_percentage": 92],
+            "exceeds_200k_tokens": false,
+            "rate_limits": ["five_hour": ["used_percentage": 23.5, "resets_at": t + 3600],
+                            "seven_day": ["used_percentage": 41.2, "resets_at": t + 3 * 86400]],
+            "vim": ["mode": "NORMAL"],
+        ]
+        return (try? JSONSerialization.data(withJSONObject: sample, options: [.sortedKeys])) ?? Data("{}".utf8)
+    }
+
+    /// The width the preview pretends the terminal has.
+    static let columns = 100
+
+    /// Runs `python args` with the sample on stdin; its stdout, or nil when it couldn't run.
+    /// The runner keeps its own 1.5 s budget; this stops it after 4 s whatever happens.
+    static func run(python: String, arguments: [String]) -> String? {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: python)
+        p.arguments = arguments
+        var env = ProcessInfo.processInfo.environment
+        env["COLUMNS"] = String(columns)
+        env.removeValue(forKey: "SANDUHR_CHAIN_DEPTH")
+        p.environment = env
+        let input = Pipe(), output = Pipe()
+        p.standardInput = input
+        p.standardOutput = output
+        p.standardError = FileHandle.nullDevice
+        do { try p.run() } catch { return nil }
+        input.fileHandleForWriting.write(sampleJSON())
+        try? input.fileHandleForWriting.close()
+        let done = DispatchSemaphore(value: 0)
+        let box = OutputBox()
+        DispatchQueue.global(qos: .userInitiated).async {
+            box.data = output.fileHandleForReading.readDataToEndOfFile()
+            done.signal()
+        }
+        if done.wait(timeout: .now() + 4) == .timedOut {
+            p.terminate()
+            _ = done.wait(timeout: .now() + 1)
+        }
+        p.waitUntilExit()
+        return String(decoding: box.data.prefix(64 * 1024), as: UTF8.self)
+    }
+
+    private final class OutputBox: @unchecked Sendable {
+        var data = Data()
+    }
+}
