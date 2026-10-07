@@ -6,7 +6,42 @@ import Foundation
 /// sentence case, periods. Related features share one card: it sits in the array of the
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
-    static var table: [WhatsNewCard] { release280 + release270 + release260 + release250 + release240 }
+    static var table: [WhatsNewCard] {
+        release290 + release280 + release270 + release260 + release250 + release240
+    }
+
+    static let release290: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.9.0", id: "message-editor",
+            title: "Desk messages without the tags",
+            body: "Add lines by day or date and style them with buttons: colors, palettes, letter styles, write-in and sweep. Birthdays add to the day instead of replacing it.",
+            art: .preview(.deskMessage), destination: .message),
+        WhatsNewCard(
+            version: "2.9.0", id: "desk-layout",
+            title: "Arrange the Desk your way",
+            body: "Eight places to put each piece, the order you want in each, and a size for every piece, with a live map of the screen.",
+            art: .symbol("rectangle.3.group"), destination: .deskLayout),
+        WhatsNewCard(
+            version: "2.9.0", id: "settings-previews",
+            title: "See it before you set it",
+            body: "Every Settings page that changes something you see now shows a live preview of it, drawn the way the real thing draws.",
+            art: .symbol("eye.square"), destination: .notch),
+        WhatsNewCard(
+            version: "2.9.0", id: "estefont-pro",
+            title: "EsteFont Pro",
+            body: "A cleaner cut of the Desk's handwriting, now the default for new installs. EsteFont 26 stays in the list.",
+            art: .preview(.font), destination: .deskLook),
+        WhatsNewCard(
+            version: "2.9.0", id: "mods-page",
+            title: "Your Claude Code mods, in one place",
+            body: "The Mods page lists what each Claude Code folder loads and what every mod can touch. Check runs Claude Code's own validation without running the mod.",
+            art: .symbol("cube"), destination: .mods),
+        WhatsNewCard(
+            version: "2.9.0", id: "camera-mic",
+            title: "Camera and mic on the notch",
+            body: "A mic glyph while any app listens, and a red dot for cameras whose own light you can't see. Indicators only: Sanduhr never mutes or records.",
+            art: .symbol("video.fill"), destination: .notch),
+    ]
 
     static let release280: [WhatsNewCard] = [
         WhatsNewCard(

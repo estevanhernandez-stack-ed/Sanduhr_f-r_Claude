@@ -156,9 +156,11 @@ struct WhatsNewTableTests {
     }
 
     @Test func releasesSinceTwoFour() {
-        let releases: Set<String> = ["2.4.0", "2.5.0", "2.6.0", "2.7.0", "2.8.0"]
+        let releases: Set<String> = ["2.4.0", "2.5.0", "2.6.0", "2.7.0", "2.8.0", "2.9.0"]
         #expect(Set(table.map(\.version)) == releases)
-        #expect(table.count == 12)
+        #expect(table.count == 18)
+        #expect(table.filter { $0.version == "2.9.0" }.map(\.id)
+                == ["message-editor", "desk-layout", "settings-previews", "estefont-pro", "mods-page", "camera-mic"])
         #expect(table.filter { $0.version == "2.8.0" }.map(\.id) == ["watchers", "combine-statusline"])
         #expect(table.filter { $0.version == "2.7.0" }.map(\.id) == ["sign-in", "tour", "now-playing"])
         #expect(table.filter { $0.version == "2.6.0" }.map(\.id)
@@ -191,6 +193,8 @@ struct WhatsNewTableTests {
     @Test func showMeLandsOnTheRightPage() {
         let dest = Dictionary(uniqueKeysWithValues: table.map { ($0.id, $0.destination) })
         #expect(dest == [
+            "message-editor": .message, "desk-layout": .deskLayout, "settings-previews": .notch,
+            "estefont-pro": .deskLook, "mods-page": .mods, "camera-mic": .notch,
             "watchers": .integrations, "combine-statusline": .integrations,
             "sign-in": .credentials, "tour": .about,
             "now-playing": .nowPlaying, "claude-suggests": .message,
@@ -222,5 +226,12 @@ struct WhatsNewTableTests {
         let fromTwoSeven = WhatsNew.cards(lastSeen: "2.7.0", current: "2.8.0")
         #expect(fromTwoSeven.map(\.id) == ["watchers", "combine-statusline"])
         #expect(WhatsNew.rangeLabel(fromTwoSeven, lastSeen: "2.7.0", current: "2.8.0") == "New in 2.8.0")
+    }
+
+    @Test func updatingToTwoNine() {
+        let fromTwoEight = WhatsNew.cards(lastSeen: "2.8.0", current: "2.9.0")
+        #expect(fromTwoEight.map(\.id)
+                == ["message-editor", "desk-layout", "settings-previews", "estefont-pro", "mods-page", "camera-mic"])
+        #expect(WhatsNew.rangeLabel(fromTwoEight, lastSeen: "2.8.0", current: "2.9.0") == "New in 2.9.0")
     }
 }
