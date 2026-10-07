@@ -6,7 +6,20 @@ import Foundation
 /// sentence case, periods. Related features share one card: it sits in the array of the
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
-    static var table: [WhatsNewCard] { release270 + release260 + release250 + release240 }
+    static var table: [WhatsNewCard] { release280 + release270 + release260 + release250 + release240 }
+
+    static let release280: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.8.0", id: "watchers",
+            title: "Watchers on the notch and the Desk",
+            body: "When an agent waits on a build, a release or a long task, a live card shows its progress, glows when it needs you and fades when it passes. Turn it on in Integrations.",
+            art: .symbol("eye"), destination: .integrations),
+        WhatsNewCard(
+            version: "2.8.0", id: "combine-statusline",
+            title: "Your statusline and Sanduhr's, combined",
+            body: "Keep your own statusline and add Sanduhr's meters, choosing each segment you keep and styling it with colors, gradients and letter styles.",
+            art: .symbol("terminal"), destination: .integrations),
+    ]
 
     static let release270: [WhatsNewCard] = [
         WhatsNewCard(
