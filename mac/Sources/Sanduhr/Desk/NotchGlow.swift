@@ -409,8 +409,8 @@ final class NotchGlowController {
         if NotchGlowRules.decide(event, switches: switches, memory: &memory, now: Date()) { fire() }
     }
 
-    /// Claude Code's hook opened `sanduhr://claude-code?event=…` (item 51): glow when its switch
-    /// is on, no terminal is in front (when that option is on) and the rate limit allows. Screens
+    /// Claude Code's hook posted ClaudeCodeSignal, or `sanduhr://claude-code?event=…` was opened
+    /// (item 51): glow when its switch is on, no terminal is in front (when that option is on) and the rate limit allows. Screens
     /// without a notch get the glow at the top center.
     func claudeCode(_ event: ClaudeCodeEvent) {
         let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier

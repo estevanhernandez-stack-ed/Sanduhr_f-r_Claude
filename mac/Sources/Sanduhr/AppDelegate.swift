@@ -23,6 +23,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// minutes costs next to nothing; idle system sleep is still allowed.
     private var appNapActivity: NSObjectProtocol?
 
+    /// Claude Code's hooks post `com.626labs.sanduhr.claude-code.waiting` and `.done` (Darwin
+    /// notifications, never a launch); registered for the life of the app.
+    private var claudeCodeSignal: ClaudeCodeSignal?
+
     // MARK: Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -144,6 +148,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Watchers (item 66): the MCP server's watch_* requests and the Stop hook's background
         // work, on the same folder watch; watchers.json follows the two switches.
         WatcherStore.shared.startForApp()
+        // Claude Code's hooks (items 51, 66): their Darwin notifications go where the
+        // sanduhr://claude-code link goes.
+        claudeCodeSignal = ClaudeCodeSignal { event in
+            MainActor.assumeIsolated { NotchGlowController.shared.claudeCode(event) }
+        }
         // Claude Code integrations (item 49): where they are installed, this version's scripts
         // replace the last one's (a new stamped folder, the link swapped). No install, no write.
         Task.detached(priority: .utility) { IntegrationScripts.standard.refreshIfInstalled() }
@@ -185,9 +194,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// estedesk:// and sanduhr:// links (Option+J joins the next meeting, …/settings opens
     /// Sanduhr Settings). sanduhr://debug/… goes to the smoke tools' hooks, which ignore it
-    /// unless they are switched on (DebugGate). sanduhr://claude-code?event=… comes from Claude
-    /// Code's hooks (item 51) and is public: it carries only an event, and anything else on that
-    /// host is dropped.
+    /// unless they are switched on (DebugGate). sanduhr://claude-code?event=… is what Claude
+    /// Code's hooks opened before they posted ClaudeCodeSignal (item 51); it stays for those and
+    /// for manual tests, and is public: it carries only an event, and anything else on that host
+    /// is dropped.
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
             if DebugLink.isDebug(url) {

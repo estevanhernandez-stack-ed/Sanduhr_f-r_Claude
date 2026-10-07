@@ -449,24 +449,30 @@ one matcher group to each of `hooks.Notification` and `hooks.Stop` in the chosen
 ```json
 "Notification": [{ "matcher": "permission_prompt|idle_prompt|elicitation_dialog",
                    "hooks": [{ "type": "command", "async": true, "timeout": 5,
-                               "command": "/usr/bin/pgrep -xq Sanduhr && /usr/bin/open -g 'sanduhr://claude-code?event=waiting' || true" }] }],
+                               "command": "/usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.waiting || true" }] }],
 "Stop":         [{ "hooks": [{ "type": "command", "async": true, "timeout": 5,
-                               "command": "/usr/bin/pgrep -xq Sanduhr && /usr/bin/open -g 'sanduhr://claude-code?event=done' || true" }] }]
+                               "command": "… /usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.done || true" }] }]
 ```
 
-`async` runs it in the background, so Claude Code never waits on it; `open -g` hands the link to
-Sanduhr without bringing it forward; `pgrep` keeps a quit Sanduhr from being launched by every
-turn; `|| true` keeps Claude Code from reporting a hook error. The matcher keeps sign-in and other
-notices out of "waiting". `hooks` and the two lists are made when missing; an existing list keeps
-every entry and gets Sanduhr's last; an older entry of Sanduhr's is rewritten where it stands. A
-group is Sanduhr's when every hook in it is a command opening `sanduhr://claude-code?`; a group of
-yours that also runs it is yours and stays. Remove takes Sanduhr's groups out in the reverse
+(The Stop command's first half is the background-work handoff, below.) `async` runs it in the
+background, so Claude Code never waits on it; `notifyutil -p` posts a Darwin notification, which
+reaches every running Sanduhr (`ClaudeCodeSignal`, registered with `notify_register_dispatch` at
+launch) and never launches one; `|| true` keeps Claude Code from reporting a hook error. Hooks
+before this opened `sanduhr://claude-code?event=…` behind `pgrep -xq Sanduhr`, but `open` goes to
+the app LaunchServices registers for the scheme and launches it: with a dev build running, every
+turn launched the installed copy. Those commands read as outdated and Install rewrites them. The
+matcher keeps sign-in and other notices out of "waiting". `hooks` and the two lists are made when
+missing; an existing list keeps every entry and gets Sanduhr's last; an older entry of Sanduhr's is
+rewritten where it stands. A group is Sanduhr's when every hook in it is a command posting
+`com.626labs.sanduhr.claude-code.` with `notifyutil -p` or opening `sanduhr://claude-code?`; a
+group of yours that also runs it is yours and stays. Remove takes Sanduhr's groups out in the reverse
 order, deletes a list or `hooks` only when Sanduhr made it and nothing else is in it, and gives an
 emptied list or object back what it held, so the file is byte for byte what it was (the receipt's
 `hooks` field records what was made). `JSONEdit` gained array appends, replacements and removals
 for this.
 
-The app side: `ClaudeCodeLink` accepts `sanduhr://claude-code?event=waiting|done` only (the host,
+The app side: both notification names and the link reach `NotchGlowController.claudeCode`.
+`ClaudeCodeLink` (kept for manual tests and hooks not yet updated) accepts `sanduhr://claude-code?event=waiting|done` only (the host,
 no path, exactly one `event` item with a known value; anything else on that host is dropped) and
 needs no debug gate. `NotchGlowController.claudeCode` glows when the event's switch is on
 (`notchGlowClaudeWaiting`, `notchGlowClaudeDone` in the Desk defaults, off by default), the front
@@ -852,11 +858,15 @@ the session's `background_tasks` (Claude Code 2.1.288's `StopHookInput`), only w
 says `"background":true`:
 
 ```sh
-/usr/bin/pgrep -xq Sanduhr && { d="$HOME/Library/Application Support/Sanduhr";
+d="$HOME/Library/Application Support/Sanduhr"; /usr/bin/pgrep -xq Sanduhr &&
   /usr/bin/grep -qs '"background":true' "$d/watchers.json" &&
   /usr/bin/osascript -l JavaScript -e '<stopTasksScript>' "$d" >/dev/null 2>&1;
-  /usr/bin/open -g 'sanduhr://claude-code?event=done'; } || true
+  /usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.done || true
 ```
+
+`pgrep` only gates the report (watchers.json outlives a quit Sanduhr): no report waits in the
+folder for a later launch, and one written longer ago than a request's ten minutes is deleted
+unread anyway (`WatcherStore.isStale`). The notification is posted either way.
 
 `stopTasksScript` (JavaScript for Automation, on every Mac; python3 may not be) keeps the session id,
 `CLAUDE_CONFIG_DIR` and per task (at most 20) only `id`, `type`, `status`, `description` (clipped to
@@ -864,7 +874,8 @@ says `"background":true`:
 It writes `watch-stop-<ms>-<uuid>.json` (0600, renamed into place) and the app deletes it on reading.
 Each task becomes a watcher (`b:<session>:<task id>`, the description as title, "background shell",
 "workflow deploy" and so on as the note); a task missing from the session's next Stop ends as
-finished (result unknown). The glow link is opened either way, so item 51's glow is unchanged.
+finished (result unknown). The glow notification is posted either way, so item 51's glow is
+unchanged.
 Installs from before this version show **Outdated**; Install rewrites the Stop entry in place.
 
 `state.yaml` has `watchers: {count, states, placements, agents, background}`, never a title, note,
