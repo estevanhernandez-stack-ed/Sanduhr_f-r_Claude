@@ -12,7 +12,9 @@ import Observation
 /// With "Let agents show watchers" off, an agent's request is deleted unread and the server
 /// refuses before writing one; with "Show Claude Code's background work" off the hook writes
 /// nothing, and a report that slipped in is deleted unread. Turning a switch off clears its
-/// watchers. Quitting Sanduhr drops every watcher.
+/// watchers. Quitting Sanduhr drops every watcher. The one other file is the band's (BandFile),
+/// written only while "Show watchers above the prompt" is on, with an agent's watcher's title and
+/// short title and a background task's kind, never a note or a description.
 @MainActor
 @Observable
 final class WatcherStore {
@@ -193,6 +195,8 @@ extension WatcherStore {
         onChange = { [weak self] in
             guard let self else { return }
             DeskController.shared.model.setWatchers(self.ordered)
+            // The band above Claude Code's prompt (band.json), while its switch is on.
+            BandFileWriter.shared.refresh()
         }
         onWaiting = { w in
             let desk = UserDefaults.desk

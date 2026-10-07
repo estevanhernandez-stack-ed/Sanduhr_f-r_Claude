@@ -79,6 +79,9 @@ struct Watcher: Equatable, Identifiable, Sendable {
     var work = false
     /// The Claude Code session an automatic watcher belongs to.
     var session: String?
+    /// An automatic watcher's kind of task (shell, subagent, monitor, workflow): all the band file
+    /// (BandFile) says of it besides its state.
+    var kind: String?
 
     /// How long it has run: until now, or until it ended.
     func elapsed(now: Date) -> TimeInterval { max(0, (ended ?? now).timeIntervalSince(started)) }
@@ -170,7 +173,7 @@ struct BackgroundTask: Equatable, Sendable {
         return WatcherText.firstWord(description) ?? WatcherText.clip(kind, 10)
     }
 
-    private var kind: String { WatcherLimits.line(type.lowercased(), cap: 20) ?? "task" }
+    var kind: String { WatcherLimits.line(type.lowercased(), cap: 20) ?? "task" }
 }
 
 /// One Stop's report: the session and its in-flight background work.
@@ -257,6 +260,7 @@ struct WatcherBoard: Equatable, Sendable {
                 watchers[i].title = task.title
                 watchers[i].short = task.short
                 watchers[i].note = task.note
+                watchers[i].kind = task.kind
                 watchers[i].touched = now
                 watchers[i].state = state
                 if state.isEnded { watchers[i].ended = now }
@@ -264,7 +268,8 @@ struct WatcherBoard: Equatable, Sendable {
                 watchers.append(Watcher(id: key, source: .automatic, title: task.title, short: task.short,
                                         link: nil, total: nil,
                                         done: nil, note: task.note, state: .running, started: now,
-                                        touched: now, ended: nil, work: work, session: report.session))
+                                        touched: now, ended: nil, work: work, session: report.session,
+                                        kind: task.kind))
             }
         }
         for i in watchers.indices where watchers[i].source == .automatic && watchers[i].session == report.session

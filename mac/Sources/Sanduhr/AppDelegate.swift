@@ -148,6 +148,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Watchers (item 66): the MCP server's watch_* requests and the Stop hook's background
         // work, on the same folder watch; watchers.json follows the two switches.
         WatcherStore.shared.startForApp()
+        // The meters mod's band (items 65f, 66): band.json, the looks and the watchers it draws.
+        BandFileWriter.shared.startForApp()
         // Claude Code's hooks (items 51, 66): their Darwin notifications go where the
         // sanduhr://claude-code link goes.
         claudeCodeSignal = ClaudeCodeSignal { event in
@@ -268,6 +270,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Now playing's adapter runs as a child process (item 53): it goes when Sanduhr quits.
     func applicationWillTerminate(_ notification: Notification) {
         NowPlayingController.shared.shutdown()
+        // Watchers go with Sanduhr: the band shows none from now on.
+        BandFileWriter.shared.refresh(quitting: true)
     }
 
     // LSUIElement apps never get this called, but set it false anyway.

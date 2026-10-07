@@ -169,6 +169,10 @@ final class IntegrationsModel {
         await load(linked: linked)
         switch outcome {
         case .success(.installed):
+            // The band takes Sanduhr's segment looks from Combine; Replace clears them (item 65f).
+            if kind == .statusline, replaceOther || combine != nil {
+                BandFileWriter.shared.setMeterStyles(combine != nil ? selection.theirs?.ours : nil)
+            }
             let what = combine != nil && kind == .statusline
                 ? "Statusline combined with yours" : "\(kind.title) installed"
             note = ("\(what) for \(display(folder)). Claude Code sessions started from now on use it.", false)
@@ -475,6 +479,7 @@ private struct IntegrationConsentSheet: View {
     let cancel: () -> Void
     @State private var join: StatuslineJoin = .line
     @State private var selection = StatuslineSelection()
+    @State private var band = false
 
     /// The statusline sheet when one is already set: Combine, Replace or Cancel.
     private var offersCombine: Bool { consent.kind == .statusline && consent.other != nil }
@@ -493,7 +498,7 @@ private struct IntegrationConsentSheet: View {
                     if offersCombine, let other = consent.other {
                         CombineChoice(other: other, folder: model.display(consent.folder), folderPath: consent.folder,
                                       model: model, join: $join,
-                                      selection: $selection)
+                                      selection: $selection, band: $band)
                     } else if let other = consent.other {
                         ReplaceNotice(other: other, folder: model.display(consent.folder), kind: consent.kind)
                     }
@@ -535,7 +540,7 @@ private struct IntegrationConsentSheet: View {
             if offersCombine {
                 Button("Cancel", role: .cancel, action: cancel).keyboardShortcut(.cancelAction)
                 Button("Replace") { install(nil, StatuslineSelection()) }
-                Button("Combine") { install(join, selection) }
+                Button("Combine") { install(join, banded) }
                     .keyboardShortcut(.defaultAction)
             } else {
                 Button("Not Now", role: .cancel, action: cancel).keyboardShortcut(.cancelAction)
@@ -543,6 +548,13 @@ private struct IntegrationConsentSheet: View {
                     .keyboardShortcut(.defaultAction)
             }
         }
+    }
+
+    /// The picks with the band choice (item 65f).
+    private var banded: StatuslineSelection {
+        var s = selection
+        s.band = band
+        return s
     }
 
     static func headline(_ kind: IntegrationKind) -> String {
