@@ -82,6 +82,60 @@ struct DeskArrangeReorderTests {
         #expect(DeskArrange.pieceAfter(y: 0, in: []) == nil)
     }
 
+    /// A tall Bottom left stack on a laptop screen: the clock's top half reaches above the
+    /// halfway line between Bottom left (y 922) and Middle left (y 493).
+    let tall: [String: CGRect] = [
+        "message": CGRect(x: 52, y: 64, width: 400, height: 60),
+        "clock": CGRect(x: 52, y: 560, width: 300, height: 140),
+        "meters": CGRect(x: 52, y: 720, width: 300, height: 80),
+        "meetings": CGRect(x: 52, y: 820, width: 300, height: 80),
+    ]
+
+    @Test("a stack's bounds: its drawn pieces' union, grown by the reach; undrawn pieces skipped")
+    func stackBounds() {
+        let a = DeskArrangement("message:tl clock:bl meters:bl watchers:bl meetings:bl")
+        let bounds = DeskArrange.stackBounds(a, frames: tall, reach: 10)
+        #expect(bounds[.bl] == CGRect(x: 42, y: 550, width: 320, height: 360))
+        #expect(bounds[.tl] == CGRect(x: 42, y: 54, width: 420, height: 80))
+        #expect(bounds[.mr] == nil)
+    }
+
+    @Test("a drop on the top of a tall stack stays in it and reorders, though Middle left's point is nearer")
+    func tallStack() {
+        var a = DeskArrangement(start)
+        let stacks = DeskArrange.stackBounds(a, frames: tall)
+        let drop = CGPoint(x: 150, y: 570)
+        #expect(DeskArrange.nearest(to: drop, in: content) == .ml)
+        let anchor = DeskArrange.target(point: drop, content: content, stacks: stacks, own: .bl)
+        #expect(anchor == .bl)
+        let stack = a.stack(anchor).filter { $0.widget != "meetings" }
+            .map { (widget: $0.widget, frame: tall[$0.widget] ?? .zero) }
+        a.put("meetings", at: anchor, before: DeskArrange.pieceAfter(y: drop.y, in: stack))
+        #expect(a.string == "message:tl meetings:bl clock:bl meters:bl")
+        // Just above the clock's outline and name label still counts as the stack.
+        #expect(DeskArrange.target(point: CGPoint(x: 150, y: 540), content: content, stacks: stacks, own: .bl) == .bl)
+    }
+
+    @Test("off every stack the nearest anchor wins; over another stack, that stack")
+    func targetFallback() {
+        let a = DeskArrangement(start)
+        let stacks = DeskArrange.stackBounds(a, frames: tall)
+        #expect(DeskArrange.target(point: CGPoint(x: 150, y: 480), content: content, stacks: stacks, own: .bl) == .ml)
+        #expect(DeskArrange.target(point: CGPoint(x: 1400, y: 900), content: content, stacks: stacks, own: .bl) == .br)
+        #expect(DeskArrange.target(point: CGPoint(x: 300, y: 90), content: content, stacks: stacks, own: .bl) == .tl)
+        #expect(DeskArrange.target(point: CGPoint(x: 150, y: 570), content: content, stacks: [:], own: .bl) == .ml)
+    }
+
+    @Test("where two stacks' bounds overlap, the dragged piece's own stack wins")
+    func ownFirst() {
+        let stacks: [DeskAnchor: CGRect] = [.ml: CGRect(x: 40, y: 400, width: 300, height: 300),
+                                            .bl: CGRect(x: 40, y: 600, width: 300, height: 330)]
+        let p = CGPoint(x: 100, y: 650)
+        #expect(DeskArrange.target(point: p, content: content, stacks: stacks, own: .bl) == .bl)
+        #expect(DeskArrange.target(point: p, content: content, stacks: stacks, own: .ml) == .ml)
+        #expect(DeskArrange.target(point: p, content: content, stacks: stacks, own: .tr) == .ml)
+    }
+
     @Test("within a stack: to the top, to the bottom, between")
     func withinStack() {
         var a = DeskArrangement(start)

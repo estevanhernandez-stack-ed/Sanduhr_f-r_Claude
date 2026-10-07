@@ -33,6 +33,36 @@ enum DeskArrange {
         return best
     }
 
+    /// How far around a stack's pieces a drop still counts as on that stack, in points: the
+    /// outline's pad and the name label that sits above it.
+    static let stackReach: CGFloat = 26
+
+    /// Each anchor's stack as one rectangle: the union of its drawn pieces' frames (the dragged
+    /// piece's own included, it stays drawn while dragged), grown by `reach`. Pieces with no
+    /// frame are skipped; an anchor with none drawn has no rectangle.
+    static func stackBounds(_ arrangement: DeskArrangement, frames: [String: CGRect],
+                            reach: CGFloat = stackReach) -> [DeskAnchor: CGRect] {
+        var out: [DeskAnchor: CGRect] = [:]
+        for piece in arrangement.pieces {
+            guard let f = frames[piece.widget], !f.isEmpty else { continue }
+            out[piece.anchor] = out[piece.anchor].map { $0.union(f) } ?? f
+        }
+        return out.mapValues { $0.insetBy(dx: -reach, dy: -reach) }
+    }
+
+    /// The anchor a drop at `point` lands on. Over a stack (`stackBounds`) it is that stack's
+    /// anchor, the dragged piece's own stack (`own`) first, so a drop anywhere on a tall stack
+    /// reorders within it even where its upper pieces reach past the halfway line to the next
+    /// anchor. Elsewhere it is the nearest anchor point.
+    static func target(point: CGPoint, content: CGRect, centerDrop: CGFloat = 0,
+                       stacks: [DeskAnchor: CGRect], own: DeskAnchor?) -> DeskAnchor {
+        if let own, stacks[own]?.contains(point) == true { return own }
+        if let over = DeskAnchor.allCases.first(where: { stacks[$0]?.contains(point) == true }) {
+            return over
+        }
+        return nearest(to: point, in: content, centerDrop: centerDrop)
+    }
+
     /// The piece a drop at height `y` goes in front of, in a stack listed top to bottom (the
     /// dragged piece left out): the first drawn piece whose middle is at or below `y`. nil puts
     /// it at the bottom of the stack. Pieces with no frame (not drawn) are skipped.

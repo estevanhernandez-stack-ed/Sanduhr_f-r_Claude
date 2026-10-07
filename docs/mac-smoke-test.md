@@ -1446,11 +1446,12 @@ the end.
    Desk, not the Finder: no icon selects, no Finder desktop menu opens, and a click on a meeting row
    does not join it. A two-finger click on the meters opens no menu.
 4. **Move.** Drag the clock: it fades where it was, an outline follows the pointer, and the eight
-   places light up as dots, the nearest one bigger and in the accent color. Drop it near the top
+   places light up as dots, the one it would land on bigger and in the accent color. Drop it near the top
    right: it lands at Top right with a short snap. Drop a piece near the top middle: it sits below
    the notch (and the island, when it shows), as Top center always does.
 5. **Reorder.** Drag the meetings up within Bottom left and drop them above the clock: they land at
-   the top of that stack. Drag the clock down below the meters: it lands under them.
+   the top of that stack, and Bottom left's dot stays lit the whole way up the stack (Middle left
+   does not take it). Drag the clock down below the meters: it lands under them.
 6. **Resize.** Drag the clock's handle away from the clock: it grows in steps of 10%, up to 160%;
    back toward it, it shrinks down to 60%. The pieces stacked with it move to make room.
 7. **The Dock.** With the Dock always shown at the bottom, the bottom places' dots sit above it and

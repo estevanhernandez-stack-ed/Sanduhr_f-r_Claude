@@ -9,6 +9,16 @@ struct DeskArrangeGeometry: Equatable {
     var centerDrop: CGFloat
 }
 
+extension DeskArrangeMode {
+    /// The anchor a drag of `widget` at `point` lands on: the stack under the pointer (its own
+    /// first), else the nearest anchor (DeskArrange.target). The drop and the lit anchor agree.
+    func target(of widget: String, at point: CGPoint, geometry: DeskArrangeGeometry) -> DeskAnchor {
+        let stacks = working.map { DeskArrange.stackBounds($0, frames: frames) } ?? [:]
+        return DeskArrange.target(point: point, content: geometry.content, centerDrop: geometry.centerDrop,
+                                  stacks: stacks, own: working?.placement(widget)?.anchor)
+    }
+}
+
 private struct DeskArrangeGeometryKey: EnvironmentKey {
     static let defaultValue: DeskArrangeGeometry? = nil
 }
@@ -119,14 +129,15 @@ private struct DeskArrangeable: ViewModifier {
             .onEnded { v in drop(at: v.location) }
     }
 
-    /// The drop: the nearest anchor, in front of the first piece there whose middle is below the
-    /// pointer (so a drop within the piece's own stack reorders it).
+    /// The drop: the stack under the pointer or else the nearest anchor, in front of the first
+    /// piece there whose middle is below the pointer (so a drop within the piece's own stack
+    /// reorders it, however tall the stack).
     private func drop(at location: CGPoint) {
         guard let geometry, let working = mode.working else {
             mode.drag = nil
             return
         }
-        let anchor = DeskArrange.nearest(to: location, in: geometry.content, centerDrop: geometry.centerDrop)
+        let anchor = mode.target(of: widget, at: location, geometry: geometry)
         let stack = working.stack(anchor)
             .filter { $0.widget != widget }
             .map { (widget: $0.widget, frame: mode.frames[$0.widget] ?? .zero) }
@@ -190,7 +201,7 @@ struct DeskArrangeOverlay: View {
     }
 
     private func lights(_ drag: DeskArrangeDrag) -> some View {
-        let target = DeskArrange.nearest(to: drag.location, in: geometry.content, centerDrop: geometry.centerDrop)
+        let target = mode.target(of: drag.widget, at: drag.location, geometry: geometry)
         return ForEach(DeskAnchor.allCases, id: \.self) { anchor in
             let lit = anchor == target
             Circle()

@@ -932,10 +932,13 @@ The pure pieces are in `DeskArrange.swift`, the views in `DeskArrangeViews.swift
   screen says what to do and holds Cancel and Done. A piece with nothing to draw (now playing
   while nothing plays) still gets a small box to grab.
 - **Move and reorder.** Dragging a piece fades it, an outline follows the pointer, and the eight
-  anchors light up as dots, the one it would land on bigger. The drop goes to the nearest anchor
-  (`DeskArrange.nearest`, measured as shares of the content's width and height so every screen
-  shape has the same zones), in front of the first piece there whose middle is below the pointer
-  (`DeskArrange.pieceAfter`, `DeskArrangement.put`); so a drop in a piece's own stack reorders it.
+  anchors light up as dots, the one it would land on bigger. A drop over a stack (its pieces'
+  frames plus 26 points for the outline and the name, `DeskArrange.stackBounds`) goes to that
+  stack, the dragged piece's own first (`DeskArrange.target`), so a tall stack whose top reaches
+  past the halfway line to the next anchor still reorders. Anywhere else it goes to the nearest
+  anchor (`DeskArrange.nearest`, measured as shares of the content's width and height so every
+  screen shape has the same zones). It lands in front of the first piece there whose middle is
+  below the pointer (`DeskArrange.pieceAfter`, `DeskArrangement.put`).
   Anchors, not free placement: a layout survives other displays and Dock moves.
 - **Resize.** The handle's drag grows or shrinks the piece by its share of the piece's width plus
   height, snapped live to Settings' 10% steps within 60% to 160% (`DeskArrange.scale`).
