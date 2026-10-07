@@ -522,9 +522,11 @@ network request; the files it writes are a Desk message request and a theme requ
 points it at a test folder (and Desk's folder beside it).
 
 **Desk messages from Claude (item 54).** `get_desk_messages` returns `{status, file_found, lines,
-pinned, rotate, today, limits}`: every raw line of Desk's `messages.txt`, whether a line is pinned,
-the rotation and the raw line the Desk shows now. Its description teaches the syntax (plain, `Mon:`,
-`MM-DD:`, `#`, the most specific pool, rotation, pinning) and the effects, with taste tips.
+pinned, rotate, mix_daily, today, today_special, limits}`: every raw line of Desk's `messages.txt`,
+whether a line is pinned, the rotation, the mix switch, the usual raw line the Desk shows now and the
+date lines it shows above it today. Its description teaches the syntax (plain, `Mon:`, `MM-DD:`,
+`#`, which line shows when, rotation, pinning; that birthdays, anniversaries and holidays are date
+lines that add to the day, one per person, added with mode add) and the effects, with taste tips.
 `propose_desk_messages {lines, mode: add|replace, note?}` checks the lines (1 to 60, 120 characters
 each, no control characters, at least one message line, prefixes and effects must parse; refusals
 come back at once with `reasons` and write nothing), then writes `desk-messages-request.json`
@@ -551,8 +553,22 @@ sidebar, and a notification without sound only while alerts are on (their delive
 `MessageSuggestionNotice`). Add appends and skips lines already in the list; Replace keeps the
 comment block at the top of the file and replaces the rest. Either way the previous file is kept as
 `messages.txt.previous`. A suggestion waits in memory (quitting drops it); a newer one replaces it.
-The app writes `desk-messages-state.json` (`{schema_version, pinned, pinned_line, rotate}`) when
-the pin or rotation changes, for `get_desk_messages`.
+The app writes `desk-messages-state.json` (`{schema_version, pinned, pinned_line, rotate,
+mix_daily}`) when the pin, the rotation or the mix switch changes, for `get_desk_messages`.
+
+**Which lines show (item 69).** Each day the Desk draws one usual line and, on a date with its own
+lines, those too (`MessageEngine.today`). The usual line comes from today's weekday lines when there
+are any, else from the plain lines; with Settings, Message's "Mix every-day lines in on days with
+their own line" (`messageMixDaily`, off by default) the weekday lines and the plain lines take
+turns together. Plain lines rotate by day; a weekday's lines rotate by week (they used to step by
+day, which comes round to a weekday every 7, so seven Friday lines always showed the same one).
+Date lines (`MM-DD:`) no longer replace the usual line: every line for today's date shows, stacked
+above it, each with its own effects; more than 3 take turns hourly, 3 at a time. Hourly rotation
+keeps hour steps within each pool. The message piece draws the date's lines at 0.8 times the
+message size (full size when no usual line shows) with a gap of 0.12 times the message size
+between lines (`DeskMessageStack`). Places with room for one line (the notch's Message choice)
+show the first date line, else the usual one. A pinned line skips the file, date lines included.
+`get_desk_messages` mirrors the rules (`desk_today`).
 
 **Message effects.** Tags at the start of a line's text, after any prefix, in any order:
 `{ink:#hex,…}` (1 to 4 colors, a gradient from two), `{glow}` / `{noglow}` (over Settings, Desk,
@@ -596,8 +612,14 @@ write the existing tags only, in the order ink, glow, size, font, motion: Friday
 sunset gradient in script with a sweep is `Fri: {ink:#ff7e5f,#feb47b,#ffd86f} {font:script}
 {sweep} ship it.` Rows have Pin (today's line stays: the pin holds the row's tags and text),
 Duplicate, Move Up, Move Down and Delete (the row's menu; VoiceOver has Move Up and Move Down too),
-and drag to reorder. Add Line, the rotation (Once a day, Every hour), Save (Command-S) and Revert
-sit above the list. **Edit as text…** shows the file itself with the tag reference beside it and the
+and drag to reorder. Add Line, the rotation (Once a day, Every hour), the mix switch, Save
+(Command-S) and Revert sit above the list, with "Today:" naming everything the Desk draws today
+(the date's lines, then the usual one, joined by " / "). Each row's note says what happens to it
+(`MessageDocument.note`): "October 31 · shows above the day's message" (plus "· with N others that
+day", and "· 3 at a time, taking turns hourly" past three), "Fridays · takes turns with N others"
+or "Fridays · shows instead of the every-day lines" ("· mixes with every-day lines" with the switch
+on), "Every day · takes turns with N others · steps aside on days with their own line" ("· mixes in
+on days with their own line" with the switch on). **Edit as text…** shows the file itself with the tag reference beside it and the
 free pin field; Edit as a list goes back. Both views edit one document (`MessageEditorModel`), and
 switching carries unsaved edits across. `MessageLineModel` reads the file into rows: a styled row
 (when, text, look) for each line the controls can represent; a raw row, shown as written and kept

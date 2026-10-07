@@ -1378,7 +1378,22 @@ its `shasum`.
     and Move Down on a row. With Reduce Motion on, the row previews hold still.
 13. `smoke/smoke run scenarios/message-editor.yaml` passes: it adds the smoke's own line unsaved and
     reverts it; `messages.txt` is untouched (`shasum`). `smoke/smoke state` shows `message_editor`
-    (`open`, `mode`, `rows`, `styled`, `raw`, `notes`, `unsaved`, `added`): counts and flags, never
+    (`open`, `mode`, `rows`, `styled`, `raw`, `notes`, `unsaved`, `today_special`, `added`): counts and flags, never
     one of your lines.
+14. **Special days add.** Add two lines for today's date (`MM-DD: happy birthday, Sam.` and
+    `MM-DD: happy birthday, Alex.`) and Save: the Desk draws both, a little smaller, stacked above
+    the day's usual line, each with its own effects; the Message preview shows the same stack;
+    "Today:" reads "Today: happy birthday, Sam. / happy birthday, Alex. / <usual line>". Their rows
+    read "<Month day> · shows above the day's message · with 1 other that day". The notch's
+    Message shows "happy birthday, Sam.". `smoke/smoke state` shows `message_editor.today_special: 2`.
+    Add two more for today: three show, and the set changes on the hour.
+15. **Weekday lines.** Rows read "Fridays · takes turns with N others" (or "· shows instead of the
+    every-day lines" for one) and the every-day rows "Every day · … · steps aside on days with their
+    own line". Switch on "Mix every-day lines in on days with their own line": the notes change to
+    "· mixes with every-day lines" and "· mixes in on days with their own line", and
+    `get_desk_messages` reports `mix_daily: true`. Switch it off again.
+16. **Claude.** `get_desk_messages` returns `today` (the usual line) and `today_special` (the
+    date lines). Ask Claude Code to add birthdays for the year: it proposes `MM-DD:` lines with
+    mode add, one per person.
 
 Put your list back: `cp ~/messages.txt.bak ~/Library/Application\ Support/Desk/messages.txt`.
