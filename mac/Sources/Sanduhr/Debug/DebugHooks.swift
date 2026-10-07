@@ -310,6 +310,7 @@ enum DebugHooks {
         s.menuBar = .saved()
         s.settingsOpen = settings.isOpen
         s.settingsSection = settings.window == nil ? nil : settings.section
+        s.settingsPreview = settings.isOpen ? SettingsPreviewKind.of(settings.section) : nil
         s.usagePageOpen = settings.isOpen && settings.section == .usage
         s.usageTab = settings.usageTab
         // A `defaults write` from the smoke runner posts no change notice here: apply the saved

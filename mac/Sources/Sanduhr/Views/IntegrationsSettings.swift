@@ -100,6 +100,16 @@ final class IntegrationsModel {
         }.value
     }
 
+    /// Sanduhr's statusline printed once against the sample statusline JSON, for the page's
+    /// preview (item 68). Nil when it couldn't run (no python3, a build without the scripts).
+    func sampleStatusline() async -> String? {
+        guard let python = pythonPath else { return nil }
+        return await Task.detached(priority: .userInitiated) { () -> String? in
+            guard let args = IntegrationInstaller.standard.sampleArguments() else { return nil }
+            return StatuslinePreview.run(python: python, arguments: args, input: StatuslinePreview.sampleJSON())
+        }.value
+    }
+
     /// The input for Test with live data: Sanduhr's current numbers and the folder's latest
     /// session (item 63b).
     func liveStatuslineInput(folder: String) async -> StatuslineLiveInput.Result {
@@ -217,6 +227,7 @@ struct IntegrationsSettings: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                IntegrationsPreview(model: model, live: DeskController.shared.model)
                 IntegrationsIntro()
                 PythonRow(model: model, reload: reload)
                 folderList
@@ -468,20 +479,33 @@ private struct IntegrationConsentSheet: View {
     /// The statusline sheet when one is already set: Combine, Replace or Cancel.
     private var offersCombine: Bool { consent.kind == .statusline && consent.other != nil }
 
+    /// The sheet's content scrolls above its buttons, so a tall Combine picker never pushes them
+    /// off the screen (2026-10-07). About 220 points stay for the title bar and the buttons.
+    static var maxContentHeight: CGFloat {
+        max(260, (NSScreen.main?.visibleFrame.height ?? 800) - 220)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            header
-            if offersCombine, let other = consent.other {
-                CombineChoice(other: other, folder: model.display(consent.folder), folderPath: consent.folder,
-                              model: model, join: $join,
-                              selection: $selection)
-            } else if let other = consent.other {
-                ReplaceNotice(other: other, folder: model.display(consent.folder), kind: consent.kind)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    header
+                    if offersCombine, let other = consent.other {
+                        CombineChoice(other: other, folder: model.display(consent.folder), folderPath: consent.folder,
+                                      model: model, join: $join,
+                                      selection: $selection)
+                    } else if let other = consent.other {
+                        ReplaceNotice(other: other, folder: model.display(consent.folder), kind: consent.kind)
+                    }
+                    Text(writes)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Text(writes)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            .frame(maxHeight: Self.maxContentHeight)
+            .fixedSize(horizontal: false, vertical: true)
             buttons
         }
         .padding(20)

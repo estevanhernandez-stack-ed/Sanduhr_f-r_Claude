@@ -35,6 +35,8 @@ struct DebugStateInput {
     var menuBar = MenuBarMode.higher
     var settingsOpen = false
     var settingsSection: SettingsSection?
+    /// The preview card the open Settings section shows (item 68), nil for none or closed.
+    var settingsPreview: SettingsPreviewKind?
     /// The Claude Usage page (item 48) shows, and its tab. Never a label, project or number.
     var usagePageOpen = false
     var usageTab = UsageTab.overview
@@ -340,6 +342,8 @@ enum DebugState {
         pairs.append(("tour", tourYAML(s.tour)))
         pairs.append(("watchers", watchersYAML(s.watchers)))
         pairs.append(("av_indicators", avIndicatorsYAML(s.avIndicators)))
+        // Item 68: which preview card the open Settings section shows (SettingsPreviewKind).
+        pairs.append(("settings_preview", s.settingsPreview.map { .string($0.rawValue) } ?? .null))
         return .object(pairs)
     }
     

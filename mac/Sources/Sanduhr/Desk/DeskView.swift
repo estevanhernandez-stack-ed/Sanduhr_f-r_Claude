@@ -30,23 +30,15 @@ struct DeskView: View {
     var model: DeskModel
 
     @AppStorage("layout", store: .desk) private var layout = "message:tl clock:bl claude:bl meetings:bl"
-    @AppStorage("font", store: .desk) private var savedFont: String?
-    /// The Desk font as drawn: EsteFont 26 unless a font was picked (DeskFont, item 58).
-    private var font: String { DeskFont.resolve(saved: savedFont) }
-    @AppStorage("messageFont", store: .desk) private var messageFont = ""
     @AppStorage("left", store: .desk) private var left = 52.0
     @AppStorage("right", store: .desk) private var right = 52.0
     @AppStorage("top", store: .desk) private var top = 40.0
     @AppStorage("bottom", store: .desk) private var bottom = 60.0
     @AppStorage("timeSize", store: .desk) private var timeSize = 112.0
-    @AppStorage("messageSize", store: .desk) private var messageSize = 84.0
-    @AppStorage("messageColor", store: .desk) private var messageColor = "9ad7ff"
-    @AppStorage(DeskMessageLook.glowKey, store: .desk) private var messageGlow = true
     @AppStorage("showMeetings", store: .desk) private var showMeetings = true
     @AppStorage("showClaude", store: .desk) private var showClaude = true
-    @AppStorage("inkColor", store: .desk) private var ink = "ffffff"
 
-    enum Widget: String { case clock, claude, meters, nowPlaying, watchers, meetings, message }
+    enum Widget: String, CaseIterable { case clock, claude, meters, nowPlaying, watchers, meetings, message }
     enum Slot: String { case tl, tr, bl, br }
 
     private var inset: CGFloat { timeSize * 0.18 }
@@ -92,31 +84,55 @@ struct DeskView: View {
     }
 
     private func column(top: [Widget], bottom: [Widget], alignment: HorizontalAlignment) -> some View {
-        VStack(alignment: alignment, spacing: DeskNowPlaying.columnSpacing) {
-            ForEach(top, id: \.self) { view(for: $0, alignment: alignment) }
+        let lineInLayout = placement.values.contains { $0.contains(.claude) }
+        return VStack(alignment: alignment, spacing: DeskNowPlaying.columnSpacing) {
+            ForEach(top, id: \.self) { DeskPiece(widget: $0, model: model, alignment: alignment, lineInLayout: lineInLayout) }
             Spacer(minLength: 32)
-            ForEach(bottom, id: \.self) { view(for: $0, alignment: alignment) }
+            ForEach(bottom, id: \.self) { DeskPiece(widget: $0, model: model, alignment: alignment, lineInLayout: lineInLayout) }
         }
         .frame(maxHeight: .infinity)
     }
+}
 
-    @ViewBuilder
-    private func view(for widget: Widget, alignment: HorizontalAlignment) -> some View {
+/// One Desk piece as the desktop draws it, in the Desk's font, sizes and ink: the clock, the
+/// claude line, the meters, now playing, the watchers, the meetings or the message. DeskView
+/// places these in its corners; Settings' previews (item 68) draw the same pieces under
+/// `isSurfacePreview`, where they report no frames and take no clicks.
+struct DeskPiece: View {
+    let widget: DeskView.Widget
+    var model: DeskModel
+    let alignment: HorizontalAlignment
+    /// The claude line is placed somewhere: a switch's note shows there, else on the meters.
+    var lineInLayout = true
+    /// The Message preview's Replay: a `{shimmer}` line sweeps at once instead of after its rest.
+    var sweepFirst = false
+
+    @AppStorage("font", store: .desk) private var savedFont: String?
+    /// The Desk font as drawn: EsteFont 26 unless a font was picked (DeskFont, item 58).
+    private var font: String { DeskFont.resolve(saved: savedFont) }
+    @AppStorage("messageFont", store: .desk) private var messageFont = ""
+    @AppStorage("timeSize", store: .desk) private var timeSize = 112.0
+    @AppStorage("messageSize", store: .desk) private var messageSize = 84.0
+    @AppStorage("messageColor", store: .desk) private var messageColor = "9ad7ff"
+    @AppStorage(DeskMessageLook.glowKey, store: .desk) private var messageGlow = true
+    @AppStorage("inkColor", store: .desk) private var ink = "ffffff"
+
+    var body: some View {
         switch widget {
-        case .clock: clock(alignment: alignment).deskInk()
+        case .clock: clock.deskInk()
         case .claude: claude.deskInk()
-        case .meters: meters(alignment: alignment).deskInk()
-        case .nowPlaying: nowPlaying(alignment: alignment).deskInk()
+        case .meters: meters.deskInk()
+        case .nowPlaying: nowPlaying.deskInk()
         case .watchers: DeskWatchers(model: model, font: font, size: timeSize * 0.17, alignment: alignment).deskInk()
-        case .meetings: meetings(alignment: alignment).deskInk()
-        case .message: message(alignment: alignment)
+        case .meetings: meetings.deskInk()
+        case .message: message
         }
     }
 
     /// The now playing element (item 53b): "▶ Title · Artist" over its position bar while a track
     /// shows, nothing otherwise. Padded so its click area stays clear of its neighbours'.
     @ViewBuilder
-    private func nowPlaying(alignment: HorizontalAlignment) -> some View {
+    private var nowPlaying: some View {
         if let info = model.nowPlaying {
             DeskNowPlayingLine(info: info, model: model, ink: ink, font: font, size: timeSize * 0.17,
                                width: timeSize * 3.2, alignment: alignment)
@@ -124,7 +140,7 @@ struct DeskView: View {
         }
     }
 
-    private func clock(alignment: HorizontalAlignment) -> some View {
+    private var clock: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             VStack(alignment: alignment, spacing: 2) {
                 // The time is the Desk's heading: EsteFont 26 draws it in its Bold face.
@@ -136,9 +152,6 @@ struct DeskView: View {
             }
         }
     }
-
-    /// The claude line in the layout: a switch's note shows there, else on the meters.
-    private var lineInLayout: Bool { placement.values.contains { $0.contains(.claude) } }
 
     /// The claude line. During an account switch the old account's line keeps its place unseen
     /// (AccountSwitchFade) and the faint note shows over it once the fetch outlasts the fade.
@@ -186,7 +199,7 @@ struct DeskView: View {
     /// A bar per Claude limit, in the widget's order: label and percent over a bar in the ink,
     /// a pace tick where the widget puts its own, and the reset time underneath.
     @ViewBuilder
-    private func meters(alignment: HorizontalAlignment) -> some View {
+    private var meters: some View {
         let noteHere = model.switchNote && !lineInLayout
         if !model.meters.isEmpty || model.signInNeeded || noteHere {
             let size = timeSize * 0.17
@@ -217,7 +230,7 @@ struct DeskView: View {
         }
     }
 
-    private func meetings(alignment: HorizontalAlignment) -> some View {
+    private var meetings: some View {
         VStack(alignment: alignment, spacing: 2) {
             if let note = model.calendarNote {
                 // Clickable like a meeting row: DeskController opens System Settings at
@@ -245,11 +258,11 @@ struct DeskView: View {
     /// takes one hex, or two or more separated by commas for a left-to-right gradient (to match
     /// Ice's menu bar tint); a line's {ink:…} replaces it for that line.
     @ViewBuilder
-    private func message(alignment: HorizontalAlignment) -> some View {
+    private var message: some View {
         if let text = model.message {
             DeskMessageLine(raw: text, font: messageFont.isEmpty ? font : messageFont, baseSize: messageSize,
                             inkSpec: messageColor, globalGlow: messageGlow, alignment: alignment,
-                            paused: model.motionPaused)
+                            paused: model.motionPaused, sweepFirst: sweepFirst)
         }
     }
 
@@ -454,11 +467,46 @@ extension View {
     /// Nothing clears a frame on disappear: when Desk comes back (off and on, a layout change) the
     /// old views' onDisappear ran after the new views' onAppear and wiped the fresh frames. A
     /// stale frame is harmless, because DeskElements lists only what is drawn now.
+    /// Under `isSurfacePreview` (Settings' previews, item 68) nothing is reported: a preview's
+    /// pieces are never click areas.
     func onGlobalFrame(_ report: @escaping (CGRect) -> Void) -> some View {
-        background(GeometryReader { geo in
-            Color.clear
-                .onAppear { report(geo.frame(in: .global)) }
-                .onChange(of: geo.frame(in: .global)) { _, frame in report(frame) }
-        })
+        modifier(GlobalFrameReport(report: report))
+    }
+}
+
+private struct GlobalFrameReport: ViewModifier {
+    let report: (CGRect) -> Void
+    @Environment(\.isSurfacePreview) private var preview
+
+    func body(content: Content) -> some View {
+        if SurfacePreview.reportsFrames(preview: preview) {
+            content.background(GeometryReader { geo in
+                Color.clear
+                    .onAppear { report(geo.frame(in: .global)) }
+                    .onChange(of: geo.frame(in: .global)) { _, frame in report(frame) }
+            })
+        } else {
+            content
+        }
+    }
+}
+
+/// A surface drawn as a preview in Settings (item 68): the real view, fed a preview model,
+/// that reports no frames, takes no clicks and registers no click areas.
+enum SurfacePreview {
+    /// Frames go to the model only off a preview.
+    static func reportsFrames(preview: Bool) -> Bool { !preview }
+}
+
+private struct SurfacePreviewKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// True inside a Settings preview card (SettingsPreviewCard): the surfaces' views draw as
+    /// usual but report no frames for click routing.
+    var isSurfacePreview: Bool {
+        get { self[SurfacePreviewKey.self] }
+        set { self[SurfacePreviewKey.self] = newValue }
     }
 }

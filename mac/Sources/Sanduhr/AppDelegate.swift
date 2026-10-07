@@ -266,6 +266,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // MARK: Status item
+    // The hourglass and the percent beside it; MenuBarItemLook styles the text, for the status
+    // item and Settings, General's preview alike (item 68).
 
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -320,20 +322,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let reading = MenuBarText.reading(viewModel.usage, mode: .saved(), step: menuBarStep)
 
         if let reading {
-            let intPct = reading.percent
-            // Color the number only when urgency is high — keeps the menu
-            // bar neutral the rest of the time (HIG preference).
-            let color: NSColor
-            switch intPct {
-            case 90...:   color = NSColor(red: 0.97, green: 0.44, blue: 0.44, alpha: 1) // red
-            case 75...89: color = NSColor(red: 0.98, green: 0.58, blue: 0.24, alpha: 1) // orange
-            default:      color = .labelColor
-            }
-            let font = NSFont.monospacedDigitSystemFont(
-                ofSize: NSFont.systemFontSize(for: .small), weight: .medium)
+            let look = MenuBarItemLook(reading)
             button.attributedTitle = NSAttributedString(
-                string: " \(reading.text)",
-                attributes: [.foregroundColor: color, .font: font])
+                string: look.title,
+                attributes: [.foregroundColor: look.color, .font: MenuBarItemLook.font])
         } else {
             // No data yet — just the icon.
             button.attributedTitle = NSAttributedString(string: "")

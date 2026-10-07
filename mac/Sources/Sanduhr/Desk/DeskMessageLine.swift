@@ -21,6 +21,8 @@ struct DeskMessageLine: View {
     let alignment: HorizontalAlignment
     let paused: Bool
     var lineLimit = 2
+    /// Settings, Message's preview Replay (item 68): the first `{shimmer}` sweep comes at once.
+    var sweepFirst = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var reveal: CGFloat = 0
@@ -85,8 +87,12 @@ struct DeskMessageLine: View {
         withTransaction(snap) { sweep = 0 }
         guard runs else { return }
         let rest = MessageMotion.shimmerPeriod - MessageMotion.shimmerSweep
+        var first = true
         while !Task.isCancelled {
-            do { try await Task.sleep(for: .seconds(rest)) } catch { return }
+            // Settings' Replay sweeps at once; the Desk waits its rest first.
+            let wait = first && sweepFirst ? 0.3 : rest
+            first = false
+            do { try await Task.sleep(for: .seconds(wait)) } catch { return }
             withAnimation(.easeInOut(duration: MessageMotion.shimmerSweep)) { sweep = 1 }
             do { try await Task.sleep(for: .seconds(MessageMotion.shimmerSweep)) } catch { return }
             withTransaction(snap) { sweep = 0 }

@@ -200,9 +200,18 @@ struct NotchWingsView: View {
     @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
     @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
     @AppStorage(NowPlayingIdle.key, store: .desk) private var idle = NowPlayingIdle.automatic
+    /// Settings, Now Playing's preview (item 68): the wings drawn with the island on, text on and
+    /// these contents, whatever the Notch page says; nil everywhere else.
+    var showing: Showing? = nil
+
+    /// What a preview draws in each wing.
+    struct Showing: Equatable {
+        var left: NotchContent
+        var right: NotchContent
+    }
 
     var body: some View {
-        if enabled {
+        if enabled || showing != nil {
             // Read here so a track change (or a watcher) redraws at once, not at the next 15-second tick.
             let _ = model.nowPlaying
             let _ = model.watchers
@@ -210,8 +219,8 @@ struct NotchWingsView: View {
             let _ = model.avIndicators
             let _ = model.avSpot
             TimelineView(.periodic(from: .now, by: 15)) { context in
-                let w = Self.layout(model: model, now: context.date, wings: wings, showText: showText,
-                                    left: leftContent, right: rightContent, idle: idle,
+                let w = Self.layout(model: model, now: context.date, wings: wings, showText: showText || showing != nil,
+                                    left: showing?.left ?? leftContent, right: showing?.right ?? rightContent, idle: idle,
                                     font: font, notchHeight: notchHeight)
                 let left = w.leftText, right = w.rightText, size = w.size
                 let wingL = w.left, wingR = w.right
@@ -454,6 +463,13 @@ struct NotchWingsView: View {
 
     /// Widest a wing can get, so the window never needs resizing.
     static let maxWings: CGFloat = 180
+
+    /// How far the wings' window reaches past the notch on each side: the widest wing, the camera
+    /// and mic indicators beside the camera (item 67) and the flare. The window (DeskController)
+    /// and Settings, Notch's preview (item 68) are this wide.
+    static func windowPad(notchHeight: CGFloat) -> CGFloat {
+        maxWings + AVIndicatorLayout.maxRoom(textSize(notchHeight)) + 12
+    }
 }
 
 /// The now playing menu as SwiftUI items, for the notch wings' context menu (the Desk uses

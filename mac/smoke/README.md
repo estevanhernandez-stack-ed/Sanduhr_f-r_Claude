@@ -64,7 +64,9 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   `strip` and `desk`; `source`, `adapter`, `fallback` or `off`; `state`, `playing`, `paused` or
   `none`; never a title, an artist or an app),
   `widget_visible`, `widget_visibility` (When the widget shows: `always`, `whileDeskOff` or
-  `onRequest`; `always` when unset), `settings_open`, `settings_section`, `meters` (tier, label, percent, fill,
+  `onRequest`; `always` when unset), `settings_open`, `settings_section`, `settings_preview` (item 68: the
+  preview card the open section shows, `notch`, `layout`, `look`, `meters`, `message`, `nowPlaying`, `widget`,
+  `menuBar` or `integrations`; null for none or with Settings closed), `meters` (tier, label, percent, fill,
   pace, reset, `warning`: the row draws red with the ink glow, per Settings, Desk, Meters), `widget_warnings` (the
   widget's tiers drawing red with a glow, same rule and settings, in display order), `meetings_count`, `desk_frames` (every interactive Desk element while Desk runs: `kind` is `meters`, `meter_row`, `account`, `note`, `meeting_row`, `meetings`, `now_playing` or `now_playing_next`; `key` is the limit's tier for a meter row, the row's index for a meeting row and `desk` or `strip` for now playing, never a title or a label; `clickable`; `frame` as `[x, y, w, h]` in whole points from the Desk window's top left), `desk_frames_ok` (the app's own check of those frames: each drawn element has a non-empty frame inside the Desk window, rows lie within their block, and no two click areas of different kinds overlap, slack included) and `desk_frames_problem` (why not, such as `meters frame empty`; null when ok), `dock` (item 56: `side` `bottom`, `left` or `right` and `autohide`, the Dock's own settings, read only; `inset`, the points the Desk's corners on that side are moved in now: the Dock's reach when always shown, its depth while an auto-hiding Dock shows, 0 otherwise), `alerts`, `last_fetch`, `active_tool`, `pacing_pinned`,
   `pulse_count`, `glow_count` (notch glows fired so far, drawn or not; a pulse fires one too), `glow_shape` (what the last

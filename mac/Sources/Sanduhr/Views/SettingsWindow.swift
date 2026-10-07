@@ -100,14 +100,32 @@ final class SettingsWindowController {
             w.title = "Sanduhr Settings"
             w.isReleasedWhenClosed = false
             w.minSize = NSSize(width: 640, height: 480)
-            w.contentView = NSHostingView(rootView: SettingsRoot(
+            let host = NSHostingView(rootView: SettingsRoot(
                 vm: app.viewModel, deskModel: DeskController.shared.model, updates: app.updates,
                 navigation: navigation))
+            // The window keeps the size it has: left to SwiftUI, a page's natural height (the
+            // preview cards, item 68) grew it past the screen with no way to scroll or close it
+            // (2026-10-07). Each page scrolls inside the window instead.
+            host.sizingOptions = []
+            w.contentView = host
             w.center()
             window = w
         }
+        if let w = window { Self.fitToScreen(w) }
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
+    }
+
+    /// Keeps the window, title bar included, on the screen it is on: never taller or wider than
+    /// the visible frame, moved back inside it when it hangs off an edge.
+    static func fitToScreen(_ w: NSWindow) {
+        guard let visible = (w.screen ?? NSScreen.main)?.visibleFrame else { return }
+        var f = w.frame
+        f.size.width = min(f.width, visible.width)
+        f.size.height = min(f.height, visible.height)
+        f.origin.x = min(max(f.minX, visible.minX), visible.maxX - f.width)
+        f.origin.y = min(max(f.minY, visible.minY), visible.maxY - f.height)
+        if f != w.frame { w.setFrame(f, display: true) }
     }
 }
 
@@ -188,20 +206,25 @@ struct SettingsRoot: View {
 
     @ViewBuilder
     private var detail: some View {
+        // Each pane that controls something visible has its live preview on top (item 68,
+        // SettingsPreviewKind); Integrations draws its own, which needs the page's model.
         switch navigation.selection {
-        case .general: GeneralSection()
-        case .deskLayout: DeskLayoutSection()
-        case .deskLook: DeskLookSection()
-        case .deskMeters: DeskMetersSection(model: deskModel)
-        case .message: DeskMessageSection(model: deskModel).padding(20)
-        case .notch: DeskNotchSection()
-        case .nowPlaying: NowPlayingSection()
+        case .general: GeneralSection().withPreview { MenuBarPreview(vm: vm) }
+        case .deskLayout: DeskLayoutSection().withPreview { DeskLayoutPreview(live: deskModel) }
+        case .deskLook: DeskLookSection().withPreview { DeskLookPreview(live: deskModel) }
+        case .deskMeters: DeskMetersSection(model: deskModel).withPreview { DeskMetersPreview(live: deskModel) }
+        case .message: DeskMessageSection(model: deskModel).padding(20).withPreview { DeskMessagePreview(live: deskModel) }
+        case .notch: DeskNotchSection().withPreview { NotchPreview(live: deskModel) }
+        case .nowPlaying: NowPlayingSection().withPreview { NowPlayingPreview(live: deskModel) }
         case .updates: UpdatesSection(updates: updates)
         case .about: AboutSection()
         case .credentials: AccountsSettings(vm: vm, navigation: navigation)
         case .usage: UsageSettings(vm: vm, navigation: navigation, theme: vm.theme.palette)
         case .integrations: IntegrationsSettings(vm: vm, navigation: navigation)
-        case .widgetLook, .themes, .pacing, .alerts:
+        case .widgetLook, .pacing:
+            WidgetSettings(vm: vm, section: navigation.selection).id(navigation.selection)
+                .withPreview { WidgetPreview(vm: vm) }
+        case .themes, .alerts:
             // A fresh view per section, so a section's unsaved fields start empty.
             WidgetSettings(vm: vm, section: navigation.selection).id(navigation.selection)
         }

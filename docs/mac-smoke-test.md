@@ -1185,3 +1185,41 @@ at any step.
     camera off` takes it away (likewise `mic`). `smoke/smoke run scenarios/av-indicators.yaml`
     passes and puts the settings back.
 12. Clean up: the dot back to Never, the mic switch off.
+
+## 33. A live preview in every settings pane (item 68)
+
+Desk on. Go pane by pane; each card sits at the top, about 160 points tall, and takes no clicks
+(only its button does).
+
+1. **Fresh install** (or a signed-out test account, no calendar access, nothing playing, no
+   watchers): every card shows something, never blank, with a "Sample: …" label naming what is
+   made up (meters, meetings, message, track, watcher, camera and mic). After the first fetch the
+   meters lose the label.
+2. **Notch**: the island at true proportions, both wings, the strip when there is extra height
+   and text under the camera, the camera and mic indicators as their switches say. Change the
+   width, the height, each wing's content and the side of the indicators: the card follows at
+   once. **Test Glow** on the card (and the one in Glow) glows the card and the real notch
+   together. Turn the island off: the card shows the plain notch. On a Mac without a notch the
+   card shows the top tab.
+3. **Layout**: the screen map shows the menu bar, the Dock on its edge and each piece in its
+   corner in stacking order; moving a piece or a margin moves it on the map at once; Hidden takes
+   it off.
+4. **Look**: the message, clock and date, and meters in the chosen fonts, sizes, ink, shadow and
+   glow; each control changes the card at once.
+5. **Meters**: a warning row red with its glow; change a threshold so it no longer warns: the row
+   turns back at once. Hide a temporary limit: it leaves the bars and "Hidden: …" names it.
+6. **Message**: today's line with its effects; with a `{write}` or `{shimmer}` line, **Replay**
+   writes it in again or sweeps it at once. Pin a line: the card shows it.
+7. **Now Playing**: a wing playing, paused (with Next; with Hide while paused on, the stand-in)
+   and with nothing playing (the When nothing is playing choice), and the Desk line.
+8. **Widget Look** and **Pacing & Focus**: the widget's cards in the theme and font; Subtle mode
+   drops the glass; Pin the pacing calculators shows them on every card.
+9. **General**: the menu bar item as it will read; Rotate shows both readings ("S 42%" then
+   "W 91%").
+10. **Integrations**: Sanduhr's statusline in a terminal frame (sample input) and a watcher card.
+    Without Python: "No preview: Python or the scripts weren't found."
+11. Reduce Motion on: the message's write-in and shimmer, the camera dot's pulse and the glow
+    hold still. VoiceOver reads each card as one sentence.
+12. `smoke/smoke state` shows `settings_preview` (`notch`, `layout`, `look`, `meters`, `message`,
+    `nowPlaying`, `widget`, `menuBar`, `integrations`, or null). `smoke/smoke run
+    scenarios/settings-sections.yaml` snaps each pane with its card.

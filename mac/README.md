@@ -889,6 +889,27 @@ so the next update shows only newer cards. Take the Tour… in Settings, About a
 again any time with the current settings, recording nothing. The cards live in
 `Sources/Sanduhr/Models/WelcomeTourSteps.swift`; a card that needs a feature this Mac lacks hides.
 
+## Settings previews
+
+Every Settings page that controls something visible opens with a preview card about 160 points
+tall (Notch, Layout, Look, Meters, Message, Now Playing, Widget Look, Pacing & Focus, General,
+Integrations; Themes keeps its gallery). Each card is drawn by the surface's own views, never a
+mock: NotchView, NotchWingsView, NotchGlowView and AVIndicatorBadge for the notch, DeskPiece (the
+Desk's pieces, factored out of DeskView) for Look, Meters, Message and Now Playing,
+WidgetCardStack in WidgetGlass (factored out of RootView) for the widget, MenuBarText and
+MenuBarItemLook (shared with the status item) for the menu bar, and TerminalPreviewFrame for
+Sanduhr's statusline. The views read the same saved settings the page writes, so a change shows
+within a frame; their data is a preview `DeskModel` filled from the live one by
+`SurfacePreviewData.fill` (through `DeskModel.update`, so the rows come from the Desk's own
+functions), with sample meters, demo mode's meetings, a sample track and a sample watcher where
+there is no live data yet, named on a "Sample" label. Layout draws `DeskLayoutMap`, a screen-shaped
+map with each piece in its corner and the Dock on its edge. Previews run under
+`isSurfacePreview`: they take no clicks, report no frames and register no click areas; content is
+scaled to fit, never cropped; Reduce Motion stills them; each has a one-sentence VoiceOver label.
+Nothing captures the screen. `TerminalPreviewFrame` (a dark terminal frame, monospaced, ANSI colors
+by ANSIText, powerline glyphs by PowerlineGlyph, an optional animation clock) is shared for later
+terminal previews. state.yaml's `settings_preview` names the card the open page shows.
+
 ## Files
 
 - `sessionKey:{label}` + `cf_clearance:{label}` per account → the Keychain, service `com.626labs.sanduhr` (release builds), or `~/Library/Application Support/Sanduhr/credentials.json` (mode `0600`, dev builds); see First run and Accounts above
