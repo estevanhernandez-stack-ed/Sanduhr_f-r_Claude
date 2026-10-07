@@ -279,7 +279,7 @@ eq('watchers there before are left alone',
    [Restore.plan(base.merge('watchers' => { 'count' => 2 }), base.merge('watchers' => { 'count' => 3 })),
     Restore.plan(base.merge('watchers' => { 'count' => 0 }), base.merge('watchers' => { 'count' => 0 }))], [[], []])
 eq('watchers state never carries a title',
-   state['watchers'], { 'count' => 0, 'states' => [], 'placements' => [], 'agents' => false, 'background' => false })
+   state['watchers'], { 'count' => 0, 'states' => [], 'placements' => [], 'agents' => false, 'background' => false, 'intro' => false })
 eq('camera light from a running camera is left alone',
    Restore.plan(base, base.merge('camera_light' => true, 'camera_in_use' => true)), [])
 

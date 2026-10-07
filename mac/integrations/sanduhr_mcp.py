@@ -190,12 +190,15 @@ THEME_GUIDE = (
 
 WATCH_GUIDE_START = (
     "Put up a watcher: a live card on the user's notch or Desk for work you are keeping an eye on "
-    "(a CI run, a deploy, a long build or test run, a migration). Shows the title, a state dot, the "
-    "time so far, done/total when you pass a total, and a one-line note; a click opens the link. "
+    "(a CI run, a deploy, a long build or test run, a migration). The notch shows the full line once "
+    "(title, time so far, done/total when you pass a total), then rests on '<short> · <done/total>', "
+    "so pass short: a name of up to 12 characters such as 'PR 140', 'v2.8.0' or 'deploy' (without "
+    "it Sanduhr derives one from the title). The Desk shows the full title and a one-line note; a "
+    "click opens the link. "
     "Returns the watcher's id: move it with watch_update (progress, a note, or state waiting when "
     "the user must act: it pulses and glows the notch) and finish it with watch_end (passed or "
     "failed). Without an update for 10 minutes it greys as lost touch, so update long jobs. Limits: "
-    "title 1 to 80 characters on one line, link https only, total 1 to 1000000. Pass work: true for "
+    "title 1 to 80 characters on one line, short up to 12, link https only, total 1 to 1000000. Pass work: true for "
     "anything from the user's employer, so it hides in demo mode. Refused with reason "
     "watchers_off when the user has not turned on Let agents show watchers in Sanduhr (Settings, "
     "Integrations); then do not retry.")
@@ -349,7 +352,8 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "title": {"type": "string", "maxLength": 80, "description": "What is being watched, one line (\"CI on main\")."},
+                "title": {"type": "string", "maxLength": 80, "description": "What is being watched, one line (\"PR 140 CI: combine statuslines\")."},
+                "short": {"type": "string", "maxLength": 12, "description": "The notch's resting name, up to 12 characters: \"PR 140\", \"v2.8.0\", \"deploy\". Pass one; without it Sanduhr derives one from the title."},
                 "link": {"type": "string", "maxLength": 2048, "description": "An https link a click opens (the run's page)."},
                 "total": {"type": "integer", "minimum": 1, "maximum": 1000000, "description": "How many steps there are, for done/total."},
                 "work": {"type": "boolean", "description": "Work for the user's employer: hidden in demo mode. Default false."},
@@ -419,6 +423,7 @@ BUILT_IN_THEME_IDS = ["obsidian", "aurora", "ember", "mint", "626-labs", "matrix
 WATCH_SWITCH_FILE = "watchers.json"
 WATCH_REQUEST_PREFIX = "watch-request-"
 WATCH_MAX_TITLE = 80
+WATCH_MAX_SHORT = 12
 WATCH_MAX_NOTE = 140
 WATCH_MAX_LINK = 2048
 WATCH_MAX_TOTAL = 1000000
@@ -1900,11 +1905,13 @@ def watch_known(wid):
 def build_watch_start(args, now=None, paths=None, env=None):
     now = now or datetime.now(timezone.utc)
     paths = paths or Paths()
-    bad = watch_checks(args, ("title", "link", "total", "work"), paths)
+    bad = watch_checks(args, ("title", "short", "link", "total", "work"), paths)
     if bad:
         return bad
     errors = []
     title, e = watch_line(args.get("title"), "title", WATCH_MAX_TITLE, required=True)
+    errors.append(e)
+    short, e = watch_line(args.get("short"), "short", WATCH_MAX_SHORT)
     errors.append(e)
     link, e = watch_link(args.get("link"))
     errors.append(e)
@@ -1919,6 +1926,8 @@ def build_watch_start(args, now=None, paths=None, env=None):
     wid = "w" + uuid.uuid4().hex[:12]
     doc = {"schema_version": 1, "op": "start", "id": wid, "requested_at": iso_o(now), "title": title,
            "work": work, "folder": claude_folder(env)}
+    if short is not None:
+        doc["short"] = short
     if link is not None:
         doc["link"] = link
     if total is not None:

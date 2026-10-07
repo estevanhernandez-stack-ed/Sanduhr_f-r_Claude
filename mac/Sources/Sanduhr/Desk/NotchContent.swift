@@ -25,8 +25,8 @@ enum NotchContent: String, CaseIterable, Identifiable {
     /// (`effective`, NowPlayingIdle). Choosing it is enough: now playing runs while placed
     /// somewhere (NowPlayingPlacement).
     case nowPlaying
-    /// The most urgent watcher with a count of the rest ("deploy · 4m · 3/10 +2", item 66). With
-    /// no watcher the place shows its own default (`effective`), as now playing stands aside.
+    /// The most urgent watcher with a count of the rest (item 66): its full line once when it
+    /// changes (WatcherIntro), then "PR 140 · 4/12 +1". With no watcher the place shows its own default (`effective`), as now playing stands aside.
     case watchers
     case nothing
 
@@ -100,7 +100,7 @@ enum NotchContent: String, CaseIterable, Identifiable {
     /// The wings are short of room, so their meeting line clips long titles; the strip has the
     /// width under the camera and keeps them whole.
     func text(at place: Place, meetings: [Meeting], meters: String?, message: String?,
-              nowPlaying: NowPlayingInfo? = nil, watchers: [Watcher] = [], now: Date,
+              nowPlaying: NowPlayingInfo? = nil, watchers: [Watcher] = [], watcherIntro: Bool = false, now: Date,
               timeZone: TimeZone = .current) -> String? {
         switch self {
         case .meetingOrTime:
@@ -116,7 +116,7 @@ enum NotchContent: String, CaseIterable, Identifiable {
         case .nowPlaying:
             return NowPlayingText.line(nowPlaying, at: place)
         case .watchers:
-            return WatcherText.notchLine(watchers, at: place, now: now)
+            return WatcherText.notchLine(watchers, intro: watcherIntro, now: now)
         case .nothing:
             return nil
         }

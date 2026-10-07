@@ -1042,8 +1042,12 @@ Watchers; in Settings, Desk, Layout put Watchers in the top right corner.
    installed there, ask Claude to call `watch_start` with title "CI on main": it comes back
    `rejected`, `watchers_off`, and nothing named `watch-request-*` appears in Sanduhr's folder.
 3. Turn **Let agents show watchers** on (`watchers.json` follows at once) and ask again with a
-   link to a real https page and total 12: within a second the right wing shows a blue dot and
-   "CI on main · 0s · 0/12", the Desk corner the same row; no `watch-request-*` file is left.
+   link to a real https page, total 12 and short "CI": within a second the right wing shows a blue
+   dot and the full line "CI on main · 0s · 0/12" (scrolling once if it doesn't fit), then
+   shrinks to "CI · 0/12"; the Desk corner shows the full row; no `watch-request-*` file is left.
+   A title like "PR 140 CI: combine statuslines" without `short` rests on "PR 140 · 0/12". Each
+   state change (waiting, passed, failed) plays the full line again; with Reduce Motion it never
+   does and the wing stays short.
 4. Ask Claude to `watch_update` it with done 3 and note "lint passed", then state waiting: the
    dot turns amber and pulses, the note shows under the Desk row, and the notch glows once. With
    Reduce Motion on the dot holds still. Click the wing or the row: the link opens in the browser.

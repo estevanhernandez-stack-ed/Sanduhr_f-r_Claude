@@ -61,6 +61,8 @@ struct Watcher: Equatable, Identifiable, Sendable {
     var id: String
     var source: WatcherSource
     var title: String
+    /// The notch's resting form: the agent's `short`, else derived (WatcherText.shortTitle).
+    var short: String = ""
     /// Opened on a click; https only (WatcherLimits.link).
     var link: URL?
     var total: Int?
@@ -91,6 +93,8 @@ struct Watcher: Equatable, Identifiable, Sendable {
 /// The caps both sides apply (the MCP server first, the app again): one short line each.
 enum WatcherLimits {
     static let title = 80
+    /// An agent's short title, for the notch's resting line.
+    static let short = 12
     static let note = 140
     static let link = 2048
     static let total = 1_000_000
@@ -117,7 +121,8 @@ enum WatcherLimits {
 
 /// What an agent asks for, checked (WatcherRequest decodes it from the request file).
 enum WatcherCommand: Equatable, Sendable {
-    case start(id: String, title: String, link: URL?, total: Int?, work: Bool)
+    /// `short` is the notch's resting title; nil derives one from the title.
+    case start(id: String, title: String, link: URL?, total: Int?, work: Bool, short: String? = nil)
     /// `state` is running or waiting.
     case update(id: String, done: Int?, note: String?, state: WatcherState?)
     /// `result` is passed or failed.
@@ -157,6 +162,12 @@ struct BackgroundTask: Equatable, Sendable {
     var note: String {
         if type == "workflow", let name = WatcherLimits.line(name, cap: 60) { return "workflow \(name)" }
         return "background \(kind)"
+    }
+
+    /// The notch's resting title: the workflow's name, else the description's first word.
+    var short: String {
+        if type == "workflow", let name = WatcherLimits.line(name, cap: 60) { return WatcherText.clip(name, 10) }
+        return WatcherText.firstWord(description) ?? WatcherText.clip(kind, 10)
     }
 
     private var kind: String { WatcherLimits.line(type.lowercased(), cap: 20) ?? "task" }
@@ -200,10 +211,11 @@ struct WatcherBoard: Equatable, Sendable {
     @discardableResult
     mutating func apply(_ command: WatcherCommand, now: Date) -> Bool {
         switch command {
-        case let .start(id, title, link, total, work):
+        case let .start(id, title, link, total, work, short):
             let key = Self.agentID(id)
             watchers.removeAll { $0.id == key }
-            watchers.append(Watcher(id: key, source: .agent, title: title, link: link, total: total,
+            watchers.append(Watcher(id: key, source: .agent, title: title,
+                                    short: short ?? WatcherText.shortTitle(title), link: link, total: total,
                                     done: total == nil ? nil : 0, note: nil, state: .running,
                                     started: now, touched: now, ended: nil, work: work))
             trim()
@@ -243,12 +255,14 @@ struct WatcherBoard: Equatable, Sendable {
             if let i = watchers.firstIndex(where: { $0.id == key }) {
                 guard !watchers[i].state.isEnded else { continue }
                 watchers[i].title = task.title
+                watchers[i].short = task.short
                 watchers[i].note = task.note
                 watchers[i].touched = now
                 watchers[i].state = state
                 if state.isEnded { watchers[i].ended = now }
             } else if !state.isEnded {
-                watchers.append(Watcher(id: key, source: .automatic, title: task.title, link: nil, total: nil,
+                watchers.append(Watcher(id: key, source: .automatic, title: task.title, short: task.short,
+                                        link: nil, total: nil,
                                         done: nil, note: task.note, state: .running, started: now,
                                         touched: now, ended: nil, work: work, session: report.session))
             }
@@ -331,18 +345,58 @@ enum WatcherText {
         return String(format: "%dh %02dm", s / 3600, (s % 3600) / 60)
     }
 
-    /// The notch line for the most urgent watcher: "deploy · 4m · 3/10 +2". The wings are short of
-    /// room, so their title clips at 18 characters; the strip keeps up to 40. Nil with no watcher.
-    static func notchLine(_ shown: [Watcher], at place: NotchContent.Place, now: Date) -> String? {
+    /// The notch line for the most urgent watcher: the full line during the intro (WatcherIntro),
+    /// the short resting line after it. Nil with no watcher.
+    static func notchLine(_ shown: [Watcher], intro: Bool, now: Date) -> String? {
+        intro ? fullLine(shown, now: now) : restLine(shown, now: now)
+    }
+
+    /// The notch's resting line: "PR 140 · 4/12", else "deploy · 4m" without a total, plus " +N"
+    /// for the other watchers. Nil with no watcher.
+    static func restLine(_ shown: [Watcher], now: Date) -> String? {
         guard let top = shown.first else { return nil }
-        let cap = place == .strip ? 40 : 18
-        let title = top.title.count > cap ? String(top.title.prefix(cap - 1)) + "…" : top.title
-        var parts = [title, elapsed(top.elapsed(now: now))]
+        let short = top.short.isEmpty ? shortTitle(top.title) : top.short
+        var line = "\(short) · \(top.progress ?? elapsed(top.elapsed(now: now)))"
+        if shown.count > 1 { line += " +\(shown.count - 1)" }
+        return line
+    }
+
+    /// The full line the notch shows once (and scrolls when it doesn't fit) before it rests: the
+    /// whole title, the time so far, the progress and the count.
+    static func fullLine(_ shown: [Watcher], now: Date) -> String? {
+        guard let top = shown.first else { return nil }
+        var parts = [top.title, elapsed(top.elapsed(now: now))]
         if let p = top.progress { parts.append(p) }
         var line = parts.joined(separator: " · ")
         if shown.count > 1 { line += " +\(shown.count - 1)" }
         return line
     }
+
+    /// A short title from a long one: "PR 140" (from "PR 140", "PR #140", "pull 140"), else "#140"
+    /// (a number anywhere), else "v2.8.0" ("Release 2.8.0", "v2.8.0"), else the first word,
+    /// clipped to 10 characters.
+    static func shortTitle(_ title: String) -> String {
+        let ns = title as NSString
+        func first(_ pattern: String) -> String? {
+            guard let re = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+                  let m = re.firstMatch(in: title, range: NSRange(location: 0, length: ns.length)),
+                  m.numberOfRanges > 1 else { return nil }
+            return ns.substring(with: m.range(at: 1))
+        }
+        if let n = first(#"\b(?:PR|pull)\s*#?\s*(\d+)"#) { return "PR \(n)" }
+        if let n = first(#"#(\d+)"#) { return "#\(n)" }
+        if let v = first(#"\brelease\s+v?(\d+(?:\.\d+)+)"#) ?? first(#"(?:^|[^\w])v(\d+(?:\.\d+)+)"#) { return "v\(v)" }
+        return firstWord(title) ?? clip(title, 10)
+    }
+
+    /// The first word, without trailing punctuation, clipped to 10 characters.
+    static func firstWord(_ s: String) -> String? {
+        guard let word = s.split(whereSeparator: { $0.isWhitespace }).first else { return nil }
+        let trimmed = String(word).trimmingCharacters(in: CharacterSet(charactersIn: ":;,.!?-–—"))
+        return trimmed.isEmpty ? nil : clip(trimmed, 10)
+    }
+
+    static func clip(_ s: String, _ n: Int) -> String { String(s.prefix(n)) }
 
     /// The Desk row's second line: the note, else the state when it says something the dot
     /// doesn't ("waiting on you", "lost touch").
@@ -360,5 +414,32 @@ enum WatcherText {
         if let p = w.progress { parts.append(p) }
         if let note = w.note { parts.append(note) }
         return parts.joined(separator: ", ")
+    }
+}
+
+/// The notch's intro (item 66): when the top watcher changes (its id) or its state changes
+/// (waiting on you, passed, failed…), a notch place on Watchers shows the full line once,
+/// scrolling through it when it doesn't fit (NowPlayingScroll's timing and fade), then rests on
+/// the short line (WatcherText.restLine). Never with Reduce Motion: straight to rest. Pure;
+/// DeskModel keeps the phase, so the wings' width follows it.
+enum WatcherIntro {
+    /// The full line stays this long when it fits.
+    static let hold: TimeInterval = 4
+
+    /// What restarts the intro: the top watcher's id and state. Nil with no watcher.
+    static func key(_ shown: [Watcher]) -> String? {
+        shown.first.map { "\($0.id)\u{1F}\($0.state.rawValue)" }
+    }
+
+    /// Whether an intro starts going from `old` to `new`.
+    static func starts(from old: String?, to new: String?, reduceMotion: Bool) -> Bool {
+        guard let new, !reduceMotion else { return false }
+        return new != old
+    }
+
+    /// How long the intro lasts for a line `textWidth` wide in `room`: the hold when it fits,
+    /// else the scroll's pauses, travel and way back.
+    static func duration(textWidth: CGFloat, room: CGFloat) -> TimeInterval {
+        NowPlayingScroll.plan(textWidth: textWidth, room: room, reduceMotion: false)?.total ?? hold
     }
 }

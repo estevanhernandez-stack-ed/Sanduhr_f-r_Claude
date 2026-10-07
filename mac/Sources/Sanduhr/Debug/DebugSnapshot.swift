@@ -146,6 +146,8 @@ struct WatchersDebug: Equatable {
     var placements: [String] = []
     var agents = false
     var background = false
+    /// The notch plays the top watcher's intro (the full line) rather than resting on the short one.
+    var intro = false
 }
 
 /// state.yaml's `notch_shows:`: each place's effective content, never its text.
@@ -234,7 +236,8 @@ enum DebugState {
         .map([YAMLPair("count", .int(w.count)),
               YAMLPair("states", .list(w.states.map { .string($0.rawValue) })),
               YAMLPair("placements", .list(w.placements.map(YAMLNode.string))),
-              YAMLPair("agents", .bool(w.agents)), YAMLPair("background", .bool(w.background))])
+              YAMLPair("agents", .bool(w.agents)), YAMLPair("background", .bool(w.background)),
+              YAMLPair("intro", .bool(w.intro))])
     }
 
     /// `vault:` (item 46): flags and a count only.

@@ -623,7 +623,7 @@ class Protocol(Base):
                 self.assertFalse(t["annotations"]["destructiveHint"])
                 self.assertFalse(t["inputSchema"]["additionalProperties"])
                 self.assertEqual(sorted(t["inputSchema"]["properties"]),
-                                 {"watch_start": ["link", "title", "total", "work"],
+                                 {"watch_start": ["link", "short", "title", "total", "work"],
                                   "watch_update": ["done", "id", "note", "state"],
                                   "watch_end": ["id", "note", "result"]}[t["name"]])
                 continue
@@ -1139,6 +1139,20 @@ class Watchers(Base):
         # An ended watcher takes no more updates.
         again = mcp.build_watch_update({"id": wid, "done": 4}, now=NOW, paths=self.paths)
         self.assertEqual(again["reason"], "ended")
+
+    def test_short_is_carried_and_checked(self):
+        self.switch()
+        r = self.start({"title": "PR 140 CI: combine statuslines", "short": " PR 140 ", "total": 12})
+        self.assertEqual(r["status"], "ok")
+        self.assertEqual(self.requests()[0]["short"], "PR 140")
+        self.assertIn("short", mcp.WATCH_GUIDE_START)
+        before = sorted(os.listdir(self.fx.support))
+        for bad in ("x" * 13, "two\nlines", 7):
+            r = self.start({"title": "ok", "short": bad})
+            self.assertEqual(r["reason"], "invalid_params", bad)
+        self.assertEqual(sorted(os.listdir(self.fx.support)), before)
+        r = self.start({"title": "no short"})
+        self.assertNotIn("short", self.requests()[-1])
 
     def test_work_flag_and_default_folder(self):
         self.switch()

@@ -53,23 +53,40 @@ struct WatcherDot: View {
     }
 }
 
-/// One watcher on a notch place: the dot and the line (WatcherText.notchLine). Its clicks are the
-/// caller's: the wings take them in SwiftUI, the strip through DeskHitTest.
+/// The intro's scroll for a notch line (WatcherIntro): the intro's key (a new intro scrolls
+/// again), the room the line has and its measured width.
+struct WatcherScroll: Equatable {
+    let key: String
+    let room: CGFloat
+    let textWidth: CGFloat
+}
+
+/// One watcher on a notch place: the dot and the line (WatcherText.notchLine). During the intro
+/// (`scroll`) the full line scrolls through once when it doesn't fit, with now playing's timing
+/// and fade (ScrollOnceText); at rest the short line. Its clicks are the caller's: the wings take
+/// them in SwiftUI, the strip through DeskHitTest.
 struct NotchWatcherLine: View {
     let text: String
     let state: WatcherState
     let size: CGFloat
     let font: String
     let ink: String
+    var scroll: WatcherScroll? = nil
 
     var body: some View {
         HStack(spacing: size * 0.35) {
             WatcherDot(state: state, size: size * 0.5)
-            Text(text)
-                .font(.custom(font, size: size))
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .foregroundStyle(LinearGradient.ink(ink))
+            if let scroll {
+                ScrollOnceText(text: text, trackKey: scroll.key, textWidth: scroll.textWidth, room: scroll.room,
+                               font: .custom(font, size: size))
+                    .foregroundStyle(LinearGradient.ink(ink))
+            } else {
+                Text(text)
+                    .font(.custom(font, size: size))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .foregroundStyle(LinearGradient.ink(ink))
+            }
         }
         .opacity(0.88 * WatcherLook.opacity(state))
     }

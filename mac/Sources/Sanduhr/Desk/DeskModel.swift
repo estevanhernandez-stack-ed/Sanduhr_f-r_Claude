@@ -94,6 +94,14 @@ final class DeskModel {
     var watchers: [Watcher] = []
     /// Every watcher, before the demo filter.
     @ObservationIgnored private(set) var allWatchers: [Watcher] = []
+    /// While the notch plays a watcher's intro (WatcherIntro: the full line once, then the short
+    /// one), when it ends; nil at rest. Observed, so the wings' width follows the phase.
+    var watcherIntroUntil: Date?
+    /// The top watcher's id and state the last intro was for (WatcherIntro.key).
+    @ObservationIgnored private var watcherIntroKey: String?
+    @ObservationIgnored private var watcherIntroTimer: Timer?
+    /// Reduce Motion: no intro, straight to rest. A seam for the tests.
+    @ObservationIgnored var reduceMotion: () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
     /// Each Desk watcher row's frame (SwiftUI global coordinates), keyed by watcher id: a click
     /// opens its link, a two-finger click opens the watcher menu.
     @ObservationIgnored var watcherRowFrames: [String: CGRect] = [:]
@@ -243,6 +251,40 @@ final class DeskModel {
         allWatchers = all
         let shown = WatcherBoard.shown(all, demo: demo)
         if shown != watchers { watchers = shown }
+        updateWatcherIntro(now: Date())
+        onHitAreasChange?()
+    }
+
+    /// Starts the notch intro when the top watcher or its state changed (WatcherIntro), for as long
+    /// as the full line takes in the widest wing; ends it with no watcher or with Reduce Motion.
+    func updateWatcherIntro(now: Date) {
+        let key = WatcherIntro.key(watchers)
+        let reduce = reduceMotion()
+        if WatcherIntro.starts(from: watcherIntroKey, to: key, reduceMotion: reduce),
+           let line = WatcherText.fullLine(watchers, now: now) {
+            let size = max(10, (notchRect?.height ?? 32) * 0.42)
+            let font = DeskFont.resolve(saved: UserDefaults.desk.string(forKey: "font"))
+            let room = NotchWingsView.maxWings - NowPlayingWingLayout.wingInsets - WatcherLook.dotRoom(size)
+            let until = now.addingTimeInterval(WatcherIntro.duration(
+                textWidth: NotchWingsView.textWidth(line, size, font), room: room))
+            watcherIntroUntil = until
+            watcherIntroTimer?.invalidate()
+            let t = Timer(timeInterval: until.timeIntervalSince(now), repeats: false) { [weak self] _ in
+                self?.endWatcherIntro()
+            }
+            RunLoop.main.add(t, forMode: .common)
+            watcherIntroTimer = t
+        } else if key == nil || reduce {
+            endWatcherIntro()
+        }
+        watcherIntroKey = key
+    }
+
+    /// The intro is over: the notch rests on the short line.
+    func endWatcherIntro() {
+        watcherIntroTimer?.invalidate()
+        watcherIntroTimer = nil
+        if watcherIntroUntil != nil { watcherIntroUntil = nil }
         onHitAreasChange?()
     }
 

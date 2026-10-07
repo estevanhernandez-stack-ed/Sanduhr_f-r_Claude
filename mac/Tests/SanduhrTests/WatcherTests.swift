@@ -11,8 +11,8 @@ struct WatcherTests {
     let t0 = Date(timeIntervalSince1970: 1_790_000_000)
 
     private func start(_ id: String, title: String = "CI on main", total: Int? = nil, link: URL? = nil,
-                       work: Bool = false) -> WatcherCommand {
-        .start(id: id, title: title, link: link, total: total, work: work)
+                       work: Bool = false, short: String? = nil) -> WatcherCommand {
+        .start(id: id, title: title, link: link, total: total, work: work, short: short)
     }
 
     private func task(_ id: String, _ status: String = "running", type: String = "shell",
@@ -302,7 +302,7 @@ struct WatcherTests {
         // A bad link or total is dropped, the card still goes up; a long title is clipped.
         let d = WatcherRequest.decode(raw(["op": "start", "title": String(repeating: "t", count: 200),
                                            "link": "http://example.com", "total": 0]), now: t0)
-        guard case let .start(_, title, link2, total, work)? = d?.command else {
+        guard case let .start(_, title, link2, total, work, _)? = d?.command else {
             Issue.record("no start")
             return
         }
@@ -446,9 +446,11 @@ struct WatcherTests {
         let three = watchers(3)
         let now = t0 + 245
         // The newest is first among equals; the wing clips the title, the strip keeps more of it.
+        // At rest the short line; during the intro the full one, on the wings and the strip alike.
         #expect(NotchContent.watchers.text(at: .right, meetings: [], meters: nil, message: nil, watchers: three, now: now)
-                == "Deploy the produc… · 4m · 0/10 +2")
-        #expect(NotchContent.watchers.text(at: .strip, meetings: [], meters: nil, message: nil, watchers: three, now: now)
+                == "Deploy · 0/10 +2")
+        #expect(NotchContent.watchers.text(at: .strip, meetings: [], meters: nil, message: nil, watchers: three,
+                                           watcherIntro: true, now: now)
                 == "Deploy the production cluster 2 · 4m · 0/10 +2")
         #expect(NotchContent.watchers.text(at: .left, meetings: [], meters: nil, message: nil, watchers: [], now: now) == nil)
     }
@@ -507,8 +509,8 @@ struct WatcherTests {
 
     @Test func stateYAMLCountsStatesAndPlacesOnly() {
         let w = WatchersDebug(count: 2, states: [.waiting, .running], placements: ["right", "desk"],
-                              agents: true, background: false)
+                              agents: true, background: false, intro: true)
         let yaml = YAMLEmitter.emit(.object([("watchers", DebugState.watchersYAML(w))]))
-        #expect(yaml == "watchers:\n  count: 2\n  states:\n    - waiting\n    - running\n  placements:\n    - right\n    - desk\n  agents: true\n  background: false\n")
+        #expect(yaml == "watchers:\n  count: 2\n  states:\n    - waiting\n    - running\n  placements:\n    - right\n    - desk\n  agents: true\n  background: false\n  intro: true\n")
     }
 }

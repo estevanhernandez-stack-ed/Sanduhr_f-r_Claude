@@ -3,7 +3,8 @@
 # say, then moves it to waiting on you, failed, and clears it. The right wing and a Desk corner
 # are set to Watchers for the run; the run puts both keys back, and a watcher left up is cleared.
 # state.yaml's watchers: holds a count, states and places, never a title.
-# Watch the snaps: the running snap shows a blue dot with "Smoke watcher · 0s · 0/10" in the
+# Watch the snaps: the running snap shows a blue dot with "Smoke watcher · 0s · 0/10" (the intro;
+# a few seconds later it rests on "smoke · 0/10", watchers.intro false) in the
 # right wing (with the island on) and the row in the top right corner; the waiting snap shows the
 # amber dot pulsing (still with Reduce Motion), the note "needs a look", and the notch glows once.
 name: Watchers on the notch and the Desk

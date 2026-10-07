@@ -37,6 +37,7 @@ struct NotchView: View {
             // Read here so a track change (or a watcher) redraws at once, not at the next 15-second tick.
             let _ = model.nowPlaying
             let _ = model.watchers
+            let _ = model.watcherIntroUntil
             TimelineView(.periodic(from: .now, by: 15)) { context in
                 // Same widths as the wings above, so the strip and the wings stay one shape
                 // even when a wing grows to fit its text.
@@ -52,11 +53,11 @@ struct NotchView: View {
                     if showChinText, let line = strip.text(
                         at: .strip, meetings: model.meetings, meters: model.claudeCompact,
                         message: model.message, nowPlaying: model.nowPlaying, watchers: model.watchers,
-                        now: context.date) {
+                        watcherIntro: model.watcherIntroUntil != nil, now: context.date) {
                         if strip == .nowPlaying {
                             stripNowPlaying(line, width: notch.width + w.left + w.right)
                         } else if strip == .watchers {
-                            stripWatcher(line)
+                            stripWatcher(line, width: notch.width + w.left + w.right)
                         } else {
                             Text(line)
                                 .font(.custom(font, size: stripSize))
@@ -80,11 +81,21 @@ struct NotchView: View {
 
     private var stripSize: CGFloat { max(11, chin * 0.55) }
 
+    /// During the watcher intro, the full line scrolls once in `room` (WatcherIntro); nil at rest.
+    private func introScroll(_ line: String, size: CGFloat, room: CGFloat) -> WatcherScroll? {
+        model.watcherIntroUntil.map { until in
+            WatcherScroll(key: "\(until.timeIntervalSince1970)", room: max(0, room),
+                          textWidth: NotchWingsView.textWidth(line, size, font))
+        }
+    }
+
     /// The most urgent watcher under the camera (item 66). Its clicks come through DeskHitTest by
     /// the frame it reports: a click opens the link, a two-finger click the watcher menu.
-    private func stripWatcher(_ line: String) -> some View {
-        NotchWatcherLine(text: line, state: model.watchers.first?.state ?? .running, size: stripSize,
-                         font: font, ink: textColor)
+    private func stripWatcher(_ line: String, width: CGFloat) -> some View {
+        let room = width - NowPlayingWingLayout.stripPadding * 2 - WatcherLook.dotRoom(stripSize)
+        return NotchWatcherLine(text: line, state: model.watchers.first?.state ?? .running, size: stripSize,
+                                font: font, ink: textColor,
+                                scroll: introScroll(line, size: stripSize, room: room))
             .frame(height: chin)
             .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
             .onGlobalFrame { model.stripWatcherFrame = $0 }
@@ -180,6 +191,7 @@ struct NotchWingsView: View {
             // Read here so a track change (or a watcher) redraws at once, not at the next 15-second tick.
             let _ = model.nowPlaying
             let _ = model.watchers
+            let _ = model.watcherIntroUntil
             TimelineView(.periodic(from: .now, by: 15)) { context in
                 let w = Self.layout(model: model, now: context.date, wings: wings, showText: showText,
                                     left: leftContent, right: rightContent, idle: idle,
@@ -219,7 +231,7 @@ struct NotchWingsView: View {
         if content == .nowPlaying, let text {
             nowPlayingWing(text, size, place: place, width: width)
         } else if content == .watchers, let text {
-            watcherWing(text, size, place: place)
+            watcherWing(text, size, place: place, width: width)
         } else {
             label(text, size)
         }
@@ -281,11 +293,17 @@ struct NotchWingsView: View {
     /// The most urgent watcher in a wing (item 66): a click opens its link (https only), a
     /// two-finger click opens Dismiss, Dismiss All and Watcher Settings…. The whole wing takes the
     /// click, so a watcher without a link never opens Settings by accident.
-    private func watcherWing(_ text: String, _ size: CGFloat, place: NotchContent.Place) -> some View {
+    private func watcherWing(_ text: String, _ size: CGFloat, place: NotchContent.Place, width: CGFloat) -> some View {
         let top = model.watchers.first
+        let room = width - NowPlayingWingLayout.wingInsets - WatcherLook.dotRoom(size)
+        let scroll = model.watcherIntroUntil.map { until in
+            WatcherScroll(key: "\(until.timeIntervalSince1970)", room: max(0, room),
+                          textWidth: Self.textWidth(text, size, font))
+        }
         return HStack(spacing: 0) {
             if place == .left { Spacer(minLength: 0) }
-            NotchWatcherLine(text: text, state: top?.state ?? .running, size: size, font: font, ink: textColor)
+            NotchWatcherLine(text: text, state: top?.state ?? .running, size: size, font: font, ink: textColor,
+                             scroll: scroll)
             if place == .right { Spacer(minLength: 0) }
         }
         .frame(maxHeight: .infinity)
@@ -366,7 +384,8 @@ struct NotchWingsView: View {
     private static func text(_ content: NotchContent, at place: NotchContent.Place,
                              model: DeskModel, now: Date) -> String? {
         content.text(at: place, meetings: model.meetings, meters: model.claudeCompact,
-                     message: model.message, nowPlaying: model.nowPlaying, watchers: model.watchers, now: now)
+                     message: model.message, nowPlaying: model.nowPlaying, watchers: model.watchers,
+                     watcherIntro: model.watcherIntroUntil != nil, now: now)
     }
 
     /// The text's width in the notch font: what the wings grow by and what a now playing title

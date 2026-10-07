@@ -493,8 +493,20 @@ an agent's; an automatic one is confirmed at each Stop and greys only after an h
 session closed mid-task). Most urgent first: waiting, failed, running, lost touch, then the rest.
 Everything is in memory: quitting drops every watcher.
 
+**The notch line.** A notch place on Watchers plays an intro when the top watcher changes (its id)
+or its state does (`WatcherIntro`): the full line, "PR 140 CI: combine statuslines · 2m · 4/12 +1",
+scrolling through once with now playing's timing and fade (`ScrollOnceText`, `NowPlayingScroll`)
+when it doesn't fit, or held 4 seconds when it does. Then it rests on "<short> · <done/total>"
+("PR 140 · 4/12 +1"), "<short> · <elapsed>" without a total. With Reduce Motion it goes straight to
+rest. The phase lives on `DeskModel.watcherIntroUntil` (its length measured for the widest wing),
+so the wings' width follows it: up to the wing maximum during the intro, back to the short form
+after. The short title is the agent's `short` (up to 12 characters), else derived from the title:
+"PR 140" from "PR 140", "PR #140" or "pull 140", else "#140" from a number anywhere, else "v2.8.0"
+from "Release 2.8.0" or "v2.8.0", else the first word clipped to 10 characters. Background tasks use
+a workflow's name or the description's first word. The Desk rows keep the full title.
+
 **Agents (`watch_start`, `watch_update`, `watch_end`).** The MCP server checks the arguments (title
-1 to 80 characters on one line, link `https://` only and at most 2048 characters, total 1 to
+1 to 80 characters on one line, short up to 12, link `https://` only and at most 2048 characters, total 1 to
 1,000,000, note up to 140 characters, state running or waiting, result passed or failed, ids it
 started this session) and refuses with `watchers_off` unless `watchers.json` (written by the app)
 says `"agents": true`. Then it writes `watch-request-<ms>-<seq>-<id>.json` (0600, atomic) and returns

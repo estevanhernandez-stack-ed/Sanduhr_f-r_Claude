@@ -7,7 +7,7 @@ import Foundation
 /// `watch_start`, `watch_update` and `watch_end`:
 ///
 ///     { "schema_version": 1, "op": "start", "id": "w0123456789ab", "requested_at": "…",
-///       "title": "CI on main", "link": "https://…", "total": 12, "work": false,
+///       "title": "PR 140 CI", "short": "PR 140", "link": "https://…", "total": 12, "work": false,
 ///       "folder": "/Users/x/.claude" }
 ///     { "schema_version": 1, "op": "update", "id": "…", "requested_at": "…", "done": 3,
 ///       "note": "lint passed", "state": "waiting" }
@@ -59,7 +59,8 @@ enum WatcherRequest {
             let total = int(o["total"]).flatMap { (1...WatcherLimits.total).contains($0) ? $0 : nil }
             let folder = (o["folder"] as? String).flatMap { $0.hasPrefix("/") ? $0 : nil }
             return Decoded(command: .start(id: id, title: title, link: WatcherLimits.link(o["link"] as? String),
-                                           total: total, work: o["work"] as? Bool ?? false),
+                                           total: total, work: o["work"] as? Bool ?? false,
+                                           short: WatcherLimits.line(o["short"] as? String, cap: WatcherLimits.short)),
                            folder: folder)
         case "update":
             let state: WatcherState?
@@ -127,8 +128,9 @@ enum WatcherRequest {
     static func json(_ command: WatcherCommand, folder: String? = nil, at: Date) -> Data {
         var o: [String: Any] = ["schema_version": schemaVersion, "requested_at": HandoffFiles.stamp(at)]
         switch command {
-        case let .start(id, title, link, total, work):
+        case let .start(id, title, link, total, work, short):
             o["op"] = "start"; o["id"] = id; o["title"] = title; o["work"] = work
+            if let short { o["short"] = short }
             if let link { o["link"] = link.absoluteString }
             if let total { o["total"] = total }
             if let folder { o["folder"] = folder }

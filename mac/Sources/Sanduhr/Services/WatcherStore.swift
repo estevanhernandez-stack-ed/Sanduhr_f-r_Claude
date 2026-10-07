@@ -88,8 +88,8 @@ final class WatcherStore {
     func receiveRequest(_ data: Data, force: Bool = false) {
         guard force || agents(), let d = WatcherRequest.decode(data, now: now()) else { return }
         var command = d.command
-        if case let .start(id, title, link, total, work) = command, !work, isWork(d.folder) {
-            command = .start(id: id, title: title, link: link, total: total, work: true)
+        if case let .start(id, title, link, total, work, short) = command, !work, isWork(d.folder) {
+            command = .start(id: id, title: title, link: link, total: total, work: true, short: short)
         }
         let waiting = board.apply(command, now: now())
         changed()
@@ -201,7 +201,7 @@ extension WatcherStore {
         switch test {
         case .start:
             command = .start(id: Self.testID, title: "Smoke watcher", link: URL(string: "https://example.com"),
-                             total: 10, work: false)
+                             total: 10, work: false, short: "smoke")
         case .wait: command = .update(id: Self.testID, done: 4, note: "needs a look", state: .waiting)
         case .pass: command = .end(id: Self.testID, result: .passed, note: "all green")
         case .fail: command = .end(id: Self.testID, result: .failed, note: "2 checks failed")

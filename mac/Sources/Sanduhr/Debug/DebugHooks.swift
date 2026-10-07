@@ -366,7 +366,8 @@ enum DebugHooks {
         s.watchers = WatchersDebug(count: shown.count, states: shown.map(\.state),
                                    placements: WatcherPlacement.places(in: .desk),
                                    agents: UserDefaults.standard.bool(forKey: WatcherStore.agentsKey),
-                                   background: UserDefaults.standard.bool(forKey: WatcherStore.backgroundKey))
+                                   background: UserDefaults.standard.bool(forKey: WatcherStore.backgroundKey),
+                                   intro: desk.model.watcherIntroUntil != nil)
         return s
     }
 }

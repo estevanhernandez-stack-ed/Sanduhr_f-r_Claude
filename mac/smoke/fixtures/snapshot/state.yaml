@@ -144,3 +144,4 @@ watchers:
   placements: []
   agents: false
   background: false
+  intro: false
