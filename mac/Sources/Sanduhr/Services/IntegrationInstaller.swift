@@ -9,7 +9,7 @@ enum IntegrationKind: String, Codable, CaseIterable, Sendable {
     /// The meters mod's folder in `env.CLAUDE_CODE_PLUGIN_DIRS` of the folder's `settings.json`.
     case meters
     /// Sanduhr's entries in `hooks.Notification` and `hooks.Stop` of the folder's
-    /// `settings.json`: Claude Code opens `sanduhr://claude-code?event=…` and the notch glows.
+    /// `settings.json`: Claude Code posts `com.626labs.sanduhr.claude-code.…` and the notch glows.
     case hooks
 
     var title: String {
@@ -31,7 +31,7 @@ enum IntegrationKind: String, Codable, CaseIterable, Sendable {
         }
     }
 
-    /// Runs on python3 (the mod runs inside Claude Code; the hooks run `open`).
+    /// Runs on python3 (the mod runs inside Claude Code; the hooks run `notifyutil`).
     var needsPython: Bool { self == .mcp || self == .statusline }
 
     /// Needs Sanduhr's integration scripts copied out of the app (the hooks need none).
@@ -193,21 +193,25 @@ struct IntegrationInstaller {
 
     // MARK: The hooks (item 51)
 
-    /// The command a hook runs: open Sanduhr's link in the background, only while Sanduhr runs
-    /// (`open` would otherwise launch it after every turn), and always exit 0 so Claude Code
-    /// never reports a hook error. `open -g` returns at once and never brings Sanduhr forward.
+    /// The command a hook runs: post Sanduhr's Darwin notification (ClaudeCodeSignal), and always
+    /// exit 0 so Claude Code never reports a hook error. A post never launches anything: it
+    /// reaches whichever Sanduhr is running, and nothing when none is. (Hooks before this opened
+    /// `sanduhr://claude-code?event=…`, which LaunchServices hands to the registered app and
+    /// launches it when it isn't running; isOurHookCommand still knows them, so they show as
+    /// outdated and Install rewrites them in place.)
     ///
     /// The Stop hook also hands Sanduhr the session's background work (item 66), and only while
-    /// "Show Claude Code's background work" is on (watchers.json says `"background":true`; Sanduhr
-    /// writes it): `stopTasksScript` reads the hook's input and drops a small report into
-    /// Sanduhr's folder, which the app reads and deletes at once. The glow link is opened either
-    /// way, so the item 51 glow behaves as before.
+    /// a Sanduhr runs to read it (`pgrep`, so no report waits for a later launch) and "Show Claude
+    /// Code's background work" is on (watchers.json says `"background":true`; Sanduhr writes it):
+    /// `stopTasksScript` reads the hook's input and drops a small report into Sanduhr's folder,
+    /// which the app reads and deletes at once. The notification is posted either way, so the
+    /// glow behaves as before.
     static func hookCommand(_ event: ClaudeCodeEvent) -> String {
-        let open = "/usr/bin/open -g '\(ClaudeCodeLink.url(event))'"
-        guard event == .done else { return "/usr/bin/pgrep -xq Sanduhr && \(open) || true" }
-        return "/usr/bin/pgrep -xq Sanduhr && { d=\"$HOME/Library/Application Support/Sanduhr\"; "
+        let post = "/usr/bin/notifyutil -p \(ClaudeCodeSignal.name(event))"
+        guard event == .done else { return "\(post) || true" }
+        return "d=\"$HOME/Library/Application Support/Sanduhr\"; /usr/bin/pgrep -xq Sanduhr && "
             + "/usr/bin/grep -qs '\"background\":true' \"$d/\(WatcherStore.switchFile)\" && "
-            + "/usr/bin/osascript -l JavaScript -e '\(stopTasksScript)' \"$d\" >/dev/null 2>&1; \(open); } || true"
+            + "/usr/bin/osascript -l JavaScript -e '\(stopTasksScript)' \"$d\" >/dev/null 2>&1; \(post) || true"
     }
 
     /// The Stop hook's report (item 66), JavaScript for Automation (`osascript`, on every Mac;
@@ -249,11 +253,13 @@ struct IntegrationInstaller {
         return .object(pairs)
     }
 
-    /// One hook command is Sanduhr's: it opens Sanduhr's Claude Code link.
+    /// One hook command is Sanduhr's: it posts Sanduhr's Claude Code notification, or (installs
+    /// before that) opens Sanduhr's Claude Code link.
     static func isOurHookCommand(_ hook: Any?) -> Bool {
         guard let o = hook as? [String: Any], o["type"] as? String == "command",
               let command = o["command"] as? String else { return false }
-        return command.contains("\(ClaudeCodeLink.scheme)://\(ClaudeCodeLink.host)?")
+        return command.contains("notifyutil -p \(ClaudeCodeSignal.prefix)")
+            || command.contains("\(ClaudeCodeLink.scheme)://\(ClaudeCodeLink.host)?")
     }
 
     /// One matcher group is Sanduhr's: every hook in it is Sanduhr's command. A group of the

@@ -56,6 +56,57 @@ struct ClaudeCodeGlowTests {
         #expect(!DebugLink.isDebug(URL(string: "sanduhr://claude-code?event=waiting")!))
     }
 
+    // MARK: The notification (hooks post it instead of opening the link)
+
+    @Test func theNotificationNames() {
+        #expect(ClaudeCodeSignal.name(.waiting) == "com.626labs.sanduhr.claude-code.waiting")
+        #expect(ClaudeCodeSignal.name(.done) == "com.626labs.sanduhr.claude-code.done")
+        for e in ClaudeCodeEvent.allCases { #expect(ClaudeCodeSignal.event(ClaudeCodeSignal.name(e)) == e) }
+        for bad in ["com.626labs.sanduhr.claude-code.", "com.626labs.sanduhr.claude-code.WAITING",
+                    "com.626labs.sanduhr.claude-code.stop", "com.example.claude-code.done", "done"] {
+            #expect(ClaudeCodeSignal.event(bad) == nil, "\(bad)")
+        }
+    }
+
+    /// A real post, as the hook makes it (`/usr/bin/notifyutil -p`), reaches the handler with
+    /// its event, once per post. Names under a made-up prefix, so a Sanduhr running on this Mac
+    /// never hears them; after cancel nothing arrives.
+    @Test func aPostedNotificationReachesTheHandler() throws {
+        let prefix = "com.626labs.sanduhr.test.\(UUID().uuidString)."
+        let box = Received()
+        let signal = ClaudeCodeSignal(prefix: prefix, queue: DispatchQueue(label: "signal-test")) { box.add($0) }
+        #expect(signal.registered == 2)
+        func post(_ event: ClaudeCodeEvent) throws {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/notifyutil")
+            p.arguments = ["-p", ClaudeCodeSignal.name(event, prefix: prefix)]
+            try p.run()
+            p.waitUntilExit()
+            #expect(p.terminationStatus == 0)
+        }
+        func wait(for count: Int) {
+            let deadline = Date().addingTimeInterval(5)
+            while box.events.count < count, Date() < deadline { Thread.sleep(forTimeInterval: 0.02) }
+        }
+        try post(.waiting)
+        wait(for: 1)
+        try post(.done)
+        wait(for: 2)
+        #expect(box.events == [.waiting, .done])
+        signal.cancel()
+        #expect(signal.registered == 0)
+        try post(.done)
+        Thread.sleep(forTimeInterval: 0.2)
+        #expect(box.events == [.waiting, .done])
+    }
+
+    private final class Received: @unchecked Sendable {
+        private let lock = NSLock()
+        private var list: [ClaudeCodeEvent] = []
+        func add(_ e: ClaudeCodeEvent) { lock.withLock { list.append(e) } }
+        var events: [ClaudeCodeEvent] { lock.withLock { list } }
+    }
+
     // MARK: The rate limit
 
     @Test func oneGlowPerKindEveryTwentySeconds() {
