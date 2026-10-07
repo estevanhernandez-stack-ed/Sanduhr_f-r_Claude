@@ -177,12 +177,24 @@ private struct KeyFields: View {
     @Binding var sessionKey: String
     @Binding var cfClearance: String
     let hasKey: Bool
+    /// The saved key was refused (session expired, Cloudflare): only then does the button read
+    /// "Sign In Again". A working account offers "Replace Sign-In", so the page never looks
+    /// signed out when it isn't.
+    var expired: Bool = false
     /// Opens the sign-in window; the form saves what it captures.
     var onSignIn: () -> Void
 
+    private var signInTitle: String {
+        if !hasKey { return "Sign In to Claude…" }
+        return expired ? "Sign In Again…" : "Replace Sign-In…"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Button(hasKey ? "Sign In Again…" : "Sign In to Claude…", action: onSignIn)
+            Button(signInTitle, action: onSignIn)
+                .help(hasKey && !expired
+                      ? "Signs in once more and replaces this account's saved key, for example to use a different claude.ai account. You're signed in now."
+                      : "Opens claude.ai's own sign-in.")
             Text("Opens claude.ai's own sign-in. An account that signs in with Google needs a pasted key: Google doesn't allow sign-in inside apps.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
@@ -240,11 +252,13 @@ private struct AccountDetail: View {
 
     private var isActive: Bool { label == vm.activeAccount }
     private var hasKey: Bool { vm.signedInAccounts.contains(label) }
+    /// The active account's key was refused at its last fetch.
+    private var expired: Bool { hasKey && isActive && vm.status.needsSignIn }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
-            KeyFields(sessionKey: $sessionKey, cfClearance: $cfClearance, hasKey: hasKey,
+            KeyFields(sessionKey: $sessionKey, cfClearance: $cfClearance, hasKey: hasKey, expired: expired,
                       onSignIn: signIn)
             saveRow
             Divider()
@@ -294,7 +308,8 @@ private struct AccountDetail: View {
                 .keyboardShortcut(.defaultAction)
                 // A signed-out account needs a key; otherwise blank keeps the current values.
                 .disabled(sessionKey.trimmed.isEmpty && (!hasKey || cfClearance.trimmed.isEmpty))
-            Text(hasKey ? "Signed in" : "Signed out. Sign in again, or paste a sessionKey.")
+            Text(!hasKey ? "Signed out. Sign in again, or paste a sessionKey."
+                 : expired ? "Session expired. Sign in again, or paste a new sessionKey." : "Signed in")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -335,7 +350,7 @@ private struct AccountDetail: View {
         noteIsError = error
     }
 
-    /// Sign In Again: what the window captures is saved to this account at once.
+    /// Sign In Again / Replace Sign-In: what the window captures is saved to this account at once.
     private func signIn() {
         Task {
             guard case .signedIn(let c) = await SignInWindowController.shared.run(account: label) else { return }

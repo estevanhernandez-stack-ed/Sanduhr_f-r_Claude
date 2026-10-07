@@ -345,7 +345,7 @@ whose names are fine to show; remove it afterwards.
 
 - [ ] Settings, Accounts, select an account: a Data section shows Meter history (30 days),
   Claude Code folder (None), Claude Code activity (Not tracked), Project names in the record
-  (Names, dimmed until Keep a record), Share with Claude (Off), with a caption that live
+  (Names, dimmed until Keep a record), Share with your agents (Off), with a caption that live
   activity works now and the record and sharing take effect in later updates. The page scrolls
   when it doesn't fit.
 - [ ] `smoke/smoke state` shows `data:` with `activity: "off"`, `names: names`, `share: "off"`,
@@ -428,7 +428,7 @@ Support/Sanduhr/vault/` before and after.
 - [ ] Console (`log stream --predicate 'subsystem == "com.626labs.sanduhr" && category ==
   "vault"'`) shows fixed phrases only. Then `rm -rf ~/.claude-smoketest` and unlink it.
 
-## 18. Share with Claude: the MCP tools (item 47)
+## 18. Share with your agents: the MCP tools (item 47)
 
 Use the test folder from section 16 (`~/.claude-smoketest`, linked to a throwaway or test account,
 activity Keep a record, names Names) with a few `cc_line`s and one refresh, so the record has a day.
@@ -543,7 +543,7 @@ S=~/Library/Application\ Support/Sanduhr/integrations
   what is needed instead, Install buttons are off, and nothing asks to install until Install
   Command Line Tools… is clicked.
 - [ ] MCP server, Install… on `~/.claude-smoketest`: the sheet lists every account with its
-  Share with Claude choice ("Off: nothing" and so on), Change in Accounts… goes to Accounts,
+  Share with your agents choice ("Off: nothing" and so on), Change in Accounts… goes to Accounts,
   and it names `~/.claude-smoketest/.claude.json`. Install: the row reads Installed; `jq
   .mcpServers ~/.claude-smoketest/.claude.json` shows `other` unchanged and `sanduhr` as
   `{"type": "stdio", "command": "<python3>", "args": [".../integrations/current/sanduhr_mcp.py"]}`;
@@ -1043,7 +1043,7 @@ the installed app starts again.
    browser; Paste a Key Instead ends the window; Back to Sign-In Choices returns to the login.
 4. Settings → Accounts → Add Account…: with a label, Sign In to Claude… adds the account when
    the window closes; with no label, it says to name the account, and Add Account finishes.
-5. An account's page: **Sign In Again…** replaces its key in place; the page says Signed in.
+5. An account's page: a working account shows **Replace Sign-In…** (never "Sign In Again"), which replaces its key in place; an expired one shows **Sign In Again…** and "Session expired"; after either, the page says Signed in.
 6. Close the window without signing in: nothing changes. Unplug the network: the error panel
    offers Try Again and Paste a Key Instead.
 7. Nothing persists: after the window closes, sign in again opens a fresh login (not signed in).

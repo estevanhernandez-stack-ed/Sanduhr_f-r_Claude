@@ -27,7 +27,7 @@ Each account in Settings, Accounts gets a **Data** section:
 | Claude Code folder | None · one of the folders found (`~/.claude`, `~/.claude-*`, or `CLAUDE_CONFIG_DIR` homes) · Choose… | None |
 | Claude Code activity | Not tracked · Live only · Keep a record | Not tracked |
 | Project names in the record | Names · Hidden · Full paths | Names |
-| Share with Claude (MCP) | Off · Meters · Meters and activity | Off |
+| Share with your agents (MCP) | Off · Meters · Meters and activity | Off |
 
 - **Meter history** is the utilization series behind the sparklines and trends (`history.{label}.json`),
   today capped at 2 hours on the Mac; 30 days matches Windows.
@@ -42,7 +42,7 @@ Each account in Settings, Accounts gets a **Data** section:
 - **Project names**: *Hidden* stores a stable short hash per project instead of its name, so the
   record still groups by project without naming it. *Full paths* is Windows'
   `vault_store_full_paths`, off unless chosen.
-- **Share with Claude** decides what `sanduhr-mcp` may return for this account. *Off* means its tools
+- **Share with your agents** decides what `sanduhr-mcp` may return for this account. *Off* means its tools
   answer as if the account did not exist. *Meters* gives `get_usage` and the meter history.
   *Meters and activity* adds the burn, model and vault tools for its folder.
 - **Erase this account's data** (meter history, vault, checkpoints) is one button, with a confirmation

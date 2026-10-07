@@ -56,7 +56,7 @@ when it closes, and no key, cookie or page is logged.
   on claude.ai, open DevTools (⌥⌘I) → Application → Cookies → `claude.ai`, copy `sessionKey`,
   and paste it in Settings → Accounts.
 - The same window signs in a new account (**Add Account…**, **Sign In to Claude…**) and an
-  account whose session expired (**Sign In Again…** on its page; the widget says "Session
+  account whose session expired (**Sign In Again…** on its page; a signed-in account offers **Replace Sign-In…** instead; the widget says "Session
   expired — sign in again").
 
 Where the key is stored depends on the build:
@@ -98,7 +98,7 @@ with the label. The notch stays as it is. A switch never needs a relaunch: the m
   days of readings (item 43), unless that account's Meter history is Off (below).
 - **Data (item 44).** Settings, Accounts, Data holds each account's Meter history, Claude Code
   folder, Claude Code activity (`off`/`live`/`record`), Project names (`names`/`hidden`/`full`)
-  and Share with Claude (`off`/`meters`/`activity`), in defaults `accountData`
+  and Share with your agents (`off`/`meters`/`activity`), in defaults `accountData`
   (`{label: {activity, names, share, folder}}`, missing means the default: nothing linked,
   tracked or shared, names). They follow Rename and go with Remove. Folders are found in the
   home folder (`.claude`, `.claude-*`, and `CLAUDE_CONFIG_DIR` when set) when they hold
@@ -144,7 +144,7 @@ with the label. The notch stays as it is. A switch never needs a relaunch: the m
   cycle checks the choice before each file and before writing, and stops), then the folder's
   directory is deleted. `VaultReader` (by day, week, project, model, tier, skill, sessions,
   coverage) and `VaultLedgerCsv` are pure and tested, for items 47 and 48.
-- **Share with Claude (item 47).** `MCPAccess` (pure, tested) turns the accounts' choices into
+- **Share with your agents (item 47).** `MCPAccess` (pure, tested) turns the accounts' choices into
   `mcp-access.json`; the view model rewrites it from `reloadAccounts`, so every change to a choice,
   a link, the account list or the active account lands, atomically (a temp file renamed over it,
   mode 0600) and only when its bytes change. The Project names picker is enabled for Keep a record
@@ -173,7 +173,7 @@ with the label. The notch stays as it is. A switch never needs a relaunch: the m
   record reads, sorts, rescopes and exports in well under a second. Reloads follow each ingest
   cycle (`VaultService.onCycleEnd`), each refresh, and every minute on Overview.
 - **One-click install (item 49).** `SettingsSection.integrations`, under Claude Usage: installing the
-  MCP server is the other half of Share with Claude, and its consent sheet points back at Accounts.
+  MCP server is the other half of Share with your agents, and its consent sheet points back at Accounts.
   `IntegrationScripts`, `IntegrationInstaller`, `JSONEdit` and `PythonFinder` are pure or work on
   injected folders, and are tested on temp homes (see Claude Code integrations).
 - **Readers.** `snapshot.json` names the active account by `account_ref` (first 4 bytes of the
@@ -540,7 +540,7 @@ atomically (mode 0600) and waits up to 10 seconds for the app's `desk-messages-r
 ```
 
 No answer within the wait is `queued` / `app_not_responding`; the app takes a request up to ten
-minutes old. Neither tool is gated by Share with Claude: the messages are on the desktop already,
+minutes old. Neither tool is gated by Share with your agents: the messages are on the desktop already,
 and a proposal only asks. The server never writes `messages.txt`. The app (`DeskMessageHandoff`,
 watching Sanduhr's folder with the themes watcher) checks the request again (`MessageProposal`,
 the server's rules and wording, pinned by a test reading the server's constants), then either
@@ -874,7 +874,7 @@ again any time with the current settings, recording nothing. The cards live in
 - Account labels and the active one → `UserDefaults` (`accounts`, `activeAccount`); following → `followAccount`
 - Selected theme → `UserDefaults` (`theme`)
 - Meter history → `~/Library/Application Support/Sanduhr/history.{label}.json`, one per account, the Windows format. Each reading is kept 30 days (and at most 8640 points per limit, Windows' cap), trimmed when the next one is written; the sparklines draw the last 24 points (about 2 hours). Settings, Accounts, Meter history: Off stops recording an account (`UserDefaults` `meterHistoryOff`, the labels switched off) and offers to erase its file; Remove Account deletes it. `state.yaml` shows the active account's `history_days` (30, or 0 when off)
-- Data choices per account (Claude Code folder, activity, project names, Share with Claude) → `UserDefaults` (`accountData`); the linked folder's path stays there, never in `state.yaml`
+- Data choices per account (Claude Code folder, activity, project names, Share with your agents) → `UserDefaults` (`accountData`); the linked folder's path stays there, never in `state.yaml`
 - What the MCP server may read → `~/Library/Application Support/Sanduhr/mcp-access.json` (mode 0600; see Claude Code integrations)
 - Themes from Claude (item 55) → `theme-request.json` (server) and `theme-result.json` (app), mode 0600 in `~/Library/Application Support/Sanduhr/`; a saved theme in `themes/<key>.json`; the opt-in in `UserDefaults` (`themeClaudeDirect`)
 - Desk messages from Claude (item 54) → `desk-messages-request.json` (server), `desk-messages-result.json` and `desk-messages-state.json` (app), all mode 0600 in `~/Library/Application Support/Sanduhr/`; the previous list in `~/Library/Application Support/Desk/messages.txt.previous`; the opt-in in the desk preference `messageClaudeDirect`, the glow in `messageGlow`
