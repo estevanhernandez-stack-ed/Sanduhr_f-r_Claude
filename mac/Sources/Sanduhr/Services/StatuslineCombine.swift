@@ -16,8 +16,149 @@ enum StatuslineJoin: String, Codable, CaseIterable, Sendable {
     case same
 }
 
+/// What a statusline puts between its segments (item 63b), as the runner names it.
+enum StatuslineSeparator: String, CaseIterable, Sendable {
+    case powerline
+    case powerlineThin = "powerline-thin"
+    case bar, pipe, bullet, dot, spaces, none
+
+    var title: String {
+        switch self {
+        case .powerline: "Powerline \u{E0B0}"
+        case .powerlineThin: "Powerline \u{E0B1}"
+        case .bar: "Bar │"
+        case .pipe: "Pipe |"
+        case .bullet: "Bullet •"
+        case .dot: "Dot ·"
+        case .spaces: "Two or more spaces"
+        case .none: "None (one segment)"
+        }
+    }
+}
+
+/// Sanduhr's own segments in a combined statusline (item 63b), in the order they print.
+enum SanduhrSegment: String, CaseIterable, Sendable {
+    case session, weekly, resets, context, model
+
+    /// What Sanduhr's line shows without `--mine`.
+    static let defaults: [SanduhrSegment] = [.session, .weekly, .resets]
+
+    var title: String {
+        switch self {
+        case .session: "Session"
+        case .weekly: "Weekly"
+        case .resets: "Weekly reset"
+        case .context: "Context"
+        case .model: "Model"
+        }
+    }
+
+    /// `--mine`'s list: names in this order, each once, at least one. Nil for anything else.
+    static func parseList(_ text: String) -> [SanduhrSegment]? {
+        let names = text.components(separatedBy: ",")
+        let segments = names.compactMap(SanduhrSegment.init(rawValue:))
+        guard segments.count == names.count, !segments.isEmpty else { return nil }
+        let order = segments.map { allCases.firstIndex(of: $0)! }
+        guard zip(order, order.dropFirst()).allSatisfy({ $0 < $1 }) else { return nil }
+        return segments
+    }
+
+    static func list(_ segments: [SanduhrSegment]) -> String {
+        allCases.filter(segments.contains).map(\.rawValue).joined(separator: ",")
+    }
+}
+
+/// Which of the user's segments a combined statusline keeps (item 63b), `--keep-theirs-b64`'s
+/// payload: matchers (a segment's leading token) kept and dropped, whether segments never seen
+/// stay, and a separator per line where one was chosen (nil: detected).
+struct StatuslinePicks: Equatable, Sendable {
+    var keep: [String] = []
+    var drop: [String] = []
+    var keepNew = true
+    var separators: [StatuslineSeparator?] = []
+
+    static let maxMatchers = 64
+    static let maxMatcherLength = 64
+    static let maxLines = 16
+
+    /// The JSON the runner reads: sorted keys, `new` only when false, `sep` only when a line has
+    /// a choice (trailing detected lines left out).
+    var json: String {
+        var o: [String: Any] = [:]
+        if !keep.isEmpty { o["keep"] = keep }
+        if !drop.isEmpty { o["drop"] = drop }
+        if !keepNew { o["new"] = false }
+        var seps = separators
+        while let last = seps.last, last == nil { seps.removeLast() }
+        if !seps.isEmpty { o["sep"] = seps.map { $0.map { $0.rawValue as Any } ?? NSNull() } }
+        let data = (try? JSONSerialization.data(withJSONObject: o, options: [.sortedKeys, .withoutEscapingSlashes])) ?? Data("{}".utf8)
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    var base64: String { Data(json.utf8).base64EncodedString() }
+
+    init(keep: [String] = [], drop: [String] = [], keepNew: Bool = true, separators: [StatuslineSeparator?] = []) {
+        self.keep = keep
+        self.drop = drop
+        self.keepNew = keepNew
+        self.separators = separators
+    }
+
+    /// The payload as the runner accepts it, nil for anything it would refuse: canonical base64
+    /// of a JSON object with only `keep`, `drop` (lists of 1 to 64 character matchers, at most
+    /// 64), `new` (a boolean) and `sep` (at most 16 separator names or nulls).
+    init?(base64 payload: String) {
+        guard IntegrationInstaller.isCanonicalBase64(payload), let data = Data(base64Encoded: payload),
+              let text = String(data: data, encoding: .utf8),
+              let o = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any],
+              Set(o.keys).isSubset(of: ["keep", "drop", "new", "sep"]) else { return nil }
+        func matchers(_ key: String) -> [String]? {
+            guard let v = o[key] else { return [] }
+            guard let list = v as? [Any], list.count <= Self.maxMatchers else { return nil }
+            let strings = list.compactMap { $0 as? String }
+            guard strings.count == list.count,
+                  strings.allSatisfy({ (1...Self.maxMatcherLength).contains($0.unicodeScalars.count) }) else { return nil }
+            return strings
+        }
+        guard let keep = matchers("keep"), let drop = matchers("drop") else { return nil }
+        self.keep = keep
+        self.drop = drop
+        if let v = o["new"] {
+            guard let n = v as? NSNumber, CFGetTypeID(n) == CFBooleanGetTypeID() else { return nil }
+            keepNew = n.boolValue
+        }
+        if let v = o["sep"] {
+            guard let list = v as? [Any], list.count <= Self.maxLines else { return nil }
+            var seps: [StatuslineSeparator?] = []
+            for item in list {
+                if item is NSNull {
+                    seps.append(nil)
+                } else if let s = item as? String, let sep = StatuslineSeparator(rawValue: s) {
+                    seps.append(sep)
+                } else {
+                    return nil
+                }
+            }
+            separators = seps
+        }
+    }
+}
+
+/// The picks a combined statusline carries (item 63b): theirs (nil keeps every segment) and
+/// Sanduhr's own (nil: the default three).
+struct StatuslineSelection: Equatable, Sendable {
+    var theirs: StatuslinePicks?
+    var mine: [SanduhrSegment]?
+
+    init(theirs: StatuslinePicks? = nil, mine: [SanduhrSegment]? = nil) {
+        self.theirs = theirs
+        self.mine = mine
+    }
+}
+
 /// Sanduhr's statusline command taken apart: `<python> <…/sanduhr_statusline.py>`, optionally
-/// followed by exactly `--chain-b64 <base64> --join line|same [--padding <n>]`.
+/// followed by exactly `--chain-b64 <base64> --join line|same [--padding <n>]
+/// [--keep-theirs-b64 <base64>] [--mine <list>]`.
 struct StatuslineCommand: Equatable, Sendable {
     /// `<python> <script>`, as written.
     var base: String
@@ -25,6 +166,8 @@ struct StatuslineCommand: Equatable, Sendable {
     var chain: String?
     var join: StatuslineJoin?
     var padding: Int?
+    /// The segments kept (item 63b); empty without picks.
+    var selection = StatuslineSelection()
 }
 
 extension IntegrationInstaller {
@@ -35,26 +178,55 @@ extension IntegrationInstaller {
     /// How many Sanduhr commands deep an unwrap goes before giving up.
     static let unwrapLimit = 16
 
-    /// Sanduhr's statusline command, alone or combined with `chain`.
+    /// Sanduhr's statusline command, alone or combined with `chain` (and its picks).
     static func statuslineCommand(python: String, script: String, chain: String? = nil,
-                                  join: StatuslineJoin = .line, padding: Int? = nil) -> String {
+                                  join: StatuslineJoin = .line, padding: Int? = nil,
+                                  selection: StatuslineSelection = StatuslineSelection()) -> String {
         let base = "\(shellQuoted(python)) \(shellQuoted(script))"
         guard let chain else { return base }
         var c = "\(base) --chain-b64 \(Data(chain.utf8).base64EncodedString()) --join \(join.rawValue)"
         if let padding, padding > 0, padding <= 999 { c += " --padding \(padding)" }
+        c += pickFlags(selection).map { " " + $0 }.joined()
         return c
+    }
+
+    /// `--keep-theirs-b64 <b64> --mine <list>` for `selection`, each left out when it is the default.
+    static func pickFlags(_ selection: StatuslineSelection) -> [String] {
+        var out: [String] = []
+        if let theirs = selection.theirs { out += ["--keep-theirs-b64", theirs.base64] }
+        if let mine = selection.mine, !mine.isEmpty { out += ["--mine", SanduhrSegment.list(mine)] }
+        return out
+    }
+
+    /// Base64 as the runner takes it: the standard alphabet, padded, `=` only at the end.
+    static func isCanonicalBase64(_ payload: String) -> Bool {
+        let alphabet = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
+        return !payload.isEmpty && payload.count % 4 == 0 && payload.unicodeScalars.allSatisfy(alphabet.contains)
+            && !payload.dropLast(2).contains("=")
     }
 
     /// `command` taken apart when it is Sanduhr's, nil when it is anyone else's. Sanduhr's line
     /// alone is a command that is only `<python> <…/sanduhr_statusline.py>` (no `;`, `&`, a pipe,
     /// a substitution or a newline); combined, that is followed by exactly the runner's flags in
-    /// order, the payload valid base64 of a non-blank UTF-8 command. Nothing looser: a command
-    /// of the user's that merely calls the script stays theirs.
+    /// order, the payload valid base64 of a non-blank UTF-8 command, the picks exactly what the
+    /// runner accepts. Nothing looser: a command of the user's that merely calls the script stays
+    /// theirs.
     static func parseStatusline(_ command: String) -> StatuslineCommand? {
         let c = command.trimmingCharacters(in: .whitespaces)
         if [";", "&", "|", "$(", "`", "\n", "\r"].contains(where: { c.contains($0) }) { return nil }
         if isPlainStatusline(c) { return StatuslineCommand(base: c) }
         var words = c.components(separatedBy: " ")
+        var selection = StatuslineSelection()
+        if words.count >= 2, words[words.count - 2] == "--mine" {
+            guard let mine = SanduhrSegment.parseList(words[words.count - 1]) else { return nil }
+            selection.mine = mine
+            words.removeLast(2)
+        }
+        if words.count >= 2, words[words.count - 2] == "--keep-theirs-b64" {
+            guard let picks = StatuslinePicks(base64: words[words.count - 1]) else { return nil }
+            selection.theirs = picks
+            words.removeLast(2)
+        }
         var padding: Int?
         if words.count >= 2, words[words.count - 2] == "--padding" {
             let n = words[words.count - 1]
@@ -65,14 +237,12 @@ extension IntegrationInstaller {
         guard words.count >= 5, words[words.count - 4] == "--chain-b64", words[words.count - 2] == "--join",
               let join = StatuslineJoin(rawValue: words[words.count - 1]) else { return nil }
         let payload = words[words.count - 3]
-        let alphabet = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
-        guard !payload.isEmpty, payload.count % 4 == 0, payload.unicodeScalars.allSatisfy(alphabet.contains),
-              !payload.dropLast(2).contains("="),
+        guard isCanonicalBase64(payload),
               let data = Data(base64Encoded: payload), let chain = String(data: data, encoding: .utf8),
               !chain.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         let base = words.dropLast(4).joined(separator: " ")
         guard isPlainStatusline(base) else { return nil }
-        return StatuslineCommand(base: base, chain: chain, join: join, padding: padding)
+        return StatuslineCommand(base: base, chain: chain, join: join, padding: padding, selection: selection)
     }
 
     /// Only `<python> <…/sanduhr_statusline.py>` (the rule before Combine).
@@ -111,15 +281,16 @@ extension IntegrationInstaller {
         return out
     }
 
-    /// Sanduhr's `statusLine` value: its command (combined with `chain` when given) and the
-    /// carried members.
-    func statuslineEntry(python: String, chain: String?, join: StatuslineJoin, siblings: [JSONEdit.Pair]) -> JSONEdit.Value {
+    /// Sanduhr's `statusLine` value: its command (combined with `chain` when given, with its
+    /// picks) and the carried members.
+    func statuslineEntry(python: String, chain: String?, join: StatuslineJoin, siblings: [JSONEdit.Pair],
+                         selection: StatuslineSelection = StatuslineSelection()) -> JSONEdit.Value {
         let padding: Int? = siblings.first { $0.key == "padding" }.flatMap {
             if case .int(let n) = $0.value { return n }
             return nil
         }
         let command = Self.statuslineCommand(python: python, script: scripts.installedPath(IntegrationScripts.statuslineScript),
-                                             chain: chain, join: join, padding: padding)
+                                             chain: chain, join: join, padding: padding, selection: selection)
         return .object([JSONEdit.Pair("type", .string("command")), JSONEdit.Pair("command", .string(command))] + siblings)
     }
 
@@ -131,12 +302,65 @@ extension IntegrationInstaller {
         return Self.parseStatusline(command)?.chain != nil
     }
 
-    /// The arguments that run the combined command once for the preview, with the app's own
-    /// copy of the script (the installed one may not be there yet). Nil without the script.
-    func previewArguments(chain: String, join: StatuslineJoin) -> [String]? {
+    /// The app's own copy of the runner (the installed one may not be there yet), nil without it.
+    private var previewScript: String? {
         guard let source = scripts.source?.appendingPathComponent(IntegrationScripts.statuslineScript).path,
               FileManager.default.fileExists(atPath: source) else { return nil }
-        return [source, "--chain-b64", Data(chain.utf8).base64EncodedString(), "--join", join.rawValue]
+        return source
+    }
+
+    /// The arguments that run the user's command once and list its segments and Sanduhr's for
+    /// the sheet's chips (item 63b). Nil without the script.
+    func inspectArguments(chain: String) -> [String]? {
+        guard let script = previewScript else { return nil }
+        return [script, "--inspect-b64", Data(chain.utf8).base64EncodedString()]
+    }
+
+    /// The arguments that print what the combined line would, from the user's output `theirs`
+    /// (their command doesn't run again), for the sheet's live preview. Nil without the script.
+    func composeArguments(theirs: String, join: StatuslineJoin, selection: StatuslineSelection) -> [String]? {
+        guard let script = previewScript else { return nil }
+        return [script, "--compose-b64", Data(theirs.utf8).base64EncodedString(), "--join", join.rawValue]
+            + Self.pickFlags(selection)
+    }
+}
+
+/// What `--inspect-b64` prints (item 63b): the user's output against the sample JSON, each line
+/// split under every separator (the detected one named), and Sanduhr's segments one by one.
+struct StatuslineInspection: Decodable, Equatable, Sendable {
+    struct Segment: Decodable, Equatable, Sendable {
+        let matcher: String
+        let text: String
+    }
+
+    struct Split: Decodable, Equatable, Sendable {
+        /// The runner keeps this line whole under this separator.
+        let doubt: Bool
+        let segments: [Segment]
+    }
+
+    struct Line: Decodable, Equatable, Sendable {
+        /// The line as printed, escapes included.
+        let text: String
+        /// The separator detected, by the runner's name.
+        let auto: String
+        let splits: [String: Split]
+    }
+
+    struct Mine: Decodable, Equatable, Sendable {
+        let name: String
+        /// What the segment shows now; empty when it has nothing to show.
+        let text: String
+    }
+
+    let theirs: String
+    let lines: [Line]
+    let mine: [Mine]
+    /// A line of Sanduhr's that shows whole whatever is picked (stale, update), else empty.
+    let notice: String
+
+    static func decode(_ text: String) -> StatuslineInspection? {
+        try? JSONDecoder().decode(StatuslineInspection.self, from: Data(text.utf8))
     }
 }
 

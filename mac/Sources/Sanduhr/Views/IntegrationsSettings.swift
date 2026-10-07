@@ -77,18 +77,25 @@ final class IntegrationsModel {
         display(IntegrationInstaller.standard.configFile(kind, folder: folder))
     }
 
-    /// The combined command's output against sample statusline JSON, per join, for the sheet.
-    /// Nil for a join that couldn't run (no python3, a build without the scripts).
-    func combinePreview(chain: String) async -> [StatuslineJoin: String] {
-        guard let python = pythonPath else { return [:] }
-        return await Task.detached(priority: .userInitiated) { () -> [StatuslineJoin: String] in
-            var out: [StatuslineJoin: String] = [:]
-            for join in StatuslineJoin.allCases {
-                guard let args = IntegrationInstaller.standard.previewArguments(chain: chain, join: join),
-                      let text = StatuslinePreview.run(python: python, arguments: args) else { continue }
-                out[join] = text
-            }
-            return out
+    /// The user's statusline run once against sample statusline JSON and split into segments,
+    /// with Sanduhr's, for the sheet's chips (item 63b). Nil when it couldn't run (no python3,
+    /// a build without the scripts).
+    func inspectStatusline(chain: String) async -> StatuslineInspection? {
+        guard let python = pythonPath else { return nil }
+        return await Task.detached(priority: .userInitiated) { () -> StatuslineInspection? in
+            guard let args = IntegrationInstaller.standard.inspectArguments(chain: chain),
+                  let text = StatuslinePreview.run(python: python, arguments: args) else { return nil }
+            return StatuslineInspection.decode(text)
+        }.value
+    }
+
+    /// What the combined line prints with these picks, from the user's output (their command
+    /// doesn't run again), for the sheet's live preview. Nil when it couldn't run.
+    func composeStatusline(theirs: String, join: StatuslineJoin, selection: StatuslineSelection) async -> String? {
+        guard let python = pythonPath else { return nil }
+        return await Task.detached(priority: .userInitiated) { () -> String? in
+            guard let args = IntegrationInstaller.standard.composeArguments(theirs: theirs, join: join, selection: selection) else { return nil }
+            return StatuslinePreview.run(python: python, arguments: args)
         }.value
     }
 
@@ -119,7 +126,7 @@ final class IntegrationsModel {
     /// replaced (the consent sheet asked); with `combine`, someone else's statusline is kept and
     /// shown with Sanduhr's (item 63). Returns the other entry when one turned up unasked.
     func install(_ kind: IntegrationKind, folder: String, replaceOther: Bool, combine: StatuslineJoin? = nil,
-                 linked: [String]) async -> String? {
+                 selection: StatuslineSelection = StatuslineSelection(), linked: [String]) async -> String? {
         // The mod runs inside Claude Code: no python3 needed.
         // The mod and the hooks run inside Claude Code: no python3 needed.
         guard let python = kind.needsPython ? pythonPath : (pythonPath ?? "") else { return nil }
@@ -128,7 +135,8 @@ final class IntegrationsModel {
         let outcome = await Task.detached(priority: .userInitiated) { () -> Result<IntegrationInstaller.Outcome, IntegrationInstaller.Failure> in
             do {
                 return .success(try IntegrationInstaller.standard.install(kind, folder: folder, python: python,
-                                                                         replaceOther: replaceOther, combine: combine))
+                                                                         replaceOther: replaceOther, combine: combine,
+                                                                         selection: selection))
             } catch let f as IntegrationInstaller.Failure {
                 return .failure(f)
             } catch {
@@ -218,7 +226,7 @@ struct IntegrationsSettings: View {
         .task { await model.load(linked: linked) }
         .sheet(item: $consent) { c in
             IntegrationConsentSheet(consent: c, vm: vm, model: model,
-                                    install: { join in confirm(c, combine: join) },
+                                    install: { join, selection in confirm(c, combine: join, selection: selection) },
                                     openAccounts: {
                                         consent = nil
                                         navigation.selection = .credentials
@@ -253,13 +261,18 @@ struct IntegrationsSettings: View {
         consent = IntegrationConsent(kind: kind, folder: folder, other: model.otherEntry(kind, folder: folder))
     }
 
-    private func confirm(_ c: IntegrationConsent, combine: StatuslineJoin?) {
+    private func confirm(_ c: IntegrationConsent, combine: StatuslineJoin?, selection: StatuslineSelection) {
         consent = nil
-        Task { await run(c.kind, folder: c.folder, replace: c.other != nil && combine == nil, combine: combine) }
+        Task {
+            await run(c.kind, folder: c.folder, replace: c.other != nil && combine == nil, combine: combine,
+                      selection: selection)
+        }
     }
 
-    private func run(_ kind: IntegrationKind, folder: String, replace: Bool, combine: StatuslineJoin?) async {
-        if let other = await model.install(kind, folder: folder, replaceOther: replace, combine: combine, linked: linked) {
+    private func run(_ kind: IntegrationKind, folder: String, replace: Bool, combine: StatuslineJoin?,
+                     selection: StatuslineSelection = StatuslineSelection()) async {
+        if let other = await model.install(kind, folder: folder, replaceOther: replace, combine: combine,
+                                           selection: selection, linked: linked) {
             consent = IntegrationConsent(kind: kind, folder: folder, other: other)
         }
     }
@@ -426,12 +439,14 @@ private struct IntegrationConsentSheet: View {
     let consent: IntegrationConsent
     var vm: UsageViewModel
     var model: IntegrationsModel
-    /// Install; a join combines someone else's statusline with Sanduhr's (item 63).
-    let install: (StatuslineJoin?) -> Void
+    /// Install; a join combines someone else's statusline with Sanduhr's (item 63), keeping the
+    /// segments picked (item 63b).
+    let install: (StatuslineJoin?, StatuslineSelection) -> Void
     let openAccounts: () -> Void
     let openNotch: () -> Void
     let cancel: () -> Void
     @State private var join: StatuslineJoin = .line
+    @State private var selection = StatuslineSelection()
 
     /// The statusline sheet when one is already set: Combine, Replace or Cancel.
     private var offersCombine: Bool { consent.kind == .statusline && consent.other != nil }
@@ -440,7 +455,8 @@ private struct IntegrationConsentSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             header
             if offersCombine, let other = consent.other {
-                CombineChoice(other: other, folder: model.display(consent.folder), model: model, join: $join)
+                CombineChoice(other: other, folder: model.display(consent.folder), model: model, join: $join,
+                              selection: $selection)
             } else if let other = consent.other {
                 ReplaceNotice(other: other, folder: model.display(consent.folder), kind: consent.kind)
             }
@@ -451,7 +467,7 @@ private struct IntegrationConsentSheet: View {
             buttons
         }
         .padding(20)
-        .frame(width: offersCombine ? 560 : 460)
+        .frame(width: offersCombine ? 600 : 460)
     }
 
     @ViewBuilder
@@ -476,12 +492,12 @@ private struct IntegrationConsentSheet: View {
             Spacer()
             if offersCombine {
                 Button("Cancel", role: .cancel, action: cancel).keyboardShortcut(.cancelAction)
-                Button("Replace") { install(nil) }
-                Button("Combine") { install(join) }
+                Button("Replace") { install(nil, StatuslineSelection()) }
+                Button("Combine") { install(join, selection) }
                     .keyboardShortcut(.defaultAction)
             } else {
                 Button("Not Now", role: .cancel, action: cancel).keyboardShortcut(.cancelAction)
-                Button(consent.other == nil ? "Install" : "Replace and Install") { install(nil) }
+                Button(consent.other == nil ? "Install" : "Replace and Install") { install(nil, StatuslineSelection()) }
                     .keyboardShortcut(.defaultAction)
             }
         }
@@ -530,7 +546,7 @@ private struct ReplaceNotice: View {
 }
 
 /// The other entry's text, set off in a box.
-private struct OtherCommandBox: View {
+struct OtherCommandBox: View {
     let text: String
 
     var body: some View {
@@ -540,88 +556,6 @@ private struct OtherCommandBox: View {
             .padding(6)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.12)))
-    }
-}
-
-/// The "other statusline" choice (item 63): Combine keeps the user's line and adds Sanduhr's,
-/// shown both ways as a preview; Replace swaps theirs out until Remove.
-private struct CombineChoice: View {
-    let other: String
-    let folder: String
-    var model: IntegrationsModel
-    @Binding var join: StatuslineJoin
-    @State private var previews: [StatuslineJoin: String] = [:]
-    @State private var loading = true
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("\(folder) already has a statusline:")
-                .fixedSize(horizontal: false, vertical: true)
-            OtherCommandBox(text: other)
-            Text("Combine keeps it: Sanduhr runs your statusline first, then adds its meters. If yours is slow (over 1.5 seconds) or fails, Sanduhr's meters still show. Replace shows only Sanduhr's line. Either way, Remove puts yours back.")
-                .fixedSize(horizontal: false, vertical: true)
-            Text("Preview, with sample data (your statusline runs once to draw it):")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            ForEach(StatuslineJoin.allCases, id: \.self) { j in
-                JoinOption(join: j, selected: join == j, output: previews[j], loading: loading) { join = j }
-            }
-        }
-        .task(id: other) {
-            loading = true
-            previews = await model.combinePreview(chain: other)
-            loading = false
-        }
-    }
-}
-
-/// One way to join, with what it looks like.
-private struct JoinOption: View {
-    let join: StatuslineJoin
-    let selected: Bool
-    let output: String?
-    let loading: Bool
-    let choose: () -> Void
-
-    var body: some View {
-        Button(action: choose) {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(selected ? Color.accentColor : .secondary)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(Self.title(join)).font(.callout)
-                    preview
-                }
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
-    @ViewBuilder
-    private var preview: some View {
-        Group {
-            if let output, !output.isEmpty {
-                Text(ANSIText.attributed(output.trimmingCharacters(in: .newlines)))
-                    .lineLimit(6)
-            } else {
-                Text(loading ? "Running…" : "No preview: Python or the scripts weren't found.")
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .font(.caption.monospaced())
-        .padding(6)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 4).fill(Color.black.opacity(0.85)))
-        .foregroundStyle(Color(white: 0.9))
-    }
-
-    static func title(_ join: StatuslineJoin) -> String {
-        switch join {
-        case .line: "Sanduhr's meters on their own row, under yours"
-        case .same: "On the same row, after yours (own row when it doesn't fit)"
-        }
     }
 }
 
