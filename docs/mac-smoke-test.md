@@ -570,11 +570,16 @@ S=~/Library/Application\ Support/Sanduhr/integrations
   /tmp/st-line.sh; printf '{\n  "statusLine": {"type": "command", "command": "/tmp/st-line.sh"}\n}\n'
   > ~/.claude-smoketest/settings.json; cp ~/.claude-smoketest/settings.json /tmp/st-seg.json`.
   Install…: three blue chips `~/proj`,
-  `⎇ main`, `+3`, "split on Pipe | (found)". Click `⎇ main`, Sanduhr's weekly and weekly reset,
+  `⎇ main`, `+3`, "Split yours on Pipe | (found)", and "Join with: Same as yours"; every control has
+  a caption under it and a tooltip on hover (each of Sanduhr's chips says what it prints, as in
+  "Session: the 5-hour limit, as in 5h 42%"). Click `⎇ main`, Sanduhr's weekly and weekly reset,
   and model: the preview reads `~/proj | +3` (blue and yellow kept) then `5h … | Opus`, and
-  updates on each click without running the line again. Switch the separator to None (one
-  segment): one chip for the whole line, the preview shows it whole; back to Pipe, the picks
-  return. Try to drop every one of Sanduhr's: the last stays. Combine: the command ends in
+  updates on each click without running the line again. Switch Split yours on to None (one
+  segment): at once one chip for the whole line, and the preview shows it whole; back to Pipe, the
+  picks return. Join with Bar │: the preview reads `~/proj │ +3` and Sanduhr's part `5h … │ Opus`;
+  Join with Same as yours puts `|` back. Test with live data: the chips and preview refill (meters
+  from the widget, model and context from the latest session in this folder) and "Tested <time>
+  with live numbers" shows; with no session there, it says model and context are sample values. Try to drop every one of Sanduhr's: the last stays. Combine: the command ends in
   `--keep-theirs-b64 … --mine session,model`, and the session's statusline matches the preview.
   Outside a repository the branch is missing: `printf '{}' | python3
   "$S/current/sanduhr_statusline.py" --chain-b64 $(printf 'printf "~/x | +0"' | base64) --join
@@ -583,8 +588,13 @@ S=~/Library/Application\ Support/Sanduhr/integrations
   picks; Remove: `diff /tmp/st-seg.json ~/.claude-smoketest/settings.json` is empty. A
   powerline-style line (a copy, in this test folder): drop a middle segment, and the arrow
   between the two now-neighbors takes their colors, with no bleed into Sanduhr's segment.
-- [ ] The sheet's note says mods' status entries aren't part of the statusline and points to
-  the Mods page. Put the `echo mine` file back (`cp /tmp/st-settings.json
+- [ ] Mods: with no mods in the folder, "From your mods" says "No mods in this folder draw status
+  entries." Make one in the test folder: `mkdir -p /tmp/st-mod/hooks; printf '{"modules":
+  ["./r.tsx"]}' > /tmp/st-mod/hooks/hooks.json; printf '$.ui.status("hi")\n' > /tmp/st-mod/hooks/r.tsx`,
+  and add `"env": {"CLAUDE_CODE_PLUGIN_DIRS": "/tmp/st-mod"}` to `/tmp/st-seg.json`'s copy in
+  `~/.claude-smoketest/settings.json`. Install…: a purple `st-mod` chip that can't be clicked, the
+  caption saying Claude Code draws it beside the statusline, and a "Claude Code's status area"
+  preview row reading `⚠ st-mod: …`. Cancel. Put the `echo mine` file back (`cp /tmp/st-settings.json
   ~/.claude-smoketest/settings.json`) before the next step.
 - [ ] A slow and a failing line: `printf '{\n  "model": "opus",\n  "statusLine": {"type":
   "command", "command": "sleep 5; echo slow", "padding": 1, "refreshInterval": 5}\n}\n' >

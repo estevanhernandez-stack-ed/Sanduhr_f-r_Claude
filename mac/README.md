@@ -291,9 +291,11 @@ your statusline".
 … --join line|same [--padding <n>] [--keep-theirs-b64 <base64 of JSON>] [--mine <list>]
 ```
 
-`--keep-theirs-b64` carries `{"keep": [...], "drop": [...], "new": false, "sep": [null, "pipe"]}`
-(every key optional): matchers kept and dropped, whether segments never seen stay (`new`, default
-true) and a separator per line (null: detected). At run time each line of yours is cut on its
+`--keep-theirs-b64` carries `{"keep": [...], "drop": [...], "new": false, "sep": [null, "pipe"],
+"with": "bar"}` (every key optional): matchers kept and dropped, whether segments never seen stay
+(`new`, default true), a separator per line to split on (null: detected) and the glyph to join
+with (`with`: `bar`, `pipe`, `dot`, `bullet`, `powerline`, `powerline-thin`, `spaces`; absent
+keeps your own separators). At run time each line of yours is cut on its
 separator (`powerline` , `powerline-thin` , `bar` │, `pipe` |, `bullet` •, `dot` ·, `spaces`
 for two or more, `none`), detected as the glyph the line holds most. A segment's matcher is its
 leading token with escapes taken out: a word, `#` for a number, else the first glyph, so `⎇ main`
@@ -303,7 +305,10 @@ and a reset after; powerline arrows between segments that weren't neighbors (and
 are redrawn from the two backgrounds. A line nothing of survives goes; when nothing of yours is
 left, Sanduhr's line prints alone, never the other way round. Any doubt (an unfinished escape, a
 carriage return or other control character, an empty segment) keeps the line whole, and a line
-where nothing drops prints byte for byte as it came. `--mine` is a comma list in this order:
+where nothing drops prints byte for byte as it came, unless `with` is set. `with` replaces the
+glyph between segments everywhere in the final line: between yours, between Sanduhr's (its usual
+` | `) and at the same-row seam (its usual ` │ `); a powerline arrow takes the two neighbors'
+backgrounds. `--mine` is a comma list in this order:
 `session`, `weekly` (with hot per-model weeklies), `resets` (the default three), `context`
 (`ctx 8%`) and `model` (`Opus`), both from Claude Code's stdin; notices (stale, update) always
 show. Each flag is left out when it holds the default, so a combine without picks writes the same
@@ -317,8 +322,32 @@ by one. That becomes chips (`StatuslineChips`): yours in blue, Sanduhr's in ambe
 through when dropped, chips that share a matcher toggling together, a line kept whole shown as
 one chip that can't be clicked, one of Sanduhr's always kept. Each change runs `--compose-b64
 <base64 of your output> --join … [picks]`, which prints what the runner would without running
-your command again, and the preview draws it. A note says mods' status entries aren't part of the
-statusline and live on the Mods page.
+your command again, and the preview draws it. Two controls sit apart: **Split yours on** (per
+line, how the script reads your line into segments; it changes the chips, and the preview
+composes again at once with the choice even when nothing is picked, while the command stays
+without picks) and **Join with** ("Same as yours" or a glyph, which changes the line itself).
+Every control has a caption under it and a tooltip.
+
+**Mods in the picker.** "From your mods" lists the mods the folder loads that draw a status
+entry: `env.CLAUDE_CODE_PLUGIN_DIRS` entries and `enabledPlugins` keys set to true (resolved through
+`plugins/installed_plugins.json`), kept when `hooks/hooks.json` lists `modules` and the source
+(`.ts`, `.tsx`, `.js`, `.mjs`, `.cjs`, `.jsx`, `node_modules` skipped, 400 files, 512 KB each)
+calls `ui.status`; an `@inline` mod set to false in `enabledPlugins` is left out. Files are read
+as text; no mod code runs and the `claude` CLI isn't called. The chips are read-only: Claude Code
+draws those entries in its status area beside the statusline, so the statusline command can't
+keep or drop them, and the sheet says to use the mod's own settings or turn it off for the
+folder (a `userConfig` entry that mentions status is named in the chip's tooltip). The preview
+adds a "Claude Code's status area" row with `⚠ <name>: …` placeholders, captioned that the text is
+known only inside a session. With none: "No mods in this folder draw status entries."
+
+**Test with live data.** The button builds the statusline input from the sample's shape with
+snapshot.json's `five_hour` and `seven_day` (percent, and resets as epoch seconds), the current
+time, and, from the newest `projects/*/*.jsonl` in the folder (its last 256 KB, only `model`,
+`usage` and `cwd` of the last assistant turn), the model (`claude-opus-5-5` reads "Opus 5.5"),
+context use (input plus cache tokens over a 200k window, 1M for `[1m]` or past 200k) and working
+folder. It runs `--inspect-b64` again with that input, refills the chips keeping every pick (a
+segment seen for the first time is a new chip, kept), composes the preview from it, and says
+"Tested 12:04 with live numbers" (or which parts were sample values).
 
 **Scripts.** `build.sh` copies both into `Sanduhr.app/Contents/Resources/integrations/`.
 `IntegrationScripts` copies them to `integrations/<stamp>/` (12 hex of a SHA-256 over the
