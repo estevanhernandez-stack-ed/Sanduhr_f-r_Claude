@@ -1316,7 +1316,7 @@ to `~/modtest/meters` and give `~/.claude-modtest/settings.json`
 `{"env": {"CLAUDE_CODE_PLUGIN_DIRS": "~/modtest/meters:~/modtest/gone"}}`.
 
 1. Settings, Mods (under Integrations, cube symbol) opens with a summary card: mods, plugins, on,
-   folders, and missing when one is; "Read-only: nothing here turns a mod on or off." No Sample
+   folders, and missing when one is; "Sanduhr's own mod switches here; other mods are read-only." No Sample
    label. VoiceOver reads it as one sentence with the counts.
 2. One box per Claude Code folder, its path on top. `~/.claude-modtest` lists **sanduhr-meters**
    (0.1.0, Mod, On, its description, "Plugin folder list (CLAUDE_CODE_PLUGIN_DIRS)" and the path),
@@ -1422,3 +1422,41 @@ its `shasum`.
     `get_desk_messages` reports `special_mode` and `special_seconds`. Set Stack again.
 
 Put your list back: `cp ~/messages.txt.bak ~/Library/Application\ Support/Desk/messages.txt`.
+
+
+## 37. Switch Sanduhr's own mod on the Mods page (item 64, slice 2)
+
+Use throwaway Claude Code folders only (`mkdir -p ~/.claude-modtest/projects ~/.claude-modtest2/projects`)
+and remove them afterwards. Give `~/.claude-modtest/settings.json` `{"model": "opus"}` and note its
+`shasum`. Settings, Integrations: install **Meters above the prompt** into `~/.claude-modtest`.
+
+1. Settings, Mods: a box at the top, "Sanduhr's mod: sanduhr-meters" and the app's version, one
+   row per Claude Code folder with a switch. `~/.claude-modtest` is on: "Version …, through
+   Sanduhr's current folder: it follows Sanduhr's updates (installed from Integrations)." In the
+   folder list below, its sanduhr-meters row says "Sanduhr's own mod: switch it under Sanduhr's
+   mod at the top of this page." Other mods carry no switch.
+2. Switch it off: the row reads "… Off: enabledPlugins sets sanduhr-meters@inline to false here."
+   and "Takes effect in new Claude Code sessions (or after /reload-plugins)." settings.json now has
+   `"enabledPlugins": {"sanduhr-meters@inline": false}` and the plugin list entry is still there;
+   the inventory row below reads Off.
+3. Switch it on: settings.json is byte for byte what Integrations wrote (`shasum` as after the
+   install).
+4. A project override: add `"/tmp/modtest-project": {}` under `projects` in
+   `~/.claude-modtest/.claude.json` (create it as `{"projects": {...}}` if missing) and
+   `{"enabledPlugins": {"sanduhr-meters@inline": true}}` in
+   `/tmp/modtest-project/.claude/settings.json`. Switch it off: the orange line reads "A project
+   setting keeps it on in /tmp/modtest-project (.claude/settings.json)."
+5. `~/.claude-modtest2` (no settings.json yet) reads "Not in this folder's plugin folder list. On
+   adds it." Switch it on: a question, "Turn on sanduhr-meters in ~/.claude-modtest2?", with Turn
+   On and Cancel. Cancel leaves the switch off and writes nothing. Turn On: its settings.json lists
+   `…/Sanduhr/integrations/<12 hex>/mods/sanduhr-meters` and the row reads "Version …, kept by the
+   Mods page: Update moves it to a new version."
+6. Update (needs two builds): with a build whose mod differs installed over this one, the
+   `~/.claude-modtest2` row shows "Update to <version>". If the new mod calls something the old
+   didn't, Update asks "The new version of sanduhr-meters can do more" listing the new calls;
+   "Keep the Version in Use" leaves settings.json alone; Update moves the entry to the new stamp.
+7. Remove on both rows: each settings.json is back to its first `shasum` (`~/.claude-modtest2`'s
+   is gone again), and Integrations shows the meters as not installed.
+8. Integrations, Statusline, Install over an existing statusline in a folder that loads a mod
+   with a status entry: under "From your mods", "Switch it on the Mods page" closes the sheet and
+   opens Settings, Mods.

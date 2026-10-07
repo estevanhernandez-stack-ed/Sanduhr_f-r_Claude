@@ -745,11 +745,49 @@ high for programs, the network, writing files or settings, gating or rewriting w
 secret-looking environment names; medium for reading files or the environment; low otherwise.
 Without `claude` the button is off and the page says why.
 
-Nothing on the page writes: no switch, no edit to any settings file (turning Sanduhr's own mods
-on and off by receipt is slice 2). A summary card (item 68's pattern) counts mods, plugins, how
+Other mods are read-only: the page says switching them comes later, and a copy of Sanduhr's mod
+outside Sanduhr's folder (a checkout) is marked read-only too.
+
+**Sanduhr's own mod** (slice 2, `ModSwitch.swift`, `ModsOwnSettings.swift`): a box at the top for
+`sanduhr-meters` with a switch per Claude Code folder, Update and Remove, all through the receipt
+in `integrations/installs.json`, so each undoes byte for byte. A row in the inventory is Sanduhr's
+when its path is a `…/Sanduhr/integrations/…/mods/sanduhr-meters` entry (`isOurModEntry`).
+
+- **Off** writes `enabledPlugins["sanduhr-meters@inline"]: false` into the folder's settings.json
+  (the documented switch for a plugin folder mod), keeping the list entry, the version and the
+  mod's own options. The receipt's `switched` (`SwitchReceipt`) records the member as it was:
+  its old value's bytes, or that the key (and `enabledPlugins` itself) was made, and what sat
+  between empty braces.
+- **On** undoes that switch. Where the user's own `false` is there, it writes `true` and records
+  the `false`, which Off puts back. Where the folder's list has no entry, it asks, then adds one
+  pinned to the app's stamped version, `integrations/<stamp>/mods/sanduhr-meters` (the receipt's
+  `pinned`), through the same JSONEdit splice as Integrations' Install. Refresh keeps every stamp
+  a receipt pins, so an app update never pulls a pinned version out from under a folder.
+- **Update** shows when a pinned entry names a stamp other than the app's. It compares what the
+  two versions can do: the validator's `$` calls and gating hooks when `claude` answers for both,
+  else the static scan's capabilities for both (`ModCapabilities.added`). Anything new stops the
+  update for a question ("The new version can also: …"); the version in use stays until you
+  agree. Then the entry moves in place and the old stamp goes once nothing pins it. An entry
+  through the `current` link (installed from Integrations) follows the app's updates as before.
+- **Remove** is Integrations' Remove for the mod, which now undoes the switch first: the folder's
+  settings.json is back to its bytes from before Sanduhr touched it. A member someone changed
+  since is left as it is.
+- **What else decides.** Claude Code merges `enabledPlugins` key by key, and a project's value
+  beats the user's. After each switch the page re-reads the managed settings
+  (`/Library/Application Support/ClaudeCode/managed-settings.json`) and every project the folder's
+  `.claude.json` lists (`.claude/settings.json` and `.claude/settings.local.json`, at most 400)
+  and says so when one disagrees: "A project setting keeps it on in ~/code/app
+  (.claude/settings.json)." Otherwise: "Takes effect in new Claude Code sessions (or after
+  /reload-plugins)."
+
+The Combine sheet's mod chips (Integrations, Statusline) link to the page: "Switch it on the Mods
+page". A summary card (item 68's pattern) counts mods, plugins, how
 many are on, the folders and any missing. state.yaml's `mods_page` holds flags and counts only.
 Tests: `ModsPageTests` (temp folders and the validator's JSON captured as fixtures under
-`Tests/SanduhrTests/Fixtures/mods-validate/`; Check against a stand-in `claude` script).
+`Tests/SanduhrTests/Fixtures/mods-validate/`; Check against a stand-in `claude` script) and
+`ModSwitchTests` (temp folders: off and on round trips byte for byte, the user's own off, a
+member changed meanwhile, project and managed overrides, an update that asks and one that
+doesn't, pinned stamps surviving refresh, Remove back to the original bytes).
 
 ## Camera and mic indicators
 
