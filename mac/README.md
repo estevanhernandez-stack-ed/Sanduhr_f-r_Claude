@@ -583,6 +583,33 @@ only during its 1.1 s run, sleeps between runs and rests the same way (a once-on
 run does not repeat when the Desk comes back into sight; one that was covered before it ran runs
 then). Settings, Message's Replay sweeps a `{sweep}` line at once.
 
+**The Message editor (item 69).** Settings, Message is a list of lines, each a row with the line
+drawn as the Desk draws it (`MessageRowPreview`: `DeskMessageLine` at 22 points on the preview
+wallpaper, in the Desk's message font, color and glow; Reduce Motion stills it as it does the
+Desk). A row's Edit opens its controls: **When** (Every day, Monday to Sunday, or A date as a month
+and a day menu, written as `Mon:` or `10-31:`), **Text** (plain, no tags), **Color** (As the Desk,
+One color, or a Gradient of 2 to 4 color wells, and a Palette menu with the now-playing mod's
+synthwave, sunset, ocean, aurora, ember, bubblegum, toxic and gold), **Glow** (On, Off, As the
+Desk), **Size** (0.5 to 2 times, in 0.05 steps), **Letters** (As written and the nine letter
+styles) and **Motion** (None, Write in, Shimmer, Sweep), each with a one-line tooltip. The controls
+write the existing tags only, in the order ink, glow, size, font, motion: Fridays, "ship it." in a
+sunset gradient in script with a sweep is `Fri: {ink:#ff7e5f,#feb47b,#ffd86f} {font:script}
+{sweep} ship it.` Rows have Pin (today's line stays: the pin holds the row's tags and text),
+Duplicate, Move Up, Move Down and Delete (the row's menu; VoiceOver has Move Up and Move Down too),
+and drag to reorder. Add Line, the rotation (Once a day, Every hour), Save (Command-S) and Revert
+sit above the list. **Edit as text…** shows the file itself with the tag reference beside it and the
+free pin field; Edit as a list goes back. Both views edit one document (`MessageEditorModel`), and
+switching carries unsaved edits across. `MessageLineModel` reads the file into rows: a styled row
+(when, text, look) for each line the controls can represent; a raw row, shown as written and kept
+verbatim, for one they can't (a tag Sanduhr doesn't know or that is malformed, two motions on one
+line, a date that isn't one, a prefix with nothing after it); comments and blank lines are kept in
+place and not listed. Each row writes the line it was read from, byte for byte, until it is changed,
+so an unchanged file saves back exactly (CRLF endings and a missing final newline included) and a
+changed row rewrites only its own line; a new line with no text is left out. A row whose text the
+Desk would read differently (it starts with `{` or `#`, or like a day on an Every day line) says so
+under it. Claude's suggestion card stays at the top of the page, and **Ask Claude** below the list
+has a copyable example prompt and the "Let Claude change the messages directly" switch.
+
 **Themes from Claude (item 55).** `propose_theme {theme, save_as?, apply?}` is the Windows tool:
 same name, inputs and result shape. `theme` is the theme JSON in `docs/themes/template.json`'s
 snake_case fields (`name`, the fourteen `#rrggbb` colors, optional `description` and the glass
