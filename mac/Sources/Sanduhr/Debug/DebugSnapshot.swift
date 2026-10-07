@@ -106,6 +106,8 @@ struct DebugStateInput {
     var tour = TourDebug()
     /// Watchers (item 66): counts, states and places, never a title or a note.
     var watchers = WatchersDebug()
+    /// The camera and mic indicators (item 67): in-use booleans and where they show, never an app.
+    var avIndicators = AVIndicatorsDebug()
     var version = ""
     var build = ""
 }
@@ -148,6 +150,16 @@ struct WatchersDebug: Equatable {
     var background = false
     /// The notch plays the top watcher's intro (the full line) rather than resting on the short one.
     var intro = false
+}
+
+/// state.yaml's `av_indicators:` (item 67): whether a camera and the microphone are in use (the
+/// real signal while Desk runs and that indicator's switch is on, or faked by `av-test`) and where
+/// the indicators show (AVIndicatorSpot.name: none, beside_left, beside_right, places, badge).
+/// Never which app.
+struct AVIndicatorsDebug: Equatable {
+    var camera = false
+    var mic = false
+    var shown = "none"
 }
 
 /// state.yaml's `notch_shows:`: each place's effective content, never its text.
@@ -240,6 +252,12 @@ enum DebugState {
               YAMLPair("intro", .bool(w.intro))])
     }
 
+    /// `av_indicators:` (item 67): two booleans and a place.
+    static func avIndicatorsYAML(_ a: AVIndicatorsDebug) -> YAMLNode {
+        .map([YAMLPair("camera", .bool(a.camera)), YAMLPair("mic", .bool(a.mic)),
+              YAMLPair("shown", .string(a.shown))])
+    }
+
     /// `vault:` (item 46): flags and a count only.
     static func vaultYAML(_ v: VaultState) -> YAMLNode {
         .map([YAMLPair("recording", .bool(v.recording)), YAMLPair("months", .int(v.months)),
@@ -321,6 +339,7 @@ enum DebugState {
         pairs.append(("whats_new", whatsNewYAML(s.whatsNew)))
         pairs.append(("tour", tourYAML(s.tour)))
         pairs.append(("watchers", watchersYAML(s.watchers)))
+        pairs.append(("av_indicators", avIndicatorsYAML(s.avIndicators)))
         return .object(pairs)
     }
     

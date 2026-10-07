@@ -28,6 +28,10 @@ enum NotchContent: String, CaseIterable, Identifiable {
     /// The most urgent watcher with a count of the rest (item 66): its full line once when it
     /// changes (WatcherIntro), then "PR 140 · 4/12 +1". With no watcher the place shows its own default (`effective`), as now playing stands aside.
     case watchers
+    /// The camera and mic indicators (item 67): the red dot and the mic glyph while they are in use
+    /// and switched on; no text. With nothing to show the place shows its own default (`effective`).
+    /// Choosing it for a place moves them there from beside the camera (AVIndicatorPlacement).
+    case avIndicators
     case nothing
 
     var id: String { rawValue }
@@ -41,6 +45,7 @@ enum NotchContent: String, CaseIterable, Identifiable {
         case .message: "Message"
         case .nowPlaying: "Now playing"
         case .watchers: "Watchers"
+        case .avIndicators: "Camera and mic"
         case .nothing: "Nothing"
         }
     }
@@ -81,9 +86,12 @@ enum NotchContent: String, CaseIterable, Identifiable {
     /// shows the When nothing is playing choice instead, and behaves fully like that content: its
     /// text, its width, its clicks. Every other choice is itself. The saved choice still places
     /// now playing (NowPlayingPlacement), so it keeps running and comes back with the next track.
-    /// A place on Watchers with no watcher to show (item 66) shows the place's own default.
+    /// A place on Watchers with no watcher to show (item 66) shows the place's own default, and so
+    /// does a place on Camera and mic with neither indicator showing (item 67).
     static func effective(_ content: NotchContent, at place: Place, hasLine: Bool,
-                          idle: NowPlayingIdle, hasWatcher: Bool = false) -> NotchContent {
+                          idle: NowPlayingIdle, hasWatcher: Bool = false,
+                          hasIndicators: Bool = false) -> NotchContent {
+        if content == .avIndicators { return hasIndicators ? .avIndicators : place.fallback }
         if content == .watchers { return hasWatcher ? .watchers : place.fallback }
         guard content == .nowPlaying, !hasLine else { return content }
         return idle.content(at: place)
@@ -91,9 +99,10 @@ enum NotchContent: String, CaseIterable, Identifiable {
 
     /// `effective` with the line taken from what plays and the watchers that show.
     static func effective(_ content: NotchContent, at place: Place, nowPlaying: NowPlayingInfo?,
-                          idle: NowPlayingIdle, watchers: [Watcher] = []) -> NotchContent {
+                          idle: NowPlayingIdle, watchers: [Watcher] = [],
+                          indicators: AVIndicators = AVIndicators()) -> NotchContent {
         effective(content, at: place, hasLine: NowPlayingText.line(nowPlaying, at: place) != nil, idle: idle,
-                  hasWatcher: !watchers.isEmpty)
+                  hasWatcher: !watchers.isEmpty, hasIndicators: indicators.any)
     }
 
     /// The text for this choice at `place`, or nil for none (the place stays plain black).
@@ -117,6 +126,9 @@ enum NotchContent: String, CaseIterable, Identifiable {
             return NowPlayingText.line(nowPlaying, at: place)
         case .watchers:
             return WatcherText.notchLine(watchers, intro: watcherIntro, now: now)
+        case .avIndicators:
+            // Drawn, not written (AVIndicatorView).
+            return nil
         case .nothing:
             return nil
         }

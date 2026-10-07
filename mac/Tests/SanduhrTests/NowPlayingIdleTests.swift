@@ -56,8 +56,9 @@ struct NowPlayingIdleTests {
     }
 
     @Test func otherChoicesAreUntouched() {
-        // Watchers stands aside without a watcher (item 66; WatcherTests).
-        for content in NotchContent.allCases where content != .nowPlaying && content != .watchers {
+        // Watchers stands aside without a watcher (item 66; WatcherTests), Camera and mic without an
+        // indicator (item 67; AVIndicatorTests).
+        for content in NotchContent.allCases where ![.nowPlaying, .watchers, .avIndicators].contains(content) {
             for place in places {
                 for idle in NowPlayingIdle.allCases {
                     #expect(NotchContent.effective(content, at: place, hasLine: false, idle: idle) == content)
@@ -69,7 +70,7 @@ struct NowPlayingIdleTests {
 
     @Test func choicesAreEveryContentButNowPlaying() {
         let contents = NowPlayingIdle.allCases.filter { $0 != .automatic }.map { $0.content(at: .left) }
-        #expect(Set(contents) == Set(NotchContent.allCases).subtracting([.nowPlaying, .watchers]))
+        #expect(Set(contents) == Set(NotchContent.allCases).subtracting([.nowPlaying, .watchers, .avIndicators]))
         #expect(NowPlayingIdle.allCases.first == .automatic)
         #expect(NowPlayingIdle.automatic.label == "What that spot shows by default")
         #expect(NowPlayingIdle.time.label == NotchContent.time.label)

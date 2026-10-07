@@ -44,6 +44,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         if !enabled, running { stop() }
         // Now playing runs only while Desk does (and its own switch is on).
         NowPlayingController.shared.apply()
+        // The camera and mic indicators run only while Desk does (and their switches are on).
+        MainActor.assumeIsolated { AVIndicatorController.shared.apply() }
         let previous = appliedEnabled
         appliedEnabled = enabled
         if let previous, previous != enabled {
@@ -243,7 +245,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         // The menu bar can be a point taller than the notch (39 vs 38 on a 14-inch MacBook Pro);
         // wings only as tall as the notch leave its bottom row showing under them.
         let barHeight = max(notch.height, model.topInset)
-        let pad = NotchWingsView.maxWings + 12   // the wing itself plus its flare
+        // The wing itself, the camera and mic indicators beside the camera (item 67) and the flare.
+        let pad = NotchWingsView.maxWings + AVIndicatorLayout.maxRoom(NotchWingsView.textSize(notch.height)) + 12
         let frame = NSRect(x: screen.frame.minX + notch.minX - pad,
                            y: screen.frame.maxY - barHeight,
                            width: notch.width + pad * 2, height: barHeight)
@@ -378,7 +381,14 @@ final class DeskController: NSObject, NSMenuDelegate {
         if hit?.kind == .watcher {
             return WatcherMenu.menu(for: DeskHitTest.watcher(hit, in: model.watchers)?.id)
         }
+        if hit?.kind == .avIndicators { return AVIndicatorMenu.menu(model.avIndicators) }
         return hit?.kind == .nowPlaying ? NowPlayingController.shared.menu() : limitMenu(for: hit)
+    }
+
+    /// Pops `menu` at the pointer in the Desk window.
+    private func popUpAtPointer(_ menu: NSMenu) {
+        guard let w = window, let view = w.contentView else { return }
+        menu.popUp(positioning: nil, at: view.convert(w.mouseLocationOutsideOfEventStream, from: nil), in: view)
     }
 
     /// The limit menu for a hit on the meters: that row's limit, or none beside the rows.
@@ -443,6 +453,13 @@ final class DeskController: NSObject, NSMenuDelegate {
             // Its link, https only; a watcher without one takes the click and does nothing (the
             // window holds the mouse there for the two-finger menu).
             WatcherMenu.open(DeskHitTest.watcher(hit, in: model.watchers))
+        case .avIndicators:
+            // Read-only: a click opens the same menu as a two-finger click, a moment later so it
+            // doesn't track inside the event monitor.
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.popUpAtPointer(AVIndicatorMenu.menu(self.model.avIndicators))
+            }
         case .meters, .meterRow:
             // The window holds the mouse over the meters so a two-finger click reaches the limit
             // menu; a plain click is swallowed there, so nothing reacts to it.
@@ -481,7 +498,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         if w.ignoresMouseEvents == over { w.ignoresMouseEvents = !over }
         let blocks = [model.metersFrame, model.accountFrame, model.noteFrame, model.meetingsFrame,
                       model.nowPlayingFrame, model.stripFrame, model.stripNextFrame,
-                      model.watchersFrame, model.stripWatcherFrame]
+                      model.watchersFrame, model.stripWatcherFrame, model.stripAVFrame]
         nearBlocks = DeskPointerWatch.near(point, frames: blocks)
         // The auto-hiding Dock's edge (item 56) runs the same watch, which reads the window list.
         watchApproach(nearBlocks || dock.wantsWatch(pointer: point, size: w.frame.size))

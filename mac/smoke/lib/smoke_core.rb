@@ -307,11 +307,21 @@ module Smoke
       if !dig_open(before, 'tour') && dig_open(after, 'tour')
         steps << ['close-tour', nil]
       end
+      # Camera and mic signals (item 67) a scenario faked go back to the real ones.
+      %w[camera mic].each do |which|
+        if !av_flag(before, which) && av_flag(after, which)
+          steps << ['av-test', "#{which} off"]
+        end
+      end
       # Watchers (item 66) a scenario put up go, when there were none before.
       if watcher_count(before).zero? && watcher_count(after).positive?
         steps << ['watch-test', 'clear']
       end
       steps
+    end
+
+    def av_flag(state, which)
+      state['av_indicators'].is_a?(Hash) && state['av_indicators'][which] == true
     end
 
     def watcher_count(state)

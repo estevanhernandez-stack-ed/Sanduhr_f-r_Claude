@@ -122,6 +122,8 @@ enum DebugHooks {
         case .tour(let step): WelcomeTourWindowController.shared.show(step: step - 1)
         case .closeTour: WelcomeTourWindowController.shared.close()
         case .watchTest(let test): WatcherStore.shared.debug(test)
+        case .avTest(.camera, let on): AVIndicatorController.shared.setFake(camera: on)
+        case .avTest(.mic, let on): AVIndicatorController.shared.setFake(mic: on)
         }
         settle()
     }
@@ -177,6 +179,7 @@ enum DebugHooks {
             else if w === desk.wingsWindow { kind = "notch" }
             else if w === CameraLightController.shared.window { kind = "camera" }
             else if w === NotchGlowController.shared.window { kind = "glow" }
+            else if w === AVIndicatorController.shared.window { kind = "indicators" }
             else if w === settings { kind = "settings" }
             else if w === WhatsNewWindowController.shared.window { kind = "whats-new" }
             else if w === WelcomeTourWindowController.shared.window { kind = "welcome-tour" }
@@ -289,14 +292,19 @@ enum DebugHooks {
         np.apply()
         s.nowPlaying = NowPlayingDebug(enabled: np.active, placed: np.placed, source: np.source, state: np.state)
         s.nowPlayingIdle = .saved(in: .desk)
+        // A `defaults write` from the smoke runner posts no change notice: apply the indicators'
+        // switches and places now (item 67).
+        let av = AVIndicatorController.shared
+        av.apply()
+        s.avIndicators = AVIndicatorsDebug(camera: av.cameraInUse, mic: av.micInUse, shown: av.spot.name)
         let playing = desk.model.nowPlaying
         s.notchShows = NotchShowsDebug(
             left: NotchContent.effective(s.notchLeft, at: .left, nowPlaying: playing, idle: s.nowPlayingIdle,
-                                         watchers: desk.model.watchers),
+                                         watchers: desk.model.watchers, indicators: desk.model.avIndicators),
             right: NotchContent.effective(s.notchRight, at: .right, nowPlaying: playing, idle: s.nowPlayingIdle,
-                                          watchers: desk.model.watchers),
+                                          watchers: desk.model.watchers, indicators: desk.model.avIndicators),
             strip: NotchContent.effective(s.notchStrip, at: .strip, nowPlaying: playing, idle: s.nowPlayingIdle,
-                                          watchers: desk.model.watchers))
+                                          watchers: desk.model.watchers, indicators: desk.model.avIndicators))
         s.widgetVisible = widgetVisible
         s.widgetVisibility = .saved()
         s.menuBar = .saved()

@@ -608,10 +608,72 @@ folders: each sharing level, no access file, hidden names, and the Windows MCP t
 two lints share `mac/Tests/SanduhrTests/Fixtures/theme-builtins.json`, the built-ins they must pass
 clean.
 
+## Camera and mic indicators
+
+Item 67. Indicators only, read-only: a red recording dot while any app uses a camera, and an
+orange mic glyph while any app uses the microphone. In Settings, Desk, Notch, Camera and mic (all
+in `com.626labs.sanduhr.desk`):
+
+- **Show the red dot** (`avCameraDotMode`): Never (the default), For cameras without a visible
+  light (`hiddenLight`), or Always. A MacBook's built-in camera has its own green light that can't
+  be turned off, so a dot for it only repeats that light. `hiddenLight` shows the dot only when a
+  running camera isn't built in (an external or Continuity camera: CoreMediaIO's
+  `kCMIODevicePropertyTransportType` isn't `'bltn'`, read with the device list, never opening it),
+  or the built-in one runs with the lid closed (IOPMrootDomain's `AppleClamshellState`, read again
+  on every camera reading and screen change). `CameraLightVisibility` decides, pure. The switch
+  before the picker (`avCameraDot`, a Bool) migrates once: on becomes `hiddenLight`.
+- **Show a mic while the microphone is on** (`avMicGlyph`), off by default.
+- **Pulse the dot gently** (`avPulse`, on) and **Beside the camera** (`avSide`, left or right,
+  right by default).
+
+They run only while Desk runs and they are on.
+
+**Motion** (`AVIndicatorMotion`). Coming and going is a 0.25-second ease-in-out opacity fade, the
+island's room growing or shrinking with it in the same transaction; the tab fades its window. The
+dot breathes between 0.55 and full opacity on a 1.6-second cosine, computed from each frame's time
+(`TimelineView(.animation)`), not a state that flips. With Reduce Motion there is no breath and the
+fades are instant. The slot beside the camera (`AVBesideSlot`) is always in the island's row: its
+width is the layout's room (0 when nothing shows), its content clipped and faded with it, so it is
+never inserted or removed and leaves nothing behind; `avDrawn` keeps the last indicators so the fade
+out shows what was there.
+
+**Signals.** The camera's is `CameraMonitor`, the camera light's own (CoreMediaIO's
+`kCMIODevicePropertyDeviceIsRunningSomewhere`); `AVIndicatorController` runs a second instance, so
+the indicator works with the camera light off. The microphone's is `MicMonitor`: Core Audio's
+`kAudioDevicePropertyDeviceIsRunningSomewhere` on the default input device, with a listener on it
+and one on `kAudioHardwarePropertyDefaultInputDevice`, so it follows a headset as it connects
+(`MicWatch`, pure). No polling: C function listeners with a retained target as client data, as in
+`CameraMonitor`, each hopping to the main queue. Both settle through `CameraActivity`: on at once,
+off 0.5 s after the last device stops. Reading those properties opens no stream, reads no audio
+and needs no permission, so macOS never asks; nothing in Sanduhr touches `AVCaptureDevice` or opens
+an input. Sanduhr learns only in-use booleans, never which app; nothing is logged (a failed
+listener call logs its OSStatus once) or saved. One limit: the flag is per device, so a headset
+whose playback and microphone are one Core Audio device can show the mic while it only plays.
+
+**Where they show** (`AVIndicatorPlacement`, `AVIndicatorSpot`). With the island up, beside the
+camera on the chosen side: the island grows by their room (`AVIndicatorLayout.besideRoom`, the
+dot, the mic and a 6-point spacing), so the wings keep theirs, and the strip under the camera
+follows the same width. Picking **Camera and mic** for a wing or the strip (`NotchContent.avIndicators`)
+moves them there instead; with nothing in use that place shows its own default, as Watchers does.
+With the island off, or on a screen without a notch, they get their own small black tab at the
+top (`badge`): against the notch on the chosen side, or at the top center like the camera light.
+A click or a two-finger click opens a menu of read-only lines ("Camera in use", "Microphone in
+use", disabled) and Indicator Settings…, which opens Settings, Notch. Nothing mutes or changes a
+device. The strip takes its clicks through `DeskHitTest` (`av_indicators`, key `strip`).
+
+The camera dot is the only red dot in Sanduhr: a failed watcher draws a red triangle instead.
+
+**Debug.** `smoke/smoke do av-test camera on|off` and `av-test mic on|off` fake a signal in
+memory (shown through the same settings, a faked camera counting as one without a visible light;
+off hands back the real one). `state.yaml` has
+`av_indicators: {camera, mic, shown}`, `shown` one of `none`, `beside_left`, `beside_right`,
+`places`, `badge`; the tab's window is kind `indicators`. `scenarios/av-indicators.yaml` runs it.
+
 ## Watchers
 
-Live cards for work in flight (item 66, slice 1), on a notch place or in a Desk corner: a state dot
-(running blue, waiting on you amber, passed green with a check, failed red, finished and lost touch
+Live cards for work in flight (item 66, slice 1), on a notch place or in a Desk corner: a state mark
+(running blue, waiting on you amber, passed green with a check, failed a red exclamation-mark
+triangle rather than a dot, since a red dot means the camera is on, finished and lost touch
 grey), the title, the time so far, `done/total` when there is a total, and a one-line note. Two
 switches in Settings, Integrations, Watchers, both off by default (`watchersAgents`,
 `watchersBackground` in `com.626labs.sanduhr`). Placement is the usual: Watchers as a notch wing's

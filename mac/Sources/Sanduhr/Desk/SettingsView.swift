@@ -529,7 +529,7 @@ struct DeskNotchSection: View {
                     .disabled(chin == 0)
                 contentPicker("Under the camera", $strip).disabled(!chinText || chin == 0)
                 if strip == .nowPlaying { NowPlayingIdleCaption(place: .strip).disabled(!chinText || chin == 0) }
-                Text("Nothing leaves that part plain black. A wing grows to fit its text. Watchers show the most urgent watcher while there is one (switched on in Integrations), else that place's default.")
+                Text("Nothing leaves that part plain black. A wing grows to fit its text. Watchers show the most urgent watcher while there is one (switched on in Integrations), else that place's default. Camera and mic shows the indicators below while one is in use, else that place's default.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             .disabled(!enabled)
@@ -552,6 +552,7 @@ struct DeskNotchSection: View {
                 Text("While any app uses a camera, a soft white light around the notch lights your face, above every app. It ends when the camera stops, with or without Desk or the island. Tools, Camera Light shows it by hand. Screens without a notch get it at the top center.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            AVIndicatorSection()
             NotchGlowSection()
         }
         .formStyle(.grouped)
@@ -560,6 +561,36 @@ struct DeskNotchSection: View {
     private func contentPicker(_ title: String, _ selection: Binding<NotchContent>) -> some View {
         Picker(title, selection: selection) {
             ForEach(NotchContent.allCases) { Text($0.label).tag($0) }
+        }
+    }
+}
+
+/// Notch, Camera and mic (item 67): when the red dot shows, the mic switch, the pulse and the side.
+/// Its own view so the Notch page's body stays small enough for Swift 6.0 and 6.1 to type-check.
+private struct AVIndicatorSection: View {
+    @AppStorage(AVCameraDotMode.key, store: .desk) private var dot = AVCameraDotMode.never
+    @AppStorage(AVIndicators.micKey, store: .desk) private var mic = false
+    @AppStorage(AVIndicators.pulseKey, store: .desk) private var pulse = true
+    @AppStorage(AVIndicatorSide.key, store: .desk) private var side = AVIndicatorSide.right
+
+    var body: some View {
+        Section("Camera and mic") {
+            Picker("Show the red dot", selection: $dot) {
+                ForEach(AVCameraDotMode.allCases) { Text($0.label).tag($0) }
+            }
+            Text("A MacBook's camera has its own green light; the dot is for cameras whose light you can't see: an external or Continuity camera, or the built-in one with the lid closed.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Toggle("Pulse the dot gently", isOn: $pulse)
+                .disabled(dot == .never)
+            Toggle("Show a mic while the microphone is on", isOn: $mic)
+            Picker("Beside the camera", selection: $side) {
+                ForEach(AVIndicatorSide.allCases) { Text($0.label).tag($0) }
+            }
+            .disabled(dot == .never && !mic)
+            Text("Indicators only: Sanduhr sees that a camera or the microphone is in use, never which app or anything captured, and never mutes or changes a device. No permission is asked and nothing is saved. They sit on the island beside the camera, or where you pick Camera and mic above; with the island off, or on a screen without a notch, in a small tab at the top. Click one for what is in use. Needs Desk. With Reduce Motion the dot holds still and they come and go without a fade.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
