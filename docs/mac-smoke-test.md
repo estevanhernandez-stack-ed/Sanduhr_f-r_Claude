@@ -1296,7 +1296,7 @@ com.626labs.sanduhr.desk layout`) to put it back at the end.
    `smoke/smoke run scenarios/desk-layout.yaml` reorders Bottom left, then moves pieces to Top
    center, Middle right (at 120%) and Bottom center, with `desk_frames_ok: true` each time.
 10. Put the `layout` string back.
-## 34. The Mods page (item 64, slice 1)
+## 35. The Mods page (item 64, slice 1)
 
 Read-only. Use a throwaway Claude Code folder for the setup (`mkdir -p ~/.claude-modtest/projects`),
 never your real settings, and remove it afterwards. Copy `mac/integrations/mods/sanduhr-meters`
