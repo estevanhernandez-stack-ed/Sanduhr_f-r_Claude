@@ -316,6 +316,9 @@ enum DebugHooks {
         s.settingsPreview = settings.isOpen ? SettingsPreviewKind.of(settings.section) : nil
         s.usagePageOpen = settings.isOpen && settings.section == .usage
         s.usageTab = settings.usageTab
+        let mods = settings.modsPage
+        s.modsPage = ModsPageDebug(open: settings.isOpen && settings.section == .mods, loaded: mods.loaded,
+                                   counts: mods.counts, checked: mods.checks.count, cli: mods.claude != nil)
         // A `defaults write` from the smoke runner posts no change notice here: apply the saved
         // warning settings before reporting, as Desk's minute refresh and the widget's countdown
         // tick would.

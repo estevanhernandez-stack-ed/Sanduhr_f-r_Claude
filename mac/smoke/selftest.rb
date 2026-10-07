@@ -294,6 +294,11 @@ eq('a camera in use before is left alone',
    Restore.plan(base.merge('av_indicators' => { 'camera' => true }), base.merge('av_indicators' => { 'camera' => true })), [])
 eq('av indicators state is two booleans and a place', state['av_indicators'],
    { 'camera' => false, 'mic' => false, 'shown' => 'none' })
+# Item 64: the Mods page, flags and counts only: never a mod's name, a path or a report.
+eq('mods page keys', state['mods_page'].keys,
+   %w[open loaded folders mods plugins enabled missing checked cli])
+check('mods page holds only flags and counts',
+      state['mods_page'].values.all? { |v| v == true || v == false || v.is_a?(Integer) })
 app_av = FakeApp.new
 app_av.action('av-test', 'mic on')
 eq('av-test fakes the mic', app_av.state_now['av_indicators']['mic'], true)

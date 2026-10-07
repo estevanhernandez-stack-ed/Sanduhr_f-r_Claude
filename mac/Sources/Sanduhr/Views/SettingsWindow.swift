@@ -7,7 +7,7 @@ import SwiftUI
 /// and its raw value stay, so `sanduhr://debug/action?name=settings&arg=credentials`, the smoke
 /// scenarios and state.yaml's `settings_section` keep working unchanged.
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case general, alerts, credentials, usage, integrations
+    case general, alerts, credentials, usage, integrations, mods
     case deskLayout, deskLook, deskMeters, message, notch, nowPlaying
     case widgetLook, themes, pacing
     case updates, about
@@ -21,6 +21,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .credentials: "Accounts"
         case .usage: "Claude Usage"
         case .integrations: "Integrations"
+        case .mods: "Mods"
         case .deskLayout: "Layout"
         case .deskLook: "Look"
         case .deskMeters: "Meters"
@@ -42,6 +43,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .credentials: "person.2"
         case .usage: "chart.bar.xaxis"
         case .integrations: "puzzlepiece.extension"
+        case .mods: "cube"
         case .deskLayout: "rectangle.3.group"
         case .deskLook: "textformat"
         case .deskMeters: "gauge.with.dots.needle.67percent"
@@ -59,9 +61,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     /// Sidebar groups: a header (nil for the first) and its sections. Claude Usage (item 48)
     /// sits under Accounts: it is per account, and its setup lives in each account's Data.
     /// Integrations (item 49) follows: installing the MCP server is the other half of Share with
-    /// Claude, and its consent points back at Accounts.
+    /// Claude, and its consent points back at Accounts. Mods (item 64) follows Integrations:
+    /// Sanduhr's meters mod is one of the mods it lists.
     static let groups: [(header: String?, sections: [SettingsSection])] = [
-        (nil, [.general, .alerts, .credentials, .usage, .integrations]),
+        (nil, [.general, .alerts, .credentials, .usage, .integrations, .mods]),
         ("Desk", [.deskLayout, .deskLook, .deskMeters, .message, .notch, .nowPlaying]),
         ("Widget", [.widgetLook, .themes, .pacing]),
         ("Sanduhr", [.updates, .about]),
@@ -83,6 +86,8 @@ final class SettingsWindowController {
     var section: SettingsSection { navigation.selection }
     /// The Claude Usage page's tab (state.yaml `usage_page.tab`).
     var usageTab: UsageTab { navigation.usageTab }
+    /// The Mods page's state (state.yaml `mods_page`).
+    var modsPage: ModsPageModel { navigation.modsPage }
 
     func close() { window?.close() }
 
@@ -140,6 +145,8 @@ final class SettingsNavigation {
     var accountToShow: String?
     /// The Claude Usage page's state, kept while the window lives.
     let usagePage = UsagePageModel()
+    /// The Mods page's state (item 64), kept while the window lives.
+    let modsPage = ModsPageModel()
 }
 
 /// Sidebar on the left, the selected section on the right.
@@ -221,6 +228,8 @@ struct SettingsRoot: View {
         case .credentials: AccountsSettings(vm: vm, navigation: navigation)
         case .usage: UsageSettings(vm: vm, navigation: navigation, theme: vm.theme.palette)
         case .integrations: IntegrationsSettings(vm: vm, navigation: navigation)
+        case .mods:
+            ModsSettings(vm: vm, model: navigation.modsPage).withPreview { ModsSummaryCard(model: navigation.modsPage) }
         case .widgetLook, .pacing:
             WidgetSettings(vm: vm, section: navigation.selection).id(navigation.selection)
                 .withPreview { WidgetPreview(vm: vm) }

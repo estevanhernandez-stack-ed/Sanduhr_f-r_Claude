@@ -10,7 +10,7 @@ import Combine
 
 /// Which preview a Settings section shows; state.yaml's `settings_preview`.
 enum SettingsPreviewKind: String, CaseIterable {
-    case notch, layout, look, meters, message, nowPlaying, widget, menuBar, integrations
+    case notch, layout, look, meters, message, nowPlaying, widget, menuBar, integrations, mods
 
     /// The preview `section` shows, nil for a section without one (Themes has its gallery;
     /// Alerts, Accounts, Claude Usage, Updates and About draw nothing on screen).
@@ -25,6 +25,7 @@ enum SettingsPreviewKind: String, CaseIterable {
         case .widgetLook, .pacing: .widget
         case .general: .menuBar
         case .integrations: .integrations
+        case .mods: .mods
         case .alerts, .credentials, .usage, .themes, .updates, .about: nil
         }
     }
@@ -33,7 +34,7 @@ enum SettingsPreviewKind: String, CaseIterable {
     var relevantSamples: PreviewSamples {
         switch self {
         case .notch: [.meters, .meetings, .message, .track, .watcher, .indicators]
-        case .layout: []
+        case .layout, .mods: []
         case .look: [.meters, .message]
         case .meters, .widget, .menuBar: [.meters]
         case .message: [.message]

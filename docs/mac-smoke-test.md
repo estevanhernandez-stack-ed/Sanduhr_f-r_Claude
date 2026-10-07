@@ -1249,7 +1249,7 @@ Desk on. Go pane by pane; each card sits at the top, about 160 points tall, and 
 11. Reduce Motion on: the message's write-in and shimmer, the camera dot's pulse and the glow
     hold still. VoiceOver reads each card as one sentence.
 12. `smoke/smoke state` shows `settings_preview` (`notch`, `layout`, `look`, `meters`, `message`,
-    `nowPlaying`, `widget`, `menuBar`, `integrations`, or null). `smoke/smoke run
+    `nowPlaying`, `widget`, `menuBar`, `integrations`, `mods`, or null). `smoke/smoke run
     scenarios/settings-sections.yaml` snaps each pane with its card.
 
 ## 34. Desk layout: more places, your order, a size per piece (item 59)
@@ -1296,3 +1296,37 @@ com.626labs.sanduhr.desk layout`) to put it back at the end.
    `smoke/smoke run scenarios/desk-layout.yaml` reorders Bottom left, then moves pieces to Top
    center, Middle right (at 120%) and Bottom center, with `desk_frames_ok: true` each time.
 10. Put the `layout` string back.
+## 34. The Mods page (item 64, slice 1)
+
+Read-only. Use a throwaway Claude Code folder for the setup (`mkdir -p ~/.claude-modtest/projects`),
+never your real settings, and remove it afterwards. Copy `mac/integrations/mods/sanduhr-meters`
+to `~/modtest/meters` and give `~/.claude-modtest/settings.json`
+`{"env": {"CLAUDE_CODE_PLUGIN_DIRS": "~/modtest/meters:~/modtest/gone"}}`.
+
+1. Settings, Mods (under Integrations, cube symbol) opens with a summary card: mods, plugins, on,
+   folders, and missing when one is; "Read-only: nothing here turns a mod on or off." No Sample
+   label. VoiceOver reads it as one sentence with the counts.
+2. One box per Claude Code folder, its path on top. `~/.claude-modtest` lists **sanduhr-meters**
+   (0.1.0, Mod, On, its description, "Plugin folder list (CLAUDE_CODE_PLUGIN_DIRS)" and the path),
+   "Draws: band above the prompt, toasts", "Its code reads or writes files." in orange, and a
+   terminal frame titled Claude Code with a cyan band right above the `>` prompt and a toast line,
+   captioned "Sketch: drawn by the mod in Claude Code" (blocks only, no numbers). **gone** reads
+   Missing with "(not found)", and its Check is off: "Nothing to check: its folder isn't here."
+3. Add `"enabledPlugins": {"sanduhr-meters@inline": false}` to that settings.json and press Read
+   Again: the row reads Off and the summary's on count drops by one.
+4. A folder with installed plugins (your real one is fine, it is only read) lists each with
+   "Installed from <marketplace>", Plugin or Mod, and On or Off as its `enabledPlugins` says; a
+   plugin with `commands/*.md` shows "slash commands (/name)".
+5. **Check** on sanduhr-meters: within a few seconds an amber card, "Medium risk · Claude Code
+   would load it", "Reads files: $.fs.read", "Reads environment variables: APPDATA, HOME, OS,
+   SANDUHR_SNAPSHOT", the hooks and calls, and "From claude plugin validate, which read the files
+   without running them." `ps` never shows a `claude plugin test`.
+6. Break the copy's manifest (`"version": 3`) and Check again: a red card, "Claude Code would
+   refuse it (1 error)", "Error: version: Invalid input…", with no absolute path in it.
+7. Without the CLI (move it aside for a minute, or on a Mac without Claude Code): the page says
+   "Check needs Claude Code's command line (claude)…", every Check is off and its tooltip says why.
+8. A `~/.claude-modtest.config-backup-20261001-000000` folder holding a `projects` folder gets no
+   box.
+9. Nothing changed: `shasum` of every settings.json listed is the same before and after.
+10. `smoke/smoke state` shows `mods_page` (`open`, `loaded`, `folders`, `mods`, `plugins`,
+    `enabled`, `missing`, `checked`, `cli`): flags and counts only, never a name or a path.

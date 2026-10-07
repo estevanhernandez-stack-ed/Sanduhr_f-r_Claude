@@ -1,0 +1,41 @@
+{
+  "success": false,
+  "strict": false,
+  "target": "/fixture/mod/.claude-plugin/plugin.json",
+  "manifest": {
+    "file": "/fixture/mod/.claude-plugin/plugin.json",
+    "type": "plugin",
+    "errors": [
+      {
+        "path": "version",
+        "message": "Invalid input: expected string, received number",
+        "code": null
+      }
+    ],
+    "warnings": [
+      {
+        "path": "weird",
+        "message": "Unknown field 'weird'. Claude Code ignores it at load time.",
+        "code": null
+      }
+    ],
+    "notes": [],
+    "gatingHooks": []
+  },
+  "contents": [
+    {
+      "file": "/fixture/mod/hooks/hooks.json",
+      "type": "hooks",
+      "errors": [
+        {
+          "path": "modules../r.ts",
+          "message": "bad: /fixture/mod/hooks/r.ts, compiled line 6 `return next(e);`: $ is passed to \"next\", which is not a function declared at the top of this file",
+          "code": null
+        }
+      ],
+      "warnings": [],
+      "notes": [],
+      "gatingHooks": []
+    }
+  ]
+}

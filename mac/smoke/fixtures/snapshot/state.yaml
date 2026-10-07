@@ -166,3 +166,13 @@ av_indicators:
   camera: false
   mic: false
   shown: none
+mods_page:
+  open: false
+  loaded: false
+  folders: 0
+  mods: 0
+  plugins: 0
+  enabled: 0
+  missing: 0
+  checked: 0
+  cli: false
