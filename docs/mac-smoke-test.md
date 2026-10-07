@@ -552,16 +552,40 @@ S=~/Library/Application\ Support/Sanduhr/integrations
 - [ ] `CLAUDE_CONFIG_DIR=~/.claude-smoketest claude` then `/mcp`: sanduhr is connected; "call
   the sanduhr ping tool" answers with `0.3.0-mac`.
 - [ ] Statusline, Install…: the sheet shows `echo mine` as the statusline already set, with
-  Combine (default), Replace and Cancel, and a preview of both joins; Cancel changes nothing
+  Combine (default), Replace and Cancel, a `mine` chip (blue) and Sanduhr's five chips (amber;
+  session, weekly and weekly reset kept, context and model struck through), the own-row/same-row
+  picker and one preview; Cancel changes nothing
   (`diff /tmp/st-settings.json ~/.claude-smoketest/settings.json` is empty). Install… again,
   Replace: Installed; `"model"` is still there; the Claude Code session above shows the meters
   under the prompt after its next refresh.
 - [ ] Combine (item 63): Remove the statusline (the diff is empty again), then Install…. The
-  preview shows `mine` then the meters on their own row, and `mine │ 5h …` on one row (meters
-  from the widget, or `5h 23%* | wk 41%*` from the sample data while the widget is stopped).
-  Pick the same-row join, Combine: the row reads "Combined with your statusline"; `jq -r
-  .statusLine.command ~/.claude-smoketest/settings.json` ends in `--chain-b64 ZWNobyBtaW5l
-  --join same`; the session shows `mine │ 5h 42% | wk 18% …` after its next refresh.
+  preview shows `mine` then the meters on their own row; pick On the same row and it shows
+  `mine │ 5h …` on one row (meters from the widget, or `5h 23%* | wk 41%*` from the sample data
+  while the widget is stopped). Combine without touching a chip: the row reads "Combined with
+  your statusline"; `jq -r .statusLine.command ~/.claude-smoketest/settings.json` ends in
+  `--chain-b64 ZWNobyBtaW5l --join same` (no picks); the session shows `mine │ 5h 42% | wk 18% …`
+  after its next refresh.
+- [ ] Segments (item 63b): Remove, then put a multi-segment line in: `printf '#!/bin/sh\nprintf
+  "\\033[34m~/proj\\033[0m | ⎇ main | \\033[33m+3\\033[0m\\n"\n' > /tmp/st-line.sh; chmod +x
+  /tmp/st-line.sh; printf '{\n  "statusLine": {"type": "command", "command": "/tmp/st-line.sh"}\n}\n'
+  > ~/.claude-smoketest/settings.json; cp ~/.claude-smoketest/settings.json /tmp/st-seg.json`.
+  Install…: three blue chips `~/proj`,
+  `⎇ main`, `+3`, "split on Pipe | (found)". Click `⎇ main`, Sanduhr's weekly and weekly reset,
+  and model: the preview reads `~/proj | +3` (blue and yellow kept) then `5h … | Opus`, and
+  updates on each click without running the line again. Switch the separator to None (one
+  segment): one chip for the whole line, the preview shows it whole; back to Pipe, the picks
+  return. Try to drop every one of Sanduhr's: the last stays. Combine: the command ends in
+  `--keep-theirs-b64 … --mine session,model`, and the session's statusline matches the preview.
+  Outside a repository the branch is missing: `printf '{}' | python3
+  "$S/current/sanduhr_statusline.py" --chain-b64 $(printf 'printf "~/x | +0"' | base64) --join
+  line --keep-theirs-b64 <the payload from the command>` prints `~/x | +0` whole, then the
+  meters. Update (after a Sanduhr update shows Outdated) keeps the
+  picks; Remove: `diff /tmp/st-seg.json ~/.claude-smoketest/settings.json` is empty. A
+  powerline-style line (a copy, in this test folder): drop a middle segment, and the arrow
+  between the two now-neighbors takes their colors, with no bleed into Sanduhr's segment.
+- [ ] The sheet's note says mods' status entries aren't part of the statusline and points to
+  the Mods page. Put the `echo mine` file back (`cp /tmp/st-settings.json
+  ~/.claude-smoketest/settings.json`) before the next step.
 - [ ] A slow and a failing line: `printf '{\n  "model": "opus",\n  "statusLine": {"type":
   "command", "command": "sleep 5; echo slow", "padding": 1, "refreshInterval": 5}\n}\n' >
   ~/.claude-smoketest/settings.json; cp ~/.claude-smoketest/settings.json /tmp/st-slow.json`,

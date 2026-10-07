@@ -281,9 +281,44 @@ dead or missing snapshot, the segment falls back on stdin's `rate_limits`, marke
 grammar and nothing looser; an existing Sanduhr command, alone or combined (any seat or version),
 is unwrapped to the innermost command of yours. The receipt gains `mode` (`replace` or
 `combine`, optional so older receipts read); Update rebuilds the command from its shape, and
-Remove puts back the exact bytes of your old `statusLine` as before. The sheet's preview runs the
-combined command once per join against the documented sample statusline JSON (made-up numbers)
-and draws the ANSI; the row reads "Combined with your statusline".
+Remove puts back the exact bytes of your old `statusLine` as before. The row reads "Combined with
+your statusline".
+
+**Pick the segments (item 63b).** The grammar takes two more optional flags, in this order after
+`--padding`:
+
+```
+… --join line|same [--padding <n>] [--keep-theirs-b64 <base64 of JSON>] [--mine <list>]
+```
+
+`--keep-theirs-b64` carries `{"keep": [...], "drop": [...], "new": false, "sep": [null, "pipe"]}`
+(every key optional): matchers kept and dropped, whether segments never seen stay (`new`, default
+true) and a separator per line (null: detected). At run time each line of yours is cut on its
+separator (`powerline` , `powerline-thin` , `bar` │, `pipe` |, `bullet` •, `dot` ·, `spaces`
+for two or more, `none`), detected as the glyph the line holds most. A segment's matcher is its
+leading token with escapes taken out: a word, `#` for a number, else the first glyph, so `⎇ main`
+and `⎇ dev` are both `⎇` and a segment missing from a run shifts nothing. Dropped segments go and
+the rest are rejoined on your own separators, each piece carrying the SGR state in force before it
+and a reset after; powerline arrows between segments that weren't neighbors (and a new end cap)
+are redrawn from the two backgrounds. A line nothing of survives goes; when nothing of yours is
+left, Sanduhr's line prints alone, never the other way round. Any doubt (an unfinished escape, a
+carriage return or other control character, an empty segment) keeps the line whole, and a line
+where nothing drops prints byte for byte as it came. `--mine` is a comma list in this order:
+`session`, `weekly` (with hot per-model weeklies), `resets` (the default three), `context`
+(`ctx 8%`) and `model` (`Opus`), both from Claude Code's stdin; notices (stale, update) always
+show. Each flag is left out when it holds the default, so a combine without picks writes the same
+command as before, and older combined commands read and run unchanged. Swift checks the payloads
+exactly as the script does, so a hand-edited command it would refuse stays the user's.
+
+The sheet runs `--inspect-b64 <base64 of your command>` once against the documented sample
+statusline JSON (made-up numbers): your command runs, and the script prints JSON with your
+output, each line split under every separator (the detected one named) and Sanduhr's segments one
+by one. That becomes chips (`StatuslineChips`): yours in blue, Sanduhr's in amber, struck
+through when dropped, chips that share a matcher toggling together, a line kept whole shown as
+one chip that can't be clicked, one of Sanduhr's always kept. Each change runs `--compose-b64
+<base64 of your output> --join … [picks]`, which prints what the runner would without running
+your command again, and the preview draws it. A note says mods' status entries aren't part of the
+statusline and live on the Mods page.
 
 **Scripts.** `build.sh` copies both into `Sanduhr.app/Contents/Resources/integrations/`.
 `IntegrationScripts` copies them to `integrations/<stamp>/` (12 hex of a SHA-256 over the
