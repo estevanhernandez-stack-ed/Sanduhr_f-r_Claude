@@ -76,11 +76,26 @@ final class WatcherStore {
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: support.path) else { return }
         for prefix in [Self.stopPrefix, Self.requestPrefix] {
             for name in names.filter({ $0.hasPrefix(prefix) && $0.hasSuffix(".json") }).sorted() {
-                guard let data = HandoffFiles.take(support.appendingPathComponent(name),
+                let url = support.appendingPathComponent(name)
+                // A Stop's report is the session's state at that moment: one older than a request
+                // may be (written while no Sanduhr read it, and only an older hook writes then)
+                // is stale, and is deleted unread.
+                if prefix == Self.stopPrefix, Self.isStale(url, now: now()) {
+                    try? FileManager.default.removeItem(at: url)
+                    continue
+                }
+                guard let data = HandoffFiles.take(url,
                                                    maxBytes: WatcherRequest.maxBytes) else { continue }
                 if prefix == Self.stopPrefix { receiveStop(data) } else { receiveRequest(data) }
             }
         }
+    }
+
+    /// Last written more than WatcherRequest.maxAge before `now`.
+    nonisolated static func isStale(_ url: URL, now: Date) -> Bool {
+        guard let m = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+        else { return false }
+        return now.timeIntervalSince(m) > WatcherRequest.maxAge
     }
 
     /// One agent request's bytes. Dropped unread while the switch is off, unless `force` (the

@@ -388,6 +388,32 @@ struct WatcherTests {
         #expect(changes > 0)
     }
 
+    /// A Stop's report written long before Sanduhr read it (no Sanduhr ran then) is the
+    /// session's state from back then: deleted unread. A fresh one is read.
+    @MainActor
+    @Test func aStaleStopReportIsDeletedUnread() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("sanduhr-watch-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let now = Date()
+        let store = WatcherStore(support: dir, agents: { false }, background: { true }, now: { now })
+        let stop = Data(#"{"schema_version":1,"session":"s","folder":null,"tasks":[{"id":"t","type":"shell","status":"running","description":"Build"}]}"#.utf8)
+        let old = dir.appendingPathComponent("watch-stop-0000000000001-old.json")
+        FileManager.default.createFile(atPath: old.path, contents: stop)
+        try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(-WatcherRequest.maxAge - 60)],
+                                              ofItemAtPath: old.path)
+        #expect(WatcherStore.isStale(old, now: now))
+        store.check()
+        #expect(store.board.watchers.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: old.path))
+        let fresh = dir.appendingPathComponent("watch-stop-0000000000002-new.json")
+        FileManager.default.createFile(atPath: fresh.path, contents: stop)
+        #expect(!WatcherStore.isStale(fresh, now: now))
+        store.check()
+        #expect(store.board.watcher("b:s:t") != nil)
+        #expect(!FileManager.default.fileExists(atPath: fresh.path))
+    }
+
     @MainActor
     @Test func theDebugWatcherGoesThroughTheSameDecoding() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("sanduhr-watch-\(UUID().uuidString)")

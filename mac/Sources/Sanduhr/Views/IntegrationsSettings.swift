@@ -626,7 +626,7 @@ private struct HooksConsentBody: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Claude Code sessions using \(folder) tell Sanduhr when they wait on you (a permission prompt or a question) and when a turn finishes, so the notch can glow.")
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Claude Code tells Sanduhr only that it is waiting or finished, by opening a sanduhr:// link that carries that one word. Nothing about the conversation or the project is sent, and nothing leaves this Mac. While Sanduhr isn't running, the hooks do nothing.")
+            Text("Claude Code tells Sanduhr only that it is waiting or finished, with a system notification whose name is that one word. Nothing about the conversation or the project is sent, and nothing leaves this Mac. The hooks never start Sanduhr: while it isn't running, they do nothing.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
