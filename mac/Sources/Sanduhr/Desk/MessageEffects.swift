@@ -9,6 +9,10 @@ import CoreGraphics
 ///   {size:1.3}              0.5 to 2 times the Desk's message size
 ///   {write}                 the line draws itself in, left to right, once when it appears
 ///   {shimmer}               a slow light sweep across the line every few seconds
+///   {sweep} / {sweep:20}    a three-character light across the line: once when it appears, or
+///                           every 2 to 3600 seconds
+///   {font:small-caps}       a letter style (item 65): bold, italic, bold-italic and small-caps
+///                           in the line's own font, the others as Unicode letters (LetterStyle)
 ///
 /// The Desk is lenient (`MessageMarkup.parse`): an unknown or malformed tag ends the tags, and it
 /// and everything after it draw as plain text, so a typo never hides a line. A proposal from
@@ -23,6 +27,12 @@ struct MessageEffects: Equatable {
     var size: Double?
     var write = false
     var shimmer = false
+    /// `{font:…}`: the line's letter style; nil draws it as written.
+    var font: LetterStyle?
+    /// `{sweep}`: a three-character light runs across the line.
+    var sweep = false
+    /// `{sweep:<seconds>}`: and again every this many seconds; nil is once.
+    var sweepPeriod: Double?
 }
 
 enum MessageMarkup {
@@ -39,6 +49,8 @@ enum MessageMarkup {
         case takesNoValue(String)
         case inkMissing, inkTooMany, inkNotHex
         case size
+        case font
+        case sweep
         case noText
 
         var reason: String {
@@ -50,14 +62,17 @@ enum MessageMarkup {
             case .inkTooMany: "{ink:...} takes at most 4 colors"
             case .inkNotHex: "{ink:...} has a color that is not hex (#rgb or #rrggbb)"
             case .size: "{size:...} needs a number from 0.5 to 2, like {size:1.3}"
+            case .font: "{font:...} needs a letter style: \(LetterStyle.tagNames)"
+            case .sweep: "{sweep:...} takes a period in seconds from 2 to 3600, like {sweep:20}"
             case .noText: "the line has effects but no text"
             }
         }
     }
 
-    static let effectNames = "ink, glow, noglow, size, write, shimmer"
+    static let effectNames = "ink, glow, noglow, size, write, shimmer, sweep, font"
     static let maxInkColors = 4
     static let sizeRange: ClosedRange<Double> = 0.5...2
+    static let sweepPeriodRange: ClosedRange<Double> = 2...3600
 
     /// Every tag must parse and text must follow.
     static func parseStrict(_ body: String) -> Result<Parsed, Failure> {
@@ -122,6 +137,20 @@ enum MessageMarkup {
                   let factor = Double(value), sizeRange.contains(factor) else { return .size }
             effects.size = factor
             return nil
+        case "font":
+            guard hasValue, let style = LetterStyle(tag: value) else { return .font }
+            effects.font = style
+            return nil
+        case "sweep":
+            if hasValue {
+                guard value.range(of: #"^\d+(\.\d+)?$"#, options: .regularExpression) != nil,
+                      let period = Double(value), sweepPeriodRange.contains(period) else { return .sweep }
+                effects.sweepPeriod = period
+            } else {
+                effects.sweepPeriod = nil
+            }
+            effects.sweep = true
+            return nil
         default:
             return .unknown(name)
         }
@@ -160,6 +189,51 @@ enum MessageMotion {
     /// covered, the screens sleep or the session is switched away (`paused`).
     static func shimmers(_ e: MessageEffects, reduceMotion: Bool, paused: Bool) -> Bool {
         e.shimmer && !reduceMotion && !paused
+    }
+
+    // MARK: {sweep}, the owner's now-playing mod's light (glow.ts): three characters wide,
+    // brightening toward white, about a second to cross.
+
+    /// How long one `{sweep}` takes to cross the line.
+    static let sweepRun: TimeInterval = 1.1
+    /// How many characters the light spans on each side of its center.
+    static let sweepWidth: Double = 3
+    /// How far toward white the center goes (0 to 1).
+    static let sweepStrength: Double = 0.75
+    /// Frames while the light moves (none between sweeps).
+    static let sweepFrame: TimeInterval = 1.0 / 30
+    /// The first sweep, after the line appears (or the Desk comes back into sight).
+    static let sweepAppearDelay: TimeInterval = 0.6
+    /// Settings' Replay sweeps sooner.
+    static let sweepReplayDelay: TimeInterval = 0.3
+
+    /// Where the light's center sits `fraction` (0 to 1) of the way through a sweep of `length`
+    /// characters, or nil outside the sweep. It starts `sweepWidth` before the first character and
+    /// ends as far past the last, so it enters and leaves softly.
+    static func sweepAt(fraction: Double, length: Int) -> Double? {
+        guard fraction >= 0, fraction < 1, length > 0 else { return nil }
+        return fraction * (Double(length) + sweepWidth * 2) - sweepWidth
+    }
+
+    /// How far character `index` blends toward white with the light at `at`: `sweepStrength` at
+    /// the center, falling to 0 at `sweepWidth` characters away.
+    static func sweepLight(index: Int, at: Double?) -> Double {
+        guard let at else { return 0 }
+        let k = 1 - abs(Double(index) - at) / sweepWidth
+        return k > 0 ? k * sweepStrength : 0
+    }
+
+    /// When `{sweep}` runs: the wait before the first sweep and, for `{sweep:<seconds>}`, the time
+    /// from one sweep's start to the next; nil when nothing moves: no `{sweep}`, Reduce Motion,
+    /// out of sight (`paused`, as `{shimmer}` rests), or a once-only sweep that has already run
+    /// for this line. Coming back into sight starts a periodic one again, and a once-only one that
+    /// had not run yet.
+    static func sweepPlan(_ e: MessageEffects, reduceMotion: Bool, paused: Bool, sweptOnce: Bool,
+                          replay: Bool) -> (first: TimeInterval, every: TimeInterval?)? {
+        guard e.sweep, !reduceMotion, !paused else { return nil }
+        if e.sweepPeriod == nil && sweptOnce { return nil }
+        let every = e.sweepPeriod.map { max($0, sweepRun) }
+        return (replay ? sweepReplayDelay : sweepAppearDelay, every)
     }
 
     /// The Desk is out of sight: its window fully covered, the screens asleep, the screen saver

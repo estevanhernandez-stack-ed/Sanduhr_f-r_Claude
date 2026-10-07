@@ -558,13 +558,30 @@ the pin or rotation changes, for `get_desk_messages`.
 `{ink:#hex,…}` (1 to 4 colors, a gradient from two), `{glow}` / `{noglow}` (over Settings, Desk,
 Look's new "Glow around the message", `messageGlow`), `{size:0.5…2}` (times the message size),
 `{write}` (the line draws itself in, left to right, over 1.5 s when it first appears, once) and
-`{shimmer}` (a light band sweeps across it in 1.6 s every 8 s). `MessageMarkup` parses strictly for
+`{shimmer}` (a light band sweeps across it in 1.6 s every 8 s), `{sweep}` (item 65: a light three
+characters wide crosses the line in 1.1 s, brightening each character toward white as it passes,
+the now-playing mod's glow; once, 0.6 s after the line appears, or with `{sweep:<seconds>}` again
+every 2 to 3600 seconds) and `{font:<style>}` (item 65: a letter style, the statusline's names:
+`bold`, `italic`, `bold-italic`, `sans`, `mono`, `double-struck`, `script`, `fraktur`, `small-caps`;
+case, spaces, hyphens and underscores don't matter, so `{font:smallcaps}` works). Bold, italic and
+small caps draw in the line's own font (`MessageTypography`): bold is the family's Bold face from
+`BundledFonts.face` (EsteFont's), or a synthesized weight for a family without one; italic is a
+12-degree slant of the line; small caps are the capitals with lowercase letters drawn as capitals
+at the font's x-height. The other five have no face in any handwriting font, so they draw as
+Unicode math letters (`LetterMap`, a port of the statusline's table with its Letterlike holes such
+as script B and double-struck R; `test_sanduhr_statusline.py` checks the two tables match) in the
+system font: A to Z, a to z and, where the style has them, digits; accents and punctuation stay as
+written, and VoiceOver reads the plain text. The notch shows the message without its tags, with
+its letter style. `MessageMarkup` parses strictly for
 proposals and leniently on the Desk: an unknown or malformed tag ends the tags and draws, with the
 rest, as plain text; a line of tags alone draws as written. Reduce Motion shows `{write}` at once and
-turns `{shimmer}` off. Cost: a line without `{write}` or `{shimmer}` draws as before (no mask, no
-task); `{write}` is one animation; `{shimmer}` is a task that sleeps between sweeps and stops while
-the Desk is covered (window occlusion), the screens sleep, the screen saver runs or the session is
-switched away (`MessageMotion.paused`).
+turns `{shimmer}` and `{sweep}` off. Cost: a line without `{write}`, `{shimmer}` or `{sweep}` draws
+as before (no mask, no task); `{write}` is one animation; `{shimmer}` is a task that sleeps between
+sweeps and stops while the Desk is covered (window occlusion), the screens sleep, the screen saver
+runs or the session is switched away (`MessageMotion.paused`); `{sweep}` draws 30 frames a second
+only during its 1.1 s run, sleeps between runs and rests the same way (a once-only sweep that has
+run does not repeat when the Desk comes back into sight; one that was covered before it ran runs
+then). Settings, Message's Replay sweeps a `{sweep}` line at once.
 
 **Themes from Claude (item 55).** `propose_theme {theme, save_as?, apply?}` is the Windows tool:
 same name, inputs and result shape. `theme` is the theme JSON in `docs/themes/template.json`'s

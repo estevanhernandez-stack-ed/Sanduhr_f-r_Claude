@@ -10,6 +10,7 @@ import base64
 import importlib.util
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -749,6 +750,36 @@ class StyleTests(unittest.TestCase):
             {"style": []}, {"ours": {"cost": {"bold": True}}}, {"ours": {"session": "bold"}},
         ):
             self.assertFalse(ok(**bad), bad)
+
+
+
+class SwiftLetterMapTests(unittest.TestCase):
+    """The Desk's {font:...} tags (item 65) draw the Unicode styles with a Swift port of FONTS and
+    SMALL_CAPS (mac/Sources/Sanduhr/Desk/LetterMap.swift); its tables must match these."""
+
+    SWIFT = os.path.join(os.path.dirname(os.path.dirname(HERE)), "Sources", "Sanduhr", "Desk", "LetterMap.swift")
+    CASES = {"bold": "bold", "italic": "italic", "boldItalic": "bold-italic", "script": "script",
+             "fraktur": "fraktur", "doubleStruck": "double-struck", "sans": "sans", "mono": "mono"}
+
+    def swift_tables(self):
+        with open(self.SWIFT, encoding="utf-8") as f:
+            source = f.read()
+        row = re.compile(r'^\s*\.(\w+): Table\(upper: 0x([0-9A-F]+), lower: 0x([0-9A-F]+), '
+                         r'digit: (0x[0-9A-F]+|nil), holes: \[(.*?)\]\),$', re.M)
+        tables = {}
+        for case, upper, lower, digit, holes in row.findall(source):
+            pairs = re.findall(r'"(\w)": 0x([0-9A-F]+)', holes)
+            tables[self.CASES[case]] = (int(upper, 16), int(lower, 16),
+                                        None if digit == "nil" else int(digit, 16),
+                                        {k: int(v, 16) for k, v in pairs})
+        small = re.search(r'static let smallCaps = "([^"]+)"', source).group(1)
+        return tables, small
+
+    def test_tables_match(self):
+        tables, small = self.swift_tables()
+        self.assertEqual(tables, {k: v for k, v in sl.FONTS.items() if v is not None})
+        self.assertEqual(dict(zip("abcdefghijklmnopqrstuvwxyz", small)), sl.SMALL_CAPS)
+        self.assertEqual(set(sl.FONTS), set(self.CASES.values()) | {"small-caps"})
 
 
 if __name__ == "__main__":

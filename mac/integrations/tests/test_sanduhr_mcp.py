@@ -772,8 +772,25 @@ class DeskMessages(Base):
         good = ["keep building.", "Mon: one thing at a time.", "10-31: {ink:#ff7518,#6b2fa0} {write} boo.",
                 "{ink:#ff2a6d,#05d9e8} {glow} hello", "{size:0.5}{noglow} small.", "{SHIMMER} loud", "# a note",
                 "", "Note: a colon in a plain line.", "02-29: leap.", "{ink:fff} three digits.", "x" * 120,
-                "hello {glow} mid-line braces are text", "ünïcödé ✨ fine."]
+                "hello {glow} mid-line braces are text", "ünïcödé ✨ fine.", "{sweep} {font:small-caps} hi.",
+                "{font:smallcaps} {sweep:20} hi.", "{FONT:Bold Italic} hi.", "{sweep:2} {font:fraktur} hi.",
+                "{sweep:3600}{font:double_struck} hi."]
         self.assertEqual(mcp.validate_desk_lines(good), [])
+
+    def test_font_and_sweep_tags(self):
+        effects, text, error = mcp.parse_effects("{sweep} {font:smallcaps} {ink:#fff} hi.")
+        self.assertIsNone(error)
+        self.assertEqual(text, "hi.")
+        self.assertEqual(effects, {"sweep": True, "font": "small-caps", "ink": ["#fff"]})
+        self.assertEqual(mcp.parse_effects("{sweep:20} x")[0], {"sweep": 20.0})
+        for name in mcp.FONT_STYLES.split(", "):
+            self.assertEqual(mcp.parse_effects("{font:%s} x" % name)[0], {"font": name})
+        # The names are the statusline's letter styles.
+        spec = importlib.util.spec_from_file_location("sanduhr_statusline_names", os.path.join(
+            os.path.dirname(HERE), "sanduhr_statusline.py"))
+        statusline = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(statusline)
+        self.assertEqual(set(mcp.FONT_STYLES.split(", ")), set(statusline.FONTS))
 
     def test_bad_lines_are_named(self):
         cases = {
@@ -796,6 +813,14 @@ class DeskMessages(Base):
             "{glow:yes} hi": "takes no value",
             "{glow hi": "not closed",
             "{glow} {write}": "no text",
+            "{font} hi": "needs a letter style",
+            "{font:outline} hi": "needs a letter style: bold, italic",
+            "{font:} hi": "needs a letter style",
+            "{sweep:1} hi": "from 2 to 3600",
+            "{sweep:3601} hi": "from 2 to 3600",
+            "{sweep:fast} hi": "from 2 to 3600",
+            "{sweep:} hi": "from 2 to 3600",
+            "{sweeps} hi": "unknown effect {sweeps}; known: ink, glow, noglow, size, write, shimmer, sweep, font",
             "\ud800 lone surrogate": "UTF-8",
         }
         for line, want in cases.items():
@@ -884,7 +909,9 @@ class DeskMessages(Base):
         tools = {t["name"]: t["description"] for t in mcp.TOOLS}
         for name in ("get_desk_messages", "propose_desk_messages"):
             for word in ("Mon:", "MM-DD", "# ", "rotate", "pinned", "{ink:", "{glow}", "{noglow}", "{size:",
-                         "{write}", "{shimmer}", "40 characters"):
+                         "{write}", "{shimmer}", "40 characters", "{sweep}", "{sweep:20}", "2 to 3600",
+                         "{font:small-caps}", "bold-italic", "double-struck", "fraktur", "Unicode",
+                         "skips {shimmer} and {sweep}"):
                 self.assertIn(word, tools[name], (name, word))
         self.assertIn("never writes messages.txt", tools["propose_desk_messages"])
 

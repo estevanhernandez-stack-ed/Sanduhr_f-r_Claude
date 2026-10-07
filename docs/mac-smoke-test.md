@@ -877,6 +877,26 @@ mcp() { printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\
   shimmers. With a `{shimmer}` line showing and Activity Monitor on Sanduhr: CPU is 0.0 between
   sweeps and with the Desk covered by a full-screen window (the sweep pauses); a plain line costs
   nothing at any time.
+- [ ] Letter styles and the sweep (item 65), pinning each in turn with the Desk in EsteFont 26:
+  1. `{font:smallcaps} {sweep} showtime.` draws SHOWTIME in the handwriting with the S full height
+     and the rest smaller, at about the height of lowercase letters; about half a second after it
+     appears a small white light, about three letters wide, crosses it once in about a second.
+  2. `{font:bold} ship it.` is in EsteFont 26 Bold; `{font:italic} ship it.` leans right, the
+     handwriting itself, not another font; `{font:bold-italic} ship it.` is both.
+  3. `{font:fraktur} Hello 42.` draws in fraktur (the H is ℌ), the digits plain;
+     `{font:double-struck} Room 42.` has double-struck digits too; `{font:script} Bonjour.` has a
+     script ℬ; `{font:mono} x` and `{font:sans} x` draw; none of them is a box or a question mark.
+  4. `{sweep:5} hi.` sweeps every 5 seconds. Cover the Desk with a full-screen window for 20
+     seconds and come back: it starts again, and Activity Monitor shows Sanduhr at 0.0 CPU while
+     covered and between sweeps. `{sweep} hi.` sweeps once and does not sweep again after the Desk
+     is covered and uncovered.
+  5. Reduce Motion on: no line sweeps; the letter styles still draw.
+  6. `{font:outline} hi.` and `{sweep:1} hi.` show as written, tags included.
+  7. Settings, Desk, Notch, a wing or the strip on Message: `{font:smallcaps} {sweep} hi.` shows
+     HI in small caps and no tags; `{font:fraktur} Hi` shows ℌ𝔦.
+  8. VoiceOver on the Desk line `{font:fraktur} Hello.` reads "Hello.".
+  9. Settings, Message with `{sweep} hi.` pinned: the preview has Replay, and Replay sweeps the
+     line at once.
 - [ ] Quit Sanduhr and propose: the answer is `queued` / `app_not_responding` after about ten
   seconds; open Sanduhr within ten minutes and the suggestion appears. One older than ten minutes
   is dropped. `log show --last 5m --predicate 'subsystem == "com.626labs.sanduhr"'` holds no
@@ -1216,8 +1236,8 @@ Desk on. Go pane by pane; each card sits at the top, about 160 points tall, and 
    glow; each control changes the card at once.
 5. **Meters**: a warning row red with its glow; change a threshold so it no longer warns: the row
    turns back at once. Hide a temporary limit: it leaves the bars and "Hidden: …" names it.
-6. **Message**: today's line with its effects; with a `{write}` or `{shimmer}` line, **Replay**
-   writes it in again or sweeps it at once. Pin a line: the card shows it.
+6. **Message**: today's line with its effects; with a `{write}`, `{shimmer}` or `{sweep}` line,
+   **Replay** writes it in again or sweeps it at once. Pin a line: the card shows it.
 7. **Now Playing**: a wing playing, paused (with Next; with Hide while paused on, the stand-in)
    and with nothing playing (the When nothing is playing choice), and the Desk line.
 8. **Widget Look** and **Pacing & Focus**: the widget's cards in the theme and font; Subtle mode
