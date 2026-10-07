@@ -18,6 +18,11 @@ desk_pieces:
     anchor: bl
     order: 2
     scale: 1
+desk_arrange:
+  active: false
+  changed: false
+  working: null
+  click_through: drawn
 notch: false
 has_notch: true
 notch_left: meetingOrTime

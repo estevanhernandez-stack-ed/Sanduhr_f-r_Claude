@@ -55,18 +55,23 @@ struct DeskView: View {
     /// Each anchor's pieces, top to bottom (DeskArrangement). Unknown widgets are skipped, so a
     /// typo hides one widget instead of blanking the desktop; an unknown anchor falls back to
     /// the widget's default.
+    /// While arranging (item 60), the layout being edited; nothing is saved until Done.
     private var stacks: [DeskAnchor: [DeskPlacement]] {
-        DeskArrangement(layout).stacks(showMeetings: showMeetings, showClaude: showClaude)
+        (model.arrange.working ?? DeskArrangement(layout)).stacks(showMeetings: showMeetings, showClaude: showClaude)
     }
 
     var body: some View {
         let place = stacks
+        let arranging = model.arrange.active
         let margins = DeskAnchorGeometry.margins(left: left, right: right, top: top, bottom: bottom,
                                                  topInset: model.topInset, dock: model.dockInsets, inset: inset)
         ZStack(alignment: .topLeading) {
+        // Arrange mode: the whole screen takes clicks (DeskArrangePlate); outside it, only what is drawn.
+        if arranging { DeskArrangePlate() }
         GeometryReader { geo in
             let colWidth = max(200, geo.size.width * 0.46)
             let lineInLayout = place.values.contains { $0.contains { $0.widget == Widget.claude.rawValue } }
+            let anchors = arrangeGeometry(geo.size, margins: margins)
             columns(place, colWidth: colWidth, lineInLayout: lineInLayout, contentTop: margins.top + inset)
             // Handwritten glyphs reach past their own boxes (the left curve of an 8, say), and
             // shadows draw inside those boxes, clipping them. Inner breathing room fixes that;
@@ -78,9 +83,20 @@ struct DeskView: View {
             .padding(.trailing, margins.trailing)
             .padding(.top, margins.top)
             .padding(.bottom, margins.bottom)
+            .environment(\.deskArrangeGeometry, arranging ? anchors : nil)
+            if arranging { DeskArrangeOverlay(mode: model.arrange, geometry: anchors) }
         }
         NotchView(model: model)
         }
+        .coordinateSpace(.named(DeskArrange.space))
+    }
+
+    /// The anchors' rectangle and the top center's drop, as the columns below lay them out.
+    private func arrangeGeometry(_ size: CGSize, margins: DeskAnchorGeometry.Margins) -> DeskArrangeGeometry {
+        let notch = DeskAnchorGeometry.notchBottom(notch: model.notchRect, island: island, chin: chin)
+        return DeskArrangeGeometry(
+            content: DeskAnchorGeometry.content(window: size, margins: margins, inset: inset),
+            centerDrop: DeskAnchorGeometry.centerDrop(contentTop: margins.top + inset, notchBottom: notch))
     }
 
     /// The columns. Corners and middles only: the two side columns as before item 59, the
@@ -150,6 +166,7 @@ struct DeskView: View {
         ForEach(stack, id: \.widget) { p in
             if let widget = Widget(rawValue: p.widget) {
                 DeskPiece(widget: widget, model: model, alignment: alignment, lineInLayout: lineInLayout, scale: p.scale)
+                    .deskArrangeable(p, mode: model.arrange)
             }
         }
     }
