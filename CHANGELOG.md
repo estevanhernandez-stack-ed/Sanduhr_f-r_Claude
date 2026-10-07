@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **Arrange the Desk on the desktop.** Pick **Arrange Desk…** from any Desk two-finger menu, or the new button on Settings, Desk, Layout, and every piece shows an outline and a round handle. Drag a piece toward any of the eight places: they light up as you drag and it snaps to the nearest. Drag it up or down its own stack to reorder it, and drag its handle to resize it in 10% steps from 60% to 160%. Nothing is saved until you press Done (or Escape); Cancel puts every piece back exactly as it was. While arranging, the whole desktop takes your clicks, so nothing reaches the Finder by accident; afterwards clicks pass through to the desktop exactly as before. It writes the same layout Settings does, the Dock clearance and the notch still apply, and with Reduce Motion pieces move without the snap.
+
 ## v2.9.0-mac — 2026-10-07
 
 - **Claude Code's hooks no longer launch Sanduhr.** The notch glow hooks used to open a `sanduhr://` link, which macOS hands to the installed app and starts it if it isn't running: with a second copy running (a dev build), every finished turn launched the installed one, and a hook could bring back a Sanduhr you had quit. They now post a system notification (`notifyutil -p com.626labs.sanduhr.claude-code.waiting` or `.done`) that reaches whichever Sanduhr is running and does nothing when none is. Settings, Integrations shows hooks installed by an earlier version as Outdated; Install updates them in place and Remove still takes them out exactly. The Stop hook hands over background work only while Sanduhr runs, and a report left from a time Sanduhr wasn't running is dropped unread. The `sanduhr://claude-code` link still works.
