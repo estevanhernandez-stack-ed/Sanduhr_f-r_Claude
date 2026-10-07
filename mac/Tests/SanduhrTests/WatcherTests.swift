@@ -514,3 +514,45 @@ struct WatcherTests {
         #expect(yaml == "watchers:\n  count: 2\n  states:\n    - waiting\n    - running\n  placements:\n    - right\n    - desk\n  agents: true\n  background: false\n  intro: true\n")
     }
 }
+
+/// The watchers' state marks next to the camera indicator (item 67): the camera's red dot is the
+/// only red dot, so failed draws a red triangle, and no dot is red.
+@Suite("Watcher marks")
+struct WatcherMarkTests {
+    static let states: [WatcherState] = [.running, .waiting, .passed, .failed, .finished, .lostTouch]
+
+    @Test func failedIsATriangleTheRestAreDots() {
+        #expect(WatcherLook.mark(.failed) == .triangle)
+        #expect(WatcherLook.mark(.passed) == .check)
+        for state in [WatcherState.running, .waiting, .finished, .lostTouch] {
+            #expect(WatcherLook.mark(state) == .dot)
+        }
+    }
+
+    /// Red: the red channel well above both others.
+    static func isRed(_ hex: String) -> Bool {
+        let v = Int(hex, radix: 16) ?? 0
+        let r = (v >> 16) & 0xff, g = (v >> 8) & 0xff, b = v & 0xff
+        return r > 180 && g < 140 && b < 140
+    }
+
+    @Test func noWatcherDrawsARedDot() {
+        for state in Self.states where WatcherLook.mark(state) != .triangle {
+            #expect(!Self.isRed(WatcherLook.hex(state)), "\(state) must not be red")
+        }
+        // Waiting on you is amber, failed's triangle red, like the camera dot.
+        #expect(WatcherLook.hex(.waiting) == "fbbf24")
+        #expect(Self.isRed(WatcherLook.hex(.failed)))
+        #expect(Self.isRed("ff3b30"))
+    }
+
+    @Test func voiceOverSaysFailed() {
+        var b = WatcherBoard()
+        let t0 = Date(timeIntervalSince1970: 1_000)
+        b.apply(.start(id: "f", title: "Deploy", link: nil, total: nil, work: false, short: nil), now: t0)
+        b.apply(.end(id: "f", result: .failed, note: nil), now: t0 + 10)
+        guard let w = b.ordered().first else { Issue.record("no watcher"); return }
+        #expect(WatcherText.spoken(w, now: t0 + 10).contains("failed"))
+        #expect(WatcherState.failed.label == "failed")
+    }
+}
