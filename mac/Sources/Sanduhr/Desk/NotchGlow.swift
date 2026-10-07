@@ -371,6 +371,8 @@ final class NotchGlowController {
     static let fadeIn: TimeInterval = 1.0
     static let hold: TimeInterval = 0.8
     static let fadeOut: TimeInterval = 1.2
+    /// Posted on every glow, drawn or not (Settings, Notch's preview lights up with it).
+    static let didFire = Notification.Name("SanduhrNotchGlowDidFire")
 
     private(set) var window: NSWindow?
     /// Glows fired so far, drawn or not (smoke's glow_count).
@@ -429,6 +431,8 @@ final class NotchGlowController {
     /// screen instead of not at all.
     func fire(topFallback: Bool = false) {
         count += 1
+        // Settings, Notch's preview (item 68) glows its island with the real one.
+        NotificationCenter.default.post(name: Self.didFire, object: nil)
         let desk = DeskController.shared
         let notchOn = UserDefaults.desk.bool(forKey: DeskController.notchKey)
         let screen = Self.notchedScreen()

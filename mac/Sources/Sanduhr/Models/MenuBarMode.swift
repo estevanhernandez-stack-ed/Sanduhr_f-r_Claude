@@ -1,4 +1,37 @@
+import AppKit
 import Foundation
+
+/// How the status item draws a reading beside the hourglass: the text with a leading space, in
+/// the small monospaced-digit system font, colored only when urgency is high (red from 90%,
+/// orange from 75%) so the menu bar stays neutral the rest of the time (HIG). The status item and
+/// Settings, General's preview (item 68) both draw from this.
+struct MenuBarItemLook {
+    enum Urgency: Equatable { case normal, high, critical }
+
+    let title: String
+    let urgency: Urgency
+
+    init(_ reading: MenuBarReading) {
+        title = " \(reading.text)"
+        switch reading.percent {
+        case 90...: urgency = .critical
+        case 75...89: urgency = .high
+        default: urgency = .normal
+        }
+    }
+
+    var color: NSColor {
+        switch urgency {
+        case .critical: NSColor(red: 0.97, green: 0.44, blue: 0.44, alpha: 1)
+        case .high: NSColor(red: 0.98, green: 0.58, blue: 0.24, alpha: 1)
+        case .normal: .labelColor
+        }
+    }
+
+    static var font: NSFont {
+        NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize(for: .small), weight: .medium)
+    }
+}
 
 /// What the menu bar percent follows (Settings, General, Menu bar). Standard defaults, key
 /// `menuBarMode`; absent means `higher`:

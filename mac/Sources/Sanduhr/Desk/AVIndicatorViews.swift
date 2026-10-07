@@ -208,14 +208,8 @@ final class AVIndicatorController {
                                  cameraSwitch: desk.bool(forKey: AVIndicators.cameraKey),
                                  micSwitch: desk.bool(forKey: AVIndicators.micKey))
             : AVIndicators()
-        let chosen = AVIndicatorPlacement.chosen(
-            left: NotchContent.saved(.left, in: desk), right: NotchContent.saved(.right, in: desk),
-            strip: NotchContent.saved(.strip, in: desk),
-            wingText: desk.object(forKey: "notchText") as? Bool ?? true,
-            chinText: desk.bool(forKey: "notchChinText"),
-            chin: desk.object(forKey: "notchChin") as? Double ?? 26)
         let islandUp = running && desk.bool(forKey: DeskController.notchKey) && controller.wingsWindow != nil
-        let next = AVIndicatorPlacement.spot(shown, islandUp: islandUp, side: .saved(in: desk), chosen: chosen)
+        let next = AVIndicatorPlacement.spot(shown, islandUp: islandUp, in: desk)
         let model = controller.model
         if model.avIndicators != shown { model.avIndicators = shown }
         if model.avSpot != next { model.avSpot = next }

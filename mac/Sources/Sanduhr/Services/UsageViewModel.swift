@@ -976,7 +976,14 @@ final class UsageViewModel {
     /// during a switch these are the old account's veiled cards.
     /// Mirrors sanduhr.py:468-478.
     func visibleTiers() -> [(tier: Tier, usage: TierUsage)] {
-        guard let u = MeterVisibility.visible(shownUsage, hidden: hiddenTiers) else { return [] }
+        Self.visibleTiers(shownUsage, hidden: hiddenTiers, compact: compact)
+    }
+
+    /// `visibleTiers()` for any numbers: Settings' widget preview (item 68) draws its sample
+    /// cards through this, so they hide and compact as the widget's do.
+    nonisolated static func visibleTiers(_ usage: UsageResponse?, hidden: Set<Tier>,
+                                         compact: Bool) -> [(tier: Tier, usage: TierUsage)] {
+        guard let u = MeterVisibility.visible(usage, hidden: hidden) else { return [] }
         let active = Tier.allCases.compactMap { t -> (Tier, TierUsage)? in
             guard let tu = u.tiers[t], tu.utilization != nil else { return nil }
             return (t, tu)

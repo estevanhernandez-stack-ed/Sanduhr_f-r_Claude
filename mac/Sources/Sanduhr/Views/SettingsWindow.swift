@@ -188,20 +188,25 @@ struct SettingsRoot: View {
 
     @ViewBuilder
     private var detail: some View {
+        // Each pane that controls something visible has its live preview on top (item 68,
+        // SettingsPreviewKind); Integrations draws its own, which needs the page's model.
         switch navigation.selection {
-        case .general: GeneralSection()
-        case .deskLayout: DeskLayoutSection()
-        case .deskLook: DeskLookSection()
-        case .deskMeters: DeskMetersSection(model: deskModel)
-        case .message: DeskMessageSection(model: deskModel).padding(20)
-        case .notch: DeskNotchSection()
-        case .nowPlaying: NowPlayingSection()
+        case .general: GeneralSection().withPreview { MenuBarPreview(vm: vm) }
+        case .deskLayout: DeskLayoutSection().withPreview { DeskLayoutPreview(live: deskModel) }
+        case .deskLook: DeskLookSection().withPreview { DeskLookPreview(live: deskModel) }
+        case .deskMeters: DeskMetersSection(model: deskModel).withPreview { DeskMetersPreview(live: deskModel) }
+        case .message: DeskMessageSection(model: deskModel).padding(20).withPreview { DeskMessagePreview(live: deskModel) }
+        case .notch: DeskNotchSection().withPreview { NotchPreview(live: deskModel) }
+        case .nowPlaying: NowPlayingSection().withPreview { NowPlayingPreview(live: deskModel) }
         case .updates: UpdatesSection(updates: updates)
         case .about: AboutSection()
         case .credentials: AccountsSettings(vm: vm, navigation: navigation)
         case .usage: UsageSettings(vm: vm, navigation: navigation, theme: vm.theme.palette)
         case .integrations: IntegrationsSettings(vm: vm, navigation: navigation)
-        case .widgetLook, .themes, .pacing, .alerts:
+        case .widgetLook, .pacing:
+            WidgetSettings(vm: vm, section: navigation.selection).id(navigation.selection)
+                .withPreview { WidgetPreview(vm: vm) }
+        case .themes, .alerts:
             // A fresh view per section, so a section's unsaved fields start empty.
             WidgetSettings(vm: vm, section: navigation.selection).id(navigation.selection)
         }

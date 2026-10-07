@@ -372,6 +372,12 @@ extension IntegrationInstaller {
         return [script, "--inspect-b64", Data(chain.utf8).base64EncodedString()]
     }
 
+    /// The arguments that print Sanduhr's own statusline, alone, as Claude Code runs it, for
+    /// Settings, Integrations' preview (item 68). Nil without the script.
+    func sampleArguments() -> [String]? {
+        previewScript.map { [$0] }
+    }
+
     /// The arguments that print what the combined line would, from the user's output `theirs`
     /// (their command doesn't run again), for the sheet's live preview. Nil without the script.
     func composeArguments(theirs: String, join: StatuslineJoin, selection: StatuslineSelection) -> [String]? {

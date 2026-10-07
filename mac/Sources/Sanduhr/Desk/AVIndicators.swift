@@ -100,6 +100,18 @@ enum AVIndicatorPlacement {
         guard islandUp else { return .badge }
         return chosen.isEmpty ? .beside(side) : .places
     }
+
+    /// `spot` with the places and the side as saved in `desk`: what the controller and Settings'
+    /// Notch preview (item 68) both ask.
+    static func spot(_ shown: AVIndicators, islandUp: Bool, in desk: UserDefaults) -> AVIndicatorSpot {
+        let places = chosen(
+            left: NotchContent.saved(.left, in: desk), right: NotchContent.saved(.right, in: desk),
+            strip: NotchContent.saved(.strip, in: desk),
+            wingText: desk.object(forKey: "notchText") as? Bool ?? true,
+            chinText: desk.bool(forKey: "notchChinText"),
+            chin: desk.object(forKey: "notchChin") as? Double ?? 26)
+        return spot(shown, islandUp: islandUp, side: .saved(in: desk), chosen: places)
+    }
 }
 
 /// The indicators' sizes, from the notch text size (`size`, as the wings use it).

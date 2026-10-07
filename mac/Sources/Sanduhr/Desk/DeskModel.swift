@@ -149,6 +149,9 @@ final class DeskModel {
 
     /// The widget's last numbers (see `update`).
     @ObservationIgnored private var usage = DeskUsage()
+    /// The numbers last handed over, for Settings' previews (item 68): they feed their own model
+    /// the same input, so its rows come from the same functions.
+    var lastUsage: DeskUsage { usage }
 
     /// Replaced when access turns full: a store made before the grant can keep the old answer.
     @ObservationIgnored private var store = EKEventStore()
@@ -300,7 +303,7 @@ final class DeskModel {
         setWatchers(allWatchers)
         if on {
             meetings = Self.demoMeetings(now: now)
-            message = "ship small. ship often. sleep anyway."
+            message = Self.demoMessage
             calendarNote = nil
         } else {
             meetings = []
@@ -308,6 +311,9 @@ final class DeskModel {
             message = MessageEngine.current()
         }
     }
+
+    /// Demo mode's message, also the Settings previews' sample line (item 68).
+    static let demoMessage = "ship small. ship often. sleep anyway."
 
     /// Three made-up meetings: one in 12 minutes (so the notch counts it down), two later today.
     static func demoMeetings(now: Date) -> [Meeting] {

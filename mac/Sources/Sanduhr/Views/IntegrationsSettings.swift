@@ -100,6 +100,16 @@ final class IntegrationsModel {
         }.value
     }
 
+    /// Sanduhr's statusline printed once against the sample statusline JSON, for the page's
+    /// preview (item 68). Nil when it couldn't run (no python3, a build without the scripts).
+    func sampleStatusline() async -> String? {
+        guard let python = pythonPath else { return nil }
+        return await Task.detached(priority: .userInitiated) { () -> String? in
+            guard let args = IntegrationInstaller.standard.sampleArguments() else { return nil }
+            return StatuslinePreview.run(python: python, arguments: args, input: StatuslinePreview.sampleJSON())
+        }.value
+    }
+
     /// The input for Test with live data: Sanduhr's current numbers and the folder's latest
     /// session (item 63b).
     func liveStatuslineInput(folder: String) async -> StatuslineLiveInput.Result {
@@ -217,6 +227,7 @@ struct IntegrationsSettings: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                IntegrationsPreview(model: model, live: DeskController.shared.model)
                 IntegrationsIntro()
                 PythonRow(model: model, reload: reload)
                 folderList

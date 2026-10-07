@@ -246,7 +246,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         // wings only as tall as the notch leave its bottom row showing under them.
         let barHeight = max(notch.height, model.topInset)
         // The wing itself, the camera and mic indicators beside the camera (item 67) and the flare.
-        let pad = NotchWingsView.maxWings + AVIndicatorLayout.maxRoom(NotchWingsView.textSize(notch.height)) + 12
+        let pad = NotchWingsView.windowPad(notchHeight: notch.height)
         let frame = NSRect(x: screen.frame.minX + notch.minX - pad,
                            y: screen.frame.maxY - barHeight,
                            width: notch.width + pad * 2, height: barHeight)
