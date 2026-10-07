@@ -374,48 +374,43 @@ private struct MeterWarningGroup: View {
 
 // MARK: - Message
 
+/// Settings, Message (item 69): Claude's suggestion card on top, then the line editor, a row per
+/// line drawn as the Desk draws it (MessageEditorView.swift), or the file as text.
 struct DeskMessageSection: View {
     var model: DeskModel
+    @Bindable var editor: MessageEditorModel
     var handoff = DeskMessageHandoff.shared
-    @AppStorage("message", store: .desk) private var pinned = ""
     @AppStorage("messageRotate", store: .desk) private var rotate = "daily"
-    @AppStorage(DeskMessageHandoff.directKey, store: .desk) private var claudeDirect = false
-    @State private var text = ""
-    @State private var saved = true
-    /// messages.txt changed under unsaved edits (Claude's lines were added): offer to reload.
-    @State private var fileChanged = false
     @State private var reviewing = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if let proposal = handoff.pending {
-                MessageSuggestionBanner(proposal: proposal, canAdd: saved,
-                                        review: { reviewing = true },
-                                        add: { handoff.approve() },
-                                        dismiss: { handoff.dismiss() })
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if let proposal = handoff.pending {
+                    MessageSuggestionBanner(proposal: proposal, canAdd: !editor.unsaved,
+                                            review: { reviewing = true },
+                                            add: { handoff.approve() },
+                                            dismiss: { handoff.dismiss() })
+                }
+                MessageEditorBar(editor: editor, saved: refreshDesk)
+                if editor.mode == .list {
+                    MessageListEditor(editor: editor, pinChanged: refreshDesk)
+                } else {
+                    MessageTextEditorPane(editor: editor, pinChanged: refreshDesk)
+                }
+                Divider()
+                MessageAskClaude()
             }
-            Text("One line per message. \"Mon: text\" only on Mondays, \"10-31: text\" only on that date, # for notes. Effects go first: {ink:#ff2a6d,#05d9e8} {glow} {noglow} {size:1.2} {write} {shimmer}.")
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            editor
-            Picker("Change", selection: $rotate) {
-                Text("Once a day").tag("daily")
-                Text("Every hour").tag("hourly")
-            }
-            .pickerStyle(.segmented)
-            TextField("Pin one line instead (leave empty to use the list)", text: $pinned)
-                .onChange(of: pinned) { _, _ in model.message = MessageEngine.current() }
-            claudeSwitch
+            .padding(20)
         }
-        .padding(.top, 8)
-        .onAppear(perform: load)
-        .onChange(of: rotate) { _, _ in model.message = MessageEngine.current() }
+        .onAppear { editor.loadIfNeeded() }
+        .onChange(of: rotate) { _, _ in refreshDesk() }
         .onChange(of: handoff.revision) { _, _ in
-            if saved { load() } else { fileChanged = true }
+            if editor.unsaved { editor.fileChanged = true } else { editor.load() }
         }
         .sheet(isPresented: $reviewing) {
             if let proposal = handoff.pending {
-                MessageSuggestionReview(proposal: proposal, canAdd: saved,
+                MessageSuggestionReview(proposal: proposal, canAdd: !editor.unsaved,
                                         add: { reviewing = false; handoff.approve() },
                                         dismiss: { reviewing = false; handoff.dismiss() },
                                         close: { reviewing = false })
@@ -423,58 +418,9 @@ struct DeskMessageSection: View {
         }
     }
 
-    private var editor: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            TextEditor(text: $text)
-                .font(.system(size: 12, design: .monospaced))
-                .frame(minHeight: 170)
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.quaternary))
-                .onChange(of: text) { _, _ in saved = false }
-            HStack {
-                Button("Save") { save() }
-                    .keyboardShortcut("s", modifiers: .command)
-                    .disabled(saved)
-                Text(saved ? "Today: \(MessageEngine.current() ?? "nothing")" : "Unsaved")
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                Spacer()
-                if fileChanged {
-                    Text("The file changed").font(.caption).foregroundStyle(.secondary)
-                    Button("Reload") { load() }
-                        .help("Shows messages.txt as it is now; your unsaved edits are dropped.")
-                }
-            }
-        }
-    }
-
-    private var claudeSwitch: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Toggle("Let Claude change the messages directly", isOn: $claudeDirect)
-            Text(claudeDirect
-                 ? "Lines Claude proposes with the Sanduhr MCP server go into the list at once. The list before each change is kept as messages.txt.previous."
-                 : "Lines Claude proposes with the Sanduhr MCP server wait here for you to add, review or dismiss.")
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.top, 6)
-    }
-
-    private func load() {
-        MessageEngine.ensureFile()
-        text = (try? String(contentsOf: MessageEngine.fileURL, encoding: .utf8)) ?? ""
-        saved = true
-        fileChanged = false
-        // Assigning the text can mark it unsaved a moment later (onChange); it is not.
-        DispatchQueue.main.async {
-            saved = true
-            fileChanged = false
-        }
-    }
-
-    private func save() {
-        try? text.write(to: MessageEngine.fileURL, atomically: true, encoding: .utf8)
+    /// The Desk picks today's line again.
+    private func refreshDesk() {
         model.message = MessageEngine.current()
-        saved = true
-        fileChanged = false
     }
 }
 

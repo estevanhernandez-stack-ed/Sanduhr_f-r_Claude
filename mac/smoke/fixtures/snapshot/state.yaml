@@ -176,3 +176,12 @@ mods_page:
   missing: 0
   checked: 0
   cli: false
+message_editor:
+  open: false
+  mode: list
+  rows: 3
+  styled: 3
+  raw: 0
+  notes: 4
+  unsaved: false
+  added: null
