@@ -123,7 +123,7 @@ struct SettingsPreviewTests {
 
     @Test func indicatorsFollowTheirSwitchesAndPlacement() {
         let desk = suite()
-        desk.set(true, forKey: AVIndicators.cameraKey)
+        desk.set(AVCameraDotMode.always.rawValue, forKey: AVCameraDotMode.key)
         let preview = DeskModel()
         let samples = SurfacePreviewData.fill(preview, from: DeskModel(), islandUp: true, desk: desk)
         #expect(samples.contains(.indicators))

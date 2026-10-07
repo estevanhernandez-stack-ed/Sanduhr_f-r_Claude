@@ -233,7 +233,8 @@ enum SurfacePreviewData {
         var shown = live.avIndicators
         if !shown.any {
             shown = AVIndicators.shown(cameraInUse: sampleInUse.camera, micInUse: sampleInUse.mic,
-                                       cameraSwitch: desk.bool(forKey: AVIndicators.cameraKey),
+                                       // The sample camera stands for one whose light you can't see, so any mode but Never shows it.
+                                       cameraSwitch: AVCameraDotMode.saved(in: desk).watches,
                                        micSwitch: desk.bool(forKey: AVIndicators.micKey))
             if shown.any { samples.insert(.indicators) }
         }
