@@ -611,11 +611,31 @@ clean.
 ## Camera and mic indicators
 
 Item 67. Indicators only, read-only: a red recording dot while any app uses a camera, and an
-orange mic glyph while any app uses the microphone. Two switches in Settings, Desk, Notch, Camera
-and mic, both off by default ("Show a red dot while the camera is on", `avCameraDot`; "Show a mic
-while the microphone is on", `avMicGlyph`, in `com.626labs.sanduhr.desk`), plus "Pulse the dot
-gently" (`avPulse`, on; still with Reduce Motion) and "Beside the camera" (`avSide`, left or right,
-right by default). They run only while Desk runs and their switch is on.
+orange mic glyph while any app uses the microphone. In Settings, Desk, Notch, Camera and mic (all
+in `com.626labs.sanduhr.desk`):
+
+- **Show the red dot** (`avCameraDotMode`): Never (the default), For cameras without a visible
+  light (`hiddenLight`), or Always. A MacBook's built-in camera has its own green light that can't
+  be turned off, so a dot for it only repeats that light. `hiddenLight` shows the dot only when a
+  running camera isn't built in (an external or Continuity camera: CoreMediaIO's
+  `kCMIODevicePropertyTransportType` isn't `'bltn'`, read with the device list, never opening it),
+  or the built-in one runs with the lid closed (IOPMrootDomain's `AppleClamshellState`, read again
+  on every camera reading and screen change). `CameraLightVisibility` decides, pure. The switch
+  before the picker (`avCameraDot`, a Bool) migrates once: on becomes `hiddenLight`.
+- **Show a mic while the microphone is on** (`avMicGlyph`), off by default.
+- **Pulse the dot gently** (`avPulse`, on) and **Beside the camera** (`avSide`, left or right,
+  right by default).
+
+They run only while Desk runs and they are on.
+
+**Motion** (`AVIndicatorMotion`). Coming and going is a 0.25-second ease-in-out opacity fade, the
+island's room growing or shrinking with it in the same transaction; the tab fades its window. The
+dot breathes between 0.55 and full opacity on a 1.6-second cosine, computed from each frame's time
+(`TimelineView(.animation)`), not a state that flips. With Reduce Motion there is no breath and the
+fades are instant. The slot beside the camera (`AVBesideSlot`) is always in the island's row: its
+width is the layout's room (0 when nothing shows), its content clipped and faded with it, so it is
+never inserted or removed and leaves nothing behind; `avDrawn` keeps the last indicators so the fade
+out shows what was there.
 
 **Signals.** The camera's is `CameraMonitor`, the camera light's own (CoreMediaIO's
 `kCMIODevicePropertyDeviceIsRunningSomewhere`); `AVIndicatorController` runs a second instance, so
@@ -644,7 +664,8 @@ device. The strip takes its clicks through `DeskHitTest` (`av_indicators`, key `
 The camera dot is the only red dot in Sanduhr: a failed watcher draws a red triangle instead.
 
 **Debug.** `smoke/smoke do av-test camera on|off` and `av-test mic on|off` fake a signal in
-memory (shown through the same switches; off hands back the real one). `state.yaml` has
+memory (shown through the same settings, a faked camera counting as one without a visible light;
+off hands back the real one). `state.yaml` has
 `av_indicators: {camera, mic, shown}`, `shown` one of `none`, `beside_left`, `beside_right`,
 `places`, `badge`; the tab's window is kind `indicators`. `scenarios/av-indicators.yaml` runs it.
 
