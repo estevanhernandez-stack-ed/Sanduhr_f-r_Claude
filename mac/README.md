@@ -740,8 +740,12 @@ Settings, Desk, Layout places each Desk piece (item 59; the pure pieces in `Desk
 
 - **Eight places.** The four corners, Top center, Bottom center, Middle left and Middle right.
   The top and bottom of a side share a column with a spacer between them, as before, so a growing
-  meeting list pushes against the message instead of drawing over it. A side's middle is centered
-  on its column's height; the centers share a column of their own. Top center sits below the
+  meeting list pushes against the message instead of drawing over it. A side's middle sits in the
+  same column, halfway between its top and bottom stacks, so a tall corner pushes it rather than
+  drawing over it. The centers share a column of their own between the sides: while a center has
+  a piece, the sides draw only in the room it leaves (`DeskColumnsLayout`,
+  `DeskAnchorGeometry.columnWidths`, 24 points either side), so a long message at Top left wraps
+  and shrinks instead of running under the meters at Top center. Top center sits below the
   notch, and below the island's strip while the island draws (`DeskAnchorGeometry.centerDrop`,
   10 points of room); on a screen without a notch it sits on the top margin like the corners.
   Margins stay global.

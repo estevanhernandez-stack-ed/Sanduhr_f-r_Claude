@@ -1255,6 +1255,12 @@ com.626labs.sanduhr.desk layout`) to put it back at the end.
 7. **Clicks.** Put the meters at Middle right and the meetings at Top center: a two-finger click on
    the meters opens their menu, a meeting row with a link opens it, and clicks elsewhere still reach
    the Finder.
+   **Side beside center.** Pin a long message (`defaults write com.626labs.sanduhr.desk message
+   "a long line that runs well past the middle of the screen"`), put it and the meetings at Top
+   left and the meters at Top center: the message wraps and shrinks to end short of the meters,
+   and nothing at Top left draws under them. Put the clock and the meetings at Bottom left with a
+   piece at Middle left: the middle moves up as the bottom stack grows, never drawn over. Delete
+   the pinned message afterwards.
 8. **A hand-edited string.** `defaults write com.626labs.sanduhr.desk layout "message:zz clock:bl:1.4
    meters:bl"`: the message shows top left (an unknown place falls back to its default, never
    blank), the clock at 140%.
