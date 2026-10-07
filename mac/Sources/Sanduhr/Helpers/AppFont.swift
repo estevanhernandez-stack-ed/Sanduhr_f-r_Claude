@@ -27,13 +27,14 @@ final class FontSettings {
         family = UserDefaults.standard.string(forKey: Self.defaultsKey) ?? ""
     }
 
-    /// Every font family installed for this user, for the Settings picker, with EsteFont 26 (it
-    /// ships inside Sanduhr, item 58) first.
+    /// Every font family installed for this user, for the Settings picker, with the bundled
+    /// families (EsteFont Pro, then EsteFont 26; they ship inside Sanduhr) first.
     static func installedFamilies() -> [String] {
         DeskFont.pickerFamilies(installed: NSFontManager.shared.availableFontFamilies)
     }
 
-    /// Weights the design draws heavier; EsteFont 26 takes its Bold face for them.
+    /// Weights the design draws heavier; a bundled family (EsteFont Pro, EsteFont 26) takes its
+    /// Bold face for them.
     static func wantsBold(_ weight: Font.Weight) -> Bool {
         [.semibold, .bold, .heavy, .black].contains(weight)
     }
@@ -67,8 +68,8 @@ extension Font {
                     weight: Font.Weight = .regular,
                     design: Font.Design = .default) -> Font {
         if design != .monospaced, let face = FontSettings.shared.faceName() {
-            if FontSettings.shared.drawnFamily == BundledFonts.family, FontSettings.wantsBold(weight) {
-                return Font.custom(BundledFonts.boldFace, size: size)
+            if let bundled = BundledFonts.bundled(FontSettings.shared.drawnFamily), FontSettings.wantsBold(weight) {
+                return Font.custom(bundled.boldFace, size: size)
             }
             return Font.custom(face, size: size).weight(weight)
         }

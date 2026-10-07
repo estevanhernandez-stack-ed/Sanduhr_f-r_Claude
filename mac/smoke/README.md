@@ -55,7 +55,10 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
     `AXHostingView`. With VoiceOver on, the full tree appears, switch values included.
   Switch on/off values are therefore not in the text nodes: check them in `state.yaml`. The
   `text` match field checks a node's label and value.
-- **state.yaml**: `desk_enabled`, `desk_running`, `layout`, `notch`, `has_notch`,
+- **state.yaml**: `desk_enabled`, `desk_running`, `layout`, `desk_pieces` (item 59: each piece the Desk
+  draws, in the layout's order: `piece`, the widget word; `anchor`, `tl`, `tc`, `tr`, `ml`, `mr`, `bl`,
+  `bc` or `br`; `order`, its place in that anchor's stack, 0 at the top; `scale`, its size, 0.6 to 1.6),
+  `notch`, `has_notch`,
   `notch_left`, `notch_right`, `notch_strip` (what each place on the island shows, a
   `NotchContent` raw value such as `meetingOrTime`, `meters` or `nothing`; the default when unset),
   `camera_in_use` (an app is using a camera; only watched while the camera light switch is on),
@@ -66,7 +69,14 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   `widget_visible`, `widget_visibility` (When the widget shows: `always`, `whileDeskOff` or
   `onRequest`; `always` when unset), `settings_open`, `settings_section`, `settings_preview` (item 68: the
   preview card the open section shows, `notch`, `layout`, `look`, `meters`, `message`, `nowPlaying`, `widget`,
-  `menuBar` or `integrations`; null for none or with Settings closed), `meters` (tier, label, percent, fill,
+  `menuBar`, `integrations` or `mods`; null for none or with Settings closed), `mods_page` (item 64: `open`,
+  the Mods page shows; `loaded`, it has read the folders; `folders`, `mods`, `plugins`, `enabled` (on, or a
+  session's dev mod) and `missing` counts across folders; `checked`, how many Checks have answered; `cli`,
+  `claude` was found; never a mod's name, a path or a report), `message_editor` (item 69: `open`, Settings,
+  Message shows; `mode`, `list` or `text`; `rows`, `styled` and `raw` message lines and `notes`, comments
+  and blank lines, in the editor's document; `unsaved`; `today_special`, how many date lines the Desk draws above the
+  usual line today; `added`, the line `message-editor add` put in, else
+  null; never one of your lines), `meters` (tier, label, percent, fill,
   pace, reset, `warning`: the row draws red with the ink glow, per Settings, Desk, Meters), `widget_warnings` (the
   widget's tiers drawing red with a glow, same rule and settings, in display order), `meetings_count`, `desk_frames` (every interactive Desk element while Desk runs: `kind` is `meters`, `meter_row`, `account`, `note`, `meeting_row`, `meetings`, `now_playing` or `now_playing_next`; `key` is the limit's tier for a meter row, the row's index for a meeting row and `desk` or `strip` for now playing, never a title or a label; `clickable`; `frame` as `[x, y, w, h]` in whole points from the Desk window's top left), `desk_frames_ok` (the app's own check of those frames: each drawn element has a non-empty frame inside the Desk window, rows lie within their block, and no two click areas of different kinds overlap, slack included) and `desk_frames_problem` (why not, such as `meters frame empty`; null when ok), `dock` (item 56: `side` `bottom`, `left` or `right` and `autohide`, the Dock's own settings, read only; `inset`, the points the Desk's corners on that side are moved in now: the Dock's reach when always shown, its depth while an auto-hiding Dock shows, 0 otherwise), `alerts`, `last_fetch`, `active_tool`, `pacing_pinned`,
   `pulse_count`, `glow_count` (notch glows fired so far, drawn or not; a pulse fires one too), `glow_shape` (what the last
@@ -89,7 +99,10 @@ signs out or removes an account, and no scenario switches one: a smoke run works
 `whats-new` and `close-whats-new` (the What's New window, item 57, with every card up to this version, as About
 opens it; window kind `whats-new`. Nothing is recorded as seen), `tour`, `tour-step <n>` and `close-tour` (the
 welcome tour, item 61, at step 1 or step n, as Take the Tour… opens it; window kind `welcome-tour`. Nothing is
-recorded: the tour's state and What's New's last-seen version stay as they were).
+recorded: the tour's state and What's New's last-seen version stay as they were),
+`message-editor add|revert` (item 69: Settings, Message's editor; add opens it and adds the smoke's own line,
+Fridays, "ship it." in a sunset gradient in script with a sweep, as the controls write it; revert drops
+unsaved edits. Neither saves, so `messages.txt` is never written; a run reverts what it added).
 
 ## Scenarios
 

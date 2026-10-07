@@ -68,6 +68,8 @@ struct MessageProposalCheckTests {
         #expect(source.contains("DESK_MAX_LINE_CHARS = \(MessageProposal.maxLineChars)"))
         #expect(source.contains("DESK_MAX_NOTE_CHARS = \(MessageProposal.maxNoteChars)"))
         #expect(source.contains(#"EFFECT_NAMES = "\#(MessageMarkup.effectNames)""#))
+        #expect(source.contains(#"FONT_STYLES = "\#(LetterStyle.tagNames)""#))
+        #expect(source.contains("SWEEP_PERIOD = (\(Int(MessageMarkup.sweepPeriodRange.lowerBound)), \(Int(MessageMarkup.sweepPeriodRange.upperBound)))"))
     }
 }
 

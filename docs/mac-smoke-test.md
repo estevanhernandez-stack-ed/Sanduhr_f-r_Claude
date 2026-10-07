@@ -886,6 +886,26 @@ mcp() { printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\
   shimmers. With a `{shimmer}` line showing and Activity Monitor on Sanduhr: CPU is 0.0 between
   sweeps and with the Desk covered by a full-screen window (the sweep pauses); a plain line costs
   nothing at any time.
+- [ ] Letter styles and the sweep (item 65), pinning each in turn with the Desk in EsteFont 26:
+  1. `{font:smallcaps} {sweep} showtime.` draws SHOWTIME in the handwriting with the S full height
+     and the rest smaller, at about the height of lowercase letters; about half a second after it
+     appears a small white light, about three letters wide, crosses it once in about a second.
+  2. `{font:bold} ship it.` is in EsteFont 26 Bold; `{font:italic} ship it.` leans right, the
+     handwriting itself, not another font; `{font:bold-italic} ship it.` is both.
+  3. `{font:fraktur} Hello 42.` draws in fraktur (the H is ℌ), the digits plain;
+     `{font:double-struck} Room 42.` has double-struck digits too; `{font:script} Bonjour.` has a
+     script ℬ; `{font:mono} x` and `{font:sans} x` draw; none of them is a box or a question mark.
+  4. `{sweep:5} hi.` sweeps every 5 seconds. Cover the Desk with a full-screen window for 20
+     seconds and come back: it starts again, and Activity Monitor shows Sanduhr at 0.0 CPU while
+     covered and between sweeps. `{sweep} hi.` sweeps once and does not sweep again after the Desk
+     is covered and uncovered.
+  5. Reduce Motion on: no line sweeps; the letter styles still draw.
+  6. `{font:outline} hi.` and `{sweep:1} hi.` show as written, tags included.
+  7. Settings, Desk, Notch, a wing or the strip on Message: `{font:smallcaps} {sweep} hi.` shows
+     HI in small caps and no tags; `{font:fraktur} Hi` shows ℌ𝔦.
+  8. VoiceOver on the Desk line `{font:fraktur} Hello.` reads "Hello.".
+  9. Settings, Message with `{sweep} hi.` pinned: the preview has Replay, and Replay sweeps the
+     line at once.
 - [ ] Quit Sanduhr and propose: the answer is `queued` / `app_not_responding` after about ten
   seconds; open Sanduhr within ten minutes and the suggestion appears. One older than ten minutes
   is dropped. `log show --last 5m --predicate 'subsystem == "com.626labs.sanduhr"'` holds no
@@ -968,34 +988,42 @@ Desktop & Dock, and put them back at the end. After each step, `mac/smoke/smoke 
   auto-hide, the Dock coming up on the other screen moves nothing on the Desk's.
 - [ ] Put your Dock settings back as they were.
 
-## 27. EsteFont 26, built in (item 58)
+## 27. EsteFont Pro and EsteFont 26, built in (items 58, 65 (e))
 
-Use a Mac or a user account where EsteFont 26 is not installed. On your own account, turn the
-installed copies off instead: Font Book, select EsteFont 26 (and any older EsteFont), Edit,
-Disable (or right-click, Deactivate), and turn them back on at the end. Never delete your fonts.
-Quit Sanduhr first and open the build afterwards, so it starts with the font switched off.
+Use a Mac or a user account where neither font is installed. On your own account, turn the
+installed copies off instead: Font Book, select EsteFont Pro, EsteFont 26 (and any older
+EsteFont), Edit, Disable (or right-click, Deactivate), and turn them back on at the end. Never
+delete your fonts. Quit Sanduhr first and open the build afterwards, so it starts with the fonts
+switched off.
 
-- [ ] The built app has both faces: `ls Sanduhr.app/Contents/Resources/Fonts` lists
-  `EsteFont26-Regular.ttf` and `EsteFont26-Bold.ttf`, and `codesign --verify --strict
-  Sanduhr.app` is quiet (`build.sh` also fails without them).
+- [ ] The built app has every face: `ls Sanduhr.app/Contents/Resources/Fonts` lists
+  `EsteFontPro-Regular.ttf`, `EsteFontPro-Bold.ttf`, `EsteFont26-Regular.ttf` and
+  `EsteFont26-Bold.ttf`, and `codesign --verify --strict Sanduhr.app` is quiet (`build.sh` also
+  fails without them).
 - [ ] Fresh install (a new user account, or `defaults delete com.626labs.sanduhr` and
   `defaults delete com.626labs.sanduhr.desk` on a test account only): the Desk's clock, date,
-  meters and message draw in EsteFont 26, the time in Bold. Settings, Desk, Look shows Desk font
-  EsteFont 26.
-- [ ] Font Book still shows EsteFont 26 off (or absent): Sanduhr did not install it. TextEdit's
-  font list does not have it.
-- [ ] Both pickers list EsteFont 26 first, under System: Settings, Desk, Look (Desk font and
-  Message font) and Settings, Widget, Look. Pick it for the widget: the cards draw in it, the
-  semibold lines in Bold. Use System Font brings the widget back.
-- [ ] Match Desk with the Desk on EsteFont 26: the widget draws in EsteFont 26.
+  meters and message draw in EsteFont Pro, the time in Bold. Settings, Desk, Look shows Desk font
+  EsteFont Pro.
+- [ ] Font Book still shows EsteFont Pro and EsteFont 26 off (or absent): Sanduhr did not install
+  them. TextEdit's font list does not have them.
+- [ ] Both pickers list EsteFont Pro first and EsteFont 26 right after it, under System:
+  Settings, Desk, Look (Desk font and Message font) and Settings, Widget, Look. Pick EsteFont Pro
+  for the widget: the cards draw in it, the semibold lines in Bold. Pick EsteFont 26: the same,
+  in its own Bold. Use System Font brings the widget back.
+- [ ] Pick EsteFont 26 for the Desk: the clock's time draws in EsteFont 26 Bold, the rest in its
+  Regular; quit and reopen: it stays.
+- [ ] Match Desk with the Desk on EsteFont Pro: the widget draws in EsteFont Pro.
 - [ ] Pick another Desk font, quit and reopen: it stays. Pick System: the Desk draws in the system
   font after a relaunch too.
 - [ ] A saved font that is gone: `defaults write com.626labs.sanduhr.desk font "No Such Font"`,
-  relaunch: the Desk draws in EsteFont 26 and the picker shows EsteFont 26.
-- [ ] Upgrade from the previous build with no Desk font picked: the Desk keeps the system font
+  relaunch: the Desk draws in EsteFont Pro and the picker shows EsteFont Pro.
+- [ ] Upgrade from 2.6.0 to 2.8.0 with no Desk font picked (the Desk drew in EsteFont 26): the Desk
+  keeps EsteFont 26 (`defaults read com.626labs.sanduhr.desk font` prints `EsteFont 26`).
+- [ ] Upgrade from a build before 2.6.0 with no Desk font picked: the Desk keeps the system font
   (`defaults read com.626labs.sanduhr.desk font` prints an empty line).
-- [ ] Settings, About shows "Handwriting: EsteFont 26 by Estevan Hernandez"; Third-Party Notices
-  opens with an EsteFont 26 section (copyright and license).
+- [ ] Settings, About shows "Handwriting: EsteFont Pro and EsteFont 26 by Estevan Hernandez";
+  Third-Party Notices opens with an EsteFont Pro and EsteFont 26 section naming all four files,
+  with the copyright and license.
 - [ ] Turn your EsteFont copies back on in Font Book.
 
 ## 28. What's New after an update (item 57)
@@ -1220,8 +1248,8 @@ Desk on. Go pane by pane; each card sits at the top, about 160 points tall, and 
    glow; each control changes the card at once.
 5. **Meters**: a warning row red with its glow; change a threshold so it no longer warns: the row
    turns back at once. Hide a temporary limit: it leaves the bars and "Hidden: …" names it.
-6. **Message**: today's line with its effects; with a `{write}` or `{shimmer}` line, **Replay**
-   writes it in again or sweeps it at once. Pin a line: the card shows it.
+6. **Message**: today's line with its effects; with a `{write}`, `{shimmer}` or `{sweep}` line,
+   **Replay** writes it in again or sweeps it at once. Pin a line: the card shows it.
 7. **Now Playing**: a wing playing, paused (with Next; with Hide while paused on, the stand-in)
    and with nothing playing (the When nothing is playing choice), and the Desk line.
 8. **Widget Look** and **Pacing & Focus**: the widget's cards in the theme and font; Subtle mode
@@ -1233,5 +1261,164 @@ Desk on. Go pane by pane; each card sits at the top, about 160 points tall, and 
 11. Reduce Motion on: the message's write-in and shimmer, the camera dot's pulse and the glow
     hold still. VoiceOver reads each card as one sentence.
 12. `smoke/smoke state` shows `settings_preview` (`notch`, `layout`, `look`, `meters`, `message`,
-    `nowPlaying`, `widget`, `menuBar`, `integrations`, or null). `smoke/smoke run
+    `nowPlaying`, `widget`, `menuBar`, `integrations`, `mods`, or null). `smoke/smoke run
     scenarios/settings-sections.yaml` snaps each pane with its card.
+
+## 34. Desk layout: more places, your order, a size per piece (item 59)
+
+Desk on, Settings, Desk, Layout open. Note the `layout` string first (`defaults read
+com.626labs.sanduhr.desk layout`) to put it back at the end.
+
+1. **An existing layout looks identical.** Before updating, screenshot the Desk; after, compare:
+   every piece sits where it sat, in the same order, at the same size. The `layout` string is
+   unchanged until you change something.
+2. **Eight places.** Each piece's place menu lists Top left, Top center, Top right, Middle left,
+   Middle right, Bottom left, Bottom center, Bottom right and Hidden. Put the clock at each in turn:
+   it moves live, and the map card shows it there. Middle left and right sit halfway down their
+   side; Bottom center rests on the bottom margin.
+3. **Top center and the notch.** On a notched Mac, put the message at Top center and set Top (below
+   the menu bar) to 0: the message sits just below the notch. Turn the notch island on with some
+   extra height: it moves below the island's strip. On a plain screen (an external display) it sits
+   on the top margin like the corners. The map draws the notch (and the island) at the top.
+4. **Your order.** With the clock, the meters and the meetings at Bottom left, the Order list shows
+   Bottom left with the three. Drag Meetings onto Clock: the meetings move above the clock on the
+   Desk and the map. Drag Clock onto Meters, below it: it lands below the meters. Drag a piece onto a piece in
+   another place: it moves there, just above that piece. With VoiceOver, Move Up and Move Down on a
+   row do the same. Picking a new place for one piece leaves the others' order alone.
+5. **A size per piece.** Set the clock's size to 160%: the clock (time and date) grows, nothing
+   else does, and the pieces stacked with it move to make room. 60% shrinks it. Set the
+   message's size to 140%: it grows from its own size in Look. The map's outlines grow and shrink
+   with them. Hide a piece: its size menu greys out.
+6. **The Dock.** With the Dock always shown at the bottom, pieces at Bottom center sit clear of it,
+   like the corners. Move the Dock to the left: Middle left moves in with Top left and Bottom left.
+   An auto-hiding Dock lifts Bottom center with the corners.
+7. **Clicks.** Put the meters at Middle right and the meetings at Top center: a two-finger click on
+   the meters opens their menu, a meeting row with a link opens it, and clicks elsewhere still reach
+   the Finder.
+   **Side beside center.** Pin a long message (`defaults write com.626labs.sanduhr.desk message
+   "a long line that runs well past the middle of the screen"`), put it and the meetings at Top
+   left and the meters at Top center: the message wraps and shrinks to end short of the meters,
+   and nothing at Top left draws under them. Put the clock and the meetings at Bottom left with a
+   piece at Middle left: the middle moves up as the bottom stack grows, never drawn over. Delete
+   the pinned message afterwards.
+8. **A hand-edited string.** `defaults write com.626labs.sanduhr.desk layout "message:zz clock:bl:1.4
+   meters:bl"`: the message shows top left (an unknown place falls back to its default, never
+   blank), the clock at 140%.
+9. `smoke/smoke state` shows `desk_pieces` (piece, anchor, order, scale) matching the Desk.
+   `smoke/smoke run scenarios/desk-layout.yaml` reorders Bottom left, then moves pieces to Top
+   center, Middle right (at 120%) and Bottom center, with `desk_frames_ok: true` each time.
+10. Put the `layout` string back.
+## 35. The Mods page (item 64, slice 1)
+
+Read-only. Use a throwaway Claude Code folder for the setup (`mkdir -p ~/.claude-modtest/projects`),
+never your real settings, and remove it afterwards. Copy `mac/integrations/mods/sanduhr-meters`
+to `~/modtest/meters` and give `~/.claude-modtest/settings.json`
+`{"env": {"CLAUDE_CODE_PLUGIN_DIRS": "~/modtest/meters:~/modtest/gone"}}`.
+
+1. Settings, Mods (under Integrations, cube symbol) opens with a summary card: mods, plugins, on,
+   folders, and missing when one is; "Read-only: nothing here turns a mod on or off." No Sample
+   label. VoiceOver reads it as one sentence with the counts.
+2. One box per Claude Code folder, its path on top. `~/.claude-modtest` lists **sanduhr-meters**
+   (0.1.0, Mod, On, its description, "Plugin folder list (CLAUDE_CODE_PLUGIN_DIRS)" and the path),
+   "Draws: band above the prompt, toasts", "Its code reads or writes files." in orange, and a
+   terminal frame titled Claude Code with a cyan band right above the `>` prompt and a toast line,
+   captioned "Sketch: drawn by the mod in Claude Code" (blocks only, no numbers). **gone** reads
+   Missing with "(not found)", and its Check is off: "Nothing to check: its folder isn't here."
+3. Add `"enabledPlugins": {"sanduhr-meters@inline": false}` to that settings.json and press Read
+   Again: the row reads Off and the summary's on count drops by one.
+4. A folder with installed plugins (your real one is fine, it is only read) lists each with
+   "Installed from <marketplace>", Plugin or Mod, and On or Off as its `enabledPlugins` says; a
+   plugin with `commands/*.md` shows "slash commands (/name)".
+5. **Check** on sanduhr-meters: within a few seconds an amber card, "Medium risk · Claude Code
+   would load it", "Reads files: $.fs.read", "Reads environment variables: APPDATA, HOME, OS,
+   SANDUHR_SNAPSHOT", the hooks and calls, and "From claude plugin validate, which read the files
+   without running them." `ps` never shows a `claude plugin test`.
+6. Break the copy's manifest (`"version": 3`) and Check again: a red card, "Claude Code would
+   refuse it (1 error)", "Error: version: Invalid input…", with no absolute path in it.
+7. Without the CLI (move it aside for a minute, or on a Mac without Claude Code): the page says
+   "Check needs Claude Code's command line (claude)…", every Check is off and its tooltip says why.
+8. A `~/.claude-modtest.config-backup-20261001-000000` folder holding a `projects` folder gets no
+   box.
+9. Nothing changed: `shasum` of every settings.json listed is the same before and after.
+10. `smoke/smoke state` shows `mods_page` (`open`, `loaded`, `folders`, `mods`, `plugins`,
+    `enabled`, `missing`, `checked`, `cli`): flags and counts only, never a name or a path.
+
+## 36. A Message editor anyone can use (item 69)
+
+Back up your list first and put it back at the end:
+`cp ~/Library/Application\ Support/Desk/messages.txt ~/messages.txt.bak`. Then replace it with a
+hand-written test file holding a note, a blank line, `  Mon:   one thing.`,
+`Fri:{ink:#FF2A6D,#05d9e8}  {glow}   showtime.`, `{blink} unknown.`, `{write} {shimmer} two motions.`
+and `keep building.` (CRLF endings in one copy of the test, no final newline in another), and note
+its `shasum`.
+
+1. Settings, Message: Claude's card (when a suggestion waits) on top, then Once a day / Every hour,
+   **Edit as text…**, Save and Revert (both off), "Today: …", and one row per message line, each
+   with its day ("Every day", "Mondays", "Fridays") over the line drawn as the Desk draws it, in
+   the Desk's font, color, glow and effects. The note and blank line are not rows; "Notes (#) and
+   blank lines in the file stay where they are." The `{blink}` and two-motion lines show as written
+   in monospace with "Kept as written…", and their previews draw them as the Desk does.
+2. Save stays off. Switch to Edit as text… and back: still nothing unsaved, and `shasum` is
+   unchanged, CRLF and the missing final newline included.
+3. **Add Line**: a new row opens its controls. Set When to Friday, Text "ship it.", Color Gradient,
+   Palette sunset, Letters Script, Motion Sweep: the row's picture changes with each, and no brace
+   shows anywhere. Save: the file's last line is
+   `Fri: {ink:#ff7e5f,#feb47b,#ffd86f} {font:script} {sweep} ship it.` and every other line is
+   unchanged (`diff` against a copy of the test file shows one added line).
+4. Each control's tooltip is one line. Size slides 0.5× to 2× in 0.05 steps; Glow On, Off, As the
+   Desk write `{glow}`, `{noglow}`, nothing; One color shows one well, Gradient two with Add Color up
+   to four and a minus on each beyond two; When, A date shows Month and Day menus and writes `MM-DD:`.
+5. Change only the Fridays row's glow to Off and Save: only that line changes in the file, rewritten
+   as `Fri: {ink:#ff2a6d,#05d9e8} {noglow} showtime.`; the odd spacing of the other lines stays.
+6. A row's menu: Duplicate puts a copy right below; Move Up and Move Down step past other lines
+   (notes keep their place); Delete removes only that line. Drag a row by its handle onto another:
+   it lands there. Each reaches the file only on Save; Revert drops them.
+7. Pin on a row: "Pinned: the Desk shows … every day; special days still show above it." above the list, the Desk shows that line,
+   the pin is filled; Unpin (or Pin again) gives the list back.
+8. Type `#1 fan` as an Every day line's text: the row warns that the Desk reads it as a note; add a
+   glow and the warning goes. `{x} hi`, and `Mon: hi` on an Every day line, warn too.
+9. **Edit as text…**: the file with the tag reference beside it (every tag, the font names) and the
+   pin field. Type a line there, switch back to the list: it is a row; edit a row, switch to text:
+   the change is there. Unsaved edits survive the switches; Save from either view writes them.
+10. With unsaved edits, have Claude suggest lines (`propose_desk_messages`): the card's Add is off;
+    Save, then Add: the list reloads with Claude's lines. With "Let Claude change the messages
+    directly" on and unsaved edits, "The file changed" and Reload show instead.
+11. **Ask Claude**: the example prompt and Copy ("Copied"); the pasteboard holds the prompt.
+12. Keyboard only (Full Keyboard Access on): Tab reaches every control, Pin, the row menu, Edit,
+    Add Line and Save. VoiceOver reads each control by name (When, Text, Color, Color 1 of 3, Glow,
+    Size with "1.2 times", Letters, Motion), each preview as "Preview: <text>", and offers Move Up
+    and Move Down on a row. With Reduce Motion on, the row previews hold still.
+13. `smoke/smoke run scenarios/message-editor.yaml` passes: it adds the smoke's own line unsaved and
+    reverts it; `messages.txt` is untouched (`shasum`). `smoke/smoke state` shows `message_editor`
+    (`open`, `mode`, `rows`, `styled`, `raw`, `notes`, `unsaved`, `today_special`, `added`): counts and flags, never
+    one of your lines.
+14. **Special days add.** Add two lines for today's date (`MM-DD: happy birthday, Sam.` and
+    `MM-DD: happy birthday, Alex.`) and Save: the Desk draws both, a little smaller, stacked above
+    the day's usual line, each with its own effects; the Message preview shows the same stack;
+    "Today:" reads "Today: happy birthday, Sam. / happy birthday, Alex. / <usual line>". Their rows
+    read "<Month day> · shows above the day's message · with 1 other that day". The notch's
+    Message shows "happy birthday, Sam.". `smoke/smoke state` shows `message_editor.today_special: 2`.
+    Add two more for today: three show, and the set changes on the hour. Pin a "Good vibes only"
+    line: the date's lines still stack above it ("Today: … / Good vibes only"); Unpin.
+15. **Weekday lines.** Rows read "Fridays · takes turns with N others" (or "· shows instead of the
+    every-day lines" for one) and the every-day rows "Every day · … · steps aside on days with their
+    own line". Switch on "Mix every-day lines in on days with their own line": the notes change to
+    "· mixes with every-day lines" and "· mixes in on days with their own line", and
+    `get_desk_messages` reports `mix_daily: true`. Switch it off again.
+16. **Claude.** `get_desk_messages` returns `today` (the usual line) and `today_special` (the
+    date lines). Ask Claude Code to add birthdays for the year: it proposes `MM-DD:` lines with
+    mode add, one per person.
+17. **On special days.** With the two birthday lines for today in place: the bar's "On special
+    days" reads Stack and no timing menu shows. Pick **Take turns**: "Each line shows for" appears
+    (5 s, 10 s, 30 s, 1 min, 5 min; 10 s chosen). Pick 5 s: the Desk shows one line at a time,
+    Sam, then Alex, then the usual line, crossfading (about 0.4 s), the piece never changing size
+    and nothing beside it moving; the notch's Message shows the same line at the same moment; the
+    Message preview card does the same. A `{write}` line writes itself in each time it comes round.
+    Pick **Scroll**: each line glides up out of view as the next glides up in, one visible at a
+    time. Turn on Reduce Motion: both swap at once with no fade or glide. Cover the Desk with a
+    window for 20 s and uncover it: the line didn't advance while covered and then jumps to the
+    current one. Remove today's date lines: nothing cycles, the usual line stays. Without a date
+    line today the preview card shows a sample birthday and "Sample: … special day".
+    `get_desk_messages` reports `special_mode` and `special_seconds`. Set Stack again.
+
+Put your list back: `cp ~/messages.txt.bak ~/Library/Application\ Support/Desk/messages.txt`.

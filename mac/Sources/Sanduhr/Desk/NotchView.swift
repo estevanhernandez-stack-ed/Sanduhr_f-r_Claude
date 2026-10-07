@@ -20,7 +20,7 @@ struct NotchView: View {
     @AppStorage("notchWings", store: .desk) private var wings = 36.0
     @AppStorage("notchChin", store: .desk) private var chin = 26.0
     @AppStorage("font", store: .desk) private var savedFont: String?
-    /// The Desk font as drawn: EsteFont 26 unless a font was picked (DeskFont, item 58).
+    /// The Desk font as drawn: EsteFont Pro unless a font was picked (DeskFont, item 58).
     private var font: String { DeskFont.resolve(saved: savedFont) }
     @AppStorage("notchChinText", store: .desk) private var showChinText = false
     @AppStorage("notchTextColor", store: .desk) private var textColor = "ffffff"
@@ -57,15 +57,14 @@ struct NotchView: View {
                         stripIndicators
                     } else if showChinText, let line = strip.text(
                         at: .strip, meetings: model.meetings, meters: model.claudeCompact,
-                        message: model.message, nowPlaying: model.nowPlaying, watchers: model.watchers,
+                        message: model.oneLineMessage, nowPlaying: model.nowPlaying, watchers: model.watchers,
                         watcherIntro: model.watcherIntroUntil != nil, now: context.date) {
                         if strip == .nowPlaying {
                             stripNowPlaying(line, width: width)
                         } else if strip == .watchers {
                             stripWatcher(line, width: width)
                         } else {
-                            Text(line)
-                                .font(.custom(font, size: stripSize))
+                            styledLine(line, content: strip, size: stripSize)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                                 .minimumScaleFactor(0.7)
@@ -85,6 +84,10 @@ struct NotchView: View {
     }
 
     private var stripSize: CGFloat { max(11, chin * 0.55) }
+
+    private func styledLine(_ line: String, content: NotchContent, size: CGFloat) -> some View {
+        NotchMessageText.line(line, content: content, message: model.oneLineMessage, font: font, size: size)
+    }
 
     /// The camera and mic indicators under the camera (item 67), centered. Their clicks come
     /// through DeskHitTest by the frame they report: a click or a two-finger click opens their menu.
@@ -195,7 +198,7 @@ struct NotchWingsView: View {
     @AppStorage("notchText", store: .desk) private var showText = true
     @AppStorage("notchTextColor", store: .desk) private var textColor = "ffffff"
     @AppStorage("font", store: .desk) private var savedFont: String?
-    /// The Desk font as drawn: EsteFont 26 unless a font was picked (DeskFont, item 58).
+    /// The Desk font as drawn: EsteFont Pro unless a font was picked (DeskFont, item 58).
     private var font: String { DeskFont.resolve(saved: savedFont) }
     @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
     @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
@@ -264,7 +267,7 @@ struct NotchWingsView: View {
         } else if content == .watchers, let text {
             watcherWing(text, size, place: place, width: width)
         } else {
-            label(text, size)
+            label(text, size, content: content)
         }
     }
 
@@ -384,9 +387,12 @@ struct NotchWingsView: View {
             .accessibilityAddTraits(.isButton)
     }
 
-    private func label(_ text: String?, _ size: CGFloat) -> some View {
-        Text(text ?? "")
-            .font(.custom(font, size: size))
+    private func styledLine(_ line: String, content: NotchContent, size: CGFloat) -> some View {
+        NotchMessageText.line(line, content: content, message: model.oneLineMessage, font: font, size: size)
+    }
+
+    private func label(_ text: String?, _ size: CGFloat, content: NotchContent) -> some View {
+        styledLine(text ?? "", content: content, size: size)
             .foregroundStyle(LinearGradient.ink(textColor))
             .opacity(0.88)
             .lineLimit(1)
@@ -447,7 +453,7 @@ struct NotchWingsView: View {
     private static func text(_ content: NotchContent, at place: NotchContent.Place,
                              model: DeskModel, now: Date) -> String? {
         content.text(at: place, meetings: model.meetings, meters: model.claudeCompact,
-                     message: model.message, nowPlaying: model.nowPlaying, watchers: model.watchers,
+                     message: model.oneLineMessage, nowPlaying: model.nowPlaying, watchers: model.watchers,
                      watcherIntro: model.watcherIntroUntil != nil, now: now)
     }
 

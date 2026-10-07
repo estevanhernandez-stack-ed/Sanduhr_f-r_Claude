@@ -104,9 +104,10 @@ struct SettingsSidebarTests {
         // Item 36: Accounts replaced Credentials; the raw value stays for links and smoke.
         #expect(SettingsSection(rawValue: "credentials") == .credentials)
         #expect(SettingsSection.credentials.title == "Accounts")
-        #expect(SettingsSection.groups.first?.sections == [.general, .alerts, .credentials, .usage, .integrations])
-        // Item 49: Integrations follows Claude Usage.
+        #expect(SettingsSection.groups.first?.sections == [.general, .alerts, .credentials, .usage, .integrations, .mods])
+        // Item 49: Integrations follows Claude Usage. Item 64: Mods follows Integrations.
         #expect(SettingsSection(rawValue: "integrations")?.title == "Integrations")
+        #expect(SettingsSection(rawValue: "mods")?.title == "Mods")
     }
 
     @Test func claudeUsageSitsUnderAccounts() {

@@ -140,7 +140,10 @@ final class DeskController: NSObject, NSMenuDelegate {
         let visible = window.map { $0.occlusionState.contains(.visible) } ?? false
         let paused = MessageMotion.paused(deskVisible: visible, screensAsleep: screensAsleep,
                                           screenSaver: screenSaver, sessionAway: sessionAway)
-        if model.motionPaused != paused { model.motionPaused = paused }
+        if model.motionPaused != paused {
+            model.motionPaused = paused
+            model.updateCycle()   // the turns rest while nobody can see them (item 69)
+        }
     }
 
     @objc private func appBecameActive() {

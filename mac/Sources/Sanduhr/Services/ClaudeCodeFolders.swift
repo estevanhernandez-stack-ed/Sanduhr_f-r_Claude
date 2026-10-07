@@ -58,14 +58,23 @@ enum ClaudeCodeFolders {
         return fm.fileExists(atPath: configFile(for: d, home: home, fileManager: fm))
     }
 
-    /// The homes under `home`: `.claude` first, then the `.claude-*` folders by name, then the
-    /// `CLAUDE_CONFIG_DIR` folder when it is somewhere else. Only folders that look like homes.
+    /// A copy a config tool left beside a home (`.claude-work.config-backup-20261001-174332`):
+    /// it looks like a home but nothing loads it, so discovery skips it.
+    static let backupMarker = ".config-backup-"
+
+    static func isBackup(_ name: String) -> Bool { name.contains(backupMarker) }
+
+    /// The homes under `home`: `.claude` first, then the `.claude-*` folders by name (never a
+    /// `*.config-backup-*` copy), then the `CLAUDE_CONFIG_DIR` folder when it is somewhere else,
+    /// even when its name looks like a backup (that is the one Claude Code uses). Only folders
+    /// that look like homes.
     static func discover(home: String, environment: [String: String] = [:],
                          fileManager fm: FileManager = .default) -> [Folder] {
         let h = AccountData.normalized(home)
         let names = (try? fm.contentsOfDirectory(atPath: h)) ?? []
         let candidates = names
             .filter { $0 == defaultName || ($0.hasPrefix(prefix) && $0.count > prefix.count) }
+            .filter { !isBackup($0) }
             .sorted { a, b in
                 if a == defaultName { return b != defaultName }
                 if b == defaultName { return false }

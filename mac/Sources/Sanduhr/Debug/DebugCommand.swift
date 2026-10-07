@@ -62,11 +62,19 @@ enum DebugAction: Equatable {
     enum AVTest: String, CaseIterable {
         case camera, mic
     }
+    /// Settings, Message's editor (item 69): add puts in the smoke's own line (Fridays, "ship it.",
+    /// a sunset gradient in script with a sweep), held unsaved; revert drops unsaved edits. Neither
+    /// saves: messages.txt is never written by a hook.
+    case messageEditor(MessageEditorStep)
+
+    enum MessageEditorStep: String, CaseIterable {
+        case add, revert
+    }
 
     static let names = ["show-widget", "hide-widget", "settings", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
                         "theme", "account", "usage", "whats-new", "close-whats-new",
-                        "tour", "tour-step", "close-tour", "watch-test", "av-test"]
+                        "tour", "tour-step", "close-tour", "watch-test", "av-test", "message-editor"]
 }
 
 enum DebugCommand: Equatable {
@@ -187,6 +195,11 @@ enum DebugLink {
                 return bad("av-test needs arg=camera on, camera off, mic on or mic off")
             }
             return .success(.avTest(which, on: on))
+        case "message-editor":
+            guard let step = arg.flatMap({ DebugAction.MessageEditorStep(rawValue: $0.lowercased()) }) else {
+                return bad("message-editor needs arg=add or revert")
+            }
+            return .success(.messageEditor(step))
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }

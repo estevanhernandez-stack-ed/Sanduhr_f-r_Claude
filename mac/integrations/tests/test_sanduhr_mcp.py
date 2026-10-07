@@ -731,8 +731,12 @@ class DeskMessages(Base):
         r = self.get()
         self.assertEqual(r["lines"], ["# header", "keep building.", "{ink:#fff} also plain", "Sun: {glow} rest."])
         self.assertEqual(r["today"], "{glow} rest.")
-        self.write_messages("Sun: rest.\n07-26: {write} today only.\n")
-        self.assertEqual(self.get()["today"], "{write} today only.")
+        self.assertEqual(r["today_special"], [])
+        # Item 69: a date line adds above the day's line; it no longer replaces it.
+        self.write_messages("Sun: rest.\n07-26: {write} today only.\n07-26: and Sam's birthday.\n")
+        r = self.get()
+        self.assertEqual(r["today"], "rest.")
+        self.assertEqual(r["today_special"], ["{write} today only.", "and Sam's birthday."])
         self.write_messages("Mon: monday.\na\nb\nc\n")
         # Plain pool, rotated by the day number like MessageEngine.pick.
         self.assertEqual(self.get()["today"], ["a", "b", "c"][NOW.date().toordinal() % 3])
@@ -749,6 +753,66 @@ class DeskMessages(Base):
         r = self.get()
         self.assertTrue(r["pinned"])
         self.assertEqual(r["today"], "{shimmer} pinned.")
+
+    def test_weekday_lines_rotate_by_week_and_mix(self):
+        # Item 69: seven Friday lines used to show the same one every Friday.
+        for n in range(1, 9):
+            text = "plain.\n" + "\n".join("Fri: f%d" % i for i in range(n))
+            fridays = [datetime(2026, 10, 9, 12) + timedelta(days=7 * i) for i in range(n)]
+            self.assertEqual({mcp.pick_desk_line(text, d, False) for d in fridays},
+                             {"f%d" % i for i in range(n)}, n)
+            hours = {mcp.pick_desk_line(text, datetime(2026, 10, 9, h), True) for h in range(24)}
+            self.assertEqual(hours, {"f%d" % i for i in range(n)}, n)
+        text = "a\nb\nFri: f\n"
+        fridays = [datetime(2026, 10, 9, 12) + timedelta(days=7 * i) for i in range(3)]
+        self.assertEqual({mcp.pick_desk_line(text, d, False) for d in fridays}, {"f"})
+        self.assertEqual({mcp.pick_desk_line(text, d, False, mix=True) for d in fridays}, {"f", "a", "b"})
+        self.write_messages("a\nb\nSun: s\n")
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 1, "pinned": False, "rotate": "daily", "mix_daily": True})
+        r = self.get()
+        self.assertTrue(r["mix_daily"])
+        self.assertEqual(r["today"], ["s", "a", "b"][(NOW.date().toordinal() // 7) % 3])
+
+    def test_more_than_three_for_a_date_take_turns_hourly(self):
+        for n in range(4, 9):
+            text = "keep.\n" + "\n".join("03-14: %d" % i for i in range(n))
+            seen = set()
+            for h in range(24):
+                special, usual = mcp.desk_today(text, datetime(2026, 3, 14, h), False)
+                self.assertEqual((len(special), len(set(special)), usual), (3, 3, "keep."))
+                seen.update(special)
+            self.assertEqual(seen, {str(i) for i in range(n)}, n)
+        self.assertEqual(mcp.desk_today("03-14: a\n03-14: b\n", datetime(2026, 3, 14, 9), False), (["a", "b"], None))
+
+    def test_a_pinned_line_keeps_special_days(self):
+        # NOW is 2026-07-26: a pinned line replaces the usual line; date lines still stack above it.
+        self.write_messages("keep.\nSun: rest.\n07-26: happy birthday, Sam.\n")
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 1, "pinned": True,
+                                                 "pinned_line": "Good vibes only", "rotate": "daily"})
+        r = self.get()
+        self.assertEqual((r["today"], r["today_special"]), ("Good vibes only", ["happy birthday, Sam."]))
+        self.write_messages("keep.\n" + "\n".join("07-26: b%d" % i for i in range(4)) + "\n")
+        r = self.get()
+        self.assertEqual(r["today"], "Good vibes only")
+        self.assertEqual(len(r["today_special"]), 3)
+        seen = set()
+        for h in range(24):
+            special, usual = mcp.desk_today("keep.\n" + "\n".join("07-26: b%d" % i for i in range(4)),
+                                            datetime(2026, 7, 26, h), False, pinned="Good vibes only")
+            self.assertEqual((len(special), usual), (3, "Good vibes only"))
+            seen.update(special)
+        self.assertEqual(seen, {"b0", "b1", "b2", "b3"})
+
+    def test_on_special_days_setting_is_reported(self):
+        r = self.get()
+        self.assertEqual((r["special_mode"], r["special_seconds"]), ("stack", 10))
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 1, "pinned": False, "rotate": "daily",
+                                                 "special_mode": "scroll", "special_seconds": 60})
+        r = self.get()
+        self.assertEqual((r["special_mode"], r["special_seconds"]), ("scroll", 60))
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 1, "special_mode": "ticker", "special_seconds": 7})
+        r = self.get()
+        self.assertEqual((r["special_mode"], r["special_seconds"]), ("stack", 10))
 
     def test_unknown_state_schema_reads_as_defaults(self):
         self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 9, "pinned": True, "rotate": "hourly"})
@@ -772,8 +836,25 @@ class DeskMessages(Base):
         good = ["keep building.", "Mon: one thing at a time.", "10-31: {ink:#ff7518,#6b2fa0} {write} boo.",
                 "{ink:#ff2a6d,#05d9e8} {glow} hello", "{size:0.5}{noglow} small.", "{SHIMMER} loud", "# a note",
                 "", "Note: a colon in a plain line.", "02-29: leap.", "{ink:fff} three digits.", "x" * 120,
-                "hello {glow} mid-line braces are text", "ünïcödé ✨ fine."]
+                "hello {glow} mid-line braces are text", "ünïcödé ✨ fine.", "{sweep} {font:small-caps} hi.",
+                "{font:smallcaps} {sweep:20} hi.", "{FONT:Bold Italic} hi.", "{sweep:2} {font:fraktur} hi.",
+                "{sweep:3600}{font:double_struck} hi."]
         self.assertEqual(mcp.validate_desk_lines(good), [])
+
+    def test_font_and_sweep_tags(self):
+        effects, text, error = mcp.parse_effects("{sweep} {font:smallcaps} {ink:#fff} hi.")
+        self.assertIsNone(error)
+        self.assertEqual(text, "hi.")
+        self.assertEqual(effects, {"sweep": True, "font": "small-caps", "ink": ["#fff"]})
+        self.assertEqual(mcp.parse_effects("{sweep:20} x")[0], {"sweep": 20.0})
+        for name in mcp.FONT_STYLES.split(", "):
+            self.assertEqual(mcp.parse_effects("{font:%s} x" % name)[0], {"font": name})
+        # The names are the statusline's letter styles.
+        spec = importlib.util.spec_from_file_location("sanduhr_statusline_names", os.path.join(
+            os.path.dirname(HERE), "sanduhr_statusline.py"))
+        statusline = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(statusline)
+        self.assertEqual(set(mcp.FONT_STYLES.split(", ")), set(statusline.FONTS))
 
     def test_bad_lines_are_named(self):
         cases = {
@@ -796,6 +877,14 @@ class DeskMessages(Base):
             "{glow:yes} hi": "takes no value",
             "{glow hi": "not closed",
             "{glow} {write}": "no text",
+            "{font} hi": "needs a letter style",
+            "{font:outline} hi": "needs a letter style: bold, italic",
+            "{font:} hi": "needs a letter style",
+            "{sweep:1} hi": "from 2 to 3600",
+            "{sweep:3601} hi": "from 2 to 3600",
+            "{sweep:fast} hi": "from 2 to 3600",
+            "{sweep:} hi": "from 2 to 3600",
+            "{sweeps} hi": "unknown effect {sweeps}; known: ink, glow, noglow, size, write, shimmer, sweep, font",
             "\ud800 lone surrogate": "UTF-8",
         }
         for line, want in cases.items():
@@ -884,9 +973,20 @@ class DeskMessages(Base):
         tools = {t["name"]: t["description"] for t in mcp.TOOLS}
         for name in ("get_desk_messages", "propose_desk_messages"):
             for word in ("Mon:", "MM-DD", "# ", "rotate", "pinned", "{ink:", "{glow}", "{noglow}", "{size:",
-                         "{write}", "{shimmer}", "40 characters"):
+                         "{write}", "{shimmer}", "40 characters", "{sweep}", "{sweep:20}", "2 to 3600",
+                         "{font:small-caps}", "bold-italic", "double-struck", "fraktur", "Unicode",
+                         "skips {shimmer} and {sweep}"):
                 self.assertIn(word, tools[name], (name, word))
         self.assertIn("never writes messages.txt", tools["propose_desk_messages"])
+        # Item 69: special days add to the day; Claude learns the birthday form.
+        for name in ("get_desk_messages", "propose_desk_messages"):
+            for word in ("birthdays, anniversaries and holidays are date lines", "they add to it",
+                         "two birthdays on one date both show", "happy birthday, Sam.", "mix_daily",
+                         "date lines still stack above the pinned line", "On special days setting (special_mode)",
+                         "special_seconds"):
+                self.assertIn(word, tools[name], (name, word))
+        self.assertIn("today_special", tools["get_desk_messages"])
+        self.assertIn("use mode add with one date line each", tools["propose_desk_messages"])
 
 
 BUILTIN_THEMES = os.path.join(FIXTURES, "theme-builtins.json")

@@ -528,9 +528,11 @@ network request; the files it writes are a Desk message request and a theme requ
 points it at a test folder (and Desk's folder beside it).
 
 **Desk messages from Claude (item 54).** `get_desk_messages` returns `{status, file_found, lines,
-pinned, rotate, today, limits}`: every raw line of Desk's `messages.txt`, whether a line is pinned,
-the rotation and the raw line the Desk shows now. Its description teaches the syntax (plain, `Mon:`,
-`MM-DD:`, `#`, the most specific pool, rotation, pinning) and the effects, with taste tips.
+pinned, rotate, mix_daily, special_mode, special_seconds, today, today_special, limits}`: every raw line of Desk's `messages.txt`,
+whether a line is pinned, the rotation, the mix switch, the usual raw line the Desk shows now and the
+date lines it shows above it today. Its description teaches the syntax (plain, `Mon:`, `MM-DD:`,
+`#`, which line shows when, rotation, pinning; that birthdays, anniversaries and holidays are date
+lines that add to the day, one per person, added with mode add) and the effects, with taste tips.
 `propose_desk_messages {lines, mode: add|replace, note?}` checks the lines (1 to 60, 120 characters
 each, no control characters, at least one message line, prefixes and effects must parse; refusals
 come back at once with `reasons` and write nothing), then writes `desk-messages-request.json`
@@ -557,20 +559,106 @@ sidebar, and a notification without sound only while alerts are on (their delive
 `MessageSuggestionNotice`). Add appends and skips lines already in the list; Replace keeps the
 comment block at the top of the file and replaces the rest. Either way the previous file is kept as
 `messages.txt.previous`. A suggestion waits in memory (quitting drops it); a newer one replaces it.
-The app writes `desk-messages-state.json` (`{schema_version, pinned, pinned_line, rotate}`) when
-the pin or rotation changes, for `get_desk_messages`.
+The app writes `desk-messages-state.json` (`{schema_version, pinned, pinned_line, rotate,
+mix_daily, special_mode, special_seconds}`) when the pin, the rotation, the mix switch or On special
+days changes, for `get_desk_messages`, which reports them.
+
+**Which lines show (item 69).** Each day the Desk draws one usual line and, on a date with its own
+lines, those too (`MessageEngine.today`). The usual line comes from today's weekday lines when there
+are any, else from the plain lines; with Settings, Message's "Mix every-day lines in on days with
+their own line" (`messageMixDaily`, off by default) the weekday lines and the plain lines take
+turns together. Plain lines rotate by day; a weekday's lines rotate by week (they used to step by
+day, which comes round to a weekday every 7, so seven Friday lines always showed the same one).
+Date lines (`MM-DD:`) no longer replace the usual line: every line for today's date shows, stacked
+above it, each with its own effects; more than 3 take turns hourly, 3 at a time. Hourly rotation
+keeps hour steps within each pool. The message piece draws the date's lines at 0.8 times the
+message size (full size when no usual line shows) with a gap of 0.12 times the message size
+between lines (`DeskMessageStack`). Places with room for one line (the notch's Message choice)
+show the first date line, else the usual one. A pinned line replaces the usual line only: the
+date's lines still stack above it, so a pinned "good vibes only" and a birthday both show.
+`get_desk_messages` mirrors the rules (`desk_today`).
+
+**On special days (item 69).** Settings, Message's bar has "On special days": **Stack** (the
+default, as above), **Take turns** or **Scroll** (`messageSpecialMode` `stack`, `turns`, `scroll`),
+and, unless Stack, "Each line shows for" 5 s, 10 s (default), 30 s, 1 min or 5 min
+(`messageSpecialSeconds`). Take turns and Scroll show one line at a time at the full message size
+(a line's own `{size:}` still applies), cycling through the date's lines and then the usual line.
+The line showing is decided by the clock alone (`MessageSpecialMode.index`: the seconds since 1970
+divided by the time each line shows, modulo the number of lines), so the Desk, the notch's Message
+and the previews show the same line at the same moment. `DeskModel.updateCycle` sets the index and
+waits with one one-shot timer for the next change; while the Desk can't be seen (covered, screens
+asleep, screen saver, session away: `motionPaused`, as `{shimmer}` rests) it holds the line and
+schedules nothing, and on return it jumps to the clock's line. On a day without date lines, or with
+a date line and no usual line, nothing cycles and nothing is scheduled. Every line is laid out
+unseen underneath the one showing, so the piece keeps the size of the biggest and nothing around it
+moves. Take turns crossfades in 0.4 s. Scroll is a slow ticker: the new line glides up in from below
+by its own height while the old one glides up out of view, both fading as they move, in 0.8 s, so
+one line is visible at a time. With Reduce Motion both swap at once. Each line that comes in is a new
+view, so its `{write}` plays again; `{shimmer}` and `{sweep}` run as on a single line. The Message
+preview card shows the chosen mode live, with a sample date line ("Sample: special day") until today
+has one. "Today:" lists the lines in cycle order.
 
 **Message effects.** Tags at the start of a line's text, after any prefix, in any order:
 `{ink:#hex,…}` (1 to 4 colors, a gradient from two), `{glow}` / `{noglow}` (over Settings, Desk,
 Look's new "Glow around the message", `messageGlow`), `{size:0.5…2}` (times the message size),
 `{write}` (the line draws itself in, left to right, over 1.5 s when it first appears, once) and
-`{shimmer}` (a light band sweeps across it in 1.6 s every 8 s). `MessageMarkup` parses strictly for
+`{shimmer}` (a light band sweeps across it in 1.6 s every 8 s), `{sweep}` (item 65: a light three
+characters wide crosses the line in 1.1 s, brightening each character toward white as it passes,
+the now-playing mod's glow; once, 0.6 s after the line appears, or with `{sweep:<seconds>}` again
+every 2 to 3600 seconds) and `{font:<style>}` (item 65: a letter style, the statusline's names:
+`bold`, `italic`, `bold-italic`, `sans`, `mono`, `double-struck`, `script`, `fraktur`, `small-caps`;
+case, spaces, hyphens and underscores don't matter, so `{font:smallcaps}` works). Bold, italic and
+small caps draw in the line's own font (`MessageTypography`): bold is the family's Bold face from
+`BundledFonts.face` (EsteFont's), or a synthesized weight for a family without one; italic is a
+12-degree slant of the line; small caps are the capitals with lowercase letters drawn as capitals
+at the font's x-height. The other five have no face in any handwriting font, so they draw as
+Unicode math letters (`LetterMap`, a port of the statusline's table with its Letterlike holes such
+as script B and double-struck R; `test_sanduhr_statusline.py` checks the two tables match) in the
+system font: A to Z, a to z and, where the style has them, digits; accents and punctuation stay as
+written, and VoiceOver reads the plain text. The notch shows the message without its tags, with
+its letter style. `MessageMarkup` parses strictly for
 proposals and leniently on the Desk: an unknown or malformed tag ends the tags and draws, with the
 rest, as plain text; a line of tags alone draws as written. Reduce Motion shows `{write}` at once and
-turns `{shimmer}` off. Cost: a line without `{write}` or `{shimmer}` draws as before (no mask, no
-task); `{write}` is one animation; `{shimmer}` is a task that sleeps between sweeps and stops while
-the Desk is covered (window occlusion), the screens sleep, the screen saver runs or the session is
-switched away (`MessageMotion.paused`).
+turns `{shimmer}` and `{sweep}` off. Cost: a line without `{write}`, `{shimmer}` or `{sweep}` draws
+as before (no mask, no task); `{write}` is one animation; `{shimmer}` is a task that sleeps between
+sweeps and stops while the Desk is covered (window occlusion), the screens sleep, the screen saver
+runs or the session is switched away (`MessageMotion.paused`); `{sweep}` draws 30 frames a second
+only during its 1.1 s run, sleeps between runs and rests the same way (a once-only sweep that has
+run does not repeat when the Desk comes back into sight; one that was covered before it ran runs
+then). Settings, Message's Replay sweeps a `{sweep}` line at once.
+
+**The Message editor (item 69).** Settings, Message is a list of lines, each a row with the line
+drawn as the Desk draws it (`MessageRowPreview`: `DeskMessageLine` at 22 points on the preview
+wallpaper, in the Desk's message font, color and glow; Reduce Motion stills it as it does the
+Desk). A row's Edit opens its controls: **When** (Every day, Monday to Sunday, or A date as a month
+and a day menu, written as `Mon:` or `10-31:`), **Text** (plain, no tags), **Color** (As the Desk,
+One color, or a Gradient of 2 to 4 color wells, and a Palette menu with the now-playing mod's
+synthwave, sunset, ocean, aurora, ember, bubblegum, toxic and gold), **Glow** (On, Off, As the
+Desk), **Size** (0.5 to 2 times, in 0.05 steps), **Letters** (As written and the nine letter
+styles) and **Motion** (None, Write in, Shimmer, Sweep), each with a one-line tooltip. The controls
+write the existing tags only, in the order ink, glow, size, font, motion: Fridays, "ship it." in a
+sunset gradient in script with a sweep is `Fri: {ink:#ff7e5f,#feb47b,#ffd86f} {font:script}
+{sweep} ship it.` Rows have Pin (today's line stays: the pin holds the row's tags and text),
+Duplicate, Move Up, Move Down and Delete (the row's menu; VoiceOver has Move Up and Move Down too),
+and drag to reorder. Add Line, the rotation (Once a day, Every hour), the mix switch, Save
+(Command-S) and Revert sit above the list, with "Today:" naming everything the Desk draws today
+(the date's lines, then the usual one, joined by " / "). Each row's note says what happens to it
+(`MessageDocument.note`): "October 31 · shows above the day's message" (plus "· with N others that
+day", and "· 3 at a time, taking turns hourly" past three), "Fridays · takes turns with N others"
+or "Fridays · shows instead of the every-day lines" ("· mixes with every-day lines" with the switch
+on), "Every day · takes turns with N others · steps aside on days with their own line" ("· mixes in
+on days with their own line" with the switch on). **Edit as text…** shows the file itself with the tag reference beside it and the
+free pin field; Edit as a list goes back. Both views edit one document (`MessageEditorModel`), and
+switching carries unsaved edits across. `MessageLineModel` reads the file into rows: a styled row
+(when, text, look) for each line the controls can represent; a raw row, shown as written and kept
+verbatim, for one they can't (a tag Sanduhr doesn't know or that is malformed, two motions on one
+line, a date that isn't one, a prefix with nothing after it); comments and blank lines are kept in
+place and not listed. Each row writes the line it was read from, byte for byte, until it is changed,
+so an unchanged file saves back exactly (CRLF endings and a missing final newline included) and a
+changed row rewrites only its own line; a new line with no text is left out. A row whose text the
+Desk would read differently (it starts with `{` or `#`, or like a day on an Every day line) says so
+under it. Claude's suggestion card stays at the top of the page, and **Ask Claude** below the list
+has a copyable example prompt and the "Let Claude change the messages directly" switch.
 
 **Themes from Claude (item 55).** `propose_theme {theme, save_as?, apply?}` is the Windows tool:
 same name, inputs and result shape. `theme` is the theme JSON in `docs/themes/template.json`'s
@@ -613,6 +701,55 @@ Tests: `python3 -m unittest discover -s mac/integrations/tests` (also a Mac CI s
 folders: each sharing level, no access file, hidden names, and the Windows MCP tests' cases. The
 two lints share `mac/Tests/SanduhrTests/Fixtures/theme-builtins.json`, the built-ins they must pass
 clean.
+
+## Mods
+
+Item 64, slice 1: Settings, Mods (under Integrations) lists every mod and plugin each Claude Code
+folder loads, read-only. The folders are the ones Integrations lists: `~/.claude`, the
+`~/.claude-*` folders and `CLAUDE_CONFIG_DIR`'s (`ClaudeCodeFolders.discover`, which now skips
+`*.config-backup-*` copies a config tool leaves beside a home, unless `CLAUDE_CONFIG_DIR` names
+one), the accounts' linked folders and the folders Sanduhr installed into.
+
+**What a folder loads** (`ModInventory.scan`, files only, no CLI): the folders in its
+settings.json's `env.CLAUDE_CODE_PLUGIN_DIRS` (`@inline`; off when `enabledPlugins["<name>@inline"]`
+is false), every plugin in `plugins/installed_plugins.json` or keyed `<name>@<marketplace>` in
+`enabledPlugins` (on only when that key is true; a key without a record, such as a `@synced`
+plugin, is listed without files), plugin folders under `skills/` (`<name>@skills-dir`), and the
+mods a session made under `dev-mods/<session>/` (the session folder itself, or each plugin folder
+in it), which load in that session only. A row shows the name, version (the manifest's, else the
+install record's), description, where it loads from, On, Off, Its session only or Missing (a
+listed folder that isn't there), Mod or Plugin (a mod's `hooks/hooks.json` lists `modules`), and
+what it touches. A `@synced` plugin from claude.ai that no settings file names has no trace on
+disk, so `claude plugin list --json` (not called here) can count more than this page.
+
+**What it touches** comes from the static scan shared with Integrations' status entries
+(`ModStatusEntries.forEachSource`): a mod's source files read as text, never node_modules, hidden
+folders, `.d.ts` files or tests (which name APIs without the mod calling them), at most 400 files
+of 512 KB. Surfaces: a band above the prompt (`AbovePrompt`), a pane (`component: 'Pane'` or
+`ui.open`), a status entry (`ui.status`), toasts (`ui.toast`) and slash commands (`command.run`
+matchers, `command.register`, and any plugin's `commands/*.md`). Capabilities: runs programs
+(`process.run`/`spawn`, a settings-style `"type": "command"` hook, an MCP server), uses the network
+(`http.fetch`, an `"type": "http"` hook) and reads or writes files (`fs.*`). A mod's surfaces are
+drawn in a TerminalPreviewFrame as a sketch (`ModSketch`): blocks stand in for its content, so
+nothing is live text, labeled "Sketch: drawn by the mod in Claude Code".
+
+**Check** runs `claude plugin validate <folder> --json` (`ModCheck`), which reads a plugin without
+running its code; `claude plugin test`, which runs it, is never called. `claude` is the first
+executable on PATH, then `~/.local/bin`, `~/.claude/local`, `/opt/homebrew/bin`, `/usr/local/bin`,
+`~/.npm-global/bin` and `~/.bun/bin`; it runs with its own folder and Homebrew's first on PATH
+(so a node script finds node), from the temp folder, and is stopped after 10 seconds. The JSON
+becomes a risk card (`ModCheckReport`): whether Claude Code would load it, errors and warnings
+with the folder's paths shortened, the hooks and `$` calls, and a risk level with its reasons:
+high for programs, the network, writing files or settings, gating or rewriting what Claude does
+(`tool.*`, `prompt.*`, `session.append`, `agent.*`, `telemetry.*`, `gatingHooks`) and
+secret-looking environment names; medium for reading files or the environment; low otherwise.
+Without `claude` the button is off and the page says why.
+
+Nothing on the page writes: no switch, no edit to any settings file (turning Sanduhr's own mods
+on and off by receipt is slice 2). A summary card (item 68's pattern) counts mods, plugins, how
+many are on, the folders and any missing. state.yaml's `mods_page` holds flags and counts only.
+Tests: `ModsPageTests` (temp folders and the validator's JSON captured as fixtures under
+`Tests/SanduhrTests/Fixtures/mods-validate/`; Check against a stand-in `claude` script).
 
 ## Camera and mic indicators
 
@@ -745,14 +882,53 @@ Installs from before this version show **Outdated**; Install rewrites the Stop e
 link or description. `smoke do watch-test start|wait|pass|fail|clear` drives a made-up watcher
 through the same decoding, whatever the switches say; `scenarios/watchers.yaml` runs it.
 
+## Desk layout
+
+Settings, Desk, Layout places each Desk piece (item 59; the pure pieces in `DeskArrangement.swift`):
+
+- **Eight places.** The four corners, Top center, Bottom center, Middle left and Middle right.
+  The top and bottom of a side share a column with a spacer between them, as before, so a growing
+  meeting list pushes against the message instead of drawing over it. A side's middle sits in the
+  same column, halfway between its top and bottom stacks, so a tall corner pushes it rather than
+  drawing over it. The centers share a column of their own between the sides: while a center has
+  a piece, the sides draw only in the room it leaves (`DeskColumnsLayout`,
+  `DeskAnchorGeometry.columnWidths`, 24 points either side), so a long message at Top left wraps
+  and shrinks instead of running under the meters at Top center. Top center sits below the
+  notch, and below the island's strip while the island draws (`DeskAnchorGeometry.centerDrop`,
+  10 points of room); on a screen without a notch it sits on the top margin like the corners.
+  Margins stay global.
+- **Your order.** The Order list shows each place that has pieces, top to bottom. Drag a piece up
+  or down to reorder it, or onto a piece in another place to move it there; VoiceOver has Move Up
+  and Move Down. Picking a new place for a piece keeps the other pieces' order: it goes before the
+  first piece there that Settings lists after it.
+- **A size per piece.** 60% to 160% in 10% steps, kept when the piece moves. Every piece scales
+  from the clock size in Look, the message from its own size.
+- **The map.** The Layout card (`DeskLayoutMap`) draws the screen with the menu bar, the notch (and
+  the island), the Dock on its edge and each piece outlined at its place, in its order and at its
+  size, live, from the same `DeskArrangement.stacks` call the Desk draws from.
+
+The layout string grows backward compatibly: each word is `widget:anchor`, or `widget:anchor:scale`
+with a size other than 1 (`clock:bl:1.2`), and the pieces at one anchor stack in the string's
+order. An older string (corners only, no sizes) draws exactly as before (pinned by a test against
+the old reader) and is written back unchanged. An anchor this build does not know puts the piece at
+its default (the message top left, the rest bottom left) instead of hiding it; an unreadable size is
+1, a size outside the range is clamped; a widget named twice keeps its last word; a widget word this
+build does not know is dropped on the next change. Older builds skip a word with a size, so going
+back to one hides the sized pieces until they are placed again.
+
+`desk_pieces` in the smoke state lists each drawn piece's `piece`, `anchor`, `order` (its place in
+the stack, 0 at the top) and `scale`; `scenarios/desk-layout.yaml` reorders a corner and moves
+pieces to the new places, checking `desk_frames_ok` each time.
+
 ## Desk and the Dock
 
-Desk's corners stay clear of the Dock on the Desk's screen (item 56, `DockFollower`, the pure
+Desk's pieces stay clear of the Dock on the Desk's screen (item 56, `DockFollower`, the pure
 pieces in `DockClearance.swift`). The Dock's own settings are read, never written: `com.apple.dock`
 `orientation` (no key is bottom), `autohide`, `tilesize`, `autohide-delay`. A bottom Dock moves the
-bottom corners up (`bl`, `br`); a side Dock moves its whole column in (`tl` and `bl` on the left,
-`tr` and `br` on the right). The Dock's reach is added to the corner margins (`left`, `right`,
-`bottom`), so the usual margin is kept from the Dock's edge instead of the screen's.
+bottom places up (`bl`, `bc`, `br`); a side Dock moves its whole column in (`tl`, `ml` and `bl` on
+the left, `tr`, `mr` and `br` on the right). The Dock's reach is added to the margins (`left`,
+`right`, `bottom`) every place sits inside, so the usual margin is kept from the Dock's edge instead
+of the screen's.
 
 - **Always shown.** The reach is the screen's `visibleFrame` against its `frame` on the Dock's side
   (the menu bar never counts), read whenever the screen parameters change (the Dock moving,
@@ -846,27 +1022,34 @@ switch and "Arrange on the Notch…" / "Arrange on the Desk…").
 
 ## Fonts
 
-The Desk draws in **EsteFont 26** (Regular and Bold), the author's handwriting, which ships inside
-the app: `mac/Resources/Fonts/EsteFont26-Regular.ttf` and `EsteFont26-Bold.ttf`, copied by
-`build.sh` to `Sanduhr.app/Contents/Resources/Fonts/` and sealed by the signature (the build fails if
-either is missing or unsealed). At launch Sanduhr registers both for its own process only
+The Desk draws in **EsteFont Pro** (Regular and Bold, version 3.000), the author's handwriting,
+which ships inside the app beside its predecessor **EsteFont 26** (Regular and Bold), kept as the
+heritage choice: `mac/Resources/Fonts/EsteFontPro-Regular.ttf`, `EsteFontPro-Bold.ttf`,
+`EsteFont26-Regular.ttf` and `EsteFont26-Bold.ttf`, copied by `build.sh` to
+`Sanduhr.app/Contents/Resources/Fonts/` and sealed by the signature (the build fails if any is
+missing or unsealed). At launch Sanduhr registers all four for its own process only
 (`CTFontManagerRegisterFontsForURL`, `.process` scope), so nothing is installed on the Mac and other
-apps never see it; a copy already installed in Font Book simply draws instead.
+apps never see them; a copy already installed in Font Book simply draws instead. `BundledFonts`
+lists both families; each maps the design's heavier weights (semibold, bold, heavy, black) to its
+Bold face (`BundledFonts.face`, `FontSettings.wantsBold`).
 
-- **The Desk** (desk preference `font`): a new install draws in EsteFont 26. A Desk an earlier version
-  ran with no font picked keeps the system font (`""`, written once at upgrade; `fontDefaultSettled`
-  marks it done). A picked font stays picked; one that is no longer installed (the standalone apps'
-  EsteFont 2.1 on a Mac without it, say) draws in EsteFont 26 instead (`DeskFont.resolve`). The clock's
-  time uses the Bold face.
+- **The Desk** (desk preference `font`): a new install draws in EsteFont Pro. An upgrade keeps the
+  font that was on screen, once each (`DeskFont.keepExistingDefault`): a Desk an earlier version
+  than 2.6.0 ran with no font picked keeps the system font (`""`; `fontDefaultSettled` marks it
+  done), and a Desk 2.6.0 to 2.8.0 ran with no font picked keeps EsteFont 26, the default then
+  (`"EsteFont 26"`; `fontProDefaultSettled` marks it done). A picked font stays picked, EsteFont 26
+  and EsteFont 2.1 included; one that is no longer installed (the standalone apps' EsteFont 2.1 on a
+  Mac without it, say) draws in EsteFont Pro instead (`DeskFont.resolve`). The clock's time uses
+  the Bold face of either bundled family.
 - **The widget** (`UserDefaults` `fontFamily`) keeps its theme fonts (the system font) unless you pick
-  one; EsteFont 26 is first in the list, and its semibold and bold text draws in the Bold face. Match
-  Desk draws in the Desk's font, EsteFont 26 included.
-- Both font pickers (Settings, Desk, Look and Settings, Widget, Look) list EsteFont 26 first, after
-  System.
+  one; with EsteFont Pro or EsteFont 26 picked, its semibold and bold text draws in that family's Bold
+  face. Match Desk draws in the Desk's font, either bundled family included.
+- Both font pickers (Settings, Desk, Look and Settings, Widget, Look) list EsteFont Pro first and
+  EsteFont 26 right after it, after System.
 
-EsteFont 26 is © 2009-2026 Estevan Hernandez / 626Labs LLC and licensed only for use by 626Labs LLC
-and Estevan Hernandez: it is not covered by the MIT license. Its license is in
-`THIRD-PARTY-NOTICES.txt`; Settings, About credits it.
+EsteFont Pro and EsteFont 26 are © 2009-2026 Estevan Hernandez / 626Labs LLC and licensed only for
+use by 626Labs LLC and Estevan Hernandez: they are not covered by the MIT license. Their license is
+in `THIRD-PARTY-NOTICES.txt`; Settings, About credits both.
 
 ## What's New
 
@@ -904,7 +1087,7 @@ again any time with the current settings, recording nothing. The cards live in
 
 Every Settings page that controls something visible opens with a preview card about 160 points
 tall (Notch, Layout, Look, Meters, Message, Now Playing, Widget Look, Pacing & Focus, General,
-Integrations; Themes keeps its gallery). Each card is drawn by the surface's own views, never a
+Integrations; Themes keeps its gallery; Mods has a summary card of its counts). Each card is drawn by the surface's own views, never a
 mock: NotchView, NotchWingsView, NotchGlowView and AVIndicatorBadge for the notch, DeskPiece (the
 Desk's pieces, factored out of DeskView) for Look, Meters, Message and Now Playing,
 WidgetCardStack in WidgetGlass (factored out of RootView) for the widget, MenuBarText and
@@ -914,7 +1097,7 @@ within a frame; their data is a preview `DeskModel` filled from the live one by
 `SurfacePreviewData.fill` (through `DeskModel.update`, so the rows come from the Desk's own
 functions), with sample meters, demo mode's meetings, a sample track and a sample watcher where
 there is no live data yet, named on a "Sample" label. Layout draws `DeskLayoutMap`, a screen-shaped
-map with each piece in its corner and the Dock on its edge. Previews run under
+map with each piece at its place, in its order and at its size, the notch and the Dock on its edge. Previews run under
 `isSurfacePreview`: they take no clicks, report no frames and register no click areas; content is
 scaled to fit, never cropped; Reduce Motion stills them; each has a one-sentence VoiceOver label.
 Nothing captures the screen. `TerminalPreviewFrame` (a dark terminal frame, monospaced, ANSI colors
@@ -935,8 +1118,8 @@ terminal previews. state.yaml's `settings_preview` names the card the open page 
 - Claude Code integrations (items 49 to 51) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json` (the notch glow hooks in its `hooks`), with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed, hooks_installed}`
 - Window position → `UserDefaults` (`windowFrame`)
 - Now playing (items 53, 53b) → where it shows is the desk preferences `notchLeft`, `notchRight`, `notchStrip` and the `nowPlaying` word in `layout`; the rest is `nowPlayingHidePaused`, `nowPlayingAskApps`, `nowPlayingExcluded` (bundle ids switched off) and `nowPlayingIdle` (When nothing is playing: `automatic` when unset, or a notch content's raw value). Item 53's `nowPlaying` and `nowPlayingDesk` are read once by the upgrade (`nowPlayingPlacementUpgraded`); what plays stays in memory
-- EsteFont 26 → `Sanduhr.app/Contents/Resources/Fonts/`, from `mac/Resources/Fonts/` (see Fonts); the Desk's choice in the desk preference `font`
-- Third-party notices (Sparkle, mediaremote-adapter, EsteFont 26) → `Sanduhr.app/Contents/Resources/THIRD-PARTY-NOTICES.txt`, from `mac/THIRD-PARTY-NOTICES.txt`; Settings, About opens it
+- EsteFont Pro and EsteFont 26 → `Sanduhr.app/Contents/Resources/Fonts/`, from `mac/Resources/Fonts/` (see Fonts); the Desk's choice in the desk preference `font`
+- Third-party notices (Sparkle, mediaremote-adapter, EsteFont Pro, EsteFont 26) → `Sanduhr.app/Contents/Resources/THIRD-PARTY-NOTICES.txt`, from `mac/THIRD-PARTY-NOTICES.txt`; Settings, About opens it
 
 ## Controls
 
@@ -969,4 +1152,4 @@ terminal previews. state.yaml's `settings_preview` names the card the open page 
 
 MIT. Python original by [626Labs LLC](https://626labs.dev). Third-party code: Sparkle (MIT) and
 mediaremote-adapter (BSD-3-Clause), with their licenses in `THIRD-PARTY-NOTICES.txt`. The bundled
-EsteFont 26 is proprietary (626Labs LLC), not MIT; its license is in the same file.
+EsteFont Pro and EsteFont 26 are proprietary (626Labs LLC), not MIT; their license is in the same file.

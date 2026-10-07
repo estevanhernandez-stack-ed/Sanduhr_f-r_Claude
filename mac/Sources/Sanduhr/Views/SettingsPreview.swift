@@ -10,7 +10,7 @@ import Combine
 
 /// Which preview a Settings section shows; state.yaml's `settings_preview`.
 enum SettingsPreviewKind: String, CaseIterable {
-    case notch, layout, look, meters, message, nowPlaying, widget, menuBar, integrations
+    case notch, layout, look, meters, message, nowPlaying, widget, menuBar, integrations, mods
 
     /// The preview `section` shows, nil for a section without one (Themes has its gallery;
     /// Alerts, Accounts, Claude Usage, Updates and About draw nothing on screen).
@@ -25,6 +25,7 @@ enum SettingsPreviewKind: String, CaseIterable {
         case .widgetLook, .pacing: .widget
         case .general: .menuBar
         case .integrations: .integrations
+        case .mods: .mods
         case .alerts, .credentials, .usage, .themes, .updates, .about: nil
         }
     }
@@ -33,10 +34,10 @@ enum SettingsPreviewKind: String, CaseIterable {
     var relevantSamples: PreviewSamples {
         switch self {
         case .notch: [.meters, .meetings, .message, .track, .watcher, .indicators]
-        case .layout: []
+        case .layout, .mods: []
         case .look: [.meters, .message]
         case .meters, .widget, .menuBar: [.meters]
-        case .message: [.message]
+        case .message: [.message, .specialDay]
         case .nowPlaying: [.track]
         case .integrations: [.watcher, .statusline]
         }
@@ -53,10 +54,12 @@ struct PreviewSamples: OptionSet, Hashable {
     static let watcher = PreviewSamples(rawValue: 1 << 4)
     static let indicators = PreviewSamples(rawValue: 1 << 5)
     static let statusline = PreviewSamples(rawValue: 1 << 6)
+    static let specialDay = PreviewSamples(rawValue: 1 << 7)
 
     static let names: [(PreviewSamples, String)] = [
         (.meters, "meters"), (.meetings, "meetings"), (.message, "message"), (.track, "track"),
         (.watcher, "watcher"), (.indicators, "camera and mic"), (.statusline, "statusline input"),
+        (.specialDay, "special day"),
     ]
 
     /// "Sample: meters, track", or nil when nothing shown is sample.
@@ -165,6 +168,9 @@ extension View {
 /// The sample data a preview shows before Sanduhr has the user's own, and the filling of a
 /// preview DeskModel from the live one.
 enum SurfacePreviewData {
+    /// The Message card's sample date line (item 69), until the user has one today.
+    static let sampleSpecialLine = "{ink:#ff7e5f,#feb47b,#ffd86f} happy birthday, Sam."
+
     /// A session at 42%, the weekly limit at 91% four days out (a warning with the default Meters
     /// settings) and a model limit at 18%.
     static func sampleUsage(now: Date = Date()) -> UsageResponse {
@@ -200,7 +206,7 @@ enum SurfacePreviewData {
     /// The numbers go through `DeskModel.update`, so the rows, the claude line and the notch's
     /// short meters come from the same functions as the Desk's, with the saved Meters settings.
     @MainActor @discardableResult
-    static func fill(_ preview: DeskModel, from live: DeskModel, islandUp: Bool,
+    static func fill(_ preview: DeskModel, from live: DeskModel, islandUp: Bool, sampleSpecialDay: Bool = false,
                      desk: UserDefaults = .desk, now: Date = Date()) -> PreviewSamples {
         var samples: PreviewSamples = []
         let usage = live.lastUsage
@@ -218,9 +224,17 @@ enum SurfacePreviewData {
             if preview.calendarNote != nil { preview.calendarNote = nil }
             samples.insert(.meetings)
         }
-        let message = live.message ?? DeskModel.demoMessage
-        if live.message == nil { samples.insert(.message) }
+        // Item 69: a date's own lines count as the user's message too.
+        let hasOwn = live.message != nil || !live.specialMessages.isEmpty
+        let message = hasOwn ? live.message : DeskModel.demoMessage
+        if !hasOwn { samples.insert(.message) }
         if preview.message != message { preview.message = message }
+        // The Message card (item 69) shows On special days with a sample date line until there is one.
+        let sampleSpecial = sampleSpecialDay && live.specialMessages.isEmpty
+        let specials = sampleSpecial ? [sampleSpecialLine] : live.specialMessages
+        if sampleSpecial { samples.insert(.specialDay) }
+        if preview.specialMessages != specials { preview.specialMessages = specials }
+        preview.applySpecialSettings(mode: .saved(in: desk), seconds: MessageSpecialMode.savedSeconds(in: desk), now: now)
         let track = live.nowPlaying ?? sampleTrack(.playing, now: now)
         if live.nowPlaying == nil { samples.insert(.track) }
         if preview.nowPlaying?.itemID != track.itemID || preview.nowPlaying?.state != track.state
@@ -253,6 +267,7 @@ struct PreviewLiveKey: Equatable {
     var signIn: Bool
     var message: String?
     var meetings: [String]
+    var specials: [String]
     var note: String?
     var track: NowPlayingInfo?
     var watchers: [Watcher]
@@ -264,6 +279,7 @@ struct PreviewLiveKey: Equatable {
         meters = m.meters
         signIn = m.signInNeeded
         message = m.message
+        specials = m.specialMessages
         meetings = m.meetings.map(\.id)
         note = m.calendarNote
         track = m.nowPlaying
@@ -279,6 +295,8 @@ struct PreviewModelSync: ViewModifier {
     let preview: DeskModel
     let live: DeskModel
     var islandUp = false
+    /// The Message card: a sample date line until the user has one today (item 69).
+    var sampleSpecialDay = false
     @Binding var samples: PreviewSamples
 
     func body(content: Content) -> some View {
@@ -291,7 +309,7 @@ struct PreviewModelSync: ViewModifier {
     }
 
     private func sync() {
-        let fresh = SurfacePreviewData.fill(preview, from: live, islandUp: islandUp)
+        let fresh = SurfacePreviewData.fill(preview, from: live, islandUp: islandUp, sampleSpecialDay: sampleSpecialDay)
         if fresh != samples { samples = fresh }
     }
 }
