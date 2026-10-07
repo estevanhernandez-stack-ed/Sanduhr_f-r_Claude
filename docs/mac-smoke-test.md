@@ -1028,3 +1028,46 @@ before each `defaults` command.
     Motion on (System Settings, Accessibility, Display), nothing in the previews moves.
 12. `smoke/smoke run scenarios/welcome-tour.yaml` passes (opens the tour, steps 1 to 5 with their
     step text and titles, closes it; records nothing).
+
+## 31. Watchers (item 66)
+
+Use the test folder from §22 (`~/.claude-smoketest`, never your real `~/.claude*`) and a dev build
+(aim links at it as §22 says). Turn the island on (Settings, Notch) and set the right wing to
+Watchers; in Settings, Desk, Layout put Watchers in the top right corner.
+
+1. Both switches off (Settings, Integrations, Watchers): `cat ~/Library/Application\
+   Support/Sanduhr/watchers.json` prints `{"agents":false,"background":false,"schema_version":1}`.
+   The right wing shows its default (the meters) and no Desk row draws.
+2. Agents, switch off: in `CLAUDE_CONFIG_DIR=~/.claude-smoketest claude` with the MCP server
+   installed there, ask Claude to call `watch_start` with title "CI on main": it comes back
+   `rejected`, `watchers_off`, and nothing named `watch-request-*` appears in Sanduhr's folder.
+3. Turn **Let agents show watchers** on (`watchers.json` follows at once) and ask again with a
+   link to a real https page and total 12: within a second the right wing shows a blue dot and
+   "CI on main · 0s · 0/12", the Desk corner the same row; no `watch-request-*` file is left.
+4. Ask Claude to `watch_update` it with done 3 and note "lint passed", then state waiting: the
+   dot turns amber and pulses, the note shows under the Desk row, and the notch glows once. With
+   Reduce Motion on the dot holds still. Click the wing or the row: the link opens in the browser.
+5. `watch_end` with result passed: a check, then it fades about 6 seconds later. Start another
+   and end it failed: it stays; two-finger click it (wing or row) and Dismiss. Start two and
+   Dismiss All. Watcher Settings… opens Settings, Integrations.
+6. Lost touch: start one and wait 10 minutes without an update: it greys and reads "lost touch";
+   an update brings it back.
+7. Background work: Settings, Integrations shows the notch glow hooks as **Outdated** for a folder
+   installed before this version; Install updates it (`jq -r '.hooks.Stop[0].hooks[0].command'
+   ~/.claude-smoketest/settings.json` names `watchers.json` and `osascript`). Turn **Show Claude
+   Code's background work** on. In the session ask for `sleep 120` in the background (or a
+   background subagent): when the turn ends a watcher with the task's description and "background
+   shell" shows; nothing named `watch-stop-*` stays in Sanduhr's folder, and
+   `log show --last 5m --predicate 'process == "Sanduhr"' | grep -i sleep` finds nothing. When the
+   task finishes and Claude's next turn ends, it ends as finished and fades.
+8. Switch background work off: its watchers go, and the next Stop writes no file at all (watch
+   the folder with `ls` during a turn). The item 51 glow still works with either switch.
+9. Work tagging: in Settings, Accounts, Data, link `~/.claude-smoketest` to an account and turn
+   **Work account** on. Start a watcher from that folder: `smoke/smoke do demo on` hides it (the
+   wing shows its default), `demo off` brings it back. One flagged `work: true` from any folder
+   hides too.
+10. `smoke/smoke do watch-test start` (then `wait`, `pass`, `fail`, `clear`) drives a made-up
+    watcher whatever the switches say; `state.yaml` shows `watchers: {count, states, placements,
+    agents, background}` with no title. `smoke/smoke run scenarios/watchers.yaml` passes and
+    leaves no watcher behind.
+11. Quit Sanduhr: watchers are gone at the next launch. Clean up: switches off, Remove the hooks.
