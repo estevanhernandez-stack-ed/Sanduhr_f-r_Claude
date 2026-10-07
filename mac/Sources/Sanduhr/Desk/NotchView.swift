@@ -29,6 +29,8 @@ struct NotchView: View {
     @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
     @AppStorage(NotchContent.Place.strip.key, store: .desk) private var stripContent = NotchContent.Place.strip.fallback
     @AppStorage(NowPlayingIdle.key, store: .desk) private var idle = NowPlayingIdle.automatic
+    /// Settings, Now Playing's "Style what's playing" (item 65c).
+    @AppStorage(NowPlayingLooks.styleKey, store: .desk) private var styleSongs = false
 
     var body: some View {
         // Extra height 0 means no strip under the camera at all: just the wings.
@@ -45,7 +47,8 @@ struct NotchView: View {
                 // even when a wing grows to fit its text.
                 let w = NotchWingsView.layout(model: model, now: context.date, wings: wings,
                                               showText: wingText, left: leftContent, right: rightContent,
-                                              idle: idle, font: font, notchHeight: notch.height)
+                                              idle: idle, font: font, notchHeight: notch.height,
+                                              styleSongs: styleSongs)
                 // Now playing with nothing to show stands aside for the When nothing is playing choice.
                 let strip = NotchContent.effective(stripContent, at: .strip, nowPlaying: model.nowPlaying, idle: idle,
                                                    watchers: model.watchers, indicators: model.avIndicators)
@@ -129,12 +132,14 @@ struct NotchView: View {
     private func stripNowPlaying(_ line: String, width: CGFloat) -> some View {
         let state = model.nowPlaying?.state
         let room = NowPlayingWingLayout.textRoom(.strip, width: width, state: state, size: stripSize)
+        let look = NowPlayingStyled.look(model.nowPlaying, on: styleSongs)
         return HStack(spacing: NowPlayingWingLayout.stripSpacing) {
             ScrollOnceText(text: line, trackKey: NowPlayingScroll.trackKey(model.nowPlaying),
                            scrolls: NowPlayingScroll.scrolls(model.nowPlaying),
-                           textWidth: NotchWingsView.textWidth(line, stripSize, font), room: room,
-                           font: .custom(font, size: stripSize))
-                .foregroundStyle(LinearGradient.ink(textColor))
+                           textWidth: NowPlayingStyled.width(line, size: stripSize, font: font, look: look), room: room,
+                           font: .custom(font, size: stripSize),
+                           plan: NowPlayingStyled.plan(line, look: look, family: font), size: stripSize)
+                .foregroundStyle(LinearGradient.ink(NowPlayingStyled.ink(look, fallback: textColor)))
                 .opacity(0.85)
                 .frame(height: chin)
                 .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
@@ -203,6 +208,8 @@ struct NotchWingsView: View {
     @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
     @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
     @AppStorage(NowPlayingIdle.key, store: .desk) private var idle = NowPlayingIdle.automatic
+    /// Settings, Now Playing's "Style what's playing" (item 65c).
+    @AppStorage(NowPlayingLooks.styleKey, store: .desk) private var styleSongs = false
     /// Settings, Now Playing's preview (item 68): the wings drawn with the island on, text on and
     /// these contents, whatever the Notch page says; nil everywhere else.
     var showing: Showing? = nil
@@ -224,7 +231,7 @@ struct NotchWingsView: View {
             TimelineView(.periodic(from: .now, by: 15)) { context in
                 let w = Self.layout(model: model, now: context.date, wings: wings, showText: showText || showing != nil,
                                     left: showing?.left ?? leftContent, right: showing?.right ?? rightContent, idle: idle,
-                                    font: font, notchHeight: notchHeight)
+                                    font: font, notchHeight: notchHeight, styleSongs: styleSongs)
                 let left = w.leftText, right = w.rightText, size = w.size
                 let wingL = w.left, wingR = w.right
                 if w.totalLeft > 0 || w.totalRight > 0 {
@@ -283,6 +290,7 @@ struct NotchWingsView: View {
         let glyphGap = size * 0.3
         let glyphWidth = parts.glyph.map { Self.textWidth($0, size, font) + glyphGap } ?? 0
         let titleRoom = max(0, room - glyphWidth)
+        let look = NowPlayingStyled.look(model.nowPlaying, on: styleSongs)
         return HStack(spacing: 0) {
             if side == .leading {
                 nextButton(size)
@@ -297,10 +305,11 @@ struct NotchWingsView: View {
                 }
                 ScrollOnceText(text: parts.rest, trackKey: NowPlayingScroll.trackKey(model.nowPlaying),
                                scrolls: NowPlayingScroll.scrolls(model.nowPlaying),
-                               textWidth: Self.textWidth(parts.rest, size, font), room: titleRoom,
-                               font: .custom(font, size: size))
+                               textWidth: NowPlayingStyled.width(parts.rest, size: size, font: font, look: look),
+                               room: titleRoom, font: .custom(font, size: size),
+                               plan: NowPlayingStyled.plan(parts.rest, look: look, family: font), size: size)
             }
-                .foregroundStyle(LinearGradient.ink(textColor))
+                .foregroundStyle(LinearGradient.ink(NowPlayingStyled.ink(look, fallback: textColor)))
                 .opacity(0.88)
                 .frame(maxHeight: .infinity)
                 .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
@@ -420,7 +429,8 @@ struct NotchWingsView: View {
 
     static func layout(model: DeskModel, now: Date, wings: Double, showText: Bool,
                        left savedLeft: NotchContent, right savedRight: NotchContent, idle: NowPlayingIdle,
-                       font: String, notchHeight: CGFloat) -> Layout {
+                       font: String, notchHeight: CGFloat,
+                       styleSongs: Bool = NowPlayingStyled.savedOn) -> Layout {
         let leftContent = NotchContent.effective(savedLeft, at: .left, nowPlaying: model.nowPlaying, idle: idle,
                                                  watchers: model.watchers, indicators: model.avIndicators)
         let rightContent = NotchContent.effective(savedRight, at: .right, nowPlaying: model.nowPlaying, idle: idle,
@@ -430,6 +440,14 @@ struct NotchWingsView: View {
         let right = showText ? (rightContent == .avIndicators ? "" : text(rightContent, at: .right, model: model, now: now)) : nil
         let size = textSize(notchHeight)
         let state = model.nowPlaying?.state
+        // A styled song (item 65c) is measured as drawn: the glyph plain, the title in its style.
+        let look = NowPlayingStyled.look(model.nowPlaying, on: styleSongs)
+        func measure(_ text: String?, _ content: NotchContent) -> CGFloat {
+            guard content == .nowPlaying, look != nil, let text else { return textWidth(text, size, font) }
+            let parts = NowPlayingText.splitGlyph(text)
+            let glyph = parts.glyph.map { textWidth($0, size, font) + size * 0.3 } ?? 0
+            return glyph + NowPlayingStyled.width(parts.rest, size: size, font: font, look: look)
+        }
         func wingWidth(_ text: String?, _ content: NotchContent, _ place: NotchContent.Place) -> CGFloat {
             // A paused now playing also makes room for its Next button (item 53b).
             // A watcher also makes room for its dot (item 66).
@@ -437,7 +455,7 @@ struct NotchWingsView: View {
             let dot = content == .watchers && text != nil ? WatcherLook.dotRoom(size)
                 : content == .avIndicators && text != nil ? AVIndicatorLayout.contentWidth(model.avIndicators, size: size) : 0
             return NowPlayingWingLayout.wingWidth(
-                textWidth: textWidth(text, size, font) + dot, place: place,
+                textWidth: measure(text, content) + dot, place: place,
                 state: NowPlayingWingLayout.sizingState(content, hasText: text != nil, state: state),
                 size: size, minimum: wings, maximum: maxWings)
         }

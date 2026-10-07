@@ -34,11 +34,16 @@ struct DeskNowPlayingLine: View {
     let size: CGFloat
     let width: CGFloat
     let alignment: HorizontalAlignment
+    /// Settings, Now Playing's "Style what's playing" (item 65c): the song's gradient and letters.
+    @AppStorage(NowPlayingLooks.styleKey, store: .desk) private var styleSongs = false
 
     var body: some View {
+        let line = NowPlayingText.desk(info) ?? ""
+        let look = NowPlayingStyled.look(info, on: styleSongs)
         VStack(alignment: alignment, spacing: size * 0.35) {
-            Text(NowPlayingText.desk(info) ?? "")
-                .font(.custom(font, size: size))
+            StyledLineText(text: line, plan: NowPlayingStyled.plan(line, look: look, family: font), size: size,
+                           font: .custom(font, size: size))
+                .foregroundStyle(LinearGradient.ink(NowPlayingStyled.ink(look, fallback: ink)))
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .opacity(0.85)
@@ -46,10 +51,10 @@ struct DeskNowPlayingLine: View {
             if (info.duration ?? 0) > 0 {
                 if info.state == .playing {
                     TimelineView(.periodic(from: .now, by: 1)) { context in
-                        bar(info.progress(at: context.date) ?? 0)
+                        bar(info.progress(at: context.date) ?? 0, ink: NowPlayingStyled.ink(look, fallback: ink))
                     }
                 } else {
-                    bar(info.progress(at: Date()) ?? 0)
+                    bar(info.progress(at: Date()) ?? 0, ink: NowPlayingStyled.ink(look, fallback: ink))
                 }
             }
         }
@@ -66,7 +71,7 @@ struct DeskNowPlayingLine: View {
         .accessibilityHint("Plays or pauses")
     }
 
-    private func bar(_ fraction: Double) -> some View {
+    private func bar(_ fraction: Double, ink: String) -> some View {
         let height = max(2, size * 0.16)
         return ZStack(alignment: .leading) {
             Capsule().fill(LinearGradient.ink(ink)).opacity(0.22)
