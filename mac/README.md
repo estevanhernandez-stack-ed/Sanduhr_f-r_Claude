@@ -608,6 +608,70 @@ folders: each sharing level, no access file, hidden names, and the Windows MCP t
 two lints share `mac/Tests/SanduhrTests/Fixtures/theme-builtins.json`, the built-ins they must pass
 clean.
 
+## Watchers
+
+Live cards for work in flight (item 66, slice 1), on a notch place or in a Desk corner: a state dot
+(running blue, waiting on you amber, passed green with a check, failed red, finished and lost touch
+grey), the title, the time so far, `done/total` when there is a total, and a one-line note. Two
+switches in Settings, Integrations, Watchers, both off by default (`watchersAgents`,
+`watchersBackground` in `com.626labs.sanduhr`). Placement is the usual: Watchers as a notch wing's
+or the strip's content (Settings, Notch; the most urgent watcher plus "+N", the place's default
+while there is none), or the Watchers element in Settings, Desk, Layout (the stack, up to four, then
+"+N more"). A click opens the watcher's link (https only); a two-finger click opens Dismiss, Dismiss
+All and Watcher Settings…. "Waiting on you" pulses (not with Reduce Motion) and fires the notch glow
+once, when watchers show somewhere and Desk runs. Passed and finished fade after 6 seconds; failed
+stays until dismissed; a watcher with no update for its window greys as lost touch (10 minutes for
+an agent's; an automatic one is confirmed at each Stop and greys only after an hour without one, the
+session closed mid-task). Most urgent first: waiting, failed, running, lost touch, then the rest.
+Everything is in memory: quitting drops every watcher.
+
+**The notch line.** A notch place on Watchers plays an intro when the top watcher changes (its id)
+or its state does (`WatcherIntro`): the full line, "PR 140 CI: combine statuslines · 2m · 4/12 +1",
+scrolling through once with now playing's timing and fade (`ScrollOnceText`, `NowPlayingScroll`)
+when it doesn't fit, or held 4 seconds when it does. Then it rests on "<short> · <done/total>"
+("PR 140 · 4/12 +1"), "<short> · <elapsed>" without a total. With Reduce Motion it goes straight to
+rest. The phase lives on `DeskModel.watcherIntroUntil` (its length measured for the widest wing),
+so the wings' width follows it: up to the wing maximum during the intro, back to the short form
+after. The short title is the agent's `short` (up to 12 characters), else derived from the title:
+"PR 140" from "PR 140", "PR #140" or "pull 140", else "#140" from a number anywhere, else "v2.8.0"
+from "Release 2.8.0" or "v2.8.0", else the first word clipped to 10 characters. Background tasks use
+a workflow's name or the description's first word. The Desk rows keep the full title.
+
+**Agents (`watch_start`, `watch_update`, `watch_end`).** The MCP server checks the arguments (title
+1 to 80 characters on one line, short up to 12, link `https://` only and at most 2048 characters, total 1 to
+1,000,000, note up to 140 characters, state running or waiting, result passed or failed, ids it
+started this session) and refuses with `watchers_off` unless `watchers.json` (written by the app)
+says `"agents": true`. Then it writes `watch-request-<ms>-<seq>-<id>.json` (0600, atomic) and returns
+the id at once; the app (`WatcherStore`, on the shared `HandoffWatch`) reads each request in name
+order, deletes it, decodes it again (`WatcherRequest`: stale after ten minutes, a bad link or total
+dropped) and updates the board (`WatcherBoard`, pure). `work: true` from the agent, or a request from
+a Claude Code folder (`CLAUDE_CONFIG_DIR`, else `~/.claude`) linked to an account marked **Work
+account** in Settings, Accounts, Data, tags the watcher: work watchers hide while demo mode is on.
+
+**Claude Code's background work.** The Stop hook the notch glow install writes now also hands over
+the session's `background_tasks` (Claude Code 2.1.288's `StopHookInput`), only while `watchers.json`
+says `"background":true`:
+
+```sh
+/usr/bin/pgrep -xq Sanduhr && { d="$HOME/Library/Application Support/Sanduhr";
+  /usr/bin/grep -qs '"background":true' "$d/watchers.json" &&
+  /usr/bin/osascript -l JavaScript -e '<stopTasksScript>' "$d" >/dev/null 2>&1;
+  /usr/bin/open -g 'sanduhr://claude-code?event=done'; } || true
+```
+
+`stopTasksScript` (JavaScript for Automation, on every Mac; python3 may not be) keeps the session id,
+`CLAUDE_CONFIG_DIR` and per task (at most 20) only `id`, `type`, `status`, `description` (clipped to
+120) and a workflow's `name`; never `command`, `last_assistant_message`, `transcript_path` or `cwd`.
+It writes `watch-stop-<ms>-<uuid>.json` (0600, renamed into place) and the app deletes it on reading.
+Each task becomes a watcher (`b:<session>:<task id>`, the description as title, "background shell",
+"workflow deploy" and so on as the note); a task missing from the session's next Stop ends as
+finished (result unknown). The glow link is opened either way, so item 51's glow is unchanged.
+Installs from before this version show **Outdated**; Install rewrites the Stop entry in place.
+
+`state.yaml` has `watchers: {count, states, placements, agents, background}`, never a title, note,
+link or description. `smoke do watch-test start|wait|pass|fail|clear` drives a made-up watcher
+through the same decoding, whatever the switches say; `scenarios/watchers.yaml` runs it.
+
 ## Desk and the Dock
 
 Desk's corners stay clear of the Dock on the Desk's screen (item 56, `DockFollower`, the pure
@@ -773,6 +837,7 @@ again any time with the current settings, recording nothing. The cards live in
 - What the MCP server may read → `~/Library/Application Support/Sanduhr/mcp-access.json` (mode 0600; see Claude Code integrations)
 - Themes from Claude (item 55) → `theme-request.json` (server) and `theme-result.json` (app), mode 0600 in `~/Library/Application Support/Sanduhr/`; a saved theme in `themes/<key>.json`; the opt-in in `UserDefaults` (`themeClaudeDirect`)
 - Desk messages from Claude (item 54) → `desk-messages-request.json` (server), `desk-messages-result.json` and `desk-messages-state.json` (app), all mode 0600 in `~/Library/Application Support/Sanduhr/`; the previous list in `~/Library/Application Support/Desk/messages.txt.previous`; the opt-in in the desk preference `messageClaudeDirect`, the glow in `messageGlow`
+- Watchers (item 66) → `watchers.json` (the two switches, written by the app), `watch-request-*.json` (MCP server) and `watch-stop-*.json` (the Stop hook), mode 0600 in `~/Library/Application Support/Sanduhr/`, each deleted as the app reads it; the switches `watchersAgents` and `watchersBackground` in `com.626labs.sanduhr`; the work mark in the account's `accountData` entry (`"work": "true"`). Watchers themselves are in memory only
 - Claude Code integrations (items 49 to 51) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json` (the notch glow hooks in its `hooks`), with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed, hooks_installed}`
 - Window position → `UserDefaults` (`windowFrame`)
 - Now playing (items 53, 53b) → where it shows is the desk preferences `notchLeft`, `notchRight`, `notchStrip` and the `nowPlaying` word in `layout`; the rest is `nowPlayingHidePaused`, `nowPlayingAskApps`, `nowPlayingExcluded` (bundle ids switched off) and `nowPlayingIdle` (When nothing is playing: `automatic` when unset, or a notch content's raw value). Item 53's `nowPlaying` and `nowPlayingDesk` are read once by the upgrade (`nowPlayingPlacementUpgraded`); what plays stays in memory

@@ -1,0 +1,10 @@
+{
+  "session_id": "6f1d2c3b-0a9e-4b8c-9d7e-112233445566",
+  "transcript_path": "/Users/someone/.claude/projects/-Users-someone-app/6f1d2c3b-0a9e-4b8c-9d7e-112233445566.jsonl",
+  "cwd": "/Users/someone/app",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false,
+  "last_assistant_message": "SECRET-CONVERSATION: all done.",
+  "background_tasks": [],
+  "session_crons": []
+}

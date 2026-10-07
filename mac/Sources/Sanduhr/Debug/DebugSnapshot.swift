@@ -104,6 +104,8 @@ struct DebugStateInput {
     var whatsNew = WhatsNewDebug()
     /// The welcome tour (item 61): the window, its step, how many steps show, and its state.
     var tour = TourDebug()
+    /// Watchers (item 66): counts, states and places, never a title or a note.
+    var watchers = WatchersDebug()
     var version = ""
     var build = ""
 }
@@ -134,6 +136,18 @@ struct TourDebug: Equatable {
     var done = false
     /// Waiting for a fresh install's first successful fetch.
     var pending = false
+}
+
+/// state.yaml's `watchers:` (item 66): how many show, their states most urgent first, where they
+/// are placed and the two switches. Never a title, a note, a link or a description.
+struct WatchersDebug: Equatable {
+    var count = 0
+    var states: [WatcherState] = []
+    var placements: [String] = []
+    var agents = false
+    var background = false
+    /// The notch plays the top watcher's intro (the full line) rather than resting on the short one.
+    var intro = false
 }
 
 /// state.yaml's `notch_shows:`: each place's effective content, never its text.
@@ -217,6 +231,15 @@ enum DebugState {
               YAMLPair("pending", .bool(t.pending))])
     }
 
+    /// `watchers:` (item 66): a count, states, places and switches only.
+    static func watchersYAML(_ w: WatchersDebug) -> YAMLNode {
+        .map([YAMLPair("count", .int(w.count)),
+              YAMLPair("states", .list(w.states.map { .string($0.rawValue) })),
+              YAMLPair("placements", .list(w.placements.map(YAMLNode.string))),
+              YAMLPair("agents", .bool(w.agents)), YAMLPair("background", .bool(w.background)),
+              YAMLPair("intro", .bool(w.intro))])
+    }
+
     /// `vault:` (item 46): flags and a count only.
     static func vaultYAML(_ v: VaultState) -> YAMLNode {
         .map([YAMLPair("recording", .bool(v.recording)), YAMLPair("months", .int(v.months)),
@@ -297,6 +320,7 @@ enum DebugState {
         pairs.append(("build", .string(s.build)))
         pairs.append(("whats_new", whatsNewYAML(s.whatsNew)))
         pairs.append(("tour", tourYAML(s.tour)))
+        pairs.append(("watchers", watchersYAML(s.watchers)))
         return .object(pairs)
     }
     

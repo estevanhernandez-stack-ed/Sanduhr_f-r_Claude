@@ -19,6 +19,9 @@ struct DeskElement: Equatable {
         /// The Next button beside the strip's now playing while paused (item 53b, key "strip"):
         /// a click skips, a two-finger click opens now playing's menu.
         case nowPlayingNext = "now_playing_next"
+        /// A watcher (item 66): a Desk row (key: its index, "0" to "3") or the strip under the camera
+        /// (key "strip"). A click opens its link, a two-finger click opens the watcher menu.
+        case watcher
     }
 
     var kind: Kind
@@ -35,13 +38,13 @@ struct DeskElement: Equatable {
 /// left clicks and two-finger clicks, so they can never disagree about what the pointer is over.
 enum DeskHitTest {
     /// First match wins, in this order: the small targets sit inside or beside the big ones.
-    static let priority: [DeskElement.Kind] = [.meetingRow, .note, .account, .meterRow, .meters, .nowPlayingNext, .nowPlaying]
+    static let priority: [DeskElement.Kind] = [.meetingRow, .note, .account, .meterRow, .meters, .watcher, .nowPlayingNext, .nowPlaying]
 
     /// How far past its frame each kind still takes the click, in points (horizontal, vertical):
     /// a little slack, so the gaps between letters and the line above or below still count.
     static func slack(_ kind: DeskElement.Kind) -> CGSize {
         switch kind {
-        case .meetingRow, .note, .meterRow, .nowPlaying: return CGSize(width: 8, height: 4)
+        case .meetingRow, .note, .meterRow, .nowPlaying, .watcher: return CGSize(width: 8, height: 4)
         case .account: return CGSize(width: 4, height: 2)
         case .nowPlayingNext: return CGSize(width: 4, height: 4)
         case .meters, .meetings: return CGSize(width: 8, height: 6)
@@ -75,6 +78,16 @@ enum DeskHitTest {
     /// playing's.
     static func hasMenu(_ element: DeskElement?) -> Bool {
         isMeters(element) || element?.kind == .nowPlaying || element?.kind == .nowPlayingNext
+            || element?.kind == .watcher
+    }
+
+    /// The watcher a hit on a watcher element stands for: the strip's is the most urgent, a Desk
+    /// row's is the one at its index. `shown` is the model's ordered list.
+    static func watcher(_ element: DeskElement?, in shown: [Watcher]) -> Watcher? {
+        guard let element, element.kind == .watcher, let key = element.key else { return nil }
+        if key == "strip" { return shown.first }
+        guard let i = Int(key), shown.indices.contains(i) else { return nil }
+        return shown[i]
     }
 }
 
@@ -114,6 +127,12 @@ enum DeskElements {
         /// The strip's Next button shows (now playing there, paused).
         var nowPlayingStripNext = false
         var stripNextFrame: CGRect = .zero
+        /// The Desk's watcher rows that draw, by watcher id in order (item 66; up to four).
+        var watcherRows: [String] = []
+        var watcherRowFrames: [String: CGRect] = [:]
+        /// The strip under the camera shows the watcher line.
+        var watcherStrip = false
+        var stripWatcherFrame: CGRect = .zero
     }
 
     /// Every element DeskView draws, block before its rows, frames as reported (.zero when none
@@ -152,6 +171,12 @@ enum DeskElements {
             if input.nowPlayingStripNext {
                 out.append(DeskElement(kind: .nowPlayingNext, key: "strip", frame: input.stripNextFrame))
             }
+        }
+        for (i, id) in input.watcherRows.enumerated() {
+            out.append(DeskElement(kind: .watcher, key: String(i), frame: input.watcherRowFrames[id] ?? .zero))
+        }
+        if input.watcherStrip {
+            out.append(DeskElement(kind: .watcher, key: "strip", frame: input.stripWatcherFrame))
         }
         return out
     }

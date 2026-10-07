@@ -638,8 +638,8 @@ struct NotchContentTests {
     }
 
     @Test func everyChoiceHasALabel() {
-        #expect(NotchContent.allCases.count == 7)
-        #expect(Set(NotchContent.allCases.map(\.label)).count == 7)
+        #expect(NotchContent.allCases.count == 8)
+        #expect(Set(NotchContent.allCases.map(\.label)).count == 8)
     }
 }
 

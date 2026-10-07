@@ -291,6 +291,7 @@ private struct DataChoiceRows: View {
             activityRow
             namesRow
             shareRow
+            workRow
         }
     }
 
@@ -345,6 +346,16 @@ private struct DataChoiceRows: View {
             .pickerStyle(.menu)
             .fixedSize()
             Caption("What Claude can read about this account through the Sanduhr MCP server. Meters: the meters and their history. Meters and activity: also Claude Code tokens by day, model and project, with project names as chosen above. Off answers as if the account weren't here.")
+        }
+    }
+
+    /// Item 66: watchers from this account's Claude Code folder hide in demo mode.
+    private var workRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle("Work account", isOn: Binding(
+                get: { choices.work },
+                set: { vm.setWork($0, for: label) }))
+            Caption("Watchers from this account's linked Claude Code folder are work: they hide while demo mode is on, so screenshots never show them.")
         }
     }
 }

@@ -307,7 +307,15 @@ module Smoke
       if !dig_open(before, 'tour') && dig_open(after, 'tour')
         steps << ['close-tour', nil]
       end
+      # Watchers (item 66) a scenario put up go, when there were none before.
+      if watcher_count(before).zero? && watcher_count(after).positive?
+        steps << ['watch-test', 'clear']
+      end
       steps
+    end
+
+    def watcher_count(state)
+      state['watchers'].is_a?(Hash) ? state['watchers']['count'].to_i : 0
     end
 
     def dig_open(state, key = 'whats_new')

@@ -17,6 +17,9 @@ tools the same way on either machine:
                              when the user lets Claude change the messages directly)
   propose_theme              suggests a widget color theme; Sanduhr asks the user (or saves and
                              applies it when the user lets Claude change themes directly)
+  watch_start, watch_update, watch_end
+                             a live watcher card on the notch or the Desk for work in flight (a CI
+                             run, a deploy), when the user lets agents show watchers
 
 What each tool may read is decided per account in Sanduhr (Settings, Accounts, Data, Share
 with Claude) and handed over in ~/Library/Application Support/Sanduhr/mcp-access.json. No
@@ -31,9 +34,10 @@ and rotation, written by Sanduhr). Desk messages are not gated by Share with Cla
 the desktop already, and a proposal only asks (Sanduhr checks it again and the user approves,
 unless they chose to let Claude change the messages directly). Never reads Sanduhr's settings,
 the Keychain or account names; never calls claude.ai or anything else on the network; never
-logs. The files it writes are desk-messages-request.json (propose_desk_messages) and
-theme-request.json (propose_theme), atomically and owner-only; it never writes messages.txt or a
-theme. No tool takes a path. Failures are typed results (status/reason/remedy), never protocol
+logs. The files it writes are desk-messages-request.json (propose_desk_messages),
+theme-request.json (propose_theme) and watch-request-<ms>-<seq>-<id>.json (the watch tools, only
+while watchers.json, written by Sanduhr, says agents may show watchers), atomically and
+owner-only; it never writes messages.txt or a theme. No tool takes a path. Failures are typed results (status/reason/remedy), never protocol
 errors. Python 3.9 standard library only.
 
 publish_usage is dropped on the Mac (nothing leaves this Mac).
@@ -48,7 +52,7 @@ import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
-SERVER_VERSION = "0.4.0-mac"
+SERVER_VERSION = "0.5.0-mac"
 PROTOCOL_VERSION = "2025-06-18"
 SCHEMA_VERSION = 1
 ACCESS_SCHEMA_VERSION = 1
@@ -184,6 +188,34 @@ THEME_GUIDE = (
     "it is not running, and picks the request up within ten minutes. This server never writes a "
     "theme itself.")
 
+WATCH_GUIDE_START = (
+    "Put up a watcher: a live card on the user's notch or Desk for work you are keeping an eye on "
+    "(a CI run, a deploy, a long build or test run, a migration). The notch shows the full line once "
+    "(title, time so far, done/total when you pass a total), then rests on '<short> · <done/total>', "
+    "so pass short: a name of up to 12 characters such as 'PR 140', 'v2.8.0' or 'deploy' (without "
+    "it Sanduhr derives one from the title). The Desk shows the full title and a one-line note; a "
+    "click opens the link. "
+    "Returns the watcher's id: move it with watch_update (progress, a note, or state waiting when "
+    "the user must act: it pulses and glows the notch) and finish it with watch_end (passed or "
+    "failed). Without an update for 10 minutes it greys as lost touch, so update long jobs. Limits: "
+    "title 1 to 80 characters on one line, short up to 12, link https only, total 1 to 1000000. Pass work: true for "
+    "anything from the user's employer, so it hides in demo mode. Refused with reason "
+    "watchers_off when the user has not turned on Let agents show watchers in Sanduhr (Settings, "
+    "Integrations); then do not retry.")
+WATCH_GUIDE_UPDATE = (
+    "Move a watcher from watch_start: done (how many of its total are done), note (one line, up to "
+    "140 characters, replaces the last), state running or waiting (waiting on the user: it pulses "
+    "and glows the notch once; set running again when they have acted). Any update also keeps it "
+    "from greying as lost touch.")
+WATCH_GUIDE_END = (
+    "Finish a watcher from watch_start: result passed (shows a check and fades after a few seconds) "
+    "or failed (stays until the user dismisses it), with an optional one-line note (up to 140 "
+    "characters) such as what failed.")
+WATCH_ANNOTATIONS = {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False,
+                     "openWorldHint": False}
+WATCH_ID_SCHEMA = {"type": "string", "pattern": "^w[0-9a-f]{12}$", "description": "The id watch_start returned."}
+WATCH_NOTE_SCHEMA = {"type": "string", "maxLength": 140, "description": "One line for the user, up to 140 characters."}
+
 READ_ONLY = {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False}
 NO_ARGS = {"type": "object", "properties": {}, "additionalProperties": False}
 TOOLS = [
@@ -314,6 +346,54 @@ TOOLS = [
         "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False,
                         "openWorldHint": False},
     },
+    {
+        "name": "watch_start",
+        "description": WATCH_GUIDE_START,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "maxLength": 80, "description": "What is being watched, one line (\"PR 140 CI: combine statuslines\")."},
+                "short": {"type": "string", "maxLength": 12, "description": "The notch's resting name, up to 12 characters: \"PR 140\", \"v2.8.0\", \"deploy\". Pass one; without it Sanduhr derives one from the title."},
+                "link": {"type": "string", "maxLength": 2048, "description": "An https link a click opens (the run's page)."},
+                "total": {"type": "integer", "minimum": 1, "maximum": 1000000, "description": "How many steps there are, for done/total."},
+                "work": {"type": "boolean", "description": "Work for the user's employer: hidden in demo mode. Default false."},
+            },
+            "required": ["title"],
+            "additionalProperties": False,
+        },
+        "annotations": WATCH_ANNOTATIONS,
+    },
+    {
+        "name": "watch_update",
+        "description": WATCH_GUIDE_UPDATE,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": WATCH_ID_SCHEMA,
+                "done": {"type": "integer", "minimum": 0, "maximum": 1000000, "description": "How many are done."},
+                "note": WATCH_NOTE_SCHEMA,
+                "state": {"type": "string", "enum": ["running", "waiting"], "description": "waiting: on the user."},
+            },
+            "required": ["id"],
+            "additionalProperties": False,
+        },
+        "annotations": WATCH_ANNOTATIONS,
+    },
+    {
+        "name": "watch_end",
+        "description": WATCH_GUIDE_END,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": WATCH_ID_SCHEMA,
+                "result": {"type": "string", "enum": ["passed", "failed"]},
+                "note": WATCH_NOTE_SCHEMA,
+            },
+            "required": ["id", "result"],
+            "additionalProperties": False,
+        },
+        "annotations": WATCH_ANNOTATIONS,
+    },
 ]
 TOOL_NAMES = [t["name"] for t in TOOLS]
 # The Desk messages handoff (item 54). The app mirrors these names (DeskMessageHandoff); a test on
@@ -338,6 +418,16 @@ THEME_WAIT_SECONDS = 10.0
 THEME_MAX_BYTES = 16 * 1024
 # The widget's compiled-in themes (ThemeRegistry.builtIn): a proposal never takes their key.
 BUILT_IN_THEME_IDS = ["obsidian", "aurora", "ember", "mint", "626-labs", "matrix", "blueprint", "match-desk"]
+# The watchers handoff (item 66). The app mirrors these names (WatcherStore); a test on each side
+# pins them.
+WATCH_SWITCH_FILE = "watchers.json"
+WATCH_REQUEST_PREFIX = "watch-request-"
+WATCH_MAX_TITLE = 80
+WATCH_MAX_SHORT = 12
+WATCH_MAX_NOTE = 140
+WATCH_MAX_LINK = 2048
+WATCH_MAX_TOTAL = 1000000
+WATCH_ID_RE = re.compile(r"^w[0-9a-f]{12}$")
 
 
 class Paths:
@@ -360,6 +450,7 @@ class Paths:
         self.desk_result = os.path.join(self.support_dir, DESK_RESULT_FILE)
         self.theme_request = os.path.join(self.support_dir, THEME_REQUEST_FILE)
         self.theme_result = os.path.join(self.support_dir, THEME_RESULT_FILE)
+        self.watch_switch = os.path.join(self.support_dir, WATCH_SWITCH_FILE)
 
     def history_file(self, name):
         return os.path.join(self.support_dir, name)
@@ -1077,6 +1168,7 @@ def build_ping(now=None, paths=None):
         },
         "tools_available": TOOL_NAMES,
         "tools_not_on_mac": TOOLS_NOT_ON_MAC,
+        "watchers_allowed": watchers_allowed(paths),
     }
 
 
@@ -1711,6 +1803,195 @@ def build_propose_theme(args, now=None, paths=None, wait=THEME_WAIT_SECONDS, pol
                       "ten minutes of when it was made." % int(wait)}
 
 
+# -- Watchers (item 66) ------------------------------------------------------------------------
+#
+# watch_start, watch_update and watch_end hand a request to the app through
+# watch-request-<ms>-<seq>-<id>.json; the app checks it again, shows the card and deletes the file.
+# Nothing is written while watchers.json (Sanduhr's switches) lacks "agents": true. The ids this
+# server started are remembered for the session, so an update to an unknown id is refused here.
+
+WATCH_STARTED = set()
+WATCH_ENDED = set()
+_watch_seq = [0]
+
+
+def watchers_allowed(paths):
+    doc = read_json(paths.watch_switch)
+    return isinstance(doc, dict) and doc.get("schema_version") == 1 and doc.get("agents") is True
+
+
+def watch_refusal(reason, remedy):
+    return {"status": "rejected", "reason": reason, "remedy": remedy}
+
+
+def watch_line(v, field, cap, required=False):
+    """(clean, error): one line of at most `cap` characters."""
+    if v is None:
+        return None, ("%s is required" % field) if required else None
+    if not isinstance(v, str):
+        return None, "%s must be a string" % field
+    s = v.strip()
+    if required and not s:
+        return None, "%s must not be empty" % field
+    if len(s) > cap or any(is_control(c) for c in s):
+        return None, "%s must be one line of at most %d characters" % (field, cap)
+    return (s or None), None
+
+
+def watch_int(v, field, lo, hi):
+    if v is None:
+        return None, None
+    if isinstance(v, bool) or not isinstance(v, int) or not lo <= v <= hi:
+        return None, "%s must be a whole number from %d to %d" % (field, lo, hi)
+    return v, None
+
+
+def watch_link(v):
+    if v is None:
+        return None, None
+    if not isinstance(v, str) or len(v) > WATCH_MAX_LINK or not re.match(r"^https://[^\s/@:]+(:\d+)?(/\S*)?$", v, re.I):
+        return None, "link must be an https:// link of at most %d characters, with no user or password" % WATCH_MAX_LINK
+    return v, None
+
+
+def claude_folder(env=None):
+    """The Claude Code folder this session runs with, for the app's work tag."""
+    env = os.environ if env is None else env
+    v = env.get("CLAUDE_CONFIG_DIR")
+    return os.path.abspath(os.path.expanduser(v)) if v else os.path.expanduser("~/.claude")
+
+
+def write_watch_request(paths, doc, now):
+    _watch_seq[0] += 1
+    name = "%s%013d-%06d-%s.json" % (WATCH_REQUEST_PREFIX, int(now.timestamp() * 1000), _watch_seq[0], doc["id"])
+    try:
+        os.makedirs(paths.support_dir, mode=0o700, exist_ok=True)
+        tmp = os.path.join(paths.support_dir, "." + name + ".tmp")
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(doc, f, ensure_ascii=False)
+        os.replace(tmp, os.path.join(paths.support_dir, name))   # atomic: the app never reads half a file
+    except OSError as e:
+        return {"status": "error", "reason": "request_write_failed",
+                "remedy": "Could not hand the watcher to Sanduhr (%s)." % type(e).__name__}
+    return None
+
+
+def watch_checks(args, allowed, paths):
+    """The common refusals: arguments not an object or unknown, the switch off."""
+    if not isinstance(args, dict):
+        return watch_refusal("invalid_params", "Arguments must be an object.")
+    unknown = sorted(k for k in args if k not in allowed)
+    if unknown:
+        return watch_refusal("invalid_params", "Unknown argument(s): " + ", ".join(str(k)[:20] for k in unknown[:5]) +
+                             ". Takes " + ", ".join(allowed) + ".")
+    if not watchers_allowed(paths):
+        return watch_refusal("watchers_off", "The user has not turned on Let agents show watchers in Sanduhr "
+                                             "(Settings, Integrations, Watchers). Do not retry; tell the user "
+                                             "if they asked for a watcher.")
+    return None
+
+
+def watch_known(wid):
+    if not isinstance(wid, str) or not WATCH_ID_RE.match(wid):
+        return watch_refusal("invalid_params", "id must be the id watch_start returned.")
+    if wid not in WATCH_STARTED:
+        return watch_refusal("unknown_id", "No watcher with that id was started in this session; call watch_start.")
+    if wid in WATCH_ENDED:
+        return watch_refusal("ended", "That watcher has ended; call watch_start for a new one.")
+    return None
+
+
+def build_watch_start(args, now=None, paths=None, env=None):
+    now = now or datetime.now(timezone.utc)
+    paths = paths or Paths()
+    bad = watch_checks(args, ("title", "short", "link", "total", "work"), paths)
+    if bad:
+        return bad
+    errors = []
+    title, e = watch_line(args.get("title"), "title", WATCH_MAX_TITLE, required=True)
+    errors.append(e)
+    short, e = watch_line(args.get("short"), "short", WATCH_MAX_SHORT)
+    errors.append(e)
+    link, e = watch_link(args.get("link"))
+    errors.append(e)
+    total, e = watch_int(args.get("total"), "total", 1, WATCH_MAX_TOTAL)
+    errors.append(e)
+    work = args.get("work", False)
+    if not isinstance(work, bool):
+        errors.append("work must be true or false")
+    errors = [x for x in errors if x]
+    if errors:
+        return watch_refusal("invalid_params", "; ".join(errors) + ".")
+    wid = "w" + uuid.uuid4().hex[:12]
+    doc = {"schema_version": 1, "op": "start", "id": wid, "requested_at": iso_o(now), "title": title,
+           "work": work, "folder": claude_folder(env)}
+    if short is not None:
+        doc["short"] = short
+    if link is not None:
+        doc["link"] = link
+    if total is not None:
+        doc["total"] = total
+    failed = write_watch_request(paths, doc, now)
+    if failed:
+        return failed
+    WATCH_STARTED.add(wid)
+    return {"status": "ok", "id": wid,
+            "note": "Sanduhr shows the watcher while it runs. Update it at least every 10 minutes, and end it with watch_end."}
+
+
+def build_watch_update(args, now=None, paths=None):
+    now = now or datetime.now(timezone.utc)
+    paths = paths or Paths()
+    bad = watch_checks(args, ("id", "done", "note", "state"), paths) or watch_known(args.get("id"))
+    if bad:
+        return bad
+    errors = []
+    done, e = watch_int(args.get("done"), "done", 0, WATCH_MAX_TOTAL)
+    errors.append(e)
+    note, e = watch_line(args.get("note"), "note", WATCH_MAX_NOTE)
+    errors.append(e)
+    state = args.get("state")
+    if state is not None and state not in ("running", "waiting"):
+        errors.append("state must be running or waiting")
+    errors = [x for x in errors if x]
+    if errors:
+        return watch_refusal("invalid_params", "; ".join(errors) + ".")
+    doc = {"schema_version": 1, "op": "update", "id": args["id"], "requested_at": iso_o(now)}
+    if done is not None:
+        doc["done"] = done
+    if note is not None:
+        doc["note"] = note
+    if state is not None:
+        doc["state"] = state
+    return write_watch_request(paths, doc, now) or {"status": "ok", "id": args["id"]}
+
+
+def build_watch_end(args, now=None, paths=None):
+    now = now or datetime.now(timezone.utc)
+    paths = paths or Paths()
+    bad = watch_checks(args, ("id", "result", "note"), paths) or watch_known(args.get("id"))
+    if bad:
+        return bad
+    errors = []
+    result_ = args.get("result")
+    if result_ not in ("passed", "failed"):
+        errors.append("result must be passed or failed")
+    note, e = watch_line(args.get("note"), "note", WATCH_MAX_NOTE)
+    errors.append(e)
+    errors = [x for x in errors if x]
+    if errors:
+        return watch_refusal("invalid_params", "; ".join(errors) + ".")
+    doc = {"schema_version": 1, "op": "end", "id": args["id"], "requested_at": iso_o(now), "result": result_}
+    if note is not None:
+        doc["note"] = note
+    failed = write_watch_request(paths, doc, now)
+    if failed:
+        return failed
+    WATCH_ENDED.add(args["id"])
+    return {"status": "ok", "id": args["id"]}
+
+
 # -- protocol ----------------------------------------------------------------------------
 
 def write(frame):
@@ -1747,6 +2028,12 @@ def call_tool(name, args):
         return build_propose_desk_messages(args)
     if name == "propose_theme":
         return build_propose_theme(args)
+    if name == "watch_start":
+        return build_watch_start(args)
+    if name == "watch_update":
+        return build_watch_update(args)
+    if name == "watch_end":
+        return build_watch_end(args)
     return None
 
 

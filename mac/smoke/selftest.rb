@@ -75,6 +75,15 @@ class FakeApp
       if arg == 'pacing' then s['pacing_pinned'] = !s['pacing_pinned']
       else s['active_tool'] = s['active_tool'] == arg ? nil : arg
       end
+    when 'watch-test'
+      w = (s['watchers'] ||= { 'count' => 0, 'states' => [], 'placements' => [] })
+      case arg
+      when 'start' then w.merge!('count' => 1, 'states' => ['running'])
+      when 'wait' then w['states'] = ['waiting'] if w['count'] == 1
+      when 'pass' then w['states'] = ['passed'] if w['count'] == 1
+      when 'fail' then w['states'] = ['failed'] if w['count'] == 1
+      when 'clear' then w.merge!('count' => 0, 'states' => [])
+      end
     end
   end
 end
@@ -264,6 +273,13 @@ eq('theme picked by the scenario goes back',
 eq('theme unchanged or unknown before is left alone',
    [Restore.plan(base.merge('theme' => 'aurora'), base.merge('theme' => 'aurora')),
     Restore.plan(base, base.merge('theme' => 'match-desk'))], [[], []])
+eq('watchers a scenario put up are cleared',
+   Restore.plan(base, base.merge('watchers' => { 'count' => 1 })), [%w[watch-test clear]])
+eq('watchers there before are left alone',
+   [Restore.plan(base.merge('watchers' => { 'count' => 2 }), base.merge('watchers' => { 'count' => 3 })),
+    Restore.plan(base.merge('watchers' => { 'count' => 0 }), base.merge('watchers' => { 'count' => 0 }))], [[], []])
+eq('watchers state never carries a title',
+   state['watchers'], { 'count' => 0, 'states' => [], 'placements' => [], 'agents' => false, 'background' => false, 'intro' => false })
 eq('camera light from a running camera is left alone',
    Restore.plan(base, base.merge('camera_light' => true, 'camera_in_use' => true)), [])
 
@@ -335,7 +351,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour]
+    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end

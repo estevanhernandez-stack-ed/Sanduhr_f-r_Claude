@@ -141,6 +141,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DeskMessageHandoff.shared.startForApp()
         // Claude's suggested themes (item 55): propose_theme's requests, on the same folder watch.
         ThemeProposalHandoff.shared.startForApp(vm: viewModel)
+        // Watchers (item 66): the MCP server's watch_* requests and the Stop hook's background
+        // work, on the same folder watch; watchers.json follows the two switches.
+        WatcherStore.shared.startForApp()
         // Claude Code integrations (item 49): where they are installed, this version's scripts
         // replace the last one's (a new stamped folder, the link swapped). No install, no write.
         Task.detached(priority: .utility) { IntegrationScripts.standard.refreshIfInstalled() }

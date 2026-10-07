@@ -1,0 +1,31 @@
+# Item 66: watchers. The watch-test action puts up a made-up watcher ("Smoke watcher", 0/10, a link
+# to example.com) through the same decoding as an agent's request, whatever the Watchers switches
+# say, then moves it to waiting on you, failed, and clears it. The right wing and a Desk corner
+# are set to Watchers for the run; the run puts both keys back, and a watcher left up is cleared.
+# state.yaml's watchers: holds a count, states and places, never a title.
+# Watch the snaps: the running snap shows a blue dot with "Smoke watcher · 0s · 0/10" (the intro;
+# a few seconds later it rests on "smoke · 0/10", watchers.intro false) in the
+# right wing (with the island on) and the row in the top right corner; the waiting snap shows the
+# amber dot pulsing (still with Reduce Motion), the note "needs a look", and the notch glows once.
+name: Watchers on the notch and the Desk
+needs: [desk]
+steps:
+  - expect_state: { watchers.count: "/^\\d+$/", watchers.agents: "/^(true|false)$/" }
+  - defaults: { domain: desk, key: notchRight, type: string, value: watchers }
+  - defaults: { domain: desk, key: layout, type: string, value: "message:tl clock:bl claude:bl watchers:tr meetings:bl" }
+  # No watcher yet: the wing stands aside for its default (the meters).
+  - expect_state: { notch_right: watchers }
+  - do: watch-test
+    arg: start
+  - expect_state: { watchers.count: "/^[1-9]/", watchers.states.0: running, notch_shows.right: watchers, "desk_frames[kind=watcher].key": "0" }
+  - snap: watchers-running
+  - do: watch-test
+    arg: wait
+  - expect_state: { watchers.states.0: waiting, glow_count: "/^[1-9]/" }
+  - snap: watchers-waiting
+  - do: watch-test
+    arg: fail
+  - expect_state: { watchers.states.0: failed }
+  - do: watch-test
+    arg: clear
+  - expect_state: { watchers.count: 0, notch_shows.right: meters }
