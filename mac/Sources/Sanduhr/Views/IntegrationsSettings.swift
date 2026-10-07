@@ -264,6 +264,10 @@ struct IntegrationsSettings: View {
                                         navigation.selection = .notch
                                     },
                                     cancel: { consent = nil })
+                .environment(\.openModsPage) {
+                    consent = nil
+                    navigation.selection = .mods
+                }
         }
     }
 

@@ -126,7 +126,15 @@ extension EnvironmentValues {
         get { self[ShowHelpKey.self] }
         set { self[ShowHelpKey.self] = newValue }
     }
+
+    /// Closes the sheet and opens Settings, Mods (item 64, slice 2); nil where there is none.
+    var openModsPage: (() -> Void)? {
+        get { self[OpenModsPageKey.self] }
+        set { self[OpenModsPageKey.self] = newValue }
+    }
 }
+
+private struct OpenModsPageKey: EnvironmentKey { static let defaultValue: (() -> Void)? = nil }
 
 /// An explanation that shows only with Show explanations on.
 private struct HelpCaption: View {
@@ -444,10 +452,11 @@ private struct InkEditor: View {
     }
 }
 
-/// The folder's mods that draw status entries, read-only.
+/// The folder's mods that draw status entries, read-only here; the Mods page switches them.
 private struct ModChips: View {
     let mods: [ModStatusEntry]?
     let badges: Badges
+    @Environment(\.openModsPage) private var openModsPage
 
     var body: some View {
         if let mods {
@@ -459,7 +468,13 @@ private struct ModChips: View {
                     ChipFlow {
                         ForEach(mods) { mod in ModChip(mod: mod, badge: badges.text(.mod(mod.path))) }
                     }
-                    HelpCaption("Claude Code draws these mods' status entries in its status area, beside the statusline, so Combine can't keep, drop or style them. To hide one, use the mod's own settings (/config in Claude Code) or turn the mod off for this folder; the Mods page will have a switch for each.")
+                    if let openModsPage {
+                        Button("Switch it on the Mods page", action: openModsPage)
+                            .buttonStyle(.link)
+                            .font(.caption)
+                            .help("Opens Settings, Mods. Sanduhr's own mod has a switch per folder there; switches for other mods come later.")
+                    }
+                    HelpCaption("Claude Code draws these mods' status entries in its status area, beside the statusline, so Combine can't keep, drop or style them. To hide one, use the mod's own settings (/config in Claude Code) or turn the mod off for this folder: Sanduhr's own mod switches on the Mods page, and switches for other mods come later.")
                 }
             }
         }
