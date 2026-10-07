@@ -522,7 +522,7 @@ network request; the files it writes are a Desk message request and a theme requ
 points it at a test folder (and Desk's folder beside it).
 
 **Desk messages from Claude (item 54).** `get_desk_messages` returns `{status, file_found, lines,
-pinned, rotate, mix_daily, today, today_special, limits}`: every raw line of Desk's `messages.txt`,
+pinned, rotate, mix_daily, special_mode, special_seconds, today, today_special, limits}`: every raw line of Desk's `messages.txt`,
 whether a line is pinned, the rotation, the mix switch, the usual raw line the Desk shows now and the
 date lines it shows above it today. Its description teaches the syntax (plain, `Mon:`, `MM-DD:`,
 `#`, which line shows when, rotation, pinning; that birthdays, anniversaries and holidays are date
@@ -554,7 +554,8 @@ sidebar, and a notification without sound only while alerts are on (their delive
 comment block at the top of the file and replaces the rest. Either way the previous file is kept as
 `messages.txt.previous`. A suggestion waits in memory (quitting drops it); a newer one replaces it.
 The app writes `desk-messages-state.json` (`{schema_version, pinned, pinned_line, rotate,
-mix_daily}`) when the pin, the rotation or the mix switch changes, for `get_desk_messages`.
+mix_daily, special_mode, special_seconds}`) when the pin, the rotation, the mix switch or On special
+days changes, for `get_desk_messages`, which reports them.
 
 **Which lines show (item 69).** Each day the Desk draws one usual line and, on a date with its own
 lines, those too (`MessageEngine.today`). The usual line comes from today's weekday lines when there
@@ -567,9 +568,29 @@ above it, each with its own effects; more than 3 take turns hourly, 3 at a time.
 keeps hour steps within each pool. The message piece draws the date's lines at 0.8 times the
 message size (full size when no usual line shows) with a gap of 0.12 times the message size
 between lines (`DeskMessageStack`). Places with room for one line (the notch's Message choice)
-show the first date line, else the usual one. A pinned line replaces the usual line only: the date's lines still stack above it, so a pinned
-"good vibes only" and a birthday both show.
+show the first date line, else the usual one. A pinned line replaces the usual line only: the
+date's lines still stack above it, so a pinned "good vibes only" and a birthday both show.
 `get_desk_messages` mirrors the rules (`desk_today`).
+
+**On special days (item 69).** Settings, Message's bar has "On special days": **Stack** (the
+default, as above), **Take turns** or **Scroll** (`messageSpecialMode` `stack`, `turns`, `scroll`),
+and, unless Stack, "Each line shows for" 5 s, 10 s (default), 30 s, 1 min or 5 min
+(`messageSpecialSeconds`). Take turns and Scroll show one line at a time at the full message size
+(a line's own `{size:}` still applies), cycling through the date's lines and then the usual line.
+The line showing is decided by the clock alone (`MessageSpecialMode.index`: the seconds since 1970
+divided by the time each line shows, modulo the number of lines), so the Desk, the notch's Message
+and the previews show the same line at the same moment. `DeskModel.updateCycle` sets the index and
+waits with one one-shot timer for the next change; while the Desk can't be seen (covered, screens
+asleep, screen saver, session away: `motionPaused`, as `{shimmer}` rests) it holds the line and
+schedules nothing, and on return it jumps to the clock's line. On a day without date lines, or with
+a date line and no usual line, nothing cycles and nothing is scheduled. Every line is laid out
+unseen underneath the one showing, so the piece keeps the size of the biggest and nothing around it
+moves. Take turns crossfades in 0.4 s. Scroll is a slow ticker: the new line glides up in from below
+by its own height while the old one glides up out of view, both fading as they move, in 0.8 s, so
+one line is visible at a time. With Reduce Motion both swap at once. Each line that comes in is a new
+view, so its `{write}` plays again; `{shimmer}` and `{sweep}` run as on a single line. The Message
+preview card shows the chosen mode live, with a sample date line ("Sample: special day") until today
+has one. "Today:" lists the lines in cycle order.
 
 **Message effects.** Tags at the start of a line's text, after any prefix, in any order:
 `{ink:#hex,…}` (1 to 4 colors, a gradient from two), `{glow}` / `{noglow}` (over Settings, Desk,

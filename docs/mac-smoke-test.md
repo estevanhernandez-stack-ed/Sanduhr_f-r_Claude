@@ -1396,5 +1396,17 @@ its `shasum`.
 16. **Claude.** `get_desk_messages` returns `today` (the usual line) and `today_special` (the
     date lines). Ask Claude Code to add birthdays for the year: it proposes `MM-DD:` lines with
     mode add, one per person.
+17. **On special days.** With the two birthday lines for today in place: the bar's "On special
+    days" reads Stack and no timing menu shows. Pick **Take turns**: "Each line shows for" appears
+    (5 s, 10 s, 30 s, 1 min, 5 min; 10 s chosen). Pick 5 s: the Desk shows one line at a time,
+    Sam, then Alex, then the usual line, crossfading (about 0.4 s), the piece never changing size
+    and nothing beside it moving; the notch's Message shows the same line at the same moment; the
+    Message preview card does the same. A `{write}` line writes itself in each time it comes round.
+    Pick **Scroll**: each line glides up out of view as the next glides up in, one visible at a
+    time. Turn on Reduce Motion: both swap at once with no fade or glide. Cover the Desk with a
+    window for 20 s and uncover it: the line didn't advance while covered and then jumps to the
+    current one. Remove today's date lines: nothing cycles, the usual line stays. Without a date
+    line today the preview card shows a sample birthday and "Sample: … special day".
+    `get_desk_messages` reports `special_mode` and `special_seconds`. Set Stack again.
 
 Put your list back: `cp ~/messages.txt.bak ~/Library/Application\ Support/Desk/messages.txt`.
