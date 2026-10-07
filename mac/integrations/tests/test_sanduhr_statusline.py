@@ -584,7 +584,7 @@ class PreviewModeTests(unittest.TestCase):
         self.assertEqual(got["theirs"], "~/p | main\nOpus  ctx\n")
         self.assertEqual([line["auto"] for line in got["lines"]], ["pipe", "spaces"])
         self.assertEqual(got["lines"][0]["splits"]["pipe"]["segments"],
-                         [{"matcher": "~", "text": "~/p"}, {"matcher": "main", "text": "main"}])
+                         [{"matcher": "~", "text": "~/p", "kind": "directory"}, {"matcher": "main", "text": "main", "kind": "branch"}])
         self.assertEqual(set(got["lines"][0]["splits"]), set(sl.SEPARATOR_IDS))
         self.assertEqual({m["name"]: m["text"] for m in got["mine"]}["model"], "Opus")
         self.assertEqual([m["name"] for m in got["mine"]], list(sl.MINE))
@@ -643,6 +643,112 @@ class JoinWithTests(unittest.TestCase):
         for value in ("same", "slash", "", 1, None):
             self.assertIsNone(sl.parse_args(["--chain-b64", good, "--join", "line",
                                              "--keep-theirs-b64", picks_b64(**{"with": value})]), value)
+
+
+
+class ClassifierTests(unittest.TestCase):
+    def test_each_kind(self):
+        for text, kind in (
+            ("⎇ main", "branch"), (chr(0xE0A0) + " dev", "branch"), ("git: fix/x", "branch"),
+            ("main", "branch"), ("feature/login", "branch"), ("main*", "branch"),
+            ("$1.42", "cost"), ("\U0001F4B0 $0.12", "cost"), ("cost 3.20", "cost"),
+            ("Opus", "model"), ("Opus 5.5", "model"), ("claude-opus-5-5", "model"), ("Model: Sonnet 4.5", "model"),
+            ("\U0001F916 Haiku", "model"), ("Fable", "model"),
+            ("ctx 38%", "context"), ("38% context", "context"),
+            ("5h 42%", "session"), ("session 9%", "session"),
+            ("wk 18%", "weekly"), ("weekly 3%", "weekly"), ("7d 50%", "weekly"),
+            ("15.5k tok", "tokens"), ("1.2M", "tokens"), ("1,204 tokens", "tokens"),
+            ("12:04", "time"), ("3:05 pm", "time"), ("09:41:07", "time"),
+            ("~/proj", "directory"), ("/usr/local", "directory"), ("\U0001F4C1 ~/proj", "directory"),
+        ):
+            self.assertEqual(sl.classify(text), kind, text)
+
+    def test_unknowns_and_false_positives(self):
+        for text in ("$PATH", "hello", "v2.1", "+3 -1", "5 files", "", "   ", "✓ ok"):
+            self.assertEqual(sl.classify(text), "segment", repr(text))
+        # A branch named after a model is a branch.
+        self.assertEqual(sl.classify("opus-fix"), "branch")
+        self.assertEqual(sl.classify("⎇ opus-fix"), "branch")
+        # "context" without a number isn't the context meter.
+        self.assertEqual(sl.classify("context"), "segment")
+
+    def test_ansi_is_stripped_before_classifying(self):
+        line = ESC + "[35m⎇ main" + ESC + "[0m | " + ESC + "[33m$1.42" + ESC + "[0m | Opus | " + ESC + "[2mctx 38%" + ESC + "[0m"
+        kinds = [sl.classify(s["plain"]) for s in sl.split_line(line)["segments"]]
+        self.assertEqual(kinds, ["branch", "cost", "model", "context"])
+
+
+class StyleTests(unittest.TestCase):
+    def test_gradient_ink_is_truecolor_per_character(self):
+        out = sl.styled_text("abc", {"ink": ["#ff0000", "#0000ff"]})
+        self.assertEqual(out, ESC + "[38;2;255;0;0ma" + ESC + "[38;2;128;0;128mb" + ESC + "[38;2;0;0;255mc" + sl.RESET)
+        self.assertEqual(sl.gradient(["#f00", "#0f0", "#00f"], 5),
+                         [(255, 0, 0), (128, 128, 0), (0, 255, 0), (0, 128, 128), (0, 0, 255)])
+        self.assertEqual(sl.styled_text("ab", {"ink": ["#0f0"], "bold": True, "underline": True}),
+                         ESC + "[1;4m" + ESC + "[38;2;0;255;0mab" + sl.RESET)
+        self.assertEqual(sl.styled_text("ab", {}), "ab")
+
+    def test_letter_styles_with_their_holes_and_width(self):
+        self.assertEqual("".join(sl.letter(c, "bold") for c in "Ab1"), "\U0001D400\U0001D41B\U0001D7CF")
+        self.assertEqual(sl.letter("h", "italic"), "ℎ")                       # a hole
+        self.assertEqual("".join(sl.letter(c, "script") for c in "BEego"), "ℬℰℯℊℴ")
+        self.assertEqual("".join(sl.letter(c, "fraktur") for c in "CHIRZ"), "ℭℌℑℜℨ")
+        self.assertEqual("".join(sl.letter(c, "double-struck") for c in "CN9"), "ℂℕ\U0001D7E1")
+        self.assertEqual(sl.letter("7", "italic"), "7")                            # no digits there
+        self.assertEqual(sl.letter("7", "mono"), "\U0001D7FD")
+        self.assertEqual("".join(sl.letter(c, "small-caps") for c in "Opus qx"), "Oᴘᴜꜱ ꞯx")
+        self.assertEqual(sl.letter("é", "bold"), "é")                    # only A-Z, a-z, 0-9
+        for font in sl.FONTS:
+            text = "".join(sl.letter(c, font) for c in "Hello World 42%")
+            self.assertEqual(sl.visible_width(text), len("Hello World 42%"), font)
+
+    def test_ink_replaces_their_foreground_but_keeps_backgrounds(self):
+        line = ESC + "[31m~/proj" + ESC + "[0m | " + ESC + "[1;32mmain" + ESC + "[0m"
+        out = sl.filter_line(line, {"style": {"main": {"ink": ["#ffffff"]}}}, 0)
+        self.assertTrue(out.endswith(ESC + "[1m" + ESC + "[38;2;255;255;255mmain" + sl.RESET), repr(out))
+        self.assertNotIn("32m", out)
+        self.assertIn(ESC + "[31m~/proj", out)                              # the other keeps its own
+        # Powerline: the block keeps its background, the arrow is redrawn as before.
+        pl = (ESC + "[44;30m ~/proj " + ESC + "[34;42m" + PL + ESC + "[30m main " + ESC + "[0;32m" + PL + ESC + "[0m")
+        out = sl.filter_line(pl, {"style": {"main": {"ink": ["#ff2a6d"], "font": "bold"}}}, 0)
+        self.assertIn("42", out.split("\U0001D426")[0])                   # green background before the m
+        self.assertIn("\U0001D426\U0001D41A\U0001D422\U0001D427", out)       # main, bold letters
+        self.assertIn(ESC + "[38;2;255;42;109m", out)
+        self.assertEqual(sl.visible_width(out), sl.visible_width(pl))
+
+    def test_without_ink_their_colors_stay_and_attributes_survive_their_resets(self):
+        line = ESC + "[33ma" + ESC + "[0mb | c"
+        out = sl.filter_line(line, {"style": {"ab": {"italic": True}}}, 0)
+        self.assertEqual(out, ESC + "[3m" + ESC + "[33m" + ESC + "[3ma" + ESC + "[0m" + ESC + "[3mb" + sl.RESET + " | c")
+
+    def test_sanduhrs_parts_take_their_style(self):
+        r = Rig()
+        try:
+            r.fresh()
+            p, _ = r.run(["--compose-b64", b64("x\n"), "--join", "line", "--keep-theirs-b64",
+                          picks_b64(ours={"session": {"font": "sans", "ink": ["#fff"]}})], session_json())
+            second = p.stdout.decode().split("\n")[1]
+            self.assertTrue(second.startswith(ESC + "[38;2;255;255;255m\U0001D7E7\U0001D5C1 \U0001D7E6\U0001D7E4%" + sl.RESET), repr(second))
+            self.assertIn(" | wk 18%", second)
+        finally:
+            r.close()
+
+    def test_the_grammar_validates_styles(self):
+        good = b64("my.sh")
+
+        def ok(**picks):
+            return sl.parse_args(["--chain-b64", good, "--join", "line", "--keep-theirs-b64", picks_b64(**picks)]) is not None
+
+        self.assertTrue(ok(style={"⎇": {"ink": ["#ff2a6d", "#05d9e8"], "font": "script", "bold": True}},
+                           ours={"session": {"dim": True}}))
+        self.assertTrue(ok(style={"a": {"ink": ["fff"]}}))
+        for bad in (
+            {"style": {"a": {"ink": []}}}, {"style": {"a": {"ink": ["#f00"] * 5}}}, {"style": {"a": {"ink": ["red"]}}},
+            {"style": {"a": {"ink": "#fff"}}}, {"style": {"a": {"font": "comic"}}}, {"style": {"a": {"bold": 1}}},
+            {"style": {"a": {"shimmer": True}}}, {"style": {"": {"bold": True}}}, {"style": {"x" * 65: {"bold": True}}},
+            {"style": []}, {"ours": {"cost": {"bold": True}}}, {"ours": {"session": "bold"}},
+        ):
+            self.assertFalse(ok(**bad), bad)
 
 
 if __name__ == "__main__":

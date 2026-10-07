@@ -153,20 +153,21 @@ def render_parts(snap, now):
     return {"parts": parts, "error": error, "ago": age // 60 if age >= FRESH_SECONDS else None}
 
 
-def format_parts(base, mine=MINE_DEFAULT, extra=(), sep=" | "):
+def format_parts(base, mine=MINE_DEFAULT, extra=(), sep=" | ", styles=None):
     """Sanduhr's line from `render_parts`, keeping the parts named in `mine`, then the picked
     `extra` parts (context, model) from Claude Code's stdin, joined with `sep`. A notice always
-    shows."""
+    shows. `styles` (by part name) gives a part its look."""
+    styles = styles or {}
     if "notice" in base:
         line = base["notice"]
     else:
-        line = sep.join(text for name, text in base["parts"] if name in mine)
+        line = sep.join(styled_text(text, styles.get(name)) for name, text in base["parts"] if name in mine)
         if base.get("error"):
             head = "sanduhr: " + base["error"]
             line = head + " | last " + line if line else head
         elif line and base.get("ago") is not None:
             line += " (%dm ago)" % base["ago"]
-    return sep.join(x for x in [line] + [text for name, text in extra if name in mine] if x)
+    return sep.join(x for x in [line] + [styled_text(text, styles.get(name)) for name, text in extra if name in mine] if x)
 
 
 def render(snap, now):
@@ -273,10 +274,10 @@ def segment_parts(stdin_bytes, now, mine=MINE_DEFAULT):
     return base, extra
 
 
-def segment(stdin_bytes, now, mine=MINE_DEFAULT, sep=" | "):
-    """Sanduhr's text, its parts filtered by `mine` and joined with `sep`."""
+def segment(stdin_bytes, now, mine=MINE_DEFAULT, sep=" | ", styles=None):
+    """Sanduhr's text, its parts filtered by `mine`, styled by `styles`, joined with `sep`."""
     base, extra = segment_parts(stdin_bytes, now, mine)
-    return format_parts(base, mine, extra, sep)
+    return format_parts(base, mine, extra, sep, styles)
 
 
 # MARK: Width
@@ -407,6 +408,57 @@ def matcher(plain):
     return s[:i][:MAX_MATCHER]
 
 
+# What a segment of theirs shows, by its content (item 63b): the chips name it, and a kind that
+# Sanduhr also shows is a duplicate. Checked in this order; the first that fits wins.
+KINDS = ("branch", "cost", "model", "context", "session", "weekly", "tokens", "time", "directory", "segment")
+_PCT = r"\d+(?:\.\d+)?\s?%"
+_BRANCH_GLYPHS = ("⎇", "")
+_MODEL = re.compile(r"(?:claude-[a-z0-9.\-\[\]]+|(?:opus|sonnet|haiku|fable)(?:\s+\d+(?:\.\d+)*)?(?:\s*\(.*\))?)", re.I)
+_CONTEXT = re.compile(r"\b(?:ctx|context)\b.*" + _PCT + r"|" + _PCT + r".*\b(?:ctx|context)\b", re.I)
+_SESSION = re.compile(r"(?:\b5h\b|\bsession\b).*" + _PCT + r"|" + _PCT + r".*(?:\b5h\b|\bsession\b)", re.I)
+_WEEKLY = re.compile(r"(?:\bwk\b|\bweekly\b|\b7d\b).*" + _PCT + r"|" + _PCT + r".*(?:\bwk\b|\bweekly\b|\b7d\b)", re.I)
+_COST = re.compile(r"\$\s?\d+(?:[.,]\d+)?|\bcost\b.*\d", re.I)
+_TOKENS = re.compile(r"\b\d+(?:\.\d+)?\s?[kKM]\b(?:\s*(?:tok|tokens)\b)?|\b\d[\d,]*\s*(?:tok|tokens)\b")
+_TIME = re.compile(r"\b\d{1,2}:\d{2}(?::\d{2})?(?:\s?[aApP][mM])?\b")
+_BRANCH_WORDS = ("main", "master", "develop", "dev", "trunk", "HEAD")
+_BRANCH_TOKEN = re.compile(r"\A(?:[\w.\-]+/[\w./\-]+|[a-z0-9]+(?:-[a-z0-9]+)+)[*+!?]*\Z")
+_LABEL = re.compile(r"\A(?:model|branch|git|dir|cwd|cost)\s*[:=]\s*", re.I)
+
+
+def classify(plain):
+    """The kind of a segment of theirs, from its text with escapes taken out: branch, cost,
+    model, context, session, weekly, tokens, time, directory, or segment (not known)."""
+    s = plain.strip()
+    if not s:
+        return "segment"
+    if s.startswith(_BRANCH_GLYPHS) or re.match(r"\A(?:git|branch)\s*[:=]?\s*\S", s, re.I):
+        return "branch"
+    # A leading icon (an emoji or a symbol) says nothing about the kind: read past it.
+    body = s
+    while body and not (body[0].isalnum() or body[0] in "$~/.[("):
+        body = body[1:].lstrip()
+    body = _LABEL.sub("", body)
+    if _COST.search(body):
+        return "cost"
+    if _MODEL.fullmatch(body):
+        return "model"
+    if _CONTEXT.search(body):
+        return "context"
+    if _SESSION.search(body):
+        return "session"
+    if _WEEKLY.search(body):
+        return "weekly"
+    if _TOKENS.search(body):
+        return "tokens"
+    if _TIME.search(body):
+        return "time"
+    if body.startswith(("~", "/", "./", "../")):
+        return "directory"
+    if body.rstrip("*+!?") in _BRANCH_WORDS or _BRANCH_TOKEN.match(body):
+        return "branch"
+    return "segment"
+
+
 def _sgr_state(tokens, upto):
     """The SGR escapes in force before token `upto`, since the last reset."""
     state = []
@@ -479,7 +531,8 @@ def split_line(line, sep=None):
         return "".join(state) + "".join(text for _, text in piece) + (RESET if open_after and not last else "")
 
     segments = [{"plain": plain[a:b].strip(), "matcher": matcher(plain[a:b]), "out": out(a, b),
-                 "bg": _background(_sgr_state(tokens, tstart(b)))} for a, b in spans]
+                 "bg": _background(_sgr_state(tokens, tstart(b))),
+                 "tokens": tokens[tstart(a):tstart(b)], "state": _sgr_state(tokens, tstart(a))} for a, b in spans]
     seps = [out(spans[k][1], spans[k + 1][0]) for k in range(len(spans) - 1)]
     prefix = "".join(text for _, text in tokens[:tstart(spans[0][0])])
     return {"sep": sep, "doubt": False, "prefix": prefix, "segments": segments, "seps": seps,
@@ -568,7 +621,9 @@ def filter_line(line, picks, index):
         return line
     kept = [k for k, seg in enumerate(sp["segments"]) if keeps(seg["matcher"], picks)]
     glue = picks.get("with")
-    if len(kept) == len(sp["segments"]) and not glue:
+    styles = picks.get("style") or {}
+    restyle = any(sp["segments"][k]["matcher"] in styles for k in kept)
+    if len(kept) == len(sp["segments"]) and not glue and not restyle:
         return line
     if not kept:
         return None
@@ -578,7 +633,8 @@ def filter_line(line, picks, index):
     glyph = GLYPHS.get(sp["sep"]) if sp["sep"] == "powerline" else None
     out = [sp["prefix"]]
     for j, k in enumerate(kept):
-        out.append(segs[k]["out"])
+        style = styles.get(segs[k]["matcher"])
+        out.append(styled(segs[k]["tokens"], style, segs[k]["state"]) if style else segs[k]["out"])
         if j + 1 < len(kept):
             nxt = kept[j + 1]
             if glue:
@@ -623,7 +679,7 @@ def parse_picks(b64):
         picks = json.loads(base64.b64decode(b64, validate=True).decode("utf-8"))
     except (binascii.Error, ValueError):
         return None
-    if not isinstance(picks, dict) or set(picks) - {"keep", "drop", "new", "sep", "with"}:
+    if not isinstance(picks, dict) or set(picks) - {"keep", "drop", "new", "sep", "with", "style", "ours"}:
         return None
     for key in ("keep", "drop"):
         if key in picks:
@@ -636,6 +692,14 @@ def parse_picks(b64):
         return None
     if "with" in picks and picks["with"] not in JOIN_WITH_IDS:
         return None
+    for key, names in (("style", None), ("ours", MINE)):
+        if key in picks:
+            v = picks[key]
+            if not isinstance(v, dict) or len(v) > MAX_MATCHERS:
+                return None
+            for name, style in v.items():
+                if not 0 < len(name) <= MAX_MATCHER or (names and name not in names) or parse_style(style) is None:
+                    return None
     if "sep" in picks:
         v = picks["sep"]
         if not isinstance(v, list) or len(v) > MAX_LINES:
@@ -656,6 +720,158 @@ def parse_mine(text):
     if any(b <= a for a, b in zip(idx, idx[1:])):
         return None
     return tuple(names)
+
+
+# MARK: Segment styles (item 63b)
+#
+# A static look per segment, applied at run time: `ink` (one hex color, or 2 to 4 stops of a
+# per-character gradient, truecolor), `font` (a Unicode letter style), and bold, italic, dim,
+# underline. The names match the Desk's effects grammar where they overlap (`ink`), so item 65
+# can share them. Statuslines print once per refresh, so nothing here moves.
+
+STYLE_KEYS = {"ink", "font", "bold", "italic", "dim", "underline"}
+STYLE_FLAGS = (("bold", "1"), ("italic", "3"), ("dim", "2"), ("underline", "4"))
+MAX_INK = 4
+HEX = re.compile(r"\A#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\Z")
+
+# Letter styles: (capital A, small a, digit 0 or None), and the letters the Mathematical
+# Alphanumeric block leaves out because Letterlike Symbols already had them ("holes").
+FONTS = {
+    "bold": (0x1D400, 0x1D41A, 0x1D7CE, {}),
+    "italic": (0x1D434, 0x1D44E, None, {"h": 0x210E}),
+    "bold-italic": (0x1D468, 0x1D482, None, {}),
+    "script": (0x1D49C, 0x1D4B6, None, {"B": 0x212C, "E": 0x2130, "F": 0x2131, "H": 0x210B, "I": 0x2110,
+                                        "L": 0x2112, "M": 0x2133, "R": 0x211B, "e": 0x212F, "g": 0x210A,
+                                        "o": 0x2134}),
+    "fraktur": (0x1D504, 0x1D51E, None, {"C": 0x212D, "H": 0x210C, "I": 0x2111, "R": 0x211C, "Z": 0x2128}),
+    "double-struck": (0x1D538, 0x1D552, 0x1D7D8, {"C": 0x2102, "H": 0x210D, "N": 0x2115, "P": 0x2119,
+                                                  "Q": 0x211A, "R": 0x211D, "Z": 0x2124}),
+    "sans": (0x1D5A0, 0x1D5BA, 0x1D7E2, {}),
+    "mono": (0x1D670, 0x1D68A, 0x1D7F6, {}),
+    "small-caps": None,
+}
+SMALL_CAPS = dict(zip("abcdefghijklmnopqrstuvwxyz",
+                      "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍ"
+                      "ɴᴏᴘꞯʀꜱᴛᴜᴠᴡxʏᴢ"))
+
+
+def letter(ch, font):
+    """`ch` in the letter style `font`; anything the style has no form for stays as it is."""
+    if not font or not ("A" <= ch <= "Z" or "a" <= ch <= "z" or "0" <= ch <= "9"):
+        return ch
+    if font == "small-caps":
+        return SMALL_CAPS.get(ch, ch)
+    upper, lower, digit, holes = FONTS[font]
+    if ch in holes:
+        return chr(holes[ch])
+    if "A" <= ch <= "Z":
+        return chr(upper + ord(ch) - 65)
+    if "a" <= ch <= "z":
+        return chr(lower + ord(ch) - 97)
+    return chr(digit + ord(ch) - 48) if digit else ch
+
+
+def _rgb(hex_color):
+    h = hex_color.lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def gradient(ink, n):
+    """`n` colors along the stops of `ink` (one color: all the same)."""
+    stops = [_rgb(c) for c in ink]
+    if len(stops) == 1 or n <= 1:
+        return [stops[0]] * max(n, 0)
+    out = []
+    for i in range(n):
+        t = i / (n - 1) * (len(stops) - 1)
+        k = min(int(t), len(stops) - 2)
+        f = t - k
+        a, b = stops[k], stops[k + 1]
+        out.append(tuple(int(round(a[j] + (b[j] - a[j]) * f)) for j in range(3)))
+    return out
+
+
+def _strip_fg(esc):
+    """An SGR escape without its foreground colors (ink replaces them; backgrounds stay, so a
+    powerline block keeps its color). "" when nothing is left."""
+    codes = esc[2:-1].split(";") if esc[2:-1] else ["0"]
+    keep, i = [], 0
+    while i < len(codes):
+        c = codes[i]
+        if c == "38":
+            width = {"5": 1, "2": 3}.get(codes[i + 1] if i + 1 < len(codes) else "", 0)
+            i += 2 + width
+            continue
+        if c == "39" or (c.isdigit() and (30 <= int(c) <= 37 or 90 <= int(c) <= 97)):
+            i += 1
+            continue
+        if c == "48":
+            width = {"5": 1, "2": 3}.get(codes[i + 1] if i + 1 < len(codes) else "", 0)
+            keep.extend(codes[i:i + 2 + width])
+            i += 2 + width
+            continue
+        keep.append(c)
+        i += 1
+    return "\x1b[%sm" % ";".join(keep) if keep else ""
+
+
+def _is_sgr(text):
+    return text.startswith("\x1b[") and text.endswith("m")
+
+
+def styled(tokens, style, state=()):
+    """`tokens` (escapes and characters) with `style` applied: the letters mapped, the
+    attributes on (again after each of their own SGR escapes, which may reset them), the ink
+    per character in truecolor in place of their foreground colors. Ends with a reset."""
+    ink, font = style.get("ink"), style.get("font")
+    attrs = ";".join(code for name, code in STYLE_FLAGS if style.get(name))
+    attr = "\x1b[%sm" % attrs if attrs else ""
+    chars = sum(1 for is_esc, _ in tokens if not is_esc)
+    colors = gradient(ink, chars) if ink else []
+    out = ["".join(_strip_fg(s) if ink else s for s in state), attr]
+    last, i = None, 0
+    for is_esc, text in tokens:
+        if is_esc:
+            if _is_sgr(text):
+                out.append((_strip_fg(text) if ink else text) + attr)
+                last = None
+            else:
+                out.append(text)
+            continue
+        if colors and colors[i] != last:
+            last = colors[i]
+            out.append("\x1b[38;2;%d;%d;%dm" % last)
+        out.append(letter(text, font))
+        i += 1
+    out.append(RESET)
+    return "".join(out)
+
+
+def styled_text(text, style):
+    """Plain text (Sanduhr's own parts) with `style` applied."""
+    if not style:
+        return text
+    return styled([(False, ch) for ch in text], style)
+
+
+def parse_style(style):
+    """A style object as the picks carry it, or None when it is anything else."""
+    if not isinstance(style, dict) or set(style) - STYLE_KEYS:
+        return None
+    if "ink" in style:
+        ink = style["ink"]
+        if not isinstance(ink, list) or not 1 <= len(ink) <= MAX_INK:
+            return None
+        if not all(isinstance(c, str) and HEX.match(c) for c in ink):
+            return None
+    if "font" in style and style["font"] not in FONTS:
+        return None
+    for name, _ in STYLE_FLAGS:
+        if name in style and not isinstance(style[name], bool):
+            return None
+    return style
 
 
 # MARK: The chained command
@@ -815,7 +1031,7 @@ def combined(theirs, data, now, mode, padding, picks, mine, cols):
     glyph between segments everywhere in the line: theirs, Sanduhr's and the seam."""
     glue = (picks or {}).get("with")
     sep = _glue(glue) if glue else " | "
-    ours = segment(lambda: data, now, mine or MINE_DEFAULT, sep)
+    ours = segment(lambda: data, now, mine or MINE_DEFAULT, sep, (picks or {}).get("ours"))
     return join(filter_theirs(theirs, picks), ours, mode, padding, cols, _glue(glue) if glue else SEPARATOR)
 
 
@@ -830,7 +1046,8 @@ def inspect(theirs, data, now):
         for sid in SEPARATOR_IDS:
             sp = split_line(text, sid)
             splits[sid] = {"doubt": sp["doubt"], "segments": [
-                {"matcher": s["matcher"], "text": s["plain"]} for s in sp.get("segments", [])]}
+                {"matcher": s["matcher"], "text": s["plain"], "kind": classify(s["plain"])}
+                for s in sp.get("segments", [])]}
         lines.append({"text": text, "auto": detect(plain) if tokens is not None else "none", "splits": splits})
     base, extra = segment_parts(lambda: data, now, MINE)
     parts = base.get("parts", []) + extra

@@ -1,9 +1,11 @@
+import AppKit
 import SwiftUI
 
 /// The "other statusline" choice (items 63, 63b): Combine keeps the user's line and adds
-/// Sanduhr's, with the segments of both picked as chips and a live preview of the final line;
-/// Replace swaps theirs out until Remove. The folder's mods that draw status entries are listed
-/// too, read-only: Claude Code draws those beside the statusline, not the command.
+/// Sanduhr's, with the segments of both picked as chips (named by what they show, styled if
+/// wanted) and a live preview of the final line; Replace swaps theirs out until Remove. The
+/// folder's mods that draw status entries are listed too, read-only: Claude Code draws those
+/// beside the statusline, not the command.
 struct CombineChoice: View {
     let other: String
     let folder: String
@@ -23,6 +25,10 @@ struct CombineChoice: View {
         let ran: Bool
     }
 
+    private var duplicates: [StatuslineDuplicate] {
+        chips.map { StatuslineDuplicate.find($0, mods: mods ?? []) } ?? []
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("\(folder) already has a statusline:")
@@ -32,10 +38,11 @@ struct CombineChoice: View {
                 .fixedSize(horizontal: false, vertical: true)
             picker
             JoinRowPicker(join: $join)
-            ModChips(mods: mods)
+            ModChips(mods: mods, badges: Badges(duplicates, mods: mods ?? []))
+            DuplicatesPanel(duplicates: duplicates, mods: mods ?? [], chips: chips, change: change)
             CombinePreview(theirs: chips?.inspection.theirs, join: join,
                            selection: chips?.previewSelection ?? selection, loading: loading,
-                           input: live?.input.data, mods: mods ?? [], model: model)
+                           input: live?.input.data, mods: (mods ?? []).filter(\.drawsStatus), model: model)
             LiveTestRow(live: live, busy: loading, enabled: chips != nil, test: testLive)
         }
         .task(id: other) {
@@ -50,12 +57,9 @@ struct CombineChoice: View {
     @ViewBuilder
     private var picker: some View {
         if let chips {
-            SegmentChips(chips: chips, change: change)
+            SegmentChips(chips: chips, badges: Badges(duplicates, mods: mods ?? []), change: change)
         } else {
-            Text(loading ? "Running your statusline once…" : "Your statusline's segments can't be shown: Python or the scripts weren't found. Combine keeps all of it.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Caption(loading ? "Running your statusline once…" : "Your statusline's segments can't be shown: Python or the scripts weren't found. Combine keeps all of it.")
         }
     }
 
@@ -80,6 +84,29 @@ struct CombineChoice: View {
     }
 }
 
+/// The duplicate badges per chip: "Also shown by Sanduhr: Context".
+struct Badges {
+    private var map: [StatuslineDuplicate.Side: [String]] = [:]
+
+    init(_ duplicates: [StatuslineDuplicate], mods: [ModStatusEntry]) {
+        func by(_ side: StatuslineDuplicate.Side) -> String {
+            switch side {
+            case .theirs: "yours"
+            case .sanduhr: "Sanduhr"
+            case .mod(let path): "the mod \(mods.first { $0.path == path }?.name ?? "")"
+            }
+        }
+        for d in duplicates {
+            map[d.a, default: []].append("Also shown by \(by(d.b)): \(d.what)")
+            map[d.b, default: []].append("Also shown by \(by(d.a)): \(d.what)")
+        }
+    }
+
+    func text(_ side: StatuslineDuplicate.Side) -> String? {
+        map[side].map { Array(NSOrderedSet(array: $0)) as? [String] ?? $0 }?.joined(separator: "; ")
+    }
+}
+
 /// A caption under a control.
 private struct Caption: View {
     let text: String
@@ -96,13 +123,14 @@ private struct Caption: View {
 /// Their lines, the join glyph, the keep-new switch and Sanduhr's segments as chips.
 private struct SegmentChips: View {
     let chips: StatuslineChips
+    let badges: Badges
     let change: ((inout StatuslineChips) -> Void) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Caption("Click a segment to keep or drop it. Yours are matched by how they start, so one that comes and goes (a git branch outside a repository) doesn't move the others.")
+            Caption("Click a segment to keep or drop it; the brush (or its menu) styles it. Yours are named by what they show and matched by how they start, so one that comes and goes (a git branch outside a repository) doesn't move the others.")
             ForEach(chips.lineIndices, id: \.self) { line in
-                LineChips(chips: chips, line: line, change: change)
+                LineChips(chips: chips, line: line, badges: badges, change: change)
             }
             JoinWithPicker(chips: chips, change: change)
             VStack(alignment: .leading, spacing: 2) {
@@ -116,7 +144,9 @@ private struct SegmentChips: View {
                 Text("Sanduhr's").font(.caption.weight(.medium))
                 ChipFlow {
                     ForEach(chips.mineChips) { chip in
-                        ChipButton(chip: chip, help: Self.help(chip)) { change { $0.toggle(chip) } }
+                        SegmentChip(chip: chip, help: Self.help(chip),
+                                    badge: SanduhrSegment(rawValue: chip.key).flatMap { badges.text(.sanduhr($0)) },
+                                    chips: chips, change: change)
                     }
                 }
             }
@@ -141,6 +171,7 @@ private struct SegmentChips: View {
 private struct LineChips: View {
     let chips: StatuslineChips
     let line: Int
+    let badges: Badges
     let change: ((inout StatuslineChips) -> Void) -> Void
 
     var body: some View {
@@ -153,9 +184,8 @@ private struct LineChips: View {
             Caption("How Sanduhr reads your line into segments: the separator it found, or one you choose. It changes the chips; your line reads the same until you drop a segment or choose Join with.")
             ChipFlow {
                 ForEach(chips.chips(line: line)) { chip in
-                    ChipButton(chip: chip, help: "Click to keep or drop it. Matched by how it starts (\u{201C}\(chip.key)\u{201D}), so it's found wherever it appears.") {
-                        change { $0.toggle(chip) }
-                    }
+                    SegmentChip(chip: chip, help: help(chip), badge: badges.text(.theirs(chip.key)),
+                                chips: chips, change: change)
                 }
             }
             if chips.isWhole(line: line) {
@@ -164,19 +194,24 @@ private struct LineChips: View {
         }
     }
 
+    private func help(_ chip: StatuslineChips.Chip) -> String {
+        "\(chip.name), from your statusline: \(chip.label). Click to keep or drop it. Matched by how it starts (\u{201C}\(chip.key)\u{201D}), so it's found wherever it appears."
+    }
+
     private var separatorMenu: some View {
         Picker("Split yours on", selection: Binding(
             get: { chips.separator(line: line) },
             set: { sep in change { $0.setSeparator(sep, line: line) } })) {
             ForEach(StatuslineSeparator.allCases, id: \.self) { sep in
-                Text(sep == chips.detected(line: line) ? "\(sep.title) (found)" : sep.title).tag(sep)
+                GlyphMenuLabel(title: sep == chips.detected(line: line) ? "\(sep.title) (found)" : sep.title, shape: sep.shape)
+                    .tag(sep)
             }
         }
         .labelsHidden()
         .pickerStyle(.menu)
         .fixedSize()
         .disabled(!chips.separatorChangeable(line: line))
-        .help("Split yours on: the separator Sanduhr cuts your line at to find its segments.")
+        .help("Split yours on: the separator Sanduhr cuts your line at to find its segments. " + PowerlineGlyph.explanation)
     }
 }
 
@@ -194,13 +229,13 @@ private struct JoinWithPicker: View {
                     set: { glyph in change { $0.joinWith = glyph } })) {
                     Text("Same as yours").tag(StatuslineJoinGlyph?.none)
                     ForEach(StatuslineJoinGlyph.allCases, id: \.self) { g in
-                        Text(g.title).tag(StatuslineJoinGlyph?.some(g))
+                        GlyphMenuLabel(title: g.title, shape: g.shape).tag(StatuslineJoinGlyph?.some(g))
                     }
                 }
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .fixedSize()
-                .help("Join with: what goes between the segments that remain, in your part and Sanduhr's.")
+                .help("Join with: what goes between the segments that remain, in your part and Sanduhr's. " + PowerlineGlyph.explanation)
             }
             Caption("The glyph between segments in the final line. Same as yours keeps your own separators.")
         }
@@ -224,9 +259,164 @@ private struct JoinRowPicker: View {
     }
 }
 
+/// The look shared by every chip: name, live text, a duplicate badge; color marks the source.
+private struct ChipFace: View {
+    let name: String
+    let text: String
+    let badge: String?
+    let tint: Color
+    let kept: Bool
+    var styled = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            HStack(spacing: 3) {
+                Text(name).font(.caption2.weight(.semibold))
+                if styled { Image(systemName: "paintbrush.fill").font(.system(size: 8)) }
+            }
+            PowerlineGlyph.text(text)
+                .font(.caption.monospaced())
+                .strikethrough(!kept)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            if let badge {
+                Text(badge).font(.caption2).foregroundStyle(Color.orange).lineLimit(2)
+            }
+        }
+        .frame(maxWidth: 220, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .foregroundStyle(kept ? Color.primary : Color.secondary)
+        .background(RoundedRectangle(cornerRadius: 8).fill(tint.opacity(kept ? 0.22 : 0.06)))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(badge == nil ? tint.opacity(kept ? 0.9 : 0.35) : Color.orange,
+                                                                lineWidth: 1))
+    }
+}
+
+/// A chip of theirs or Sanduhr's: click keeps or drops it, the brush or its menu styles it.
+private struct SegmentChip: View {
+    let chip: StatuslineChips.Chip
+    let help: String
+    let badge: String?
+    let chips: StatuslineChips
+    let change: ((inout StatuslineChips) -> Void) -> Void
+    @State private var styling = false
+
+    private var tint: Color { chip.source == .sanduhr ? Color.hex("f59e0b") : Color.hex("60a5fa") }
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Button { change { $0.toggle(chip) } } label: {
+                ChipFace(name: chip.name, text: chip.label, badge: badge, tint: tint, kept: chip.kept, styled: chip.styled)
+            }
+            .buttonStyle(.plain)
+            .disabled(!chip.enabled)
+            .help(chip.enabled ? help : "Kept whole: this can't be dropped.")
+            .accessibilityLabel("\(chip.name): \(chip.label)")
+            .accessibilityValue(chip.kept ? "kept" : "dropped")
+            if chip.enabled && !chip.key.isEmpty {
+                Button { styling = true } label: { Image(systemName: "paintbrush") }
+                    .buttonStyle(.borderless)
+                    .help("Style \(chip.name)…")
+                    .popover(isPresented: $styling) { popover }
+            }
+        }
+        .contextMenu {
+            if chip.enabled {
+                Button(chip.kept ? "Drop" : "Keep") { change { $0.toggle(chip) } }
+                Button("Style…") { styling = true }
+            }
+        }
+    }
+
+    private var popover: some View {
+        StylePopover(name: chip.name, style: Binding(
+            get: { chips.style(for: chip) },
+            set: { style in change { $0.setStyle(style, for: chip) } }))
+    }
+}
+
+/// A segment's look: its own colors or ink (one color or a gradient), attributes, letters.
+private struct StylePopover: View {
+    let name: String
+    @Binding var style: SegmentStyle
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Style: \(name)").font(.headline)
+            Toggle("Keep its own colors", isOn: Binding(
+                get: { style.keepsOwnColors },
+                set: { on in if on { style.keepOwnColors() } else { style.setSolid("#ff2a6d") } }))
+                .help("Keep its own colors: the segment keeps the colors your statusline (or Sanduhr) gives it.")
+            if !style.keepsOwnColors { InkEditor(style: $style) }
+            HStack {
+                Toggle("Bold", isOn: $style.bold)
+                Toggle("Italic", isOn: $style.italic)
+                Toggle("Dim", isOn: $style.dim)
+                Toggle("Underline", isOn: $style.underline)
+            }
+            .toggleStyle(.checkbox)
+            Picker("Letters", selection: $style.font) {
+                Text("As written").tag(LetterStyle?.none)
+                ForEach(LetterStyle.allCases, id: \.self) { f in Text(f.title).tag(LetterStyle?.some(f)) }
+            }
+            .help("Letters: Unicode letter styles (math letters and small caps). Some fonts draw them differently; digits change only in bold, double-struck, sans and monospace.")
+            Caption("Sanduhr's statusline applies this each refresh. Statuslines can't animate; the Desk can.")
+            Button("Reset to its own look") { style = SegmentStyle() }
+                .disabled(style.isEmpty)
+        }
+        .padding(14)
+        .frame(width: 340)
+    }
+}
+
+/// Ink: one color, or a gradient of 2 to 4 stops.
+private struct InkEditor: View {
+    @Binding var style: SegmentStyle
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Picker("Ink", selection: Binding(
+                get: { style.isGradient },
+                set: { g in if g { style.makeGradient() } else { style.makeSolid() } })) {
+                Text("One color").tag(false)
+                Text("Gradient").tag(true)
+            }
+            .pickerStyle(.segmented)
+            HStack(spacing: 6) {
+                ForEach(Array(style.ink.indices), id: \.self) { i in
+                    ColorPicker("", selection: color(i), supportsOpacity: false).labelsHidden()
+                    if style.isGradient && style.ink.count > 2 {
+                        Button { style.removeStop(at: i) } label: { Image(systemName: "minus.circle") }
+                            .buttonStyle(.borderless)
+                            .help("Remove this stop")
+                    }
+                }
+                if style.isGradient && style.ink.count < SegmentStyle.maxInk {
+                    Button("Add stop") { style.addStop() }
+                }
+            }
+            Caption(style.isGradient ? "A gradient runs across the segment's characters, in truecolor." : "One color for the whole segment, in truecolor.")
+        }
+    }
+
+    private func color(_ i: Int) -> Binding<Color> {
+        Binding(
+            get: {
+                let c = style.ink.indices.contains(i) ? SegmentStyle.components(style.ink[i]) : nil
+                return Color(red: c?.0 ?? 1, green: c?.1 ?? 1, blue: c?.2 ?? 1)
+            },
+            set: { new in
+                guard let ns = NSColor(new).usingColorSpace(.sRGB) else { return }
+                style.setStop(i, hex: SegmentStyle.hex(red: ns.redComponent, green: ns.greenComponent, blue: ns.blueComponent))
+            })
+    }
+}
+
 /// The folder's mods that draw status entries, read-only.
 private struct ModChips: View {
     let mods: [ModStatusEntry]?
+    let badges: Badges
 
     var body: some View {
         if let mods {
@@ -236,11 +426,9 @@ private struct ModChips: View {
                     Caption("No mods in this folder draw status entries.")
                 } else {
                     ChipFlow {
-                        ForEach(mods) { mod in
-                            ModChip(mod: mod)
-                        }
+                        ForEach(mods) { mod in ModChip(mod: mod, badge: badges.text(.mod(mod.path))) }
                     }
-                    Caption("Claude Code draws these mods' status entries in its status area, beside the statusline, so Combine can't keep or drop them. To hide one, use the mod's own settings (/config in Claude Code) or turn the mod off for this folder; the Mods page will have a switch for each.")
+                    Caption("Claude Code draws these mods' status entries in its status area, beside the statusline, so Combine can't keep, drop or style them. To hide one, use the mod's own settings (/config in Claude Code) or turn the mod off for this folder; the Mods page will have a switch for each.")
                 }
             }
         }
@@ -249,24 +437,63 @@ private struct ModChips: View {
 
 private struct ModChip: View {
     let mod: ModStatusEntry
+    let badge: String?
 
     private var help: String {
         let from = mod.origin == .pluginDirs ? "a plugin folder this folder's settings list" : "a plugin turned on in this folder"
-        var text = "\(mod.name): a mod from \(from). Claude Code draws its status entry, not the statusline."
+        let draws = mod.drawsStatus ? "Claude Code draws its status entry, not the statusline" : "it draws Sanduhr's meters above the prompt"
+        var text = "\(mod.name): a mod from \(from); \(draws), so Sanduhr can't keep, drop or style it."
         if let setting = mod.statusSetting { text += " Its own setting \u{201C}\(setting)\u{201D} may switch the entry." }
+        if badge != nil { text += " To remove the duplicate, change the mod's own settings or turn it off on the Mods page." }
         return text
     }
 
     var body: some View {
-        Text(mod.name)
-            .font(.caption.monospaced())
-            .lineLimit(1)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(Capsule().fill(Color.hex("a78bfa").opacity(0.2)))
-            .overlay(Capsule().strokeBorder(Color.hex("a78bfa").opacity(0.8), lineWidth: 1))
+        ChipFace(name: mod.name, text: mod.drawsStatus ? "Status entry" : "Above the prompt", badge: badge,
+                 tint: Color.hex("a78bfa"), kept: true)
             .help(help)
             .accessibilityLabel("Mod \(mod.name), drawn by Claude Code")
+    }
+}
+
+/// Duplicates: a summary, and for yours against Sanduhr's a one-click choice.
+private struct DuplicatesPanel: View {
+    let duplicates: [StatuslineDuplicate]
+    let mods: [ModStatusEntry]
+    let chips: StatuslineChips?
+    let change: ((inout StatuslineChips) -> Void) -> Void
+
+    var body: some View {
+        if let summary = StatuslineDuplicate.summary(duplicates) {
+            VStack(alignment: .leading, spacing: 4) {
+                Label(summary, systemImage: "exclamationmark.triangle").font(.caption.weight(.medium)).foregroundStyle(Color.orange)
+                ForEach(duplicates) { d in row(d) }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ d: StatuslineDuplicate) -> some View {
+        if d.resolvable {
+            HStack(spacing: 6) {
+                Caption("\(d.what): yours and Sanduhr's both show it.")
+                Button("Keep yours") { change { $0.resolve(d, keepYours: true) } }
+                    .help("Drops Sanduhr's \(d.what) segment.")
+                    .disabled((chips?.mineChips.filter(\.kept).count ?? 0) <= 1)
+                Button("Keep Sanduhr's") { change { $0.resolve(d, keepYours: false) } }
+                    .help("Drops your \(d.what) segment.")
+            }
+        } else {
+            Caption("\(d.what): \(side(d.a)) and \(side(d.b)) both show it. A mod's entry changes only in its own settings (/config in Claude Code) or on the Mods page.")
+        }
+    }
+
+    private func side(_ s: StatuslineDuplicate.Side) -> String {
+        switch s {
+        case .theirs: "yours"
+        case .sanduhr: "Sanduhr's"
+        case .mod(let path): "the mod \(mods.first { $0.path == path }?.name ?? "")"
+        }
     }
 }
 
@@ -295,36 +522,6 @@ private struct LiveTestRow: View {
         case (false, true): return "Tested \(time); no saved numbers yet, so the limits are sample values."
         case (false, false): return "Tested \(time) with sample values: no saved numbers or session found."
         }
-    }
-}
-
-/// A chip: colored by source, struck through when dropped.
-private struct ChipButton: View {
-    let chip: StatuslineChips.Chip
-    let help: String
-    let toggle: () -> Void
-
-    private var tint: Color { chip.source == .sanduhr ? Color.hex("f59e0b") : Color.hex("60a5fa") }
-
-    var body: some View {
-        Button(action: toggle) {
-            Text(chip.label)
-                .font(.caption.monospaced())
-                .strikethrough(!chip.kept)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(maxWidth: 240)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .foregroundStyle(chip.kept ? Color.primary : Color.secondary)
-                .background(Capsule().fill(tint.opacity(chip.kept ? 0.25 : 0.06)))
-                .overlay(Capsule().strokeBorder(tint.opacity(chip.kept ? 0.9 : 0.35), lineWidth: 1))
-        }
-        .buttonStyle(.plain)
-        .disabled(!chip.enabled)
-        .help(chip.enabled ? help : "Kept whole: this can't be dropped.")
-        .accessibilityLabel("\(chip.source == .sanduhr ? "Sanduhr's" : "Your") segment \(chip.label)")
-        .accessibilityValue(chip.kept ? "kept" : "dropped")
     }
 }
 
@@ -368,7 +565,7 @@ private struct CombinePreview: View {
     }
 }
 
-/// Terminal-looking text, ANSI drawn.
+/// Terminal-looking text, ANSI drawn, powerline glyphs drawn by Sanduhr.
 private struct Terminal: View {
     let text: String?
     let placeholder: String
@@ -376,7 +573,7 @@ private struct Terminal: View {
     var body: some View {
         Group {
             if let text {
-                Text(ANSIText.attributed(text)).lineLimit(8)
+                ANSIText.text(text).lineLimit(8)
             } else {
                 Text(placeholder).foregroundStyle(.secondary)
             }

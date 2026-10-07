@@ -24,8 +24,8 @@ enum StatuslineSeparator: String, CaseIterable, Sendable {
 
     var title: String {
         switch self {
-        case .powerline: "Powerline \u{E0B0}"
-        case .powerlineThin: "Powerline \u{E0B1}"
+        case .powerline: "Powerline arrow (needs a Nerd Font)"
+        case .powerlineThin: "Powerline thin arrow (needs a Nerd Font)"
         case .bar: "Bar │"
         case .pipe: "Pipe |"
         case .bullet: "Bullet •"
@@ -49,8 +49,8 @@ enum StatuslineJoinGlyph: String, CaseIterable, Sendable {
         case .pipe: "Pipe |"
         case .dot: "Dot ·"
         case .bullet: "Bullet •"
-        case .powerline: "Powerline \u{E0B0}"
-        case .powerlineThin: "Powerline \u{E0B1}"
+        case .powerline: "Powerline arrow (needs a Nerd Font)"
+        case .powerlineThin: "Powerline thin arrow (needs a Nerd Font)"
         case .spaces: "Two spaces"
         }
     }
@@ -98,6 +98,10 @@ struct StatuslinePicks: Equatable, Sendable {
     var keepNew = true
     var separators: [StatuslineSeparator?] = []
     var joinWith: StatuslineJoinGlyph?
+    /// Looks for their segments, by matcher.
+    var styles: [String: SegmentStyle] = [:]
+    /// Looks for Sanduhr's segments.
+    var ours: [SanduhrSegment: SegmentStyle] = [:]
 
     static let maxMatchers = 64
     static let maxMatcherLength = 64
@@ -114,6 +118,10 @@ struct StatuslinePicks: Equatable, Sendable {
         while let last = seps.last, last == nil { seps.removeLast() }
         if !seps.isEmpty { o["sep"] = seps.map { $0.map { $0.rawValue as Any } ?? NSNull() } }
         if let joinWith { o["with"] = joinWith.rawValue }
+        let theirStyles = styles.filter { !$0.value.isEmpty }
+        if !theirStyles.isEmpty { o["style"] = theirStyles.mapValues(\.json) }
+        let ourStyles = ours.filter { !$0.value.isEmpty }
+        if !ourStyles.isEmpty { o["ours"] = Dictionary(uniqueKeysWithValues: ourStyles.map { ($0.key.rawValue, $0.value.json) }) }
         let data = (try? JSONSerialization.data(withJSONObject: o, options: [.sortedKeys, .withoutEscapingSlashes])) ?? Data("{}".utf8)
         return String(decoding: data, as: UTF8.self)
     }
@@ -121,12 +129,15 @@ struct StatuslinePicks: Equatable, Sendable {
     var base64: String { Data(json.utf8).base64EncodedString() }
 
     init(keep: [String] = [], drop: [String] = [], keepNew: Bool = true, separators: [StatuslineSeparator?] = [],
-         joinWith: StatuslineJoinGlyph? = nil) {
+         joinWith: StatuslineJoinGlyph? = nil, styles: [String: SegmentStyle] = [:],
+         ours: [SanduhrSegment: SegmentStyle] = [:]) {
         self.keep = keep
         self.drop = drop
         self.keepNew = keepNew
         self.separators = separators
         self.joinWith = joinWith
+        self.styles = styles
+        self.ours = ours
     }
 
     /// The payload as the runner accepts it, nil for anything it would refuse: canonical base64
@@ -137,7 +148,7 @@ struct StatuslinePicks: Equatable, Sendable {
         guard IntegrationInstaller.isCanonicalBase64(payload), let data = Data(base64Encoded: payload),
               let text = String(data: data, encoding: .utf8),
               let o = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any],
-              Set(o.keys).isSubset(of: ["keep", "drop", "new", "sep", "with"]) else { return nil }
+              Set(o.keys).isSubset(of: ["keep", "drop", "new", "sep", "with", "style", "ours"]) else { return nil }
         func matchers(_ key: String) -> [String]? {
             guard let v = o[key] else { return [] }
             guard let list = v as? [Any], list.count <= Self.maxMatchers else { return nil }
@@ -152,6 +163,21 @@ struct StatuslinePicks: Equatable, Sendable {
         if let v = o["new"] {
             guard let n = v as? NSNumber, CFGetTypeID(n) == CFBooleanGetTypeID() else { return nil }
             keepNew = n.boolValue
+        }
+        if let v = o["style"] {
+            guard let map = v as? [String: Any], map.count <= Self.maxMatchers else { return nil }
+            for (key, value) in map {
+                guard (1...Self.maxMatcherLength).contains(key.unicodeScalars.count),
+                      let style = SegmentStyle(json: value) else { return nil }
+                styles[key] = style
+            }
+        }
+        if let v = o["ours"] {
+            guard let map = v as? [String: Any] else { return nil }
+            for (key, value) in map {
+                guard let segment = SanduhrSegment(rawValue: key), let style = SegmentStyle(json: value) else { return nil }
+                ours[segment] = style
+            }
         }
         if let v = o["with"] {
             guard let name = v as? String, let glyph = StatuslineJoinGlyph(rawValue: name) else { return nil }
@@ -361,6 +387,8 @@ struct StatuslineInspection: Decodable, Equatable, Sendable {
     struct Segment: Decodable, Equatable, Sendable {
         let matcher: String
         let text: String
+        /// What it shows, as the runner's classifier names it (nil from an older script).
+        var kind: String?
     }
 
     struct Split: Decodable, Equatable, Sendable {

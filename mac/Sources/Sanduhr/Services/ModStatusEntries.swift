@@ -16,6 +16,11 @@ struct ModStatusEntry: Identifiable, Equatable, Sendable {
     let origin: Origin
     /// The title of a setting of its own (`userConfig`) that mentions its status, if any.
     let statusSetting: String?
+    /// Its manifest's description, empty without one.
+    var description = ""
+    /// It draws a status entry (`ui.status`); Sanduhr's own meters mod is listed without one,
+    /// as it shows the same meters above the prompt.
+    var drawsStatus = true
     var id: String { path }
 }
 
@@ -48,13 +53,16 @@ enum ModStatusEntries {
         var out: [ModStatusEntry] = []
         for (path, origin) in dirs {
             let dir = URL(fileURLWithPath: path)
-            guard isMod(dir), drawsStatus(dir) else { continue }
+            guard isMod(dir) else { continue }
             let manifest = manifest(dir)
             let name = (manifest["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? dir.lastPathComponent
+            let status = drawsStatus(dir)
+            guard status || name == "sanduhr-meters" else { continue }
             // An @inline mod turned off in this folder draws nothing here.
             if origin == .pluginDirs, (enabled["\(name)@inline"] as? Bool) == false { continue }
             guard !out.contains(where: { $0.path == dir.path }) else { continue }
-            out.append(ModStatusEntry(name: name, path: dir.path, origin: origin, statusSetting: statusSetting(manifest)))
+            out.append(ModStatusEntry(name: name, path: dir.path, origin: origin, statusSetting: statusSetting(manifest),
+                                      description: manifest["description"] as? String ?? "", drawsStatus: status))
         }
         return out
     }
