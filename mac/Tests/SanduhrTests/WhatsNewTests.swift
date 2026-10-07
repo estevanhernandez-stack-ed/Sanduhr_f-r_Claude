@@ -156,9 +156,10 @@ struct WhatsNewTableTests {
     }
 
     @Test func releasesSinceTwoFour() {
-        let releases: Set<String> = ["2.4.0", "2.5.0", "2.6.0", "2.7.0"]
+        let releases: Set<String> = ["2.4.0", "2.5.0", "2.6.0", "2.7.0", "2.8.0"]
         #expect(Set(table.map(\.version)) == releases)
-        #expect(table.count == 10)
+        #expect(table.count == 12)
+        #expect(table.filter { $0.version == "2.8.0" }.map(\.id) == ["watchers", "combine-statusline"])
         #expect(table.filter { $0.version == "2.7.0" }.map(\.id) == ["sign-in", "tour", "now-playing"])
         #expect(table.filter { $0.version == "2.6.0" }.map(\.id)
                 == ["claude-suggests", "dock-aware-desk", "estefont"])
@@ -190,6 +191,7 @@ struct WhatsNewTableTests {
     @Test func showMeLandsOnTheRightPage() {
         let dest = Dictionary(uniqueKeysWithValues: table.map { ($0.id, $0.destination) })
         #expect(dest == [
+            "watchers": .integrations, "combine-statusline": .integrations,
             "sign-in": .credentials, "tour": .about,
             "now-playing": .nowPlaying, "claude-suggests": .message,
             "dock-aware-desk": .deskLayout, "estefont": .deskLook,
@@ -214,5 +216,11 @@ struct WhatsNewTableTests {
         #expect(fromOld.first?.id == "sign-in")
         #expect(!fromOld.contains { $0.version == "2.4.0" })
         #expect(WhatsNew.rangeLabel(fromOld, lastSeen: "2.3.4", current: "2.7.0") == "New in 2.5.0 – 2.7.0")
+    }
+
+    @Test func updatingToTwoEight() {
+        let fromTwoSeven = WhatsNew.cards(lastSeen: "2.7.0", current: "2.8.0")
+        #expect(fromTwoSeven.map(\.id) == ["watchers", "combine-statusline"])
+        #expect(WhatsNew.rangeLabel(fromTwoSeven, lastSeen: "2.7.0", current: "2.8.0") == "New in 2.8.0")
     }
 }
