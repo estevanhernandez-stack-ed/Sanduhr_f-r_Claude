@@ -238,6 +238,34 @@ struct DeskAnchorGeometryTests {
         #expect(DeskAnchorGeometry.point(.bc, in: content) == CGPoint(x: content.midX, y: content.maxY))
     }
 
+    @Test func aSideNeverReachesTheCenterColumn() {
+        // A 1512pt screen: the content is about 1408 wide, a side may take 46% of the window.
+        let total: CGFloat = 1408
+        let colWidth: CGFloat = 1512 * 0.46
+        // Meters at Top center (3.2 times the clock), a long message at Top left.
+        let meters: CGFloat = 112 * 3.2
+        let w = DeskAnchorGeometry.columnWidths(total: total, colWidth: colWidth, center: meters)
+        #expect(w.center == meters)
+        let leftEdge = w.side
+        let centerStart = (total - w.center) / 2
+        #expect(leftEdge + DeskAnchorGeometry.columnGap <= centerStart + 0.001)
+        #expect(w.side * 2 + w.center + DeskAnchorGeometry.columnGap * 2 <= total + 0.001)
+        // Before the fix the side ran to 695 and the center started at 525: they overlapped.
+        #expect(w.side < colWidth)
+    }
+
+    @Test func theCenterColumnNeverOutgrowsTheSideCapOrTheScreen() {
+        let wide = DeskAnchorGeometry.columnWidths(total: 1408, colWidth: 695, center: 2000)
+        #expect(wide.center == 695)
+        #expect(wide.side * 2 + wide.center + DeskAnchorGeometry.columnGap * 2 <= 1408 + 0.001)
+        let narrow = DeskAnchorGeometry.columnWidths(total: 300, colWidth: 200, center: 280)
+        #expect(narrow.center <= 300 - DeskAnchorGeometry.columnGap * 2)
+        #expect(narrow.side >= 0)
+        // A small center leaves each side its full cap when there is room.
+        let small = DeskAnchorGeometry.columnWidths(total: 2400, colWidth: 400, center: 100)
+        #expect(small.side == 400)
+    }
+
     @Test(arguments: DockSide.allCases)
     func theDockClearanceCoversEveryAnchorOnItsSide(_ side: DockSide) {
         let reach: CGFloat = 70

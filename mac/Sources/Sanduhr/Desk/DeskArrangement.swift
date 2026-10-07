@@ -254,9 +254,25 @@ enum DeskAnchorGeometry {
         return max(0, notchBottom + notchGap - contentTop)
     }
 
+    /// Room kept between the center column and each side column, in points (the gap the sides
+    /// keep between them without a center).
+    static let columnGap: CGFloat = 24
+
+    /// How wide each column may draw when the centers have pieces: the center column takes its
+    /// own width (at most `colWidth`, the side cap), and each side gets what is left on its half,
+    /// less `columnGap`, so a side's pieces wrap or shrink before they reach the center. The three
+    /// never overlap horizontally: side + gap + center + gap + side <= total.
+    static func columnWidths(total: CGFloat, colWidth: CGFloat, center: CGFloat) -> (side: CGFloat, center: CGFloat) {
+        let mid = max(0, min(center, colWidth, total - 2 * columnGap))
+        let side = max(0, min(colWidth, (total - mid) / 2 - columnGap))
+        return (side, mid)
+    }
+
     /// The point an anchor's stack hangs from: its outer corner or edge middle in `content`
     /// (top anchors hang down from the top, bottom ones rest on the bottom, middles are
-    /// centered on the height), the top center moved down by `centerDrop`.
+    /// centered on the height), the top center moved down by `centerDrop`. A middle stack is
+    /// drawn between its side's top and bottom stacks, so a tall corner pushes it off the exact
+    /// middle rather than drawing over it; this is where it sits when its side has room.
     static func point(_ anchor: DeskAnchor, in content: CGRect, centerDrop: CGFloat = 0) -> CGPoint {
         let x: CGFloat
         switch anchor.column {

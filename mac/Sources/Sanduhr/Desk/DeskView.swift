@@ -6,8 +6,10 @@ import AppKit
 /// widgets at the same anchor stack in the order listed. The top and bottom of a side share one
 /// column with a spacer between them, so a growing meeting list pushes against the message
 /// instead of drawing over it, and the message shrinks to fit before anything overlaps. A
-/// side's middle is centered on that column; the centers share a column of their own, the top
-/// center below the notch or the island. A layout with corners only draws exactly as before.
+/// side's middle sits in that column between its top and bottom, pushed by them the same way;
+/// the centers share a column of their own between the sides, which then draw only in the room
+/// it leaves (DeskColumnsLayout), the top center below the notch or the island. A layout with
+/// corners only draws exactly as before.
 ///
 /// Settings live in the com.626labs.sanduhr.desk defaults domain:
 ///   defaults write com.626labs.sanduhr.desk layout "message:tl clock:bl claude:bl meetings:bl"
@@ -65,17 +67,7 @@ struct DeskView: View {
         GeometryReader { geo in
             let colWidth = max(200, geo.size.width * 0.46)
             let lineInLayout = place.values.contains { $0.contains { $0.widget == Widget.claude.rawValue } }
-            HStack(alignment: .top, spacing: 0) {
-                column(.left, place, alignment: .leading, lineInLayout: lineInLayout)
-                    .frame(maxWidth: colWidth, alignment: .leading)
-                Spacer(minLength: 24)
-                column(.right, place, alignment: .trailing, lineInLayout: lineInLayout)
-                    .frame(maxWidth: colWidth, alignment: .trailing)
-            }
-            .overlay {
-                centerColumn(place, lineInLayout: lineInLayout, contentTop: margins.top + inset)
-                    .frame(maxWidth: colWidth)
-            }
+            columns(place, colWidth: colWidth, lineInLayout: lineInLayout, contentTop: margins.top + inset)
             // Handwritten glyphs reach past their own boxes (the left curve of an 8, say), and
             // shadows draw inside those boxes, clipping them. Inner breathing room fixes that;
             // the outer padding gives it back so the margins still mean the visible edge.
@@ -91,32 +83,49 @@ struct DeskView: View {
         }
     }
 
-    /// A side's column: its top and bottom stacks as before, and its middle (item 59) centered
-    /// on the column's height. Without a middle it is exactly the column from before item 59.
+    /// The columns. Corners and middles only: the two side columns as before item 59, the
+    /// spacer between them. With a piece at a center, the center column sits between the sides
+    /// (DeskColumnsLayout) and the sides draw only in the room it leaves, so nothing at a side
+    /// reaches a center piece: a long message wraps and shrinks instead.
     @ViewBuilder
+    private func columns(_ place: [DeskAnchor: [DeskPlacement]], colWidth: CGFloat,
+                         lineInLayout: Bool, contentTop: CGFloat) -> some View {
+        let left = column(.left, place, alignment: .leading, lineInLayout: lineInLayout)
+        let right = column(.right, place, alignment: .trailing, lineInLayout: lineInLayout)
+        if (place[.tc] ?? []).isEmpty && (place[.bc] ?? []).isEmpty {
+            HStack(alignment: .top, spacing: 0) {
+                left.frame(maxWidth: colWidth, alignment: .leading)
+                Spacer(minLength: DeskAnchorGeometry.columnGap)
+                right.frame(maxWidth: colWidth, alignment: .trailing)
+            }
+        } else {
+            DeskColumnsLayout(colWidth: colWidth) {
+                left.frame(maxWidth: .infinity, alignment: .leading)
+                centerColumn(place, lineInLayout: lineInLayout, contentTop: contentTop)
+                right.frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        }
+    }
+
+    /// A side's column: its top and bottom stacks as before, and its middle (item 59) between
+    /// them, with a flexible spacer on each side, so it sits halfway between the two stacks and a
+    /// tall corner pushes against it instead of drawing over it. Without a middle it is exactly
+    /// the column from before item 59.
     private func column(_ side: DeskAnchor.Column, _ place: [DeskAnchor: [DeskPlacement]],
                         alignment: HorizontalAlignment, lineInLayout: Bool) -> some View {
         let top = DeskAnchor.at(side, .top).flatMap { place[$0] } ?? []
         let middle = DeskAnchor.at(side, .middle).flatMap { place[$0] } ?? []
         let bottom = DeskAnchor.at(side, .bottom).flatMap { place[$0] } ?? []
-        let ends = VStack(alignment: alignment, spacing: DeskNowPlaying.columnSpacing) {
+        return VStack(alignment: alignment, spacing: DeskNowPlaying.columnSpacing) {
             pieces(top, alignment: alignment, lineInLayout: lineInLayout)
             Spacer(minLength: 32)
+            if !middle.isEmpty {
+                pieces(middle, alignment: alignment, lineInLayout: lineInLayout)
+                Spacer(minLength: 32)
+            }
             pieces(bottom, alignment: alignment, lineInLayout: lineInLayout)
         }
         .frame(maxHeight: .infinity)
-        if middle.isEmpty {
-            ends
-        } else {
-            let edge = Alignment(horizontal: alignment, vertical: .center)
-            // Full width, so the middle is offered the column's room, not its ends' width.
-            ends.frame(maxWidth: .infinity, alignment: edge)
-                .overlay(alignment: edge) {
-                    VStack(alignment: alignment, spacing: DeskNowPlaying.columnSpacing) {
-                        pieces(middle, alignment: alignment, lineInLayout: lineInLayout)
-                    }
-                }
-        }
     }
 
     /// The centers (item 59): top center below the notch or the island, bottom center on the
@@ -143,6 +152,30 @@ struct DeskView: View {
                 DeskPiece(widget: widget, model: model, alignment: alignment, lineInLayout: lineInLayout, scale: p.scale)
             }
         }
+    }
+}
+
+/// Left, center and right columns side by side with no horizontal overlap (item 59): the
+/// center takes its own width, the sides what is left (DeskAnchorGeometry.columnWidths). The
+/// center stays on the screen's middle; each side hugs its edge. Expects three subviews.
+struct DeskColumnsLayout: Layout {
+    let colWidth: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        proposal.replacingUnspecifiedDimensions()
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 3 else { return }
+        let height = bounds.height
+        let ideal = subviews[1].sizeThatFits(ProposedViewSize(width: colWidth, height: height)).width
+        let widths = DeskAnchorGeometry.columnWidths(total: bounds.width, colWidth: colWidth, center: ideal)
+        subviews[0].place(at: CGPoint(x: bounds.minX, y: bounds.minY), anchor: .topLeading,
+                          proposal: ProposedViewSize(width: widths.side, height: height))
+        subviews[1].place(at: CGPoint(x: bounds.midX, y: bounds.minY), anchor: .top,
+                          proposal: ProposedViewSize(width: widths.center, height: height))
+        subviews[2].place(at: CGPoint(x: bounds.maxX, y: bounds.minY), anchor: .topTrailing,
+                          proposal: ProposedViewSize(width: widths.side, height: height))
     }
 }
 
