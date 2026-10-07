@@ -125,7 +125,10 @@ DESK_SYNTAX = (
     "still shows under them. Pinning one line is a user setting (pinned): the pinned line replaces "
     "the usual line every day, so weekday and plain lines don't show while it is pinned (say so "
     "before proposing them), but date lines still stack above the pinned line, so birthdays and "
-    "holidays show either way. ")
+    "holidays show either way. The user's On special days setting (special_mode) decides how the date's "
+    "lines share the Desk with the usual line: stack (all at once, the date's lines on top), turns "
+    "(one at a time, crossfading) or scroll (one at a time, gliding up like a slow ticker), each "
+    "line shown for special_seconds. ")
 DESK_EFFECTS = (
     "Effects: tags at the start of the text, after any prefix, in any order, each in braces: "
     "{ink:#ff2a6d,#05d9e8} this line's ink, 1 to 4 hex colors (2 or more make a left-to-right "
@@ -1362,6 +1365,8 @@ def validate_desk_lines(lines):
 
 
 DESK_MAX_SPECIAL = 3
+DESK_SPECIAL_MODES = ("stack", "turns", "scroll")
+DESK_SPECIAL_SECONDS = (5, 10, 30, 60, 300)
 
 
 def desk_today(text, now, hourly, mix=False, pinned=None):
@@ -1416,7 +1421,8 @@ def pick_desk_line(text, now, hourly, mix=False):
 def read_desk_state(paths):
     """The app's note of the user's settings (pinned, rotation, mix_daily), or the defaults."""
     doc = read_json(paths.desk_state)
-    state = {"known": False, "pinned": False, "pinned_line": None, "rotate": "daily", "mix_daily": False}
+    state = {"known": False, "pinned": False, "pinned_line": None, "rotate": "daily", "mix_daily": False,
+             "special_mode": "stack", "special_seconds": 10}
     if isinstance(doc, dict) and doc.get("schema_version") == 1:
         state["known"] = True
         state["pinned"] = doc.get("pinned") is True
@@ -1425,6 +1431,10 @@ def read_desk_state(paths):
         if doc.get("rotate") in ROTATIONS:
             state["rotate"] = doc["rotate"]
         state["mix_daily"] = doc.get("mix_daily") is True
+        if doc.get("special_mode") in DESK_SPECIAL_MODES:
+            state["special_mode"] = doc["special_mode"]
+        if doc.get("special_seconds") in DESK_SPECIAL_SECONDS:
+            state["special_seconds"] = doc["special_seconds"]
     return state
 
 
@@ -1433,7 +1443,8 @@ def build_desk_messages(now=None, paths=None):
     paths = paths or Paths()
     state = read_desk_state(paths)
     out = {"status": "ok", "file_found": False, "lines": [], "pinned": state["pinned"],
-           "rotate": state["rotate"], "mix_daily": state["mix_daily"], "today": None, "today_special": [],
+           "rotate": state["rotate"], "mix_daily": state["mix_daily"],
+           "special_mode": state["special_mode"], "special_seconds": state["special_seconds"], "today": None, "today_special": [],
            "limits": {"lines_per_proposal": DESK_MAX_LINES, "characters_per_line": DESK_MAX_LINE_CHARS}}
     if not state["known"]:
         out["settings_note"] = "Sanduhr has not reported the pin and rotation yet; shown as the defaults."

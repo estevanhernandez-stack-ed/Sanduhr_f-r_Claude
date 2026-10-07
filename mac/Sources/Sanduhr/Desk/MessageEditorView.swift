@@ -35,6 +35,7 @@ struct MessageEditorBar: View {
             Toggle("Mix every-day lines in on days with their own line", isOn: $mix)
                 .help("Off: on a day with its own lines (Fridays), only those show. On: they take turns with the every-day lines.")
                 .onChange(of: mix) { _, _ in saved() }
+            MessageSpecialDaysControl(changed: saved)
             HStack {
                 Button("Save") { if editor.save() { saved() } }
                     .keyboardShortcut("s", modifiers: .command)
@@ -59,6 +60,33 @@ struct MessageEditorBar: View {
     static func todayText(_ today: MessageEngine.Today) -> String {
         let lines = today.lines.map { MessageMarkup.parse($0).text }
         return "Today: " + (lines.isEmpty ? "nothing" : lines.joined(separator: " / "))
+    }
+}
+
+/// On special days: Stack, Take turns or Scroll, and, unless Stack, how long each line shows.
+struct MessageSpecialDaysControl: View {
+    let changed: () -> Void
+    @AppStorage(MessageSpecialMode.key, store: .desk) private var mode = MessageSpecialMode.stack
+    @AppStorage(MessageSpecialMode.secondsKey, store: .desk) private var seconds = MessageSpecialMode.defaultSeconds
+
+    var body: some View {
+        HStack {
+            Picker("On special days", selection: $mode) {
+                ForEach(MessageSpecialMode.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            .fixedSize()
+            .help("How a date's own lines share the Desk with the day's line. \(mode.help)")
+            if mode != .stack {
+                Picker("Each line shows for", selection: $seconds) {
+                    ForEach(MessageSpecialMode.presets, id: \.self) { Text(MessageSpecialMode.label($0)).tag($0) }
+                }
+                .fixedSize()
+                .help("How long each line stays before the next one comes in.")
+            }
+            Spacer()
+        }
+        .onChange(of: mode) { _, _ in changed() }
+        .onChange(of: seconds) { _, _ in changed() }
     }
 }
 

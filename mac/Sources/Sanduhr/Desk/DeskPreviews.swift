@@ -249,7 +249,7 @@ struct DeskMessagePreview: View {
                 .frame(maxWidth: messageSize * 9, alignment: .leading)
                 .padding(messageSize * 0.2)
         }
-        .modifier(PreviewModelSync(preview: preview, live: live, samples: $samples))
+        .modifier(PreviewModelSync(preview: preview, live: live, sampleSpecialDay: true, samples: $samples))
     }
 
     private var replayButton: some View {

@@ -159,3 +159,84 @@ enum MessageEngine {
         today(from: text, now: now, hourly: hourly, mix: mix, calendar: calendar).usual
     }
 }
+
+/// On special days (item 69): how the date's lines and the usual line share the message piece.
+/// Stack draws them all, the date's lines on top; Take turns shows one at a time with a crossfade;
+/// Scroll moves them up one after another like a slow ticker. The line showing is decided by the
+/// clock alone (`index(at:)`), so the Desk, the notch and the previews agree without talking.
+enum MessageSpecialMode: String, CaseIterable, Sendable {
+    case stack, turns, scroll
+
+    static let key = "messageSpecialMode"
+    static let secondsKey = "messageSpecialSeconds"
+    static let defaultSeconds: Double = 10
+    /// The timing menu's presets.
+    static let presets: [Double] = [5, 10, 30, 60, 300]
+
+    var title: String {
+        switch self {
+        case .stack: "Stack"
+        case .turns: "Take turns"
+        case .scroll: "Scroll"
+        }
+    }
+
+    var help: String {
+        switch self {
+        case .stack: "The day's special lines sit above its usual line, all at once."
+        case .turns: "One line at a time, fading from the special lines to the usual line and round again."
+        case .scroll: "One line at a time, each gliding up out of view as the next comes in, like a slow ticker."
+        }
+    }
+
+    /// "5 s", "10 s", "30 s", "1 min", "5 min".
+    static func label(_ seconds: Double) -> String {
+        seconds >= 60 ? "\(Int(seconds / 60)) min" : "\(Int(seconds)) s"
+    }
+
+    /// The saved choice; anything unknown is Stack.
+    static func saved(in d: UserDefaults = .desk) -> MessageSpecialMode {
+        d.string(forKey: key).flatMap(MessageSpecialMode.init(rawValue:)) ?? .stack
+    }
+
+    /// The saved time each line shows, one of the presets (10 s unless set).
+    static func savedSeconds(in d: UserDefaults = .desk) -> Double {
+        let v = d.double(forKey: secondsKey)
+        return presets.contains(v) ? v : defaultSeconds
+    }
+
+    /// How a change of line is drawn.
+    enum Change: Equatable { case none, crossfade, scroll }
+
+    /// Reduce Motion: Take turns swaps at once, and Scroll does the same.
+    static func change(_ mode: MessageSpecialMode, reduceMotion: Bool) -> Change {
+        switch mode {
+        case .stack: .none
+        case .turns: reduceMotion ? .none : .crossfade
+        case .scroll: reduceMotion ? .none : .scroll
+        }
+    }
+
+    /// The crossfade's length.
+    static let fade: TimeInterval = 0.4
+    /// Scroll's glide: the old line up and out while the new one comes up in.
+    static let glide: TimeInterval = 0.8
+
+    /// Whether the lines cycle: Take turns or Scroll on a special day (more than one line).
+    static func cycles(_ mode: MessageSpecialMode, today: MessageEngine.Today) -> Bool {
+        mode != .stack && !today.special.isEmpty && today.lines.count > 1
+    }
+
+    /// Which of `count` lines shows at `date`, each for `seconds`, by the clock.
+    static func index(at date: Date, count: Int, seconds: Double) -> Int {
+        guard count > 1, seconds > 0 else { return 0 }
+        let step = Int(floor(date.timeIntervalSince1970 / seconds))
+        return ((step % count) + count) % count
+    }
+
+    /// When the line next changes after `date`.
+    static func nextChange(after date: Date, seconds: Double) -> Date {
+        let step = floor(date.timeIntervalSince1970 / seconds) + 1
+        return Date(timeIntervalSince1970: step * seconds)
+    }
+}

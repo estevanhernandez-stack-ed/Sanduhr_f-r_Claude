@@ -75,8 +75,51 @@ final class DeskModel {
     var message: String?
     /// Today's date lines (item 69), drawn above the usual line; empty on most days.
     var specialMessages: [String] = []
-    /// For places with room for one line (the notch): the first special line, else the usual one.
-    var oneLineMessage: String? { specialMessages.first ?? message }
+    /// On special days: Stack, Take turns or Scroll (MessageSpecialMode), and how long each line
+    /// shows while they take turns.
+    var specialMode: MessageSpecialMode = .stack
+    var specialSeconds: Double = MessageSpecialMode.defaultSeconds
+    /// While the lines take turns: which of `messageLines` shows. Moves with the clock
+    /// (MessageSpecialMode.index), rests while the Desk can't be seen.
+    var cycleIndex = 0
+    @ObservationIgnored private var cycleTimer: Timer?
+
+    /// Everything the message piece draws today, in cycle order: the date's lines, then the usual one.
+    var messageLines: [String] { specialMessages + [message].compactMap { $0 } }
+    /// Take turns or Scroll on a special day.
+    var cycling: Bool {
+        MessageSpecialMode.cycles(specialMode, today: MessageEngine.Today(special: specialMessages, usual: message))
+    }
+    /// The line showing now while they take turns, nil otherwise.
+    var cycleLine: String? {
+        guard cycling else { return nil }
+        let lines = messageLines
+        return lines[cycleIndex % lines.count]
+    }
+    /// For places with room for one line (the notch): the line taking its turn, else the first
+    /// special line, else the usual one.
+    var oneLineMessage: String? { cycleLine ?? specialMessages.first ?? message }
+
+    /// Moves the turn to the clock's line and waits for the next change; while the Desk can't be
+    /// seen (`motionPaused`) the turn holds and nothing waits. Nothing runs without a cycle.
+    func updateCycle(now: Date = Date()) {
+        cycleTimer?.invalidate()
+        cycleTimer = nil
+        guard cycling, !motionPaused else { return }
+        let index = MessageSpecialMode.index(at: now, count: messageLines.count, seconds: specialSeconds)
+        if cycleIndex != index { cycleIndex = index }
+        let wait = MessageSpecialMode.nextChange(after: now, seconds: specialSeconds).timeIntervalSince(now)
+        cycleTimer = Timer.scheduledTimer(withTimeInterval: max(0.05, wait), repeats: false) { [weak self] _ in
+            self?.updateCycle()
+        }
+    }
+
+    /// The saved On special days choice and timing (Settings, Message).
+    func applySpecialSettings(mode: MessageSpecialMode, seconds: Double, now: Date = Date()) {
+        if specialMode != mode { specialMode = mode }
+        if specialSeconds != seconds { specialSeconds = seconds }
+        updateCycle(now: now)
+    }
     /// Nobody can see the Desk (covered, screens asleep, screen saver, session switched away):
     /// the message's {shimmer} rests (MessageMotion). Set by DeskController.
     var motionPaused = false
@@ -312,6 +355,7 @@ final class DeskModel {
             meetings = Self.demoMeetings(now: now)
             message = Self.demoMessage
             specialMessages = []
+            updateCycle()
             calendarNote = nil
         } else {
             meetings = []
@@ -325,6 +369,7 @@ final class DeskModel {
         let today = MessageEngine.today(now: now)
         if message != today.usual { message = today.usual }
         if specialMessages != today.special { specialMessages = today.special }
+        applySpecialSettings(mode: .saved(), seconds: MessageSpecialMode.savedSeconds(), now: now)
     }
 
     /// Demo mode's message, also the Settings previews' sample line (item 68).

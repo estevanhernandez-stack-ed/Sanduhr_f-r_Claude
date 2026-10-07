@@ -486,3 +486,127 @@ struct MessageRowNoteTests {
                 == "Today: happy birthday, Sam. / keep.")
     }
 }
+
+@Suite("On special days: Stack, Take turns, Scroll")
+@MainActor
+struct MessageSpecialModeTests {
+    private let t0 = Date(timeIntervalSince1970: 1_800_000_000)   // a multiple of 10, 30, 60 and 300
+
+    private func model(_ mode: MessageSpecialMode, seconds: Double = 10, special: [String] = ["sam.", "alex."],
+                       usual: String? = "keep.", at now: Date) -> DeskModel {
+        let m = DeskModel()
+        m.specialMessages = special
+        m.message = usual
+        m.applySpecialSettings(mode: mode, seconds: seconds, now: now)
+        return m
+    }
+
+    @Test func cycleOrderAndTiming() {
+        for (offset, want) in [(0.0, 0), (9.9, 0), (10, 1), (19, 1), (20, 2), (29.9, 2), (30, 0), (45, 1)] {
+            #expect(MessageSpecialMode.index(at: t0.addingTimeInterval(offset), count: 3, seconds: 10) == want, "\(offset)")
+        }
+        #expect(MessageSpecialMode.index(at: t0.addingTimeInterval(61), count: 2, seconds: 60) == 1)
+        #expect(MessageSpecialMode.index(at: t0, count: 1, seconds: 10) == 0)
+        #expect(MessageSpecialMode.nextChange(after: t0.addingTimeInterval(3), seconds: 10) == t0.addingTimeInterval(10))
+        #expect(MessageSpecialMode.nextChange(after: t0, seconds: 300) == t0.addingTimeInterval(300))
+        // Cycle order: the date's lines, then the usual line, round again.
+        let m = model(.turns, at: t0)
+        #expect(m.messageLines == ["sam.", "alex.", "keep."])
+        var shown: [String?] = []
+        for k in 0..<4 {
+            m.updateCycle(now: t0.addingTimeInterval(Double(k) * 10))
+            shown.append(m.cycleLine)
+        }
+        #expect(shown == ["sam.", "alex.", "keep.", "sam."])
+    }
+
+    @Test func theNotchFollowsTheSameLine() {
+        for mode in [MessageSpecialMode.turns, .scroll] {
+            let m = model(mode, at: t0.addingTimeInterval(10))
+            #expect(m.oneLineMessage == "alex.")
+            m.updateCycle(now: t0.addingTimeInterval(20))
+            #expect(m.oneLineMessage == "keep.")
+        }
+        // Stack: the first date line, as before.
+        #expect(model(.stack, at: t0.addingTimeInterval(10)).oneLineMessage == "sam.")
+        #expect(model(.stack, at: t0).cycleLine == nil)
+    }
+
+    @Test func nothingCyclesWithoutASpecialDay() {
+        let m = model(.turns, special: [], at: t0.addingTimeInterval(10))
+        #expect(!m.cycling)
+        #expect(m.oneLineMessage == "keep.")
+        // A date line alone: one line, nothing to take turns with.
+        let alone = model(.scroll, special: ["sam."], usual: nil, at: t0.addingTimeInterval(10))
+        #expect(!alone.cycling)
+        #expect(alone.oneLineMessage == "sam.")
+    }
+
+    @Test func theTurnsRestWhileTheDeskIsCovered() {
+        let m = model(.turns, at: t0)
+        #expect(m.cycleIndex == 0)
+        m.motionPaused = true
+        m.updateCycle(now: t0.addingTimeInterval(10))
+        #expect(m.cycleIndex == 0)
+        m.updateCycle(now: t0.addingTimeInterval(20))
+        #expect(m.cycleLine == "sam.")
+        m.motionPaused = false
+        m.updateCycle(now: t0.addingTimeInterval(20))
+        #expect(m.cycleLine == "keep.")
+    }
+
+    @Test func reduceMotionFallsBackToASwap() {
+        #expect(MessageSpecialMode.change(.turns, reduceMotion: false) == .crossfade)
+        #expect(MessageSpecialMode.change(.scroll, reduceMotion: false) == .scroll)
+        #expect(MessageSpecialMode.change(.turns, reduceMotion: true) == .none)
+        #expect(MessageSpecialMode.change(.scroll, reduceMotion: true) == .none)
+        #expect(MessageSpecialMode.change(.stack, reduceMotion: false) == .none)
+        #expect(MessageSpecialMode.fade == 0.4)
+    }
+
+    @Test func settingsRoundTrip() throws {
+        let d = try #require(UserDefaults(suiteName: "special-\(UUID().uuidString)"))
+        #expect(MessageSpecialMode.saved(in: d) == .stack)
+        #expect(MessageSpecialMode.savedSeconds(in: d) == 10)
+        d.set("scroll", forKey: MessageSpecialMode.key)
+        d.set(60.0, forKey: MessageSpecialMode.secondsKey)
+        #expect(MessageSpecialMode.saved(in: d) == .scroll)
+        #expect(MessageSpecialMode.savedSeconds(in: d) == 60)
+        d.set("ticker", forKey: MessageSpecialMode.key)
+        d.set(7.0, forKey: MessageSpecialMode.secondsKey)
+        #expect(MessageSpecialMode.saved(in: d) == .stack)
+        #expect(MessageSpecialMode.savedSeconds(in: d) == 10)
+        #expect(MessageSpecialMode.key == "messageSpecialMode")
+        #expect(MessageSpecialMode.secondsKey == "messageSpecialSeconds")
+        #expect(MessageSpecialMode.allCases.map(\.title) == ["Stack", "Take turns", "Scroll"])
+        #expect(MessageSpecialMode.presets.map(MessageSpecialMode.label) == ["5 s", "10 s", "30 s", "1 min", "5 min"])
+    }
+
+    @Test func stateFileCarriesTheSetting() throws {
+        let doc = try #require(JSONSerialization.jsonObject(
+            with: MessageProposal.stateJSON(pinned: nil, rotate: "daily", specialMode: .turns, specialSeconds: 30)) as? [String: Any])
+        #expect(doc["special_mode"] as? String == "turns")
+        #expect(doc["special_seconds"] as? Int == 30)
+        let plain = try #require(JSONSerialization.jsonObject(
+            with: MessageProposal.stateJSON(pinned: nil, rotate: "daily")) as? [String: Any])
+        #expect(plain["special_mode"] as? String == "stack")
+        #expect(plain["special_seconds"] as? Int == 10)
+    }
+
+    @Test func theMessageCardShowsASampleSpecialDay() throws {
+        let d = try #require(UserDefaults(suiteName: "special-card-\(UUID().uuidString)"))
+        d.set("turns", forKey: MessageSpecialMode.key)
+        let live = DeskModel()
+        live.message = "keep."
+        let preview = DeskModel()
+        let samples = SurfacePreviewData.fill(preview, from: live, islandUp: false, sampleSpecialDay: true, desk: d, now: t0)
+        #expect(samples.contains(.specialDay))
+        #expect(preview.specialMessages == [SurfacePreviewData.sampleSpecialLine])
+        #expect(preview.specialMode == .turns)
+        #expect(preview.cycling)
+        // Other cards copy the live lines only.
+        let other = DeskModel()
+        #expect(!SurfacePreviewData.fill(other, from: live, islandUp: false, desk: d, now: t0).contains(.specialDay))
+        #expect(other.specialMessages.isEmpty)
+    }
+}

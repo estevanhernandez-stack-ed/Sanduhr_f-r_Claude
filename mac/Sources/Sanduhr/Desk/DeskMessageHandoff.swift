@@ -159,9 +159,11 @@ final class DeskMessageHandoff {
     }
 
     /// desk-messages-state.json, for get_desk_messages: rewritten only when the pin, the
-    /// rotation or the mix switch changed.
-    func writeState(pinned: String?, rotate: String, mixDaily: Bool = false) {
-        let data = MessageProposal.stateJSON(pinned: pinned, rotate: rotate, mixDaily: mixDaily)
+    /// rotation, the mix switch or On special days changed.
+    func writeState(pinned: String?, rotate: String, mixDaily: Bool = false,
+                    specialMode: MessageSpecialMode = .stack, specialSeconds: Double = MessageSpecialMode.defaultSeconds) {
+        let data = MessageProposal.stateJSON(pinned: pinned, rotate: rotate, mixDaily: mixDaily,
+                                             specialMode: specialMode, specialSeconds: specialSeconds)
         guard data != lastState else { return }
         lastState = data
         HandoffFiles.writeOwnerOnly(data, to: paths.state)
@@ -191,6 +193,7 @@ extension DeskMessageHandoff {
     func reportSettings() {
         let d = UserDefaults.desk
         writeState(pinned: d.string(forKey: "message"), rotate: d.string(forKey: "messageRotate") ?? "daily",
-                   mixDaily: d.bool(forKey: MessageEngine.mixKey))
+                   mixDaily: d.bool(forKey: MessageEngine.mixKey),
+                   specialMode: .saved(in: d), specialSeconds: MessageSpecialMode.savedSeconds(in: d))
     }
 }
