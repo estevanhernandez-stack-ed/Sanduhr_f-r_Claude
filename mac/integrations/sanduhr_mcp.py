@@ -30,7 +30,7 @@ names as the account chose (Hidden returns the record's short code, never a name
 
 Reads snapshot.json, mcp-access.json, the history files and vault folders it names, the
 session logs under a folder it names, Desk's messages.txt and desk-messages-state.json (the pin
-and rotation, written by Sanduhr). Desk messages are not gated by Share with Claude: they are on
+and rotation, written by Sanduhr). Desk messages are not gated by Share with your agents: they are on
 the desktop already, and a proposal only asks (Sanduhr checks it again and the user approves,
 unless they chose to let Claude change the messages directly). Never reads Sanduhr's settings,
 the Keychain or account names; never calls claude.ai or anything else on the network; never
@@ -97,18 +97,18 @@ REMEDY_ERROR = {
 REMEDY_NETWORK = "Sanduhr's last fetch failed (network). Tiers below are last-good, not current."
 SETTINGS_PLACE = "Sanduhr's Settings > Accounts > Data"
 REMEDY_NOT_SHARED = {
-    "missing": "Nothing is shared with Claude. Choose Share with Claude for an account in " + SETTINGS_PLACE + " (Sanduhr writes the choices for this server to mcp-access.json).",
-    "unreadable": "Sanduhr's sharing file (mcp-access.json) could not be read, so nothing is shared. Change any Share with Claude choice in " + SETTINGS_PLACE + " to rewrite it.",
+    "missing": "Nothing is shared with your agents. Choose Share with your agents for an account in " + SETTINGS_PLACE + " (Sanduhr writes the choices for this server to mcp-access.json).",
+    "unreadable": "Sanduhr's sharing file (mcp-access.json) could not be read, so nothing is shared. Change any Share with your agents choice in " + SETTINGS_PLACE + " to rewrite it.",
     "schema_unsupported": "Sanduhr's sharing file is newer than this server understands, so nothing is shared. Update the Sanduhr integrations (bash mac/integrations/install.sh).",
-    "none": "No account is shared with Claude. Choose Share with Claude for an account in " + SETTINGS_PLACE + ".",
+    "none": "No account is shared with your agents. Choose Share with your agents for an account in " + SETTINGS_PLACE + ".",
 }
 REMEDY_ACTIVE_NOT_SHARED = (
-    "The account Sanduhr shows is not shared with Claude. Set its Share with Claude to Meters "
+    "The account Sanduhr shows is not shared with your agents. Set its Share with your agents to Meters "
     "(or Meters and activity) in " + SETTINGS_PLACE + ".")
 REMEDY_NO_ACTIVITY = (
     "No account shares Claude Code activity from a folder Sanduhr reads. In " + SETTINGS_PLACE +
     ": link the account's Claude Code folder, set Claude Code activity to Live only or Keep a "
-    "record, and Share with Claude to Meters and activity.")
+    "record, and Share with your agents to Meters and activity.")
 
 DESK_SYNTAX = (
     "messages.txt syntax, one line each: a plain line shows on any day; 'Mon: text' only on that "

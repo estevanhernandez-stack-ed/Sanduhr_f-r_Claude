@@ -275,7 +275,7 @@ private struct SuggestionBox: View {
     }
 }
 
-/// Claude Code activity, project names and Share with Claude: activity reads the linked folder
+/// Claude Code activity, project names and Share with your agents: activity reads the linked folder
 /// (item 45) and keeps the record (item 46) with the project names chosen; sharing writes
 /// `mcp-access.json` (item 47).
 private struct DataChoiceRows: View {
@@ -338,14 +338,14 @@ private struct DataChoiceRows: View {
 
     private var shareRow: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Picker("Share with Claude", selection: Binding(
+            Picker("Share with your agents", selection: Binding(
                 get: { choices.share },
                 set: { vm.setShare($0, for: label) })) {
                 ForEach(ShareChoice.allCases, id: \.self) { Text($0.title).tag($0) }
             }
             .pickerStyle(.menu)
             .fixedSize()
-            Caption("What Claude can read about this account through the Sanduhr MCP server. Meters: the meters and their history. Meters and activity: also Claude Code tokens by day, model and project, with project names as chosen above. Off answers as if the account weren't here.")
+            Caption("What your agents (Claude Code and Claude Desktop sessions on this Mac that use the Sanduhr MCP server) can read about this account. Sanduhr hands it to them on this Mac and sends nothing anywhere; an agent may use what it reads in its conversation. Meters: the meters and their history. Meters and activity: also Claude Code tokens by day, model and project, with project names as chosen above. Off answers as if the account weren't here.")
         }
     }
 
