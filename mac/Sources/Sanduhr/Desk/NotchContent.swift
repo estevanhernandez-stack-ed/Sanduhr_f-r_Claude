@@ -121,7 +121,8 @@ enum NotchContent: String, CaseIterable, Identifiable {
         case .meters:
             return Self.nonEmpty(meters)
         case .message:
-            return Self.nonEmpty(message?.trimmingCharacters(in: .whitespacesAndNewlines))
+            // The line as it reads: its effect tags gone, a Unicode letter style applied (item 65).
+            return Self.nonEmpty(message.map { MessageTypography.characters(MessageMarkup.parse($0.trimmingCharacters(in: .whitespacesAndNewlines))) })
         case .nowPlaying:
             return NowPlayingText.line(nowPlaying, at: place)
         case .watchers:

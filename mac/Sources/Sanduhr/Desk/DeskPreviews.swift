@@ -232,7 +232,7 @@ struct DeskMetersPreview: View {
 // MARK: - Message
 
 /// Today's line with its effects; Replay writes a `{write}` line in again and sweeps a
-/// `{shimmer}` line at once.
+/// `{shimmer}` or `{sweep}` line at once.
 struct DeskMessagePreview: View {
     var live: DeskModel
     @State private var preview = DeskModel()
@@ -256,14 +256,14 @@ struct DeskMessagePreview: View {
         Button("Replay") { replay += 1 }
             .controlSize(.small)
             .disabled(reduceMotion)
-            .help(reduceMotion ? "Reduce Motion is on: the line stays still" : "Plays the line's {write} and {shimmer} again")
+            .help(reduceMotion ? "Reduce Motion is on: the line stays still" : "Plays the line's {write}, {shimmer} and {sweep} again")
     }
 
-    /// A line with `{write}` or `{shimmer}` has something to replay.
+    /// A line with `{write}`, `{shimmer}` or `{sweep}` has something to replay.
     static func replays(_ raw: String?) -> Bool {
         guard let raw else { return false }
         let e = MessageMarkup.parse(raw).effects
-        return e.write || e.shimmer
+        return e.write || e.shimmer || e.sweep
     }
 
     static func spoken(_ raw: String?) -> String {

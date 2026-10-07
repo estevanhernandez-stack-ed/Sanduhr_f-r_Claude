@@ -64,8 +64,7 @@ struct NotchView: View {
                         } else if strip == .watchers {
                             stripWatcher(line, width: width)
                         } else {
-                            Text(line)
-                                .font(.custom(font, size: stripSize))
+                            styledLine(line, content: strip, size: stripSize)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                                 .minimumScaleFactor(0.7)
@@ -85,6 +84,10 @@ struct NotchView: View {
     }
 
     private var stripSize: CGFloat { max(11, chin * 0.55) }
+
+    private func styledLine(_ line: String, content: NotchContent, size: CGFloat) -> some View {
+        NotchMessageText.line(line, content: content, message: model.message, font: font, size: size)
+    }
 
     /// The camera and mic indicators under the camera (item 67), centered. Their clicks come
     /// through DeskHitTest by the frame they report: a click or a two-finger click opens their menu.
@@ -264,7 +267,7 @@ struct NotchWingsView: View {
         } else if content == .watchers, let text {
             watcherWing(text, size, place: place, width: width)
         } else {
-            label(text, size)
+            label(text, size, content: content)
         }
     }
 
@@ -384,9 +387,12 @@ struct NotchWingsView: View {
             .accessibilityAddTraits(.isButton)
     }
 
-    private func label(_ text: String?, _ size: CGFloat) -> some View {
-        Text(text ?? "")
-            .font(.custom(font, size: size))
+    private func styledLine(_ line: String, content: NotchContent, size: CGFloat) -> some View {
+        NotchMessageText.line(line, content: content, message: model.message, font: font, size: size)
+    }
+
+    private func label(_ text: String?, _ size: CGFloat, content: NotchContent) -> some View {
+        styledLine(text ?? "", content: content, size: size)
             .foregroundStyle(LinearGradient.ink(textColor))
             .opacity(0.88)
             .lineLimit(1)

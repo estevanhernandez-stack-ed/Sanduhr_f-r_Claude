@@ -226,6 +226,9 @@ struct SettingsPreviewTests {
     @Test func replayOnlyForMovingLines() {
         #expect(DeskMessagePreview.replays("{write} ship it"))
         #expect(DeskMessagePreview.replays("{shimmer} ship it"))
+        #expect(DeskMessagePreview.replays("{sweep} ship it"))
+        #expect(DeskMessagePreview.replays("{sweep:20} {font:bold} ship it"))
+        #expect(!DeskMessagePreview.replays("{font:smallcaps} ship it"))
         #expect(!DeskMessagePreview.replays("{glow} ship it"))
         #expect(!DeskMessagePreview.replays(nil))
         #expect(DeskMessagePreview.spoken("{write} ship it").hasSuffix("ship it"))
