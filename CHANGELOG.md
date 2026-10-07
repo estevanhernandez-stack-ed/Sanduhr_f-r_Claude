@@ -2,6 +2,7 @@
 
 ## Unreleased (mac)
 
+- **A signed-in account no longer offers "Sign In Again".** On an account's page the button reads Replace Sign-In… while the account works, and Sign In Again… only once its session has expired, next to "Session expired", so a working account never looks signed out.
 - **"Share with Claude" is now "Share with your agents".** The old name read as if Sanduhr sends your data to Anthropic. It never does: the choice decides what Claude Code and Claude Desktop sessions on this Mac can read through Sanduhr's MCP server, and its caption now says so. Nothing else changed.
 ## v2.8.0-mac — 2026-10-07
 

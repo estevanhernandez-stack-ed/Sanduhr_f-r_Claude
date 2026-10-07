@@ -56,7 +56,7 @@ when it closes, and no key, cookie or page is logged.
   on claude.ai, open DevTools (⌥⌘I) → Application → Cookies → `claude.ai`, copy `sessionKey`,
   and paste it in Settings → Accounts.
 - The same window signs in a new account (**Add Account…**, **Sign In to Claude…**) and an
-  account whose session expired (**Sign In Again…** on its page; the widget says "Session
+  account whose session expired (**Sign In Again…** on its page; a signed-in account offers **Replace Sign-In…** instead; the widget says "Session
   expired — sign in again").
 
 Where the key is stored depends on the build:

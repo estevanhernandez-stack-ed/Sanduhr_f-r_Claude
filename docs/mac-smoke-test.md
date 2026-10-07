@@ -1043,7 +1043,7 @@ the installed app starts again.
    browser; Paste a Key Instead ends the window; Back to Sign-In Choices returns to the login.
 4. Settings → Accounts → Add Account…: with a label, Sign In to Claude… adds the account when
    the window closes; with no label, it says to name the account, and Add Account finishes.
-5. An account's page: **Sign In Again…** replaces its key in place; the page says Signed in.
+5. An account's page: a working account shows **Replace Sign-In…** (never "Sign In Again"), which replaces its key in place; an expired one shows **Sign In Again…** and "Session expired"; after either, the page says Signed in.
 6. Close the window without signing in: nothing changes. Unplug the network: the error panel
    offers Try Again and Paste a Key Instead.
 7. Nothing persists: after the window closes, sign in again opens a fresh login (not signed in).
