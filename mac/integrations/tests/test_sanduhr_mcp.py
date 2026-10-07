@@ -784,6 +784,25 @@ class DeskMessages(Base):
             self.assertEqual(seen, {str(i) for i in range(n)}, n)
         self.assertEqual(mcp.desk_today("03-14: a\n03-14: b\n", datetime(2026, 3, 14, 9), False), (["a", "b"], None))
 
+    def test_a_pinned_line_keeps_special_days(self):
+        # NOW is 2026-07-26: a pinned line replaces the usual line; date lines still stack above it.
+        self.write_messages("keep.\nSun: rest.\n07-26: happy birthday, Sam.\n")
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 1, "pinned": True,
+                                                 "pinned_line": "Good vibes only", "rotate": "daily"})
+        r = self.get()
+        self.assertEqual((r["today"], r["today_special"]), ("Good vibes only", ["happy birthday, Sam."]))
+        self.write_messages("keep.\n" + "\n".join("07-26: b%d" % i for i in range(4)) + "\n")
+        r = self.get()
+        self.assertEqual(r["today"], "Good vibes only")
+        self.assertEqual(len(r["today_special"]), 3)
+        seen = set()
+        for h in range(24):
+            special, usual = mcp.desk_today("keep.\n" + "\n".join("07-26: b%d" % i for i in range(4)),
+                                            datetime(2026, 7, 26, h), False, pinned="Good vibes only")
+            self.assertEqual((len(special), usual), (3, "Good vibes only"))
+            seen.update(special)
+        self.assertEqual(seen, {"b0", "b1", "b2", "b3"})
+
     def test_unknown_state_schema_reads_as_defaults(self):
         self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 9, "pinned": True, "rotate": "hourly"})
         r = self.get()
@@ -951,7 +970,8 @@ class DeskMessages(Base):
         # Item 69: special days add to the day; Claude learns the birthday form.
         for name in ("get_desk_messages", "propose_desk_messages"):
             for word in ("birthdays, anniversaries and holidays are date lines", "they add to it",
-                         "two birthdays on one date both show", "happy birthday, Sam.", "mix_daily"):
+                         "two birthdays on one date both show", "happy birthday, Sam.", "mix_daily",
+                         "date lines still stack above the pinned line"):
                 self.assertIn(word, tools[name], (name, word))
         self.assertIn("today_special", tools["get_desk_messages"])
         self.assertIn("use mode add with one date line each", tools["propose_desk_messages"])

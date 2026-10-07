@@ -1361,7 +1361,7 @@ its `shasum`.
 6. A row's menu: Duplicate puts a copy right below; Move Up and Move Down step past other lines
    (notes keep their place); Delete removes only that line. Drag a row by its handle onto another:
    it lands there. Each reaches the file only on Save; Revert drops them.
-7. Pin on a row: "Pinned: the Desk shows … every day." above the list, the Desk shows that line,
+7. Pin on a row: "Pinned: the Desk shows … every day; special days still show above it." above the list, the Desk shows that line,
    the pin is filled; Unpin (or Pin again) gives the list back.
 8. Type `#1 fan` as an Every day line's text: the row warns that the Desk reads it as a note; add a
    glow and the warning goes. `{x} hi`, and `Mon: hi` on an Every day line, warn too.
@@ -1386,7 +1386,8 @@ its `shasum`.
     "Today:" reads "Today: happy birthday, Sam. / happy birthday, Alex. / <usual line>". Their rows
     read "<Month day> · shows above the day's message · with 1 other that day". The notch's
     Message shows "happy birthday, Sam.". `smoke/smoke state` shows `message_editor.today_special: 2`.
-    Add two more for today: three show, and the set changes on the hour.
+    Add two more for today: three show, and the set changes on the hour. Pin a "Good vibes only"
+    line: the date's lines still stack above it ("Today: … / Good vibes only"); Unpin.
 15. **Weekday lines.** Rows read "Fridays · takes turns with N others" (or "· shows instead of the
     every-day lines" for one) and the every-day rows "Every day · … · steps aside on days with their
     own line". Switch on "Mix every-day lines in on days with their own line": the notes change to

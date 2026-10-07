@@ -95,7 +95,7 @@ struct MessageListEditor: View {
     private var pinnedNote: some View {
         HStack {
             Image(systemName: "pin.fill").foregroundStyle(.tint).accessibilityHidden(true)
-            Text("Pinned: the Desk shows \"\(MessageMarkup.parse(pinned).text)\" every day.")
+            Text("Pinned: the Desk shows \"\(MessageMarkup.parse(pinned).text)\" every day; special days still show above it.")
                 .lineLimit(1)
             Spacer()
             Button("Unpin") { pinned = ""; pinChanged() }
@@ -178,7 +178,7 @@ private struct MessageRowView: View {
         }
         .buttonStyle(.borderless)
         .disabled(row.deskBody == nil)
-        .help(isPinned ? "Unpin: the Desk picks from the list again." : "Pin: the Desk shows this line every day, whatever the list says.")
+        .help(isPinned ? "Unpin: the Desk picks from the list again." : "Pin: the Desk shows this line every day instead of the list; special days still show above it.")
         .accessibilityLabel(isPinned ? "Unpin this line" : "Pin this line")
     }
 

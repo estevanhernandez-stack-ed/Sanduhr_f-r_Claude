@@ -53,6 +53,28 @@ struct MessagePickTests {
         #expect(alone.first == "boo.")
     }
 
+    /// The owner's scenario: a pinned "Good vibes only" and a loved one's birthday. The pin
+    /// replaces the usual line only; the date's lines still stack above it.
+    @Test func aPinnedLineKeepsSpecialDays() {
+        let one = "keep.\nSat: rest.\n03-14: happy birthday, Sam."
+        let t = MessageEngine.today(from: one, now: date(2026, 3, 14), hourly: false, pinned: "Good vibes only", calendar: cal)
+        #expect(t == MessageEngine.Today(special: ["happy birthday, Sam."], usual: "Good vibes only"))
+        #expect(t.lines == ["happy birthday, Sam.", "Good vibes only"])
+        // Other days: the pin alone, the weekday line stays hidden.
+        #expect(MessageEngine.today(from: one, now: date(2026, 3, 21), hourly: false, pinned: "Good vibes only", calendar: cal)
+                == MessageEngine.Today(usual: "Good vibes only"))
+        let four = "keep.\n" + (0..<4).map { "03-14: b\($0)" }.joined(separator: "\n")
+        var seen = Set<String>()
+        for hour in 0..<24 {
+            let day = MessageEngine.today(from: four, now: date(2026, 3, 14, hour: hour), hourly: false,
+                                          pinned: "Good vibes only", calendar: cal)
+            #expect(day.special.count == 3)
+            #expect(day.usual == "Good vibes only")
+            seen.formUnion(day.special)
+        }
+        #expect(seen == ["b0", "b1", "b2", "b3"])
+    }
+
     @Test func everyLineForADateShowsUpToThree() {
         let two = "good vibes only.\n03-14: happy birthday, Sam.\n03-14: happy birthday, Alex."
         let t = MessageEngine.today(from: two, now: date(2026, 3, 14), hourly: false, calendar: cal)

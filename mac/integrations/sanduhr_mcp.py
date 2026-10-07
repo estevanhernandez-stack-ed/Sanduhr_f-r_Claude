@@ -122,8 +122,10 @@ DESK_SYNTAX = (
     "(two birthdays on one date both show; more than 3 take turns hourly, 3 at a time). So "
     "birthdays, anniversaries and holidays are date lines, one per person or occasion, short and "
     "friendly, like '03-14: {ink:#ff7e5f,#feb47b} happy birthday, Sam.'; the user's everyday line "
-    "still shows under them. Pinning one line is a user setting (pinned): while pinned the list "
-    "is not shown, date lines included, so say so before proposing. ")
+    "still shows under them. Pinning one line is a user setting (pinned): the pinned line replaces "
+    "the usual line every day, so weekday and plain lines don't show while it is pinned (say so "
+    "before proposing them), but date lines still stack above the pinned line, so birthdays and "
+    "holidays show either way. ")
 DESK_EFFECTS = (
     "Effects: tags at the start of the text, after any prefix, in any order, each in braces: "
     "{ink:#ff2a6d,#05d9e8} this line's ink, 1 to 4 hex colors (2 or more make a left-to-right "
@@ -1362,8 +1364,9 @@ def validate_desk_lines(lines):
 DESK_MAX_SPECIAL = 3
 
 
-def desk_today(text, now, hourly, mix=False):
-    """MessageEngine.today: (special, usual) at `now` (local time), raw bodies. The usual line is
+def desk_today(text, now, hourly, mix=False, pinned=None):
+    """MessageEngine.today: (special, usual) at `now` (local time), raw bodies. A pinned line is the
+    usual line; the date's lines still stack above it. Otherwise the usual line is
     today's weekday pool if it has lines (with the plain lines too when `mix`), else the plain
     pool; plain rotates by day, a weekday pool by week. Every line for today's date is special,
     up to 3; more take turns hourly, 3 at a time."""
@@ -1392,7 +1395,9 @@ def desk_today(text, now, hourly, mix=False):
         slot = step * 24 + now.hour if hourly else step
         return pool[slot % len(pool)]
 
-    if daily:
+    if pinned:
+        usual = pinned
+    elif daily:
         usual = turn(daily + plain if mix else daily, day_index // 7)
     else:
         usual = turn(plain, day_index)
@@ -1451,11 +1456,9 @@ def build_desk_messages(now=None, paths=None):
         lines.pop()
     out["file_found"] = True
     out["lines"] = lines
-    if state["pinned"]:
-        out["today"] = state["pinned_line"]
-    else:
-        local = now.astimezone()
-        out["today_special"], out["today"] = desk_today(text, local, state["rotate"] == "hourly", state["mix_daily"])
+    local = now.astimezone()
+    out["today_special"], out["today"] = desk_today(text, local, state["rotate"] == "hourly", state["mix_daily"],
+                                                    pinned=state["pinned_line"] if state["pinned"] else None)
     return out
 
 

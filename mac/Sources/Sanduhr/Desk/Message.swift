@@ -19,7 +19,8 @@ import Foundation
 /// - Special lines: every line for today's date shows, stacked above the usual line, up to
 ///   `maxSpecial`; more than that take turns hourly, `maxSpecial` at a time.
 /// `messageRotate hourly` turns every pool hourly, steady within the hour.
-/// defaults write com.626labs.sanduhr.desk message "text" pins one line and skips the file.
+/// defaults write com.626labs.sanduhr.desk message "text" pins one line: it replaces the usual line,
+/// and the date's lines still stack above it.
 enum MessageEngine {
     static var fileURL: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -51,7 +52,7 @@ enum MessageEngine {
     }
 
     /// What the Desk draws today: the date's special lines (tags on, prefix gone) and the usual
-    /// line. A pinned line is the usual line and the file is not read.
+    /// line. A pinned line is the usual line; the date's lines still show above it.
     struct Today: Equatable {
         var special: [String] = []
         var usual: String?
@@ -64,10 +65,10 @@ enum MessageEngine {
 
     static func today(now: Date = Date()) -> Today {
         let d = UserDefaults.desk
-        if let pinned = d.string(forKey: "message"), !pinned.isEmpty { return Today(usual: pinned) }
-        guard let text = try? String(contentsOf: fileURL, encoding: .utf8) else { return Today() }
+        let pinned = d.string(forKey: "message").flatMap { $0.isEmpty ? nil : $0 }
+        guard let text = try? String(contentsOf: fileURL, encoding: .utf8) else { return Today(usual: pinned) }
         return today(from: text, now: now, hourly: d.string(forKey: "messageRotate") == "hourly",
-                     mix: d.bool(forKey: mixKey))
+                     mix: d.bool(forKey: mixKey), pinned: pinned)
     }
 
     /// The usual line (or the pin); `today(now:)` has the special lines too.
@@ -116,8 +117,9 @@ enum MessageEngine {
         return p
     }
 
+    /// `pinned` replaces the usual line only: the date's lines still stack above it.
     static func today(from text: String, now: Date, hourly: Bool, mix: Bool = false,
-                      calendar: Calendar = .current) -> Today {
+                      pinned: String? = nil, calendar: Calendar = .current) -> Today {
         let p = pools(text)
         let comps = calendar.dateComponents([.month, .day, .weekday, .hour], from: now)
         let date = String(format: "%02d-%02d", comps.month ?? 0, comps.day ?? 0)
@@ -132,7 +134,9 @@ enum MessageEngine {
         }
         let days = p.weekday[weekday] ?? []
         let usual: String?
-        if days.isEmpty {
+        if let pinned {
+            usual = pinned
+        } else if days.isEmpty {
             usual = turn(p.plain, dayIndex)
         } else {
             usual = turn(mix ? days + p.plain : days, weekIndex)

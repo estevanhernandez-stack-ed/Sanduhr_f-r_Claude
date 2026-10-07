@@ -567,7 +567,8 @@ above it, each with its own effects; more than 3 take turns hourly, 3 at a time.
 keeps hour steps within each pool. The message piece draws the date's lines at 0.8 times the
 message size (full size when no usual line shows) with a gap of 0.12 times the message size
 between lines (`DeskMessageStack`). Places with room for one line (the notch's Message choice)
-show the first date line, else the usual one. A pinned line skips the file, date lines included.
+show the first date line, else the usual one. A pinned line replaces the usual line only: the date's lines still stack above it, so a pinned
+"good vibes only" and a birthday both show.
 `get_desk_messages` mirrors the rules (`desk_today`).
 
 **Message effects.** Tags at the start of a line's text, after any prefix, in any order:
