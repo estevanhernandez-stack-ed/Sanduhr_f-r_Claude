@@ -51,7 +51,7 @@ struct DeskMessageLine: View {
     private func styled(_ text: String, size: CGFloat) -> some View {
         Text(text)
             .font(.custom(font, size: size))
-            .multilineTextAlignment(alignment == .trailing ? .trailing : .leading)
+            .multilineTextAlignment(alignment.deskText)
             .lineLimit(lineLimit)
             .minimumScaleFactor(0.4)
     }

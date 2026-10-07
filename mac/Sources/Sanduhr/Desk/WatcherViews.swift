@@ -195,7 +195,7 @@ private struct DeskWatcherRow: View {
             }
         }
         .opacity(WatcherLook.opacity(watcher.state))
-        .frame(maxWidth: size * 22, alignment: alignment == .trailing ? .trailing : .leading)
+        .frame(maxWidth: size * 22, alignment: alignment.deskEdge)
         .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
         .contentShape(Rectangle())
         .onHover { inside in

@@ -129,6 +129,11 @@ eq('no temporary limit in the fixture', state['temporary_limits'], [])
 # Item 39: silencing a limit from its menu shows here; the session warns only once switched on.
 eq('only the session silenced by default', state['silenced_limits'], ['five_hour'])
 # Item 41: the Desk's click areas, checked in the app; kinds and keys only, never labels or titles.
+# Item 59: each drawn piece's anchor, place in its stack and size, in the layout's order.
+eq('desk pieces follow the layout', state['desk_pieces'].map { |p| [p['piece'], p['anchor'], p['order']] },
+   [['message', 'tl', 0], ['clock', 'bl', 0], ['meters', 'bl', 1], ['meetings', 'bl', 2]])
+eq('desk pieces at size 1 in the fixture', state['desk_pieces'].map { |p| p['scale'] }.uniq, [1])
+eq('select a piece by name', State.dig(state, 'desk_pieces[piece=meters].order'), [true, 1])
 eq('desk frames ok in the fixture', [state['desk_frames_ok'], state['desk_frames_problem']], [true, nil])
 eq('desk frame kinds', state['desk_frames'].map { |f| f['kind'] }, %w[meters meter_row meter_row meetings])
 check('desk frames are [x, y, w, h] in whole points',

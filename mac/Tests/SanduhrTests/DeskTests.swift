@@ -99,6 +99,8 @@ struct DeskLayoutTests {
 
     @Test func skipsMalformedWordsAndExtraSpaces() {
         #expect(DeskLayout.parse("  clock   message:tr a:b:c :bl claude: ") == ["message": "tr"])
+        // An unknown anchor reads as the piece's default (item 59), never hidden.
+        #expect(DeskLayout.parse("clock:zz message:qq") == ["clock": "bl", "message": "tl"])
         #expect(DeskLayout.parse("") == [:])
     }
 
@@ -116,10 +118,13 @@ struct DeskLayoutTests {
                 == "message:tl clock:bl claude:bl")
     }
 
-    @Test func placingRewritesInCanonicalOrder() {
-        // A hand-written order (defaults write) comes back in the order the tab lists.
+    @Test func placingKeepsYourOrder() {
+        // Item 59: a hand-written order (defaults write, or Layout's Order list) stays; the
+        // moved piece goes where Settings' order puts it.
         #expect(DeskLayout.placing("message", in: "br", layout: "meetings:bl clock:bl")
-                == "message:br clock:bl meetings:bl")
+                == "message:br meetings:bl clock:bl")
+        #expect(DeskLayout.placing("claude", in: "bl", layout: "meetings:bl clock:bl message:tl")
+                == "claude:bl meetings:bl clock:bl message:tl")
     }
 
     @Test func placingDropsWordsTheTabDoesNotKnow() {
@@ -130,6 +135,8 @@ struct DeskLayoutTests {
         #expect(DeskLayout.widgets.contains { $0.key == "meters" })
         #expect(DeskLayout.placing("meters", in: "br", layout: standard)
                 == "message:tl clock:bl claude:bl meters:br meetings:bl")
+        #expect(DeskLayout.placing("meters", in: "bl", layout: standard)
+                == "message:tl clock:bl claude:bl meters:bl meetings:bl")
     }
 }
 

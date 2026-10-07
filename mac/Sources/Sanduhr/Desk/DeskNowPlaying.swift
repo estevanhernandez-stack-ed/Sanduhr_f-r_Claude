@@ -42,7 +42,7 @@ struct DeskNowPlayingLine: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .opacity(0.85)
-                .frame(maxWidth: width, alignment: alignment == .trailing ? .trailing : .leading)
+                .frame(maxWidth: width, alignment: alignment.deskEdge)
             if (info.duration ?? 0) > 0 {
                 if info.state == .playing {
                     TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -53,7 +53,7 @@ struct DeskNowPlayingLine: View {
                 }
             }
         }
-        .frame(width: width, alignment: alignment == .trailing ? .trailing : .leading)
+        .frame(width: width, alignment: alignment.deskEdge)
         .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity)
             .padding(EdgeInsets(top: -4, leading: -8, bottom: -4, trailing: -8)))
         .contentShape(Rectangle())
