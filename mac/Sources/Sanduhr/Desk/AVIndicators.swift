@@ -6,7 +6,8 @@ import CoreGraphics
 /// a device, and learns only that a camera or the default microphone is in use, never which app
 /// or anything captured. Nothing is logged or saved. Pure, so the decisions test on their own.
 ///
-///   defaults write com.626labs.sanduhr.desk avCameraDot -bool true     (the red dot; off by default)
+///   defaults write com.626labs.sanduhr.desk avCameraDotMode -string always   (the red dot: never,
+///                                                                            hiddenLight or always; never by default)
 ///   defaults write com.626labs.sanduhr.desk avMicGlyph -bool true      (the mic glyph; off by default)
 ///   defaults write com.626labs.sanduhr.desk avPulse -bool false        (the dot's gentle pulse; on)
 ///   defaults write com.626labs.sanduhr.desk avSide -string left        (beside the camera: left or right)
@@ -14,13 +15,13 @@ struct AVIndicators: Equatable {
     var camera = false
     var mic = false
 
-    static let cameraKey = "avCameraDot"
     static let micKey = "avMicGlyph"
     static let pulseKey = "avPulse"
 
     var any: Bool { camera || mic }
 
-    /// What shows: each signal only while its own switch is on.
+    /// What shows: the dot when its mode wants it (AVCameraDotMode.shows), the mic only while its
+    /// switch is on.
     static func shown(cameraInUse: Bool, micInUse: Bool, cameraSwitch: Bool, micSwitch: Bool) -> AVIndicators {
         AVIndicators(camera: cameraSwitch && cameraInUse, mic: micSwitch && micInUse)
     }
@@ -31,6 +32,59 @@ struct AVIndicators: Equatable {
         if camera { parts.append(AVIndicatorMenu.cameraLine) }
         if mic { parts.append(camera ? "microphone in use" : AVIndicatorMenu.micLine) }
         return parts.isEmpty ? "Camera and microphone not in use" : parts.joined(separator: ", ")
+    }
+}
+
+/// When the red dot shows (Settings, Desk, Notch, "Show the red dot"). A MacBook's built-in camera
+/// has its own green light that can't be turned off, so a dot for it only repeats that light:
+/// `hiddenLight` shows it only for a camera whose light the person can't see
+/// (CameraLightVisibility: not built in, or built in with the lid closed).
+enum AVCameraDotMode: String, CaseIterable, Identifiable {
+    case never, hiddenLight, always
+
+    static let key = "avCameraDotMode"
+    /// The switch before the picker (`-bool`): on becomes `hiddenLight`.
+    static let legacyKey = "avCameraDot"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .never: "Never"
+        case .hiddenLight: "For cameras without a visible light"
+        case .always: "Always"
+        }
+    }
+
+    /// The saved mode; unset falls back to the old switch (on: `hiddenLight`), else never.
+    static func resolve(raw: String?, legacy: Bool?) -> AVCameraDotMode {
+        if let mode = raw.flatMap(AVCameraDotMode.init(rawValue:)) { return mode }
+        return legacy == true ? .hiddenLight : .never
+    }
+
+    static func saved(in defaults: UserDefaults) -> AVCameraDotMode {
+        resolve(raw: defaults.string(forKey: key), legacy: defaults.object(forKey: legacyKey) as? Bool)
+    }
+
+    /// Writes the old switch's choice as a mode once, and removes the old key.
+    static func migrate(_ defaults: UserDefaults) {
+        guard let legacy = defaults.object(forKey: legacyKey) as? Bool else { return }
+        if defaults.string(forKey: key) == nil {
+            defaults.set(resolve(raw: nil, legacy: legacy).rawValue, forKey: key)
+        }
+        defaults.removeObject(forKey: legacyKey)
+    }
+
+    /// Whether the camera monitor needs to run.
+    var watches: Bool { self != .never }
+
+    /// Whether the dot shows for a camera in use.
+    func shows(inUse: Bool, withoutVisibleLight: Bool) -> Bool {
+        switch self {
+        case .never: false
+        case .hiddenLight: inUse && withoutVisibleLight
+        case .always: inUse
+        }
     }
 }
 

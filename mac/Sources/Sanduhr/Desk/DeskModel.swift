@@ -137,6 +137,9 @@ final class DeskModel {
     var avIndicators = AVIndicators()
     /// Where they draw now (AVIndicatorPlacement). Set by AVIndicatorController.
     var avSpot = AVIndicatorSpot.none
+    /// The last indicators that showed: what the slot beside the camera draws while it fades out,
+    /// so it fades the dot that was there rather than going blank. Set by AVIndicatorController.
+    var avDrawn = AVIndicators()
     /// Where the strip under the camera draws them, same coordinates: a click opens their menu.
     @ObservationIgnored var stripAVFrame: CGRect = .zero { didSet { if stripAVFrame != oldValue { onHitAreasChange?() } } }
     /// Called when a clickable piece moves or comes and goes (DeskController takes the mouse there).

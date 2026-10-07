@@ -221,9 +221,10 @@ struct NotchWingsView: View {
                             .fill(Color.black)
                         HStack(spacing: 0) {
                             wing(left, size, w.leftContent, place: .left, width: wingL).frame(width: max(0, wingL - 10), alignment: .trailing)
-                            if w.besideLeft > 0 { beside(.left, size: size, width: w.besideLeft) }
+                            // Always in the row, 0 wide when empty: never inserted or removed (AVBesideSlot).
+                            AVBesideSlot(model: model, side: .left, size: size, width: w.besideLeft)
                             Color.clear.frame(width: notchWidth + 20)
-                            if w.besideRight > 0 { beside(.right, size: size, width: w.besideRight) }
+                            AVBesideSlot(model: model, side: .right, size: size, width: w.besideRight)
                             wing(right, size, w.rightContent, place: .right, width: wingR).frame(width: max(0, wingR - 10), alignment: .leading)
                         }
                     }
@@ -337,14 +338,6 @@ struct NotchWingsView: View {
         .accessibilityLabel(top.map { WatcherText.spoken($0, now: Date()) } ?? text)
     }
 
-    /// The camera and mic indicators beside the camera (item 67): the island grows by their room on
-    /// that side, so the wing keeps its own. They hug the camera; the spacing faces the wing.
-    private func beside(_ side: AVIndicatorSide, size: CGFloat, width: CGFloat) -> some View {
-        AVIndicatorButton(model: model, size: size)
-            .frame(width: max(0, width - AVIndicatorLayout.spacing))
-            .padding(side == .left ? .leading : .trailing, AVIndicatorLayout.spacing)
-    }
-
     /// The camera and mic indicators as a wing's content (item 67), at the wing's inner end by the
     /// camera. The whole wing takes the click (their menu), so it never opens Settings by accident.
     private func avWing(_ size: CGFloat, place: NotchContent.Place) -> some View {
@@ -396,7 +389,7 @@ struct NotchWingsView: View {
     /// with nothing to show draws, sizes and clicks as its When nothing is playing choice.
     /// `left` and `right` are the wings; `besideLeft` and `besideRight` the room the camera and mic
     /// indicators add beside the camera (item 67), 0 when they aren't there.
-    struct Layout {
+    struct Layout: Equatable {
         let left: CGFloat; let right: CGFloat; let leftText: String?; let rightText: String?; let size: CGFloat
         var leftContent: NotchContent = NotchContent.Place.left.fallback
         var rightContent: NotchContent = NotchContent.Place.right.fallback

@@ -1,5 +1,6 @@
 # Item 67: camera and mic indicators. The av-test action fakes each signal in memory (no camera or
-# microphone is opened); the indicators still go through their own switches, which the run sets and
+# microphone is opened; a faked camera counts as one without a visible light); the indicators still
+# go through their own settings (Show the red dot, the mic switch), which the run sets and
 # puts back, with the right wing on Camera and mic for part of it. state.yaml's av_indicators: holds
 # two booleans and where they show, never an app. Run it with no call going: a real camera or
 # microphone in use reads true.
@@ -10,13 +11,13 @@ name: Camera and mic indicators
 needs: [desk]
 steps:
   - expect_state: { av_indicators.shown: "/^(none|beside_left|beside_right|places|badge)$/" }
-  - defaults: { domain: desk, key: avCameraDot, type: bool, value: false }
+  - defaults: { domain: desk, key: avCameraDotMode, type: string, value: never }
   - defaults: { domain: desk, key: avMicGlyph, type: bool, value: false }
   - do: av-test
     arg: camera on
-  # Switch off: the signal is there, nothing shows.
+  # Never: the signal is there, nothing shows.
   - expect_state: { av_indicators.camera: true, av_indicators.shown: none }
-  - defaults: { domain: desk, key: avCameraDot, type: bool, value: true }
+  - defaults: { domain: desk, key: avCameraDotMode, type: string, value: always }
   - expect_state: { av_indicators.shown: "/^(beside_(left|right)|badge)$/" }
   - snap: av-camera
   - do: av-test

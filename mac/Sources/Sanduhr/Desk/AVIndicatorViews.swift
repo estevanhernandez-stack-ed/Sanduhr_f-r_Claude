@@ -1,4 +1,5 @@
 import AppKit
+import IOKit
 import SwiftUI
 
 /// How the indicators draw. The camera's red dot is the only red dot in Sanduhr: a failed watcher
@@ -9,7 +10,30 @@ enum AVIndicatorLook {
     static let mic = Color.hex("ff9f0a")
 }
 
-/// The red recording dot. It pulses gently while the pulse switch is on, never with Reduce Motion.
+/// The indicators' motion. Coming and going is an opacity fade (and the island's room grows or
+/// shrinks with it); the dot breathes between `breathLow` and full on a smooth cosine. With Reduce
+/// Motion there is no breath and the fades are instant. Pure.
+enum AVIndicatorMotion {
+    static let fade: TimeInterval = 0.25
+    static let breathPeriod: TimeInterval = 1.6
+    static let breathLow = 0.55
+
+    /// The fade for coming and going: nil (instant) with Reduce Motion.
+    static func fadeAnimation(reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : .easeInOut(duration: fade)
+    }
+
+    /// The dot's opacity at `seconds` into the breath: 1 at the start of each period, `breathLow`
+    /// halfway, eased in and out at both ends (a cosine, so it never jumps).
+    static func breath(at seconds: TimeInterval) -> Double {
+        let phase = seconds.truncatingRemainder(dividingBy: breathPeriod) / breathPeriod
+        return breathLow + (1 - breathLow) * (0.5 + 0.5 * cos(2 * Double.pi * phase))
+    }
+}
+
+/// The red recording dot. It breathes gently while the pulse switch is on, never with Reduce
+/// Motion. The breath is computed from the frame's time (TimelineView .animation), not a state
+/// that flips, so it moves smoothly and leaves nothing behind when the dot goes.
 struct AVCameraDot: View {
     let diameter: CGFloat
     let pulse: Bool
@@ -20,9 +44,9 @@ struct AVCameraDot: View {
             .fill(AVIndicatorLook.camera)
             .frame(width: diameter, height: diameter)
         if pulse && !reduceMotion {
-            dot.phaseAnimator([false, true]) { view, dim in
-                view.opacity(dim ? 0.55 : 1)
-            } animation: { _ in .easeInOut(duration: 1.1) }
+            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: false)) { context in
+                dot.opacity(AVIndicatorMotion.breath(at: context.date.timeIntervalSinceReferenceDate))
+            }
         } else {
             dot
         }
@@ -52,27 +76,59 @@ struct AVIndicatorView: View {
     }
 }
 
-/// The indicators where they take their own clicks (a wing, beside the camera, the tab): a click
-/// or a two-finger click opens the read-only menu. The faint plate gives the transparent window a
-/// pixel under the whole area, so the click reaches it.
+/// The slot beside the camera on the island (item 67). Always in the island's row, so it is never
+/// inserted or removed: its width is the room the layout gives it (0 when nothing shows) and its
+/// content fades with it, both in the controller's fade transaction. At width 0 it is clipped
+/// away, transparent and takes no click, so the wing sits exactly where it was.
+struct AVBesideSlot: View {
+    var model: DeskModel
+    let side: AVIndicatorSide
+    let size: CGFloat
+    let width: CGFloat
+
+    var body: some View {
+        let showing = width > 0 && model.avIndicators.any
+        AVIndicatorView(shown: model.avDrawn, size: size)
+            .fixedSize()
+            .frame(width: max(0, width - AVIndicatorLayout.spacing), alignment: side == .left ? .trailing : .leading)
+            .frame(maxHeight: .infinity)
+            .padding(side == .left ? .leading : .trailing, width > 0 ? AVIndicatorLayout.spacing : 0)
+            .frame(width: width)
+            .clipped()
+            .opacity(showing ? 1 : 0)
+            .background(Color.black.opacity(showing ? DeskPointerMenu.hitPlateOpacity : 0))
+            .contentShape(Rectangle())
+            .onTapGesture { AVIndicatorMenu.popUpAtPointer(model.avIndicators) }
+            .contextMenu { AVIndicatorMenuItems(shown: model.avIndicators) }
+            .help("Camera and microphone in use. Click for more.")
+            .allowsHitTesting(showing)
+            .accessibilityHidden(!showing)
+            .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// The indicators where they take their own clicks in the tab: a click or a two-finger click
+/// opens the read-only menu. The faint plate gives the transparent window a pixel under the whole
+/// area, so the click reaches it.
 struct AVIndicatorButton: View {
     var model: DeskModel
     let size: CGFloat
 
     var body: some View {
-        let shown = model.avIndicators
-        AVIndicatorView(shown: shown, size: size)
+        AVIndicatorView(shown: model.avDrawn, size: size)
+            .opacity(model.avIndicators.any ? 1 : 0)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
             .contentShape(Rectangle())
-            .onTapGesture { AVIndicatorMenu.popUpAtPointer(shown) }
-            .contextMenu { AVIndicatorMenuItems(shown: shown) }
+            .onTapGesture { AVIndicatorMenu.popUpAtPointer(model.avIndicators) }
+            .contextMenu { AVIndicatorMenuItems(shown: model.avIndicators) }
             .help("Camera and microphone in use. Click for more.")
             .accessibilityAddTraits(.isButton)
     }
 }
 
 /// The tab at the top (AVIndicatorSpot.badge): a small black shape with rounded lower corners.
+/// The window fades in and out as a whole (AVIndicatorController).
 struct AVIndicatorBadge: View {
     var model: DeskModel
     let size: CGFloat
@@ -136,7 +192,7 @@ final class AVIndicatorMenuTarget: NSObject {
     @objc func settings() { MainActor.assumeIsolated { SettingsWindowController.shared.show(.notch) } }
 }
 
-/// Runs the camera and mic indicators while Desk runs and their switch is on: the camera signal
+/// Runs the camera and mic indicators while Desk runs and they are switched on: the camera signal
 /// from its own CameraMonitor (the camera light's), the microphone's from MicMonitor. Publishes
 /// what shows and where (AVIndicatorPlacement) to the Desk model, which the island draws, and
 /// draws the tab itself when the island can't show them. In-use booleans only, in memory.
@@ -147,36 +203,44 @@ final class AVIndicatorController {
     private let camera = CameraMonitor()
     private let mic = MicMonitor()
     /// `av-test camera on|off` and `av-test mic on|off` (debug hooks): a faked signal, held in
-    /// memory only. Shown like a real one, through the same switches.
+    /// memory only. Shown like a real one, through the same switches; a faked camera counts as one
+    /// without a visible light.
     private(set) var fakeCamera = false
     private(set) var fakeMic = false
     private(set) var window: NSWindow?
     private var windowSize: CGFloat = 0
     private var refront: Timer?
     private var observing = false
+    private var badgeShown = false
+    /// Bumped on every show and hide of the tab, so a fade-out that ends after a new show leaves it up.
+    private var generation = 0
     private(set) var spot = AVIndicatorSpot.none
 
     var cameraInUse: Bool { fakeCamera || camera.inUse }
     var micInUse: Bool { fakeMic || mic.inUse }
 
     private init() {
-        // Both monitors publish on the main queue.
-        camera.onChange = { [weak self] _ in MainActor.assumeIsolated { self?.update() } }
+        // Both monitors publish on the main queue. The camera reports every reading, so a switch
+        // from the built-in camera to another one is seen while the camera stays in use.
+        camera.onActivity = { [weak self] in MainActor.assumeIsolated { self?.update() } }
         mic.onChange = { [weak self] _ in MainActor.assumeIsolated { self?.update() } }
     }
 
     /// At Desk's start and stop and whenever a Desk setting changes: run each monitor only while
-    /// Desk runs and its switch is on.
+    /// Desk runs and its indicator is on.
     func apply() {
         let desk = UserDefaults.desk
+        AVCameraDotMode.migrate(desk)
         let running = DeskController.shared.running
-        if running && desk.bool(forKey: AVIndicators.cameraKey) { camera.start() } else { camera.stop() }
+        if running && AVCameraDotMode.saved(in: desk).watches { camera.start() } else { camera.stop() }
         if running && desk.bool(forKey: AVIndicators.micKey) { mic.start() } else { mic.stop() }
         if !observing {
             observing = true
             NotificationCenter.default.addObserver(
                 self, selector: #selector(settingsChanged),
                 name: UserDefaults.didChangeNotification, object: UserDefaults.desk)
+            // Closing or opening the lid changes the screens: the built-in camera's light changes
+            // from out of sight to visible.
             NotificationCenter.default.addObserver(
                 self, selector: #selector(screensChanged),
                 name: NSApplication.didChangeScreenParametersNotification, object: nil)
@@ -198,15 +262,36 @@ final class AVIndicatorController {
         DispatchQueue.main.async { MainActor.assumeIsolated { AVIndicatorController.shared.update() } }
     }
 
-    /// Works out what shows and where, and hands it to the island or the tab.
+    /// Whether the red dot shows now, by its mode.
+    private func cameraDot(_ mode: AVCameraDotMode) -> Bool {
+        guard cameraInUse else { return false }
+        switch mode {
+        case .never: return false
+        case .always: return true
+        case .hiddenLight:
+            return fakeCamera || CameraLightVisibility.withoutVisibleLight(
+                active: camera.activeDevices, builtIn: camera.builtInDevices, lidClosed: Self.lidClosed())
+        }
+    }
+
+    /// The lid is closed (clamshell). IOPMrootDomain's AppleClamshellState: a registry read.
+    private static func lidClosed() -> Bool {
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPMrootDomain"))
+        guard service != 0 else { return false }
+        defer { IOObjectRelease(service) }
+        let value = IORegistryEntryCreateCFProperty(service, "AppleClamshellState" as CFString, kCFAllocatorDefault, 0)
+        return (value?.takeRetainedValue() as? Bool) ?? false
+    }
+
+    /// Works out what shows and where, and hands it to the island or the tab. Changes land in one
+    /// fade transaction: the slot's room and its opacity move together.
     func update() {
         let desk = UserDefaults.desk
         let controller = DeskController.shared
         let running = controller.running
         let shown = running
-            ? AVIndicators.shown(cameraInUse: cameraInUse, micInUse: micInUse,
-                                 cameraSwitch: desk.bool(forKey: AVIndicators.cameraKey),
-                                 micSwitch: desk.bool(forKey: AVIndicators.micKey))
+            ? AVIndicators(camera: cameraDot(.saved(in: desk)),
+                           mic: desk.bool(forKey: AVIndicators.micKey) && micInUse)
             : AVIndicators()
         let chosen = AVIndicatorPlacement.chosen(
             left: NotchContent.saved(.left, in: desk), right: NotchContent.saved(.right, in: desk),
@@ -217,15 +302,20 @@ final class AVIndicatorController {
         let islandUp = running && desk.bool(forKey: DeskController.notchKey) && controller.wingsWindow != nil
         let next = AVIndicatorPlacement.spot(shown, islandUp: islandUp, side: .saved(in: desk), chosen: chosen)
         let model = controller.model
-        if model.avIndicators != shown { model.avIndicators = shown }
-        if model.avSpot != next { model.avSpot = next }
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        withAnimation(AVIndicatorMotion.fadeAnimation(reduceMotion: reduceMotion)) {
+            // What the slot draws while it fades out: the last indicators that showed.
+            if shown.any, model.avDrawn != shown { model.avDrawn = shown }
+            if model.avIndicators != shown { model.avIndicators = shown }
+            if model.avSpot != next { model.avSpot = next }
+        }
         spot = next
-        if next == .badge { showBadge(shown) } else { hideBadge() }
+        if next == .badge { showBadge(shown, reduceMotion: reduceMotion) } else { hideBadge(reduceMotion: reduceMotion) }
     }
 
     // MARK: The tab
 
-    private func showBadge(_ shown: AVIndicators) {
+    private func showBadge(_ shown: AVIndicators, reduceMotion: Bool) {
         guard let screen = NSScreen.screens.first(where: { $0.cameraNotch != nil }) ?? NSScreen.main else { return }
         let notch = screen.cameraNotch
         let bar = max(screen.frame.maxY - screen.visibleFrame.maxY, 24)
@@ -240,18 +330,45 @@ final class AVIndicatorController {
             w.contentView = FirstClickHostingView(rootView: AVIndicatorBadge(model: DeskController.shared.model, size: size))
         }
         if w.frame != frame { w.setFrame(frame, display: true) }
+        guard !badgeShown else { return }
+        badgeShown = true
+        generation += 1
         w.orderFrontRegardless()
-        if refront == nil {
-            // Menu bar tools that re-raise their own overlays would cover it otherwise (as for the wings).
-            refront = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated { self?.window?.orderFrontRegardless() }
+        if reduceMotion {
+            w.alphaValue = 1
+        } else {
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = AVIndicatorMotion.fade
+                w.animator().alphaValue = 1
             }
+        }
+        // Menu bar tools that re-raise their own overlays would cover it otherwise (as for the wings).
+        refront?.invalidate()
+        refront = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.window?.orderFrontRegardless() }
         }
     }
 
-    private func hideBadge() {
+    private func hideBadge(reduceMotion: Bool) {
         refront?.invalidate(); refront = nil
-        window?.orderOut(nil)
+        guard badgeShown, let w = window else { return }
+        badgeShown = false
+        generation += 1
+        let mine = generation
+        if reduceMotion {
+            w.alphaValue = 0
+            w.orderOut(nil)
+            return
+        }
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = AVIndicatorMotion.fade
+            w.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.generation == mine else { return }
+                w.orderOut(nil)
+            }
+        })
     }
 
     private func makeWindow() -> NSWindow {
@@ -264,6 +381,7 @@ final class AVIndicatorController {
         w.backgroundColor = .clear
         w.hasShadow = false
         w.ignoresMouseEvents = false
+        w.alphaValue = 0
         return w
     }
 }

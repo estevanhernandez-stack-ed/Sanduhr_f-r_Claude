@@ -20,12 +20,173 @@ struct AVIndicatorStateTests {
     }
 
     @Test func switchesAreOffByDefaultKeys() {
-        #expect(AVIndicators.cameraKey == "avCameraDot")
+        #expect(AVCameraDotMode.key == "avCameraDotMode")
         #expect(AVIndicators.micKey == "avMicGlyph")
         let defaults = UserDefaults(suiteName: "av-test-\(UUID().uuidString)")!
-        #expect(defaults.bool(forKey: AVIndicators.cameraKey) == false)
+        #expect(AVCameraDotMode.saved(in: defaults) == .never)
         #expect(defaults.bool(forKey: AVIndicators.micKey) == false)
         #expect(AVIndicatorSide.saved(in: defaults) == .right)
+    }
+}
+
+@Suite("AV indicators: when the red dot shows")
+struct AVCameraDotModeTests {
+    @Test func labels() {
+        #expect(AVCameraDotMode.allCases.map(\.label) == ["Never", "For cameras without a visible light", "Always"])
+    }
+
+    @Test func oldSwitchMigrates() {
+        #expect(AVCameraDotMode.resolve(raw: nil, legacy: nil) == .never)
+        #expect(AVCameraDotMode.resolve(raw: nil, legacy: false) == .never)
+        #expect(AVCameraDotMode.resolve(raw: nil, legacy: true) == .hiddenLight)
+        #expect(AVCameraDotMode.resolve(raw: "always", legacy: true) == .always)
+        #expect(AVCameraDotMode.resolve(raw: "bogus", legacy: nil) == .never)
+
+        let d = UserDefaults(suiteName: "av-migrate-\(UUID().uuidString)")!
+        d.set(true, forKey: AVCameraDotMode.legacyKey)
+        AVCameraDotMode.migrate(d)
+        #expect(d.string(forKey: AVCameraDotMode.key) == "hiddenLight")
+        #expect(d.object(forKey: AVCameraDotMode.legacyKey) == nil)
+        // A mode already picked wins over the old switch.
+        d.set("always", forKey: AVCameraDotMode.key)
+        d.set(true, forKey: AVCameraDotMode.legacyKey)
+        AVCameraDotMode.migrate(d)
+        #expect(AVCameraDotMode.saved(in: d) == .always)
+        // Off migrates to nothing picked: never.
+        let e = UserDefaults(suiteName: "av-migrate-\(UUID().uuidString)")!
+        e.set(false, forKey: AVCameraDotMode.legacyKey)
+        AVCameraDotMode.migrate(e)
+        #expect(AVCameraDotMode.saved(in: e) == .never)
+    }
+
+    @Test func modeDecides() {
+        for hidden in [false, true] {
+            #expect(!AVCameraDotMode.never.shows(inUse: true, withoutVisibleLight: hidden))
+            #expect(AVCameraDotMode.always.shows(inUse: true, withoutVisibleLight: hidden))
+            #expect(!AVCameraDotMode.always.shows(inUse: false, withoutVisibleLight: hidden))
+        }
+        #expect(AVCameraDotMode.hiddenLight.shows(inUse: true, withoutVisibleLight: true))
+        #expect(!AVCameraDotMode.hiddenLight.shows(inUse: true, withoutVisibleLight: false))
+        #expect(!AVCameraDotMode.never.watches)
+        #expect(AVCameraDotMode.hiddenLight.watches && AVCameraDotMode.always.watches)
+    }
+
+    // Fixtures: camera object ids as CoreMediaIO hands them out.
+    let builtIn: UInt32 = 33, usb: UInt32 = 51, continuity: UInt32 = 88
+
+    @Test func builtInWithTheLidOpenHasAVisibleLight() {
+        #expect(!CameraLightVisibility.withoutVisibleLight(active: [builtIn], builtIn: [builtIn], lidClosed: false))
+    }
+
+    @Test func builtInWithTheLidClosedDoesNot() {
+        #expect(CameraLightVisibility.withoutVisibleLight(active: [builtIn], builtIn: [builtIn], lidClosed: true))
+    }
+
+    @Test func externalAndContinuityCamerasDoNot() {
+        #expect(CameraLightVisibility.withoutVisibleLight(active: [usb], builtIn: [builtIn], lidClosed: false))
+        #expect(CameraLightVisibility.withoutVisibleLight(active: [continuity], builtIn: [builtIn], lidClosed: false))
+        // Built-in and an external one at once: the external one's light is out of sight.
+        #expect(CameraLightVisibility.withoutVisibleLight(active: [builtIn, usb], builtIn: [builtIn], lidClosed: false))
+        #expect(!CameraLightVisibility.withoutVisibleLight(active: [], builtIn: [builtIn], lidClosed: true))
+        #expect(CameraLightVisibility.builtInTransport == 0x626C746E)   // 'bltn'
+    }
+
+    @Test func activeCamerasHoldThroughTheOffDelay() {
+        #expect(CameraLightVisibility.active(running: [33: true, 51: false], inUse: true, previous: []) == [33])
+        // All stopped, still in use (the settle): the last ones seen.
+        #expect(CameraLightVisibility.active(running: [33: false], inUse: true, previous: [33]) == [33])
+        // Off: none.
+        #expect(CameraLightVisibility.active(running: [33: false], inUse: false, previous: [33]) == [])
+        // Moved from the built-in camera to another one.
+        #expect(CameraLightVisibility.active(running: [33: false, 51: true], inUse: true, previous: [33]) == [51])
+    }
+}
+
+@Suite("AV indicators: motion")
+struct AVIndicatorMotionTests {
+    @Test func breathIsSmoothBetweenItsBounds() {
+        #expect(abs(AVIndicatorMotion.breath(at: 0) - 1) < 0.0001)
+        #expect(abs(AVIndicatorMotion.breath(at: AVIndicatorMotion.breathPeriod / 2) - AVIndicatorMotion.breathLow) < 0.0001)
+        #expect(abs(AVIndicatorMotion.breath(at: AVIndicatorMotion.breathPeriod) - 1) < 0.0001)
+        var last = AVIndicatorMotion.breath(at: 0)
+        for i in 1...160 {
+            let v = AVIndicatorMotion.breath(at: Double(i) * 0.01)
+            #expect(v >= AVIndicatorMotion.breathLow - 0.0001 && v <= 1.0001)
+            // No jump between frames 10 ms apart: a fade, not a blink.
+            #expect(abs(v - last) < 0.02)
+            last = v
+        }
+        #expect(AVIndicatorMotion.breathPeriod == 1.6)
+    }
+
+    @Test func fadesAreInstantWithReduceMotion() {
+        #expect(AVIndicatorMotion.fadeAnimation(reduceMotion: true) == nil)
+        #expect(AVIndicatorMotion.fadeAnimation(reduceMotion: false) != nil)
+        #expect(AVIndicatorMotion.fade == 0.25)
+    }
+}
+
+/// After the camera turns off the island must be exactly as it was before it came on: no room
+/// kept beside the camera, the wings at their widths, no click area left in the strip.
+@Suite("AV indicators: nothing left behind")
+struct AVIndicatorLeaveNoTraceTests {
+    func layout(_ model: DeskModel) -> NotchWingsView.Layout {
+        NotchWingsView.layout(model: model, now: Date(timeIntervalSince1970: 1_000_000), wings: 36, showText: true,
+                              left: .time, right: .message, idle: .automatic, font: "Helvetica", notchHeight: 32)
+    }
+
+    @Test func layoutReturnsToItsWidths() {
+        let model = DeskModel()
+        model.message = "ship small"
+        let before = layout(model)
+        #expect(before.besideLeft == 0 && before.besideRight == 0)
+
+        for side in AVIndicatorSide.allCases {
+            model.avIndicators = AVIndicators(camera: true, mic: true)
+            model.avDrawn = model.avIndicators
+            model.avSpot = .beside(side)
+            let on = layout(model)
+            // The wings keep their own room; only the slot beside the camera is added.
+            #expect(on.left == before.left && on.right == before.right)
+            #expect(on.leftText == before.leftText && on.rightText == before.rightText)
+            #expect((side == .left ? on.besideLeft : on.besideRight) == AVIndicatorLayout.besideRoom(model.avIndicators, size: on.size))
+            #expect((side == .left ? on.besideRight : on.besideLeft) == 0)
+
+            // The camera turns off: nothing in use, nowhere to show.
+            model.avIndicators = AVIndicators()
+            model.avSpot = .none
+            let after = layout(model)
+            #expect(after == before)
+            #expect(after.totalLeft == before.totalLeft && after.totalRight == before.totalRight)
+        }
+    }
+
+    @Test func micOnlyLeavesTheMicsRoom() {
+        let model = DeskModel()
+        model.avIndicators = AVIndicators(camera: true, mic: true)
+        model.avSpot = .beside(.right)
+        let both = layout(model).besideRight
+        model.avIndicators = AVIndicators(mic: true)
+        let mic = layout(model).besideRight
+        #expect(mic == AVIndicatorLayout.besideRoom(AVIndicators(mic: true), size: layout(model).size))
+        #expect(mic < both)
+    }
+
+    @Test func stripClickAreaGoesWithTheIndicators() {
+        var input = DeskElements.Input()
+        let before = DeskElements.build(input)
+        input.avStrip = true
+        input.stripAVFrame = CGRect(x: 700, y: 34, width: 40, height: 26)
+        #expect(DeskElements.build(input).count == before.count + 1)
+        input.avStrip = false
+        #expect(DeskElements.build(input) == before)
+    }
+}
+
+@Suite("AV indicators: legacy what-shows helper")
+struct AVIndicatorShownTests {
+    @Test func micNeedsItsSwitch() {
+        #expect(AVIndicators.shown(cameraInUse: false, micInUse: true, cameraSwitch: false, micSwitch: false) == AVIndicators())
     }
 
     @Test func spokenNamesWhatIsInUseOnly() {
