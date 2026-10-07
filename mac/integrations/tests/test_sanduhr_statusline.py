@@ -602,5 +602,48 @@ class PreviewModeTests(unittest.TestCase):
         self.assertTrue(empty.stdout.decode().startswith("5h 42%"))
 
 
+
+class JoinWithTests(unittest.TestCase):
+    """Join with (item 63b): the glyph between segments in the final line, apart from the split."""
+
+    def test_join_with_changes_the_glyph_even_when_nothing_drops(self):
+        line = "~/proj %s main %s +3" % (DOT, DOT)
+        self.assertEqual(sl.filter_line(line, {"with": "pipe"}, 0), "~/proj | main | +3")
+        self.assertEqual(sl.filter_line(line, {"with": "bar", "drop": ["main"]}, 0), "~/proj %s +3" % BAR)
+        self.assertEqual(sl.filter_line(line, {"with": "spaces"}, 0), "~/proj  main  +3")
+        self.assertEqual(sl.filter_line(line, {"with": "powerline-thin"}, 0), "~/proj %s main %s +3" % (PL_THIN, PL_THIN))
+        # Without it, nothing dropped leaves the bytes alone.
+        self.assertEqual(sl.filter_line(line, {}, 0), line)
+        # The split still decides what a segment is.
+        self.assertEqual(sl.filter_line(line, {"with": "pipe", "sep": ["none"]}, 0), line)
+        self.assertEqual(sl.filter_theirs(line + "\n", {"with": "pipe", "sep": ["none"]}), line + "\n")
+
+    def test_powerline_join_draws_arrows_in_the_neighbors_colors(self):
+        line = ESC + "[44m a " + ESC + "[0m | " + ESC + "[42m b " + ESC + "[0m"
+        out = sl.filter_line(line, {"with": "powerline"}, 0)
+        self.assertIn(" " + ESC + "[0;34;42m" + PL + sl.RESET + " ", out)
+        self.assertEqual(sl.visible_width(out), len(" a") + 3 + len("b "))   # their outer padding stays
+
+    def test_join_with_reaches_sanduhrs_part_and_the_seam(self):
+        r = Rig()
+        try:
+            r.fresh()
+            p, _ = r.run(["--compose-b64", b64("a %s b\n" % DOT), "--join", "same",
+                          "--keep-theirs-b64", picks_b64(**{"with": "bar"})], session_json(), COLUMNS="200")
+            self.assertEqual(p.stdout.decode(), "a %s b" % BAR + sl.RESET + " %s 5h 42%% %s wk 18%% %s " % (BAR, BAR, BAR)
+                             + p.stdout.decode().rsplit(" %s " % BAR, 1)[1])
+            self.assertNotIn(" | ", p.stdout.decode())
+        finally:
+            r.close()
+
+    def test_the_grammar_takes_with_and_refuses_anything_else(self):
+        good = b64("my.sh")
+        args = sl.parse_args(["--chain-b64", good, "--join", "line", "--keep-theirs-b64", picks_b64(**{"with": "powerline"})])
+        self.assertEqual(args[3], {"with": "powerline"})
+        for value in ("same", "slash", "", 1, None):
+            self.assertIsNone(sl.parse_args(["--chain-b64", good, "--join", "line",
+                                             "--keep-theirs-b64", picks_b64(**{"with": value})]), value)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -153,19 +153,20 @@ def render_parts(snap, now):
     return {"parts": parts, "error": error, "ago": age // 60 if age >= FRESH_SECONDS else None}
 
 
-def format_parts(base, mine=MINE_DEFAULT, extra=()):
+def format_parts(base, mine=MINE_DEFAULT, extra=(), sep=" | "):
     """Sanduhr's line from `render_parts`, keeping the parts named in `mine`, then the picked
-    `extra` parts (context, model) from Claude Code's stdin. A notice always shows."""
+    `extra` parts (context, model) from Claude Code's stdin, joined with `sep`. A notice always
+    shows."""
     if "notice" in base:
         line = base["notice"]
     else:
-        line = " | ".join(text for name, text in base["parts"] if name in mine)
+        line = sep.join(text for name, text in base["parts"] if name in mine)
         if base.get("error"):
             head = "sanduhr: " + base["error"]
             line = head + " | last " + line if line else head
         elif line and base.get("ago") is not None:
             line += " (%dm ago)" % base["ago"]
-    return " | ".join(x for x in [line] + [text for name, text in extra if name in mine] if x)
+    return sep.join(x for x in [line] + [text for name, text in extra if name in mine] if x)
 
 
 def render(snap, now):
@@ -272,10 +273,10 @@ def segment_parts(stdin_bytes, now, mine=MINE_DEFAULT):
     return base, extra
 
 
-def segment(stdin_bytes, now, mine=MINE_DEFAULT):
-    """Sanduhr's text, its parts filtered by `mine`."""
+def segment(stdin_bytes, now, mine=MINE_DEFAULT, sep=" | "):
+    """Sanduhr's text, its parts filtered by `mine` and joined with `sep`."""
     base, extra = segment_parts(stdin_bytes, now, mine)
-    return format_parts(base, mine, extra)
+    return format_parts(base, mine, extra, sep)
 
 
 # MARK: Width
@@ -305,8 +306,9 @@ def columns():
     return n if n > 0 else None
 
 
-def join(theirs, ours, mode, padding=0, cols=None):
-    """Their output (text) and Sanduhr's segment as the lines to print."""
+def join(theirs, ours, mode, padding=0, cols=None, seam=SEPARATOR):
+    """Their output (text) and Sanduhr's segment as the lines to print; `seam` goes between
+    their last row and Sanduhr's on a same-row join."""
     rows = theirs.rstrip("\r\n")
     if not ours:
         return theirs
@@ -318,9 +320,9 @@ def join(theirs, ours, mode, padding=0, cols=None):
         fits = True
         if cols is not None:
             room = cols - padding - RIGHT_ROOM
-            fits = visible_width(last) + visible_width(SEPARATOR) + visible_width(ours) <= room
+            fits = visible_width(last) + visible_width(seam) + visible_width(ours) <= room
         if fits:
-            lines[-1] = last + RESET + SEPARATOR + ours
+            lines[-1] = last + RESET + seam + ours
             return "\n".join(lines) + "\n"
     return rows + "\n" + ours + "\n"
 
@@ -507,6 +509,28 @@ def _background(state):
     return bg
 
 
+# Join with (item 63b): what goes between segments when the user picks a glyph of their own.
+JOIN_WITH = {
+    "bar": " \u2502 ",
+    "pipe": " | ",
+    "dot": " \u00b7 ",
+    "bullet": " \u2022 ",
+    "powerline-thin": " \ue0b1 ",
+    "spaces": "  ",
+}
+JOIN_WITH_IDS = tuple(JOIN_WITH) + ("powerline",)
+
+
+def _glue(glue, left=None, right=None, blocks=False):
+    """The text Join with puts between two segments: the glyph with a space each side, or a
+    powerline arrow in the two segments' backgrounds (padded unless the segments are powerline
+    blocks with padding of their own)."""
+    if glue != "powerline":
+        return JOIN_WITH[glue]
+    arrow = _arrow(left, right, GLYPHS["powerline"])
+    return arrow if blocks else " " + arrow + " "
+
+
 def _arrow(left, right, glyph):
     """A powerline arrow drawn from a segment with background `left` into one with `right`
     (None: the terminal's own), as their own arrows are when the two are neighbors."""
@@ -543,7 +567,8 @@ def filter_line(line, picks, index):
     if sp["doubt"]:
         return line
     kept = [k for k, seg in enumerate(sp["segments"]) if keeps(seg["matcher"], picks)]
-    if len(kept) == len(sp["segments"]):
+    glue = picks.get("with")
+    if len(kept) == len(sp["segments"]) and not glue:
         return line
     if not kept:
         return None
@@ -556,7 +581,12 @@ def filter_line(line, picks, index):
         out.append(segs[k]["out"])
         if j + 1 < len(kept):
             nxt = kept[j + 1]
-            out.append(_arrow(segs[k]["bg"], segs[nxt]["bg"], glyph) if glyph and nxt != k + 1 else sp["seps"][k])
+            if glue:
+                out.append(_glue(glue, segs[k]["bg"], segs[nxt]["bg"], blocks=sp["sep"] == "powerline"))
+            elif glyph and nxt != k + 1:
+                out.append(_arrow(segs[k]["bg"], segs[nxt]["bg"], glyph))
+            else:
+                out.append(sp["seps"][k])
     if glyph and sp["cap"] and kept[-1] != len(segs) - 1:
         out.append(_arrow(segs[kept[-1]]["bg"], None, glyph))
     else:
@@ -593,7 +623,7 @@ def parse_picks(b64):
         picks = json.loads(base64.b64decode(b64, validate=True).decode("utf-8"))
     except (binascii.Error, ValueError):
         return None
-    if not isinstance(picks, dict) or set(picks) - {"keep", "drop", "new", "sep"}:
+    if not isinstance(picks, dict) or set(picks) - {"keep", "drop", "new", "sep", "with"}:
         return None
     for key in ("keep", "drop"):
         if key in picks:
@@ -603,6 +633,8 @@ def parse_picks(b64):
             if not all(isinstance(m, str) and 0 < len(m) <= MAX_MATCHER for m in v):
                 return None
     if "new" in picks and not isinstance(picks["new"], bool):
+        return None
+    if "with" in picks and picks["with"] not in JOIN_WITH_IDS:
         return None
     if "sep" in picks:
         v = picks["sep"]
@@ -779,9 +811,12 @@ def parse_args(argv, flag="--chain-b64", blank=False):
 
 def combined(theirs, data, now, mode, padding, picks, mine, cols):
     """What a combined statusline prints: their output (text) with `picks` applied, joined
-    with Sanduhr's segment, its parts filtered by `mine`."""
-    ours = segment(lambda: data, now, mine or MINE_DEFAULT)
-    return join(filter_theirs(theirs, picks), ours, mode, padding, cols)
+    with Sanduhr's segment, its parts filtered by `mine`. A `with` pick (Join with) sets the
+    glyph between segments everywhere in the line: theirs, Sanduhr's and the seam."""
+    glue = (picks or {}).get("with")
+    sep = _glue(glue) if glue else " | "
+    ours = segment(lambda: data, now, mine or MINE_DEFAULT, sep)
+    return join(filter_theirs(theirs, picks), ours, mode, padding, cols, _glue(glue) if glue else SEPARATOR)
 
 
 def inspect(theirs, data, now):

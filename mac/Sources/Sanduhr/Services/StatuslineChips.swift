@@ -23,16 +23,28 @@ struct StatuslineChips: Equatable, Sendable {
         let enabled: Bool
     }
 
-    let inspection: StatuslineInspection
+    private(set) var inspection: StatuslineInspection
     /// The separator chosen per line; nil follows the one detected.
     private(set) var separators: [StatuslineSeparator?]
     private(set) var dropped: Set<String> = []
     var keepNew = true
     private(set) var mine: [SanduhrSegment] = SanduhrSegment.defaults
+    /// The glyph the final line joins segments with; nil keeps their own separators.
+    var joinWith: StatuslineJoinGlyph?
 
     init(_ inspection: StatuslineInspection) {
         self.inspection = inspection
         separators = Array(repeating: nil, count: inspection.lines.count)
+    }
+
+    /// The same picks over a new run of their statusline (Test with live data): what was dropped
+    /// stays dropped, a segment seen for the first time shows as a new chip, kept, and the
+    /// separators chosen stay with their lines.
+    func refilled(_ next: StatuslineInspection) -> StatuslineChips {
+        var c = self
+        c.inspection = next
+        c.separators = (0..<next.lines.count).map { $0 < separators.count ? separators[$0] : nil }
+        return c
     }
 
     /// The lines worth a row: ones with something visible.
@@ -117,14 +129,28 @@ struct StatuslineChips: Equatable, Sendable {
     var theirs: StatuslinePicks? {
         let seen = seenMatchers
         let drop = Array(seen.filter(dropped.contains).prefix(StatuslinePicks.maxMatchers))
-        guard !drop.isEmpty || !keepNew else { return nil }
-        let keep = Array(seen.filter { !dropped.contains($0) }.prefix(StatuslinePicks.maxMatchers))
-        return StatuslinePicks(keep: keep, drop: drop, keepNew: keepNew,
-                               separators: Array(separators.prefix(StatuslinePicks.maxLines)))
+        guard !drop.isEmpty || !keepNew || joinWith != nil else { return nil }
+        return allPicks(drop: drop)
     }
 
+    private func allPicks(drop: [String]) -> StatuslinePicks {
+        let keep = Array(seenMatchers.filter { !dropped.contains($0) }.prefix(StatuslinePicks.maxMatchers))
+        return StatuslinePicks(keep: keep, drop: drop, keepNew: keepNew,
+                               separators: Array(separators.prefix(StatuslinePicks.maxLines)), joinWith: joinWith)
+    }
+
+    /// What the command carries: nothing for a choice that changes nothing.
     var selection: StatuslineSelection {
         StatuslineSelection(theirs: theirs, mine: mine == SanduhrSegment.defaults ? nil : mine)
+    }
+
+    /// What the preview composes with: the command's picks, or, when those are empty, the split
+    /// choices anyway, so a change of separator re-runs the preview at once (the line reads the
+    /// same until a segment drops or Join with is set).
+    var previewSelection: StatuslineSelection {
+        var s = selection
+        if s.theirs == nil { s.theirs = allPicks(drop: []) }
+        return s
     }
 
     /// Escapes taken out of terminal text.

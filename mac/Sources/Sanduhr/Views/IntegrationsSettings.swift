@@ -80,23 +80,36 @@ final class IntegrationsModel {
     /// The user's statusline run once against sample statusline JSON and split into segments,
     /// with Sanduhr's, for the sheet's chips (item 63b). Nil when it couldn't run (no python3,
     /// a build without the scripts).
-    func inspectStatusline(chain: String) async -> StatuslineInspection? {
+    func inspectStatusline(chain: String, input: Data? = nil) async -> StatuslineInspection? {
         guard let python = pythonPath else { return nil }
         return await Task.detached(priority: .userInitiated) { () -> StatuslineInspection? in
             guard let args = IntegrationInstaller.standard.inspectArguments(chain: chain),
-                  let text = StatuslinePreview.run(python: python, arguments: args) else { return nil }
+                  let text = StatuslinePreview.run(python: python, arguments: args, input: input) else { return nil }
             return StatuslineInspection.decode(text)
         }.value
     }
 
     /// What the combined line prints with these picks, from the user's output (their command
     /// doesn't run again), for the sheet's live preview. Nil when it couldn't run.
-    func composeStatusline(theirs: String, join: StatuslineJoin, selection: StatuslineSelection) async -> String? {
+    func composeStatusline(theirs: String, join: StatuslineJoin, selection: StatuslineSelection,
+                           input: Data? = nil) async -> String? {
         guard let python = pythonPath else { return nil }
         return await Task.detached(priority: .userInitiated) { () -> String? in
             guard let args = IntegrationInstaller.standard.composeArguments(theirs: theirs, join: join, selection: selection) else { return nil }
-            return StatuslinePreview.run(python: python, arguments: args)
+            return StatuslinePreview.run(python: python, arguments: args, input: input)
         }.value
+    }
+
+    /// The input for Test with live data: Sanduhr's current numbers and the folder's latest
+    /// session (item 63b).
+    func liveStatuslineInput(folder: String) async -> StatuslineLiveInput.Result {
+        await Task.detached(priority: .userInitiated) { StatuslineLiveInput.build(folder: folder) }.value
+    }
+
+    /// The mods `folder` loads that draw status entries in Claude Code's status area (item 63b).
+    func modStatusEntries(folder: String) async -> [ModStatusEntry] {
+        let home = self.home
+        return await Task.detached(priority: .userInitiated) { ModStatusEntries.scan(folder: folder, home: home) }.value
     }
 
     /// Someone else's entry under Sanduhr's key, for the consent sheet.
@@ -455,7 +468,8 @@ private struct IntegrationConsentSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             header
             if offersCombine, let other = consent.other {
-                CombineChoice(other: other, folder: model.display(consent.folder), model: model, join: $join,
+                CombineChoice(other: other, folder: model.display(consent.folder), folderPath: consent.folder,
+                              model: model, join: $join,
                               selection: $selection)
             } else if let other = consent.other {
                 ReplaceNotice(other: other, folder: model.display(consent.folder), kind: consent.kind)

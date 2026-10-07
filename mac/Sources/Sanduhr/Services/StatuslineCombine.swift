@@ -36,6 +36,26 @@ enum StatuslineSeparator: String, CaseIterable, Sendable {
     }
 }
 
+/// What a combined statusline puts between segments when the user picks it (item 63b's Join
+/// with), as the runner names it. Nil (not one of these) keeps their own separators.
+enum StatuslineJoinGlyph: String, CaseIterable, Sendable {
+    case bar, pipe, dot, bullet, powerline
+    case powerlineThin = "powerline-thin"
+    case spaces
+
+    var title: String {
+        switch self {
+        case .bar: "Bar │"
+        case .pipe: "Pipe |"
+        case .dot: "Dot ·"
+        case .bullet: "Bullet •"
+        case .powerline: "Powerline \u{E0B0}"
+        case .powerlineThin: "Powerline \u{E0B1}"
+        case .spaces: "Two spaces"
+        }
+    }
+}
+
 /// Sanduhr's own segments in a combined statusline (item 63b), in the order they print.
 enum SanduhrSegment: String, CaseIterable, Sendable {
     case session, weekly, resets, context, model
@@ -70,12 +90,14 @@ enum SanduhrSegment: String, CaseIterable, Sendable {
 
 /// Which of the user's segments a combined statusline keeps (item 63b), `--keep-theirs-b64`'s
 /// payload: matchers (a segment's leading token) kept and dropped, whether segments never seen
-/// stay, and a separator per line where one was chosen (nil: detected).
+/// stay, a separator per line where one was chosen (nil: detected), and the glyph to join with
+/// (nil: their own).
 struct StatuslinePicks: Equatable, Sendable {
     var keep: [String] = []
     var drop: [String] = []
     var keepNew = true
     var separators: [StatuslineSeparator?] = []
+    var joinWith: StatuslineJoinGlyph?
 
     static let maxMatchers = 64
     static let maxMatcherLength = 64
@@ -91,27 +113,31 @@ struct StatuslinePicks: Equatable, Sendable {
         var seps = separators
         while let last = seps.last, last == nil { seps.removeLast() }
         if !seps.isEmpty { o["sep"] = seps.map { $0.map { $0.rawValue as Any } ?? NSNull() } }
+        if let joinWith { o["with"] = joinWith.rawValue }
         let data = (try? JSONSerialization.data(withJSONObject: o, options: [.sortedKeys, .withoutEscapingSlashes])) ?? Data("{}".utf8)
         return String(decoding: data, as: UTF8.self)
     }
 
     var base64: String { Data(json.utf8).base64EncodedString() }
 
-    init(keep: [String] = [], drop: [String] = [], keepNew: Bool = true, separators: [StatuslineSeparator?] = []) {
+    init(keep: [String] = [], drop: [String] = [], keepNew: Bool = true, separators: [StatuslineSeparator?] = [],
+         joinWith: StatuslineJoinGlyph? = nil) {
         self.keep = keep
         self.drop = drop
         self.keepNew = keepNew
         self.separators = separators
+        self.joinWith = joinWith
     }
 
     /// The payload as the runner accepts it, nil for anything it would refuse: canonical base64
     /// of a JSON object with only `keep`, `drop` (lists of 1 to 64 character matchers, at most
-    /// 64), `new` (a boolean) and `sep` (at most 16 separator names or nulls).
+    /// 64), `new` (a boolean), `sep` (at most 16 separator names or nulls) and `with` (a
+    /// join glyph's name).
     init?(base64 payload: String) {
         guard IntegrationInstaller.isCanonicalBase64(payload), let data = Data(base64Encoded: payload),
               let text = String(data: data, encoding: .utf8),
               let o = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any],
-              Set(o.keys).isSubset(of: ["keep", "drop", "new", "sep"]) else { return nil }
+              Set(o.keys).isSubset(of: ["keep", "drop", "new", "sep", "with"]) else { return nil }
         func matchers(_ key: String) -> [String]? {
             guard let v = o[key] else { return [] }
             guard let list = v as? [Any], list.count <= Self.maxMatchers else { return nil }
@@ -126,6 +152,10 @@ struct StatuslinePicks: Equatable, Sendable {
         if let v = o["new"] {
             guard let n = v as? NSNumber, CFGetTypeID(n) == CFBooleanGetTypeID() else { return nil }
             keepNew = n.boolValue
+        }
+        if let v = o["with"] {
+            guard let name = v as? String, let glyph = StatuslineJoinGlyph(rawValue: name) else { return nil }
+            joinWith = glyph
         }
         if let v = o["sep"] {
             guard let list = v as? [Any], list.count <= Self.maxLines else { return nil }
@@ -366,12 +396,17 @@ struct StatuslineInspection: Decodable, Equatable, Sendable {
 
 /// Runs the combined statusline once against sample statusline JSON for the "other statusline"
 /// sheet (item 63). The JSON is the shape Claude Code documents, with made-up numbers: no real
-/// session's data goes in. The user's command runs as Claude Code would run it.
+/// session's data goes in, except when the user presses Test with live data (`StatuslineLiveInput`). The user's command runs as Claude Code would run it.
 enum StatuslinePreview {
     /// The docs' sample statusline input, trimmed, with resets an hour and three days out.
     static func sampleJSON(now: Date = Date()) -> Data {
+        (try? JSONSerialization.data(withJSONObject: sample(now: now), options: [.sortedKeys])) ?? Data("{}".utf8)
+    }
+
+    /// The sample as a dictionary, for the live input to fill in.
+    static func sample(now: Date = Date()) -> [String: Any] {
         let t = Int(now.timeIntervalSince1970)
-        let sample: [String: Any] = [
+        return [
             "cwd": "/home/user/project",
             "session_id": "abc123",
             "session_name": "my-session",
@@ -389,15 +424,14 @@ enum StatuslinePreview {
                             "seven_day": ["used_percentage": 41.2, "resets_at": t + 3 * 86400]],
             "vim": ["mode": "NORMAL"],
         ]
-        return (try? JSONSerialization.data(withJSONObject: sample, options: [.sortedKeys])) ?? Data("{}".utf8)
     }
 
     /// The width the preview pretends the terminal has.
     static let columns = 100
 
-    /// Runs `python args` with the sample on stdin; its stdout, or nil when it couldn't run.
+    /// Runs `python args` with the sample on stdin (or `input`); its stdout, or nil when it couldn't run.
     /// The runner keeps its own 1.5 s budget; this stops it after 4 s whatever happens.
-    static func run(python: String, arguments: [String]) -> String? {
+    static func run(python: String, arguments: [String], input stdin: Data? = nil) -> String? {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: python)
         p.arguments = arguments
@@ -410,7 +444,7 @@ enum StatuslinePreview {
         p.standardOutput = output
         p.standardError = FileHandle.nullDevice
         do { try p.run() } catch { return nil }
-        input.fileHandleForWriting.write(sampleJSON())
+        input.fileHandleForWriting.write(stdin ?? sampleJSON())
         try? input.fileHandleForWriting.close()
         let done = DispatchSemaphore(value: 0)
         let box = OutputBox()
