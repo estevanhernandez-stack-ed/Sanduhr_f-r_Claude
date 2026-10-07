@@ -588,6 +588,18 @@ S=~/Library/Application\ Support/Sanduhr/integrations
   picks; Remove: `diff /tmp/st-seg.json ~/.claude-smoketest/settings.json` is empty. A
   powerline-style line (a copy, in this test folder): drop a middle segment, and the arrow
   between the two now-neighbors takes their colors, with no bleed into Sanduhr's segment.
+- [ ] Kinds, duplicates, styles (round 3): with `printf "⎇ main | \$1.42 | Opus | ctx 38%%\n"` as
+  the line, the chips read Branch `⎇ main`, Cost `$1.42`, Model `Opus`, Context `ctx 38%`, each
+  tooltip like "Branch, from your statusline: ⎇ main". Turn on Sanduhr's Context and Model: both
+  pairs get orange badges ("Also shown by Sanduhr: Context" and "Also shown by yours: Context"),
+  and "2 duplicates: Model, Context" shows above the preview. Keep yours on Model: Sanduhr's Model
+  is struck through; Keep Sanduhr's on Context: yours is. Brush on Branch: Gradient, two stops,
+  Script letters: the preview draws `⎇ 𝓂𝒶𝒾𝓃` in the gradient, and the command's
+  `--keep-theirs-b64` payload decodes to a `style` entry for `⎇`. Brush on Sanduhr's Session,
+  Bold: the preview's `5h` is bold. Reset to its own look returns both. The Join with and Split
+  yours on menus show drawn arrows beside "Powerline arrow (needs a Nerd Font)" and "Powerline
+  thin arrow (needs a Nerd Font)", never boxes; with Join with on Powerline arrow, the preview
+  draws filled triangles, not boxes.
 - [ ] Mods: with no mods in the folder, "From your mods" says "No mods in this folder draw status
   entries." Make one in the test folder: `mkdir -p /tmp/st-mod/hooks; printf '{"modules":
   ["./r.tsx"]}' > /tmp/st-mod/hooks/hooks.json; printf '$.ui.status("hi")\n' > /tmp/st-mod/hooks/r.tsx`,
