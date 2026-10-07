@@ -443,3 +443,19 @@ New options keep today's behavior by default; the camera light and the glow star
   Slice 2, agent widgets: `propose_widget` with a fixed vocabulary (meter, sparkline, counter, short list, status dot, countdown, a text line with the Desk effects), approved once like a theme, then `publish_widget_data(id, values)` without approval; stale data greys; Remove any time. The Sanduhr mod draws the same widgets as a band above the prompt (item 64's managed mod).
   Acceptance: an agent watching a CI run shows a live card on the notch within a second of `watch_start`; a background command started in Claude Code appears as a watcher with no tool call; "waiting on you" glows; nothing shows with the switches off; no description or command is ever written to disk or logged.
   Verify: swift-testing for the watcher state machine (start, update, waiting, end, lost touch, stacking order), the hook payload parsing (fixtures of `background_tasks`), and placement; Python tests for the MCP tools; a smoke action to post watchers and state.yaml keys; by hand with a real CI watch and a background command.
+
+- [ ] **68. A live preview in every settings pane**
+  Spec ref: session 2026-10-07 ("we need an example of what each area will look like in their settings panes … a visualization and not just all the dropdowns").
+  What to build: a preview card at the top of each pane that controls something visible, drawn by the same views that draw the real thing (never a separate mock), updating as each control changes, with the user's live data where there is some and labeled sample data where there isn't (demo meetings, a sample track, a sample watcher, sample meters before the first fetch):
+  - Desk, Notch: the island at true proportions with both wings, the strip, the camera and mic indicators, watchers and now playing as chosen, the glow testable in place; a no-notch Mac shows the top tab.
+  - Desk, Layout: the screen-shaped map (shared with item 59), every piece in its corner, the Dock edge drawn.
+  - Desk, Look: a Desk corner (clock, date, meters, message) in the chosen font, size, ink and glow.
+  - Desk, Meters: the meter bars in their states (normal, warning, a temporary limit, hidden).
+  - Desk, Message: today's line with its effects, `{write}` and `{shimmer}` replayable.
+  - Desk, Now Playing: a wing and the Desk line with a sample track, paused and playing, and the "when nothing is playing" stand-in.
+  - Widget, Look and Pacing: the widget card in the chosen theme and font (Themes already has its gallery).
+  - General: the menu bar item as it will read (session, weekly, higher, both in turn).
+  - Integrations: the statusline sample (item 63b's preview already) and a watcher card.
+  Size about 160 points tall, resizes with the window, scaled not cropped; Reduce Motion stills it; VoiceOver describes it in one sentence; it never captures the screen or shows another app.
+  Acceptance: changing any visible setting changes its pane's preview within a frame; every preview matches the real surface (same view code); a fresh install's previews show labeled sample data, never blank.
+  Verify: swift-testing that each preview's model is the real one fed the pane's settings (no duplicated layout logic); smoke snaps of each pane with its preview (OCR for the sample labels); by hand pane by pane.
