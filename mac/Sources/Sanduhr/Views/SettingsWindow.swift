@@ -100,14 +100,32 @@ final class SettingsWindowController {
             w.title = "Sanduhr Settings"
             w.isReleasedWhenClosed = false
             w.minSize = NSSize(width: 640, height: 480)
-            w.contentView = NSHostingView(rootView: SettingsRoot(
+            let host = NSHostingView(rootView: SettingsRoot(
                 vm: app.viewModel, deskModel: DeskController.shared.model, updates: app.updates,
                 navigation: navigation))
+            // The window keeps the size it has: left to SwiftUI, a page's natural height (the
+            // preview cards, item 68) grew it past the screen with no way to scroll or close it
+            // (2026-10-07). Each page scrolls inside the window instead.
+            host.sizingOptions = []
+            w.contentView = host
             w.center()
             window = w
         }
+        if let w = window { Self.fitToScreen(w) }
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
+    }
+
+    /// Keeps the window, title bar included, on the screen it is on: never taller or wider than
+    /// the visible frame, moved back inside it when it hangs off an edge.
+    static func fitToScreen(_ w: NSWindow) {
+        guard let visible = (w.screen ?? NSScreen.main)?.visibleFrame else { return }
+        var f = w.frame
+        f.size.width = min(f.width, visible.width)
+        f.size.height = min(f.height, visible.height)
+        f.origin.x = min(max(f.minX, visible.minX), visible.maxX - f.width)
+        f.origin.y = min(max(f.minY, visible.minY), visible.maxY - f.height)
+        if f != w.frame { w.setFrame(f, display: true) }
     }
 }
 
