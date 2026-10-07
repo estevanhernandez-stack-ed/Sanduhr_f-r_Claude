@@ -27,6 +27,9 @@ struct SettingsPreviewTests {
         #expect(SettingsPreviewKind.of(.pacing) == .widget)
         #expect(SettingsPreviewKind.of(.general) == .menuBar)
         #expect(SettingsPreviewKind.of(.integrations) == .integrations)
+        // Item 64: the Mods page's summary card, all real counts, never sample data.
+        #expect(SettingsPreviewKind.of(.mods) == .mods)
+        #expect(SettingsPreviewKind.mods.relevantSamples.isEmpty)
         // Themes has its gallery; the rest draw nothing on screen.
         for s in [SettingsSection.themes, .alerts, .credentials, .usage, .updates, .about] {
             #expect(SettingsPreviewKind.of(s) == nil)

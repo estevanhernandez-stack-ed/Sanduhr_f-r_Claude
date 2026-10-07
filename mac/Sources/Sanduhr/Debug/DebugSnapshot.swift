@@ -110,6 +110,8 @@ struct DebugStateInput {
     var watchers = WatchersDebug()
     /// The camera and mic indicators (item 67): in-use booleans and where they show, never an app.
     var avIndicators = AVIndicatorsDebug()
+    /// The Mods page (item 64): open, read, and counts only, never a name or a path.
+    var modsPage = ModsPageDebug()
     var version = ""
     var build = ""
 }
@@ -162,6 +164,17 @@ struct AVIndicatorsDebug: Equatable {
     var camera = false
     var mic = false
     var shown = "none"
+}
+
+/// state.yaml's `mods_page:` (item 64): whether the page shows and has read the folders, the
+/// counts across folders, how many Checks have answered and whether `claude` was found. Never a
+/// mod's name, a path or a report.
+struct ModsPageDebug: Equatable {
+    var open = false
+    var loaded = false
+    var counts = ModCounts()
+    var checked = 0
+    var cli = false
 }
 
 /// state.yaml's `notch_shows:`: each place's effective content, never its text.
@@ -260,6 +273,15 @@ enum DebugState {
               YAMLPair("shown", .string(a.shown))])
     }
 
+    /// `mods_page:` (item 64): flags and counts only.
+    static func modsPageYAML(_ m: ModsPageDebug) -> YAMLNode {
+        .map([YAMLPair("open", .bool(m.open)), YAMLPair("loaded", .bool(m.loaded)),
+              YAMLPair("folders", .int(m.counts.folders)), YAMLPair("mods", .int(m.counts.mods)),
+              YAMLPair("plugins", .int(m.counts.plugins)), YAMLPair("enabled", .int(m.counts.on)),
+              YAMLPair("missing", .int(m.counts.missing)), YAMLPair("checked", .int(m.checked)),
+              YAMLPair("cli", .bool(m.cli))])
+    }
+
     /// `vault:` (item 46): flags and a count only.
     static func vaultYAML(_ v: VaultState) -> YAMLNode {
         .map([YAMLPair("recording", .bool(v.recording)), YAMLPair("months", .int(v.months)),
@@ -344,6 +366,7 @@ enum DebugState {
         pairs.append(("av_indicators", avIndicatorsYAML(s.avIndicators)))
         // Item 68: which preview card the open Settings section shows (SettingsPreviewKind).
         pairs.append(("settings_preview", s.settingsPreview.map { .string($0.rawValue) } ?? .null))
+        pairs.append(("mods_page", modsPageYAML(s.modsPage)))
         return .object(pairs)
     }
     
