@@ -112,7 +112,7 @@ struct DeskLookSection: View {
     @AppStorage("notchTextColor", store: .desk) private var notchTextColor = "ffffff"
     @State private var families: [String] = []
 
-    /// The Desk font as drawn (EsteFont 26 until one is picked, or when the picked one is gone);
+    /// The Desk font as drawn (EsteFont Pro until one is picked, or when the picked one is gone);
     /// picking writes it.
     private var font: Binding<String> {
         Binding(get: { DeskFont.resolve(saved: savedFont) }, set: { savedFont = $0 })
@@ -154,7 +154,7 @@ struct DeskLookSection: View {
         }
         .formStyle(.grouped)
         .onAppear {
-            // EsteFont 26 first: it ships inside Sanduhr (item 58).
+            // EsteFont Pro, then EsteFont 26, first: they ship inside Sanduhr.
             families = DeskFont.pickerFamilies(installed: NSFontManager.shared.availableFontFamilies)
         }
     }

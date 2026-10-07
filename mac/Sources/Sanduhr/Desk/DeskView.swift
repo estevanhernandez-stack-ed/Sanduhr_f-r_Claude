@@ -11,7 +11,7 @@ import AppKit
 ///       widgets: clock (time and date), claude (Sanduhr line), meters (a bar per limit),
 ///                nowPlaying (what plays, item 53b), watchers (item 66), meetings, message
 ///       slots:   tl tr bl br; leave a widget out to hide it
-///   defaults write com.626labs.sanduhr.desk font "EsteFont 26"    (any installed font family; EsteFont 26 ships in the app and is the default)
+///   defaults write com.626labs.sanduhr.desk font "EsteFont Pro"   (any installed font family; EsteFont Pro and EsteFont 26 ship in the app, Pro is the default)
 ///   defaults write com.626labs.sanduhr.desk timeSize -float 112    (clock size; the rest scales from it)
 ///   defaults write com.626labs.sanduhr.desk messageSize -float 84
 ///   defaults write com.626labs.sanduhr.desk messageColor 9ad7ff    (hex, or "5b8cff,a86bff" for a gradient)
@@ -108,7 +108,7 @@ struct DeskPiece: View {
     var sweepFirst = false
 
     @AppStorage("font", store: .desk) private var savedFont: String?
-    /// The Desk font as drawn: EsteFont 26 unless a font was picked (DeskFont, item 58).
+    /// The Desk font as drawn: EsteFont Pro unless a font was picked (DeskFont, item 58).
     private var font: String { DeskFont.resolve(saved: savedFont) }
     @AppStorage("messageFont", store: .desk) private var messageFont = ""
     @AppStorage("timeSize", store: .desk) private var timeSize = 112.0
@@ -143,7 +143,8 @@ struct DeskPiece: View {
     private var clock: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             VStack(alignment: alignment, spacing: 2) {
-                // The time is the Desk's heading: EsteFont 26 draws it in its Bold face.
+                // The time is the Desk's heading: a bundled family (EsteFont Pro, EsteFont 26)
+                // draws it in its Bold face.
                 Text(Self.format(context.date, "h:mm"))
                     .font(.custom(BundledFonts.face(font, bold: true), size: timeSize))
                 Text(Self.format(context.date, "EEEE, MMMM d"))

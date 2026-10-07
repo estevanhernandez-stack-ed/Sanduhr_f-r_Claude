@@ -116,12 +116,12 @@ cp -R "$ADAPTER_OUT/MediaRemoteAdapter.framework" "$APP/Contents/Frameworks/"
 mkdir -p "$APP/Contents/Helpers" "$APP/Contents/Resources/NowPlaying"
 install -m 0755 "$ADAPTER_OUT/MediaRemoteAdapterTestClient" "$APP/Contents/Helpers/MediaRemoteAdapterTestClient"
 install -m 0644 Vendor/mediaremote-adapter/bin/mediaremote-adapter.pl "$APP/Contents/Resources/NowPlaying/mediaremote-adapter.pl"
-# The third-party notices (Sparkle, mediaremote-adapter, EsteFont 26), opened from Settings, About.
+# The third-party notices (Sparkle, mediaremote-adapter, EsteFont Pro, EsteFont 26), opened from Settings, About.
 install -m 0644 THIRD-PARTY-NOTICES.txt "$APP/Contents/Resources/THIRD-PARTY-NOTICES.txt"
-# EsteFont 26 (item 58): registered for Sanduhr's process at launch (BundledFonts), sealed by the
-# signature as resources. Nothing is installed on the Mac.
-echo "→ Bundling EsteFont 26..."
-FONTS=(EsteFont26-Regular.ttf EsteFont26-Bold.ttf)
+# EsteFont Pro and EsteFont 26 (items 58, 65 (e)): registered for Sanduhr's process at launch
+# (BundledFonts), sealed by the signature as resources. Nothing is installed on the Mac.
+echo "→ Bundling EsteFont Pro and EsteFont 26..."
+FONTS=(EsteFontPro-Regular.ttf EsteFontPro-Bold.ttf EsteFont26-Regular.ttf EsteFont26-Bold.ttf)
 mkdir -p "$APP/Contents/Resources/Fonts"
 for font in "${FONTS[@]}"; do
     [[ -f "Resources/Fonts/$font" ]] || { echo "✗ Resources/Fonts/$font is missing" >&2; exit 1; }
@@ -187,7 +187,7 @@ else
         "$APP"
 fi
 codesign --verify --strict --verbose=2 "$APP"
-# Both faces made it into the signed app, unchanged (the signature seals them).
+# Every face made it into the signed app, unchanged (the signature seals them).
 for font in "${FONTS[@]}"; do
     cmp -s "Resources/Fonts/$font" "$APP/Contents/Resources/Fonts/$font" \
         || { echo "✗ $APP is missing Fonts/$font" >&2; exit 1; }
