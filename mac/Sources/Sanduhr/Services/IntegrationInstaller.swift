@@ -407,10 +407,12 @@ struct IntegrationInstaller {
     /// Writes Sanduhr's entry for `kind` into `folder`'s config, refreshing the scripts first.
     /// Someone else's entry is replaced only with `replaceOther`, and remembered for Remove.
     /// For the statusline, `combine` (item 63) keeps someone else's line instead: Sanduhr's
-    /// command runs it and prints both, joined that way; it is remembered for Remove the same.
+    /// command runs it and prints both, joined that way, keeping the segments `selection` picks
+    /// (item 63b); it is remembered for Remove the same.
     @discardableResult
     func install(_ kind: IntegrationKind, folder: String, python: String,
-                 replaceOther: Bool = false, combine: StatuslineJoin? = nil) throws -> Outcome {
+                 replaceOther: Bool = false, combine: StatuslineJoin? = nil,
+                 selection: StatuslineSelection = StatuslineSelection()) throws -> Outcome {
         if kind.needsScripts {
             do {
                 try scripts.refresh()
@@ -428,7 +430,8 @@ struct IntegrationInstaller {
             let original = try read(file)
             let plan = try malformedNamed(file) {
                 try planInstall(kind, bytes: original ?? Array("{}\n".utf8), value: value, python: python,
-                                combine: combine, prior: receipts.first { $0.file == file && $0.kind == kind },
+                                combine: combine, selection: selection,
+                                prior: receipts.first { $0.file == file && $0.kind == kind },
                                 createdFile: original == nil)
             }
             if let other = plan.other, !replaceOther, combine == nil { return .needsReplaceConsent(existing: other) }
@@ -464,7 +467,8 @@ struct IntegrationInstaller {
     }
 
     private func planInstall(_ kind: IntegrationKind, bytes b: [UInt8], value: JSONEdit.Value, python: String,
-                             combine: StatuslineJoin?, prior: IntegrationReceipt?, createdFile: Bool) throws -> Plan {
+                             combine: StatuslineJoin?, selection: StatuslineSelection, prior: IntegrationReceipt?,
+                             createdFile: Bool) throws -> Plan {
         let root = try parse(b)
         let top = try JSONEdit.topObject(b)
         var receipt = IntegrationReceipt(folder: "", file: "", kind: kind, createdFile: createdFile)
@@ -477,7 +481,7 @@ struct IntegrationInstaller {
             return try planInstallHooks(bytes: b, root: root, top: top, receipt: receipt, prior: prior)
         case .statusline:
             return try planInstallStatusline(bytes: b, root: root, top: top, python: python, combine: combine,
-                                             receipt: receipt, prior: prior)
+                                             selection: selection, receipt: receipt, prior: prior)
         case .mcp:
             if let m = top.member(Self.serversKey) {
                 guard root[Self.serversKey] is [String: Any] else { throw Failure.malformed(file: "") }
@@ -509,15 +513,17 @@ struct IntegrationInstaller {
     /// The statusline's install. Someone else's line is kept as `previous` and either replaced
     /// or, with `combine`, chained inside Sanduhr's command (unwrapped to their own command when
     /// it is itself Sanduhr's). Sanduhr's own entry, alone or combined, is rebuilt from its
-    /// shape: an update keeps the chained command and the join. Either way the value carries the
+    /// shape: an update keeps the chained command, the join and the picks. Either way the value carries the
     /// line's padding, refresh interval and vim choice.
     private func planInstallStatusline(bytes b: [UInt8], root: [String: Any], top: JSONEdit.Object, python: String,
-                                       combine: StatuslineJoin?, receipt start: IntegrationReceipt,
+                                       combine: StatuslineJoin?, selection picked: StatuslineSelection,
+                                       receipt start: IntegrationReceipt,
                                        prior: IntegrationReceipt?) throws -> Plan {
         var receipt = start
         var other: String?
         var chain: String?
         var join = StatuslineJoin.line
+        var selection = StatuslineSelection()
         let existing = root[Self.statusLineKey]
         let command = (existing as? [String: Any])?["command"] as? String
         if let m = top.member(Self.statusLineKey) {
@@ -527,6 +533,7 @@ struct IntegrationInstaller {
                 if let inner = ours.chain, let foreign = Self.innermostForeign(inner) {
                     chain = foreign
                     join = ours.join ?? .line
+                    selection = ours.selection
                 }
                 if receipt.previous != nil || chain != nil { receipt.mode = chain == nil ? .replace : .combine }
             } else {
@@ -535,11 +542,13 @@ struct IntegrationInstaller {
                 if let combine, let command, !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     chain = command
                     join = combine
+                    selection = picked
                 }
                 receipt.mode = chain == nil ? .replace : .combine
             }
         }
-        let value = statuslineEntry(python: python, chain: chain, join: join, siblings: Self.carriedSiblings(existing))
+        let value = statuslineEntry(python: python, chain: chain, join: join, siblings: Self.carriedSiblings(existing),
+                                    selection: selection)
         let r = JSONEdit.set(b, in: top, key: Self.statusLineKey, value: value)
         if let inner = r.emptyInner { receipt.emptyInner = String(decoding: inner, as: UTF8.self) }
         try verify(.statusline, before: b, after: r.bytes, expect: value.plain)

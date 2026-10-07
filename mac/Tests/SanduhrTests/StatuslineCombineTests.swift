@@ -207,10 +207,17 @@ struct StatuslineCombineTests {
     @Test func previewArgumentsUseTheAppsCopyOfTheScript() {
         let r = IntegrationRig()
         defer { r.cleanUp() }
-        let args = r.installer.previewArguments(chain: "my.sh", join: .same)
-        #expect(args == [r.app.appendingPathComponent("sanduhr_statusline.py").path, "--chain-b64", Self.b64("my.sh"), "--join", "same"])
+        let script = r.app.appendingPathComponent("sanduhr_statusline.py").path
+        #expect(r.installer.inspectArguments(chain: "my.sh") == [script, "--inspect-b64", Self.b64("my.sh")])
+        let picks = StatuslinePicks(keep: ["~"], drop: ["main"])
+        #expect(r.installer.composeArguments(theirs: "~ | main\n", join: .same,
+                                             selection: StatuslineSelection(theirs: picks, mine: [.session]))
+                == [script, "--compose-b64", Self.b64("~ | main\n"), "--join", "same",
+                    "--keep-theirs-b64", picks.base64, "--mine", "session"])
+        #expect(r.installer.composeArguments(theirs: "", join: .line, selection: StatuslineSelection())
+                == [script, "--compose-b64", "", "--join", "line"])
         let none = IntegrationInstaller(home: r.home.path, scripts: IntegrationScripts(source: nil, dir: r.support))
-        #expect(none.previewArguments(chain: "my.sh", join: .line) == nil)
+        #expect(none.inspectArguments(chain: "my.sh") == nil)
         let sample = try? JSONSerialization.jsonObject(with: StatuslinePreview.sampleJSON()) as? [String: Any]
         #expect((sample?["rate_limits"] as? [String: Any])?["five_hour"] != nil)
         #expect((sample?["model"] as? [String: Any])?["display_name"] as? String == "Opus")

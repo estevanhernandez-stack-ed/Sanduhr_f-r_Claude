@@ -24,8 +24,21 @@ own row; `same` appends ` | <segment>` (after an SGR reset) to their last row, f
 back to `line` when that would not fit `COLUMNS`. `--padding <n>` is the statusline's
 padding, counted against the width. Exit is always 0; reasons go to stderr only.
 
+Segments (item 63b): `--keep-theirs-b64 <base64 of JSON>` keeps only some of their segments.
+Each line of theirs is cut on the separator it uses (`|`, `·`, `│`, `•`, powerline arrows, or
+two-plus spaces; detected per line unless the JSON's `sep` names one), each segment is known by
+its leading token (`matcher`), and segments whose matcher is dropped go, the rest rejoined on
+their own separators with their colors (reset between). Segments never seen follow `new`. A line
+that loses every segment goes; when nothing of theirs is left, Sanduhr's line shows alone. Any
+doubt (an unfinished escape, a carriage return, an empty segment) keeps the line whole.
+`--mine <list>` picks Sanduhr's own: session, weekly, resets (the default three), context,
+model (the last two from Claude Code's stdin).
+
 Usage: sanduhr_statusline.py                                    print the Sanduhr segment
        sanduhr_statusline.py --chain-b64 B --join line|same [--padding N]
+                             [--keep-theirs-b64 K] [--mine M]
+       sanduhr_statusline.py --inspect-b64 B                    the Combine sheet's pieces (JSON)
+       sanduhr_statusline.py --compose-b64 O --join ...         the sheet's preview from output O
        SANDUHR_SNAPSHOT=path ...                                read another snapshot (tests)
 """
 import base64
@@ -56,6 +69,10 @@ SEPARATOR = " │ "      # " | " with a box-drawing bar
 RESET = "\x1b[0m"
 STDIN_WAIT = 0.25           # plain mode: how long to wait for stdin that may never come
 B64 = re.compile(r"\A[A-Za-z0-9+/]+={0,2}\Z")
+
+# Sanduhr's own segments, in the order they print (item 63b); the first three are the default.
+MINE = ("session", "weekly", "resets", "context", "model")
+MINE_DEFAULT = ("session", "weekly", "resets")
 
 
 def parse(ts):
@@ -93,17 +110,21 @@ def snapshot_age(snap, now):
     return max(0, int((now - captured).total_seconds()))
 
 
-def render(snap, now):
+def render_parts(snap, now):
+    """The snapshot as Sanduhr's line in named parts: `{"notice": text}` for a line that stands
+    whole (update, dead, or "" when unreadable), else `{"parts": [(name, text)], "error": kind
+    or None, "ago": minutes or None}`. Names: session, weekly (with hot per-model weeklies),
+    resets."""
     try:
         if int(snap.get("schema_version", 0)) > SCHEMA_VERSION:
-            return "sanduhr: update statusline"
+            return {"notice": "sanduhr: update statusline"}
     except (TypeError, ValueError):
-        return ""
+        return {"notice": ""}
     age = snapshot_age(snap, now)
     if age is None:
-        return ""
+        return {"notice": ""}
     if age > DEAD_SECONDS:
-        return "sanduhr: stale %dm - start widget" % (age // 60)
+        return {"notice": "sanduhr: stale %dm - start widget" % (age // 60)}
 
     parts, reset_suffix = [], None
     for tier in snap.get("tiers") or []:
@@ -122,30 +143,45 @@ def render(snap, now):
                 continue  # reset crossed: the stored % is arbitrarily wrong
             if key == "seven_day":
                 reset_suffix = week_reset(reset)
-        parts.append("%s %d%%" % (label, int(util)))
-
-    line = " | ".join(parts)
-    if reset_suffix and line:
-        line += " | " + reset_suffix
+        parts.append(("session" if key == "five_hour" else "weekly", "%s %d%%" % (label, int(util))))
+    if reset_suffix and parts:
+        parts.append(("resets", reset_suffix))
+    error = None
     if snap.get("status") == "error":
-        kind = {"session_expired": "reauth needed", "cloudflare": "blocked - reauth"}.get(
+        error = {"session_expired": "reauth needed", "cloudflare": "blocked - reauth"}.get(
             snap.get("error_kind"), "offline")
-        return "sanduhr: %s | last %s" % (kind, line) if line else "sanduhr: " + kind
-    if not line:
-        return ""
-    if age >= FRESH_SECONDS:
-        line += " (%dm ago)" % (age // 60)
-    return line
+    return {"parts": parts, "error": error, "ago": age // 60 if age >= FRESH_SECONDS else None}
 
 
-def render_stdin(session, now):
-    """Claude Code's own `rate_limits` (stdin), for when the snapshot is dead: the same
-    line with each percent marked `*`, or "" when the session JSON carries none."""
+def format_parts(base, mine=MINE_DEFAULT, extra=(), sep=" | ", styles=None):
+    """Sanduhr's line from `render_parts`, keeping the parts named in `mine`, then the picked
+    `extra` parts (context, model) from Claude Code's stdin, joined with `sep`. A notice always
+    shows. `styles` (by part name) gives a part its look."""
+    styles = styles or {}
+    if "notice" in base:
+        line = base["notice"]
+    else:
+        line = sep.join(styled_text(text, styles.get(name)) for name, text in base["parts"] if name in mine)
+        if base.get("error"):
+            head = "sanduhr: " + base["error"]
+            line = head + " | last " + line if line else head
+        elif line and base.get("ago") is not None:
+            line += " (%dm ago)" % base["ago"]
+    return sep.join(x for x in [line] + [styled_text(text, styles.get(name)) for name, text in extra if name in mine] if x)
+
+
+def render(snap, now):
+    return format_parts(render_parts(snap, now))
+
+
+def render_stdin_parts(session, now):
+    """Claude Code's own `rate_limits` (stdin), for when the snapshot is dead: the parts with
+    each percent marked `*`, or None when the session JSON carries none."""
     if not isinstance(session, dict):
-        return ""
+        return None
     limits = session.get("rate_limits")
     if not isinstance(limits, dict):
-        return ""
+        return None
     parts, reset_suffix = [], None
     for key in ("five_hour", "seven_day"):
         window = limits.get(key)
@@ -167,11 +203,36 @@ def render_stdin(session, now):
             continue
         if key == "seven_day" and reset is not None:
             reset_suffix = week_reset(reset)
-        parts.append("%s %d%%*" % (LABELS[key], int(used)))
-    line = " | ".join(parts)
-    if reset_suffix and line:
-        line += " | " + reset_suffix
-    return line
+        parts.append(("session" if key == "five_hour" else "weekly", "%s %d%%*" % (LABELS[key], int(used))))
+    if not parts:
+        return None
+    if reset_suffix:
+        parts.append(("resets", reset_suffix))
+    return {"parts": parts, "error": None, "ago": None}
+
+
+def render_stdin(session, now):
+    """`render_stdin_parts` as the line, or "" without `rate_limits`."""
+    base = render_stdin_parts(session, now)
+    return format_parts(base) if base else ""
+
+
+def session_parts(session):
+    """The parts only Claude Code's stdin knows: context used and the model's name."""
+    out = []
+    if not isinstance(session, dict):
+        return out
+    ctx = session.get("context_window")
+    used = ctx.get("used_percentage") if isinstance(ctx, dict) else None
+    if isinstance(used, (int, float)) and not isinstance(used, bool) and 0 <= used <= 1000:
+        out.append(("context", "ctx %d%%" % int(used)))
+    model = session.get("model")
+    name = model.get("display_name") if isinstance(model, dict) else None
+    if isinstance(name, str):
+        name = "".join(ch for ch in name if unicodedata.category(ch) not in ("Cc", "Cf")).strip()[:40]
+        if name:
+            out.append(("model", name))
+    return out
 
 
 def load_snapshot():
@@ -183,24 +244,40 @@ def load_snapshot():
     return snap if isinstance(snap, dict) else None
 
 
-def segment(stdin_bytes, now):
-    """Sanduhr's text: the snapshot's line, or stdin's `rate_limits` when the snapshot is
-    dead or missing (`stdin_bytes` is a callable so plain mode reads stdin only then)."""
+def segment_parts(stdin_bytes, now, mine=MINE_DEFAULT):
+    """Sanduhr's line as (base, extra) for `format_parts`: the snapshot's parts, or stdin's
+    `rate_limits` when the snapshot is dead or missing (`stdin_bytes` is a callable so plain
+    mode reads stdin only then), and stdin's context and model when `mine` asks for them."""
+    cache = []
+
+    def session():
+        if not cache:
+            raw = stdin_bytes()
+            value = None
+            if raw:
+                try:
+                    value = json.loads(raw.decode("utf-8", "replace"))
+                except ValueError:
+                    value = None
+            cache.append(value)
+        return cache[0]
+
     snap = load_snapshot()
     age = snapshot_age(snap, now) if snap is not None else None
     if snap is not None and age is not None and age <= DEAD_SECONDS:
-        return render(snap, now)
-    raw = stdin_bytes()
-    session = None
-    if raw:
-        try:
-            session = json.loads(raw.decode("utf-8", "replace"))
-        except ValueError:
-            session = None
-    fallback = render_stdin(session, now)
-    if fallback:
-        return fallback
-    return render(snap, now) if snap is not None else ""
+        base = render_parts(snap, now)
+    else:
+        base = render_stdin_parts(session(), now)
+        if base is None:
+            base = render_parts(snap, now) if snap is not None else {"notice": ""}
+    extra = session_parts(session()) if "context" in mine or "model" in mine else []
+    return base, extra
+
+
+def segment(stdin_bytes, now, mine=MINE_DEFAULT, sep=" | ", styles=None):
+    """Sanduhr's text, its parts filtered by `mine`, styled by `styles`, joined with `sep`."""
+    base, extra = segment_parts(stdin_bytes, now, mine)
+    return format_parts(base, mine, extra, sep, styles)
 
 
 # MARK: Width
@@ -230,8 +307,9 @@ def columns():
     return n if n > 0 else None
 
 
-def join(theirs, ours, mode, padding=0, cols=None):
-    """Their output (text) and Sanduhr's segment as the lines to print."""
+def join(theirs, ours, mode, padding=0, cols=None, seam=SEPARATOR):
+    """Their output (text) and Sanduhr's segment as the lines to print; `seam` goes between
+    their last row and Sanduhr's on a same-row join."""
     rows = theirs.rstrip("\r\n")
     if not ours:
         return theirs
@@ -243,11 +321,557 @@ def join(theirs, ours, mode, padding=0, cols=None):
         fits = True
         if cols is not None:
             room = cols - padding - RIGHT_ROOM
-            fits = visible_width(last) + visible_width(SEPARATOR) + visible_width(ours) <= room
+            fits = visible_width(last) + visible_width(seam) + visible_width(ours) <= room
         if fits:
-            lines[-1] = last + RESET + SEPARATOR + ours
+            lines[-1] = last + RESET + seam + ours
             return "\n".join(lines) + "\n"
     return rows + "\n" + ours + "\n"
+
+
+# MARK: Their segments (item 63b)
+
+# The separators a statusline uses between its segments, in the order a tie goes to.
+SEPARATORS = (
+    ("powerline", "\ue0b0"),
+    ("powerline-thin", "\ue0b1"),
+    ("bar", "\u2502"),
+    ("pipe", "|"),
+    ("bullet", "\u2022"),
+    ("dot", "\u00b7"),
+)
+GLYPHS = dict(SEPARATORS)
+SEPARATOR_IDS = tuple(i for i, _ in SEPARATORS) + ("spaces", "none")
+ESCAPE = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-Z\\^_])")
+SPACES = re.compile(r"(?<=\S)[ \t]{2,}(?=\S)")
+WORD = re.compile(r"[^\W\d_][\w-]*")
+MAX_MATCHERS = 64
+MAX_MATCHER = 64
+MAX_LINES = 16
+
+
+def tokenize(line):
+    """`line` as [(is_escape, text)], one visible character per text token; None when the line
+    holds what a splitter can't be sure of (an unfinished escape, a carriage return or another
+    control character)."""
+    out = []
+    i = 0
+    while i < len(line):
+        ch = line[i]
+        if ch == "\x1b":
+            m = ESCAPE.match(line, i)
+            if m is None:
+                return None
+            out.append((True, m.group(0)))
+            i = m.end()
+            continue
+        if ch != "\t" and unicodedata.category(ch) == "Cc":
+            return None
+        out.append((False, ch))
+        i += 1
+    return out
+
+
+def detect(plain):
+    """The separator `plain` (a line, escapes taken out) uses: the glyph it holds most (ties
+    to the order of SEPARATORS), else runs of two or more spaces, else none."""
+    best, count = "none", 0
+    for sid, glyph in SEPARATORS:
+        n = plain.count(glyph)
+        if n > count:
+            best, count = sid, n
+    if count:
+        return best
+    return "spaces" if SPACES.search(plain) else "none"
+
+
+def matcher(plain):
+    """A segment's leading token, escapes taken out: a word (letter first), `#` for a number,
+    else the first glyph with what joins it (variation selectors, combining marks, a ZWJ
+    sequence). Stable while the segment's content changes: `⎇ main`, `⎇ dev` are both `⎇`."""
+    s = plain.strip()
+    if not s:
+        return ""
+    m = WORD.match(s)
+    if m:
+        return m.group(0)[:MAX_MATCHER]
+    if s[0].isdigit():
+        return "#"
+    i = 1
+    while i < len(s):
+        c = s[i]
+        if unicodedata.category(c) in ("Mn", "Mc", "Me") or c in ("\ufe0e", "\ufe0f"):
+            i += 1
+        elif c == "\u200d" and i + 1 < len(s):
+            i += 2
+        else:
+            break
+    return s[:i][:MAX_MATCHER]
+
+
+# What a segment of theirs shows, by its content (item 63b): the chips name it, and a kind that
+# Sanduhr also shows is a duplicate. Checked in this order; the first that fits wins.
+KINDS = ("branch", "cost", "model", "context", "session", "weekly", "tokens", "time", "directory", "segment")
+_PCT = r"\d+(?:\.\d+)?\s?%"
+_BRANCH_GLYPHS = ("⎇", "")
+_MODEL = re.compile(r"(?:claude-[a-z0-9.\-\[\]]+|(?:opus|sonnet|haiku|fable)(?:\s+\d+(?:\.\d+)*)?(?:\s*\(.*\))?)", re.I)
+_CONTEXT = re.compile(r"\b(?:ctx|context)\b.*" + _PCT + r"|" + _PCT + r".*\b(?:ctx|context)\b", re.I)
+_SESSION = re.compile(r"(?:\b5h\b|\bsession\b).*" + _PCT + r"|" + _PCT + r".*(?:\b5h\b|\bsession\b)", re.I)
+_WEEKLY = re.compile(r"(?:\bwk\b|\bweekly\b|\b7d\b).*" + _PCT + r"|" + _PCT + r".*(?:\bwk\b|\bweekly\b|\b7d\b)", re.I)
+_COST = re.compile(r"\$\s?\d+(?:[.,]\d+)?|\bcost\b.*\d", re.I)
+_TOKENS = re.compile(r"\b\d+(?:\.\d+)?\s?[kKM]\b(?:\s*(?:tok|tokens)\b)?|\b\d[\d,]*\s*(?:tok|tokens)\b")
+_TIME = re.compile(r"\b\d{1,2}:\d{2}(?::\d{2})?(?:\s?[aApP][mM])?\b")
+_BRANCH_WORDS = ("main", "master", "develop", "dev", "trunk", "HEAD")
+_BRANCH_TOKEN = re.compile(r"\A(?:[\w.\-]+/[\w./\-]+|[a-z0-9]+(?:-[a-z0-9]+)+)[*+!?]*\Z")
+_LABEL = re.compile(r"\A(?:model|branch|git|dir|cwd|cost)\s*[:=]\s*", re.I)
+
+
+def classify(plain):
+    """The kind of a segment of theirs, from its text with escapes taken out: branch, cost,
+    model, context, session, weekly, tokens, time, directory, or segment (not known)."""
+    s = plain.strip()
+    if not s:
+        return "segment"
+    if s.startswith(_BRANCH_GLYPHS) or re.match(r"\A(?:git|branch)\s*[:=]?\s*\S", s, re.I):
+        return "branch"
+    # A leading icon (an emoji or a symbol) says nothing about the kind: read past it.
+    body = s
+    while body and not (body[0].isalnum() or body[0] in "$~/.[("):
+        body = body[1:].lstrip()
+    body = _LABEL.sub("", body)
+    if _COST.search(body):
+        return "cost"
+    if _MODEL.fullmatch(body):
+        return "model"
+    if _CONTEXT.search(body):
+        return "context"
+    if _SESSION.search(body):
+        return "session"
+    if _WEEKLY.search(body):
+        return "weekly"
+    if _TOKENS.search(body):
+        return "tokens"
+    if _TIME.search(body):
+        return "time"
+    if body.startswith(("~", "/", "./", "../")):
+        return "directory"
+    if body.rstrip("*+!?") in _BRANCH_WORDS or _BRANCH_TOKEN.match(body):
+        return "branch"
+    return "segment"
+
+
+def _sgr_state(tokens, upto):
+    """The SGR escapes in force before token `upto`, since the last reset."""
+    state = []
+    for is_esc, text in tokens[:upto]:
+        if is_esc and text.startswith("\x1b[") and text.endswith("m"):
+            params = text[2:-1]
+            if params in ("", "0"):
+                state = []
+            elif params.startswith("0;") or params.startswith(";"):
+                state = [text]
+            else:
+                state.append(text)
+    return state
+
+
+def split_line(line, sep=None):
+    """`line` cut on `sep` (detected when None) into a dict: `sep`, `doubt` (True when the line
+    must stay whole), and when there's no doubt `prefix`, `segments` [{plain, matcher, out}],
+    `seps` [out] (the separator after each segment but the last) and `suffix`. Each `out` is
+    that piece's own bytes with the colors in force before it and a reset after, so pieces
+    rejoin in any subset. Caps (a separator with nothing before or after) go to the prefix or
+    the suffix."""
+    tokens = tokenize(line)
+    if tokens is None:
+        return {"sep": sep or "none", "doubt": True}
+    pos = [k for k, (is_esc, _) in enumerate(tokens) if not is_esc]
+    plain = "".join(tokens[k][1] for k in pos)
+    n = len(plain)
+    if sep is None:
+        sep = detect(plain)
+    # A powerline segment's padding is part of its colored block: cut on the arrow alone.
+    blocks = sep == "powerline"
+    if sep == "spaces":
+        cuts = [m.span() for m in SPACES.finditer(plain)]
+    elif blocks:
+        cuts = [m.span() for m in re.finditer(re.escape(GLYPHS[sep]), plain)]
+    elif sep in GLYPHS:
+        cuts = [m.span() for m in re.finditer(r"[ \t]*" + re.escape(GLYPHS[sep]) + r"[ \t]*", plain)]
+    else:
+        cuts = []
+    edges = [(0, 0)] + cuts + [(n, n)]
+    pieces = [(edges[i][1], edges[i + 1][0]) for i in range(len(edges) - 1)]
+    full = [i for i, (a, b) in enumerate(pieces) if plain[a:b].strip()]
+    if not full or any(not plain[a:b].strip() for a, b in pieces[full[0]:full[-1] + 1]):
+        return {"sep": sep, "doubt": True}
+    spans = []
+    for a, b in pieces[full[0]:full[-1] + 1]:
+        while not blocks and plain[a].isspace():
+            a += 1
+        while not blocks and plain[b - 1].isspace():
+            b -= 1
+        spans.append((a, b))
+
+    def tstart(i):
+        return 0 if i == 0 else pos[i - 1] + 1
+
+    def out(a, b, last=False):
+        ts = tstart(a)
+        te = len(tokens) if last else tstart(b)
+        piece = tokens[ts:te]
+        if last and all(is_esc for is_esc, _ in piece):
+            return ""  # only escapes after the last segment: each piece already resets
+        state = _sgr_state(tokens, ts)
+        for is_esc, text in piece:
+            if not is_esc:
+                break
+            if text.startswith("\x1b[") and text.endswith("m") and (text[2:-1] in ("", "0") or text[2:].startswith("0;")):
+                state = []  # the piece starts by resetting: what came before doesn't matter
+        open_after = _sgr_state(tokens, te)
+        return "".join(state) + "".join(text for _, text in piece) + (RESET if open_after and not last else "")
+
+    segments = [{"plain": plain[a:b].strip(), "matcher": matcher(plain[a:b]), "out": out(a, b),
+                 "bg": _background(_sgr_state(tokens, tstart(b))),
+                 "tokens": tokens[tstart(a):tstart(b)], "state": _sgr_state(tokens, tstart(a))} for a, b in spans]
+    seps = [out(spans[k][1], spans[k + 1][0]) for k in range(len(spans) - 1)]
+    prefix = "".join(text for _, text in tokens[:tstart(spans[0][0])])
+    return {"sep": sep, "doubt": False, "prefix": prefix, "segments": segments, "seps": seps,
+            "suffix": out(spans[-1][1], n, last=True), "cap": blocks and GLYPHS[sep] in plain[spans[-1][1]:]}
+
+
+def _background(state):
+    """The background the SGR escapes in `state` leave set, as SGR parameters ("44",
+    "48;5;23", "48;2;1;2;3"), or None for the terminal's own."""
+    bg = None
+    for esc in state:
+        codes = esc[2:-1].split(";")
+        i = 0
+        while i < len(codes):
+            c = codes[i]
+            if c in ("", "0", "49"):
+                bg = None
+            elif c.isdigit() and (40 <= int(c) <= 47 or 100 <= int(c) <= 107):
+                bg = c
+            elif c in ("38", "48") and i + 1 < len(codes):
+                width = {"5": 1, "2": 3}.get(codes[i + 1], 0)
+                if width and i + 1 + width < len(codes):
+                    if c == "48":
+                        bg = ";".join(codes[i:i + 2 + width])
+                    i += 1 + width
+            i += 1
+    return bg
+
+
+# Join with (item 63b): what goes between segments when the user picks a glyph of their own.
+JOIN_WITH = {
+    "bar": " \u2502 ",
+    "pipe": " | ",
+    "dot": " \u00b7 ",
+    "bullet": " \u2022 ",
+    "powerline-thin": " \ue0b1 ",
+    "spaces": "  ",
+}
+JOIN_WITH_IDS = tuple(JOIN_WITH) + ("powerline",)
+
+
+def _glue(glue, left=None, right=None, blocks=False):
+    """The text Join with puts between two segments: the glyph with a space each side, or a
+    powerline arrow in the two segments' backgrounds (padded unless the segments are powerline
+    blocks with padding of their own)."""
+    if glue != "powerline":
+        return JOIN_WITH[glue]
+    arrow = _arrow(left, right, GLYPHS["powerline"])
+    return arrow if blocks else " " + arrow + " "
+
+
+def _arrow(left, right, glyph):
+    """A powerline arrow drawn from a segment with background `left` into one with `right`
+    (None: the terminal's own), as their own arrows are when the two are neighbors."""
+    if left is None:
+        fg = "39"
+    elif left.startswith("48;"):
+        fg = "38;" + left[3:]
+    else:
+        fg = str(int(left) - 10)
+    return "\x1b[0;%s;%sm%s%s" % (fg, right or "49", glyph, RESET)
+
+
+def _lines(text):
+    """`text` as (lines, ended with a newline); a line keeps no `\\r` of its CRLF."""
+    ended = text.endswith("\n")
+    body = text[:-1] if ended else text
+    return [line[:-1] if line.endswith("\r") else line for line in body.split("\n")], ended
+
+
+def keeps(m, picks):
+    """Whether a segment led by `m` stays: dropped and kept matchers first, new ones per `new`."""
+    if m in (picks.get("drop") or ()):
+        return False
+    if m in (picks.get("keep") or ()):
+        return True
+    return picks.get("new", True) is not False
+
+
+def filter_line(line, picks, index):
+    """`line` with the segments `picks` drops taken out, rejoined on its own separators; the line
+    itself when nothing drops or on any doubt, None when nothing of it stays."""
+    seps = picks.get("sep") or []
+    sp = split_line(line, seps[index] if index < len(seps) else None)
+    if sp["doubt"]:
+        return line
+    kept = [k for k, seg in enumerate(sp["segments"]) if keeps(seg["matcher"], picks)]
+    glue = picks.get("with")
+    styles = picks.get("style") or {}
+    restyle = any(sp["segments"][k]["matcher"] in styles for k in kept)
+    if len(kept) == len(sp["segments"]) and not glue and not restyle:
+        return line
+    if not kept:
+        return None
+    segs = sp["segments"]
+    # Powerline arrows take their colors from both neighbors: one between segments that weren't
+    # neighbors, or a cap after a new last segment, is drawn again in the new neighbors' colors.
+    glyph = GLYPHS.get(sp["sep"]) if sp["sep"] == "powerline" else None
+    out = [sp["prefix"]]
+    for j, k in enumerate(kept):
+        style = styles.get(segs[k]["matcher"])
+        out.append(styled(segs[k]["tokens"], style, segs[k]["state"]) if style else segs[k]["out"])
+        if j + 1 < len(kept):
+            nxt = kept[j + 1]
+            if glue:
+                out.append(_glue(glue, segs[k]["bg"], segs[nxt]["bg"], blocks=sp["sep"] == "powerline"))
+            elif glyph and nxt != k + 1:
+                out.append(_arrow(segs[k]["bg"], segs[nxt]["bg"], glyph))
+            else:
+                out.append(sp["seps"][k])
+    if glyph and sp["cap"] and kept[-1] != len(segs) - 1:
+        out.append(_arrow(segs[kept[-1]]["bg"], None, glyph))
+    else:
+        out.append(sp["suffix"])
+    return "".join(out)
+
+
+def filter_theirs(text, picks):
+    """Their output with `picks` applied line by line: a line that loses every segment goes, and
+    when nothing visible of theirs is left, the result is empty (Sanduhr's line still shows)."""
+    if not text or picks is None:
+        return text
+    lines, ended = _lines(text)
+    out = []
+    for i, line in enumerate(lines):
+        if not line.strip():
+            out.append(line)
+            continue
+        kept = filter_line(line, picks, i)
+        if kept is not None:
+            out.append(kept)
+    if not any(visible_width(line) for line in out):
+        return ""
+    return "\n".join(out) + ("\n" if ended else "")
+
+
+def parse_picks(b64):
+    """The `--keep-theirs-b64` payload: base64 of a JSON object with only `keep` and `drop`
+    (lists of matchers), `new` (keep segments never seen, default true) and `sep` (per line,
+    a separator id or null for detected). None when it is anything else."""
+    if not B64.match(b64) or len(b64) % 4:
+        return None
+    try:
+        picks = json.loads(base64.b64decode(b64, validate=True).decode("utf-8"))
+    except (binascii.Error, ValueError):
+        return None
+    if not isinstance(picks, dict) or set(picks) - {"keep", "drop", "new", "sep", "with", "style", "ours"}:
+        return None
+    for key in ("keep", "drop"):
+        if key in picks:
+            v = picks[key]
+            if not isinstance(v, list) or len(v) > MAX_MATCHERS:
+                return None
+            if not all(isinstance(m, str) and 0 < len(m) <= MAX_MATCHER for m in v):
+                return None
+    if "new" in picks and not isinstance(picks["new"], bool):
+        return None
+    if "with" in picks and picks["with"] not in JOIN_WITH_IDS:
+        return None
+    for key, names in (("style", None), ("ours", MINE)):
+        if key in picks:
+            v = picks[key]
+            if not isinstance(v, dict) or len(v) > MAX_MATCHERS:
+                return None
+            for name, style in v.items():
+                if not 0 < len(name) <= MAX_MATCHER or (names and name not in names) or parse_style(style) is None:
+                    return None
+    if "sep" in picks:
+        v = picks["sep"]
+        if not isinstance(v, list) or len(v) > MAX_LINES:
+            return None
+        if not all(s is None or s in SEPARATOR_IDS for s in v):
+            return None
+    return picks
+
+
+def parse_mine(text):
+    """The `--mine` list: Sanduhr's segment names, comma-separated, in MINE's order, each once.
+    None when it is anything else."""
+    names = text.split(",")
+    try:
+        idx = [MINE.index(n) for n in names]
+    except ValueError:
+        return None
+    if any(b <= a for a, b in zip(idx, idx[1:])):
+        return None
+    return tuple(names)
+
+
+# MARK: Segment styles (item 63b)
+#
+# A static look per segment, applied at run time: `ink` (one hex color, or 2 to 4 stops of a
+# per-character gradient, truecolor), `font` (a Unicode letter style), and bold, italic, dim,
+# underline. The names match the Desk's effects grammar where they overlap (`ink`), so item 65
+# can share them. Statuslines print once per refresh, so nothing here moves.
+
+STYLE_KEYS = {"ink", "font", "bold", "italic", "dim", "underline"}
+STYLE_FLAGS = (("bold", "1"), ("italic", "3"), ("dim", "2"), ("underline", "4"))
+MAX_INK = 4
+HEX = re.compile(r"\A#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\Z")
+
+# Letter styles: (capital A, small a, digit 0 or None), and the letters the Mathematical
+# Alphanumeric block leaves out because Letterlike Symbols already had them ("holes").
+FONTS = {
+    "bold": (0x1D400, 0x1D41A, 0x1D7CE, {}),
+    "italic": (0x1D434, 0x1D44E, None, {"h": 0x210E}),
+    "bold-italic": (0x1D468, 0x1D482, None, {}),
+    "script": (0x1D49C, 0x1D4B6, None, {"B": 0x212C, "E": 0x2130, "F": 0x2131, "H": 0x210B, "I": 0x2110,
+                                        "L": 0x2112, "M": 0x2133, "R": 0x211B, "e": 0x212F, "g": 0x210A,
+                                        "o": 0x2134}),
+    "fraktur": (0x1D504, 0x1D51E, None, {"C": 0x212D, "H": 0x210C, "I": 0x2111, "R": 0x211C, "Z": 0x2128}),
+    "double-struck": (0x1D538, 0x1D552, 0x1D7D8, {"C": 0x2102, "H": 0x210D, "N": 0x2115, "P": 0x2119,
+                                                  "Q": 0x211A, "R": 0x211D, "Z": 0x2124}),
+    "sans": (0x1D5A0, 0x1D5BA, 0x1D7E2, {}),
+    "mono": (0x1D670, 0x1D68A, 0x1D7F6, {}),
+    "small-caps": None,
+}
+SMALL_CAPS = dict(zip("abcdefghijklmnopqrstuvwxyz",
+                      "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍ"
+                      "ɴᴏᴘꞯʀꜱᴛᴜᴠᴡxʏᴢ"))
+
+
+def letter(ch, font):
+    """`ch` in the letter style `font`; anything the style has no form for stays as it is."""
+    if not font or not ("A" <= ch <= "Z" or "a" <= ch <= "z" or "0" <= ch <= "9"):
+        return ch
+    if font == "small-caps":
+        return SMALL_CAPS.get(ch, ch)
+    upper, lower, digit, holes = FONTS[font]
+    if ch in holes:
+        return chr(holes[ch])
+    if "A" <= ch <= "Z":
+        return chr(upper + ord(ch) - 65)
+    if "a" <= ch <= "z":
+        return chr(lower + ord(ch) - 97)
+    return chr(digit + ord(ch) - 48) if digit else ch
+
+
+def _rgb(hex_color):
+    h = hex_color.lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def gradient(ink, n):
+    """`n` colors along the stops of `ink` (one color: all the same)."""
+    stops = [_rgb(c) for c in ink]
+    if len(stops) == 1 or n <= 1:
+        return [stops[0]] * max(n, 0)
+    out = []
+    for i in range(n):
+        t = i / (n - 1) * (len(stops) - 1)
+        k = min(int(t), len(stops) - 2)
+        f = t - k
+        a, b = stops[k], stops[k + 1]
+        out.append(tuple(int(round(a[j] + (b[j] - a[j]) * f)) for j in range(3)))
+    return out
+
+
+def _strip_fg(esc):
+    """An SGR escape without its foreground colors (ink replaces them; backgrounds stay, so a
+    powerline block keeps its color). "" when nothing is left."""
+    codes = esc[2:-1].split(";") if esc[2:-1] else ["0"]
+    keep, i = [], 0
+    while i < len(codes):
+        c = codes[i]
+        if c == "38":
+            width = {"5": 1, "2": 3}.get(codes[i + 1] if i + 1 < len(codes) else "", 0)
+            i += 2 + width
+            continue
+        if c == "39" or (c.isdigit() and (30 <= int(c) <= 37 or 90 <= int(c) <= 97)):
+            i += 1
+            continue
+        if c == "48":
+            width = {"5": 1, "2": 3}.get(codes[i + 1] if i + 1 < len(codes) else "", 0)
+            keep.extend(codes[i:i + 2 + width])
+            i += 2 + width
+            continue
+        keep.append(c)
+        i += 1
+    return "\x1b[%sm" % ";".join(keep) if keep else ""
+
+
+def _is_sgr(text):
+    return text.startswith("\x1b[") and text.endswith("m")
+
+
+def styled(tokens, style, state=()):
+    """`tokens` (escapes and characters) with `style` applied: the letters mapped, the
+    attributes on (again after each of their own SGR escapes, which may reset them), the ink
+    per character in truecolor in place of their foreground colors. Ends with a reset."""
+    ink, font = style.get("ink"), style.get("font")
+    attrs = ";".join(code for name, code in STYLE_FLAGS if style.get(name))
+    attr = "\x1b[%sm" % attrs if attrs else ""
+    chars = sum(1 for is_esc, _ in tokens if not is_esc)
+    colors = gradient(ink, chars) if ink else []
+    out = ["".join(_strip_fg(s) if ink else s for s in state), attr]
+    last, i = None, 0
+    for is_esc, text in tokens:
+        if is_esc:
+            if _is_sgr(text):
+                out.append((_strip_fg(text) if ink else text) + attr)
+                last = None
+            else:
+                out.append(text)
+            continue
+        if colors and colors[i] != last:
+            last = colors[i]
+            out.append("\x1b[38;2;%d;%d;%dm" % last)
+        out.append(letter(text, font))
+        i += 1
+    out.append(RESET)
+    return "".join(out)
+
+
+def styled_text(text, style):
+    """Plain text (Sanduhr's own parts) with `style` applied."""
+    if not style:
+        return text
+    return styled([(False, ch) for ch in text], style)
+
+
+def parse_style(style):
+    """A style object as the picks carry it, or None when it is anything else."""
+    if not isinstance(style, dict) or set(style) - STYLE_KEYS:
+        return None
+    if "ink" in style:
+        ink = style["ink"]
+        if not isinstance(ink, list) or not 1 <= len(ink) <= MAX_INK:
+            return None
+        if not all(isinstance(c, str) and HEX.match(c) for c in ink):
+            return None
+    if "font" in style and style["font"] not in FONTS:
+        return None
+    for name, _ in STYLE_FLAGS:
+        if name in style and not isinstance(style[name], bool):
+            return None
+    return style
 
 
 # MARK: The chained command
@@ -354,28 +978,81 @@ def run_chain(command, data, budget=CHAIN_BUDGET, cap=CHAIN_CAP):
     return bytes(out), reason
 
 
-def parse_args(argv):
-    """`[]` for plain mode, `(command, join, padding)` for Combine, or None when the
-    arguments aren't exactly the grammar."""
+def parse_args(argv, flag="--chain-b64", blank=False):
+    """`[]` for plain mode, `(command, join, padding, picks, mine)` for Combine, or None when the
+    arguments aren't exactly the grammar:
+        --chain-b64 B --join line|same [--padding N] [--keep-theirs-b64 K] [--mine M]
+    `picks` is None (keep all of theirs) or `parse_picks`'s object, `mine` None (the default
+    three) or `parse_mine`'s names. `flag` and `blank` serve the preview's compose mode, whose
+    payload is their output (possibly empty) instead of a command."""
     if not argv:
         return []
-    if len(argv) not in (4, 6) or argv[0] != "--chain-b64" or argv[2] != "--join":
+    if len(argv) < 4 or argv[0] != flag or argv[2] != "--join":
         return None
     b64, mode = argv[1], argv[3]
-    if mode not in ("line", "same") or not B64.match(b64) or len(b64) % 4:
+    if mode not in ("line", "same"):
         return None
-    padding = 0
-    if len(argv) == 6:
-        if argv[4] != "--padding" or not argv[5].isdigit() or len(argv[5]) > 3:
+    if blank and b64 == "":
+        command = ""
+    else:
+        if not B64.match(b64) or len(b64) % 4:
             return None
-        padding = int(argv[5])
-    try:
-        command = base64.b64decode(b64, validate=True).decode("utf-8")
-    except (binascii.Error, ValueError):
+        try:
+            command = base64.b64decode(b64, validate=True).decode("utf-8")
+        except (binascii.Error, ValueError):
+            return None
+        if not blank and not command.strip():
+            return None
+    rest = argv[4:]
+    padding, picks, mine = 0, None, None
+    if rest[:1] == ["--padding"]:
+        if len(rest) < 2 or not re.match(r"\A[0-9]{1,3}\Z", rest[1]):
+            return None
+        padding = int(rest[1])
+        rest = rest[2:]
+    if rest[:1] == ["--keep-theirs-b64"]:
+        picks = parse_picks(rest[1]) if len(rest) >= 2 else None
+        if picks is None:
+            return None
+        rest = rest[2:]
+    if rest[:1] == ["--mine"]:
+        mine = parse_mine(rest[1]) if len(rest) >= 2 else None
+        if mine is None:
+            return None
+        rest = rest[2:]
+    if rest:
         return None
-    if not command.strip():
-        return None
-    return (command, mode, padding)
+    return (command, mode, padding, picks, mine)
+
+
+def combined(theirs, data, now, mode, padding, picks, mine, cols):
+    """What a combined statusline prints: their output (text) with `picks` applied, joined
+    with Sanduhr's segment, its parts filtered by `mine`. A `with` pick (Join with) sets the
+    glyph between segments everywhere in the line: theirs, Sanduhr's and the seam."""
+    glue = (picks or {}).get("with")
+    sep = _glue(glue) if glue else " | "
+    ours = segment(lambda: data, now, mine or MINE_DEFAULT, sep, (picks or {}).get("ours"))
+    return join(filter_theirs(theirs, picks), ours, mode, padding, cols, _glue(glue) if glue else SEPARATOR)
+
+
+def inspect(theirs, data, now):
+    """For the Combine sheet's chips: their output split per line under every separator (the
+    detected one named), and each of Sanduhr's segments on its own."""
+    lines = []
+    for text in _lines(theirs)[0] if theirs else []:
+        tokens = tokenize(text)
+        plain = "".join(t for e, t in tokens if not e) if tokens is not None else ""
+        splits = {}
+        for sid in SEPARATOR_IDS:
+            sp = split_line(text, sid)
+            splits[sid] = {"doubt": sp["doubt"], "segments": [
+                {"matcher": s["matcher"], "text": s["plain"], "kind": classify(s["plain"])}
+                for s in sp.get("segments", [])]}
+        lines.append({"text": text, "auto": detect(plain) if tokens is not None else "none", "splits": splits})
+    base, extra = segment_parts(lambda: data, now, MINE)
+    parts = base.get("parts", []) + extra
+    mine = [{"name": n, "text": " | ".join(t for name, t in parts if name == n)} for n in MINE]
+    return {"theirs": theirs, "lines": lines, "mine": mine, "notice": base.get("notice", "")}
 
 
 def read_stdin_all():
@@ -418,12 +1095,43 @@ def say(reason):
         pass
 
 
+def write(text):
+    try:
+        sys.stdout.write(text)
+        sys.stdout.flush()
+    except (OSError, ValueError):
+        pass
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     now = datetime.now(timezone.utc)
+    if argv[:1] == ["--inspect-b64"]:
+        # The Combine sheet (never a statusline): run theirs once, print the pieces as JSON.
+        args = parse_args(["--chain-b64", argv[1] if len(argv) > 1 else "", "--join", "line"])
+        if len(argv) != 2 or not args:
+            say("--inspect-b64 takes one base64 command")
+            return 0
+        data = read_stdin_all()
+        theirs, reason = run_chain(args[0], data)
+        if reason:
+            say("your statusline " + reason)
+        write(json.dumps(inspect(theirs.decode("utf-8", "replace"), data, now), ensure_ascii=False) + "\n")
+        return 0
+    if argv[:1] == ["--compose-b64"]:
+        # The Combine sheet's live preview: what the combined line prints, from their output.
+        args = parse_args(argv, flag="--compose-b64", blank=True)
+        if not args:
+            say("--compose-b64 takes the combined grammar with their output")
+            return 0
+        theirs, mode, padding, picks, mine = args
+        write(combined(theirs, read_stdin_all(), now, mode, padding, picks, mine, columns()))
+        return 0
+
     args = parse_args(argv)
     if args is None:
-        say("arguments aren't --chain-b64 <base64> --join line|same [--padding n]; showing Sanduhr only")
+        say("arguments aren't --chain-b64 <base64> --join line|same [--padding n] "
+            "[--keep-theirs-b64 <base64>] [--mine <list>]; showing Sanduhr only")
         args = []
     if not args:
         out = segment(read_stdin_patiently, now)
@@ -431,7 +1139,7 @@ def main(argv=None):
             print(out)
         return 0
 
-    command, mode, padding = args
+    command, mode, padding, picks, mine = args
     signal.signal(signal.SIGTERM, _on_signal)
     signal.signal(signal.SIGINT, _on_signal)
     data = read_stdin_all()
@@ -442,13 +1150,7 @@ def main(argv=None):
         theirs, reason = run_chain(command, data)
         if reason:
             say("your statusline " + reason)
-    ours = segment(lambda: data, now)
-    text = join(theirs.decode("utf-8", "replace"), ours, mode, padding, columns())
-    try:
-        sys.stdout.write(text)
-        sys.stdout.flush()
-    except (OSError, ValueError):
-        pass
+    write(combined(theirs.decode("utf-8", "replace"), data, now, mode, padding, picks, mine, columns()))
     return 0
 
 

@@ -281,9 +281,115 @@ dead or missing snapshot, the segment falls back on stdin's `rate_limits`, marke
 grammar and nothing looser; an existing Sanduhr command, alone or combined (any seat or version),
 is unwrapped to the innermost command of yours. The receipt gains `mode` (`replace` or
 `combine`, optional so older receipts read); Update rebuilds the command from its shape, and
-Remove puts back the exact bytes of your old `statusLine` as before. The sheet's preview runs the
-combined command once per join against the documented sample statusline JSON (made-up numbers)
-and draws the ANSI; the row reads "Combined with your statusline".
+Remove puts back the exact bytes of your old `statusLine` as before. The row reads "Combined with
+your statusline".
+
+**Pick the segments (item 63b).** The grammar takes two more optional flags, in this order after
+`--padding`:
+
+```
+… --join line|same [--padding <n>] [--keep-theirs-b64 <base64 of JSON>] [--mine <list>]
+```
+
+`--keep-theirs-b64` carries `{"keep": [...], "drop": [...], "new": false, "sep": [null, "pipe"],
+"with": "bar"}` (every key optional): matchers kept and dropped, whether segments never seen stay
+(`new`, default true), a separator per line to split on (null: detected) and the glyph to join
+with (`with`: `bar`, `pipe`, `dot`, `bullet`, `powerline`, `powerline-thin`, `spaces`; absent
+keeps your own separators). At run time each line of yours is cut on its
+separator (`powerline` , `powerline-thin` , `bar` │, `pipe` |, `bullet` •, `dot` ·, `spaces`
+for two or more, `none`), detected as the glyph the line holds most. A segment's matcher is its
+leading token with escapes taken out: a word, `#` for a number, else the first glyph, so `⎇ main`
+and `⎇ dev` are both `⎇` and a segment missing from a run shifts nothing. Dropped segments go and
+the rest are rejoined on your own separators, each piece carrying the SGR state in force before it
+and a reset after; powerline arrows between segments that weren't neighbors (and a new end cap)
+are redrawn from the two backgrounds. A line nothing of survives goes; when nothing of yours is
+left, Sanduhr's line prints alone, never the other way round. Any doubt (an unfinished escape, a
+carriage return or other control character, an empty segment) keeps the line whole, and a line
+where nothing drops prints byte for byte as it came, unless `with` is set. `with` replaces the
+glyph between segments everywhere in the final line: between yours, between Sanduhr's (its usual
+` | `) and at the same-row seam (its usual ` │ `); a powerline arrow takes the two neighbors'
+backgrounds. `--mine` is a comma list in this order:
+`session`, `weekly` (with hot per-model weeklies), `resets` (the default three), `context`
+(`ctx 8%`) and `model` (`Opus`), both from Claude Code's stdin; notices (stale, update) always
+show. Each flag is left out when it holds the default, so a combine without picks writes the same
+command as before, and older combined commands read and run unchanged. Swift checks the payloads
+exactly as the script does, so a hand-edited command it would refuse stays the user's.
+
+The sheet runs `--inspect-b64 <base64 of your command>` once against the documented sample
+statusline JSON (made-up numbers): your command runs, and the script prints JSON with your
+output, each line split under every separator (the detected one named) and Sanduhr's segments one
+by one. That becomes chips (`StatuslineChips`): yours in blue, Sanduhr's in amber, struck
+through when dropped, chips that share a matcher toggling together, a line kept whole shown as
+one chip that can't be clicked, one of Sanduhr's always kept. Each change runs `--compose-b64
+<base64 of your output> --join … [picks]`, which prints what the runner would without running
+your command again, and the preview draws it. Two controls sit apart: **Split yours on** (per
+line, how the script reads your line into segments; it changes the chips, and the preview
+composes again at once with the choice even when nothing is picked, while the command stays
+without picks) and **Join with** ("Same as yours" or a glyph, which changes the line itself).
+Every control has a caption under it and a tooltip.
+
+**Mods in the picker.** "From your mods" lists the mods the folder loads that draw a status
+entry: `env.CLAUDE_CODE_PLUGIN_DIRS` entries and `enabledPlugins` keys set to true (resolved through
+`plugins/installed_plugins.json`), kept when `hooks/hooks.json` lists `modules` and the source
+(`.ts`, `.tsx`, `.js`, `.mjs`, `.cjs`, `.jsx`, `node_modules` skipped, 400 files, 512 KB each)
+calls `ui.status`; an `@inline` mod set to false in `enabledPlugins` is left out. Files are read
+as text; no mod code runs and the `claude` CLI isn't called. The chips are read-only: Claude Code
+draws those entries in its status area beside the statusline, so the statusline command can't
+keep or drop them, and the sheet says to use the mod's own settings or turn it off for the
+folder (a `userConfig` entry that mentions status is named in the chip's tooltip). The preview
+adds a "Claude Code's status area" row with `⚠ <name>: …` placeholders, captioned that the text is
+known only inside a session. With none: "No mods in this folder draw status entries."
+
+**Test with live data.** The button builds the statusline input from the sample's shape with
+snapshot.json's `five_hour` and `seven_day` (percent, and resets as epoch seconds), the current
+time, and, from the newest `projects/*/*.jsonl` in the folder (its last 256 KB, only `model`,
+`usage` and `cwd` of the last assistant turn), the model (`claude-opus-5-5` reads "Opus 5.5"),
+context use (input plus cache tokens over a 200k window, 1M for `[1m]` or past 200k) and working
+folder. It runs `--inspect-b64` again with that input, refills the chips keeping every pick (a
+segment seen for the first time is a new chip, kept), composes the preview from it, and says
+"Tested 12:04 with live numbers" (or which parts were sample values).
+
+**Kinds and duplicates.** `classify` in the script names each segment of yours from its text,
+escapes stripped, first fit wins: `branch` (⎇, U+E0A0, `git:`/`branch:`, `main`/`master`/`develop`
+/`dev`/`trunk`/`HEAD`, `a/b` or kebab-case tokens with optional `*+!?`), `cost` (`$` then a digit, so
+`$PATH` isn't), `model` (the whole segment is Opus/Sonnet/Haiku/Fable with an optional version, or a
+`claude-*` id, so a branch `opus-fix` stays a branch), `context`, `session` (`5h`/`session`) and
+`weekly` (`wk`/`weekly`/`7d`) each with a percent, `tokens` (`15.5k`, `1.2M`, `n tokens`), `time`
+(clock-like), `directory` (`~`, `/`, `./`), else `segment` ("Your segment"). A leading icon and a
+`model:`-style label are read past. `--inspect-b64` carries `kind` per segment; chips show the
+kind's name, the live text and a tooltip ("Branch, from your statusline: ⎇ main"), in one chip
+style for all three sections (blue yours, amber Sanduhr's, purple mods). `StatuslineDuplicate.find`
+pairs what is kept: yours against Sanduhr's by kind (Model, Context, Session, Weekly), yours
+against a mod whose name or description names the kind (git/branch, cost, model, context, and
+usage words), and a usage-like mod (usage, limit, quota, meter, rate, token, or `sanduhr-meters`,
+now listed even without a status entry, as "Above the prompt") against Sanduhr's Session and
+Weekly. Both chips get a badge; a summary sits above the preview; yours against Sanduhr's offers
+Keep yours (Sanduhr's segment goes, never its last one) and Keep Sanduhr's (yours is dropped); a
+mod's duplicate only explains and points at its own settings or the Mods page.
+
+**Styles.** The picks JSON takes `"style": {"<matcher>": {...}}` for yours and `"ours": {"session":
+{...}}` for Sanduhr's. A style is `ink` (1 to 4 hex colors, `#rgb` or `#rrggbb`, `#` optional;
+several are a per-character gradient), `font` (`bold`, `italic`, `bold-italic`, `sans`, `mono`,
+`double-struck`, `script`, `fraktur`, `small-caps`) and the booleans `bold`, `italic`, `dim`,
+`underline`; anything else, more than 64 entries or a key over 64 characters is refused by both
+Swift and the script. `ink` and the letter-style key `font` follow the Desk's effects grammar so
+item 65 can share them; there is no shimmer, since a statusline prints once per refresh. At run
+time a styled segment of yours is rebuilt: with `ink` its own foreground colors go (backgrounds
+stay, so a powerline block keeps its color) and each character gets its truecolor; the attributes
+are set again after each of its own SGR escapes; letters map to the Mathematical Alphanumeric
+forms with the Letterlike holes (italic h, script B E F H I L M R e g o, fraktur C H I R Z,
+double-struck C H N P Q R Z), digits only in bold, double-struck, sans and mono, small caps from
+the IPA and Latin Extended letters (x stays x); widths are unchanged; a reset ends it. Sanduhr's
+parts are styled the same way. The chip's brush or its context menu opens the popover: Keep its
+own colors (default), One color or Gradient (2 to 4 stops), Bold/Italic/Dim/Underline, Letters,
+"Statuslines can't animate; the Desk can." Mods' chips have no popover.
+
+**Powerline glyphs.** U+E0B0 to U+E0B3 are Private Use Area glyphs only Nerd Fonts have, so
+`PowerlineGlyph` draws them: menu items get a drawn icon and the label "Powerline arrow (needs a
+Nerd Font)" / "Powerline thin arrow (needs a Nerd Font)" with the shapes described in the
+tooltip; chips draw them inline; the preview cuts them out of the ANSI runs (`ANSIText.pieces`)
+and draws the arrow in the run's foreground over its background, as a terminal would. U+E0A0
+reads ⎇.
 
 **Scripts.** `build.sh` copies both into `Sanduhr.app/Contents/Resources/integrations/`.
 `IntegrationScripts` copies them to `integrations/<stamp>/` (12 hex of a SHA-256 over the
