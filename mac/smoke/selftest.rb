@@ -75,6 +75,10 @@ class FakeApp
       if arg == 'pacing' then s['pacing_pinned'] = !s['pacing_pinned']
       else s['active_tool'] = s['active_tool'] == arg ? nil : arg
       end
+    when 'av-test'
+      which, on = arg.to_s.split
+      a = (s['av_indicators'] ||= { 'camera' => false, 'mic' => false, 'shown' => 'none' })
+      a[which] = (on == 'on') if %w[camera mic].include?(which)
     when 'watch-test'
       w = (s['watchers'] ||= { 'count' => 0, 'states' => [], 'placements' => [] })
       case arg
@@ -278,6 +282,16 @@ eq('watchers a scenario put up are cleared',
 eq('watchers there before are left alone',
    [Restore.plan(base.merge('watchers' => { 'count' => 2 }), base.merge('watchers' => { 'count' => 3 })),
     Restore.plan(base.merge('watchers' => { 'count' => 0 }), base.merge('watchers' => { 'count' => 0 }))], [[], []])
+eq('faked camera and mic go back to the real signals',
+   Restore.plan(base, base.merge('av_indicators' => { 'camera' => true, 'mic' => true, 'shown' => 'badge' })),
+   [['av-test', 'camera off'], ['av-test', 'mic off']])
+eq('a camera in use before is left alone',
+   Restore.plan(base.merge('av_indicators' => { 'camera' => true }), base.merge('av_indicators' => { 'camera' => true })), [])
+eq('av indicators state is two booleans and a place', state['av_indicators'],
+   { 'camera' => false, 'mic' => false, 'shown' => 'none' })
+app_av = FakeApp.new
+app_av.action('av-test', 'mic on')
+eq('av-test fakes the mic', app_av.state_now['av_indicators']['mic'], true)
 eq('watchers state never carries a title',
    state['watchers'], { 'count' => 0, 'states' => [], 'placements' => [], 'agents' => false, 'background' => false, 'intro' => false })
 eq('camera light from a running camera is left alone',
@@ -351,7 +365,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test]
+    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end

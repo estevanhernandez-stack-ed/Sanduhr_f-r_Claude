@@ -55,11 +55,18 @@ enum DebugAction: Equatable {
     enum WatchTest: String, CaseIterable {
         case start, wait, pass, fail, clear
     }
+    /// A faked camera or microphone signal (item 67), shown through the indicators' own switches;
+    /// off hands the indicator back to the real signal. Held in memory only.
+    case avTest(AVTest, on: Bool)
+
+    enum AVTest: String, CaseIterable {
+        case camera, mic
+    }
 
     static let names = ["show-widget", "hide-widget", "settings", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
                         "theme", "account", "usage", "whats-new", "close-whats-new",
-                        "tour", "tour-step", "close-tour", "watch-test"]
+                        "tour", "tour-step", "close-tour", "watch-test", "av-test"]
 }
 
 enum DebugCommand: Equatable {
@@ -172,6 +179,14 @@ enum DebugLink {
                 return bad("watch-test needs arg=start, wait, pass, fail or clear")
             }
             return .success(.watchTest(test))
+        case "av-test":
+            // "camera on", "mic off" (also "camera-on", "mic:off").
+            let words = (arg ?? "").lowercased().split(whereSeparator: { " +-:_".contains($0) }).map(String.init)
+            guard words.count == 2, let which = DebugAction.AVTest(rawValue: words[0]),
+                  let on = ["on": true, "off": false][words[1]] else {
+                return bad("av-test needs arg=camera on, camera off, mic on or mic off")
+            }
+            return .success(.avTest(which, on: on))
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }

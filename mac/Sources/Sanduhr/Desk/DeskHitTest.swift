@@ -22,6 +22,9 @@ struct DeskElement: Equatable {
         /// A watcher (item 66): a Desk row (key: its index, "0" to "3") or the strip under the camera
         /// (key "strip"). A click opens its link, a two-finger click opens the watcher menu.
         case watcher
+        /// The camera and mic indicators in the strip under the camera (item 67, key "strip"). A click
+        /// or a two-finger click opens their read-only menu.
+        case avIndicators = "av_indicators"
     }
 
     var kind: Kind
@@ -38,13 +41,13 @@ struct DeskElement: Equatable {
 /// left clicks and two-finger clicks, so they can never disagree about what the pointer is over.
 enum DeskHitTest {
     /// First match wins, in this order: the small targets sit inside or beside the big ones.
-    static let priority: [DeskElement.Kind] = [.meetingRow, .note, .account, .meterRow, .meters, .watcher, .nowPlayingNext, .nowPlaying]
+    static let priority: [DeskElement.Kind] = [.meetingRow, .note, .account, .meterRow, .meters, .watcher, .avIndicators, .nowPlayingNext, .nowPlaying]
 
     /// How far past its frame each kind still takes the click, in points (horizontal, vertical):
     /// a little slack, so the gaps between letters and the line above or below still count.
     static func slack(_ kind: DeskElement.Kind) -> CGSize {
         switch kind {
-        case .meetingRow, .note, .meterRow, .nowPlaying, .watcher: return CGSize(width: 8, height: 4)
+        case .meetingRow, .note, .meterRow, .nowPlaying, .watcher, .avIndicators: return CGSize(width: 8, height: 4)
         case .account: return CGSize(width: 4, height: 2)
         case .nowPlayingNext: return CGSize(width: 4, height: 4)
         case .meters, .meetings: return CGSize(width: 8, height: 6)
@@ -78,7 +81,7 @@ enum DeskHitTest {
     /// playing's.
     static func hasMenu(_ element: DeskElement?) -> Bool {
         isMeters(element) || element?.kind == .nowPlaying || element?.kind == .nowPlayingNext
-            || element?.kind == .watcher
+            || element?.kind == .watcher || element?.kind == .avIndicators
     }
 
     /// The watcher a hit on a watcher element stands for: the strip's is the most urgent, a Desk
@@ -133,6 +136,9 @@ enum DeskElements {
         /// The strip under the camera shows the watcher line.
         var watcherStrip = false
         var stripWatcherFrame: CGRect = .zero
+        /// The strip under the camera shows the camera and mic indicators (item 67).
+        var avStrip = false
+        var stripAVFrame: CGRect = .zero
     }
 
     /// Every element DeskView draws, block before its rows, frames as reported (.zero when none
@@ -177,6 +183,9 @@ enum DeskElements {
         }
         if input.watcherStrip {
             out.append(DeskElement(kind: .watcher, key: "strip", frame: input.stripWatcherFrame))
+        }
+        if input.avStrip {
+            out.append(DeskElement(kind: .avIndicators, key: "strip", frame: input.stripAVFrame))
         }
         return out
     }

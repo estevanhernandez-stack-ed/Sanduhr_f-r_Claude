@@ -1116,7 +1116,9 @@ Watchers; in Settings, Desk, Layout put Watchers in the top right corner.
    dot turns amber and pulses, the note shows under the Desk row, and the notch glows once. With
    Reduce Motion on the dot holds still. Click the wing or the row: the link opens in the browser.
 5. `watch_end` with result passed: a check, then it fades about 6 seconds later. Start another
-   and end it failed: it stays; two-finger click it (wing or row) and Dismiss. Start two and
+   and end it failed: it stays, marked with a red exclamation mark in a triangle (never a red
+   dot, which means the camera; §32), and VoiceOver on the wing or the row says "failed";
+   two-finger click it (wing or row) and Dismiss. Start two and
    Dismiss All. Watcher Settings… opens Settings, Integrations.
 6. Lost touch: start one and wait 10 minutes without an update: it greys and reads "lost touch";
    an update brings it back.
@@ -1139,3 +1141,37 @@ Watchers; in Settings, Desk, Layout put Watchers in the top right corner.
     agents, background}` with no title. `smoke/smoke run scenarios/watchers.yaml` passes and
     leaves no watcher behind.
 11. Quit Sanduhr: watchers are gone at the next launch. Clean up: switches off, Remove the hooks.
+
+## 32. Camera and mic indicators (item 67)
+
+Desk on, the island on (Settings, Notch), no call running. No macOS permission prompt may appear
+at any step.
+
+1. Both switches off (Settings, Desk, Notch, Camera and mic): open Photo Booth and record a Voice
+   Memo; nothing shows on the notch. `smoke/smoke state` shows `av_indicators: {camera: false,
+   mic: false, shown: none}` (the monitors don't run with their switch off).
+2. Turn on **Show a red dot while the camera is on**. Open Photo Booth: within a second a red dot
+   shows on the island right of the camera, the island a little wider on that side, both wings
+   unchanged; it pulses gently. Turn on Reduce Motion: it holds still. Turn off **Pulse the dot
+   gently**: still too. Quit Photo Booth: the dot goes within a second.
+3. Turn on **Show a mic while the microphone is on**. Start a Voice Memo recording (or a FaceTime
+   or browser call): an orange mic glyph shows beside the dot (or alone). Stop: it goes within a
+   second. Sanduhr's log (`log show --last 5m --predicate 'process == "Sanduhr"'`) names no app.
+4. Click the dot: a menu with "Camera in use" and "Microphone in use" (greyed) and Indicator
+   Settings…, which opens Settings, Notch. Two-finger click: the same. Nothing mutes, the call
+   keeps its camera and microphone.
+5. **Beside the camera**: Left of the camera moves them to the left of the cutout.
+6. Set the right wing to **Camera and mic**: they move into the right wing (at its inner end); with
+   nothing in use the wing shows the meters. Set the strip under the camera to Camera and mic (with
+   text under the camera on): they show there, centered; a click opens the menu.
+7. Headset: with a call running on the built-in mic, connect a Bluetooth headset and make it the
+   input: the glyph stays (it follows the default input); end the call: it goes.
+8. Turn the island off (Extend the camera notch off): during a call the indicators show in a small
+   black tab against the notch on the chosen side. On a Mac without a notch (or an external main
+   display with the lid closed) they show in a small tab at the top center.
+9. With a watcher running, now playing in the left wing and a call going: all three show; the
+   indicators take only their own room.
+10. `smoke/smoke do av-test camera on` with the camera switch on shows the dot with no camera;
+    `smoke/smoke do av-test camera off` takes it away (likewise `mic`). `smoke/smoke run
+    scenarios/av-indicators.yaml` passes and puts the switches back.
+11. Clean up: both switches off.

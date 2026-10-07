@@ -145,3 +145,7 @@ watchers:
   agents: false
   background: false
   intro: false
+av_indicators:
+  camera: false
+  mic: false
+  shown: none

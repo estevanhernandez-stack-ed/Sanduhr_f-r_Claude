@@ -132,6 +132,13 @@ final class DeskModel {
     @ObservationIgnored var stripFrame: CGRect = .zero { didSet { if stripFrame != oldValue { onHitAreasChange?() } } }
     /// Where the strip's Next button sits while paused (item 53b), same coordinates. A click skips.
     @ObservationIgnored var stripNextFrame: CGRect = .zero { didSet { if stripNextFrame != oldValue { onHitAreasChange?() } } }
+    /// The camera and mic indicators that show (item 67), after their switches: in-use booleans
+    /// only, never which app. Set by AVIndicatorController.
+    var avIndicators = AVIndicators()
+    /// Where they draw now (AVIndicatorPlacement). Set by AVIndicatorController.
+    var avSpot = AVIndicatorSpot.none
+    /// Where the strip under the camera draws them, same coordinates: a click opens their menu.
+    @ObservationIgnored var stripAVFrame: CGRect = .zero { didSet { if stripAVFrame != oldValue { onHitAreasChange?() } } }
     /// Called when a clickable piece moves or comes and goes (DeskController takes the mouse there).
     @ObservationIgnored var onHitAreasChange: (() -> Void)?
     /// Alert pulses so far, per limit (Settings, Alerts, Where alerts show). A meter row pulses
@@ -427,7 +434,7 @@ final class DeskModel {
         input.nowPlayingFrame = nowPlayingFrame
         let strip = NotchContent.effective(NotchContent.saved(.strip, in: desk), at: .strip,
                                            nowPlaying: nowPlaying, idle: NowPlayingIdle.saved(in: desk),
-                                           watchers: watchers)
+                                           watchers: watchers, indicators: avIndicators)
         let notch = desk.bool(forKey: DeskController.notchKey)
         let chin = desk.object(forKey: "notchChin") as? Double ?? 26
         let chinText = desk.bool(forKey: "notchChinText")
@@ -443,6 +450,8 @@ final class DeskModel {
         input.watcherRowFrames = watcherRowFrames
         input.watcherStrip = notch && notchRect != nil && chin > 0 && chinText && strip == .watchers
         input.stripWatcherFrame = stripWatcherFrame
+        input.avStrip = notch && notchRect != nil && chin > 0 && chinText && strip == .avIndicators
+        input.stripAVFrame = stripAVFrame
         return DeskElements.build(input)
     }
 

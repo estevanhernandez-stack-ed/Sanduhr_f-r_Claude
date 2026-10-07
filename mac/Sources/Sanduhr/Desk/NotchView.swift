@@ -38,6 +38,8 @@ struct NotchView: View {
             let _ = model.nowPlaying
             let _ = model.watchers
             let _ = model.watcherIntroUntil
+            let _ = model.avIndicators
+            let _ = model.avSpot
             TimelineView(.periodic(from: .now, by: 15)) { context in
                 // Same widths as the wings above, so the strip and the wings stay one shape
                 // even when a wing grows to fit its text.
@@ -46,18 +48,21 @@ struct NotchView: View {
                                               idle: idle, font: font, notchHeight: notch.height)
                 // Now playing with nothing to show stands aside for the When nothing is playing choice.
                 let strip = NotchContent.effective(stripContent, at: .strip, nowPlaying: model.nowPlaying, idle: idle,
-                                                   watchers: model.watchers)
+                                                   watchers: model.watchers, indicators: model.avIndicators)
+                let width = notch.width + w.totalLeft + w.totalRight
                 ZStack(alignment: .bottom) {
                     IslandShape(flare: 8, radius: min(16, chin * 0.7))
                         .fill(Color.black)
-                    if showChinText, let line = strip.text(
+                    if showChinText, strip == .avIndicators {
+                        stripIndicators
+                    } else if showChinText, let line = strip.text(
                         at: .strip, meetings: model.meetings, meters: model.claudeCompact,
                         message: model.message, nowPlaying: model.nowPlaying, watchers: model.watchers,
                         watcherIntro: model.watcherIntroUntil != nil, now: context.date) {
                         if strip == .nowPlaying {
-                            stripNowPlaying(line, width: notch.width + w.left + w.right)
+                            stripNowPlaying(line, width: width)
                         } else if strip == .watchers {
-                            stripWatcher(line, width: notch.width + w.left + w.right)
+                            stripWatcher(line, width: width)
                         } else {
                             Text(line)
                                 .font(.custom(font, size: stripSize))
@@ -71,8 +76,8 @@ struct NotchView: View {
                         }
                     }
                 }
-                .frame(width: notch.width + w.left + w.right, height: height)
-                .offset(x: (w.right - w.left) / 2)
+                .frame(width: width, height: height)
+                .offset(x: (w.totalRight - w.totalLeft) / 2)
             }
             .position(x: notch.midX, y: height / 2)
             .allowsHitTesting(false)
@@ -80,6 +85,16 @@ struct NotchView: View {
     }
 
     private var stripSize: CGFloat { max(11, chin * 0.55) }
+
+    /// The camera and mic indicators under the camera (item 67), centered. Their clicks come
+    /// through DeskHitTest by the frame they report: a click or a two-finger click opens their menu.
+    private var stripIndicators: some View {
+        AVIndicatorView(shown: model.avIndicators, size: stripSize * 0.8)
+            .padding(.horizontal, 8)
+            .frame(height: chin)
+            .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
+            .onGlobalFrame { model.stripAVFrame = $0 }
+    }
 
     /// During the watcher intro, the full line scrolls once in `room` (WatcherIntro); nil at rest.
     private func introScroll(_ line: String, size: CGFloat, room: CGFloat) -> WatcherScroll? {
@@ -192,30 +207,34 @@ struct NotchWingsView: View {
             let _ = model.nowPlaying
             let _ = model.watchers
             let _ = model.watcherIntroUntil
+            let _ = model.avIndicators
+            let _ = model.avSpot
             TimelineView(.periodic(from: .now, by: 15)) { context in
                 let w = Self.layout(model: model, now: context.date, wings: wings, showText: showText,
                                     left: leftContent, right: rightContent, idle: idle,
                                     font: font, notchHeight: notchHeight)
                 let left = w.leftText, right = w.rightText, size = w.size
                 let wingL = w.left, wingR = w.right
-                if wingL > 0 || wingR > 0 {
+                if w.totalLeft > 0 || w.totalRight > 0 {
                     ZStack {
                         IslandShape(flare: 8, radius: min(10, barHeight * 0.3))
                             .fill(Color.black)
                         HStack(spacing: 0) {
                             wing(left, size, w.leftContent, place: .left, width: wingL).frame(width: max(0, wingL - 10), alignment: .trailing)
+                            if w.besideLeft > 0 { beside(.left, size: size, width: w.besideLeft) }
                             Color.clear.frame(width: notchWidth + 20)
+                            if w.besideRight > 0 { beside(.right, size: size, width: w.besideRight) }
                             wing(right, size, w.rightContent, place: .right, width: wingR).frame(width: max(0, wingR - 10), alignment: .leading)
                         }
                     }
-                    .frame(width: notchWidth + wingL + wingR, height: barHeight)
+                    .frame(width: notchWidth + w.totalLeft + w.totalRight, height: barHeight)
                     .contentShape(Rectangle())
                     .onTapGesture { DeskController.shared.showSettings() }
                     .help("Sanduhr Settings")
                     // Last, so the island's click area moves with its drawing: an offset before
                     // contentShape left the click area at the unshifted place, so the far end of
                     // the wider wing (a paused Next button) drew where nothing took the click.
-                    .offset(x: (wingR - wingL) / 2)
+                    .offset(x: (w.totalRight - w.totalLeft) / 2)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
             }
@@ -228,7 +247,9 @@ struct NotchWingsView: View {
     @ViewBuilder
     private func wing(_ text: String?, _ size: CGFloat, _ content: NotchContent, place: NotchContent.Place,
                       width: CGFloat) -> some View {
-        if content == .nowPlaying, let text {
+        if content == .avIndicators, text != nil {
+            avWing(size, place: place)
+        } else if content == .nowPlaying, let text {
             nowPlayingWing(text, size, place: place, width: width)
         } else if content == .watchers, let text {
             watcherWing(text, size, place: place, width: width)
@@ -316,6 +337,30 @@ struct NotchWingsView: View {
         .accessibilityLabel(top.map { WatcherText.spoken($0, now: Date()) } ?? text)
     }
 
+    /// The camera and mic indicators beside the camera (item 67): the island grows by their room on
+    /// that side, so the wing keeps its own. They hug the camera; the spacing faces the wing.
+    private func beside(_ side: AVIndicatorSide, size: CGFloat, width: CGFloat) -> some View {
+        AVIndicatorButton(model: model, size: size)
+            .frame(width: max(0, width - AVIndicatorLayout.spacing))
+            .padding(side == .left ? .leading : .trailing, AVIndicatorLayout.spacing)
+    }
+
+    /// The camera and mic indicators as a wing's content (item 67), at the wing's inner end by the
+    /// camera. The whole wing takes the click (their menu), so it never opens Settings by accident.
+    private func avWing(_ size: CGFloat, place: NotchContent.Place) -> some View {
+        HStack(spacing: 0) {
+            if place == .left { Spacer(minLength: 0) }
+            AVIndicatorView(shown: model.avIndicators, size: size)
+            if place == .right { Spacer(minLength: 0) }
+        }
+        .frame(maxHeight: .infinity)
+        .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
+        .contentShape(Rectangle())
+        .onTapGesture { AVIndicatorMenu.popUpAtPointer(model.avIndicators) }
+        .contextMenu { AVIndicatorMenuItems(shown: model.avIndicators) }
+        .help("Camera and microphone in use. Click for more.")
+    }
+
     /// The paused wing's Next button: its own click area, the wing's height.
     private func nextButton(_ size: CGFloat) -> some View {
         Image(systemName: "forward.end.fill")
@@ -349,36 +394,52 @@ struct NotchWingsView: View {
     /// Wing widths and texts, shared with the strip under the notch so both draw one shape. The
     /// contents are what each wing actually shows (NotchContent.effective): a wing on Now playing
     /// with nothing to show draws, sizes and clicks as its When nothing is playing choice.
+    /// `left` and `right` are the wings; `besideLeft` and `besideRight` the room the camera and mic
+    /// indicators add beside the camera (item 67), 0 when they aren't there.
     struct Layout {
         let left: CGFloat; let right: CGFloat; let leftText: String?; let rightText: String?; let size: CGFloat
         var leftContent: NotchContent = NotchContent.Place.left.fallback
         var rightContent: NotchContent = NotchContent.Place.right.fallback
+        var besideLeft: CGFloat = 0
+        var besideRight: CGFloat = 0
+        /// Everything left and right of the notch: the island is the notch plus both.
+        var totalLeft: CGFloat { left + besideLeft }
+        var totalRight: CGFloat { right + besideRight }
     }
+
+    /// The notch text size for a notch this tall.
+    static func textSize(_ notchHeight: CGFloat) -> CGFloat { max(10, notchHeight * 0.42) }
 
     static func layout(model: DeskModel, now: Date, wings: Double, showText: Bool,
                        left savedLeft: NotchContent, right savedRight: NotchContent, idle: NowPlayingIdle,
                        font: String, notchHeight: CGFloat) -> Layout {
         let leftContent = NotchContent.effective(savedLeft, at: .left, nowPlaying: model.nowPlaying, idle: idle,
-                                                 watchers: model.watchers)
+                                                 watchers: model.watchers, indicators: model.avIndicators)
         let rightContent = NotchContent.effective(savedRight, at: .right, nowPlaying: model.nowPlaying, idle: idle,
-                                                  watchers: model.watchers)
-        let left = showText ? text(leftContent, at: .left, model: model, now: now) : nil
-        let right = showText ? text(rightContent, at: .right, model: model, now: now) : nil
-        let size = max(10, notchHeight * 0.42)
+                                                  watchers: model.watchers, indicators: model.avIndicators)
+        // Camera and mic draws no text: "" marks a wing that shows them (sized below).
+        let left = showText ? (leftContent == .avIndicators ? "" : text(leftContent, at: .left, model: model, now: now)) : nil
+        let right = showText ? (rightContent == .avIndicators ? "" : text(rightContent, at: .right, model: model, now: now)) : nil
+        let size = textSize(notchHeight)
         let state = model.nowPlaying?.state
         func wingWidth(_ text: String?, _ content: NotchContent, _ place: NotchContent.Place) -> CGFloat {
             // A paused now playing also makes room for its Next button (item 53b).
             // A watcher also makes room for its dot (item 66).
-            let dot = content == .watchers && text != nil ? WatcherLook.dotRoom(size) : 0
+            // The camera and mic indicators are their own width (item 67).
+            let dot = content == .watchers && text != nil ? WatcherLook.dotRoom(size)
+                : content == .avIndicators && text != nil ? AVIndicatorLayout.contentWidth(model.avIndicators, size: size) : 0
             return NowPlayingWingLayout.wingWidth(
                 textWidth: textWidth(text, size, font) + dot, place: place,
                 state: NowPlayingWingLayout.sizingState(content, hasText: text != nil, state: state),
                 size: size, minimum: wings, maximum: maxWings)
         }
+        let beside = AVIndicatorLayout.besideRoom(model.avIndicators, size: size)
         return Layout(left: wingWidth(left, leftContent, .left),
                       right: wingWidth(right, rightContent, .right),
                       leftText: left, rightText: right, size: size,
-                      leftContent: leftContent, rightContent: rightContent)
+                      leftContent: leftContent, rightContent: rightContent,
+                      besideLeft: model.avSpot == .beside(.left) ? beside : 0,
+                      besideRight: model.avSpot == .beside(.right) ? beside : 0)
     }
 
     private static func text(_ content: NotchContent, at place: NotchContent.Place,

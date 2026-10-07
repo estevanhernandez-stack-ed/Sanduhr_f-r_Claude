@@ -1,0 +1,33 @@
+# Item 67: camera and mic indicators. The av-test action fakes each signal in memory (no camera or
+# microphone is opened); the indicators still go through their own switches, which the run sets and
+# puts back, with the right wing on Camera and mic for part of it. state.yaml's av_indicators: holds
+# two booleans and where they show, never an app. Run it with no call going: a real camera or
+# microphone in use reads true.
+# Watch the snaps: av-camera shows a red dot beside the camera on the island (right of it by
+# default; with the island off or no notch, in a small black tab at the top); av-wing shows the dot
+# and an orange mic glyph in the right wing instead.
+name: Camera and mic indicators
+needs: [desk]
+steps:
+  - expect_state: { av_indicators.shown: "/^(none|beside_left|beside_right|places|badge)$/" }
+  - defaults: { domain: desk, key: avCameraDot, type: bool, value: false }
+  - defaults: { domain: desk, key: avMicGlyph, type: bool, value: false }
+  - do: av-test
+    arg: camera on
+  # Switch off: the signal is there, nothing shows.
+  - expect_state: { av_indicators.camera: true, av_indicators.shown: none }
+  - defaults: { domain: desk, key: avCameraDot, type: bool, value: true }
+  - expect_state: { av_indicators.shown: "/^(beside_(left|right)|badge)$/" }
+  - snap: av-camera
+  - do: av-test
+    arg: mic on
+  - defaults: { domain: desk, key: avMicGlyph, type: bool, value: true }
+  - defaults: { domain: desk, key: notchRight, type: string, value: avIndicators }
+  - expect_state: { av_indicators.mic: true, notch_shows.right: avIndicators, av_indicators.shown: "/^(places|badge)$/" }
+  - snap: av-wing
+  - do: av-test
+    arg: camera off
+  - do: av-test
+    arg: mic off
+  # Nothing in use: the wing stands aside for its default (the meters).
+  - expect_state: { av_indicators.camera: false, av_indicators.mic: false, av_indicators.shown: none, notch_shows.right: meters }
