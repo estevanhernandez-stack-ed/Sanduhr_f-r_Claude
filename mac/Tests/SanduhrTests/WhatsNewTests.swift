@@ -156,9 +156,11 @@ struct WhatsNewTableTests {
     }
 
     @Test func releasesSinceTwoFour() {
-        let releases: Set<String> = ["2.4.0", "2.5.0", "2.6.0", "2.7.0", "2.8.0", "2.9.0", "2.10.0"]
+        let releases: Set<String> = ["2.4.0", "2.5.0", "2.6.0", "2.7.0", "2.8.0", "2.9.0", "2.10.0", "2.11.0"]
         #expect(Set(table.map(\.version)) == releases)
-        #expect(table.count == 23)
+        #expect(table.count == 27)
+        #expect(table.filter { $0.version == "2.11.0" }.map(\.id)
+                == ["settings-pages", "settings-search", "shortcut-keys", "account-status"])
         #expect(table.filter { $0.version == "2.10.0" }.map(\.id)
                 == ["arrange-desk", "above-the-prompt", "song-looks", "desk-clicks", "mod-switches"])
         #expect(table.filter { $0.version == "2.9.0" }.map(\.id)
@@ -195,6 +197,8 @@ struct WhatsNewTableTests {
     @Test func showMeLandsOnTheRightPage() {
         let dest = Dictionary(uniqueKeysWithValues: table.map { ($0.id, $0.destination) })
         #expect(dest == [
+            "settings-pages": .general, "settings-search": .general, "shortcut-keys": .general,
+            "account-status": .credentials,
             "arrange-desk": .deskLayout, "above-the-prompt": .mods, "song-looks": .nowPlaying,
             "desk-clicks": .deskLayout, "mod-switches": .mods,
             "message-editor": .message, "desk-layout": .deskLayout, "settings-previews": .notch,
@@ -243,5 +247,11 @@ struct WhatsNewTableTests {
         let fromTwoNine = WhatsNew.cards(lastSeen: "2.9.0", current: "2.10.0")
         #expect(fromTwoNine.map(\.id) == ["arrange-desk", "above-the-prompt", "song-looks", "desk-clicks", "mod-switches"])
         #expect(WhatsNew.rangeLabel(fromTwoNine, lastSeen: "2.9.0", current: "2.10.0") == "New in 2.10.0")
+    }
+
+    @Test func updatingToTwoEleven() {
+        let fromTwoTen = WhatsNew.cards(lastSeen: "2.10.1", current: "2.11.0")
+        #expect(fromTwoTen.map(\.id) == ["settings-pages", "settings-search", "shortcut-keys", "account-status"])
+        #expect(WhatsNew.rangeLabel(fromTwoTen, lastSeen: "2.10.1", current: "2.11.0") == "New in 2.11.0")
     }
 }

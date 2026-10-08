@@ -7,8 +7,31 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2110: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.11.0", id: "settings-pages",
+            title: "Settings, sorted by task",
+            body: "Sixteen pages in five groups, every control in one place, and every Settings… button names the page it opens. Your choices carried over.",
+            art: .symbol("sidebar.left"), destination: .general),
+        WhatsNewCard(
+            version: "2.11.0", id: "settings-search",
+            title: "Find any setting",
+            body: "Search over the sidebar, or press Command-F. Pick a match and the page opens scrolled to it, lit for a moment.",
+            art: .symbol("magnifyingglass"), destination: .general),
+        WhatsNewCard(
+            version: "2.11.0", id: "shortcut-keys",
+            title: "Pick your own shortcuts",
+            body: "On General, click a shortcut's keys and press new ones. Reset puts ⌥S or ⌥J back.",
+            art: .symbol("keyboard"), destination: .general),
+        WhatsNewCard(
+            version: "2.11.0", id: "account-status",
+            title: "See that you're signed in",
+            body: "Accounts shows Active and Signed in in green beside each name, and keeps sign-in tools folded while an account works.",
+            art: .symbol("person.crop.circle.badge.checkmark"), destination: .credentials),
+    ]
 
     static let release2100: [WhatsNewCard] = [
         WhatsNewCard(
