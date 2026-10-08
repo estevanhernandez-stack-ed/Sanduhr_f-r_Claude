@@ -77,7 +77,7 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   `settings_preview` (item 68: the
   preview card the open section shows, `notch`, `layout`, `look`, `meters`, `message`, `nowPlaying`, `widget`,
   `menuBar`, `integrations` or `mods`; null for none or with Settings closed), `settings_preview_folded` (slice 3:
-  the card is folded to its 44 pt strip, as on a window under 720 pt; null for a page without one), `mods_page` (item 64: `open`,
+  the card is folded to its 44 pt strip, as on a window under 600 pt; null for a page without one), `mods_page` (item 64: `open`,
   the Mods page shows; `loaded`, it has read the folders; `folders`, `mods`, `plugins`, `enabled` (on, or a
   session's dev mod) and `missing` counts across folders; `checked`, how many Checks have answered; `cli`,
   `claude` was found; never a mod's name, a path or a report), `message_editor` (item 69: `open`, Settings,

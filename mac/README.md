@@ -1419,10 +1419,11 @@ without scrolling blind.
   the sidebar to the matching pages with the matching sections under each; choosing one opens it
   scrolled to and lit for 1.5 s, Return opens the best match, Escape clears. Smoke:
   `settings-search <words>`.
-- **Previews fold.** Below 720 pt of window height a page's preview is a 44 pt strip with its
+- **Previews fold.** Below 600 pt of window height a page's preview is a 44 pt strip with its
   title ("Notch preview") and an arrow; opening it pushes the controls down and is remembered per
-  page until the window closes; reopened, it starts folded again. The window opens 680 pt tall where the screen allows (was 600), so on
-  the default window the previews start folded. Claude Code's strip says its card is sample input.
+  page until the window closes; reopened, it starts folded again. The window opens 680 pt tall
+  where the screen allows (was 600), so the default window and anything taller show full previews;
+  a small screen squeezed under 600 pt folds them. Claude Code's strip says its card is sample input.
 - **Advanced.** A collapsed **Advanced** section on Desk (Margins), Desk Look (the hex fields; the
   Colors section keeps the presets and a swatch) and Notch (Size and Notch text color). Search and
   an anchor link open it; closing the window collapses it again.

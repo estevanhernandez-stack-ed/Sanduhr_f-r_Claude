@@ -1744,7 +1744,8 @@ desktop well away from every piece.
 ## 44. Settings v2, slice 3: reach (item 72)
 
 `docs/settings-v2-spec.md`, Slice 3. On a 13-inch screen, with the Settings window dragged down to
-628 pt tall (`smoke/smoke state` shows `settings_preview_folded: true` on a page with a preview).
+560 pt tall (`smoke/smoke state` shows `settings_preview_folded: true` on a page with a preview;
+the default 680 pt window shows full previews, `settings_preview_folded: false`).
 
 1. `smoke/smoke run smoke/scenarios/settings-reach.yaml` (from `mac/`) passes: `settings notch glow`,
    `settings watchers above-prompt` and the searches `glow`, `percent` and `margins` each report
@@ -1764,10 +1765,10 @@ desktop well away from every piece.
    "estedesk://settings/watchers#above-prompt"` opens Watchers at Above the prompt; `open
    "sanduhr://settings/deskMeters"` opens Alerts at Each limit; `open "sanduhr://settings"` opens
    Settings where it was left. An anchor the page doesn't have (`notch#nope`) opens the page's top.
-4. Previews: at 628 pt each preview is a 44 pt strip ("Notch preview", an arrow, Show). Click it:
+4. Previews: at 560 pt each preview is a 44 pt strip ("Notch preview", an arrow, Show). Click it:
    the card opens and pushes the controls down; go to another page and back, it stays open; close
-   and reopen the window, it is folded again. Drag the window taller than 720 pt: every card shows
-   in full. Claude Code's strip reads "Sample: statusline input".
+   and reopen the window, it is folded again. Drag the window to 600 pt or taller: every card shows
+   in full, as it does when Settings first opens. Claude Code's strip reads "Sample: statusline input".
 5. Advanced: Desk, Desk Look and Notch end with a folded **Advanced**. Desk's holds Margins; Desk
    Look's the two hex fields (Colors above keeps the presets and a swatch; pick Custom in the hex
    field and the preset reads Custom); Notch's Size (Extra width each side, Extra height below) and

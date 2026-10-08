@@ -44,7 +44,7 @@ struct DebugStateInput {
     var settingsAnchor: String?
     /// Slice 3: the anchor is on screen, inside the page's scrolling area; nil without one.
     var settingsAnchorVisible: Bool?
-    /// Slice 3: the page's preview is folded to its strip (a window under 720 pt); nil without one.
+    /// Slice 3: the page's preview is folded to its strip (a window under 600 pt); nil without one.
     var settingsPreviewFolded: Bool?
     /// The preview card the open Settings section shows (item 68), nil for none or closed.
     var settingsPreview: SettingsPreviewKind?

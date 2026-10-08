@@ -155,7 +155,7 @@ struct SettingsPreviewCard<Content: View>: View {
 
 extension View {
     /// The pane with its preview card on top, the card outside the pane's scrolling form. Below
-    /// 720 pt of window height the card folds to a strip (PreviewFold, slice 3); the pane under it
+    /// 600 pt of window height the card folds to a strip (PreviewFold, slice 3); the pane under it
     /// is the page's viewport for `settings_anchor_visible`.
     func withPreview<Card: View>(_ page: SettingsSection, @ViewBuilder _ card: @escaping () -> Card) -> some View {
         VStack(spacing: 0) {

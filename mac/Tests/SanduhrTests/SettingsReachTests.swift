@@ -189,15 +189,18 @@ struct SettingsAnchorLinkTests {
         #expect(!SettingsAnchorVisibility.isVisible(CGRect(x: 600, y: 200, width: 50, height: 20), in: view))
     }
 
-    @Test func previewsFoldBelow720Points() {
-        #expect(SettingsPreviewFold.folds(windowHeight: 628))
-        #expect(SettingsPreviewFold.folds(windowHeight: SettingsPreviewFold.defaultWindowHeight))
-        #expect(!SettingsPreviewFold.folds(windowHeight: 720))
+    @Test func previewsFoldBelow600Points() {
+        #expect(SettingsPreviewFold.folds(windowHeight: 560))
+        #expect(SettingsPreviewFold.folds(windowHeight: 599))
+        // The default window shows full previews (2026-10-08: it opened folded at 720).
+        #expect(!SettingsPreviewFold.folds(windowHeight: SettingsPreviewFold.defaultWindowHeight))
+        #expect(!SettingsPreviewFold.folds(windowHeight: 600))
+        #expect(!SettingsPreviewFold.folds(windowHeight: 628))
         #expect(!SettingsPreviewFold.folds(windowHeight: 900))
         #expect(!SettingsPreviewFold.folds(windowHeight: 0))
         #expect(SettingsPreviewFold.stripHeight == 44 && SettingsPreviewFold.defaultWindowHeight == 680)
         let nav = SettingsNavigation()
-        nav.windowHeight = 628
+        nav.windowHeight = 560
         #expect(nav.previewFolds)
         nav.windowHeight = 800
         #expect(!nav.previewFolds)

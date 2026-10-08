@@ -144,7 +144,7 @@ final class SettingsWindowController {
             w.contentView = host
             w.center()
             window = w
-            // The previews fold below 720 pt (slice 3): the page reads the window's height.
+            // The previews fold below 600 pt (slice 3): the page reads the window's height.
             let nav = navigation
             NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: w, queue: .main) { note in
                 let height = (note.object as? NSWindow)?.frame.height ?? 0
@@ -236,7 +236,7 @@ final class SettingsNavigation {
     var openAdvanced: Set<SettingsSection> = []
     /// Pages whose folded preview was opened, kept until the window closes (slice 3).
     var openPreviews: Set<SettingsSection> = []
-    /// The window's height; below 720 pt the previews fold.
+    /// The window's height; below 600 pt the previews fold.
     var windowHeight: CGFloat = 0
     /// The sidebar's search field.
     var searchText = ""
@@ -246,7 +246,7 @@ final class SettingsNavigation {
     @ObservationIgnored var viewport: CGRect?
     @ObservationIgnored private var highlightClear: DispatchWorkItem?
 
-    /// Below 720 pt of window height the previews fold to a strip.
+    /// Below 600 pt of window height the previews fold to a strip.
     var previewFolds: Bool { SettingsPreviewFold.folds(windowHeight: windowHeight) }
 
     /// The anchor the page was opened at is inside the page's scrolling area; nil without one.

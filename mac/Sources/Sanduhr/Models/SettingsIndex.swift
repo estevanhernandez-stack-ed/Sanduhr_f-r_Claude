@@ -365,9 +365,11 @@ enum SettingsAnchorVisibility {
     }
 }
 
-/// Below 720 pt of window height a page's preview folds to a 44 pt strip (slice 3).
+/// Below 600 pt of window height a page's preview folds to a 44 pt strip (slice 3; was 720 until
+/// 2026-10-08, which folded the default 680 pt window). The default window and anything taller show
+/// full previews; a 13-inch screen squeezed small still folds.
 enum SettingsPreviewFold {
-    static let threshold: CGFloat = 720
+    static let threshold: CGFloat = 600
     static let stripHeight: CGFloat = 44
     /// The Settings window's height when it first opens, where the screen allows (was 600).
     static let defaultWindowHeight: CGFloat = 680
