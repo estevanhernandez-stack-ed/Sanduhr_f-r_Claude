@@ -7,8 +7,36 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release290 + release280 + release270 + release260 + release250 + release240
+        release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2100: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.10.0", id: "arrange-desk",
+            title: "Arrange the Desk on the desktop",
+            body: "Choose Arrange Desk… and drag pieces to any of eight places, reorder them and resize them right on the desktop. Return keeps it, Escape puts it back.",
+            art: .symbol("hand.draw"), destination: .deskLayout),
+        WhatsNewCard(
+            version: "2.10.0", id: "above-the-prompt",
+            title: "Meters and watchers above the prompt",
+            body: "In Claude Code, Sanduhr's meters can sit above the prompt with your styles and real motion, and watchers can show there as rows.",
+            art: .symbol("rectangle.topthird.inset.filled"), destination: .integrations),
+        WhatsNewCard(
+            version: "2.10.0", id: "song-looks",
+            title: "A look for every song",
+            body: "Now playing can wear a gradient and letter style per song, suggested by Claude and approved by you. Themes can style the widget's title too.",
+            art: .preview(.nowPlaying), destination: .nowPlaying),
+        WhatsNewCard(
+            version: "2.10.0", id: "desk-clicks",
+            title: "The clock and message answer clicks",
+            body: "Two-finger click the clock or the message for Sanduhr's menu, or click once to open their settings. A switch in Desk Look lets clicks through instead.",
+            art: .symbol("cursorarrow.click"), destination: .deskLook),
+        WhatsNewCard(
+            version: "2.10.0", id: "mod-switches",
+            title: "Switch Sanduhr's mod per folder",
+            body: "The Mods page now turns Sanduhr's meters mod on or off for each Claude Code folder, and removes it cleanly.",
+            art: .symbol("cube"), destination: .mods),
+    ]
 
     static let release290: [WhatsNewCard] = [
         WhatsNewCard(
