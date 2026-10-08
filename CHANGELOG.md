@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- A setup guide, docs/setup-guide.md.
+
 ## v2.10.1-mac — 2026-10-08
 
 - **Fixed: the Arrange Desk panel was invisible in 2.10.0.** Its window opened at zero size, so Cancel and Done never showed (Return and Escape still worked). It now opens at its full size, centered above your windows.
