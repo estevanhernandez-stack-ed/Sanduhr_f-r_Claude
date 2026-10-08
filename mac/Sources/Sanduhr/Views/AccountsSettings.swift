@@ -157,11 +157,29 @@ private struct AccountRow: View {
                 }
             }
             Spacer(minLength: 0)
-            if active {
-                Text("Active").font(.caption2).foregroundStyle(.secondary)
-            }
+            if active { AccountPill.active }
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// A small coloured capsule beside an account's name: Active in green, and whether it's signed in
+/// (green), its session expired (orange) or it's signed out (grey).
+enum AccountPill {
+    static var active: some View { pill("Active", "4ade80") }
+
+    static func status(hasKey: Bool, expired: Bool) -> some View {
+        !hasKey ? pill("Signed out", "9ca3af") : expired ? pill("Session expired", "fb923c") : pill("Signed in", "4ade80")
+    }
+
+    private static func pill(_ text: String, _ hex: String) -> some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(Color.hex(hex))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(Color.hex(hex).opacity(0.16)))
+            .overlay(Capsule().strokeBorder(Color.hex(hex).opacity(0.45), lineWidth: 1))
     }
 }
 
@@ -265,9 +283,16 @@ private struct AccountDetail: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
-            KeyFields(sessionKey: $sessionKey, cfClearance: $cfClearance, hasKey: hasKey, expired: expired,
-                      onSignIn: signIn)
-            saveRow
+            if hasKey && !expired {
+                // A working account keeps its sign-in tools folded (2026-10-08: a sign-in button
+                // on top read as signed out).
+                DisclosureGroup("Change Sign-In") {
+                    VStack(alignment: .leading, spacing: 14) { signInForm }
+                        .padding(.top, 6)
+                }
+            } else {
+                signInForm
+            }
             Divider()
             renameRow
             Divider()
@@ -296,12 +321,17 @@ private struct AccountDetail: View {
         }
     }
 
+    @ViewBuilder private var signInForm: some View {
+        KeyFields(sessionKey: $sessionKey, cfClearance: $cfClearance, hasKey: hasKey, expired: expired,
+                  onSignIn: signIn)
+        saveRow
+    }
+
     private var header: some View {
-        HStack {
+        HStack(spacing: 8) {
             Text(label).font(.title3.weight(.semibold))
-            if isActive {
-                Text("Active").font(.caption).foregroundStyle(.secondary)
-            }
+            if isActive { AccountPill.active }
+            AccountPill.status(hasKey: hasKey, expired: expired)
             Spacer()
             if !isActive {
                 Button("Make Active") { vm.switchAccount(to: label) }
@@ -316,7 +346,7 @@ private struct AccountDetail: View {
                 // A signed-out account needs a key; otherwise blank keeps the current values.
                 .disabled(sessionKey.trimmed.isEmpty && (!hasKey || cfClearance.trimmed.isEmpty))
             Text(!hasKey ? "Signed out. Sign in again, or paste a sessionKey."
-                 : expired ? "Session expired. Sign in again, or paste a new sessionKey." : "Signed in")
+                 : expired ? "Session expired. Sign in again, or paste a new sessionKey." : "Blank keeps the saved key.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
