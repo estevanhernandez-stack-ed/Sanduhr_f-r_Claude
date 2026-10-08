@@ -38,14 +38,7 @@ enum ModStatusEntries {
         guard let data = FileManager.default.contents(atPath: root.appendingPathComponent("settings.json").path),
               let settings = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return [] }
         let enabled = settings["enabledPlugins"] as? [String: Any] ?? [:]
-        var dirs: [(String, ModStatusEntry.Origin)] = []
-        if let env = settings["env"] as? [String: Any], let list = env["CLAUDE_CODE_PLUGIN_DIRS"] as? String {
-            for raw in list.components(separatedBy: IntegrationInstaller.pluginDirsSeparator) {
-                let p = raw.trimmingCharacters(in: .whitespaces)
-                guard !p.isEmpty else { continue }
-                dirs.append((p.hasPrefix("~/") ? (home as NSString).appendingPathComponent(String(p.dropFirst(2))) : p, .pluginDirs))
-            }
-        }
+        var dirs: [(String, ModStatusEntry.Origin)] = pluginDirs(settings, home: home).map { ($0, .pluginDirs) }
         let installed = installedPaths(root)
         for (key, on) in enabled.sorted(by: { $0.key < $1.key }) where (on as? Bool) == true {
             if let path = installed[key] { dirs.append((path, .enabledPlugins)) }
@@ -67,18 +60,39 @@ enum ModStatusEntries {
         return out
     }
 
-    /// `plugins/installed_plugins.json`'s install folder per plugin key.
-    static func installedPaths(_ root: URL) -> [String: String] {
+    /// The folders a settings.json's `env.CLAUDE_CODE_PLUGIN_DIRS` lists, in order, `~/` expanded.
+    static func pluginDirs(_ settings: [String: Any], home: String) -> [String] {
+        guard let env = settings["env"] as? [String: Any], let list = env["CLAUDE_CODE_PLUGIN_DIRS"] as? String else { return [] }
+        return list.components(separatedBy: IntegrationInstaller.pluginDirsSeparator).compactMap { raw in
+            let p = raw.trimmingCharacters(in: .whitespaces)
+            guard !p.isEmpty else { return nil }
+            return p.hasPrefix("~/") ? (home as NSString).appendingPathComponent(String(p.dropFirst(2))) : p
+        }
+    }
+
+    /// One plugin's record in `plugins/installed_plugins.json`: its folder and version.
+    struct InstalledRecord: Equatable, Sendable {
+        let path: String
+        let version: String?
+    }
+
+    /// `plugins/installed_plugins.json`'s first record per plugin key.
+    static func installedRecords(_ root: URL) -> [String: InstalledRecord] {
         guard let data = FileManager.default.contents(atPath: root.appendingPathComponent("plugins/installed_plugins.json").path),
               let o = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               let plugins = o["plugins"] as? [String: Any] else { return [:] }
-        var out: [String: String] = [:]
+        var out: [String: InstalledRecord] = [:]
         for (key, value) in plugins {
             if let first = (value as? [Any])?.first as? [String: Any], let path = first["installPath"] as? String {
-                out[key] = path
+                out[key] = InstalledRecord(path: path, version: first["version"] as? String)
             }
         }
         return out
+    }
+
+    /// `plugins/installed_plugins.json`'s install folder per plugin key.
+    static func installedPaths(_ root: URL) -> [String: String] {
+        installedRecords(root).mapValues(\.path)
     }
 
     /// A plugin folder that is a mod: its hooks.json lists modules.
@@ -90,22 +104,36 @@ enum ModStatusEntries {
 
     /// The mod's source calls `ui.status` (its status entry), read as text, never run.
     static func drawsStatus(_ dir: URL) -> Bool {
+        var found = false
+        forEachSource(dir) { _, text in
+            found = text.contains("ui.status")
+            return found
+        }
+        return found
+    }
+
+    /// Calls `body` with each of the mod's source files as text until it returns true. Never
+    /// node_modules, hidden folders (the engine's `.claude-plugin/types`), declaration files
+    /// (`.d.ts`, which name every API without calling it) or tests (`*.test.*`, `*.spec.*`, whose
+    /// stubs aren't what the mod does). At most `fileLimit` files of `byteLimit` bytes each.
+    static func forEachSource(_ dir: URL, _ body: (URL, String) -> Bool) {
         guard let e = FileManager.default.enumerator(at: dir, includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
-                                                     options: [.skipsHiddenFiles]) else { return false }
+                                                     options: [.skipsHiddenFiles]) else { return }
         var read = 0
         while let url = e.nextObject() as? URL {
             if url.lastPathComponent == "node_modules" {
                 e.skipDescendants()
                 continue
             }
-            guard sourceExtensions.contains(url.pathExtension.lowercased()),
+            let file = url.lastPathComponent.lowercased()
+            guard sourceExtensions.contains(url.pathExtension.lowercased()), !file.hasSuffix(".d.ts"),
+                  !file.contains(".test."), !file.contains(".spec."),
                   let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
                   values.isRegularFile == true, (values.fileSize ?? 0) <= byteLimit else { continue }
             read += 1
-            if read > fileLimit { return false }
-            if let text = try? String(contentsOf: url, encoding: .utf8), text.contains("ui.status") { return true }
+            if read > fileLimit { return }
+            if let text = try? String(contentsOf: url, encoding: .utf8), body(url, text) { return }
         }
-        return false
     }
 
     static func manifest(_ dir: URL) -> [String: Any] {

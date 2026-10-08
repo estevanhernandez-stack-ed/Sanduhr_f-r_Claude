@@ -15,13 +15,14 @@ struct AccountsSettings: View {
     @State private var scrollToData = false
 
     /// The Data section's scroll anchor.
-    static let dataAnchor = "account-data"
+    static let dataAnchor = SettingsAnchor.data
     @State private var adding = false
 
     var body: some View {
         Group {
             if vm.accountLabels.isEmpty {
                 FirstAccountForm(vm: vm)
+                    .settingsAnchor(SettingsAnchor.accounts)
             } else {
                 accounts
             }
@@ -36,6 +37,7 @@ struct AccountsSettings: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+                .settingsAnchor(SettingsAnchor.accounts)
             HStack(alignment: .top, spacing: 16) {
                 AccountList(vm: vm, selection: $selection, adding: $adding)
                     .frame(width: 190)
@@ -64,6 +66,11 @@ struct AccountsSettings: View {
         .onAppear {
             if let wanted = navigation?.accountToShow, vm.accountLabels.contains(wanted) {
                 selection = wanted
+                adding = false
+                scrollToData = true
+            } else if navigation?.anchor == SettingsAnchor.data {
+                // sanduhr://settings/credentials#data: the active account's Data.
+                selection = selection ?? vm.activeAccount
                 adding = false
                 scrollToData = true
             } else if selection == nil {
@@ -150,11 +157,29 @@ private struct AccountRow: View {
                 }
             }
             Spacer(minLength: 0)
-            if active {
-                Text("Active").font(.caption2).foregroundStyle(.secondary)
-            }
+            if active { AccountPill.active }
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// A small coloured capsule beside an account's name: Active in green, and whether it's signed in
+/// (green), its session expired (orange) or it's signed out (grey).
+enum AccountPill {
+    static var active: some View { pill("Active", "4ade80") }
+
+    static func status(hasKey: Bool, expired: Bool) -> some View {
+        !hasKey ? pill("Signed out", "9ca3af") : expired ? pill("Session expired", "fb923c") : pill("Signed in", "4ade80")
+    }
+
+    private static func pill(_ text: String, _ hex: String) -> some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(Color.hex(hex))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(Color.hex(hex).opacity(0.16)))
+            .overlay(Capsule().strokeBorder(Color.hex(hex).opacity(0.45), lineWidth: 1))
     }
 }
 
@@ -177,12 +202,24 @@ private struct KeyFields: View {
     @Binding var sessionKey: String
     @Binding var cfClearance: String
     let hasKey: Bool
+    /// The saved key was refused (session expired, Cloudflare): only then does the button read
+    /// "Sign In Again". A working account offers "Replace Sign-In", so the page never looks
+    /// signed out when it isn't.
+    var expired: Bool = false
     /// Opens the sign-in window; the form saves what it captures.
     var onSignIn: () -> Void
 
+    private var signInTitle: String {
+        if !hasKey { return "Sign In to Claude…" }
+        return expired ? "Sign In Again…" : "Replace Sign-In…"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Button(hasKey ? "Sign In Again…" : "Sign In to Claude…", action: onSignIn)
+            Button(signInTitle, action: onSignIn)
+                .help(hasKey && !expired
+                      ? "Signs in once more and replaces this account's saved key, for example to use a different claude.ai account. You're signed in now."
+                      : "Opens claude.ai's own sign-in.")
             Text("Opens claude.ai's own sign-in. An account that signs in with Google needs a pasted key: Google doesn't allow sign-in inside apps.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
@@ -240,18 +277,27 @@ private struct AccountDetail: View {
 
     private var isActive: Bool { label == vm.activeAccount }
     private var hasKey: Bool { vm.signedInAccounts.contains(label) }
+    /// The active account's key was refused at its last fetch.
+    private var expired: Bool { hasKey && isActive && vm.status.needsSignIn }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
-            KeyFields(sessionKey: $sessionKey, cfClearance: $cfClearance, hasKey: hasKey,
-                      onSignIn: signIn)
-            saveRow
+            if hasKey && !expired {
+                // A working account keeps its sign-in tools folded (2026-10-08: a sign-in button
+                // on top read as signed out).
+                DisclosureGroup("Change Sign-In") {
+                    VStack(alignment: .leading, spacing: 14) { signInForm }
+                        .padding(.top, 6)
+                }
+            } else {
+                signInForm
+            }
             Divider()
             renameRow
             Divider()
             AccountDataSection(vm: vm, label: label)
-                .id(AccountsSettings.dataAnchor)
+                .settingsAnchor(AccountsSettings.dataAnchor)
             Divider()
             endRow
             if let note { FormNote(text: note, isError: noteIsError) }
@@ -275,12 +321,17 @@ private struct AccountDetail: View {
         }
     }
 
+    @ViewBuilder private var signInForm: some View {
+        KeyFields(sessionKey: $sessionKey, cfClearance: $cfClearance, hasKey: hasKey, expired: expired,
+                  onSignIn: signIn)
+        saveRow
+    }
+
     private var header: some View {
-        HStack {
+        HStack(spacing: 8) {
             Text(label).font(.title3.weight(.semibold))
-            if isActive {
-                Text("Active").font(.caption).foregroundStyle(.secondary)
-            }
+            if isActive { AccountPill.active }
+            AccountPill.status(hasKey: hasKey, expired: expired)
             Spacer()
             if !isActive {
                 Button("Make Active") { vm.switchAccount(to: label) }
@@ -294,7 +345,8 @@ private struct AccountDetail: View {
                 .keyboardShortcut(.defaultAction)
                 // A signed-out account needs a key; otherwise blank keeps the current values.
                 .disabled(sessionKey.trimmed.isEmpty && (!hasKey || cfClearance.trimmed.isEmpty))
-            Text(hasKey ? "Signed in" : "Signed out. Sign in again, or paste a sessionKey.")
+            Text(!hasKey ? "Signed out. Sign in again, or paste a sessionKey."
+                 : expired ? "Session expired. Sign in again, or paste a new sessionKey." : "Blank keeps the saved key.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -335,7 +387,7 @@ private struct AccountDetail: View {
         noteIsError = error
     }
 
-    /// Sign In Again: what the window captures is saved to this account at once.
+    /// Sign In Again / Replace Sign-In: what the window captures is saved to this account at once.
     private func signIn() {
         Task {
             guard case .signedIn(let c) = await SignInWindowController.shared.run(account: label) else { return }

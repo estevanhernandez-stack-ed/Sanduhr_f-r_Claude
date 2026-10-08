@@ -42,16 +42,29 @@ enum CalendarAccess {
     static func shouldRequest(_ status: EKAuthorizationStatus) -> Bool { status == .notDetermined }
 }
 
+/// What the meetings piece and the meetings menu say with no meeting left today.
+enum MeetingsCopy {
+    /// "Nothing else on the calendar today" after the day's last meeting; "Nothing on the
+    /// calendar today" on a day that had none (Settings v2, slice 1).
+    static func none(hadEarlier: Bool) -> String {
+        hadEarlier ? "Nothing else on the calendar today" : "Nothing on the calendar today"
+    }
+}
+
 /// Today's remaining timed meetings, read straight from macOS Calendar (no icalBuddy).
 /// Refreshes every 5 minutes and whenever Calendar reports a change.
 @Observable
 final class DeskModel {
     var meetings: [Meeting] = []
+    /// Today had a timed meeting that has already ended, so an empty list says "else".
+    var hadEarlierMeetings = false
     var calendarNote: String?
+    /// The line where the meetings go when none is left today.
+    var noMeetingsLine: String { MeetingsCopy.none(hadEarlier: hadEarlierMeetings) }
     /// One row per Claude limit for the meters piece, in the widget's order, hidden limits left out.
     var meters: [DeskMeterRow] = []
     /// Every limit the server reported with a utilization, hidden or not, in the widget's order:
-    /// Settings, Desk, Meters lists these, so a hidden limit can be shown again.
+    /// Settings, Alerts, Each limit lists these, so a hidden limit can be shown again.
     var reportedTiers: [Tier] = []
     /// The reported limits believed temporary (LimitLifetime): only these get Settings' "Show
     /// this limit" switch.
@@ -71,8 +84,55 @@ final class DeskModel {
     var veiled = false
     /// The switch's fetch outlasts the fade: the faint "switching account…".
     var switchNote = false
-    /// Today's line from MessageEngine (messages.txt), or nil when there is none.
+    /// Today's usual line from MessageEngine (messages.txt, or the pin), or nil when there is none.
     var message: String?
+    /// Today's date lines (item 69), drawn above the usual line; empty on most days.
+    var specialMessages: [String] = []
+    /// On special days: Stack, Take turns or Scroll (MessageSpecialMode), and how long each line
+    /// shows while they take turns.
+    var specialMode: MessageSpecialMode = .stack
+    var specialSeconds: Double = MessageSpecialMode.defaultSeconds
+    /// While the lines take turns: which of `messageLines` shows. Moves with the clock
+    /// (MessageSpecialMode.index), rests while the Desk can't be seen.
+    var cycleIndex = 0
+    @ObservationIgnored private var cycleTimer: Timer?
+
+    /// Everything the message piece draws today, in cycle order: the date's lines, then the usual one.
+    var messageLines: [String] { specialMessages + [message].compactMap { $0 } }
+    /// Take turns or Scroll on a special day.
+    var cycling: Bool {
+        MessageSpecialMode.cycles(specialMode, today: MessageEngine.Today(special: specialMessages, usual: message))
+    }
+    /// The line showing now while they take turns, nil otherwise.
+    var cycleLine: String? {
+        guard cycling else { return nil }
+        let lines = messageLines
+        return lines[cycleIndex % lines.count]
+    }
+    /// For places with room for one line (the notch): the line taking its turn, else the first
+    /// special line, else the usual one.
+    var oneLineMessage: String? { cycleLine ?? specialMessages.first ?? message }
+
+    /// Moves the turn to the clock's line and waits for the next change; while the Desk can't be
+    /// seen (`motionPaused`) the turn holds and nothing waits. Nothing runs without a cycle.
+    func updateCycle(now: Date = Date()) {
+        cycleTimer?.invalidate()
+        cycleTimer = nil
+        guard cycling, !motionPaused else { return }
+        let index = MessageSpecialMode.index(at: now, count: messageLines.count, seconds: specialSeconds)
+        if cycleIndex != index { cycleIndex = index }
+        let wait = MessageSpecialMode.nextChange(after: now, seconds: specialSeconds).timeIntervalSince(now)
+        cycleTimer = Timer.scheduledTimer(withTimeInterval: max(0.05, wait), repeats: false) { [weak self] _ in
+            self?.updateCycle()
+        }
+    }
+
+    /// The saved On special days choice and timing (Settings, Message).
+    func applySpecialSettings(mode: MessageSpecialMode, seconds: Double, now: Date = Date()) {
+        if specialMode != mode { specialMode = mode }
+        if specialSeconds != seconds { specialSeconds = seconds }
+        updateCycle(now: now)
+    }
     /// Nobody can see the Desk (covered, screens asleep, screen saver, session switched away):
     /// the message's {shimmer} rests (MessageMotion). Set by DeskController.
     var motionPaused = false
@@ -132,8 +192,25 @@ final class DeskModel {
     @ObservationIgnored var stripFrame: CGRect = .zero { didSet { if stripFrame != oldValue { onHitAreasChange?() } } }
     /// Where the strip's Next button sits while paused (item 53b), same coordinates. A click skips.
     @ObservationIgnored var stripNextFrame: CGRect = .zero { didSet { if stripNextFrame != oldValue { onHitAreasChange?() } } }
+    /// The camera and mic indicators that show (item 67), after their switches: in-use booleans
+    /// only, never which app. Set by AVIndicatorController.
+    var avIndicators = AVIndicators()
+    /// Where they draw now (AVIndicatorPlacement). Set by AVIndicatorController.
+    var avSpot = AVIndicatorSpot.none
+    /// The last indicators that showed: what the slot beside the camera draws while it fades out,
+    /// so it fades the dot that was there rather than going blank. Set by AVIndicatorController.
+    var avDrawn = AVIndicators()
+    /// Where the strip under the camera draws them, same coordinates: a click opens their menu.
+    @ObservationIgnored var stripAVFrame: CGRect = .zero { didSet { if stripAVFrame != oldValue { onHitAreasChange?() } } }
+    /// Where the clock, the message and the claude line sit, same coordinates. Click areas only
+    /// while "Clock and message take clicks" is on (DeskPieceClicks).
+    @ObservationIgnored var clockFrame: CGRect = .zero { didSet { if clockFrame != oldValue { onHitAreasChange?() } } }
+    @ObservationIgnored var messageFrame: CGRect = .zero { didSet { if messageFrame != oldValue { onHitAreasChange?() } } }
+    @ObservationIgnored var claudeLineFrame: CGRect = .zero { didSet { if claudeLineFrame != oldValue { onHitAreasChange?() } } }
     /// Called when a clickable piece moves or comes and goes (DeskController takes the mouse there).
     @ObservationIgnored var onHitAreasChange: (() -> Void)?
+    /// Arrange mode (item 60): the layout being edited on the desktop, nil-session outside it.
+    let arrange = DeskArrangeMode()
     /// Alert pulses so far, per limit (Settings, Alerts, Where alerts show). A meter row pulses
     /// when its count goes up.
     var pulses: [Tier: Int] = [:]
@@ -142,6 +219,9 @@ final class DeskModel {
 
     /// The widget's last numbers (see `update`).
     @ObservationIgnored private var usage = DeskUsage()
+    /// The numbers last handed over, for Settings' previews (item 68): they feed their own model
+    /// the same input, so its rows come from the same functions.
+    var lastUsage: DeskUsage { usage }
 
     /// Replaced when access turns full: a store made before the grant can keep the old answer.
     @ObservationIgnored private var store = EKEventStore()
@@ -162,10 +242,10 @@ final class DeskModel {
         }
         MessageEngine.ensureFile()
         refreshClaude()
-        message = MessageEngine.current()
+        refreshMessage()
         claudeTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             self?.refreshClaude()
-            if self?.demo != true { self?.message = MessageEngine.current() }   // picks up messages.txt edits within a minute
+            if self?.demo != true { self?.refreshMessage() }   // picks up messages.txt edits within a minute
             // A grant made in System Settings shows within a minute, no relaunch.
             if self?.calendarStatus != .fullAccess { self?.recheckCalendar() }
         }
@@ -293,14 +373,27 @@ final class DeskModel {
         setWatchers(allWatchers)
         if on {
             meetings = Self.demoMeetings(now: now)
-            message = "ship small. ship often. sleep anyway."
+            message = Self.demoMessage
+            specialMessages = []
+            updateCycle()
             calendarNote = nil
         } else {
             meetings = []
             refreshEvents()
-            message = MessageEngine.current()
+            refreshMessage()
         }
     }
+
+    /// Picks today's lines again: the usual one and any date lines (MessageEngine.today).
+    func refreshMessage(now: Date = Date()) {
+        let today = MessageEngine.today(now: now)
+        if message != today.usual { message = today.usual }
+        if specialMessages != today.special { specialMessages = today.special }
+        applySpecialSettings(mode: .saved(), seconds: MessageSpecialMode.savedSeconds(), now: now)
+    }
+
+    /// Demo mode's message, also the Settings previews' sample line (item 68).
+    static let demoMessage = "ship small. ship often. sleep anyway."
 
     /// Three made-up meetings: one in 12 minutes (so the notch counts it down), two later today.
     static func demoMeetings(now: Date) -> [Meeting] {
@@ -326,11 +419,16 @@ final class DeskModel {
         guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return }
         let now = Date()
         let endOfDay = Calendar.current.startOfDay(for: now).addingTimeInterval(24 * 60 * 60)
-        let predicate = store.predicateForEvents(withStart: now, end: endOfDay, calendars: nil)
+        // From midnight, so a day whose meetings are over can say "else" and one without can't.
+        let predicate = store.predicateForEvents(withStart: Calendar.current.startOfDay(for: now),
+                                                 end: endOfDay, calendars: nil)
         let fmt = DateFormatter()
         fmt.dateFormat = "h:mm"
-        let upcoming = store.events(matching: predicate)
-            .filter { !$0.isAllDay && $0.endDate > now }
+        let timed = store.events(matching: predicate).filter { !$0.isAllDay }
+        let earlier = timed.contains { $0.endDate <= now }
+        if hadEarlierMeetings != earlier { hadEarlierMeetings = earlier }
+        let upcoming = timed
+            .filter { $0.endDate > now }
             .sorted { $0.startDate < $1.startDate }
         meetings = upcoming.prefix(3).map { event in
             let link = Self.joinLink(event)
@@ -381,7 +479,7 @@ final class DeskModel {
         }
     }
 
-    /// The meter rows for the limits that show, with the saved warning settings (Settings, Desk, Meters).
+    /// The meter rows for the limits that show, with the saved warning settings (Settings, Alerts, Each limit).
     private static func meterRows(_ usage: UsageResponse?, now: Date) -> [DeskMeterRow] {
         let desk = UserDefaults.desk
         let shown = MeterVisibility.visible(usage, hidden: MeterVisibility.hidden(in: desk))
@@ -409,8 +507,7 @@ final class DeskModel {
         let desk = UserDefaults.desk
         var input = DeskElements.Input()
         input.placed = DeskLayout.placed(desk.string(forKey: "layout") ?? DeskLayout.standard,
-                                         showMeetings: desk.object(forKey: "showMeetings") as? Bool ?? true,
-                                         showClaude: desk.object(forKey: "showClaude") as? Bool ?? true)
+                                         showMeetings: desk.object(forKey: "showMeetings") as? Bool ?? true)
         input.meterTiers = meters.map(\.tier)
         input.signInNeeded = signInNeeded
         input.switchNote = switchNote
@@ -427,7 +524,8 @@ final class DeskModel {
         input.nowPlayingFrame = nowPlayingFrame
         let strip = NotchContent.effective(NotchContent.saved(.strip, in: desk), at: .strip,
                                            nowPlaying: nowPlaying, idle: NowPlayingIdle.saved(in: desk),
-                                           watchers: watchers)
+                                           watchers: watchers, indicators: avIndicators,
+                                           avPlace: AVPlace.saved(in: desk))
         let notch = desk.bool(forKey: DeskController.notchKey)
         let chin = desk.object(forKey: "notchChin") as? Double ?? 26
         let chinText = desk.bool(forKey: "notchChinText")
@@ -443,6 +541,14 @@ final class DeskModel {
         input.watcherRowFrames = watcherRowFrames
         input.watcherStrip = notch && notchRect != nil && chin > 0 && chinText && strip == .watchers
         input.stripWatcherFrame = stripWatcherFrame
+        input.avStrip = notch && notchRect != nil && chin > 0 && chinText && strip == .avIndicators
+        input.stripAVFrame = stripAVFrame
+        input.piecesTakeClicks = DeskPieceClicks.isOn(in: desk)
+        input.clockFrame = clockFrame
+        input.messageDrawn = cycling || !specialMessages.isEmpty || message != nil
+        input.messageFrame = messageFrame
+        input.claudeLineDrawn = claudeLine != nil || claudeParts?.account != nil || switchNote
+        input.claudeLineFrame = claudeLineFrame
         return DeskElements.build(input)
     }
 

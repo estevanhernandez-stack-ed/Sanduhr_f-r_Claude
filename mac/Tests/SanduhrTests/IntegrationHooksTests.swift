@@ -7,18 +7,63 @@ import Testing
 /// homes only.
 @Suite("Integration installer, notch glow hooks")
 struct IntegrationHooksTests {
-    private let waitingCommand = "/usr/bin/pgrep -xq Sanduhr && /usr/bin/open -g 'sanduhr://claude-code?event=waiting' || true"
-    /// Item 66: the Stop hook also hands over the background work while watchers.json allows it.
-    private let doneCommand = "/usr/bin/pgrep -xq Sanduhr && { d=\"$HOME/Library/Application Support/Sanduhr\"; "
+    /// The hooks post a Darwin notification: never a launch, whichever Sanduhr runs hears it.
+    private let waitingCommand = "/usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.waiting || true"
+    /// Item 66: the Stop hook also hands over the background work while a Sanduhr runs and
+    /// watchers.json allows it, then posts.
+    private let doneCommand = "d=\"$HOME/Library/Application Support/Sanduhr\"; /usr/bin/pgrep -xq Sanduhr && "
+        + "/usr/bin/grep -qs '\"background\":true' \"$d/watchers.json\" && "
+        + "/usr/bin/osascript -l JavaScript -e '" + IntegrationInstaller.stopTasksScript + "' \"$d\" >/dev/null 2>&1; "
+        + "/usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.done || true"
+    /// Item 51's commands, as installs before item 66 hold them (item 66 kept the waiting one).
+    private let item51WaitingCommand = "/usr/bin/pgrep -xq Sanduhr && /usr/bin/open -g 'sanduhr://claude-code?event=waiting' || true"
+    private let item51DoneCommand = "/usr/bin/pgrep -xq Sanduhr && /usr/bin/open -g 'sanduhr://claude-code?event=done' || true"
+    /// Item 66's Stop command, which opened the link (and launched an app that wasn't running).
+    private let item66DoneCommand = "/usr/bin/pgrep -xq Sanduhr && { d=\"$HOME/Library/Application Support/Sanduhr\"; "
         + "/usr/bin/grep -qs '\"background\":true' \"$d/watchers.json\" && "
         + "/usr/bin/osascript -l JavaScript -e '" + IntegrationInstaller.stopTasksScript + "' \"$d\" >/dev/null 2>&1; "
         + "/usr/bin/open -g 'sanduhr://claude-code?event=done'; } || true"
-    /// Item 51's Stop command, as installs before item 66 hold it.
-    private let item51DoneCommand = "/usr/bin/pgrep -xq Sanduhr && /usr/bin/open -g 'sanduhr://claude-code?event=done' || true"
-    /// The Stop command as it sits inside a JSON string in the file.
-    private var doneJSON: String {
-        let quoted = String(decoding: JSONEdit.quoted(doneCommand), as: UTF8.self)
+    /// A command as it sits inside a JSON string in the file.
+    private func inJSON(_ command: String) -> String {
+        let quoted = String(decoding: JSONEdit.quoted(command), as: UTF8.self)
         return String(quoted.dropFirst().dropLast())
+    }
+    private var doneJSON: String { inJSON(doneCommand) }
+
+    /// A settings.json holding Sanduhr's two entries with these commands, as Install writes them.
+    private func installed(waiting: String, done: String) -> String {
+        """
+        {
+          "hooks": {
+            "Notification": [
+              {
+                "matcher": "permission_prompt|idle_prompt|elicitation_dialog",
+                "hooks": [
+                  {
+                    "type": "command",
+                    "command": "\(inJSON(waiting))",
+                    "async": true,
+                    "timeout": 5
+                  }
+                ]
+              }
+            ],
+            "Stop": [
+              {
+                "hooks": [
+                  {
+                    "type": "command",
+                    "command": "\(inJSON(done))",
+                    "async": true,
+                    "timeout": 5
+                  }
+                ]
+              }
+            ]
+          }
+        }
+
+        """
     }
 
     private func hooks(_ r: IntegrationRig, _ relative: String) -> [String: Any] {
@@ -228,61 +273,73 @@ struct IntegrationHooksTests {
         #expect(((left[0]["hooks"] as? [[String: Any]])?.first?["command"] as? String) == "say done")
     }
 
-    /// Item 66: an item 51 install is outdated (its Stop command hands over no background work);
-    /// Install rewrites only the Stop command, the Notification entry stays byte for byte, and
-    /// Remove still takes everything out.
-    @Test func anItem51InstallIsOutdatedAndInstallUpdatesTheStopHook() throws {
+    /// Installs that opened `sanduhr://claude-code` (item 51's two commands, item 66's Stop
+    /// command beside item 51's waiting one) are outdated: Install rewrites both commands in place,
+    /// every other byte stays, installing again changes nothing, and Remove takes everything out.
+    @Test func installsThatOpenedTheLinkAreOutdatedAndUpdatedInPlace() throws {
+        for (waiting, done) in [(item51WaitingCommand, item51DoneCommand), (item51WaitingCommand, item66DoneCommand),
+                                (waitingCommand, item66DoneCommand), (item51WaitingCommand, doneCommand)] {
+            let r = IntegrationRig()
+            defer { r.cleanUp() }
+            r.home.dir(".claude/projects")
+            r.home.file(".claude/settings.json", installed(waiting: waiting, done: done))
+            let folder = r.home.at(".claude")
+            #expect(r.installer.status(.hooks, folder: folder) == .outdated)
+            #expect(r.installer.installedCounts(folders: [folder]).3 == 1)
+            try r.installer.install(.hooks, folder: folder, python: "")
+            #expect(r.installer.status(.hooks, folder: folder) == .installed)
+            #expect(r.text(".claude/settings.json") == installed(waiting: waitingCommand, done: doneCommand))
+            #expect(r.text(".claude/settings.json")?.contains("sanduhr://") == false)
+            let once = r.bytes(".claude/settings.json")
+            try r.installer.install(.hooks, folder: folder, python: "")
+            #expect(r.bytes(".claude/settings.json") == once)
+            try r.installer.remove(.hooks, folder: folder)
+            #expect(r.installer.status(.hooks, folder: folder) == .notInstalled)
+            let h = hooks(r, ".claude/settings.json")
+            #expect(((h["Notification"] as? [Any]) ?? []).isEmpty && ((h["Stop"] as? [Any]) ?? []).isEmpty)
+        }
+    }
+
+    /// Remove without updating first takes out an old install's commands exactly, and leaves the
+    /// user's own hooks around them.
+    @Test func removeTakesOutAnOldInstallAsItIs() throws {
         let r = IntegrationRig()
         defer { r.cleanUp() }
         r.home.dir(".claude/projects")
-        let item51 = """
-        {
-          "hooks": {
-            "Notification": [
-              {
-                "matcher": "permission_prompt|idle_prompt|elicitation_dialog",
-                "hooks": [
-                  {
-                    "type": "command",
-                    "command": "\(waitingCommand)",
-                    "async": true,
-                    "timeout": 5
-                  }
-                ]
-              }
-            ],
-            "Stop": [
-              {
-                "hooks": [
-                  {
-                    "type": "command",
-                    "command": "\(item51DoneCommand)",
-                    "async": true,
-                    "timeout": 5
-                  }
-                ]
-              }
-            ]
-          }
-        }
-
-        """
-        r.home.file(".claude/settings.json", item51)
+        let user = #"{ "hooks": [ { "type": "command", "command": "say done" } ] }"#
+        let old = installed(waiting: item51WaitingCommand, done: item66DoneCommand)
+            .replacingOccurrences(of: "\"Stop\": [\n", with: "\"Stop\": [\n      \(user),\n")
+        r.home.file(".claude/settings.json", old)
         let folder = r.home.at(".claude")
         #expect(r.installer.status(.hooks, folder: folder) == .outdated)
-        try r.installer.install(.hooks, folder: folder, python: "")
-        #expect(r.installer.status(.hooks, folder: folder) == .installed)
-        #expect(r.text(".claude/settings.json") == item51.replacingOccurrences(of: item51DoneCommand, with: doneJSON))
+        try r.installer.remove(.hooks, folder: folder)
+        #expect(r.installer.status(.hooks, folder: folder) == .notInstalled)
+        let text = r.text(".claude/settings.json") ?? ""
+        #expect(!text.contains("sanduhr://") && !text.contains("notifyutil"))
         let stop = hooks(r, ".claude/settings.json")["Stop"] as? [[String: Any]] ?? []
-        #expect(((stop[0]["hooks"] as? [[String: Any]])?.first?["command"] as? String) == doneCommand)
+        #expect(stop.count == 1)
+        #expect(((stop[0]["hooks"] as? [[String: Any]])?.first?["command"] as? String) == "say done")
     }
 
-    /// The Stop command's shape (item 66): the glow link is always opened; the report needs
-    /// Sanduhr running and the background switch; no single quote inside the script.
+    /// Neither command launches anything: no `open`, no link; each posts its own name.
+    @Test func theCommandsPostANotificationAndNeverOpenALink() {
+        for event in ClaudeCodeEvent.allCases {
+            let command = IntegrationInstaller.hookCommand(event)
+            #expect(command.hasSuffix("/usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.\(event.rawValue) || true"))
+            #expect(!command.contains("open"))
+            #expect(!command.contains("sanduhr://"))
+        }
+        #expect(FileManager.default.isExecutableFile(atPath: "/usr/bin/notifyutil"))
+        #expect(IntegrationInstaller.hookCommand(.waiting) == waitingCommand)
+        #expect(IntegrationInstaller.hookCommand(.done) == doneCommand)
+    }
+
+    /// The Stop command's shape (item 66): the notification is always posted; the report needs
+    /// a Sanduhr running and the background switch; no single quote inside the script.
     @Test func theStopCommandHandsOverBackgroundWorkOnlyWithTheSwitch() {
         let stop = IntegrationInstaller.hookCommand(.done)
-        #expect(stop.hasPrefix("/usr/bin/pgrep -xq Sanduhr && {"))
-        #expect(stop.hasSuffix("/usr/bin/open -g 'sanduhr://claude-code?event=done'; } || true"))
+        #expect(stop.hasPrefix("d=\"$HOME/Library/Application Support/Sanduhr\"; /usr/bin/pgrep -xq Sanduhr && /usr/bin/grep"))
+        #expect(stop.hasSuffix(">/dev/null 2>&1; /usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.done || true"))
         #expect(stop.contains("/usr/bin/grep -qs '\"background\":true' \"$d/\(WatcherStore.switchFile)\" && /usr/bin/osascript"))
         #expect(!IntegrationInstaller.stopTasksScript.contains("'"))
         #expect(!IntegrationInstaller.stopTasksScript.contains("command"))
@@ -298,7 +355,6 @@ struct IntegrationHooksTests {
             p.waitUntilExit()
             #expect(p.terminationStatus == 0, "\(event)")
         }
-        // The waiting hook is item 51's, unchanged.
         #expect(IntegrationInstaller.hookCommand(.waiting) == waitingCommand)
         // The switch text the hook matches is exactly what Sanduhr writes.
         let on = String(decoding: WatcherStore.switchesJSON(agents: false, background: true), as: UTF8.self)
@@ -379,13 +435,17 @@ struct IntegrationHooksTests {
     @Test func theKindNeedsNoPythonAndNoScripts() {
         #expect(!IntegrationKind.hooks.needsPython)
         #expect(!IntegrationKind.hooks.needsScripts)
-        #expect(IntegrationKind.hooks.title == "Notch glow when Claude needs you")
+        #expect(IntegrationKind.hooks.title == "Claude Code glow hook")
         #expect(IntegrationKind.hooks.keyPath == "hooks.Notification and hooks.Stop")
     }
 
     @Test func recognizingOurCommand() {
         #expect(IntegrationInstaller.isOurHookCommand(["type": "command", "command": waitingCommand]))
+        #expect(IntegrationInstaller.isOurHookCommand(["type": "command", "command": doneCommand]))
+        #expect(IntegrationInstaller.isOurHookCommand(["type": "command", "command": item51WaitingCommand]))
+        #expect(IntegrationInstaller.isOurHookCommand(["type": "command", "command": item66DoneCommand]))
         #expect(IntegrationInstaller.isOurHookCommand(["type": "command", "command": "open sanduhr://claude-code?event=done"]))
+        #expect(!IntegrationInstaller.isOurHookCommand(["type": "command", "command": "/usr/bin/notifyutil -p com.example.done"]))
         #expect(!IntegrationInstaller.isOurHookCommand(["type": "command", "command": "open sanduhr://settings"]))
         #expect(!IntegrationInstaller.isOurHookCommand(["type": "http", "command": waitingCommand]))
         #expect(!IntegrationInstaller.isOurHookGroup(["hooks": []]))

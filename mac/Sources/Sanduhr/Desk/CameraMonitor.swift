@@ -102,6 +102,14 @@ final class CameraMonitor {
     private(set) var inUse = false
     private(set) var isRunning = false
     var onChange: ((Bool) -> Void)?
+    /// After every reading, flip or not: which cameras run can change while `inUse` holds (the
+    /// camera indicator's "without a visible light", item 67).
+    var onActivity: (() -> Void)?
+    /// The cameras running at the last reading that had any, kept through the off-delay while
+    /// `inUse` still holds; empty once it is off. Object ids only.
+    private(set) var activeDevices: Set<UInt32> = []
+    /// The watched cameras that are built in (transport type 'bltn'), read with the device list.
+    private(set) var builtInDevices: Set<UInt32> = []
 
     private var activity = CameraActivity()
     private var watched: [CMIOObjectID] = []
@@ -180,6 +188,7 @@ final class CameraMonitor {
         guard isRunning else { return }
         unwatchAll()
         watched = Self.videoDevices()
+        builtInDevices = Set(watched.filter(Self.isBuiltIn))
         var addr = Self.address(kCMIODevicePropertyDeviceIsRunningSomewhere)
         for id in watched {
             check(.add, .running, id, CMIOObjectAddPropertyListener(id, &addr, Self.runningListener, clientData))
@@ -257,8 +266,48 @@ final class CameraMonitor {
     }
 
     private func publish() {
-        guard activity.inUse != inUse else { return }
-        inUse = activity.inUse
-        onChange?(inUse)
+        activeDevices = CameraLightVisibility.active(running: activity.running, inUse: activity.inUse,
+                                                     previous: activeDevices)
+        if activity.inUse != inUse {
+            inUse = activity.inUse
+            onChange?(inUse)
+        }
+        onActivity?()
+    }
+}
+
+extension CameraMonitor {
+    /// Whether a camera reports a built-in transport ('bltn'). A property read: the camera stays off.
+    fileprivate static func isBuiltIn(_ id: CMIOObjectID) -> Bool {
+        var addr = CMIOObjectPropertyAddress(mSelector: CMIOObjectPropertySelector(kCMIODevicePropertyTransportType),
+                                             mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal),
+                                             mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain))
+        var value: UInt32 = 0
+        var used: UInt32 = 0
+        guard CMIOObjectGetPropertyData(id, &addr, 0, nil, UInt32(MemoryLayout<UInt32>.size), &used, &value) == noErr
+        else { return false }
+        return value == CameraLightVisibility.builtInTransport
+    }
+}
+
+/// Whether the camera in use has a light the person can see (item 67): a Mac's built-in camera
+/// has its own green light, which can't be turned off, unless the lid is closed (clamshell on an
+/// external display); an external or Continuity camera's light is out of sight or absent. Pure.
+enum CameraLightVisibility {
+    /// CoreMediaIO's transport type for a built-in camera, 'bltn' (as Core Audio's).
+    static let builtInTransport: UInt32 = 0x626C_746E
+
+    /// True when a running camera has no light the person can see: one that isn't built in, or
+    /// the built-in one with the lid closed.
+    static func withoutVisibleLight(active: Set<UInt32>, builtIn: Set<UInt32>, lidClosed: Bool) -> Bool {
+        active.contains { !builtIn.contains($0) } || (lidClosed && active.contains { builtIn.contains($0) })
+    }
+
+    /// The cameras to count as in use: the running ones; through the off-delay (`inUse` holding
+    /// with none running) the last ones seen; none once off.
+    static func active(running: [UInt32: Bool], inUse: Bool, previous: Set<UInt32>) -> Set<UInt32> {
+        guard inUse else { return [] }
+        let now = Set(running.filter(\.value).keys)
+        return now.isEmpty ? previous : now
     }
 }

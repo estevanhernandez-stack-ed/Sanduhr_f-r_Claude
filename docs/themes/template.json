@@ -23,5 +23,8 @@
   "border_alpha": 0.40,
   "border_tint": null,
   "accent_bloom": {"blur": 5, "alpha": 0.45},
-  "inner_highlight": null
+  "inner_highlight": null,
+
+  "title_ink": null,
+  "title_style": null
 }

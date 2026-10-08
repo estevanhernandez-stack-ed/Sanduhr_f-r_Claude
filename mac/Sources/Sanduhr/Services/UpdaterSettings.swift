@@ -9,7 +9,7 @@ import Sparkle
 @MainActor
 @Observable
 final class UpdaterSettings {
-    /// False while a check runs (or before the updater has started): Check Now is disabled.
+    /// False while a check runs (or before the updater has started): Check for Updates… is disabled.
     private(set) var canCheck = false
     private(set) var lastCheck: Date?
     private(set) var checksAutomatically = false
@@ -48,7 +48,7 @@ final class UpdaterSettings {
         allowsAutomaticDownloads = updater.allowsAutomaticUpdates
     }
 
-    /// Check Now: the same user-initiated check as the menus' Check for Updates….
+    /// Check for Updates…: the same user-initiated check as the menus' Check for Updates….
     func checkNow() {
         controller.checkForUpdates(nil)
         sync()

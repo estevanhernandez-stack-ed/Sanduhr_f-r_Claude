@@ -1,0 +1,22 @@
+# docs/mac-smoke-test.md section 43, step 11: General, Shortcuts' recorder (2026-10-08). The keys
+# set through the hook follow the recorder's rules and show in state.yaml and on the switch's
+# label; Reset (the default) brings back ⌥S. The run sets the keys back to what they were, so a
+# changed pair on this Mac is left as found.
+name: A shortcut's keys can be changed and reset
+steps:
+  - do: settings
+    arg: general shortcuts
+  - expect_state: { settings_section: general, settings_anchor: shortcuts }
+  - do: hot-key
+    arg: settings ctrl-opt-s
+  - expect_state: { hot_keys.settings_keys: ⌃⌥S, hot_keys.settings_taken: false }
+  - expect:
+      window: settings
+      contains: { text: "/S opens Settings/" }
+  - snap: shortcut-changed
+  - do: hot-key
+    arg: settings default
+  - expect_state: { hot_keys.settings_keys: ⌥S }
+  # Leave General at its top: the next open of the same page keeps its scroll.
+  - do: settings
+    arg: general surfaces

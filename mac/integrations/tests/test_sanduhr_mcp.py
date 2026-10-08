@@ -546,7 +546,7 @@ class ActivityLevel(Base):
         self.assertEqual(p["tools_available"],
                          ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
                           "get_desk_messages", "propose_desk_messages", "propose_theme",
-                          "watch_start", "watch_update", "watch_end"])
+                          "watch_start", "watch_update", "watch_end", "propose_now_playing_looks"])
         self.assertFalse(p["watchers_allowed"])
         self.assertEqual(sorted(p["tools_not_on_mac"]), ["publish_usage"])
         text = json.dumps(p)
@@ -608,7 +608,7 @@ class Protocol(Base):
         names = [t["name"] for t in frames[1]["result"]["tools"]]
         self.assertEqual(names, ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
                                  "get_desk_messages", "propose_desk_messages", "propose_theme",
-                                 "watch_start", "watch_update", "watch_end"])
+                                 "watch_start", "watch_update", "watch_end", "propose_now_playing_looks"])
         for t in frames[1]["result"]["tools"]:
             if t["name"] == "propose_desk_messages":
                 # The one tool that asks for a change: not read-only, never destructive, no path.
@@ -626,6 +626,17 @@ class Protocol(Base):
                                  {"watch_start": ["link", "short", "title", "total", "work"],
                                   "watch_update": ["done", "id", "note", "state"],
                                   "watch_end": ["id", "note", "result"]}[t["name"]])
+                continue
+            if t["name"] == "propose_now_playing_looks":
+                # Item 65c: asks for a change, never destructive, no path, closed shapes.
+                self.assertFalse(t["annotations"]["readOnlyHint"])
+                self.assertFalse(t["annotations"]["destructiveHint"])
+                self.assertEqual(sorted(t["inputSchema"]["properties"]), ["looks"])
+                self.assertFalse(t["inputSchema"]["additionalProperties"])
+                item = t["inputSchema"]["properties"]["looks"]["items"]
+                self.assertFalse(item["additionalProperties"])
+                self.assertEqual(sorted(item["properties"]), sorted(mcp.LOOKS_FIELDS))
+                self.assertEqual(item["properties"]["font"]["enum"], mcp.FONT_STYLES.split(", "))
                 continue
             if t["name"] == "propose_theme":
                 # The Windows tool's inputs, no path.
@@ -731,8 +742,12 @@ class DeskMessages(Base):
         r = self.get()
         self.assertEqual(r["lines"], ["# header", "keep building.", "{ink:#fff} also plain", "Sun: {glow} rest."])
         self.assertEqual(r["today"], "{glow} rest.")
-        self.write_messages("Sun: rest.\n07-26: {write} today only.\n")
-        self.assertEqual(self.get()["today"], "{write} today only.")
+        self.assertEqual(r["today_special"], [])
+        # Item 69: a date line adds above the day's line; it no longer replaces it.
+        self.write_messages("Sun: rest.\n07-26: {write} today only.\n07-26: and Sam's birthday.\n")
+        r = self.get()
+        self.assertEqual(r["today"], "rest.")
+        self.assertEqual(r["today_special"], ["{write} today only.", "and Sam's birthday."])
         self.write_messages("Mon: monday.\na\nb\nc\n")
         # Plain pool, rotated by the day number like MessageEngine.pick.
         self.assertEqual(self.get()["today"], ["a", "b", "c"][NOW.date().toordinal() % 3])
@@ -749,6 +764,66 @@ class DeskMessages(Base):
         r = self.get()
         self.assertTrue(r["pinned"])
         self.assertEqual(r["today"], "{shimmer} pinned.")
+
+    def test_weekday_lines_rotate_by_week_and_mix(self):
+        # Item 69: seven Friday lines used to show the same one every Friday.
+        for n in range(1, 9):
+            text = "plain.\n" + "\n".join("Fri: f%d" % i for i in range(n))
+            fridays = [datetime(2026, 10, 9, 12) + timedelta(days=7 * i) for i in range(n)]
+            self.assertEqual({mcp.pick_desk_line(text, d, False) for d in fridays},
+                             {"f%d" % i for i in range(n)}, n)
+            hours = {mcp.pick_desk_line(text, datetime(2026, 10, 9, h), True) for h in range(24)}
+            self.assertEqual(hours, {"f%d" % i for i in range(n)}, n)
+        text = "a\nb\nFri: f\n"
+        fridays = [datetime(2026, 10, 9, 12) + timedelta(days=7 * i) for i in range(3)]
+        self.assertEqual({mcp.pick_desk_line(text, d, False) for d in fridays}, {"f"})
+        self.assertEqual({mcp.pick_desk_line(text, d, False, mix=True) for d in fridays}, {"f", "a", "b"})
+        self.write_messages("a\nb\nSun: s\n")
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 1, "pinned": False, "rotate": "daily", "mix_daily": True})
+        r = self.get()
+        self.assertTrue(r["mix_daily"])
+        self.assertEqual(r["today"], ["s", "a", "b"][(NOW.date().toordinal() // 7) % 3])
+
+    def test_more_than_three_for_a_date_take_turns_hourly(self):
+        for n in range(4, 9):
+            text = "keep.\n" + "\n".join("03-14: %d" % i for i in range(n))
+            seen = set()
+            for h in range(24):
+                special, usual = mcp.desk_today(text, datetime(2026, 3, 14, h), False)
+                self.assertEqual((len(special), len(set(special)), usual), (3, 3, "keep."))
+                seen.update(special)
+            self.assertEqual(seen, {str(i) for i in range(n)}, n)
+        self.assertEqual(mcp.desk_today("03-14: a\n03-14: b\n", datetime(2026, 3, 14, 9), False), (["a", "b"], None))
+
+    def test_a_pinned_line_keeps_special_days(self):
+        # NOW is 2026-07-26: a pinned line replaces the usual line; date lines still stack above it.
+        self.write_messages("keep.\nSun: rest.\n07-26: happy birthday, Sam.\n")
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 1, "pinned": True,
+                                                 "pinned_line": "Good vibes only", "rotate": "daily"})
+        r = self.get()
+        self.assertEqual((r["today"], r["today_special"]), ("Good vibes only", ["happy birthday, Sam."]))
+        self.write_messages("keep.\n" + "\n".join("07-26: b%d" % i for i in range(4)) + "\n")
+        r = self.get()
+        self.assertEqual(r["today"], "Good vibes only")
+        self.assertEqual(len(r["today_special"]), 3)
+        seen = set()
+        for h in range(24):
+            special, usual = mcp.desk_today("keep.\n" + "\n".join("07-26: b%d" % i for i in range(4)),
+                                            datetime(2026, 7, 26, h), False, pinned="Good vibes only")
+            self.assertEqual((len(special), usual), (3, "Good vibes only"))
+            seen.update(special)
+        self.assertEqual(seen, {"b0", "b1", "b2", "b3"})
+
+    def test_on_special_days_setting_is_reported(self):
+        r = self.get()
+        self.assertEqual((r["special_mode"], r["special_seconds"]), ("stack", 10))
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 1, "pinned": False, "rotate": "daily",
+                                                 "special_mode": "scroll", "special_seconds": 60})
+        r = self.get()
+        self.assertEqual((r["special_mode"], r["special_seconds"]), ("scroll", 60))
+        self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 1, "special_mode": "ticker", "special_seconds": 7})
+        r = self.get()
+        self.assertEqual((r["special_mode"], r["special_seconds"]), ("stack", 10))
 
     def test_unknown_state_schema_reads_as_defaults(self):
         self.fx.write_json(mcp.DESK_STATE_FILE, {"schema_version": 9, "pinned": True, "rotate": "hourly"})
@@ -772,8 +847,25 @@ class DeskMessages(Base):
         good = ["keep building.", "Mon: one thing at a time.", "10-31: {ink:#ff7518,#6b2fa0} {write} boo.",
                 "{ink:#ff2a6d,#05d9e8} {glow} hello", "{size:0.5}{noglow} small.", "{SHIMMER} loud", "# a note",
                 "", "Note: a colon in a plain line.", "02-29: leap.", "{ink:fff} three digits.", "x" * 120,
-                "hello {glow} mid-line braces are text", "ünïcödé ✨ fine."]
+                "hello {glow} mid-line braces are text", "ünïcödé ✨ fine.", "{sweep} {font:small-caps} hi.",
+                "{font:smallcaps} {sweep:20} hi.", "{FONT:Bold Italic} hi.", "{sweep:2} {font:fraktur} hi.",
+                "{sweep:3600}{font:double_struck} hi."]
         self.assertEqual(mcp.validate_desk_lines(good), [])
+
+    def test_font_and_sweep_tags(self):
+        effects, text, error = mcp.parse_effects("{sweep} {font:smallcaps} {ink:#fff} hi.")
+        self.assertIsNone(error)
+        self.assertEqual(text, "hi.")
+        self.assertEqual(effects, {"sweep": True, "font": "small-caps", "ink": ["#fff"]})
+        self.assertEqual(mcp.parse_effects("{sweep:20} x")[0], {"sweep": 20.0})
+        for name in mcp.FONT_STYLES.split(", "):
+            self.assertEqual(mcp.parse_effects("{font:%s} x" % name)[0], {"font": name})
+        # The names are the statusline's letter styles.
+        spec = importlib.util.spec_from_file_location("sanduhr_statusline_names", os.path.join(
+            os.path.dirname(HERE), "sanduhr_statusline.py"))
+        statusline = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(statusline)
+        self.assertEqual(set(mcp.FONT_STYLES.split(", ")), set(statusline.FONTS))
 
     def test_bad_lines_are_named(self):
         cases = {
@@ -796,6 +888,14 @@ class DeskMessages(Base):
             "{glow:yes} hi": "takes no value",
             "{glow hi": "not closed",
             "{glow} {write}": "no text",
+            "{font} hi": "needs a letter style",
+            "{font:outline} hi": "needs a letter style: bold, italic",
+            "{font:} hi": "needs a letter style",
+            "{sweep:1} hi": "from 2 to 3600",
+            "{sweep:3601} hi": "from 2 to 3600",
+            "{sweep:fast} hi": "from 2 to 3600",
+            "{sweep:} hi": "from 2 to 3600",
+            "{sweeps} hi": "unknown effect {sweeps}; known: ink, glow, noglow, size, write, shimmer, sweep, font",
             "\ud800 lone surrogate": "UTF-8",
         }
         for line, want in cases.items():
@@ -884,9 +984,20 @@ class DeskMessages(Base):
         tools = {t["name"]: t["description"] for t in mcp.TOOLS}
         for name in ("get_desk_messages", "propose_desk_messages"):
             for word in ("Mon:", "MM-DD", "# ", "rotate", "pinned", "{ink:", "{glow}", "{noglow}", "{size:",
-                         "{write}", "{shimmer}", "40 characters"):
+                         "{write}", "{shimmer}", "40 characters", "{sweep}", "{sweep:20}", "2 to 3600",
+                         "{font:small-caps}", "bold-italic", "double-struck", "fraktur", "Unicode",
+                         "skips {shimmer} and {sweep}"):
                 self.assertIn(word, tools[name], (name, word))
         self.assertIn("never writes messages.txt", tools["propose_desk_messages"])
+        # Item 69: special days add to the day; Claude learns the birthday form.
+        for name in ("get_desk_messages", "propose_desk_messages"):
+            for word in ("birthdays, anniversaries and holidays are date lines", "they add to it",
+                         "two birthdays on one date both show", "happy birthday, Sam.", "mix_daily",
+                         "date lines still stack above the pinned line", "On special days setting (special_mode)",
+                         "special_seconds"):
+                self.assertIn(word, tools[name], (name, word))
+        self.assertIn("today_special", tools["get_desk_messages"])
+        self.assertIn("use mode add with one date line each", tools["propose_desk_messages"])
 
 
 BUILTIN_THEMES = os.path.join(FIXTURES, "theme-builtins.json")
@@ -993,6 +1104,28 @@ class ThemeLint(unittest.TestCase):
             j = clean_theme()
             j[field] = value
             self.assertIn(field, fields(self.lint(j), "error"), (field, value))
+
+    def test_title_ink_and_style(self):
+        # Item 65d: a gradient and a letter style for the title.
+        j = dict(clean_theme(), title_ink=["#ffd6e7", "#f3e3ff", "#d6f6ff"], title_style="small-caps")
+        self.assertEqual(self.lint(j), [])
+        self.assertEqual(self.lint(dict(clean_theme(), title_ink=None, title_style=None)), [])
+        self.assertEqual(self.lint(dict(clean_theme(), title_style="SmallCaps")), [])
+        for field, value in (("title_ink", ["#ff2a6d"]), ("title_ink", ["#ff2a6d"] * 5), ("title_ink", "#ff2a6d"),
+                             ("title_ink", ["#ff2a6d", "#fff"]), ("title_ink", ["#ff2a6d", 3]),
+                             ("title_style", "comic"), ("title_style", 1)):
+            errs = [f for f in self.lint(dict(clean_theme(), **{field: value})) if f["level"] == "error"]
+            self.assertEqual([f["field"] for f in errs], [field], (field, value))
+        self.assertIn("bold, italic, bold-italic", next(
+            f["message"] for f in self.lint(dict(clean_theme(), title_style="comic"))))
+
+    def test_title_ink_contrast_is_checked_per_stop(self):
+        j = dict(clean_theme(), title_ink=["#ffffff", "#202020", "#e0e0ff", "#303030"])
+        warnings = [f for f in self.lint(j) if f["level"] == "warning"]
+        self.assertEqual([f["field"] for f in warnings], ["title_ink", "title_ink"])
+        self.assertTrue(warnings[0]["message"].startswith("title_ink stop 2 reads at "))
+        self.assertIn("(needs 4.5:1)", warnings[0]["message"])
+        self.assertTrue(warnings[1]["message"].startswith("title_ink stop 4 reads at "))
 
     def test_light_base_warns_and_still_passes(self):
         j = clean_theme()
@@ -1329,9 +1462,130 @@ class ProposeTheme(Base):
     def test_description_teaches_the_fields_and_the_rules(self):
         d = next(t["description"] for t in mcp.TOOLS if t["name"] == "propose_theme")
         for word in mcp.THEME_COLOR_FIELDS + ["name", "description", "glass_alpha", "border_alpha", "border_tint",
+                                             "title_ink", "title_style", "small-caps", "fraktur",
                                              "accent_bloom", "inner_highlight", "#rrggbb", "4.5:1", "pace_marker",
-                                             "Match Desk", "Save and Apply", "pending_approval", "applied", "saved",
+                                             "Match Desk", "Save & Apply", "pending_approval", "applied", "saved",
                                              "rejected", "queued", "renamed_from", "previous_key", "never writes"]:
+            self.assertIn(word, d, word)
+
+
+def look(**kw):
+    out = {"artist": "Kavinsky", "title": "Nightcall", "colors": ["#ff2a6d", "#d16ba5", "#05d9e8"],
+           "font": "small-caps", "mood": "neon night drive"}
+    out.update(kw)
+    return {k: v for k, v in out.items() if v is not None}
+
+
+class ProposeNowPlayingLooks(Base):
+    """propose_now_playing_looks (item 65c) on a temp folder; the app's answer is played by a fake
+    sleep. The reasons' wording is pinned here and in NowPlayingLookTests.swift."""
+
+    def propose(self, args, answer=None, wait=1.0):
+        ticks = [0.0]
+
+        def clock():
+            return ticks[0]
+
+        def sleep(seconds):
+            ticks[0] += seconds
+            if answer is None or not os.path.exists(self.paths.looks_request):
+                return
+            with open(self.paths.looks_request, encoding="utf-8") as f:
+                req = json.load(f)
+            res = answer(req)
+            if res is not None:
+                self.fx.write_json(mcp.LOOKS_RESULT_FILE, {"id": req["id"], "completed_at": iso(NOW), "result": res})
+
+        return mcp.build_propose_now_playing_looks(args, now=NOW, paths=self.paths, wait=wait, poll=0.25,
+                                                   sleep=sleep, clock=clock)
+
+    def test_file_names_and_limits_match_the_app(self):
+        self.assertEqual(self.paths.looks_request, os.path.join(self.fx.support, "now-playing-looks-request.json"))
+        self.assertEqual(self.paths.looks_result, os.path.join(self.fx.support, "now-playing-looks-result.json"))
+        self.assertEqual(mcp.LOOKS_FILE, "now-playing-looks.json")
+        self.assertEqual((mcp.LOOKS_MAX, mcp.LOOKS_MAX_ARTIST, mcp.LOOKS_MAX_TITLE, mcp.LOOKS_MAX_MOOD_WORDS,
+                          mcp.LOOKS_MAX_MOOD_CHARS, mcp.LOOKS_MIN_CONTRAST_ON_BLACK), (50, 100, 200, 3, 40, 3.0))
+
+    def test_the_request_file_and_a_pending_answer(self):
+        seen = []
+
+        def app(req):
+            seen.append(req)
+            return {"status": "pending_approval", "style_on": False, "extra": "dropped"}
+
+        r = self.propose({"looks": [look(colors=["#FF2A6D", "05D9E8", "#fd0"]), look(title=" Odd Look ", font="SmallCaps",
+                                                                                     mood=None)]}, app)
+        self.assertEqual((r["status"], r["style_on"], r["request_id"]), ("pending_approval", False, seen[0]["id"]))
+        self.assertNotIn("extra", r)
+        req = seen[0]
+        self.assertEqual(req["schema_version"], 1)
+        self.assertTrue(mcp.parse(req["requested_at"]))
+        self.assertEqual(req["looks"][0], {"artist": "Kavinsky", "title": "Nightcall",
+                                           "colors": ["#ff2a6d", "#05d9e8", "#ffdd00"], "font": "small-caps",
+                                           "mood": "neon night drive"})
+        self.assertEqual((req["looks"][1]["title"], req["looks"][1]["font"], req["looks"][1]["mood"]),
+                         ("Odd Look", "small-caps", None))
+        self.assertEqual(os.stat(self.paths.looks_request).st_mode & 0o777, 0o600)
+        self.assertFalse(os.path.exists(self.paths.looks_request + ".tmp"))
+        self.assertFalse(os.path.exists(os.path.join(self.fx.support, mcp.LOOKS_FILE)))   # never the saved looks
+
+    def test_applied_answers_pass_through(self):
+        r = self.propose({"looks": [look()]}, lambda req: {"status": "applied", "looks_saved": 1, "style_on": True})
+        self.assertEqual((r["status"], r["looks_saved"], r["style_on"]), ("applied", 1, True))
+
+    def test_bad_looks_are_named_and_write_nothing(self):
+        before = sorted(os.listdir(self.fx.support))
+        cases = [
+            ({}, ["looks must be a list of 1 to 50 looks"]),
+            ({"looks": []}, ["looks must be a list of 1 to 50 looks"]),
+            ({"looks": [look()] * 51}, ["looks must be a list of 1 to 50 looks"]),
+            ({"looks": [look()], "path": "/etc"}, ["unknown argument(s): path"]),
+            ({"looks": ["x"]}, ["look 1 must be an object with artist, title and colors"]),
+            ({"looks": [look(artist="")]}, ["look 1 artist must be one line of 1 to 100 characters"]),
+            ({"looks": [look(), look(title="a\nb")]}, ["look 2 title must be one line of 1 to 200 characters"]),
+            ({"looks": [look(colors=["#ff2a6d"])]},
+             ['look 1 colors must be 2 to 4 hex colors, like ["#ff2a6d", "#05d9e8"]']),
+            ({"looks": [look(colors=["#ff2a6d", "red"])]},
+             ['look 1 colors must be 2 to 4 hex colors, like ["#ff2a6d", "#05d9e8"]']),
+            ({"looks": [look(colors=["#ff2a6d", "#ff2a6d\n"])]},
+             ['look 1 colors must be 2 to 4 hex colors, like ["#ff2a6d", "#05d9e8"]']),
+            ({"looks": [look(colors=["#ff2a6d", "#202020"])]},
+             ["look 1 color #202020 is too dark for the black notch (1.3:1, needs 3.0:1)"]),
+            ({"looks": [look(font="comic")]},
+             ["look 1 font must be one of: bold, italic, bold-italic, sans, mono, double-struck, script, "
+              "fraktur, small-caps"]),
+            ({"looks": [look(mood="one two three four")]}, ["look 1 mood must be at most 3 words and 40 characters"]),
+            ({"looks": [look(mood="x" * 41)]}, ["look 1 mood must be at most 3 words and 40 characters"]),
+            ({"looks": [dict(look(), cover="x")]}, ["look 1 has an unknown field: cover"]),
+        ]
+        for args, reasons in cases:
+            r = self.propose(args)
+            self.assertEqual(r, {"status": "rejected", "reasons": reasons}, args)
+        self.assertEqual(sorted(os.listdir(self.fx.support)), before)
+
+    def test_silent_app_returns_queued(self):
+        r = self.propose({"looks": [look()]}, answer=lambda req: None)
+        self.assertEqual((r["status"], r["reason"]), ("queued", "app_not_responding"))
+        self.assertTrue(os.path.exists(self.paths.looks_request))
+
+    def test_over_stdio(self):
+        env = dict(os.environ, SANDUHR_SUPPORT_DIR=self.fx.support)
+        import subprocess
+        msgs = [{"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                 "params": {"name": "propose_now_playing_looks", "arguments": {"looks": [look(colors=["#000", "#111"])]}}}]
+        out = subprocess.run([sys.executable, SERVER], input="\n".join(json.dumps(m) for m in msgs) + "\n",
+                             capture_output=True, text=True, env=env, timeout=30)
+        self.assertEqual(out.stderr, "")
+        refused = json.loads(json.loads(out.stdout.splitlines()[0])["result"]["content"][0]["text"])
+        self.assertEqual(refused["status"], "rejected")
+        self.assertEqual(len(refused["reasons"]), 2)
+        self.assertFalse(os.path.exists(self.paths.looks_request))
+
+    def test_description_teaches_the_shape_and_the_rules(self):
+        d = next(t["description"] for t in mcp.TOOLS if t["name"] == "propose_now_playing_looks")
+        for word in ("artist", "title", "colors", "font", "mood", "3 words", "3:1", "black notch", "small-caps",
+                     "Style what's playing", "pending_approval", "applied", "rejected", "queued", "style_on",
+                     "never writes", "eight palettes"):
             self.assertIn(word, d, word)
 
 

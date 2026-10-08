@@ -419,7 +419,8 @@ struct DeskNowPlayingTests {
         #expect(DeskHitTest.hasMenu(hit))
         #expect(!DeskHitTest.isMeters(hit))
         #expect(DeskHitTest.hasMenu(meters))
-        #expect(!DeskHitTest.hasMenu(DeskElement(kind: .account, frame: .zero)))
+        // The account name opens the shared menu (item 60: it carries Arrange Desk…).
+        #expect(DeskHitTest.hasSharedMenu(DeskElement(kind: .account, frame: .zero)))
         #expect(!DeskHitTest.hasMenu(nil))
         #expect(DeskHitTest.priority.contains(.nowPlaying))
     }
@@ -483,8 +484,11 @@ struct NowPlayingPlacementTests {
         i.wingText = false
         i.chin = 0
         #expect(P.places(i).isEmpty)
-        // A corner the Desk does not know.
+        // A corner the Desk does not know puts it at its default (item 59): it shows there.
         i.layout = "nowPlaying:xx"
+        #expect(P.places(i) == [.desk])
+        // A widget word the Desk does not know places nothing.
+        i.layout = "nowplaying:bl"
         #expect(P.places(i).isEmpty)
     }
 
@@ -556,7 +560,10 @@ struct NowPlayingPlacementTests {
 
     @Test func theLayoutPickerKnowsTheElement() {
         #expect(DeskLayout.widgets.contains { $0.key == P.widget && $0.name == "Now playing" })
+        // Your order stays (item 59); the new piece goes before the first one listed after it.
         #expect(DeskLayout.placing(P.widget, in: "bl", layout: "meetings:bl meters:bl")
+                == "nowPlaying:bl meetings:bl meters:bl")
+        #expect(DeskLayout.placing(P.widget, in: "bl", layout: "meters:bl meetings:bl")
                 == "meters:bl nowPlaying:bl meetings:bl")
         #expect(DeskLayout.placing(P.widget, in: "", layout: "meters:bl nowPlaying:bl") == "meters:bl")
     }

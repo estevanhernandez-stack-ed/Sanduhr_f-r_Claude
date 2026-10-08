@@ -1,0 +1,35 @@
+{
+  "success": true,
+  "strict": false,
+  "target": "/fixture/mod/.claude-plugin/plugin.json",
+  "manifest": {
+    "file": "/fixture/mod/.claude-plugin/plugin.json",
+    "type": "plugin",
+    "errors": [],
+    "warnings": [],
+    "notes": [],
+    "gatingHooks": []
+  },
+  "contents": [
+    {
+      "file": "/fixture/mod/hooks/hooks.json",
+      "type": "hooks",
+      "errors": [],
+      "warnings": [],
+      "notes": [
+        "./r.ts hooks: tool.call, ui.render{component=Pane}",
+        "./r.ts gating hook without .catch: tool.call",
+        "./r.ts calls: $.fs.write, $.http.fetch, $.process.run, $.ui.status",
+        "./r.ts env reads: GITHUB_TOKEN, HOME"
+      ],
+      "gatingHooks": [
+        {
+          "module": "./r.ts",
+          "pattern": "tool.call",
+          "hook": "tool.call",
+          "hasCatch": false
+        }
+      ]
+    }
+  ]
+}

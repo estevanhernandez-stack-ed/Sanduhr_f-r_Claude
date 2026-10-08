@@ -109,7 +109,7 @@ enum AlertRules {
             alerts.append(AlertDecision(kind: kind, tier: tier, title: title, body: body, onceKey: key))
         }
 
-        // A limit hidden in Settings, Desk, Meters never alerts (MeterVisibility).
+        // A limit hidden in Settings, Alerts, Each limit never alerts (MeterVisibility).
         let shown = MeterVisibility.visible(usage, hidden: hidden) ?? usage
         for tier in Tier.allCases {
             guard let t = shown.tiers[tier], let util = t.utilization else { continue }

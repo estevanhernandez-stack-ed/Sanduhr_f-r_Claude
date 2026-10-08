@@ -6,6 +6,38 @@
         <description>Updates for Sanduhr für Claude</description>
         <language>en</language>
         <item>
+            <title>2.11.0</title>
+            <pubDate>Thu, 08 Oct 2026 20:15:11 -0000</pubDate>
+            <sparkle:version>19</sparkle:version>
+            <sparkle:shortVersionString>2.11.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/download/v2.11.0-mac/Sanduhr-2.11.0.dmg" length="10007153" type="application/octet-stream" sparkle:edSignature="vn8v5BbKacyQM73dmJY4SzhY72d2bu+yF/uS4YGe7cLE0dEmtvW2v8z6q3NT/OhlkhMPufk1xEvGcz+r2uO3AQ=="/>
+        </item>
+        <item>
+            <title>2.10.1</title>
+            <pubDate>Thu, 08 Oct 2026 03:47:00 -0000</pubDate>
+            <sparkle:version>18</sparkle:version>
+            <sparkle:shortVersionString>2.10.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/download/v2.10.1-mac/Sanduhr-2.10.1.dmg" length="9491016" type="application/octet-stream" sparkle:edSignature="mtSKesMeBtHBBY8WVczKu6v9iHQrVMXaorat5tArAT8J5l4PGx94yuTbB1Mi6YZVsjNh27v1wZNdF6OX6dlvCg=="/>
+        </item>
+        <item>
+            <title>2.10.0</title>
+            <pubDate>Thu, 08 Oct 2026 02:08:46 -0000</pubDate>
+            <sparkle:version>17</sparkle:version>
+            <sparkle:shortVersionString>2.10.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/download/v2.10.0-mac/Sanduhr-2.10.0.dmg" length="9491428" type="application/octet-stream" sparkle:edSignature="kBPsxJ8Om1vn0T2hgdhVHq1PQRz1BPoPLGaO7aJN/INNz46e+B63ZJYMTuqz5HEk9T1mTDYkNY9OjoKAzstNDQ=="/>
+        </item>
+        <item>
+            <title>2.9.0</title>
+            <pubDate>Wed, 07 Oct 2026 21:44:49 -0000</pubDate>
+            <sparkle:version>16</sparkle:version>
+            <sparkle:shortVersionString>2.9.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/download/v2.9.0-mac/Sanduhr-2.9.0.dmg" length="8987201" type="application/octet-stream" sparkle:edSignature="1VS106NAxGD9R0sdBVFkKE8QW/sjziDUgRtDpMaTSaRxa7oHV50jVupmtBSpIzS72ArUrigNlQDeCQOfxvk6Ag=="/>
+        </item>
+        <item>
             <title>2.8.0</title>
             <pubDate>Wed, 07 Oct 2026 14:40:48 -0000</pubDate>
             <sparkle:version>15</sparkle:version>

@@ -201,20 +201,23 @@ struct StatuslinePicks: Equatable, Sendable {
 }
 
 /// The picks a combined statusline carries (item 63b): theirs (nil keeps every segment) and
-/// Sanduhr's own (nil: the default three).
+/// Sanduhr's own (nil: the default three). `band` (item 65f, `--band`) moves Sanduhr's meters
+/// out of the statusline into the meters mod's animated band; context and model stay.
 struct StatuslineSelection: Equatable, Sendable {
     var theirs: StatuslinePicks?
     var mine: [SanduhrSegment]?
+    var band = false
 
-    init(theirs: StatuslinePicks? = nil, mine: [SanduhrSegment]? = nil) {
+    init(theirs: StatuslinePicks? = nil, mine: [SanduhrSegment]? = nil, band: Bool = false) {
         self.theirs = theirs
         self.mine = mine
+        self.band = band
     }
 }
 
 /// Sanduhr's statusline command taken apart: `<python> <…/sanduhr_statusline.py>`, optionally
 /// followed by exactly `--chain-b64 <base64> --join line|same [--padding <n>]
-/// [--keep-theirs-b64 <base64>] [--mine <list>]`.
+/// [--keep-theirs-b64 <base64>] [--mine <list>] [--band]`.
 struct StatuslineCommand: Equatable, Sendable {
     /// `<python> <script>`, as written.
     var base: String
@@ -246,11 +249,13 @@ extension IntegrationInstaller {
         return c
     }
 
-    /// `--keep-theirs-b64 <b64> --mine <list>` for `selection`, each left out when it is the default.
+    /// `--keep-theirs-b64 <b64> --mine <list> --band` for `selection`, each left out when it is
+    /// the default.
     static func pickFlags(_ selection: StatuslineSelection) -> [String] {
         var out: [String] = []
         if let theirs = selection.theirs { out += ["--keep-theirs-b64", theirs.base64] }
         if let mine = selection.mine, !mine.isEmpty { out += ["--mine", SanduhrSegment.list(mine)] }
+        if selection.band { out.append("--band") }
         return out
     }
 
@@ -273,6 +278,10 @@ extension IntegrationInstaller {
         if isPlainStatusline(c) { return StatuslineCommand(base: c) }
         var words = c.components(separatedBy: " ")
         var selection = StatuslineSelection()
+        if words.last == "--band" {
+            selection.band = true
+            words.removeLast()
+        }
         if words.count >= 2, words[words.count - 2] == "--mine" {
             guard let mine = SanduhrSegment.parseList(words[words.count - 1]) else { return nil }
             selection.mine = mine
@@ -370,6 +379,12 @@ extension IntegrationInstaller {
     func inspectArguments(chain: String) -> [String]? {
         guard let script = previewScript else { return nil }
         return [script, "--inspect-b64", Data(chain.utf8).base64EncodedString()]
+    }
+
+    /// The arguments that print Sanduhr's own statusline, alone, as Claude Code runs it, for
+    /// Settings, Integrations' preview (item 68). Nil without the script.
+    func sampleArguments() -> [String]? {
+        previewScript.map { [$0] }
     }
 
     /// The arguments that print what the combined line would, from the user's output `theirs`

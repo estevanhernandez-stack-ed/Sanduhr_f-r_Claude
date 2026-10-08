@@ -20,6 +20,9 @@ tools the same way on either machine:
   watch_start, watch_update, watch_end
                              a live watcher card on the notch or the Desk for work in flight (a CI
                              run, a deploy), when the user lets agents show watchers
+  propose_now_playing_looks  suggests a gradient and letter style per song for now playing; Sanduhr
+                             asks the user (or saves them when the user lets Claude style songs
+                             directly)
 
 What each tool may read is decided per account in Sanduhr (Settings, Accounts, Data, Share
 with Claude) and handed over in ~/Library/Application Support/Sanduhr/mcp-access.json. No
@@ -30,14 +33,15 @@ names as the account chose (Hidden returns the record's short code, never a name
 
 Reads snapshot.json, mcp-access.json, the history files and vault folders it names, the
 session logs under a folder it names, Desk's messages.txt and desk-messages-state.json (the pin
-and rotation, written by Sanduhr). Desk messages are not gated by Share with Claude: they are on
+and rotation, written by Sanduhr). Desk messages are not gated by Share with your agents: they are on
 the desktop already, and a proposal only asks (Sanduhr checks it again and the user approves,
 unless they chose to let Claude change the messages directly). Never reads Sanduhr's settings,
 the Keychain or account names; never calls claude.ai or anything else on the network; never
 logs. The files it writes are desk-messages-request.json (propose_desk_messages),
-theme-request.json (propose_theme) and watch-request-<ms>-<seq>-<id>.json (the watch tools, only
-while watchers.json, written by Sanduhr, says agents may show watchers), atomically and
-owner-only; it never writes messages.txt or a theme. No tool takes a path. Failures are typed results (status/reason/remedy), never protocol
+theme-request.json (propose_theme), now-playing-looks-request.json (propose_now_playing_looks) and
+watch-request-<ms>-<seq>-<id>.json (the watch tools, only while watchers.json, written by Sanduhr,
+says agents may show watchers), atomically and owner-only; it never writes messages.txt, a theme or
+the saved looks. No tool takes a path. Failures are typed results (status/reason/remedy), never protocol
 errors. Python 3.9 standard library only.
 
 publish_usage is dropped on the Mac (nothing leaves this Mac).
@@ -97,43 +101,65 @@ REMEDY_ERROR = {
 REMEDY_NETWORK = "Sanduhr's last fetch failed (network). Tiers below are last-good, not current."
 SETTINGS_PLACE = "Sanduhr's Settings > Accounts > Data"
 REMEDY_NOT_SHARED = {
-    "missing": "Nothing is shared with Claude. Choose Share with Claude for an account in " + SETTINGS_PLACE + " (Sanduhr writes the choices for this server to mcp-access.json).",
-    "unreadable": "Sanduhr's sharing file (mcp-access.json) could not be read, so nothing is shared. Change any Share with Claude choice in " + SETTINGS_PLACE + " to rewrite it.",
+    "missing": "Nothing is shared with your agents. Choose Share with your agents for an account in " + SETTINGS_PLACE + " (Sanduhr writes the choices for this server to mcp-access.json).",
+    "unreadable": "Sanduhr's sharing file (mcp-access.json) could not be read, so nothing is shared. Change any Share with your agents choice in " + SETTINGS_PLACE + " to rewrite it.",
     "schema_unsupported": "Sanduhr's sharing file is newer than this server understands, so nothing is shared. Update the Sanduhr integrations (bash mac/integrations/install.sh).",
-    "none": "No account is shared with Claude. Choose Share with Claude for an account in " + SETTINGS_PLACE + ".",
+    "none": "No account is shared with your agents. Choose Share with your agents for an account in " + SETTINGS_PLACE + ".",
 }
 REMEDY_ACTIVE_NOT_SHARED = (
-    "The account Sanduhr shows is not shared with Claude. Set its Share with Claude to Meters "
+    "The account Sanduhr shows is not shared with your agents. Set its Share with your agents to Meters "
     "(or Meters and activity) in " + SETTINGS_PLACE + ".")
 REMEDY_NO_ACTIVITY = (
     "No account shares Claude Code activity from a folder Sanduhr reads. In " + SETTINGS_PLACE +
     ": link the account's Claude Code folder, set Claude Code activity to Live only or Keep a "
-    "record, and Share with Claude to Meters and activity.")
+    "record, and Share with your agents to Meters and activity.")
 
 DESK_SYNTAX = (
     "messages.txt syntax, one line each: a plain line shows on any day; 'Mon: text' only on that "
     "weekday (Mon Tue Wed Thu Fri Sat Sun, exactly so); '10-31: text' only on that date (MM-DD); "
-    "'# text' is a comment and blank lines are ignored. The most specific pool that has lines wins "
-    "(today's date, else today's weekday, else the plain lines); within it Desk rotates once a day "
-    "or once an hour (rotate, the user's choice), steady in between. Pinning one line is a user "
-    "setting (pinned): while pinned the list is not shown, so say so before proposing. ")
+    "'# text' is a comment and blank lines are ignored. Each day the Desk shows one usual line: "
+    "today's weekday lines if there are any (they replace the plain lines that day, unless the "
+    "user's mix_daily switch is on, which lets the plain lines take turns with them), else the "
+    "plain lines; it rotates through them once a day (a weekday's lines once a week) or once an "
+    "hour (rotate, the user's choice), steady in between. Date lines are special days: they do not "
+    "replace the usual line, they add to it, drawn above it, and every line for that date shows "
+    "(two birthdays on one date both show; more than 3 take turns hourly, 3 at a time). So "
+    "birthdays, anniversaries and holidays are date lines, one per person or occasion, short and "
+    "friendly, like '03-14: {ink:#ff7e5f,#feb47b} happy birthday, Sam.'; the user's everyday line "
+    "still shows under them. Pinning one line is a user setting (pinned): the pinned line replaces "
+    "the usual line every day, so weekday and plain lines don't show while it is pinned (say so "
+    "before proposing them), but date lines still stack above the pinned line, so birthdays and "
+    "holidays show either way. The user's On special days setting (special_mode) decides how the date's "
+    "lines share the Desk with the usual line: stack (all at once, the date's lines on top), turns "
+    "(one at a time, crossfading) or scroll (one at a time, gliding up like a slow ticker), each "
+    "line shown for special_seconds. ")
 DESK_EFFECTS = (
     "Effects: tags at the start of the text, after any prefix, in any order, each in braces: "
     "{ink:#ff2a6d,#05d9e8} this line's ink, 1 to 4 hex colors (2 or more make a left-to-right "
     "gradient); {glow} / {noglow} turn the soft glow on or off for this line; {size:1.3} scales "
     "the line from 0.5 to 2 times the Desk's message size; {write} draws the line in, left to right "
     "like handwriting, once when it first appears; {shimmer} sends a slow light sweep across it "
-    "every few seconds. Examples: '{ink:#ffd08a} showtime.', 'Fri: {ink:#ff2a6d,#05d9e8} {glow} "
+    "every few seconds; {sweep} runs a three-character light across the line that brightens it "
+    "toward white, once when the line appears, and {sweep:20} every 20 seconds (2 to 3600); "
+    "{font:small-caps} draws the line in a letter style: bold, italic, bold-italic and small-caps "
+    "in the Desk's own handwriting (its Bold face, a slant, capitals at x-height size), sans, mono, "
+    "double-struck, script and fraktur as Unicode math letters (A to Z, a to z and, where the "
+    "style has them, digits; accents and punctuation stay as written) in the system font. "
+    "Examples: '{ink:#ffd08a} showtime.', 'Fri: {ink:#ff2a6d,#05d9e8} {glow} "
     "ship it.', '10-31: {ink:#ff7518,#6b2fa0} {write} happy halloween.', '{size:0.8} {noglow} "
-    "breathe.'. Good taste: short lines (handwriting reads best under about 40 characters, two "
-    "lines at most on screen), lowercase and a period suit the hand, {write} and {shimmer} "
-    "sparingly (a few lines, not every line), gradients with 2 or 3 colors that sit near each "
-    "other, sizes near 1. Reduce Motion shows {write} at once and skips {shimmer}. ")
+    "breathe.', '{font:small-caps} {sweep} showtime.', '{font:script} {sweep:30} good morning.'. "
+    "Good taste: short lines (handwriting reads best under about 40 characters, two "
+    "lines at most on screen), lowercase and a period suit the hand, {write}, {shimmer} and {sweep} "
+    "sparingly (a few lines, not every line, and one of them per line), {font:...} on short "
+    "lines, gradients with 2 or 3 colors that sit near each other, sizes near 1. Reduce Motion "
+    "shows {write} at once and skips {shimmer} and {sweep}. ")
 DESK_GUIDE_READ = (
     "Read the user's Desk messages: the handwritten line Sanduhr draws on the macOS desktop, picked "
     "from ~/Library/Application Support/Desk/messages.txt. Returns every raw line of the file "
-    "(comments and effects included), whether one line is pinned, the rotation (daily or hourly) "
-    "and today: the raw line the Desk shows now. Call this before propose_desk_messages to match "
+    "(comments and effects included), whether one line is pinned, the rotation (daily or hourly), "
+    "mix_daily (whether plain lines take turns with a weekday's own lines), "
+    "today: the usual raw line the Desk shows now, and today_special: the date lines it shows above "
+    "it today (empty on most days). Call this before propose_desk_messages to match "
     "the user's voice and to avoid repeats. " + DESK_SYNTAX + DESK_EFFECTS)
 DESK_GUIDE_PROPOSE = (
     "Suggest lines for the user's Desk messages. Sanduhr checks them and, unless the user lets "
@@ -142,8 +168,10 @@ DESK_GUIDE_PROPOSE = (
     "comes with reasons to fix. This server never writes messages.txt. Limits: 1 to 60 lines, "
     "120 characters each, no control characters or line breaks inside a line, at least one line "
     "that is not a comment; prefixes and effects must parse. mode add appends (default), replace "
-    "swaps the whole list (the user's previous list is kept as messages.txt.previous). Read the "
-    "current list first with get_desk_messages. " + DESK_SYNTAX + DESK_EFFECTS)
+    "swaps the whole list (the user's previous list is kept as messages.txt.previous); to add "
+    "birthdays, anniversaries or holidays use mode add with one date line each (MM-DD:), never "
+    "replace, so the user's own lines stay. Read the current list first with get_desk_messages. "
+    + DESK_SYNTAX + DESK_EFFECTS)
 
 THEME_GUIDE = (
     "Give the Sanduhr widget a new color theme. Call when the user asks for a theme, a new look, or "
@@ -162,8 +190,12 @@ THEME_GUIDE = (
     "({blur: 0 to 20, alpha: 0 to 1}, 3 to 8 and 0.25 to 0.65 read well), inner_highlight "
     "({color: '#rrggbb', alpha: 0.15 to 0.30} or null), card_corner_radius (0 to 24, default 10), "
     "breath_period_ms (500 to 20000, the bar's slow breathing, default 2800), ghost_alpha (0 to 1, "
-    "the pace ghost tick), opts_out_of_mica (true makes the cards opaque; then set glass_alpha 1) "
-    "and monospace_font (any string gives monospaced numbers). What makes a good theme, measured "
+    "the pace ghost tick), opts_out_of_mica (true makes the cards opaque; then set glass_alpha 1), "
+    "monospace_font (any string gives monospaced numbers), and the title's text style: title_ink (2 to "
+    "4 '#rrggbb' colors, the widget title's gradient left to right; each stop needs 4.5:1 on the card "
+    "like text) and title_style (its letters: bold, italic, bold-italic and small-caps in the widget "
+    "font, sans, mono, double-struck, script and fraktur as Unicode letters), so a synthwave theme can "
+    "carry its text too. What makes a good theme, measured "
     "by the lint: a dark base (bg, glass and glass_on_mica luminance under 0.25: light glass does "
     "not layer); text at 4.5:1 or better on the card (glass_on_mica at glass_alpha over a mid-gray "
     "desktop) and text_secondary at 3:1; the text ramp one hue at decreasing luminance; one accent "
@@ -176,7 +208,7 @@ THEME_GUIDE = (
     "as one desktop, and Match Desk itself cannot be replaced. A theme is checked here first: "
     "status rejected with findings (level, field, message) means fix the named fields and call "
     "again, nothing was written; warnings ride along with a theme that goes through. Then Sanduhr "
-    "asks the user, who sees a preview card with the description and chooses Save, Save and Apply "
+    "asks the user, who sees a preview card with the description and chooses Save, Save & Apply "
     "or Dismiss: pending_approval means the user decides (the result arrives later; do not "
     "propose the same theme again). When the user lets Claude change themes directly, Sanduhr saves "
     "it to its themes folder and applies it at once (apply: false saves without switching): "
@@ -215,6 +247,24 @@ WATCH_ANNOTATIONS = {"readOnlyHint": False, "destructiveHint": False, "idempoten
                      "openWorldHint": False}
 WATCH_ID_SCHEMA = {"type": "string", "pattern": "^w[0-9a-f]{12}$", "description": "The id watch_start returned."}
 WATCH_NOTE_SCHEMA = {"type": "string", "maxLength": 140, "description": "One line for the user, up to 140 characters."}
+
+LOOKS_GUIDE = (
+    "Suggest a look for songs the user plays: a gradient and a letter style per song, drawn on the "
+    "now playing line on the user's notch and Desk while Sanduhr's Style what's playing is on "
+    "(Settings, Desk, Now Playing). Until a song has a look it wears one picked from its name out of "
+    "eight palettes. Pass looks: 1 to 50 of {artist, title, colors, font, mood}: artist and title "
+    "exactly as the player shows them (matched ignoring case and extra spaces), colors 2 to 4 hex "
+    "colors left to right (each must read on the black notch: 3:1 or better against black, so no "
+    "dark shades), font one letter style (bold, italic, bold-italic, small-caps drawn in the user's "
+    "handwriting font; sans, mono, double-struck, script, fraktur as Unicode letters; omit for plain), "
+    "mood up to 3 words for the user ('neon night drive'). Pick songs you know the user plays (they "
+    "said so, or ask them); a look should feel like the song: its era, its cover, its energy. "
+    "Sanduhr checks the looks again and, unless the user lets Claude style songs directly, shows "
+    "them as a suggestion to Save or Dismiss: pending_approval means the user decides, applied "
+    "means they are saved (looks_saved), rejected comes with reasons. style_on says whether Style "
+    "what's playing is on; when it is false, tell the user where to switch it on. A saved look "
+    "replaces an older one for the same song. queued means Sanduhr did not answer: it is not "
+    "running. This server never writes the saved looks and never reads what is playing.")
 
 READ_ONLY = {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False}
 NO_ARGS = {"type": "object", "properties": {}, "additionalProperties": False}
@@ -394,6 +444,39 @@ TOOLS = [
         },
         "annotations": WATCH_ANNOTATIONS,
     },
+    {
+        "name": "propose_now_playing_looks",
+        "description": LOOKS_GUIDE,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "looks": {
+                    "type": "array", "minItems": 1, "maxItems": 50,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "artist": {"type": "string", "maxLength": 100},
+                            "title": {"type": "string", "maxLength": 200},
+                            "colors": {"type": "array", "minItems": 2, "maxItems": 4,
+                                       "items": {"type": "string", "pattern": "^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"},
+                                       "description": "2 to 4 hex colors, left to right, each 3:1 or better on black."},
+                            "font": {"type": "string",
+                                     "enum": ["bold", "italic", "bold-italic", "sans", "mono", "double-struck",
+                                              "script", "fraktur", "small-caps"]},
+                            "mood": {"type": "string", "maxLength": 40, "description": "Up to 3 words."},
+                        },
+                        "required": ["artist", "title", "colors"],
+                        "additionalProperties": False,
+                    },
+                    "description": "One look per song.",
+                },
+            },
+            "required": ["looks"],
+            "additionalProperties": False,
+        },
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True,
+                        "openWorldHint": False},
+    },
 ]
 TOOL_NAMES = [t["name"] for t in TOOLS]
 # The Desk messages handoff (item 54). The app mirrors these names (DeskMessageHandoff); a test on
@@ -418,6 +501,19 @@ THEME_WAIT_SECONDS = 10.0
 THEME_MAX_BYTES = 16 * 1024
 # The widget's compiled-in themes (ThemeRegistry.builtIn): a proposal never takes their key.
 BUILT_IN_THEME_IDS = ["obsidian", "aurora", "ember", "mint", "626-labs", "matrix", "blueprint", "match-desk"]
+# The now playing looks handoff (item 65c). The app mirrors these names and limits
+# (NowPlayingLookProposal); a test on each side pins them.
+LOOKS_REQUEST_FILE = "now-playing-looks-request.json"
+LOOKS_RESULT_FILE = "now-playing-looks-result.json"
+LOOKS_FILE = "now-playing-looks.json"
+LOOKS_MAX = 50
+LOOKS_MAX_ARTIST = 100
+LOOKS_MAX_TITLE = 200
+LOOKS_MAX_MOOD_WORDS = 3
+LOOKS_MAX_MOOD_CHARS = 40
+LOOKS_MIN_CONTRAST_ON_BLACK = 3.0
+LOOKS_FIELDS = ("artist", "title", "colors", "font", "mood")
+LOOKS_WAIT_SECONDS = 10.0
 # The watchers handoff (item 66). The app mirrors these names (WatcherStore); a test on each side
 # pins them.
 WATCH_SWITCH_FILE = "watchers.json"
@@ -451,6 +547,8 @@ class Paths:
         self.theme_request = os.path.join(self.support_dir, THEME_REQUEST_FILE)
         self.theme_result = os.path.join(self.support_dir, THEME_RESULT_FILE)
         self.watch_switch = os.path.join(self.support_dir, WATCH_SWITCH_FILE)
+        self.looks_request = os.path.join(self.support_dir, LOOKS_REQUEST_FILE)
+        self.looks_result = os.path.join(self.support_dir, LOOKS_RESULT_FILE)
 
     def history_file(self, name):
         return os.path.join(self.support_dir, name)
@@ -1186,7 +1284,11 @@ DATE_TAG_RE = re.compile(r"^\d{2}-\d{2}$")
 DATE_LIKE_RE = re.compile(r"^\d{1,2}-\d{1,2}$")
 HEX_RE = re.compile(r"^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 SIZE_RE = re.compile(r"^\d+(?:\.\d+)?$")
-EFFECT_NAMES = "ink, glow, noglow, size, write, shimmer"
+EFFECT_NAMES = "ink, glow, noglow, size, write, shimmer, sweep, font"
+# {font:...}'s letter styles, the statusline's names (sanduhr_statusline.py FONTS), in the app's order.
+FONT_STYLES = "bold, italic, bold-italic, sans, mono, double-struck, script, fraktur, small-caps"
+# {sweep:<seconds>}'s period, inclusive.
+SWEEP_PERIOD = (2, 3600)
 DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 ROTATIONS = ("daily", "hourly")
 
@@ -1233,7 +1335,32 @@ def parse_effect(tag):
         if not sep or not SIZE_RE.match(value) or not 0.5 <= float(value) <= 2:
             return "{size:...} needs a number from 0.5 to 2, like {size:1.3}"
         return name, float(value)
+    if name == "font":
+        style = font_style(value) if sep else None
+        if style is None:
+            return "{font:...} needs a letter style: %s" % FONT_STYLES
+        return name, style
+    if name == "sweep":
+        if not sep:
+            return name, None
+        if not SIZE_RE.match(value) or not SWEEP_PERIOD[0] <= float(value) <= SWEEP_PERIOD[1]:
+            return "{sweep:...} takes a period in seconds from 2 to 3600, like {sweep:20}"
+        return name, float(value)
     return "unknown effect {%s}; known: %s" % (name[:20], EFFECT_NAMES)
+
+
+def _style_key(s):
+    return "".join(c for c in s.lower() if c not in " -_")
+
+
+def font_style(value):
+    """The letter style a {font:...} value names (case, spaces, hyphens and underscores
+    ignored, so smallcaps is small-caps), or None."""
+    key = _style_key(value)
+    for name in FONT_STYLES.split(", "):
+        if _style_key(name) == key:
+            return name
+    return None
 
 
 def parse_effects(body):
@@ -1311,8 +1438,17 @@ def validate_desk_lines(lines):
     return reasons[:20]
 
 
-def pick_desk_line(text, now, hourly):
-    """MessageEngine.pick: the line Desk shows at `now` (local time), raw, or None."""
+DESK_MAX_SPECIAL = 3
+DESK_SPECIAL_MODES = ("stack", "turns", "scroll")
+DESK_SPECIAL_SECONDS = (5, 10, 30, 60, 300)
+
+
+def desk_today(text, now, hourly, mix=False, pinned=None):
+    """MessageEngine.today: (special, usual) at `now` (local time), raw bodies. A pinned line is the
+    usual line; the date's lines still stack above it. Otherwise the usual line is
+    today's weekday pool if it has lines (with the plain lines too when `mix`), else the plain
+    pool; plain rotates by day, a weekday pool by week. Every line for today's date is special,
+    up to 3; more take turns hourly, 3 at a time."""
     today = now.strftime("%m-%d")
     weekday = WEEKDAYS[(now.isoweekday()) % 7]
     dated, daily, plain = [], [], []
@@ -1330,18 +1466,37 @@ def pick_desk_line(text, now, hourly):
                 daily.append(body)
             continue
         plain.append(line)
-    pool = dated or daily or plain
-    if not pool:
-        return None
     day_index = now.date().toordinal()
-    slot = day_index * 24 + now.hour if hourly else day_index
-    return pool[slot % len(pool)]
+
+    def turn(pool, step):
+        if not pool:
+            return None
+        slot = step * 24 + now.hour if hourly else step
+        return pool[slot % len(pool)]
+
+    if pinned:
+        usual = pinned
+    elif daily:
+        usual = turn(daily + plain if mix else daily, day_index // 7)
+    else:
+        usual = turn(plain, day_index)
+    special = dated
+    if len(dated) > DESK_MAX_SPECIAL:
+        start = ((now.year * 24 + now.hour) * DESK_MAX_SPECIAL) % len(dated)
+        special = [dated[(start + i) % len(dated)] for i in range(DESK_MAX_SPECIAL)]
+    return special, usual
+
+
+def pick_desk_line(text, now, hourly, mix=False):
+    """MessageEngine.pick: the usual line Desk shows at `now` (local time), raw, or None."""
+    return desk_today(text, now, hourly, mix)[1]
 
 
 def read_desk_state(paths):
-    """The app's note of the user's settings (pinned, rotation), or the defaults."""
+    """The app's note of the user's settings (pinned, rotation, mix_daily), or the defaults."""
     doc = read_json(paths.desk_state)
-    state = {"known": False, "pinned": False, "pinned_line": None, "rotate": "daily"}
+    state = {"known": False, "pinned": False, "pinned_line": None, "rotate": "daily", "mix_daily": False,
+             "special_mode": "stack", "special_seconds": 10}
     if isinstance(doc, dict) and doc.get("schema_version") == 1:
         state["known"] = True
         state["pinned"] = doc.get("pinned") is True
@@ -1349,6 +1504,11 @@ def read_desk_state(paths):
         state["pinned_line"] = line if state["pinned"] and isinstance(line, str) else None
         if doc.get("rotate") in ROTATIONS:
             state["rotate"] = doc["rotate"]
+        state["mix_daily"] = doc.get("mix_daily") is True
+        if doc.get("special_mode") in DESK_SPECIAL_MODES:
+            state["special_mode"] = doc["special_mode"]
+        if doc.get("special_seconds") in DESK_SPECIAL_SECONDS:
+            state["special_seconds"] = doc["special_seconds"]
     return state
 
 
@@ -1357,7 +1517,8 @@ def build_desk_messages(now=None, paths=None):
     paths = paths or Paths()
     state = read_desk_state(paths)
     out = {"status": "ok", "file_found": False, "lines": [], "pinned": state["pinned"],
-           "rotate": state["rotate"], "today": None,
+           "rotate": state["rotate"], "mix_daily": state["mix_daily"],
+           "special_mode": state["special_mode"], "special_seconds": state["special_seconds"], "today": None, "today_special": [],
            "limits": {"lines_per_proposal": DESK_MAX_LINES, "characters_per_line": DESK_MAX_LINE_CHARS}}
     if not state["known"]:
         out["settings_note"] = "Sanduhr has not reported the pin and rotation yet; shown as the defaults."
@@ -1380,11 +1541,9 @@ def build_desk_messages(now=None, paths=None):
         lines.pop()
     out["file_found"] = True
     out["lines"] = lines
-    if state["pinned"]:
-        out["today"] = state["pinned_line"]
-    else:
-        local = now.astimezone()
-        out["today"] = pick_desk_line(text, local, state["rotate"] == "hourly")
+    local = now.astimezone()
+    out["today_special"], out["today"] = desk_today(text, local, state["rotate"] == "hourly", state["mix_daily"],
+                                                    pinned=state["pinned_line"] if state["pinned"] else None)
     return out
 
 
@@ -1567,6 +1726,14 @@ def is_number(v):
     return isinstance(v, (int, float)) and not isinstance(v, bool)
 
 
+def title_ink(v):
+    """title_ink's stops as (r, g, b), or None unless it is 2 to 4 '#rrggbb' strings."""
+    if not isinstance(v, list) or not 2 <= len(v) <= 4:
+        return None
+    stops = [theme_hex(c) for c in v]
+    return None if any(c is None for c in stops) else stops
+
+
 def lint_theme(data):
     """Findings for a theme dict: [{level, field, message}]. Errors block it; warnings ride along."""
     findings = []
@@ -1656,6 +1823,12 @@ def lint_theme(data):
     if oom is not None and not isinstance(oom, bool):
         err("opts_out_of_mica", "opts_out_of_mica must be true or false, got %s." % describe_json(oom))
     opts_out = oom is True
+    # Text style (item 65d).
+    if data.get("title_ink") is not None and title_ink(data["title_ink"]) is None:
+        err("title_ink", "title_ink must be 2 to 4 #rrggbb colors (the title's gradient, left to right), or null.")
+    ts = data.get("title_style")
+    if ts is not None and (not isinstance(ts, str) or font_style(ts) is None):
+        err("title_style", "title_style must be one of %s, or null." % FONT_STYLES)
 
     if any(f["level"] == "error" for f in findings):
         return findings
@@ -1676,6 +1849,11 @@ def lint_theme(data):
     if ratio2 < THEME_TEXT_SECONDARY_CONTRAST_MIN:
         warn("text_secondary", "text_secondary reads at %s:1 on the card (needs %s:1)."
              % (fmt(ratio2, 1), fmt(THEME_TEXT_SECONDARY_CONTRAST_MIN, 1)))
+    for i, stop in enumerate(title_ink(data.get("title_ink")) or []):
+        r = contrast(luminance(stop), card_l)
+        if r < THEME_TEXT_CONTRAST_MIN:
+            warn("title_ink", "title_ink stop %d reads at %s:1 on the card (needs %s:1); brighten it or darken glass_on_mica."
+                 % (i + 1, fmt(r, 1), fmt(THEME_TEXT_CONTRAST_MIN, 1)))
 
     ramp = ["text", "text_secondary", "text_dim", "text_muted"]
     for i in range(1, len(ramp)):
@@ -1801,6 +1979,132 @@ def build_propose_theme(args, now=None, paths=None, wait=THEME_WAIT_SECONDS, pol
             "findings": findings,
             "remedy": "Sanduhr did not answer within %d seconds. Start Sanduhr: it picks the request up within "
                       "ten minutes of when it was made." % int(wait)}
+
+
+# -- propose_now_playing_looks (item 65c) ------------------------------------------------------
+#
+# The looks are checked here (an instant refusal writes nothing) with the app's rules and wording
+# (NowPlayingLookProposal), then handed over in now-playing-looks-request.json. The app checks them
+# again, and saves them to now-playing-looks.json when the user approves (or lets Claude style
+# songs directly). This server never reads what is playing.
+
+LOOK_HEX_RE = re.compile(r"#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})")
+
+
+def look_hex(v):
+    """'#FF2A6D', 'ff2a6d' or '#f2d' as 'ff2a6d'; None for anything else."""
+    if not isinstance(v, str) or not LOOK_HEX_RE.fullmatch(v):
+        return None
+    h = v.lower().lstrip("#")
+    return "".join(c * 2 for c in h) if len(h) == 3 else h
+
+
+def look_line(v, cap):
+    """A one-line string of 1 to `cap` characters, trimmed, or None."""
+    if not isinstance(v, str) or any(is_control(c) for c in v):
+        return None
+    t = v.strip()
+    return t if t and len(t) <= cap else None
+
+
+def check_look(item, n):
+    """(look, reasons) for one look; reasons start 'look N'."""
+    if not isinstance(item, dict):
+        return None, ["look %d must be an object with artist, title and colors" % n]
+    reasons = []
+    extra = sorted(str(k) for k in item if k not in LOOKS_FIELDS)
+    if extra:
+        reasons.append("look %d has an unknown field: %s" % (n, extra[0][:20]))
+    artist = look_line(item.get("artist"), LOOKS_MAX_ARTIST)
+    if artist is None:
+        reasons.append("look %d artist must be one line of 1 to %d characters" % (n, LOOKS_MAX_ARTIST))
+    title = look_line(item.get("title"), LOOKS_MAX_TITLE)
+    if title is None:
+        reasons.append("look %d title must be one line of 1 to %d characters" % (n, LOOKS_MAX_TITLE))
+    raw = item.get("colors")
+    raw = raw if isinstance(raw, list) else []
+    colors = [look_hex(c) for c in raw]
+    if 2 <= len(raw) <= 4 and all(colors):
+        for h in colors:
+            ratio = contrast(luminance(theme_hex("#" + h)), 0)
+            if ratio < LOOKS_MIN_CONTRAST_ON_BLACK:
+                reasons.append("look %d color #%s is too dark for the black notch (%s:1, needs %s:1)"
+                               % (n, h, fmt(ratio, 1), fmt(LOOKS_MIN_CONTRAST_ON_BLACK, 1)))
+    else:
+        reasons.append('look %d colors must be 2 to 4 hex colors, like ["#ff2a6d", "#05d9e8"]' % n)
+    font = None
+    if item.get("font") is not None:
+        font = font_style(item["font"]) if isinstance(item["font"], str) else None
+        if font is None:
+            reasons.append("look %d font must be one of: %s" % (n, FONT_STYLES))
+    mood = None
+    if item.get("mood") is not None:
+        m = item["mood"]
+        t = m.strip() if isinstance(m, str) else None
+        if (t is not None and len(t) <= LOOKS_MAX_MOOD_CHARS and len(t.split()) <= LOOKS_MAX_MOOD_WORDS
+                and not any(is_control(c) for c in m)):
+            mood = t or None
+        else:
+            reasons.append("look %d mood must be at most %d words and %d characters"
+                           % (n, LOOKS_MAX_MOOD_WORDS, LOOKS_MAX_MOOD_CHARS))
+    if reasons:
+        return None, reasons
+    return {"artist": artist, "title": title, "colors": ["#" + h for h in colors], "font": font, "mood": mood}, []
+
+
+def validate_looks(looks):
+    """(looks, reasons): the looks cleaned, and why they are refused ([] when they may go)."""
+    if not isinstance(looks, list) or not 1 <= len(looks) <= LOOKS_MAX:
+        return [], ["looks must be a list of 1 to %d looks" % LOOKS_MAX]
+    out, reasons = [], []
+    for i, item in enumerate(looks):
+        look, why = check_look(item, i + 1)
+        if look is not None:
+            out.append(look)
+        reasons += why
+    return out, reasons[:20]
+
+
+def build_propose_now_playing_looks(args, now=None, paths=None, wait=LOOKS_WAIT_SECONDS, poll=DESK_POLL_SECONDS,
+                                    sleep=time.sleep, clock=time.monotonic):
+    """Checks the looks here (an instant refusal writes nothing), then hands them to the app through
+    now-playing-looks-request.json and waits briefly for its answer. Never writes the saved looks."""
+    now = now or datetime.now(timezone.utc)
+    paths = paths or Paths()
+    args = args if isinstance(args, dict) else {}
+    unknown = sorted(str(k) for k in args if k != "looks")
+    if unknown:
+        return {"status": "rejected", "reasons": ["unknown argument(s): " + ", ".join(k[:20] for k in unknown[:5])]}
+    looks, reasons = validate_looks(args.get("looks"))
+    if reasons:
+        return {"status": "rejected", "reasons": reasons}
+
+    request_id = uuid.uuid4().hex
+    request = {"schema_version": 1, "id": request_id, "requested_at": iso_o(now), "looks": looks}
+    try:
+        os.makedirs(paths.support_dir, mode=0o700, exist_ok=True)
+        tmp = paths.looks_request + ".tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(request, f, ensure_ascii=False)
+        os.replace(tmp, paths.looks_request)   # atomic: the app never reads half a file
+    except OSError as e:
+        return {"status": "error", "reason": "request_write_failed",
+                "remedy": "Could not queue the request (%s)." % type(e).__name__}
+
+    deadline = clock() + wait
+    while True:
+        res = read_desk_result(paths.looks_result, request_id)
+        if res is not None:
+            out = {k: res[k] for k in ("status", "reasons", "looks_saved", "style_on") if k in res}
+            out["request_id"] = request_id
+            return out
+        if clock() >= deadline:
+            break
+        sleep(poll)
+    return {"status": "queued", "reason": "app_not_responding", "request_id": request_id,
+            "remedy": "Sanduhr did not answer within %d seconds. Start Sanduhr: it picks the request up "
+                      "within ten minutes of when it was made and shows it as a suggestion." % int(wait)}
 
 
 # -- Watchers (item 66) ------------------------------------------------------------------------
@@ -2034,6 +2338,8 @@ def call_tool(name, args):
         return build_watch_update(args)
     if name == "watch_end":
         return build_watch_end(args)
+    if name == "propose_now_playing_looks":
+        return build_propose_now_playing_looks(args)
     return None
 
 

@@ -12,7 +12,9 @@ import Observation
 /// With "Let agents show watchers" off, an agent's request is deleted unread and the server
 /// refuses before writing one; with "Show Claude Code's background work" off the hook writes
 /// nothing, and a report that slipped in is deleted unread. Turning a switch off clears its
-/// watchers. Quitting Sanduhr drops every watcher.
+/// watchers. Quitting Sanduhr drops every watcher. The one other file is the band's (BandFile),
+/// written only while "Show watchers above the prompt" is on, with an agent's watcher's title and
+/// short title and a background task's kind, never a note or a description.
 @MainActor
 @Observable
 final class WatcherStore {
@@ -76,11 +78,26 @@ final class WatcherStore {
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: support.path) else { return }
         for prefix in [Self.stopPrefix, Self.requestPrefix] {
             for name in names.filter({ $0.hasPrefix(prefix) && $0.hasSuffix(".json") }).sorted() {
-                guard let data = HandoffFiles.take(support.appendingPathComponent(name),
+                let url = support.appendingPathComponent(name)
+                // A Stop's report is the session's state at that moment: one older than a request
+                // may be (written while no Sanduhr read it, and only an older hook writes then)
+                // is stale, and is deleted unread.
+                if prefix == Self.stopPrefix, Self.isStale(url, now: now()) {
+                    try? FileManager.default.removeItem(at: url)
+                    continue
+                }
+                guard let data = HandoffFiles.take(url,
                                                    maxBytes: WatcherRequest.maxBytes) else { continue }
                 if prefix == Self.stopPrefix { receiveStop(data) } else { receiveRequest(data) }
             }
         }
+    }
+
+    /// Last written more than WatcherRequest.maxAge before `now`.
+    nonisolated static func isStale(_ url: URL, now: Date) -> Bool {
+        guard let m = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+        else { return false }
+        return now.timeIntervalSince(m) > WatcherRequest.maxAge
     }
 
     /// One agent request's bytes. Dropped unread while the switch is off, unless `force` (the
@@ -178,6 +195,8 @@ extension WatcherStore {
         onChange = { [weak self] in
             guard let self else { return }
             DeskController.shared.model.setWatchers(self.ordered)
+            // The band above Claude Code's prompt (band.json), while its switch is on.
+            BandFileWriter.shared.refresh()
         }
         onWaiting = { w in
             let desk = UserDefaults.desk
@@ -248,5 +267,112 @@ enum WatcherPlacement {
                left: NotchContent.saved(.left, in: d), right: NotchContent.saved(.right, in: d),
                strip: NotchContent.saved(.strip, in: d),
                layoutPlaced: DeskLayout.placed(d.string(forKey: "layout") ?? DeskLayout.standard))
+    }
+
+    // MARK: Settings, Watchers (Settings v2, slice 2)
+
+    /// Watchers, Where they show, On the notch: Off or one place. It reads and writes the notch
+    /// places' own keys, the ones the Notch page's pickers write.
+    enum NotchSpot: String, CaseIterable, Identifiable {
+        case off, left, right, strip
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .off: "Off"
+            case .left: "Left wing"
+            case .right: "Right wing"
+            case .strip: "Under the camera"
+            }
+        }
+
+        var place: NotchContent.Place? {
+            switch self {
+            case .off: nil
+            case .left: .left
+            case .right: .right
+            case .strip: .strip
+            }
+        }
+
+        static func of(_ place: NotchContent.Place) -> NotchSpot {
+            switch place {
+            case .left: .left
+            case .right: .right
+            case .strip: .strip
+            }
+        }
+    }
+
+    static let notchPlaces: [NotchContent.Place] = [.left, .right, .strip]
+
+    /// The first notch place set to Watchers, or Off.
+    static func notchSpot(in d: DefaultsStore) -> NotchSpot {
+        notchPlaces.first { NotchContent.resolve($0, raw: d.object(forKey: $0.key) as? String) == .watchers }
+            .map(NotchSpot.of) ?? .off
+    }
+
+    /// Puts watchers in `spot`: any other place set to Watchers goes back to its default content.
+    static func setNotchSpot(_ spot: NotchSpot, in d: DefaultsStore) {
+        for place in notchPlaces where place != spot.place
+            && NotchContent.resolve(place, raw: d.object(forKey: place.key) as? String) == .watchers {
+            d.set(nil, forKey: place.key)
+        }
+        if let place = spot.place { d.set(NotchContent.watchers.rawValue, forKey: place.key) }
+    }
+
+    /// Why the notch place picked doesn't show watchers now, nil when it does (or none is picked).
+    static func notchHint(spot: NotchSpot, notch: Bool, wingText: Bool, chinText: Bool, chin: Double) -> String? {
+        guard spot != .off else { return nil }
+        if !notch { return "The notch is off, so watchers don't show there." }
+        if spot == .strip, !chinText || chin == 0 {
+            return "Text under the camera is off or has no height, so watchers don't show there."
+        }
+        if spot != .strip, !wingText { return "Text beside the camera is off, so watchers don't show there." }
+        return nil
+    }
+
+    static func notchHint(in d: UserDefaults) -> String? {
+        notchHint(spot: notchSpot(in: d), notch: d.bool(forKey: DeskController.notchKey),
+                  wingText: d.object(forKey: "notchText") as? Bool ?? true,
+                  chinText: d.bool(forKey: "notchChinText"),
+                  chin: d.object(forKey: "notchChin") as? Double ?? 26)
+    }
+
+    /// The rule `WatcherStore.startForApp` follows, as the Watchers page states it.
+    static let glowRule = "The notch glows once when a watcher waits on you, if watchers show somewhere above."
+
+    /// Where `places` are, in words: "on the right wing and the Desk".
+    static func placesText(_ places: [String]) -> String {
+        let words = places.map { p -> String in
+            switch p {
+            case "left": "the left wing"
+            case "right": "the right wing"
+            case "strip": "under the camera"
+            default: "the Desk"
+            }
+        }
+        let joined = words.count > 1 ? words.dropLast().joined(separator: ", ") + " and " + words.last! : words.first ?? ""
+        return joined.hasPrefix("under") ? joined : "on " + joined
+    }
+
+    /// Whether the rule holds now, and why not when it doesn't.
+    static func glowStatus(deskOn: Bool, places: [String]) -> String {
+        if !deskOn { return "Now: the Desk is off, so watchers don't show and a waiting watcher doesn't glow the notch." }
+        if places.isEmpty {
+            return "Now: watchers aren't placed anywhere they can show, so a waiting watcher doesn't glow the notch. Place them above."
+        }
+        return "Now: watchers show \(placesText(places)), so one that waits on you glows the notch once."
+    }
+
+    /// A folder's meters mod, for Above the prompt.
+    static func metersLine(_ status: IntegrationStatus) -> String {
+        switch status {
+        case .installed: "Meters mod installed"
+        case .outdated: "Meters mod installed, update waiting"
+        case .notInstalled, .other: "No meters mod"
+        case .unreadable: "settings.json isn't valid JSON"
+        }
     }
 }

@@ -13,8 +13,8 @@ final class DeskController: NSObject, NSMenuDelegate {
     static let enabledKey = "deskEnabled"
     /// The notch island, off until switched on in Settings (General or Notch).
     static let notchKey = "notch"
-    /// Option+J and Option+S while Desk runs, on by default.
-    static let hotKeysKey = "hotKeys"
+    /// 2.10.0's one switch for ⌥J and ⌥S; slice 2 split it (SanduhrHotKeys).
+    static let hotKeysKey = SanduhrHotKeys.legacyKey
     private(set) var running = false
     private(set) var window: NSWindow?
     private var statusItem: NSStatusItem?
@@ -31,6 +31,22 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// The pointer was near a Desk block at the last mouse-through check.
     private var nearBlocks = false
     private let hotKeys = DeskHotKeys()
+    /// The shortcuts asked for now, by switch and keys (applyHotKeys).
+    private var registeredShortcuts: [HotKeyRequest] = []
+    private struct HotKeyRequest: Equatable {
+        let shortcut: SanduhrHotKeys.Shortcut
+        let combo: HotKeyCombo
+    }
+    /// The shortcuts whose keys another app holds, so they did not register (state.yaml
+    /// `hot_keys.<name>_taken`, the note under the switch on General).
+    private(set) var takenShortcuts: Set<SanduhrHotKeys.Shortcut> = []
+    /// While General's recorder listens, nothing is registered, so the keys pressed reach it
+    /// instead of opening Settings or joining a meeting.
+    var hotKeysSuspended = false {
+        didSet { if hotKeysSuspended != oldValue { applyHotKeys() } }
+    }
+    /// How many shortcuts are registered (state.yaml `hot_keys.registered`).
+    var hotKeysRegistered: Int { hotKeys.count }
 
     var enabled: Bool { UserDefaults.desk.bool(forKey: Self.enabledKey) }
 
@@ -44,6 +60,10 @@ final class DeskController: NSObject, NSMenuDelegate {
         if !enabled, running { stop() }
         // Now playing runs only while Desk does (and its own switch is on).
         NowPlayingController.shared.apply()
+        // The camera and mic indicators run only while Desk does (and their switches are on).
+        MainActor.assumeIsolated { AVIndicatorController.shared.apply() }
+        // The two shortcuts work whenever Sanduhr runs, Desk or not (slice 2).
+        applyHotKeys()
         let previous = appliedEnabled
         appliedEnabled = enabled
         if let previous, previous != enabled {
@@ -61,7 +81,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         dock.start()
         buildWindow()
         // The clock menu is off by default: Sanduhr owns the menu bar, meetings join from the
-        // desktop or Option+J. `defaults write com.626labs.sanduhr.desk menuIcon -bool true` brings it back.
+        // desktop or the join shortcut. `defaults write com.626labs.sanduhr.desk menuIcon -bool true` brings it back.
         if UserDefaults.desk.bool(forKey: "menuIcon") { buildMenu() }
         model.start()
         watchMouse()
@@ -138,7 +158,10 @@ final class DeskController: NSObject, NSMenuDelegate {
         let visible = window.map { $0.occlusionState.contains(.visible) } ?? false
         let paused = MessageMotion.paused(deskVisible: visible, screensAsleep: screensAsleep,
                                           screenSaver: screenSaver, sessionAway: sessionAway)
-        if model.motionPaused != paused { model.motionPaused = paused }
+        if model.motionPaused != paused {
+            model.motionPaused = paused
+            model.updateCycle()   // the turns rest while nobody can see them (item 69)
+        }
     }
 
     @objc private func appBecameActive() {
@@ -159,6 +182,8 @@ final class DeskController: NSObject, NSMenuDelegate {
     }
 
     private func stop() {
+        // Arrange mode ends with Desk; nothing was saved, so the layout stays as it was.
+        endArrange(keep: false)
         running = false
         window?.close(); window = nil
         wingsWindow?.close(); wingsWindow = nil
@@ -179,18 +204,32 @@ final class DeskController: NSObject, NSMenuDelegate {
         screensAsleep = false; screenSaver = false; sessionAway = false
     }
 
-    /// Called when Desk starts or stops and when the shortcuts switch flips.
+    /// Called at launch, when Desk starts or stops, when either shortcut's switch flips and when
+    /// its keys change (General, Shortcuts). Each registers its saved keys while its switch is on,
+    /// with or without the Desk.
     func applyHotKeys() {
-        let wanted = running && (UserDefaults.desk.object(forKey: Self.hotKeysKey) as? Bool ?? true)
-        guard wanted != hotKeys.isRegistered else { return }
-        if wanted {
-            let option = UInt32(optionKey)
-            hotKeys.register([
-                .init(keyCode: UInt32(kVK_ANSI_J), modifiers: option) { [weak self] in self?.joinNext() },
-                .init(keyCode: UInt32(kVK_ANSI_S), modifiers: option) { [weak self] in self?.showSettings() },
-            ])
-        } else {
+        let desk = UserDefaults.desk
+        let wanted = hotKeysSuspended ? [] : SanduhrHotKeys.Shortcut.allCases
+            .filter { SanduhrHotKeys.isOn($0, in: desk) }
+            .map { HotKeyRequest(shortcut: $0, combo: SanduhrHotKeys.combo($0, in: desk)) }
+        guard wanted != registeredShortcuts else { return }
+        registeredShortcuts = wanted
+        var taken: Set<SanduhrHotKeys.Shortcut> = []
+        if wanted.isEmpty {
             hotKeys.unregister()
+        } else {
+            let failed = hotKeys.register(wanted.map { r -> DeskHotKeys.Binding in
+                switch r.shortcut {
+                case .join: DeskHotKeys.Binding(keyCode: r.combo.keyCode, modifiers: r.combo.modifiers) { [weak self] in self?.joinNext() }
+                case .settings: DeskHotKeys.Binding(keyCode: r.combo.keyCode, modifiers: r.combo.modifiers) { [weak self] in self?.showSettings() }
+                }
+            })
+            taken = Set(failed.map { wanted[$0].shortcut })
+        }
+        // Suspended for the recorder, the last answer stands.
+        if !hotKeysSuspended, taken != takenShortcuts {
+            takenShortcuts = taken
+            NotificationCenter.default.post(name: .sanduhrHotKeysDidRegister, object: nil)
         }
     }
 
@@ -204,9 +243,11 @@ final class DeskController: NSObject, NSMenuDelegate {
         }
         window?.close()
         guard let screen = NSScreen.main else { return }
-        let w = NSWindow(contentRect: screen.frame, styleMask: [.borderless],
-                         backing: .buffered, defer: false)
+        let w = DeskWindow(contentRect: screen.frame, styleMask: [.borderless],
+                           backing: .buffered, defer: false)
         w.isReleasedWhenClosed = false
+        // Arrange mode carries over a rebuild (a display change): the window can still take the key.
+        w.takesKey = model.arrange.active
         // Just below normal windows, not in the desktop layer: on newer macOS a click on the
         // desktop layer counts as clicking the wallpaper, which sweeps the windows away
         // instead of reaching the meeting row.
@@ -224,6 +265,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         w.setFrame(screen.frame, display: true)
         w.orderFront(nil)
         window = w
+        // The bar's panel follows the Desk to its new screen.
+        if model.arrange.active { arrangeBar.place(on: screen) }
         NotificationCenter.default.addObserver(
             self, selector: #selector(occlusionChanged),
             name: NSWindow.didChangeOcclusionStateNotification, object: w)
@@ -243,7 +286,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         // The menu bar can be a point taller than the notch (39 vs 38 on a 14-inch MacBook Pro);
         // wings only as tall as the notch leave its bottom row showing under them.
         let barHeight = max(notch.height, model.topInset)
-        let pad = NotchWingsView.maxWings + 12   // the wing itself plus its flare
+        // The wing itself, the camera and mic indicators beside the camera (item 67) and the flare.
+        let pad = NotchWingsView.windowPad(notchHeight: notch.height)
         let frame = NSRect(x: screen.frame.minX + notch.minX - pad,
                            y: screen.frame.maxY - barHeight,
                            width: notch.width + pad * 2, height: barHeight)
@@ -287,12 +331,25 @@ final class DeskController: NSObject, NSMenuDelegate {
         }) {
             mouseMonitors.append(l)
         }
+        // A drag ends (DeskPointerDrag): the window was held as it was while the button was down,
+        // so it catches up with the pointer now, wherever the drop landed.
+        let released: (NSEvent) -> Void = { [weak self] _ in
+            DispatchQueue.main.async { [weak self] in self?.updateMouseThrough() }
+        }
+        if let g = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp, .rightMouseUp], handler: released) {
+            mouseMonitors.append(g)
+        }
+        if let l = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseUp, .rightMouseUp], handler: { event in
+            released(event); return event
+        }) {
+            mouseMonitors.append(l)
+        }
         // Clicks: whichever app macOS gives the click to, if it landed on a meeting row with a
         // link, open the meeting (DeskHitTest decides what is under the pointer). A plain click
         // on the meters does nothing. A click that reaches Desk itself is consumed.
         if let g = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown], handler: { [weak self] event in
             // Another app's window over the clock means the click was meant for that app.
-            guard let self, !Self.appWindowCoversPointer() else { return }
+            guard let self, !self.model.arrange.active, !Self.appWindowCoversPointer() else { return }
             // A control-click is a two-finger click.
             if event.modifierFlags.contains(.control) { self.limitMenuAfterMissedClick(); return }
             _ = self.clickUnderPointer()
@@ -301,13 +358,16 @@ final class DeskController: NSObject, NSMenuDelegate {
         }
         // A two-finger click that still went to another app (the desktop) over the meters.
         if let g = NSEvent.addGlobalMonitorForEvents(matching: [.rightMouseDown], handler: { [weak self] _ in
-            self?.limitMenuAfterMissedClick()
+            guard let self, !self.model.arrange.active else { return }
+            self.limitMenuAfterMissedClick()
         }) {
             mouseMonitors.append(g)
         }
         if let l = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown], handler: { [weak self] event in
             // Same process as the widget and its settings: only clicks on the desk layer count.
             guard let self, event.window == nil || event.window === self.window else { return event }
+            // Arrange mode: the click is the pieces' and the bar's (SwiftUI's gestures), never a join.
+            if self.model.arrange.active { return event }
             // Control-click is a two-finger click.
             if event.modifierFlags.contains(.control) { return self.limitMenuUnderPointer(event) ? nil : event }
             return self.clickUnderPointer() ? nil : event
@@ -319,6 +379,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         // point there a drawn pixel, so the click reaches Desk and the desktop never sees it.
         if let l = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown], handler: { [weak self] event in
             guard let self, event.window == nil || event.window === self.window else { return event }
+            if self.model.arrange.active { return event }
             return self.limitMenuUnderPointer(event) ? nil : event
         }) {
             mouseMonitors.append(l)
@@ -364,7 +425,7 @@ final class DeskController: NSObject, NSMenuDelegate {
     }
 
     /// A two-finger click on the meters opens the limit menu for the row under the pointer
-    /// (LimitMenu): Accounts, Hide, the warnings item, Meter Settings…, then the shared menu.
+    /// (LimitMenu): Accounts, Hide, the warnings item, Alerts Settings…, then the shared menu.
     /// On now playing (the Desk line or the strip under the camera), its menu instead.
     private func limitMenuUnderPointer(_ event: NSEvent) -> Bool {
         let hit = elementUnderPointer()
@@ -373,19 +434,71 @@ final class DeskController: NSObject, NSMenuDelegate {
         return true
     }
 
-    /// The two-finger menu for a hit: now playing's, or the limit menu on the meters.
+    /// The two-finger menu for a hit: now playing's, a watcher's, the indicators', the shared menu
+    /// on the meetings and the account name, or the limit menu on the meters. Every one of them
+    /// has Arrange Desk… (item 60): the shared menu carries it, the others end with it.
     private func menu(for hit: DeskElement?) -> NSMenu {
         if hit?.kind == .watcher {
-            return WatcherMenu.menu(for: DeskHitTest.watcher(hit, in: model.watchers)?.id)
+            return withArrangeItem(WatcherMenu.menu(for: DeskHitTest.watcher(hit, in: model.watchers)?.id))
         }
-        return hit?.kind == .nowPlaying ? NowPlayingController.shared.menu() : limitMenu(for: hit)
+        if hit?.kind == .avIndicators { return withArrangeItem(AVIndicatorMenu.menu(model.avIndicators)) }
+        if hit?.kind == .nowPlaying || hit?.kind == .nowPlayingNext {
+            return withArrangeItem(NowPlayingController.shared.menu())
+        }
+        if DeskHitTest.hasSharedMenu(hit) {
+            let menu = NSMenu()
+            // The clock's Desk Look Settings… and the message's Edit Messages… (DeskPieceClicks), above
+            // the shared items, whose Settings… then reads All Settings….
+            let extra = hit.flatMap { DeskPieceClicks.menuItem($0.kind) }
+            if let extra {
+                let item = NSMenuItem(title: extra.title, action: #selector(pieceSettingsFromMenu(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = extra.section.rawValue
+                menu.addItem(item)
+                menu.addItem(.separator())
+            }
+            addStandardItems(to: menu, allSettings: extra != nil)
+            return menu
+        }
+        return limitMenu(for: hit)
+    }
+
+    /// Desk Look Settings… (the clock's menu) or Edit Messages… (the message's): Settings at that page.
+    @objc private func pieceSettingsFromMenu(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let page = SettingsSection.resolve(raw) else { return }
+        MainActor.assumeIsolated { SettingsWindowController.shared.show(page.section, anchor: page.anchor) }
+    }
+
+    /// "Arrange Desk…" (item 60), at the end of a Desk menu that has no shared items.
+    private func withArrangeItem(_ menu: NSMenu) -> NSMenu {
+        menu.addItem(.separator())
+        menu.addItem(arrangeMenuItem())
+        return menu
+    }
+
+    private func arrangeMenuItem() -> NSMenuItem {
+        let item = NSMenuItem(title: DeskArrangeCopy.menuItem, action: #selector(arrangeFromMenu), keyEquivalent: "")
+        item.target = self
+        return item
+    }
+
+    /// After the menu has closed, so the window takes the mouse and the key with nothing tracking.
+    @objc private func arrangeFromMenu() {
+        DispatchQueue.main.async { [weak self] in self?.arrangeDesk() }
+    }
+
+    /// Pops `menu` at the pointer in the Desk window.
+    private func popUpAtPointer(_ menu: NSMenu) {
+        guard let w = window, let view = w.contentView else { return }
+        menu.popUp(positioning: nil, at: view.convert(w.mouseLocationOutsideOfEventStream, from: nil), in: view)
     }
 
     /// The limit menu for a hit on the meters: that row's limit, or none beside the rows.
     private func limitMenu(for hit: DeskElement?) -> NSMenu {
         let tier = hit?.kind == .meterRow ? hit?.key.flatMap(Tier.init(rawValue:)) : nil
         let menu = NSMenu()
-        // Event monitors and their follow-ups run on the main thread.
+        // Event monitors and their follow-ups run on the main thread. Arrange Desk… comes with
+        // the shared items under the limit's own.
         MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.addLimitMenuItems(to: menu, tier: tier) }
         return menu
     }
@@ -443,10 +556,23 @@ final class DeskController: NSObject, NSMenuDelegate {
             // Its link, https only; a watcher without one takes the click and does nothing (the
             // window holds the mouse there for the two-finger menu).
             WatcherMenu.open(DeskHitTest.watcher(hit, in: model.watchers))
+        case .avIndicators:
+            // Read-only: a click opens the same menu as a two-finger click, a moment later so it
+            // doesn't track inside the event monitor.
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.popUpAtPointer(AVIndicatorMenu.menu(self.model.avIndicators))
+            }
         case .meters, .meterRow:
             // The window holds the mouse over the meters so a two-finger click reaches the limit
             // menu; a plain click is swallowed there, so nothing reacts to it.
             break
+        case .clock, .message, .claudeLine:
+            // DeskPieceClicks: the clock opens Settings, Desk, Look, the message Settings, Desk,
+            // Message; the claude line, like the meters, takes the click and does nothing.
+            if let section = DeskPieceClicks.plainClick(hit.kind) {
+                DispatchQueue.main.async { [weak self] in self?.showSettings(section) }
+            }
         case .meetings:
             return false
         }
@@ -477,11 +603,21 @@ final class DeskController: NSObject, NSMenuDelegate {
             watchApproach(false)
             return
         }
-        let over = DeskHitTest.element(at: point, in: model.elements()) != nil
+        // Arrange mode (item 60) takes the whole frame; otherwise only the click areas, as before.
+        let arranging = model.arrange.active
+        let wanted = DeskArrange.takesMouse(arranging: arranging,
+                                            overElement: DeskHitTest.element(at: point, in: model.elements()) != nil)
+        // Outside Arrange mode, a button held down (a file dragged from the desktop) keeps the
+        // window as it was, so a drag that started elsewhere crosses the plates to the Finder
+        // (DeskPointerDrag); the button coming up runs this again.
+        let over = arranging ? wanted
+            : DeskPointerDrag.takesMouse(wanted: wanted, buttonDown: NSEvent.pressedMouseButtons != 0,
+                                         takingNow: !w.ignoresMouseEvents)
         if w.ignoresMouseEvents == over { w.ignoresMouseEvents = !over }
         let blocks = [model.metersFrame, model.accountFrame, model.noteFrame, model.meetingsFrame,
                       model.nowPlayingFrame, model.stripFrame, model.stripNextFrame,
-                      model.watchersFrame, model.stripWatcherFrame]
+                      model.watchersFrame, model.stripWatcherFrame, model.stripAVFrame]
+            + (DeskPieceClicks.isOn(in: UserDefaults.desk) ? [model.clockFrame, model.messageFrame, model.claudeLineFrame] : [])
         nearBlocks = DeskPointerWatch.near(point, frames: blocks)
         // The auto-hiding Dock's edge (item 56) runs the same watch, which reads the window list.
         watchApproach(nearBlocks || dock.wantsWatch(pointer: point, size: w.frame.size))
@@ -522,12 +658,83 @@ final class DeskController: NSObject, NSMenuDelegate {
         approachTimer = t
     }
 
-    /// estedesk://join-next opens the next meeting's link (Option+J does the same, see applyHotKeys).
+    // MARK: Arrange mode (item 60)
+
+    private var arrangeKeyMonitor: Any?
+    /// The bar with Cancel and Done, in its own floating panel while arranging.
+    private let arrangeBar = DeskArrangeBarController()
+    /// The windows put away while arranging (Settings), brought back when it ends.
+    private var arrangeStash: DeskArrangeStash?
+
+    /// state.yaml's `desk_arrange.click_through`: `whole` while arranging with the window taking
+    /// the mouse, `drawn` otherwise.
+    var clickThrough: String {
+        DeskArrange.clickThrough(arranging: model.arrange.active, windowTakesMouse: window.map { !$0.ignoresMouseEvents } ?? false)
+    }
+
+    /// state.yaml's `desk_arrange.bar_visible`: the bar's panel is on screen.
+    var arrangeBarVisible: Bool { arrangeBar.isVisible }
+
+    /// "Arrange Desk…" in every Desk menu, the menu bar item's and the widget's menus, and on
+    /// Settings, Desk, Layout: the pieces get outlines and handles and the window takes clicks over
+    /// the whole screen. Settings steps aside until it ends, and the bar with Cancel and Done floats
+    /// above every window at the middle of the Desk's screen, taking the key: Return is Done,
+    /// Escape is Cancel, wherever the key focus is in Sanduhr. Nothing is saved until Done. While
+    /// Desk is off, or already arranging, nothing happens.
+    func arrangeDesk() {
+        guard running, !model.arrange.active, let w = window as? DeskWindow else { return }
+        model.arrange.begin()
+        w.takesKey = true
+        // Arrange runs on the main thread (menus, Settings' button, the debug hooks).
+        arrangeStash = MainActor.assumeIsolated {
+            let stash = DeskArrangeStash()
+            stash.hide([SettingsWindowController.shared.window])
+            return stash
+        }
+        NSApp.activate()
+        arrangeBar.show(on: w.screen ?? NSScreen.main)
+        arrangeKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+            guard let self, self.model.arrange.active,
+                  let end = DeskArrange.endKey(event.keyCode) else { return event }
+            self.endArrange(keep: end.keep)
+            return nil
+        }
+        updateMouseThrough()
+    }
+
+    /// Done (or Return) keeps the edit, writing the layout once; Cancel (or Escape) drops it.
+    /// Either way the bar's panel closes, Settings comes back if Arrange put it away, and the
+    /// window goes back to taking clicks only where something is drawn.
+    func endArrange(keep: Bool) {
+        if let m = arrangeKeyMonitor {
+            NSEvent.removeMonitor(m)
+            arrangeKeyMonitor = nil
+        }
+        guard model.arrange.active else { return }
+        if keep { model.arrange.done() } else { model.arrange.cancel() }
+        arrangeBar.close()
+        if let w = window as? DeskWindow {
+            w.takesKey = false
+            w.resignKey()
+        }
+        if let stash = arrangeStash {
+            arrangeStash = nil
+            MainActor.assumeIsolated { stash.restore() }
+        }
+        updateMouseThrough()
+    }
+
+    /// estedesk://join-next opens the next meeting's link (the join shortcut does the same, see applyHotKeys).
     /// estedesk://join-next, estedesk://settings (and the same on sanduhr://), forwarded by
-    /// the app delegate.
+    /// the app delegate. settings/<page>#<anchor> opens a page at a section (Settings v2, slice 3);
+    /// the host alone opens Settings where it was left.
     func handle(_ url: URL) {
         if url.host == "join-next" { joinNext() }
-        if url.host == "settings" || url.host == "desk" { showSettings() }
+        if url.host == "desk" { showSettings() }
+        if url.host == "settings" {
+            let target = SettingsLink.target(url)
+            MainActor.assumeIsolated { SettingsWindowController.shared.show(target.section, anchor: target.anchor) }
+        }
     }
 
     private func joinNext() {
@@ -546,7 +753,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         model.refreshEvents()
         if model.meetings.isEmpty {
-            let none = NSMenuItem(title: model.calendarNote ?? "Nothing else on the calendar today", action: nil, keyEquivalent: "")
+            let none = NSMenuItem(title: model.calendarNote ?? model.noMeetingsLine, action: nil, keyEquivalent: "")
             none.isEnabled = false
             menu.addItem(none)
         }
@@ -568,7 +775,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         addStandardItems(to: menu)
     }
 
-    /// Option+S, …/settings links and the notch island: the one Settings window, at `section`
+    /// The Settings shortcut, …/settings links and the notch island: the one Settings window, at `section`
     /// when given.
     func showSettings(_ section: SettingsSection? = nil) {
         // Hotkeys, links and taps all arrive on the main thread.
@@ -585,9 +792,10 @@ final class DeskController: NSObject, NSMenuDelegate {
     }
 
     /// The same items as the menu bar item's menu and the widget's menu (SanduhrMenu).
-    private func addStandardItems(to menu: NSMenu) {
+    /// `allSettings` names Settings… "All Settings…", for a menu with a page's own Settings item.
+    private func addStandardItems(to menu: NSMenu, allSettings: Bool = false) {
         // Menus are built on the main thread.
-        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.addMenuItems(to: menu) }
+        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.addMenuItems(to: menu, allSettings: allSettings) }
     }
 
     private func buildMenu() {
@@ -599,6 +807,13 @@ final class DeskController: NSObject, NSMenuDelegate {
         item.menu = menu
         statusItem = item
     }
+}
+
+/// The Desk window. It never takes the key, except in Arrange mode (item 60), where a click on a
+/// piece may make it key; Return and Escape still reach the key monitor from there.
+final class DeskWindow: NSWindow {
+    var takesKey = false
+    override var canBecomeKey: Bool { takesKey }
 }
 
 /// Takes the first click instead of spending it on activating Desk, so one click joins.
@@ -641,4 +856,9 @@ enum MeetingOpener {
         }
         NSWorkspace.shared.open(link)
     }
+}
+
+extension Notification.Name {
+    /// The shortcuts registered again; DeskController.takenShortcuts may have changed.
+    static let sanduhrHotKeysDidRegister = Notification.Name("sanduhrHotKeysDidRegister")
 }

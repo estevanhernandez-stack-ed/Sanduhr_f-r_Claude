@@ -55,7 +55,14 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
     `AXHostingView`. With VoiceOver on, the full tree appears, switch values included.
   Switch on/off values are therefore not in the text nodes: check them in `state.yaml`. The
   `text` match field checks a node's label and value.
-- **state.yaml**: `desk_enabled`, `desk_running`, `layout`, `notch`, `has_notch`,
+- **state.yaml**: `desk_enabled`, `desk_running`, `layout`, `desk_pieces` (item 59: each piece the Desk
+  draws, in the layout's order: `piece`, the widget word; `anchor`, `tl`, `tc`, `tr`, `ml`, `mr`, `bl`,
+  `bc` or `br`; `order`, its place in that anchor's stack, 0 at the top; `scale`, its size, 0.6 to 1.6),
+  `desk_arrange` (item 60: `active`, Arrange mode is on; `changed`, its edit differs from the saved layout;
+  `working`, the layout string being edited, null outside Arrange mode; `click_through`, `whole` while the
+  Desk window takes clicks over its whole frame, `drawn` when only what is drawn takes them; `bar_visible`,
+  the floating panel with Cancel and Done is on screen),
+  `notch`, `has_notch`,
   `notch_left`, `notch_right`, `notch_strip` (what each place on the island shows, a
   `NotchContent` raw value such as `meetingOrTime`, `meters` or `nothing`; the default when unset),
   `camera_in_use` (an app is using a camera; only watched while the camera light switch is on),
@@ -64,20 +71,38 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   `strip` and `desk`; `source`, `adapter`, `fallback` or `off`; `state`, `playing`, `paused` or
   `none`; never a title, an artist or an app),
   `widget_visible`, `widget_visibility` (When the widget shows: `always`, `whileDeskOff` or
-  `onRequest`; `always` when unset), `settings_open`, `settings_section`, `meters` (tier, label, percent, fill,
+  `onRequest`; `always` when unset), `settings_open`, `settings_section`, `settings_anchor` (item 72: the
+  section the page was opened at, such as `glow` on `notch`; null for the page's top), `settings_anchor_visible`
+  (item 72, slice 3: that section's top line is inside the page's scrolling area; null with no anchor),
+  `settings_preview` (item 68: the
+  preview card the open section shows, `notch`, `layout`, `look`, `meters`, `message`, `nowPlaying`, `widget`,
+  `menuBar`, `integrations` or `mods`; null for none or with Settings closed), `settings_preview_folded` (slice 3:
+  the card is folded to its 44 pt strip, as on a window under 600 pt; null for a page without one), `mods_page` (item 64: `open`,
+  the Mods page shows; `loaded`, it has read the folders; `folders`, `mods`, `plugins`, `enabled` (on, or a
+  session's dev mod) and `missing` counts across folders; `checked`, how many Checks have answered; `cli`,
+  `claude` was found; never a mod's name, a path or a report), `message_editor` (item 69: `open`, Settings,
+  Message shows; `mode`, `list` or `text`; `rows`, `styled` and `raw` message lines and `notes`, comments
+  and blank lines, in the editor's document; `unsaved`; `today_special`, how many date lines the Desk draws above the
+  usual line today; `added`, the line `message-editor add` put in, else
+  null; never one of your lines), `hot_keys` (General, Shortcuts: `join` and `settings`, each switch; `registered`, how
+  many shortcuts are registered now; `join_keys` and `settings_keys`, each one's keys as the switch's label shows them,
+  `⌥J` and `⌥S` unless changed; `join_taken` and `settings_taken`, another app holds those keys so it did not register), `meters` (tier, label, percent, fill,
   pace, reset, `warning`: the row draws red with the ink glow, per Settings, Desk, Meters), `widget_warnings` (the
-  widget's tiers drawing red with a glow, same rule and settings, in display order), `meetings_count`, `desk_frames` (every interactive Desk element while Desk runs: `kind` is `meters`, `meter_row`, `account`, `note`, `meeting_row`, `meetings`, `now_playing` or `now_playing_next`; `key` is the limit's tier for a meter row, the row's index for a meeting row and `desk` or `strip` for now playing, never a title or a label; `clickable`; `frame` as `[x, y, w, h]` in whole points from the Desk window's top left), `desk_frames_ok` (the app's own check of those frames: each drawn element has a non-empty frame inside the Desk window, rows lie within their block, and no two click areas of different kinds overlap, slack included) and `desk_frames_problem` (why not, such as `meters frame empty`; null when ok), `dock` (item 56: `side` `bottom`, `left` or `right` and `autohide`, the Dock's own settings, read only; `inset`, the points the Desk's corners on that side are moved in now: the Dock's reach when always shown, its depth while an auto-hiding Dock shows, 0 otherwise), `alerts`, `last_fetch`, `active_tool`, `pacing_pinned`,
+  widget's tiers drawing red with a glow, same rule and settings, in display order), `meetings_count`, `desk_frames` (every interactive Desk element while Desk runs: `kind` is `meters`, `meter_row`, `account`, `note`, `meeting_row`, `meetings`, `now_playing`, `now_playing_next`, `watcher`, `av_indicators`, or, while "Clock and message take clicks" is on, `clock`, `message` and `claude_line` (the account name nests inside the claude line); `key` is the limit's tier for a meter row, the row's index for a meeting row and `desk` or `strip` for now playing, never a title or a label; `clickable`; `frame` as `[x, y, w, h]` in whole points from the Desk window's top left), `desk_frames_ok` (the app's own check of those frames: each drawn element has a non-empty frame inside the Desk window, rows lie within their block, and no two click areas of different kinds overlap, slack included) and `desk_frames_problem` (why not, such as `meters frame empty`; null when ok), `desk_piece_clicks` (Settings, Desk, Look's "Clock and message take clicks", desk suite key `piecesTakeClicks`; `scenarios/desk-layout.yaml` flips it and checks the clock's frame comes and goes), `dock` (item 56: `side` `bottom`, `left` or `right` and `autohide`, the Dock's own settings, read only; `inset`, the points the Desk's corners on that side are moved in now: the Dock's reach when always shown, its depth while an auto-hiding Dock shows, 0 otherwise), `alerts`, `last_fetch`, `active_tool`, `pacing_pinned`,
   `pulse_count`, `glow_count` (notch glows fired so far, drawn or not; a pulse fires one too), `glow_shape` (what the last
   drawn glow outlined: `island`, `plain` for the hardware notch alone, `top` for Claude Code's glow at the top center of a screen without a notch, or `none` yet), `glow_alerts`, `glow_meetings`,
-  `glow_camera` (the three Glow switches in Settings, Desk, Notch), `glow_claude_waiting`, `glow_claude_done` (the two Glow for Claude Code switches, item 51), `theme` (the widget theme's id), `menu` (groups with item titles and checkmarks), `credentials_store` (`keychain` or `file`: where the session key lives this launch, never the value), `account_ref` (the active account as snapshot.json names it: 8 hex digits of a hash of its label, never the label; null with no accounts), `accounts_count`, `history_days` (the active account's Meter history: 30, or 0 when off; item 43), `data` (the active account's data choices, item 44: `activity` `off`/`live`/`record`, `names` `names`/`hidden`/`full`, `share` `off`/`meters`/`activity`, and `folder_linked` true or false; never the folder's path or the label), `local_activity` (live Claude Code activity, item 45: `reading` true while the shown account's linked folder is read for the cards, which needs activity Live only or Keep a record and a linked folder, and `events`, the usage events counted since the last refresh; never a path, project or model), `vault` (the active account's record, item 46: `recording` true while its activity is Keep a record with a folder linked, `months` the session-shard months kept, `last_ingest_ok` whether the last cycle for its folder completed this launch; never a path, project, folder id or label), `integrations` (items 49 to 51: `mcp_installed`, `statusline_installed`, `meters_installed` and `hooks_installed`, how many Claude Code folders hold Sanduhr's MCP server, statusline, meters mod and notch glow hook entries, current or outdated; counts only, never a path), `pending_suggestions` (items 54, 55: `messages` and `theme`, whether a suggestion from Claude waits for the user; flags only, never its content), `follow` (Follow the account I'm using), `follow_paused` (a manual switch is holding following back), `version`, `build`, `whats_new` (item 57: `last_seen`, the version whose cards were last shown or recorded, null before any; `pending`, how many cards the next launch would show, 0 with Don't show after updates on; `open`, the window shows; `hide_after_updates`, that switch), `tour` (item 61: `open`, the window shows;
+  `glow_camera` (the three Glow switches in Settings, Desk, Notch), `glow_claude_waiting`, `glow_claude_done` (the two Glow for Claude Code switches, item 51), `theme` (the widget theme's id), `menu` (groups with item titles and checkmarks), `menu_submenus` (the submenus every Sanduhr menu shows after Show or Hide Widget, by title: `Accounts` with two or more accounts, then `Menu Bar Shows`), `credentials_store` (`keychain` or `file`: where the session key lives this launch, never the value), `account_ref` (the active account as snapshot.json names it: 8 hex digits of a hash of its label, never the label; null with no accounts), `accounts_count`, `history_days` (the active account's Meter history: 30, or 0 when off; item 43), `data` (the active account's data choices, item 44: `activity` `off`/`live`/`record`, `names` `names`/`hidden`/`full`, `share` `off`/`meters`/`activity`, and `folder_linked` true or false; never the folder's path or the label), `local_activity` (live Claude Code activity, item 45: `reading` true while the shown account's linked folder is read for the cards, which needs activity Live only or Keep a record and a linked folder, and `events`, the usage events counted since the last refresh; never a path, project or model), `vault` (the active account's record, item 46: `recording` true while its activity is Keep a record with a folder linked, `months` the session-shard months kept, `last_ingest_ok` whether the last cycle for its folder completed this launch; never a path, project, folder id or label), `integrations` (items 49 to 51: `mcp_installed`, `statusline_installed`, `meters_installed` and `hooks_installed`, how many Claude Code folders hold Sanduhr's MCP server, statusline, meters mod and notch glow hook entries, current or outdated; counts only, never a path), `pending_suggestions` (items 54, 55: `messages` and `theme`, whether a suggestion from Claude waits for the user; flags only, never its content), `follow` (Follow the account I'm using), `follow_paused` (a manual switch is holding following back), `version`, `build`, `whats_new` (item 57: `last_seen`, the version whose cards were last shown or recorded, null before any; `pending`, how many cards the next launch would show, 0 with Don't show after updates on; `open`, the window shows; `hide_after_updates`, that switch), `tour` (item 61: `open`, the window shows;
 `step`, its step from 1, 0 when closed; `steps_shown`, how many steps this Mac shows; `done`, finished or
 skipped; `pending`, a fresh install's tour waiting for its first successful fetch). The Accounts submenu is not in `menu`: its items are labels.
 
-Actions: `show-widget`, `hide-widget`, `settings [section]` (a `SettingsSection` raw value such
-as `notch` or `deskLayout`), `close-settings`, `refresh` (waits for the fetch), `test-alert`,
+Actions: `show-widget`, `hide-widget`, `settings-link "<Page> Settings…"` (Settings at the page a button with that title opens, as the button opens it; three dots work for the ellipsis; a title that names no sidebar page is an error), `settings [section [anchor]]` (a `SettingsSection` raw value such
+as `notch` or `deskLayout`, or a retired one such as `deskMeters`; with an anchor, `notch glow` or `notch#glow`,
+the page scrolled to that section, opening its Advanced disclosure when it is under one; an anchor the page lacks is
+an error naming the ones it has), `settings-search <words>` (the sidebar search with the words typed and Return
+pressed: the best match opened, scrolled to and lit; words that find nothing are an error), `close-settings`, `refresh` (waits for the fetch), `test-alert`,
 `pulse [tier]` (`five_hour` by default; it glows the notch too), `tool deep-work|pacing|snake` (as the Tools menu: chosen
-again it closes), `desk on|off`, `notch on|off`, `camera-light on|off` (the light by hand, as Tools, Camera Light;
-its window is kind `camera` in tree.yaml, one node labeled `Camera light`), `glow [alert|meeting|camera|claude-waiting|claude-done]`
+again it closes), `desk on|off`, `notch on|off`, `camera-light on|off` (the light by hand, as Tools, Camera Fill Light;
+its window is kind `camera` in tree.yaml, one node labeled `Camera fill light`), `glow [alert|meeting|camera|claude-waiting|claude-done]`
 (the notch glow once, whatever its switches; around the island while Desk runs with it on, else around
 the plain hardware notch on a notched screen, in a click-through window of kind `glow` labeled `Notch glow` that fades out after about three seconds),
 `theme <id>` (the widget theme by id, as the Theme menu and the gallery pick it, such as `obsidian`
@@ -87,7 +112,17 @@ signs out or removes an account, and no scenario switches one: a smoke run works
 `whats-new` and `close-whats-new` (the What's New window, item 57, with every card up to this version, as About
 opens it; window kind `whats-new`. Nothing is recorded as seen), `tour`, `tour-step <n>` and `close-tour` (the
 welcome tour, item 61, at step 1 or step n, as Take the Tour… opens it; window kind `welcome-tour`. Nothing is
-recorded: the tour's state and What's New's last-seen version stay as they were).
+recorded: the tour's state and What's New's last-seen version stay as they were),
+`message-editor add|revert` (item 69: Settings, Message's editor; add opens it and adds the smoke's own line,
+Fridays, "ship it." in a sunset gradient in script with a sweep, as the controls write it; revert drops
+unsaved edits. Neither saves, so `messages.txt` is never written; a run reverts what it added),
+`desk-arrange start|test|done|cancel` (item 60: Arrange mode on the Desk, as Arrange Desk… enters it; test
+makes the smoke's own edit, the clock to Top right at 120%, in the working layout only; done ends it writing
+the layout once when it changed, cancel ends it writing nothing. A run that leaves it on cancels it),
+`hot-key settings|join <keys>|default` (General, Shortcuts: a shortcut's keys set as the recorder sets them,
+written as `ctrl-opt-s` or `⌃⌥S`; refused with an error, nothing saved, without ⌘, ⌃ or ⌥ or when the other
+shortcut has them. It writes the desk keys `hotKey<Settings|Join>KeyCode` and `…Modifiers`; a run puts changed
+keys back).
 
 ## Scenarios
 

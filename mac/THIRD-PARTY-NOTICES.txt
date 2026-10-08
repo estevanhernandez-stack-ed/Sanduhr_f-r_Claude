@@ -5,12 +5,14 @@ Sanduhr für Claude is MIT-licensed (LICENSE at the root of the repository). It 
 following third-party software, under their own licenses.
 
 
-EsteFont 26
------------
+EsteFont Pro and EsteFont 26
+----------------------------
 
-The Desk's handwriting is EsteFont 26 by Estevan Hernandez, Regular and Bold, bundled as
-Fonts/EsteFont26-Regular.ttf and Fonts/EsteFont26-Bold.ttf and loaded for Sanduhr only (it is
-not installed on the Mac). It is not covered by Sanduhr's MIT license.
+The Desk's handwriting is EsteFont Pro by Estevan Hernandez, Regular and Bold, bundled as
+Fonts/EsteFontPro-Regular.ttf and Fonts/EsteFontPro-Bold.ttf, with its predecessor EsteFont 26,
+Regular and Bold, bundled as Fonts/EsteFont26-Regular.ttf and Fonts/EsteFont26-Bold.ttf. Both are
+loaded for Sanduhr only (they are not installed on the Mac) and are not covered by Sanduhr's MIT
+license. Both carry the same copyright and license.
 
 Copyright (c) 2009-2026 Estevan Hernandez / 626Labs LLC. All rights reserved.
 

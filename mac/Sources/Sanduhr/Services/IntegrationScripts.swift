@@ -17,7 +17,8 @@ import Foundation
 /// changes nothing on disk.
 ///
 /// The folder swapped out stays until the next refresh (a session that resolved the link a
-/// moment before the swap still finds it); every older stamped folder is deleted. Python reads a
+/// moment before the swap still finds it); every older stamped folder is deleted, except a
+/// version the Mods page pinned an entry to (item 64, slice 2), kept while a receipt names it. Python reads a
 /// script whole when it starts, so a running server or statusline never needs its folder again.
 /// The flat copies `install.sh` makes beside them are never touched.
 ///
@@ -61,6 +62,29 @@ struct IntegrationScripts {
 
     /// The mod's folder through the stable link: the entry in Claude Code's plugin folders.
     var installedModPath: String { current.appendingPathComponent(Self.modPath).path }
+
+    /// A stamped version's mod folder: what the Mods page pins an entry to (item 64, slice 2).
+    func pinnedModPath(_ stamp: String) -> String {
+        dir.appendingPathComponent(stamp).appendingPathComponent(Self.modPath).path
+    }
+
+    /// The stamp a plugin folders entry pins, nil for the `current` link or anything else.
+    func pinnedStamp(of entry: String) -> String? {
+        let e = entry.trimmingCharacters(in: .whitespaces)
+        let suffix = "/" + Self.modPath
+        guard e.hasSuffix(suffix) else { return nil }
+        let stampDir = String(e.dropLast(suffix.count))
+        let stamp = (stampDir as NSString).lastPathComponent
+        guard Self.isStampName(stamp), (stampDir as NSString).deletingLastPathComponent == dir.path else { return nil }
+        return stamp
+    }
+
+    /// The stamps receipts pin (`installs.json`'s `pinned`): refresh keeps them.
+    var pinnedStamps: [String] {
+        guard let data = try? Data(contentsOf: dir.appendingPathComponent(IntegrationInstaller.receiptsName)),
+              let receipts = try? JSONDecoder().decode([IntegrationReceipt].self, from: data) else { return [] }
+        return receipts.compactMap(\.pinned).filter(Self.isStampName)
+    }
 
     /// The app carries the mod (its manifest is there).
     var hasMod: Bool {
@@ -168,7 +192,7 @@ struct IntegrationScripts {
                     throw Failure.writeFailed
                 }
             }
-            prune(keep: [stamp, replaced].compactMap { $0 })
+            prune(keep: [stamp, replaced].compactMap { $0 } + pinnedStamps)
             return stamp
         } catch let f as Failure {
             NSLog("Sanduhr integrations refresh failed (\(f))")

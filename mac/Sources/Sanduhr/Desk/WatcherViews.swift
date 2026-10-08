@@ -4,17 +4,41 @@ import SwiftUI
 /// How watchers draw (item 66): a state dot, the title, the elapsed time, the progress when there
 /// is a total, a one-line note. "Waiting on you" pulses (not with Reduce Motion); lost touch and
 /// finished draw greyed.
+///
+/// The camera indicator's red dot (item 67) is the only red dot in Sanduhr, so a red dot on the
+/// notch always means the camera: a failed watcher draws a red exclamation mark in a triangle
+/// instead, and no other state is red.
 enum WatcherLook {
-    /// The dot's color for a state.
-    static func dot(_ state: WatcherState) -> Color {
+    /// The shape a state draws.
+    enum Mark: Equatable {
+        case dot
+        /// A dot with a check (passed).
+        case check
+        /// `exclamationmark.triangle.fill` (failed).
+        case triangle
+    }
+
+    static func mark(_ state: WatcherState) -> Mark {
         switch state {
-        case .running: Color.hex("60a5fa")
-        case .waiting: Color.hex("fbbf24")
-        case .passed: Color.hex("4ade80")
-        case .failed: Color.hex("f87171")
-        case .finished, .lostTouch: Color.hex("9ca3af")
+        case .failed: .triangle
+        case .passed: .check
+        case .running, .waiting, .finished, .lostTouch: .dot
         }
     }
+
+    /// The color as hex, for the tests: only the failed triangle is red.
+    static func hex(_ state: WatcherState) -> String {
+        switch state {
+        case .running: "60a5fa"
+        case .waiting: "fbbf24"
+        case .passed: "4ade80"
+        case .failed: "f87171"
+        case .finished, .lostTouch: "9ca3af"
+        }
+    }
+
+    /// The mark's color for a state.
+    static func dot(_ state: WatcherState) -> Color { Color.hex(hex(state)) }
 
     /// Lost touch and finished draw dimmer than the rest.
     static func opacity(_ state: WatcherState) -> Double {
@@ -25,23 +49,17 @@ enum WatcherLook {
     static func dotRoom(_ size: CGFloat) -> CGFloat { size * 0.5 + size * 0.35 }
 }
 
-/// The state dot. Waiting on you pulses, unless Reduce Motion is on; passed carries a check.
+/// The state mark (WatcherLook.mark): a dot, passed with a check, failed a red triangle with an
+/// exclamation mark in the same room. Waiting on you pulses, unless Reduce Motion is on. Hidden
+/// from VoiceOver: the line's label says the state ("failed").
 struct WatcherDot: View {
     let state: WatcherState
     let size: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let dot = Circle()
-            .fill(WatcherLook.dot(state))
+        let dot = mark
             .frame(width: size, height: size)
-            .overlay {
-                if state == .passed {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: size * 0.7, weight: .heavy))
-                        .foregroundStyle(Color.black.opacity(0.75))
-                }
-            }
             .accessibilityHidden(true)
         if state == .waiting && !reduceMotion {
             dot.phaseAnimator([false, true]) { view, dim in
@@ -49,6 +67,26 @@ struct WatcherDot: View {
             } animation: { _ in .easeInOut(duration: 0.7) }
         } else {
             dot
+        }
+    }
+
+    @ViewBuilder private var mark: some View {
+        switch WatcherLook.mark(state) {
+        case .triangle:
+            // A little larger than the dot: a triangle reads smaller than a circle of its width.
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: size * 1.05, weight: .bold))
+                .foregroundStyle(WatcherLook.dot(state))
+        case .check:
+            Circle()
+                .fill(WatcherLook.dot(state))
+                .overlay {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: size * 0.7, weight: .heavy))
+                        .foregroundStyle(Color.black.opacity(0.75))
+                }
+        case .dot:
+            Circle().fill(WatcherLook.dot(state))
         }
     }
 }
@@ -157,7 +195,7 @@ private struct DeskWatcherRow: View {
             }
         }
         .opacity(WatcherLook.opacity(watcher.state))
-        .frame(maxWidth: size * 22, alignment: alignment == .trailing ? .trailing : .leading)
+        .frame(maxWidth: size * 22, alignment: alignment.deskEdge)
         .background(Color.black.opacity(DeskPointerMenu.hitPlateOpacity))
         .contentShape(Rectangle())
         .onHover { inside in
@@ -172,8 +210,11 @@ private struct DeskWatcherRow: View {
 }
 
 /// The watcher menu (a two-finger click on a watcher, on the Desk or the notch): Dismiss,
-/// Dismiss All, Watcher Settings…. And the click: a watcher's link, https only.
+/// Dismiss All, Watchers Settings…. And the click: a watcher's link, https only.
 enum WatcherMenu {
+    /// The watchers' one home (Settings v2, slice 2), which the menu's last item opens.
+    static let settingsSection = SettingsSection.watchers
+
     /// Opens the watcher's link when it has an https one; nothing otherwise.
     static func open(_ w: Watcher?) {
         guard let link = w?.link, link.scheme?.lowercased() == "https" else { return }
@@ -193,7 +234,7 @@ enum WatcherMenu {
         all.target = WatcherMenuTarget.shared
         menu.addItem(all)
         menu.addItem(.separator())
-        let settings = NSMenuItem(title: "Watcher Settings…", action: #selector(WatcherMenuTarget.settings), keyEquivalent: "")
+        let settings = NSMenuItem(title: WatcherMenu.settingsSection.linkTitle, action: #selector(WatcherMenuTarget.settings), keyEquivalent: "")
         settings.target = WatcherMenuTarget.shared
         menu.addItem(settings)
         return menu
@@ -208,7 +249,7 @@ final class WatcherMenuTarget: NSObject {
         MainActor.assumeIsolated { WatcherStore.shared.dismiss(id) }
     }
     @objc func dismissAll() { MainActor.assumeIsolated { WatcherStore.shared.dismissAll() } }
-    @objc func settings() { MainActor.assumeIsolated { SettingsWindowController.shared.show(.integrations) } }
+    @objc func settings() { MainActor.assumeIsolated { SettingsWindowController.shared.show(WatcherMenu.settingsSection) } }
 }
 
 /// The same menu as SwiftUI items, for the notch wings' context menu.
@@ -220,6 +261,6 @@ struct WatcherMenuItems: View {
             .disabled(id == nil)
         Button("Dismiss All") { WatcherStore.shared.dismissAll() }
         Divider()
-        Button("Watcher Settings…") { SettingsWindowController.shared.show(.integrations) }
+        SettingsLinkButton(WatcherMenu.settingsSection)
     }
 }

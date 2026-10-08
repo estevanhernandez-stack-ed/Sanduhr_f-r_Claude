@@ -1,11 +1,12 @@
-# The spec's example: Settings opens at Notch with its switch.
+# The spec's example: Settings opens at Notch with its switch, named as on General (Settings v2,
+# slice 1: "Extend the camera notch" retired).
 name: Settings opens at Notch
 steps:
   - do: settings
     arg: notch
   - expect:
       window: settings
-      contains: { label: Extend the camera notch }
+      contains: { text: "/Notch: the island around the camera/" }
   - expect_state: { settings_section: notch }
   - snap: notch-settings
   - do: close-settings

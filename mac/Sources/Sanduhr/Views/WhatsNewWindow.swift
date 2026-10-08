@@ -193,8 +193,8 @@ struct WhatsNewPreviewView: View {
     /// EsteFont 26, both weights.
     private var font: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text("Aa").font(.custom(BundledFonts.boldFace, size: 40))
-            Text("hello, Desk").font(.custom(BundledFonts.regularFace, size: 26))
+            Text("Aa").font(.custom(BundledFonts.esteFont26.boldFace, size: 40))
+            Text("hello, Desk").font(.custom(BundledFonts.esteFont26.regularFace, size: 26))
         }
         .foregroundStyle(Color.primary)
     }

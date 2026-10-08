@@ -88,52 +88,7 @@ struct RootView: View {
         // fixed to content so there's never empty space anywhere.
         .frame(minWidth: 340, maxWidth: .infinity, alignment: .top)
         .fixedSize(horizontal: false, vertical: true)
-        // The full macOS glass stack: NSVisualEffectView behind the window
-        // blurs whatever's underneath; a very faint theme tint adds mood
-        // without killing the transparency; a hairline white inner stroke
-        // is the "lit glass edge" convention Apple uses in Control Center,
-        // the HUDs, etc.
-        .background(
-            ZStack {
-                VisualEffectView(material: .hudWindow,
-                                 blendingMode: .behindWindow,
-                                 state: .active)
-                // Theme tint — translucent for most themes (so vibrancy
-                // dominates), opaque for Matrix (so the green reads pure
-                // and the desktop wallpaper can't bleed through).
-                t.bg.opacity(t.overlayOpacity)
-                // Top-edge sheen: lighter at the top, nothing at the bottom.
-                LinearGradient(
-                    colors: [Color.white.opacity(0.06), Color.clear],
-                    startPoint: .top, endPoint: .center)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .opacity(Chrome.opacity)
-        )
-        .overlay(
-            // Outer hairline — slightly darker than the inner highlight so
-            // the window reads "raised" against whatever's behind it.
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5)
-                .opacity(Chrome.opacity)
-        )
-        .overlay(
-            // Inset inner highlight — the "lit from above" glass rim.
-            RoundedRectangle(cornerRadius: 13.5, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.18),
-                                 Color.white.opacity(0.04)],
-                        startPoint: .top, endPoint: .bottom),
-                    lineWidth: 0.5)
-                .padding(0.5)
-                .allowsHitTesting(false)
-                .opacity(Chrome.opacity)
-        )
-        // Soft drop shadow for the floating-panel feel.
-        // In subtle mode the same shadow, small and tight, keeps the text readable on any wallpaper;
-        // Match Desk uses Desk's drop shadow, or none when Desk's shadow switch is off.
-        .shadow(color: .black.opacity(shadow.opacity), radius: shadow.radius, x: 0, y: shadow.y)
+        .modifier(WidgetGlass(palette: t, shadow: shadow))
         .contextMenu {
             // The same items, in the same order, as the menu bar item's menu and Desk's clock
             // menu (SanduhrMenu). The widget shows while its menu is open.
@@ -142,25 +97,7 @@ struct RootView: View {
             }
         }
         .sheet(isPresented: $showOnboarding) {
-            OnboardingSheet(vm: vm, onSignIn: {
-                showOnboarding = false
-                Task {
-                    switch await SignInWindowController.shared.run() {
-                    case .signedIn(let c):
-                        // The first key, as Settings, Accounts saves it: it becomes Personal.
-                        KeychainStore.set(c.sessionKey, account: KeychainAccount.sessionKey)
-                        if let cf = c.cfClearance { KeychainStore.set(cf, account: KeychainAccount.cfClearance) }
-                        vm.credentialsChanged()
-                    case .pasteInstead:
-                        SettingsWindowController.shared.show(.credentials)
-                    case .cancelled:
-                        if !KeychainStore.exists(account: KeychainAccount.sessionKey) { showOnboarding = true }
-                    }
-                }
-            }, onPaste: {
-                showOnboarding = false
-                SettingsWindowController.shared.show(.credentials)
-            })
+            onboarding
         }
         .onAppear {
             // `exists()` never prompts (no access control on the Keychain
@@ -171,42 +108,34 @@ struct RootView: View {
         }
     }
 
+    private var onboarding: some View {
+        OnboardingSheet(vm: vm, onSignIn: {
+            showOnboarding = false
+            Task {
+                switch await SignInWindowController.shared.run() {
+                case .signedIn(let c):
+                    // The first key, as Settings, Accounts saves it: it becomes Personal.
+                    KeychainStore.set(c.sessionKey, account: KeychainAccount.sessionKey)
+                    if let cf = c.cfClearance { KeychainStore.set(cf, account: KeychainAccount.cfClearance) }
+                    vm.credentialsChanged()
+                case .pasteInstead:
+                    SettingsWindowController.shared.show(.credentials)
+                case .cancelled:
+                    if !KeychainStore.exists(account: KeychainAccount.sessionKey) { showOnboarding = true }
+                }
+            }
+        }, onPaste: {
+            showOnboarding = false
+            SettingsWindowController.shared.show(.credentials)
+        })
+    }
+
     /// The tier cards and the extra-usage card. During an account switch these are the old
     /// account's, faded out and kept in the layout unseen so the widget keeps its height, with
     /// the faint "Switching account…" over them once the fetch outlasts the fade; the new
     /// account's fade in when they arrive (AccountSwitchFade).
     private func cards(_ rows: [(tier: Tier, usage: TierUsage)], palette t: Theme.Palette) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach(rows, id: \.tier) { row in
-                TierCardView(
-                    tier: row.tier,
-                    usage: row.usage,
-                    history: vm.shownHistory[row.tier.rawValue]?.map(\.v) ?? [],
-                    palette: t,
-                    tick: vm.countdownTick,
-                    pinDeepMath: vm.pacingPinned,
-                    warning: vm.warningTiers.contains(row.tier),
-                    sparklineMode: SparklineView.mode(themeID: vm.theme.id),
-                    localTokens: vm.localBurn.tokens(for: row.tier)
-                )
-                .modifier(LimitContextMenu(tier: row.tier, vm: vm))
-            }
-            if let extra = vm.shownUsage?.extraUsage, extra.isEnabled, !vm.compact {
-                ExtraUsageCard(extra: extra, palette: t)
-            }
-        }
-        .opacity(vm.switchVeil ? 0 : 1)
-        .accessibilityHidden(vm.switchVeil)
-        .allowsHitTesting(!vm.switchVeil)
-        .overlay(alignment: .topLeading) {
-            if vm.switchNote {
-                Text(AccountSwitchFade.note)
-                    .font(.app(size: 11))
-                    .foregroundStyle(t.textDim)
-                    .opacity(AccountSwitchFade.noteOpacity)
-                    .transition(.opacity)
-            }
-        }
+        WidgetCardStack(cards: WidgetCards.live(vm, rows: rows), palette: t, vm: vm)
     }
 
     /// The action row's Deep Work and Snake buttons: open the tool, or close it if it is open.
@@ -261,16 +190,38 @@ struct AccountsSubmenu: View {
     }
 }
 
+/// "Menu Bar Shows ▸" in the widget's menus, as AppDelegate draws it in the AppKit ones: the four
+/// choices, the current one checked; a pick saves where Settings reads it and redraws the menu bar.
+struct MenuBarModesSubmenu: View {
+    let app: AppDelegate
+
+    var body: some View {
+        let modes = SanduhrMenu.menuBarModes(current: .saved())
+        Menu(MenuBarModeMenu.title) {
+            ForEach(modes.items, id: \.mode) { item in
+                Toggle(item.title, isOn: Binding(
+                    get: { item.checked },
+                    set: { _ in
+                        MenuBarMode.save(item.mode)
+                        app.menuBarModeDidChange()
+                    }))
+            }
+        }
+    }
+}
+
 /// The shared menu (SanduhrMenu) as SwiftUI items, separators between the groups, the Accounts
-/// submenu after Show/Hide as AppDelegate.addMenuItems puts it. `accounts` false leaves the
-/// submenu out, for a card's limit menu that already has it.
+/// and Menu Bar Shows submenus after Show/Hide as AppDelegate.addMenuItems puts them (SanduhrMenu.submenus). `accounts` false leaves the
+/// submenu out, for a card's limit menu that already has it; `allSettings` names Settings…
+/// "All Settings…" there, beside the card's Alerts Settings….
 struct SanduhrMenuItems: View {
     let app: AppDelegate
     var vm: UsageViewModel
     var accounts = true
+    var allSettings = false
 
     var body: some View {
-        let groups = app.currentMenu(widgetVisible: true)
+        let groups = app.currentMenu(widgetVisible: true, allSettings: allSettings)
         ForEach(groups.indices, id: \.self) { i in
             if i > 0 { Divider() }
             if let header = groups[i].header {
@@ -278,9 +229,12 @@ struct SanduhrMenuItems: View {
             } else {
                 menuRows(groups[i].entries)
             }
-            if i == 0, accounts, let menu = app.currentAccountsMenu() {
+            if i == 0 {
                 Divider()
-                AccountsSubmenu(accounts: menu, vm: vm, onManage: app.manageAccounts)
+                if accounts, let menu = app.currentAccountsMenu() {
+                    AccountsSubmenu(accounts: menu, vm: vm, onManage: app.manageAccounts)
+                }
+                MenuBarModesSubmenu(app: app)
             }
         }
     }
@@ -294,8 +248,17 @@ struct SanduhrMenuItems: View {
                     Toggle(entry.title, isOn: Binding(
                         get: { entry.checked },
                         set: { _ in withAnimation { app.perform(entry.command) } }))
+                } else if let note = entry.note {
+                    // An item that is off says why (Arrange Desk… while Desk is off).
+                    Button { app.perform(entry.command) } label: {
+                        Text(entry.title)
+                        Text(note)
+                    }
+                    .disabled(!entry.enabled)
+                    .help(note)
                 } else {
                     Button(entry.title) { app.perform(entry.command) }
+                        .disabled(!entry.enabled)
                 }
             }
             if let key = entry.key.first {
@@ -309,9 +272,9 @@ struct SanduhrMenuItems: View {
 
 /// A tier card's two-finger menu (LimitMenu), in place of the widget's own menu on the card:
 /// Accounts, Hide (temporary limits only) and the warnings item for the card's limit, Hidden
-/// Limits (when something is hidden), Meter Settings…, then the widget's
+/// Limits (when something is hidden), Alerts Settings…, then the widget's
 /// shared items under a separator, so nothing the widget menu offers is lost on a card. The
-/// warning switch is read through @AppStorage on the same key as Settings, Desk, Meters, so the
+/// warning switch is read through @AppStorage on the same key as Settings, Alerts, Each limit, so the
 /// menu reads the current setting whichever side changed it.
 struct LimitContextMenu: ViewModifier {
     let tier: Tier
@@ -338,7 +301,7 @@ struct LimitContextMenu: ViewModifier {
                     }
                 }
                 Divider()
-                SanduhrMenuItems(app: app, vm: vm, accounts: false)
+                SanduhrMenuItems(app: app, vm: vm, accounts: false, allSettings: true)
             }
         }
     }

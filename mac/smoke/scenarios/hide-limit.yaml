@@ -12,8 +12,9 @@ steps:
   - defaults: { domain: desk, key: meterShow.iguana_necktie, type: bool, value: false }
   - expect_state: { hidden_limits: [iguana_necktie], meters.0.tier: five_hour, meters.1.tier: seven_day }
   - do: settings
-    arg: deskMeters
-  - expect_state: { settings_section: deskMeters }
+    arg: alerts
+  # Settings v2, slice 2: Show this limit lives in Alerts, Each limit (was Desk, Meters).
+  - expect_state: { settings_section: alerts, settings_preview: meters }
   - snap: hide-limit
   - defaults: { domain: desk, key: meterShow.iguana_necktie, type: bool, value: true }
   - expect_state: { hidden_limits: [] }
