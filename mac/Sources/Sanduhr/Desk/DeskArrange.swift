@@ -112,6 +112,15 @@ enum DeskArrange {
 
     /// Where the bar's floating panel goes: its middle on the middle of `screen` (the visible
     /// frame of the screen the Desk is on, AppKit coordinates), on whole points.
+    /// The bar panel's size: what its content fits, never smaller than the bar needs to show its
+    /// words and buttons. 2.10.0 read the fitting size before the hosting view had laid out, got
+    /// zero, and opened an invisible 0×0 panel.
+    static let barMinimum = CGSize(width: 340, height: 170)
+    static func barSize(fitting: CGSize?) -> CGSize {
+        let f = fitting ?? .zero
+        return CGSize(width: max(f.width, barMinimum.width), height: max(f.height, barMinimum.height))
+    }
+
     static func barOrigin(size: CGSize, in screen: CGRect) -> CGPoint {
         CGPoint(x: (screen.midX - size.width / 2).rounded(), y: (screen.midY - size.height / 2).rounded())
     }

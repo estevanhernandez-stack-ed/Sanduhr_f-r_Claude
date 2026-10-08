@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import SwiftUI
 import Testing
 @testable import Sanduhr
 
@@ -473,5 +474,20 @@ struct DeskArrangeStashTests {
         settings.isVisible = true
         stash.hide([settings])
         #expect(stash.hidden.count == 1)
+    }
+
+    @Test func theBarPanelIsNeverZeroSized() {
+        #expect(DeskArrange.barSize(fitting: .zero) == DeskArrange.barMinimum)
+        #expect(DeskArrange.barSize(fitting: nil) == DeskArrange.barMinimum)
+        let big = CGSize(width: 420, height: 220)
+        #expect(DeskArrange.barSize(fitting: big) == big)
+    }
+
+    @MainActor @Test func theBarContentFitsBeforeItShows() {
+        let host = NSHostingView(rootView: DeskArrangeBar().fixedSize())
+        host.layoutSubtreeIfNeeded()
+        let size = DeskArrange.barSize(fitting: host.fittingSize)
+        #expect(size.width >= DeskArrange.barMinimum.width)
+        #expect(size.height >= DeskArrange.barMinimum.height)
     }
 }
