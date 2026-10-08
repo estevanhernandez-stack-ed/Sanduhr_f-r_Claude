@@ -1,21 +1,27 @@
-# docs/mac-smoke-test.md section 4: General, Surfaces shows the three switches, matching state.
+# docs/mac-smoke-test.md section 4: General, Surfaces shows each surface's status, matching state.
+# Settings v2, slice 2 (item 72): the switches moved to their own pages, so General shows status
+# lines, and the widget's line follows showing and hiding it.
 name: Surfaces switches follow the app
 steps:
   - do: settings
     arg: general
   - expect:
       window: settings
-      contains: { label: "/^Desk: clock, meters/" }
+      contains: { label: "/^Desk: (on|off)/" }
   - expect:
       window: settings
-      contains: { label: "/^Notch: the island/" }
+      contains: { label: "/^Notch: (on|off)/" }
   - expect:
       window: settings
-      contains: { label: "/^Widget: the floating window/" }
-  # Switch values are not visible to text recognition (smoke reads drawn text, see README);
-  # state.yaml holds what the switches show.
+      contains: { label: "/^Widget: .*, showing now$/" }
   - do: hide-widget
   - expect_state: { widget_visible: false }
+  - expect:
+      window: settings
+      contains: { label: "/^Widget: .*, hidden now$/" }
   - do: show-widget
   - expect_state: { widget_visible: true }
+  - expect:
+      window: settings
+      contains: { label: "/^Widget: .*, showing now$/" }
   - snap: general
