@@ -20,6 +20,10 @@ extension View {
 private struct SettingsAnchorMark: ViewModifier {
     let anchor: String
     @Environment(SettingsNavigation.self) private var navigation: SettingsNavigation?
+    /// The frame this mark last reported, so leaving clears only its own: ids are page-local, and
+    /// the page being left can share one with the page arriving ("glow" on Watchers and Notch),
+    /// whose row reports before the old one disappears.
+    @State private var reported: CGRect?
 
     func body(content: Content) -> some View {
         let lit = navigation?.highlight == anchor
@@ -31,9 +35,12 @@ private struct SettingsAnchorMark: ViewModifier {
                     .allowsHitTesting(false))
             .animation(.easeOut(duration: 0.25), value: lit)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+                reported = frame
                 navigation?.anchorFrames[anchor] = frame
             }
-            .onDisappear { navigation?.anchorFrames[anchor] = nil }
+            .onDisappear {
+                if let navigation, navigation.anchorFrames[anchor] == reported { navigation.anchorFrames[anchor] = nil }
+            }
             .id(anchor)
     }
 }

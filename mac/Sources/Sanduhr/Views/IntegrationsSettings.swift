@@ -396,6 +396,7 @@ private struct GlowHint: View {
             Spacer(minLength: 8)
             SettingsLinkButton(.notch, anchor: SettingsAnchor.glow)
         }
+        .settingsAnchor(SettingsAnchor.glowHint)
     }
 }
 

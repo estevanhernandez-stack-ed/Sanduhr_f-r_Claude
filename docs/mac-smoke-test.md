@@ -1657,7 +1657,9 @@ desktop well away from every piece.
 `docs/settings-v2-spec.md`, Slice 1. No page moves; only names, links and copy.
 
 1. `smoke/smoke run smoke/scenarios/settings-names.yaml` (from `mac/`) passes: Claude Code, Watchers,
-   General, Notch and Now Playing each show their "<Page> Settings…" buttons by those exact titles, each title opens
+   General, Notch and Now Playing each show their "<Page> Settings…" buttons by those exact titles
+   (read from the drawn text; a button below the fold is opened at its anchor first, as
+   `settings integrations glow-hint` and `settings notch glow` do), each title opens
    its page through `settings-link`, the retired names are missing from the pages that
    had them, and `menu_submenus` ends with `Menu Bar Shows`.
 2. Every Settings… button, by hand (page names as of slice 2): Claude Code's **Notch Settings…**
@@ -1748,10 +1750,13 @@ desktop well away from every piece.
    `settings watchers above-prompt` and the searches `glow`, `percent` and `margins` each report
    `settings_anchor_visible: true`; `settings watchers` opens the page at its top
    (`settings_anchor: null`). `message-editor.yaml` passes with `settings_anchor: new-line` and
-   `settings_anchor_visible: true` after `message-editor add`.
+   `settings_anchor_visible: true` after `message-editor add`. Every anchor in `SettingsIndex.swift`
+   (`smoke/smoke do settings "<page> <anchor>"`, then `smoke/smoke state`) reports
+   `settings_anchor_visible: true`, Advanced ones included, and so does the search **glow** right
+   after `settings watchers above-prompt` (Watchers and Notch both have a `glow`).
 2. Search: type **glow** in the field over the sidebar. The sidebar shows Notch with **Notch glow**
-   under it, Watchers with **Glow when a watcher waits on you**, Claude Code with **Claude Code glow
-   hook**, then Desk Look (Colors, a synonym match). Press Return: Notch opens scrolled to Notch glow,
+   under it, Watchers with **Glow when a watcher waits on you**, Claude Code with **Turning the glow
+   on** and **Claude Code glow hook**, then Desk Look (Colors, a synonym match). Press Return: Notch opens scrolled to Notch glow,
    lit for about a second and a half. Type **percent**: General, **Menu Bar Shows**. Type
    **margins**, click **Margins**: Desk opens with **Advanced** open and Margins on screen. Escape
    clears the field and the sidebar shows every page again.

@@ -49,10 +49,14 @@ steps:
   - expect:
       window: settings
       contains: { text: "Desk: clock, meters, meetings and the message on the desktop" }
+  - snap: preview-layout
+  # Clicks sits below the fold: open Desk at it (the tree holds only what is drawn).
+  - do: settings
+    arg: deskLayout clicks
+  - expect_state: { settings_anchor: clicks, settings_anchor_visible: true }
   - expect:
       window: settings
       contains: { text: Clock and message take clicks }
-  - snap: preview-layout
   - do: settings
     arg: deskLook
   - expect_state: { settings_section: deskLook, settings_preview: look }
@@ -70,10 +74,14 @@ steps:
   - expect:
       window: settings
       contains: { text: Test Glow }
+  - snap: preview-notch
+  # Camera and mic sits below the fold: open Notch at it (the tree holds only what is drawn).
+  - do: settings
+    arg: notch camera-mic
+  - expect_state: { settings_anchor: camera-mic, settings_anchor_visible: true }
   - expect:
       window: settings
       contains: { text: Where they show }
-  - snap: preview-notch
   - do: settings
     arg: nowPlaying
   - expect_state: { settings_section: nowPlaying, settings_preview: nowPlaying }
@@ -103,7 +111,7 @@ steps:
       contains: { text: "/Sample/" }
   - expect:
       window: settings
-      contains: { role: AXButton, label: "Add Folder…" }
+      contains: { text: '/^Add Folder(…|\.\.\.)$/' }
   - expect:
       window: settings
       missing: { text: Let agents show watchers }
@@ -130,7 +138,7 @@ steps:
   - expect_state: { settings_section: widgetLook, settings_anchor: pacing, settings_preview: widget }
   - expect:
       window: settings
-      contains: { text: Pin the pacing calculators on every card }
+      contains: { text: "/Pin the pacing calculators on every card$/" }
   - do: settings
     arg: themes
   - expect_state: { settings_section: themes, settings_preview: null }

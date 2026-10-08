@@ -2,7 +2,10 @@
 # "Settings…" names a page by its sidebar title and opens that page. `settings-link` opens Settings
 # the way a "<Page> Settings…" button does (SettingsLinkButton) and refuses a title that names no
 # page, so "Desk Layout Settings…" or "Watcher Settings…" can't come back. Each step starts on the
-# page that carries the button, and first checks that page shows a button with that exact title;
+# page that carries the button, and first checks that page shows a button with that exact title
+# (read from the drawn text, where OCR may give the ellipsis as three dots; a plain smoke run has
+# no accessibility tree under the hosting view, and the text holds only what is on screen, so a
+# button below the fold is opened at its anchor first);
 # every Settings-page link is a SettingsLinkButton, so its title and its page come from one
 # SettingsSection. The retired names must be gone from the pages that used them, and the shared
 # Sanduhr menu carries Menu Bar Shows. Slice 2 renamed pages (Desk, Usage, Claude Code, Mods &
@@ -16,18 +19,25 @@ steps:
   - expect:
       window: settings
       missing: { text: "/Desk Layout Settings|Layout Settings|Notch glow when Claude needs you/" }
+  # The hint sits under the folder list, below the fold: open the page at it.
+  - do: settings
+    arg: integrations glow-hint
+  - expect_state: { settings_anchor: glow-hint, settings_anchor_visible: true }
   - expect:
       window: settings
-      contains: { role: AXButton, label: "Notch Settings…" }
+      contains: { text: '/^Notch Settings(…|\.\.\.)$/' }
   - do: settings-link
     arg: Notch Settings…
   - expect_state: { settings_section: notch }
   # Watchers: where they show is inline; the hint and Above the prompt open Claude Code.
   - do: settings
     arg: watchers
+  # The link sits under Above the prompt, below the fold.
+  - do: settings
+    arg: watchers above-prompt
   - expect:
       window: settings
-      contains: { role: AXButton, label: "Claude Code Settings…" }
+      contains: { text: '/^Claude Code Settings(…|\.\.\.)$/' }
   - do: settings-link
     arg: Claude Code Settings…
   - expect_state: { settings_section: integrations }
@@ -36,10 +46,10 @@ steps:
     arg: general
   - expect:
       window: settings
-      contains: { role: AXButton, label: "Desk Settings…" }
+      contains: { text: '/^Desk Settings(…|\.\.\.)$/' }
   - expect:
       window: settings
-      contains: { role: AXButton, label: "Widget Settings…" }
+      contains: { text: '/^Widget Settings(…|\.\.\.)$/' }
   - do: settings-link
     arg: Desk Settings…
   - expect_state: { settings_section: deskLayout }
@@ -57,9 +67,12 @@ steps:
   - expect:
       window: settings
       missing: { text: "/Extend the camera notch|Glow for Claude Code/" }
+  # The link sits in Notch glow, below the fold.
+  - do: settings
+    arg: notch glow
   - expect:
       window: settings
-      contains: { role: AXButton, label: "Claude Code Settings…" }
+      contains: { text: '/^Claude Code Settings(…|\.\.\.)$/' }
   - do: settings-link
     arg: Claude Code Settings…
   - expect_state: { settings_section: integrations }
@@ -68,10 +81,10 @@ steps:
     arg: nowPlaying
   - expect:
       window: settings
-      contains: { role: AXButton, label: "Notch Settings…" }
+      contains: { text: '/^Notch Settings(…|\.\.\.)$/' }
   - expect:
       window: settings
-      contains: { role: AXButton, label: "Desk Settings…" }
+      contains: { text: '/^Desk Settings(…|\.\.\.)$/' }
   - do: settings-link
     arg: Notch Settings…
   - expect_state: { settings_section: notch }

@@ -76,6 +76,8 @@ enum SettingsAnchor {
     // Claude Code
     static let python = "python"
     static let folders = "folders"
+    /// Claude Code, the line under the folders that links to where the notch glow is switched on.
+    static let glowHint = "glow-hint"
     // Mods & Config
     static let inventory = "inventory"
     // Widget
@@ -177,6 +179,8 @@ enum SettingsAnchor {
         SettingsEntry(title: "Python", page: .integrations, anchor: python, synonyms: ["python3", "Command Line Tools"]),
         SettingsEntry(title: "Folders", page: .integrations, anchor: folders,
                       synonyms: ["Add Folder", "MCP server", "statusline", "prompt", "hooks", "install", "mod", "account"]),
+        SettingsEntry(title: "Turning the glow on", page: .integrations, anchor: glowHint,
+                      synonyms: ["Notch Settings…", "glow hook"]),
         SettingsEntry(title: "Mods and plugins", page: .mods, anchor: inventory, synonyms: ["mods", "plugins", "Check", "risk"]),
     ]
 

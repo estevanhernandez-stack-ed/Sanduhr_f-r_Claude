@@ -326,12 +326,14 @@ struct SettingsRoot: View {
 
     /// Brings the page's anchor into view, at the top of its scrolling area. Twice: a page that
     /// just appeared, or an Advanced disclosure that just opened, may not have its rows yet.
+    /// Never animated: inside `withAnimation`, `scrollTo` does nothing on a grouped `Form` (macOS
+    /// 26, 2026-10-08), so links, search and the smoke hook left every Form page at its top.
     private func scroll(_ proxy: ScrollViewProxy) {
         guard let anchor = navigation.anchor else { return }
         for delay in [0.05, 0.3] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 guard navigation.anchor == anchor else { return }
-                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(anchor, anchor: .top) }
+                proxy.scrollTo(anchor, anchor: .top)
             }
         }
     }
