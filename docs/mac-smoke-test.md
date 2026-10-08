@@ -1460,3 +1460,46 @@ and remove them afterwards. Give `~/.claude-modtest/settings.json` `{"model": "o
 8. Integrations, Statusline, Install over an existing statusline in a folder that loads a mod
    with a status entry: under "From your mods", "Switch it on the Mods page" closes the sheet and
    opens Settings, Mods.
+## 37. A look per song and themes with a title style (item 65, parts c and d)
+
+Back up your saved looks if you have any:
+`cp ~/Library/Application\ Support/Sanduhr/now-playing-looks.json ~/looks.bak` (skip when it is
+missing). Place now playing on a notch wing, the strip and the Desk (Layout), and play a song in
+Music.
+
+1. Settings, Desk, Now Playing has a **Looks** section: **Style what's playing** (off), its
+   caption, **Let Claude style songs directly** (off), its caption naming
+   `propose_now_playing_looks`, "No saved looks" and **Clear Looks…** (off). The page's top caption
+   says titles are never saved, "only the songs of looks you save from Claude, below".
+2. Switch on Style what's playing: the wing, the strip and the Desk line draw the song in a
+   gradient from one of the eight palettes and a letter style (small caps, italic, bold or bold
+   italic) in the Desk font; the Desk line's position bar takes the gradient. The ▶ glyph stays
+   plain. Skip to the next song: another look. Go back: the first song's look again. Quit and
+   relaunch Sanduhr: the same song wears the same look.
+3. A long title in a styled look still fits or scrolls once in its wing, with nothing clipped at
+   rest and the Next button where it was while paused.
+4. Ask Claude Code for looks for the song playing and two others (`propose_now_playing_looks`):
+   it answers `pending_approval` with `style_on: true`. The page shows "Claude suggested looks for 3
+   songs", each song drawn in its look on black with its mood, Dismiss and Save. Save: the playing
+   song changes to its look at once, the row reads "3 saved looks", and
+   `now-playing-looks.json` is mode 600 and holds the three songs. A second app playing the same
+   song (a browser) wears the same look.
+5. Have Claude suggest again and Dismiss: Claude hears `rejected` ("dismissed by the user"),
+   nothing changes. Ask for a look with a dark color (`#202020`): refused at once, naming "too dark
+   for the black notch", and no request file appears in `~/Library/Application Support/Sanduhr`.
+6. Switch on Let Claude style songs directly and ask again: `applied` with `looks_saved`, no card.
+7. Switch off Style what's playing and have Claude suggest: the result carries `style_on: false`;
+   the notch and Desk draw in their own ink as before.
+8. **Clear Looks…** asks "Clear every saved look?"; Clear Looks deletes the file, the row reads
+   "No saved looks" and the playing song goes back to its seeded look (with the switch on).
+9. VoiceOver on the card reads each song as "Title by Artist, small caps, mood …"; the notch and
+   Desk still read the plain title.
+10. **Theme title.** Save a theme with `"title_ink": ["#ff9ac1", "#9ff3ff"]` and
+    `"title_style": "small-caps"` (Settings, Widget, Themes, or have Claude call `propose_theme`
+    with them) and apply it: the widget's "Sanduhr" title draws in that gradient in small caps.
+    `"title_style": "fraktur"` draws it in Unicode fraktur letters. A built-in theme's title is as
+    before. A proposal with `"title_ink": ["#ff9ac1"]` is refused naming `title_ink`; one with a
+    dark stop (`#303030`) goes through with a warning "title_ink stop 2 reads at … on the card".
+
+Put your looks back: `cp ~/looks.bak ~/Library/Application\ Support/Sanduhr/now-playing-looks.json`
+(or leave it cleared).

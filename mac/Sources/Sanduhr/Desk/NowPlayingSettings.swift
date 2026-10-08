@@ -12,12 +12,13 @@ struct NowPlayingSection: View {
         Form {
             Section {
                 NowPlayingSourceRow(deskEnabled: deskEnabled)
-                Text("Shows the song or video playing in any app, browsers included, wherever you place it: a notch wing or the strip under the camera (Notch), or the Desk (Layout). Click it to play or pause; two-finger click for Previous and Next. Nothing leaves your Mac, and titles are never saved. Runs only while it is placed somewhere and Desk is on.")
+                Text("Shows the song or video playing in any app, browsers included, wherever you place it: a notch wing or the strip under the camera (Notch), or the Desk (Layout). Click it to play or pause; two-finger click for Previous and Next. Nothing leaves your Mac, and titles are never saved (only the songs of looks you save from Claude, below). Runs only while it is placed somewhere and Desk is on.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 NowPlayingArrangeRow()
             }
             NowPlayingShowSection()
+            NowPlayingLooksSection()
             NowPlayingIdleSection()
             NowPlayingAppsSection()
             NowPlayingAskSection()

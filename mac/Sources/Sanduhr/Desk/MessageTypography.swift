@@ -107,6 +107,34 @@ enum MessageTypography {
         return Text(out)
     }
 
+    /// The plan's width as drawn at `size`: what a notch wing grows by for a styled title
+    /// (item 65c). Small caps measure their small runs at the small size; a slant adds its lean.
+    static func width(_ plan: Plan, size: CGFloat) -> CGFloat {
+        guard !plan.text.isEmpty else { return 0 }
+        func nsFont(_ size: CGFloat) -> NSFont {
+            switch plan.face {
+            case .system:
+                return .systemFont(ofSize: size, weight: plan.bold ? .bold : .regular)
+            case .custom(let name):
+                let f = NSFontManager.shared.font(withFamily: name, traits: [], weight: 5, size: size)
+                    ?? NSFont(name: name, size: size) ?? .systemFont(ofSize: size)
+                return plan.bold ? NSFontManager.shared.convert(f, toHaveTrait: .boldFontMask) : f
+            }
+        }
+        func measure(_ s: String, _ size: CGFloat) -> CGFloat {
+            (s as NSString).size(withAttributes: [.font: nsFont(size)]).width
+        }
+        var w: CGFloat
+        if plan.smallCaps {
+            let scale = smallCapsScale(family: familyName(plan.face))
+            w = smallCapsRuns(plan.text).reduce(0) { $0 + measure($1.text, $1.small ? size * scale : size) }
+        } else {
+            w = measure(plan.text, size)
+        }
+        w += CGFloat(tan(plan.slant * .pi / 180)) * size * 0.5
+        return ceil(w)
+    }
+
     /// The text as drawn and read: tags gone, its style applied. For places that draw only
     /// characters, typographic styles stay as written (the view draws them).
     static func characters(_ parsed: MessageMarkup.Parsed) -> String {

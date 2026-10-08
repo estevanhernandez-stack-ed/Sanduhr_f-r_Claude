@@ -246,6 +246,12 @@ private struct ThemeDTO: Decodable {
     let ghostAlpha: Double?
     let breathPeriodMs: Int?
 
+    // Optional text style (item 65d): the title's ink gradient and letter style. A value the
+    // widget can't draw (one stop, a style it doesn't know) is ignored; ThemeLint refuses it in a
+    // proposal.
+    let titleInk: [String]?
+    let titleStyle: String?
+
     struct AccentBloomDTO: Decodable {
         let blur: Double
         let alpha: Double
@@ -281,7 +287,9 @@ private struct ThemeDTO: Decodable {
                 },
                 cardCornerRadius: cardCornerRadius.map { CGFloat($0) } ?? 10,
                 ghostAlpha: ghostAlpha ?? 1.0,
-                breathPeriodMs: breathPeriodMs ?? 2800),
+                breathPeriodMs: breathPeriodMs ?? 2800,
+                titleInk: ThemeTitle.stops(titleInk),
+                titleStyle: titleStyle.flatMap(LetterStyle.init(tag:))),
             summary: ThemeGalleryItem.cleaned(description))
     }
 }

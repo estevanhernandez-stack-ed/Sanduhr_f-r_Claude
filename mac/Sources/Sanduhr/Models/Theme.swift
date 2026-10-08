@@ -62,6 +62,13 @@ struct Theme: Identifiable, Hashable {
         /// by the Match Desk theme; nil for every other theme, which draws as before.
         var ink: Ink? = nil
 
+        // Text style (item 65d).
+        /// The widget title's ink: 2 to 4 stops, left to right, from a user theme's `title_ink`;
+        /// nil draws the title in `text`.
+        var titleInk: [Color]? = nil
+        /// The widget title's letter style, from a user theme's `title_style`; nil is upright.
+        var titleStyle: LetterStyle? = nil
+
         struct AccentBloom: Hashable {
             let blur: CGFloat
             let alpha: Double

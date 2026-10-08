@@ -16,9 +16,8 @@ struct TitleBarView: View {
             TrafficLightCloseButton(action: onClose)
                 .padding(.leading, 10)
 
-            Text("Sanduhr")
-                .font(.app(size: 11, weight: .semibold, design: .rounded))
-                .foregroundStyle(t.text)
+            // A theme's title_ink and title_style (item 65d); as before without them.
+            ThemeTitleText(palette: t, size: 11)
 
             if let chip = vm.accountChip {
                 AccountChip(chip: chip, palette: t) { vm.cycleAccount() }
