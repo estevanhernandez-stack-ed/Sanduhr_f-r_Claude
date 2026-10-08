@@ -113,7 +113,7 @@ struct CameraLightView: View {
 private final class CameraLightContainer: NSView {
     override func isAccessibilityElement() -> Bool { true }
     override func accessibilityRole() -> NSAccessibility.Role? { .image }
-    override func accessibilityLabel() -> String? { "Camera light" }
+    override func accessibilityLabel() -> String? { "Camera fill light" }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 

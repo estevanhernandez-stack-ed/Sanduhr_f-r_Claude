@@ -119,10 +119,10 @@ final class UsageViewModel {
         didSet { refreshMeterWarnings() }
     }
     /// The tiers whose card bar draws red with a glow: the same rule and settings as the Desk
-    /// meters (MeterWarning, Settings, Desk, Meters). Re-applied when the numbers arrive, on the
+    /// meters (MeterWarning, Settings, Alerts, Each limit). Re-applied when the numbers arrive, on the
     /// countdown tick (the reset draws nearer) and at once when a Meters setting changes.
     private(set) var warningTiers: Set<Tier> = []
-    /// The limits switched off in Settings, Desk, Meters (MeterVisibility): left off the cards
+    /// The limits switched off in Settings, Alerts, Each limit (MeterVisibility): left off the cards
     /// and out of `warningTiers`. Re-read with the warnings; a change resizes the panel.
     private(set) var hiddenTiers: Set<Tier> = MeterVisibility.hidden(in: UserDefaults.desk)
     /// The limits believed temporary with the current numbers (LimitLifetime): the only ones a
@@ -212,7 +212,7 @@ final class UsageViewModel {
     /// Tools items in every menu set it and show it checked.
     var activeTool: WidgetTool?
     /// The pacing calculators (cool down, surplus) stay showing on every card instead of only
-    /// under the pointer. Turned on and off from the Tools items and Settings, Pacing & Focus; not saved.
+    /// under the pointer. Turned on and off from the Tools items and Settings, Widget; not saved.
     var pacingPinned: Bool = false
 
     /// The widget overlays a menu can ask for.
@@ -976,7 +976,14 @@ final class UsageViewModel {
     /// during a switch these are the old account's veiled cards.
     /// Mirrors sanduhr.py:468-478.
     func visibleTiers() -> [(tier: Tier, usage: TierUsage)] {
-        guard let u = MeterVisibility.visible(shownUsage, hidden: hiddenTiers) else { return [] }
+        Self.visibleTiers(shownUsage, hidden: hiddenTiers, compact: compact)
+    }
+
+    /// `visibleTiers()` for any numbers: Settings' widget preview (item 68) draws its sample
+    /// cards through this, so they hide and compact as the widget's do.
+    nonisolated static func visibleTiers(_ usage: UsageResponse?, hidden: Set<Tier>,
+                                         compact: Bool) -> [(tier: Tier, usage: TierUsage)] {
+        guard let u = MeterVisibility.visible(usage, hidden: hidden) else { return [] }
         let active = Tier.allCases.compactMap { t -> (Tier, TierUsage)? in
             guard let tu = u.tiers[t], tu.utilization != nil else { return nil }
             return (t, tu)

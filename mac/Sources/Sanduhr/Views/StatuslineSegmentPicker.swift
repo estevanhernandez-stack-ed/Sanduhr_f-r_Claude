@@ -13,6 +13,8 @@ struct CombineChoice: View {
     var model: IntegrationsModel
     @Binding var join: StatuslineJoin
     @Binding var selection: StatuslineSelection
+    /// "Show Sanduhr's meters above the prompt instead (animated)" (item 65f): `--band`.
+    @Binding var band: Bool
     @State private var chips: StatuslineChips?
     @State private var mods: [ModStatusEntry]?
     @State private var loading = true
@@ -25,6 +27,8 @@ struct CombineChoice: View {
         let ran: Bool
     }
 
+    @AppStorage("combineShowsHelp") private var showHelp = false
+
     private var duplicates: [StatuslineDuplicate] {
         chips.map { StatuslineDuplicate.find($0, mods: mods ?? []) } ?? []
     }
@@ -34,17 +38,26 @@ struct CombineChoice: View {
             Text("\(folder) already has a statusline:")
                 .fixedSize(horizontal: false, vertical: true)
             OtherCommandBox(text: other)
-            Text("Combine keeps it: Sanduhr runs your statusline first, then adds its meters. If yours is slow (over 1.5 seconds) or fails, Sanduhr's meters still show. Replace shows only Sanduhr's line. Either way, Remove puts yours back.")
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .firstTextBaseline) {
+                Text("Combine keeps yours and adds Sanduhr's meters. Remove puts yours back.")
+                    .fixedSize(horizontal: false, vertical: true)
+                    .help("Sanduhr runs your statusline first, then adds its meters. If yours is slow (over 1.5 seconds) or fails, Sanduhr's meters still show. Replace shows only Sanduhr's line. Either way, Remove puts yours back.")
+                Spacer(minLength: 8)
+                Toggle("Show explanations", isOn: $showHelp)
+                    .toggleStyle(.checkbox)
+                    .font(.caption)
+            }
             picker
             JoinRowPicker(join: $join)
+            BandChoice(band: $band)
             ModChips(mods: mods, badges: Badges(duplicates, mods: mods ?? []))
             DuplicatesPanel(duplicates: duplicates, mods: mods ?? [], chips: chips, change: change)
             CombinePreview(theirs: chips?.inspection.theirs, join: join,
-                           selection: chips?.previewSelection ?? selection, loading: loading,
+                           selection: banded(chips?.previewSelection ?? selection), loading: loading,
                            input: live?.input.data, mods: (mods ?? []).filter(\.drawsStatus), model: model)
             LiveTestRow(live: live, busy: loading, enabled: chips != nil, test: testLive)
         }
+        .environment(\.combineShowsHelp, showHelp)
         .task(id: other) {
             loading = true
             chips = await model.inspectStatusline(chain: other).map(StatuslineChips.init)
@@ -61,6 +74,12 @@ struct CombineChoice: View {
         } else {
             Caption(loading ? "Running your statusline once…" : "Your statusline's segments can't be shown: Python or the scripts weren't found. Combine keeps all of it.")
         }
+    }
+
+    private func banded(_ s: StatuslineSelection) -> StatuslineSelection {
+        var out = s
+        out.band = band
+        return out
     }
 
     private func change(_ body: (inout StatuslineChips) -> Void) {
@@ -82,6 +101,24 @@ struct CombineChoice: View {
             loading = false
         }
     }
+}
+
+/// Moves Sanduhr's meters out of the statusline into the meters mod's band above the prompt,
+/// where their looks animate (item 65f). The user's own segments stay in the statusline.
+private struct BandChoice: View {
+    @Binding var band: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Toggle(BandChoice.title, isOn: $band)
+                .toggleStyle(.checkbox)
+            Caption(band ? BandChoice.onCaption : BandChoice.offCaption)
+        }
+    }
+
+    static let title = "Show Sanduhr's meters above the prompt instead (animated)"
+    static let onCaption = "Your segments stay in the statusline; Sanduhr's session, weekly and reset segments move to the band the meters mod draws above the prompt, with their styles, a sweep when a meter crosses a warning line, a shimmer before a limit resets and a glow while one is nearly full. Needs the meters mod in this folder, switched on Mods & Config."
+    static let offCaption = "Off, Sanduhr's meters stay in the statusline. Their styles reach the meters mod's band either way."
 }
 
 /// The duplicate badges per chip: "Also shown by Sanduhr: Context".
@@ -108,6 +145,35 @@ struct Badges {
 }
 
 /// A caption under a control.
+/// "Show explanations" in the Combine sheet (2026-10-07: the sheet was all text). Off, the
+/// explanations step aside and each control's tooltip carries them.
+private struct ShowHelpKey: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+    var combineShowsHelp: Bool {
+        get { self[ShowHelpKey.self] }
+        set { self[ShowHelpKey.self] = newValue }
+    }
+
+    /// Closes the sheet and opens Settings, Mods & Config (item 64, slice 2); nil where there is none.
+    var openModsPage: (() -> Void)? {
+        get { self[OpenModsPageKey.self] }
+        set { self[OpenModsPageKey.self] = newValue }
+    }
+}
+
+private struct OpenModsPageKey: EnvironmentKey { static let defaultValue: (() -> Void)? = nil }
+
+/// An explanation that shows only with Show explanations on.
+private struct HelpCaption: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    @Environment(\.combineShowsHelp) private var shows
+
+    var body: some View {
+        if shows { Caption(text) }
+    }
+}
+
 private struct Caption: View {
     let text: String
     init(_ text: String) { self.text = text }
@@ -128,7 +194,7 @@ private struct SegmentChips: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Caption("Click a segment to keep or drop it; the brush (or its menu) styles it. Yours are named by what they show and matched by how they start, so one that comes and goes (a git branch outside a repository) doesn't move the others.")
+            HelpCaption("Click a segment to keep or drop it; the brush (or its menu) styles it. Yours are named by what they show and matched by how they start, so one that comes and goes (a git branch outside a repository) doesn't move the others.")
             ForEach(chips.lineIndices, id: \.self) { line in
                 LineChips(chips: chips, line: line, badges: badges, change: change)
             }
@@ -138,7 +204,7 @@ private struct SegmentChips: View {
                     get: { chips.keepNew },
                     set: { on in change { $0.keepNew = on } }))
                     .help("Keep segments yours shows later: what happens to a segment Sanduhr hasn't seen yet.")
-                Caption("When your statusline shows a segment that isn't here now, on keeps it and off leaves it out.")
+                HelpCaption("When your statusline shows a segment that isn't here now, on keeps it and off leaves it out.")
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text("Sanduhr's").font(.caption.weight(.medium))
@@ -181,7 +247,7 @@ private struct LineChips: View {
                     .font(.caption.weight(.medium))
                 separatorMenu
             }
-            Caption("How Sanduhr reads your line into segments: the separator it found, or one you choose. It changes the chips; your line reads the same until you drop a segment or choose Join with.")
+            HelpCaption("How Sanduhr reads your line into segments: the separator it found, or one you choose. It changes the chips; your line reads the same until you drop a segment or choose Join with.")
             ChipFlow {
                 ForEach(chips.chips(line: line)) { chip in
                     SegmentChip(chip: chip, help: help(chip), badge: badges.text(.theirs(chip.key)),
@@ -237,7 +303,7 @@ private struct JoinWithPicker: View {
                 .fixedSize()
                 .help("Join with: what goes between the segments that remain, in your part and Sanduhr's. " + PowerlineGlyph.explanation)
             }
-            Caption("The glyph between segments in the final line. Same as yours keeps your own separators.")
+            HelpCaption("The glyph between segments in the final line. Same as yours keeps your own separators.")
         }
     }
 }
@@ -254,7 +320,7 @@ private struct JoinRowPicker: View {
             }
             .pickerStyle(.segmented)
             .help("Sanduhr's meters: where Sanduhr's segments go next to yours.")
-            Caption("Own row: your line, then Sanduhr's under it. Same row: Sanduhr's after yours, moving to its own row when the terminal is too narrow.")
+            HelpCaption("Own row: your line, then Sanduhr's under it. Same row: Sanduhr's after yours, moving to its own row when the terminal is too narrow.")
         }
     }
 }
@@ -361,7 +427,7 @@ private struct StylePopover: View {
                 ForEach(LetterStyle.allCases, id: \.self) { f in Text(f.title).tag(LetterStyle?.some(f)) }
             }
             .help("Letters: Unicode letter styles (math letters and small caps). Some fonts draw them differently; digits change only in bold, double-struck, sans and monospace.")
-            Caption("Sanduhr's statusline applies this each refresh. Statuslines can't animate; the Desk can.")
+            Caption("Sanduhr's statusline applies this each refresh. Statuslines can't animate; the meters mod's band above the prompt draws Sanduhr's segments in this look and moves it (sweep, shimmer, glow).")
             Button("Reset to its own look") { style = SegmentStyle() }
                 .disabled(style.isEmpty)
         }
@@ -413,10 +479,11 @@ private struct InkEditor: View {
     }
 }
 
-/// The folder's mods that draw status entries, read-only.
+/// The folder's mods that draw status entries, read-only here; the Mods page switches them.
 private struct ModChips: View {
     let mods: [ModStatusEntry]?
     let badges: Badges
+    @Environment(\.openModsPage) private var openModsPage
 
     var body: some View {
         if let mods {
@@ -428,7 +495,13 @@ private struct ModChips: View {
                     ChipFlow {
                         ForEach(mods) { mod in ModChip(mod: mod, badge: badges.text(.mod(mod.path))) }
                     }
-                    Caption("Claude Code draws these mods' status entries in its status area, beside the statusline, so Combine can't keep, drop or style them. To hide one, use the mod's own settings (/config in Claude Code) or turn the mod off for this folder; the Mods page will have a switch for each.")
+                    if let openModsPage {
+                        Button("See It in Mods & Config", action: openModsPage)
+                            .buttonStyle(.link)
+                            .font(.caption)
+                            .help("Opens Settings, Mods & Config, which lists every mod each folder loads. Sanduhr's own mod switches per folder there too.")
+                    }
+                    HelpCaption("Claude Code draws these mods' status entries in its status area, beside the statusline, so Combine can't keep, drop or style them. To hide one, use the mod's own settings (/config in Claude Code) or turn the mod off for this folder: Sanduhr's own mod switches per folder on Mods & Config (Meters above the prompt), and switches for other mods come later.")
                 }
             }
         }
@@ -444,7 +517,7 @@ private struct ModChip: View {
         let draws = mod.drawsStatus ? "Claude Code draws its status entry, not the statusline" : "it draws Sanduhr's meters above the prompt"
         var text = "\(mod.name): a mod from \(from); \(draws), so Sanduhr can't keep, drop or style it."
         if let setting = mod.statusSetting { text += " Its own setting \u{201C}\(setting)\u{201D} may switch the entry." }
-        if badge != nil { text += " To remove the duplicate, change the mod's own settings or turn it off on the Mods page." }
+        if badge != nil { text += " To remove the duplicate, change the mod's own settings or turn it off for this folder." }
         return text
     }
 
@@ -484,7 +557,7 @@ private struct DuplicatesPanel: View {
                     .help("Drops your \(d.what) segment.")
             }
         } else {
-            Caption("\(d.what): \(side(d.a)) and \(side(d.b)) both show it. A mod's entry changes only in its own settings (/config in Claude Code) or on the Mods page.")
+            Caption("\(d.what): \(side(d.a)) and \(side(d.b)) both show it. A mod's entry changes only in its own settings (/config in Claude Code) or by turning the mod off for this folder.")
         }
     }
 
@@ -552,7 +625,7 @@ private struct CombinePreview: View {
             if !mods.isEmpty {
                 Text("Claude Code's status area").font(.caption.weight(.medium))
                 Terminal(text: mods.map { "\u{26A0} \($0.name): …" }.joined(separator: "\n"), placeholder: "")
-                Caption("Mods draw these themselves, so only their names stand in: their text is known only inside a session.")
+                HelpCaption("Mods draw these themselves, so only their names stand in: their text is known only inside a session.")
             }
         }
         .task(id: Key(theirs: theirs, join: join, selection: selection, input: input)) {

@@ -14,13 +14,23 @@ module Smoke
                             welcome-tour, sheet)
       state                 snapshot and print state.yaml
       do <action> [arg]     run one hook action and wait for it: show-widget, hide-widget,
-                            settings [section], close-settings, refresh, test-alert,
+                            settings [section [anchor]] (notch glow: the page scrolled to a section),
+                            settings-search <words> (the sidebar search's best match, as Return),
+                            close-settings, refresh, test-alert,
                             pulse [tier], tool deep-work|pacing|snake, desk on|off, notch on|off,
                             camera-light on|off, glow [alert|meeting|camera], demo on|off,
                             account next (the next account, as the widget's chip),
                             whats-new, close-whats-new (the What's New window),
                             tour, tour-step <n>, close-tour (the welcome tour),
                             watch-test start|wait|pass|fail|clear (a made-up watcher)
+                            av-test camera on|off, av-test mic on|off (fake the camera or mic signal)
+                            message-editor add|revert (Settings, Message: the smoke's own line,
+                            unsaved; revert drops unsaved edits; never saves)
+                            desk-arrange start|test|done|cancel (Arrange mode on the Desk: test is
+                            the smoke's own edit, unsaved; done writes the layout, cancel nothing)
+                            hot-key settings|join <keys>|default (a shortcut's keys, as General's
+                            recorder sets them: ctrl-opt-s or ⌃⌥S; refused without ⌘⌃⌥ or when the
+                            other shortcut has them; a run puts them back)
       watch [seconds]       stream Sanduhr's log and refresh out/watch/ every N seconds (default 5)
       run [scenario.yaml…]  run scenarios (all in scenarios/ when none given); exits 1 on failure
       view [folder]         build and open an HTML gallery of a snapshot or run (default: newest)
@@ -185,7 +195,9 @@ module Smoke
 
     def act(argv)
       raise Failure, 'usage: smoke do <action> [arg]' if argv.empty?
-      LiveApp.new.action(argv[0], argv[1])
+      # Words after the action are one argument: `smoke do av-test camera on`.
+      arg = argv[1..].join(' ')
+      LiveApp.new.action(argv[0], arg.empty? ? nil : arg)
       puts 'ok'
     end
 

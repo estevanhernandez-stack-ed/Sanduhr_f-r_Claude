@@ -1,12 +1,15 @@
 import SwiftUI
 import AppKit
 
-/// The widget's sections of the Settings window (SettingsWindow.swift): Pacing & Focus,
-/// Themes, Widget Look and Alerts. They were the tabs of the widget's settings sheet;
-/// SettingsRoot picks one with `section`. Accounts has its own view (AccountsSettings.swift).
+/// The widget's pages of the Settings window (SettingsWindow.swift): Widget, Themes and Alerts.
+/// They were the tabs of the widget's settings sheet; SettingsRoot picks one with `section`.
+/// Settings v2 (slice 2) folded Pacing & Focus into Widget, with the widget's switches from
+/// General, and Desk, Meters into Alerts as Each limit. Accounts has its own view.
 struct WidgetSettings: View {
     @Bindable var vm: UsageViewModel
     let section: SettingsSection
+    /// Alerts' Each limit reads the Desk model's reported and temporary limits.
+    var deskModel: DeskModel? = nil
 
     @AppStorage("remindSessionEnd") private var remindSessionEnd = false
     @AppStorage("alertsEnabled") private var alertsEnabled = false
@@ -43,10 +46,9 @@ struct WidgetSettings: View {
         let t = vm.theme.palette
         Group {
             switch section {
-            case .pacing: pacingTab(t: t)
             case .themes: themesTab(t: t)
-            case .widgetLook: fontTab(t: t)
-            case .alerts: ScrollView { alertsTab(t: t) }
+            case .widgetLook: widgetPage(t: t)
+            case .alerts: alertsPage(t: t)
             default: EmptyView()
             }
         }
@@ -70,11 +72,12 @@ struct WidgetSettings: View {
                     .font(.caption)
                     .foregroundStyle(t.textSecondary)
                 ThemeGalleryView(vm: vm)
+                    .settingsAnchor(SettingsAnchor.gallery)
                 Divider().padding(.vertical, 6)
                 Text("Your own themes")
                     .font(.headline)
-                themeTools(t: t)
-                claudeThemeSwitch(t: t)
+                themeTools(t: t).settingsAnchor(SettingsAnchor.ownThemes)
+                claudeThemeSwitch(t: t).settingsAnchor(SettingsAnchor.claudeThemes)
             }
             .padding(.trailing, 4)
         }
@@ -107,7 +110,7 @@ struct WidgetSettings: View {
             }
 
             HStack(spacing: 8) {
-                Button("Save & Apply", action: saveAndApplyTheme)
+                Button(SettingsNames.saveAndApply, action: saveAndApplyTheme)
                     .keyboardShortcut(.defaultAction)
                     .disabled(themePaste.trimmingCharacters(in: .whitespaces).isEmpty)
                 Button("Copy Agent Prompt", action: copyAgentPrompt)
@@ -245,10 +248,25 @@ struct WidgetSettings: View {
         }
     }
 
-    // MARK: - Font tab
+    // MARK: - Widget
+
+    /// Widget: Show the widget (from General), the font and subtle mode, the pacing calculators.
+    private func widgetPage(t: Theme.Palette) -> some View {
+        // The window's scroll reader brings an anchor into view (SettingsRoot, slice 3).
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                WidgetShowRows().settingsAnchor(SettingsAnchor.show)
+                Divider()
+                fontTab(t: t).settingsAnchor(SettingsAnchor.font)
+                Divider()
+                pacingTab(t: t).settingsAnchor(SettingsAnchor.pacing)
+            }
+        }
+    }
 
     private func fontTab(t: Theme.Palette) -> some View {
         VStack(alignment: .leading, spacing: 14) {
+            Text("Font").font(.headline)
             Text("Pick any font installed on this Mac, your own handwriting font included. The widget changes as you choose. Monospaced readouts keep the system font so the digits stay aligned.")
                 .font(.caption)
                 .foregroundStyle(t.textSecondary)
@@ -287,15 +305,28 @@ struct WidgetSettings: View {
                 }
                 Spacer()
             }
-            Spacer()
         }
         .onAppear { fontFamilies = FontSettings.installedFamilies() }
     }
 
-    // MARK: - Alerts tab
+    // MARK: - Alerts
+
+    /// Alerts: Notifications, then Each limit (was Desk, Meters).
+    private func alertsPage(t: Theme.Palette) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                alertsTab(t: t).settingsAnchor(SettingsAnchor.notifications)
+                if let deskModel {
+                    Divider()
+                    EachLimitSection(model: deskModel).settingsAnchor(SettingsAnchor.eachLimit)
+                }
+            }
+        }
+    }
 
     private func alertsTab(t: Theme.Palette) -> some View {
         VStack(alignment: .leading, spacing: 12) {
+            Text("Notifications").font(.headline)
             Text("A heads-up before you hit a limit. Each alert comes once per reset window. Focus and Do Not Disturb still apply.")
                 .font(.caption)
                 .foregroundStyle(t.textSecondary)
@@ -348,6 +379,7 @@ struct WidgetSettings: View {
                 }
 
                 Toggle("Quiet hours", isOn: $alertQuietEnabled)
+                    .settingsAnchor(SettingsAnchor.quietHours)
                 HStack {
                     DatePicker("From", selection: quietTime($alertQuietStart), displayedComponents: .hourAndMinute)
                     DatePicker("to", selection: quietTime($alertQuietEnd), displayedComponents: .hourAndMinute)
@@ -375,7 +407,6 @@ struct WidgetSettings: View {
                 Text(note).font(.caption).foregroundStyle(Color.hex("f87171"))
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer()
         }
     }
 
@@ -389,10 +420,11 @@ struct WidgetSettings: View {
             })
     }
 
-    // MARK: - Pacing tab
+    // MARK: - Pacing calculators
 
     private func pacingTab(t: Theme.Palette) -> some View {
         VStack(alignment: .leading, spacing: 14) {
+            Text("Pacing calculators").font(.headline)
             Text("The pacing calculators (cool down and surplus) show on a card under the pointer. Pin them to keep them on every card; Tools, Pacing Calculators in any Sanduhr menu does the same. Deep Work and Cooldown Snake open from Tools too.")
                 .font(.caption)
                 .foregroundStyle(t.textSecondary)
@@ -402,7 +434,42 @@ struct WidgetSettings: View {
             Text("Until Sanduhr quits.")
                 .font(.caption)
                 .foregroundStyle(t.textDim)
-            Spacer()
+        }
+    }
+}
+
+
+/// Widget, Show the widget (moved from General's Surfaces in slice 2): when it shows on its own,
+/// and showing or hiding it now. The switch mirrors panelHidden, which AppDelegate writes whenever
+/// the widget shows or hides.
+private struct WidgetShowRows: View {
+    @AppStorage(WidgetVisibility.key) private var widgetVisibility = WidgetVisibility.always
+    @AppStorage(AppDelegate.panelHiddenKey) private var panelHidden = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // A choice made here, not any change to the key: onChange also fired for writes
+            // from outside (a smoke run's defaults step), even with Settings closed, and
+            // treated them as a pick (issue #105's "Always shown shows the widget").
+            Picker(SettingsNames.showWidget, selection: Binding(
+                get: { widgetVisibility },
+                set: { choice in
+                    guard choice != widgetVisibility else { return }
+                    widgetVisibility = choice
+                    (NSApp.delegate as? AppDelegate)?.widgetVisibilityDidChange()
+                })) {
+                ForEach(WidgetVisibility.allCases) { Text($0.label).tag($0) }
+            }
+            Toggle("Show the widget now", isOn: Binding(
+                get: { !panelHidden },
+                set: { show in
+                    let app = NSApp.delegate as? AppDelegate
+                    if show { app?.showPanel() } else { app?.hidePanel() }
+                }))
+            Text("The floating window with the tools. Showing or hiding it by hand lasts until the Desk turns on or off or Sanduhr starts again; then the choice above takes over.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// One Claude Code folder's row on the Integrations page.
+/// One Claude Code folder's box on the Claude Code page.
 struct IntegrationFolderState: Identifiable, Equatable {
     let path: String
     var mcp: IntegrationStatus
@@ -100,6 +100,16 @@ final class IntegrationsModel {
         }.value
     }
 
+    /// Sanduhr's statusline printed once against the sample statusline JSON, for the page's
+    /// preview (item 68). Nil when it couldn't run (no python3, a build without the scripts).
+    func sampleStatusline() async -> String? {
+        guard let python = pythonPath else { return nil }
+        return await Task.detached(priority: .userInitiated) { () -> String? in
+            guard let args = IntegrationInstaller.standard.sampleArguments() else { return nil }
+            return StatuslinePreview.run(python: python, arguments: args, input: StatuslinePreview.sampleJSON())
+        }.value
+    }
+
     /// The input for Test with live data: Sanduhr's current numbers and the folder's latest
     /// session (item 63b).
     func liveStatuslineInput(folder: String) async -> StatuslineLiveInput.Result {
@@ -140,7 +150,6 @@ final class IntegrationsModel {
     /// shown with Sanduhr's (item 63). Returns the other entry when one turned up unasked.
     func install(_ kind: IntegrationKind, folder: String, replaceOther: Bool, combine: StatuslineJoin? = nil,
                  selection: StatuslineSelection = StatuslineSelection(), linked: [String]) async -> String? {
-        // The mod runs inside Claude Code: no python3 needed.
         // The mod and the hooks run inside Claude Code: no python3 needed.
         guard let python = kind.needsPython ? pythonPath : (pythonPath ?? "") else { return nil }
         busy = folder
@@ -159,6 +168,10 @@ final class IntegrationsModel {
         await load(linked: linked)
         switch outcome {
         case .success(.installed):
+            // The band takes Sanduhr's segment looks from Combine; Replace clears them (item 65f).
+            if kind == .statusline, replaceOther || combine != nil {
+                BandFileWriter.shared.setMeterStyles(combine != nil ? selection.theirs?.ours : nil)
+            }
             let what = combine != nil && kind == .statusline
                 ? "Statusline combined with yours" : "\(kind.title) installed"
             note = ("\(what) for \(display(folder)). Claude Code sessions started from now on use it.", false)
@@ -201,10 +214,11 @@ final class IntegrationsModel {
     }
 }
 
-/// Settings, Integrations (item 49): install or remove Sanduhr's MCP server and statusline for
-/// each Claude Code folder. Sits under Claude Usage in the first group: like the Data section,
-/// it is about what Claude Code and Claude get from Sanduhr, and its consent points at the
-/// accounts' Share with your agents choices.
+/// Settings, Claude Code (raw value `integrations`; item 49, Settings v2 slice 2): one home for
+/// what Sanduhr installs into Claude Code folders: the MCP server, the statusline and the Claude
+/// Code glow hook, per folder, with the account each folder follows. The meters mod is a mod, so
+/// its controls live on Mods & Config (2026-10-08); each folder shows its state in one line with
+/// the way there. Its consent points at the accounts' Share with your agents choices.
 struct IntegrationsSettings: View {
     var vm: UsageViewModel
     @Bindable var navigation: SettingsNavigation
@@ -213,22 +227,28 @@ struct IntegrationsSettings: View {
 
     /// The accounts' linked folders, listed even where discovery wouldn't find them.
     private var linked: [String] { vm.accountLabels.compactMap { vm.dataChoices(for: $0).folder } }
+    /// Mods & Config's model, kept by the window: each folder's meters mod state, read only here.
+    private var mods: ModsPageModel { navigation.modsPage }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                // Its preview draws only sample input, so its folded strip says so (slice 3).
+                PreviewFold(page: .integrations, note: PreviewSamples.statusline.label) { IntegrationsPreview(model: model) }
                 IntegrationsIntro()
                 PythonRow(model: model, reload: reload)
-                folderList
-                GlowHint(openNotch: { navigation.selection = .notch })
-                Divider()
-                WatcherSettings(openNotch: { navigation.selection = .notch },
-                                openLayout: { navigation.selection = .deskLayout })
-                Divider()
-                Button("Add Folder…") {
-                    model.choose()
-                    reload()
+                    .settingsAnchor(SettingsAnchor.python)
+                HStack {
+                    Text("Folders").font(.headline)
+                    Spacer()
+                    Button("Add Folder…") {
+                        model.choose()
+                        reload()
+                    }
                 }
+                .settingsAnchor(SettingsAnchor.folders)
+                folderList
+                GlowHint()
                 if let note = model.note {
                     Text(note.text)
                         .font(.caption)
@@ -240,7 +260,10 @@ struct IntegrationsSettings: View {
             .padding(20)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .task { await model.load(linked: linked) }
+        .task {
+            await model.load(linked: linked)
+            await mods.load(linked: linked)
+        }
         .sheet(item: $consent) { c in
             IntegrationConsentSheet(consent: c, vm: vm, model: model,
                                     install: { join, selection in confirm(c, combine: join, selection: selection) },
@@ -248,11 +271,12 @@ struct IntegrationsSettings: View {
                                         consent = nil
                                         navigation.selection = .credentials
                                     },
-                                    openNotch: {
-                                        consent = nil
-                                        navigation.selection = .notch
-                                    },
+                                    closeSheet: { consent = nil },
                                     cancel: { consent = nil })
+                .environment(\.openModsPage) {
+                    consent = nil
+                    navigation.selection = .mods
+                }
         }
     }
 
@@ -265,13 +289,24 @@ struct IntegrationsSettings: View {
         }
         ForEach(model.folders) { f in
             IntegrationFolderBox(folder: f, model: model, owner: vm.account(linkedTo: f.path),
+                                 meters: MetersModStatus.text(mods.own.first { $0.folder == f.path }, fallback: f.meters),
                                  install: { kind in ask(kind, folder: f.path) },
                                  update: { kind in Task { await run(kind, folder: f.path, replace: false, combine: nil) } },
-                                 remove: { kind in Task { await model.remove(kind, folder: f.path, linked: linked) } })
+                                 remove: { kind in Task { await model.remove(kind, folder: f.path, linked: linked) } },
+                                 openAccounts: { owner in
+                                     navigation.accountToShow = owner
+                                     navigation.selection = .credentials
+                                 })
         }
     }
 
-    private func reload() { Task { await model.load(linked: linked) } }
+    /// Reads both models again: Add Folder… and Check Again can change what each shows.
+    private func reload() {
+        Task {
+            await model.load(linked: linked)
+            await mods.load(linked: linked)
+        }
+    }
 
     private func ask(_ kind: IntegrationKind, folder: String) {
         model.note = nil
@@ -299,7 +334,7 @@ private struct IntegrationsIntro: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Claude Code").font(.headline)
-            Text("The MCP server lets Claude Code ask Sanduhr about your usage, as each account's Share with your agents choice allows. The statusline shows the active account's meters under Claude Code's prompt; the meters mod draws them as bars above it. The notch glow hooks let Claude Code tell Sanduhr when a session waits on you or finishes, so the notch can glow. Each is installed per Claude Code folder: Sanduhr adds one entry to that folder's settings, keeps a backup of the file beside it, and Remove takes the entry out again. Nothing leaves this Mac.")
+            Text("The MCP server lets Claude Code ask Sanduhr about your usage, as each account's Share with your agents choice allows. The statusline shows the active account's meters under Claude Code's prompt, whichever account a folder is linked to; Sanduhr's meters mod draws them as bars above it, switched on Mods & Config. The Claude Code glow hook lets Claude Code tell Sanduhr when a session waits on you or finishes, so the notch can glow. Each is installed per Claude Code folder: Sanduhr adds one entry to that folder's settings, keeps a backup of the file beside it, and Remove takes the entry out again. Nothing leaves this Mac.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -346,33 +381,37 @@ private struct PythonRow: View {
 
 /// Where the glow the hooks feed is switched on (item 51).
 private struct GlowHint: View {
-    let openNotch: () -> Void
-
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("The notch glow hooks only tell Sanduhr; the glow itself is off until you turn it on in Notch, Glow.")
+            Text("The Claude Code glow hook only tells Sanduhr; the glow itself is off until you turn it on in Notch, Notch glow.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
-            Button("Glow Settings…", action: openNotch)
+            SettingsLinkButton(.notch, anchor: SettingsAnchor.glow)
         }
+        .settingsAnchor(SettingsAnchor.glowHint)
     }
 }
 
-/// One folder: its MCP server, statusline, meters mod and notch glow hooks rows.
+/// One folder: the account it follows, then its MCP server, statusline and Claude Code glow hook
+/// rows, and the meters mod's state with the way to Mods & Config.
 private struct IntegrationFolderBox: View {
     let folder: IntegrationFolderState
     var model: IntegrationsModel
     let owner: String?
+    /// "Meters above the prompt: on" (MetersModStatus).
+    let meters: String
     let install: (IntegrationKind) -> Void
     let update: (IntegrationKind) -> Void
     let remove: (IntegrationKind) -> Void
+    let openAccounts: (String?) -> Void
 
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(IntegrationKind.allCases, id: \.self) { kind in
+                FolderAccountRow(owner: owner, open: { openAccounts(owner) })
+                ForEach(IntegrationFolderKinds.withControls, id: \.self) { kind in
                     IntegrationRow(kind: kind, status: folder.status(kind),
                                    combined: kind == .statusline && folder.statuslineCombined,
                                    file: model.configDisplay(kind, folder: folder.path),
@@ -380,15 +419,48 @@ private struct IntegrationFolderBox: View {
                                    install: { install(kind) }, update: { update(kind) },
                                    remove: { remove(kind) })
                 }
+                MetersModLine(text: meters)
             }
             .padding(4)
         } label: {
-            HStack(spacing: 6) {
-                Text(model.display(folder.path)).font(.body.monospaced())
-                if let owner {
-                    Text(owner).font(.caption).foregroundStyle(.secondary)
-                }
-            }
+            Text(model.display(folder.path)).font(.body.monospaced())
+        }
+    }
+}
+
+/// The rows with controls in a Claude Code folder box: the meters mod's are on Mods & Config.
+enum IntegrationFolderKinds {
+    static let withControls = IntegrationKind.allCases.filter { $0 != .meters }
+}
+
+/// The account a folder follows (Settings v2, F18): the one Accounts' Data links to it, or the
+/// active account. The link itself is set in Accounts.
+private struct FolderAccountRow: View {
+    let owner: String?
+    let open: () -> Void
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text("Account").frame(width: 150, alignment: .leading)
+            Text(Self.text(owner)).font(.caption).foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            Button("Change in Accounts…", action: open)
+        }
+    }
+
+    /// "Work", or "Follows the active account" for a folder no account links.
+    static func text(_ owner: String?) -> String { owner ?? "Follows the active account" }
+}
+
+/// The meters mod's state in a folder, no controls: they live on Mods & Config (2026-10-08).
+private struct MetersModLine: View {
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(text).font(.caption).foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            SettingsLinkButton(.mods, anchor: SettingsAnchor.metersMod)
         }
     }
 }
@@ -460,28 +532,43 @@ private struct IntegrationConsentSheet: View {
     /// segments picked (item 63b).
     let install: (StatuslineJoin?, StatuslineSelection) -> Void
     let openAccounts: () -> Void
-    let openNotch: () -> Void
+    /// Closes the sheet on the way to a page a link button opens.
+    let closeSheet: () -> Void
     let cancel: () -> Void
     @State private var join: StatuslineJoin = .line
     @State private var selection = StatuslineSelection()
+    @State private var band = false
 
     /// The statusline sheet when one is already set: Combine, Replace or Cancel.
     private var offersCombine: Bool { consent.kind == .statusline && consent.other != nil }
 
+    /// The sheet's content scrolls above its buttons, so a tall Combine picker never pushes them
+    /// off the screen (2026-10-07). About 220 points stay for the title bar and the buttons.
+    static var maxContentHeight: CGFloat {
+        max(260, (NSScreen.main?.visibleFrame.height ?? 800) - 220)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            header
-            if offersCombine, let other = consent.other {
-                CombineChoice(other: other, folder: model.display(consent.folder), folderPath: consent.folder,
-                              model: model, join: $join,
-                              selection: $selection)
-            } else if let other = consent.other {
-                ReplaceNotice(other: other, folder: model.display(consent.folder), kind: consent.kind)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    header
+                    if offersCombine, let other = consent.other {
+                        CombineChoice(other: other, folder: model.display(consent.folder), folderPath: consent.folder,
+                                      model: model, join: $join,
+                                      selection: $selection, band: $band)
+                    } else if let other = consent.other {
+                        ReplaceNotice(other: other, folder: model.display(consent.folder), kind: consent.kind)
+                    }
+                    Text(writes)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Text(writes)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            .frame(maxHeight: Self.maxContentHeight)
+            .fixedSize(horizontal: false, vertical: true)
             buttons
         }
         .padding(20)
@@ -494,10 +581,8 @@ private struct IntegrationConsentSheet: View {
             .font(.headline)
         if consent.kind == .mcp {
             MCPConsentBody(vm: vm, folder: model.display(consent.folder), openAccounts: openAccounts)
-        } else if consent.kind == .meters {
-            MetersConsentBody(folder: model.display(consent.folder))
         } else if consent.kind == .hooks {
-            HooksConsentBody(folder: model.display(consent.folder), openNotch: openNotch)
+            HooksConsentBody(folder: model.display(consent.folder), closeSheet: closeSheet)
         } else {
             Text("Claude Code sessions using \(model.display(consent.folder)) show the active account's session and weekly meters under the prompt, read from the numbers Sanduhr saves on this Mac. Claude Code shows the line to you; it isn't added to the conversation.")
                 .fixedSize(horizontal: false, vertical: true)
@@ -511,7 +596,7 @@ private struct IntegrationConsentSheet: View {
             if offersCombine {
                 Button("Cancel", role: .cancel, action: cancel).keyboardShortcut(.cancelAction)
                 Button("Replace") { install(nil, StatuslineSelection()) }
-                Button("Combine") { install(join, selection) }
+                Button("Combine") { install(join, banded) }
                     .keyboardShortcut(.defaultAction)
             } else {
                 Button("Not Now", role: .cancel, action: cancel).keyboardShortcut(.cancelAction)
@@ -521,11 +606,18 @@ private struct IntegrationConsentSheet: View {
         }
     }
 
+    /// The picks with the band choice (item 65f).
+    private var banded: StatuslineSelection {
+        var s = selection
+        s.band = band
+        return s
+    }
+
     static func headline(_ kind: IntegrationKind) -> String {
         switch kind {
         case .mcp: "Let Claude Code ask Sanduhr about your usage?"
         case .statusline: "Show the meters in Claude Code?"
-        case .meters: "Show the meters above Claude Code's prompt?"
+        case .meters: MetersConsentSheet.headline
         case .hooks: "Glow the notch when Claude Code needs you?"
         }
     }
@@ -535,9 +627,6 @@ private struct IntegrationConsentSheet: View {
         let file = model.configDisplay(consent.kind, folder: consent.folder)
         if consent.kind == .hooks {
             return "Sanduhr adds one entry to each of \(consent.kind.keyPath) in \(file), keeping every hook already there, and keeps a copy of the file as it was, with .sanduhr-backup added to its name. Remove takes out only those two entries."
-        }
-        if consent.kind == .meters {
-            return "Sanduhr adds its mod's folder to \(consent.kind.keyPath) in \(file), keeping any folders already listed, and keeps a copy of the file as it was, with .sanduhr-backup added to its name. Remove takes out only that folder."
         }
         if offersCombine {
             return "Either way Sanduhr sets \(consent.kind.keyPath) in \(file), keeping your line's padding, refresh interval and vim setting, and keeps a copy of the file as it was, with .sanduhr-backup added to its name. Remove puts your statusline back exactly as it is now."
@@ -577,32 +666,16 @@ struct OtherCommandBox: View {
     }
 }
 
-/// What the meters mod shows and reads (item 50).
-private struct MetersConsentBody: View {
-    let folder: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Claude Code sessions using \(folder) draw the active account's session and weekly bars above the prompt, with the pace mark and reset countdowns, and show a short notice when a limit nearly fills or the session resets. It is a Claude Code mod, so it needs a Claude Code version that loads mods.")
-                .fixedSize(horizontal: false, vertical: true)
-            Text("The mod reads only the numbers Sanduhr saves on this Mac (snapshot.json). It never uses the network, never calls a model and adds nothing to the conversation.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-}
-
 /// What the notch glow hooks tell Sanduhr (item 51), and where the glow is switched on.
 private struct HooksConsentBody: View {
     let folder: String
-    let openNotch: () -> Void
+    let closeSheet: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Claude Code sessions using \(folder) tell Sanduhr when they wait on you (a permission prompt or a question) and when a turn finishes, so the notch can glow.")
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Claude Code tells Sanduhr only that it is waiting or finished, by opening a sanduhr:// link that carries that one word. Nothing about the conversation or the project is sent, and nothing leaves this Mac. While Sanduhr isn't running, the hooks do nothing.")
+            Text("Claude Code tells Sanduhr only that it is waiting or finished, with a system notification whose name is that one word. Nothing about the conversation or the project is sent, and nothing leaves this Mac. The hook never starts Sanduhr: while it isn't running, it does nothing.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -611,11 +684,11 @@ private struct HooksConsentBody: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .firstTextBaseline) {
-                Text("The glow stays off until you turn it on in Notch, Glow.")
+                Text("The glow stays off until you turn it on in Notch, Notch glow.")
                     .font(.caption)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
-                Button("Glow Settings…", action: openNotch)
+                SettingsLinkButton(.notch, anchor: SettingsAnchor.glow, before: closeSheet)
             }
         }
     }

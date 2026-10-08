@@ -164,7 +164,7 @@ final class UsagePageModel {
 /// **Why a Settings section.** Everything about an account's data already lives in Settings:
 /// the choices that decide what this page can show are in Accounts, Data, one row up, and the
 /// page sends people there when a choice is missing. Settings is the one window every menu,
-/// Option+S and the notch already open, it resizes, and it keeps its state while open. A
+/// The Settings shortcut and the notch already open, it resizes, and it keeps its state while open. A
 /// separate window would be a second place to look for the same account's data. The widget's
 /// Tools menu, Desk's menus and the menu bar menu reach it with Claude Usage….
 struct UsageSettings: View {
@@ -515,10 +515,8 @@ struct UsageNeedsSetup: View {
             Text(text)
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("Data Settings…") {
-                navigation.accountToShow = label
-                navigation.selection = .credentials
-            }
+            // Accounts, scrolled to this account's Data.
+            SettingsLinkButton(.credentials) { navigation.accountToShow = label }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)

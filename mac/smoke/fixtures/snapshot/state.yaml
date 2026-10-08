@@ -1,6 +1,29 @@
 desk_enabled: true
 desk_running: true
 layout: "message:tl clock:bl meters:bl meetings:bl"
+desk_pieces:
+  - piece: message
+    anchor: tl
+    order: 0
+    scale: 1
+  - piece: clock
+    anchor: bl
+    order: 0
+    scale: 1
+  - piece: meters
+    anchor: bl
+    order: 1
+    scale: 1
+  - piece: meetings
+    anchor: bl
+    order: 2
+    scale: 1
+desk_arrange:
+  active: false
+  changed: false
+  working: null
+  click_through: drawn
+  bar_visible: false
 notch: false
 has_notch: true
 notch_left: meetingOrTime
@@ -18,6 +41,9 @@ widget_visibility: always
 menu_bar: higher
 settings_open: true
 settings_section: notch
+settings_anchor: null
+settings_anchor_visible: null
+settings_preview_folded: null
 usage_page:
   open: false
   tab: overview
@@ -57,8 +83,15 @@ desk_frames:
   - kind: meetings
     clickable: false
     frame: [52, 898, 260, 22]
+  - kind: clock
+    clickable: true
+    frame: [52, 580, 300, 152]
+  - kind: message
+    clickable: true
+    frame: [52, 60, 700, 100]
 desk_frames_ok: true
 desk_frames_problem: null
+desk_piece_clicks: true
 dock:
   side: bottom
   autohide: false
@@ -100,7 +133,7 @@ menu:
         checked: false
       - title: Cooldown Snake
         checked: false
-      - title: Camera Light
+      - title: Camera Fill Light
         checked: false
 credentials_store: file
 account_ref: "104ab921"
@@ -145,3 +178,35 @@ watchers:
   agents: false
   background: false
   intro: false
+av_indicators:
+  camera: false
+  mic: false
+  shown: none
+mods_page:
+  open: false
+  loaded: false
+  folders: 0
+  mods: 0
+  plugins: 0
+  enabled: 0
+  missing: 0
+  checked: 0
+  cli: false
+message_editor:
+  open: false
+  mode: list
+  rows: 3
+  styled: 3
+  raw: 0
+  notes: 4
+  unsaved: false
+  today_special: 0
+  added: null
+hot_keys:
+  join: true
+  settings: true
+  registered: 2
+  join_keys: ⌥J
+  settings_keys: ⌥S
+  join_taken: false
+  settings_taken: false

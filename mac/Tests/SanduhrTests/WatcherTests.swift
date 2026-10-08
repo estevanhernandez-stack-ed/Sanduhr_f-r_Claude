@@ -388,6 +388,32 @@ struct WatcherTests {
         #expect(changes > 0)
     }
 
+    /// A Stop's report written long before Sanduhr read it (no Sanduhr ran then) is the
+    /// session's state from back then: deleted unread. A fresh one is read.
+    @MainActor
+    @Test func aStaleStopReportIsDeletedUnread() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("sanduhr-watch-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let now = Date()
+        let store = WatcherStore(support: dir, agents: { false }, background: { true }, now: { now })
+        let stop = Data(#"{"schema_version":1,"session":"s","folder":null,"tasks":[{"id":"t","type":"shell","status":"running","description":"Build"}]}"#.utf8)
+        let old = dir.appendingPathComponent("watch-stop-0000000000001-old.json")
+        FileManager.default.createFile(atPath: old.path, contents: stop)
+        try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(-WatcherRequest.maxAge - 60)],
+                                              ofItemAtPath: old.path)
+        #expect(WatcherStore.isStale(old, now: now))
+        store.check()
+        #expect(store.board.watchers.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: old.path))
+        let fresh = dir.appendingPathComponent("watch-stop-0000000000002-new.json")
+        FileManager.default.createFile(atPath: fresh.path, contents: stop)
+        #expect(!WatcherStore.isStale(fresh, now: now))
+        store.check()
+        #expect(store.board.watcher("b:s:t") != nil)
+        #expect(!FileManager.default.fileExists(atPath: fresh.path))
+    }
+
     @MainActor
     @Test func theDebugWatcherGoesThroughTheSameDecoding() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("sanduhr-watch-\(UUID().uuidString)")
@@ -512,5 +538,47 @@ struct WatcherTests {
                               agents: true, background: false, intro: true)
         let yaml = YAMLEmitter.emit(.object([("watchers", DebugState.watchersYAML(w))]))
         #expect(yaml == "watchers:\n  count: 2\n  states:\n    - waiting\n    - running\n  placements:\n    - right\n    - desk\n  agents: true\n  background: false\n  intro: true\n")
+    }
+}
+
+/// The watchers' state marks next to the camera indicator (item 67): the camera's red dot is the
+/// only red dot, so failed draws a red triangle, and no dot is red.
+@Suite("Watcher marks")
+struct WatcherMarkTests {
+    static let states: [WatcherState] = [.running, .waiting, .passed, .failed, .finished, .lostTouch]
+
+    @Test func failedIsATriangleTheRestAreDots() {
+        #expect(WatcherLook.mark(.failed) == .triangle)
+        #expect(WatcherLook.mark(.passed) == .check)
+        for state in [WatcherState.running, .waiting, .finished, .lostTouch] {
+            #expect(WatcherLook.mark(state) == .dot)
+        }
+    }
+
+    /// Red: the red channel well above both others.
+    static func isRed(_ hex: String) -> Bool {
+        let v = Int(hex, radix: 16) ?? 0
+        let r = (v >> 16) & 0xff, g = (v >> 8) & 0xff, b = v & 0xff
+        return r > 180 && g < 140 && b < 140
+    }
+
+    @Test func noWatcherDrawsARedDot() {
+        for state in Self.states where WatcherLook.mark(state) != .triangle {
+            #expect(!Self.isRed(WatcherLook.hex(state)), "\(state) must not be red")
+        }
+        // Waiting on you is amber, failed's triangle red, like the camera dot.
+        #expect(WatcherLook.hex(.waiting) == "fbbf24")
+        #expect(Self.isRed(WatcherLook.hex(.failed)))
+        #expect(Self.isRed("ff3b30"))
+    }
+
+    @Test func voiceOverSaysFailed() {
+        var b = WatcherBoard()
+        let t0 = Date(timeIntervalSince1970: 1_000)
+        b.apply(.start(id: "f", title: "Deploy", link: nil, total: nil, work: false, short: nil), now: t0)
+        b.apply(.end(id: "f", result: .failed, note: nil), now: t0 + 10)
+        guard let w = b.ordered().first else { Issue.record("no watcher"); return }
+        #expect(WatcherText.spoken(w, now: t0 + 10).contains("failed"))
+        #expect(WatcherState.failed.label == "failed")
     }
 }

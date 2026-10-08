@@ -235,7 +235,7 @@ struct TourChoiceView: View {
                 }))
             .help("Off goes back to the theme you had before")
         case .menuBar:
-            Picker("Menu bar shows", selection: Binding(
+            Picker(SettingsNames.menuBarShows, selection: Binding(
                 get: { menuBarMode },
                 set: { mode in
                     guard mode != menuBarMode else { return }

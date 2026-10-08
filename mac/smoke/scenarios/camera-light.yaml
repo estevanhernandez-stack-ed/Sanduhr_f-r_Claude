@@ -1,15 +1,15 @@
-# Iteration 3 item 20: Tools, Camera Light shows the light by hand, in its own click-through
+# Iteration 3 item 20: Tools, Camera Fill Light shows the light by hand, in its own click-through
 # window (kind camera) over the notch or the top center. No camera is turned on; the run turns
 # the light off again. Watch the snap for a soft white glow around the notch.
-name: Camera light by hand
+name: Camera fill light by hand
 steps:
   - expect_state: { camera_light: false }
   - do: camera-light
     arg: "on"
-  - expect_state: { camera_light: true, menu.1.items.3.title: Camera Light, menu.1.items.3.checked: true }
+  - expect_state: { camera_light: true, menu.1.items.3.title: Camera Fill Light, menu.1.items.3.checked: true }
   - expect:
       window: camera
-      contains: { label: Camera light }
+      contains: { label: Camera fill light }
   - snap: camera-light
   - do: camera-light
     arg: "off"

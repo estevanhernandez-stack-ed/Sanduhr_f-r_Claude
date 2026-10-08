@@ -6,7 +6,7 @@ import Observation
 /// HandoffWatch, the same watch as the Desk messages' handoff), checks it again (ThemeProposal,
 /// ThemeLint) and either saves it into the themes folder and applies it when asked, when
 /// Settings, Themes' "Let Claude change themes directly" is on, or holds it as the suggestion
-/// Settings, Themes shows with a preview card, Save, Save and Apply, and Dismiss. Each step
+/// Settings, Themes shows with a preview card, Save, Save & Apply, and Dismiss. Each step
 /// answers in theme-result.json, which the server reads: `pending_approval` at once, then
 /// `saved`, `applied` or `rejected` when the user decides.
 ///
@@ -109,7 +109,7 @@ final class ThemeProposalHandoff {
         }
     }
 
-    /// Save, or Save and Apply: the waiting suggestion goes into the themes folder.
+    /// Save, or Save & Apply: the waiting suggestion goes into the themes folder.
     func approve(apply: Bool) {
         guard let p = pending else { return }
         pending = nil

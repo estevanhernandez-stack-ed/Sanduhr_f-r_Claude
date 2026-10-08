@@ -1,0 +1,18 @@
+# docs/mac-smoke-test.md section 36: Settings, Message's line editor (item 69). The hook adds the
+# smoke's own line (Fridays, "ship it.", a sunset gradient in script letters with a sweep) as the
+# controls would write it, held unsaved; no hook saves, so messages.txt is never written. Revert
+# drops the line again. Starts only with nothing unsaved, so your own edits are never dropped.
+name: Message editor adds and styles a line
+steps:
+  - do: settings
+    arg: message
+  - expect_state: { settings_section: message, settings_preview: message, message_editor.open: true, message_editor.mode: list, message_editor.unsaved: false }
+  - do: message-editor
+    arg: add
+  # Settings v2, slice 3: Add Line puts the line at the top of its day's lines and scrolls its open
+  # editor into view (the new-line anchor), wherever the list was scrolled.
+  - expect_state: { message_editor.unsaved: true, message_editor.added: "Fri: {ink:#ff7e5f,#feb47b,#ffd86f} {font:script} {sweep} ship it.", settings_anchor: new-line, settings_anchor_visible: true }
+  - snap: message-editor
+  - do: message-editor
+    arg: revert
+  - expect_state: { message_editor.unsaved: false, message_editor.added: null }
