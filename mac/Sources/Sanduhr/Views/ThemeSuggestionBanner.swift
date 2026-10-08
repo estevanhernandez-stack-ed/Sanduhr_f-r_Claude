@@ -2,7 +2,7 @@ import SwiftUI
 
 /// "Claude suggested a theme" over Settings, Widget, Themes (item 55): the theme drawn as its
 /// gallery card would be, its name and description (Claude's note), where it would be saved when
-/// the name is taken, the lint's warnings, and Save, Save and Apply, Dismiss.
+/// the name is taken, the lint's warnings, and Save, Save & Apply, Dismiss.
 struct ThemeSuggestionBanner: View {
     let proposal: ThemeProposal
     let placement: ThemeProposal.Placement?
@@ -68,7 +68,7 @@ struct ThemeSuggestionBanner: View {
             Button("Save", action: save)
                 .help("Adds the theme to your themes without switching to it.")
                 .disabled(placement == nil)
-            Button("Save and Apply", action: saveAndApply)
+            Button(SettingsNames.saveAndApply, action: saveAndApply)
                 .buttonStyle(.borderedProminent)
                 .help("Adds the theme and puts it on the widget.")
                 .disabled(placement == nil)

@@ -23,7 +23,7 @@ struct LimitMenuTests {
         #expect(flat(groups) == [
             "Accounts", "-",
             "Hide Weekly — Opus", "Stop warnings for this limit", "-",
-            "Meter Settings…",
+            LimitMenu.meterSettings,
         ])
         // The submenu: each account, the active one checked.
         guard case .accounts(let menu) = groups[0][0] else { Issue.record("no Accounts submenu"); return }
@@ -34,14 +34,14 @@ struct LimitMenuTests {
     @Test func sessionAndWeeklyCannotBeHidden() {
         for tier in [Tier.fiveHour, .sevenDay] {
             let groups = LimitMenu.groups(tier: tier, accounts: nil, hidden: [], temporary: Self.temp, warningsOn: true)
-            #expect(flat(groups) == ["Stop warnings for this limit", "-", "Meter Settings…"])
+            #expect(flat(groups) == ["Stop warnings for this limit", "-", LimitMenu.meterSettings])
         }
     }
 
     @Test func oneAccountHasNoAccountsSubmenu() {
         let one = SanduhrMenu.accounts(["Personal"], active: "Personal")
         let groups = LimitMenu.groups(tier: .iguanaNecktie, accounts: one, hidden: [], temporary: Self.temp, warningsOn: false)
-        #expect(flat(groups) == ["Hide Weekly — Special", "Warn again for this limit", "-", "Meter Settings…"])
+        #expect(flat(groups) == ["Hide Weekly — Special", "Warn again for this limit", "-", LimitMenu.meterSettings])
     }
 
     @Test func warningsItemFollowsTheSetting() {
@@ -54,14 +54,14 @@ struct LimitMenuTests {
 
     @Test func anAlreadyHiddenLimitHasNoHide() {
         let groups = LimitMenu.groups(tier: .sevenDayOpus, accounts: nil, hidden: [.sevenDayOpus], temporary: Self.temp, warningsOn: true)
-        #expect(flat(groups) == ["Stop warnings for this limit", "-", "Hidden Limits", "Meter Settings…"])
+        #expect(flat(groups) == ["Stop warnings for this limit", "-", "Hidden Limits", LimitMenu.meterSettings])
     }
 
     /// Item 42: Hide only for a limit believed temporary; a permanent one keeps its warnings item.
     @Test func aPermanentLimitHasNoHide() {
         for tier in [Tier.sevenDaySonnet, .sevenDayOpus, .sevenDayCowork] {
             let groups = LimitMenu.groups(tier: tier, accounts: nil, hidden: [], temporary: [], warningsOn: true)
-            #expect(flat(groups) == ["Stop warnings for this limit", "-", "Meter Settings…"])
+            #expect(flat(groups) == ["Stop warnings for this limit", "-", LimitMenu.meterSettings])
         }
         let temporary = LimitMenu.groups(tier: .sevenDaySonnet, accounts: nil, hidden: [],
                                          temporary: [.sevenDaySonnet], warningsOn: true)
@@ -74,7 +74,7 @@ struct LimitMenuTests {
         let hidden: Set<Tier> = [.iguanaNecktie, .sevenDayOpus]
         let groups = LimitMenu.groups(tier: nil, accounts: two, hidden: hidden, temporary: Self.temp,
                                       warningsOn: true, widgetVisible: false)
-        #expect(flat(groups) == ["Show Widget", "-", "Accounts", "-", "Hidden Limits", "Meter Settings…"])
+        #expect(flat(groups) == ["Show Widget", "-", "Accounts", "-", "Hidden Limits", LimitMenu.meterSettings])
         #expect(groups.last?.first == .hiddenLimits([.sevenDayOpus, .iguanaNecktie]))
         #expect(LimitMenuEntry.show(.iguanaNecktie).title == "Weekly — Special")
         let onRow = LimitMenu.groups(tier: .sevenDay, accounts: nil, hidden: [.iguanaNecktie],
@@ -98,8 +98,8 @@ struct LimitMenuTests {
 
     @Test func besideTheRowsOnlyAccountsAndMeterSettings() {
         #expect(flat(LimitMenu.groups(tier: nil, accounts: two, hidden: [], temporary: Self.temp, warningsOn: true))
-            == ["Accounts", "-", "Meter Settings…"])
-        #expect(flat(LimitMenu.groups(tier: nil, accounts: nil, hidden: [], temporary: Self.temp, warningsOn: true)) == ["Meter Settings…"])
+            == ["Accounts", "-", LimitMenu.meterSettings])
+        #expect(flat(LimitMenu.groups(tier: nil, accounts: nil, hidden: [], temporary: Self.temp, warningsOn: true)) == [LimitMenu.meterSettings])
     }
 
     @Test func readsTheSavedSettings() {
@@ -143,10 +143,10 @@ struct LimitMenuTests {
     @Test func aDeskMeterMenuStartsWithShowOrHideWidget() {
         let hidden = LimitMenu.groups(tier: .sevenDay, accounts: two, hidden: [], temporary: Self.temp, warningsOn: true, widgetVisible: false)
         #expect(flat(hidden) == [
-            "Show Widget", "-", "Accounts", "-", "Stop warnings for this limit", "-", "Meter Settings…",
+            "Show Widget", "-", "Accounts", "-", "Stop warnings for this limit", "-", LimitMenu.meterSettings,
         ])
         let shown = LimitMenu.groups(tier: nil, accounts: nil, hidden: [], temporary: Self.temp, warningsOn: true, widgetVisible: true)
-        #expect(flat(shown) == ["Hide Widget", "-", "Meter Settings…"])
+        #expect(flat(shown) == ["Hide Widget", "-", LimitMenu.meterSettings])
         #expect(LimitMenu.groups(tier: nil, accounts: nil, store: MemoryDefaults(), usage: nil, now: now,
                                  widgetVisible: false)[0]
             == [.widget(visible: false)])

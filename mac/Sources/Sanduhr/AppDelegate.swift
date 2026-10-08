@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBarStep = 0
     private let updaterController = SPUStandardUpdaterController(
         startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
-    /// Sparkle's settings and Check Now for Settings, Updates; the same updater the menus use.
+    /// Sparkle's settings and Check for Updates… for Settings, Updates; the same updater the menus use.
     private(set) lazy var updates = UpdaterSettings(controller: updaterController)
     /// Keeps Sanduhr out of App Nap. Its windows sit on the desktop layer, under every app window,
     /// so macOS counts them as hidden and naps the app: the five-minute refresh timer then stops
@@ -23,10 +23,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// minutes costs next to nothing; idle system sleep is still allowed.
     private var appNapActivity: NSObjectProtocol?
 
+    /// Claude Code's hooks post `com.626labs.sanduhr.claude-code.waiting` and `.done` (Darwin
+    /// notifications, never a launch); registered for the life of the app.
+    private var claudeCodeSignal: ClaudeCodeSignal?
+
     // MARK: Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // EsteFont 26 (item 58), from Contents/Resources/Fonts, for this process only: before any
+        // EsteFont Pro and EsteFont 26, from Contents/Resources/Fonts, for this process only: before any
         // view draws, so the Desk and the widget find it on a Mac that never had it installed.
         BundledFonts.register()
         NSApp.setActivationPolicy(.accessory)
@@ -41,7 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // has signed in. Decided once, before the panel shows and before DeskMigration marks the suite.
         let firstRun = DeskFirstRun.run()
         // Before DeskMigration marks the suite: an earlier version's Desk with no font picked keeps
-        // the system font; a new install draws in EsteFont 26.
+        // the system font, one that drew in EsteFont 26 keeps it; a new install draws in EsteFont Pro.
         DeskFont.keepExistingDefault()
         // The welcome tour (item 61), decided once, before What's New records its version: pending
         // only on a fresh install with no key, accounts or What's New; it shows after the first
@@ -132,6 +136,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DeskMigration.run()
         // Item 53's Now Playing switch becomes a place in the Desk layout, once (item 53b).
         NowPlayingPlacement.upgrade(UserDefaults.desk)
+        // Settings v2's moves (item 72, slice 2): the Claude meters switch into the layout, the
+        // shortcuts split in two, Camera and mic's one placement. Idempotent; after the upgrade
+        // above, which still reads the retired Claude meters switch.
+        SettingsMigrations.run(UserDefaults.desk)
         DeskController.shared.apply()
         // The camera light watches the cameras while its switch is on, with or without Desk.
         CameraLightController.shared.apply()
@@ -144,6 +152,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Watchers (item 66): the MCP server's watch_* requests and the Stop hook's background
         // work, on the same folder watch; watchers.json follows the two switches.
         WatcherStore.shared.startForApp()
+        // Per-song looks (item 65c): propose_now_playing_looks' requests, on the same folder watch.
+        NowPlayingLookStore.shared.start()
+        // The meters mod's band (items 65f, 66): band.json, the looks and the watchers it draws.
+        BandFileWriter.shared.startForApp()
+        // Claude Code's hooks (items 51, 66): their Darwin notifications go where the
+        // sanduhr://claude-code link goes.
+        claudeCodeSignal = ClaudeCodeSignal { event in
+            MainActor.assumeIsolated { NotchGlowController.shared.claudeCode(event) }
+        }
         // Claude Code integrations (item 49): where they are installed, this version's scripts
         // replace the last one's (a new stamped folder, the link swapped). No install, no write.
         Task.detached(priority: .utility) { IntegrationScripts.standard.refreshIfInstalled() }
@@ -183,11 +200,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// estedesk:// and sanduhr:// links (Option+J joins the next meeting, …/settings opens
+    /// estedesk:// and sanduhr:// links (the join shortcut joins the next meeting, …/settings opens
     /// Sanduhr Settings). sanduhr://debug/… goes to the smoke tools' hooks, which ignore it
-    /// unless they are switched on (DebugGate). sanduhr://claude-code?event=… comes from Claude
-    /// Code's hooks (item 51) and is public: it carries only an event, and anything else on that
-    /// host is dropped.
+    /// unless they are switched on (DebugGate). sanduhr://claude-code?event=… is what Claude
+    /// Code's hooks opened before they posted ClaudeCodeSignal (item 51); it stays for those and
+    /// for manual tests, and is public: it carries only an event, and anything else on that host
+    /// is dropped.
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
             if DebugLink.isDebug(url) {
@@ -258,6 +276,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Now playing's adapter runs as a child process (item 53): it goes when Sanduhr quits.
     func applicationWillTerminate(_ notification: Notification) {
         NowPlayingController.shared.shutdown()
+        // Watchers go with Sanduhr: the band shows none from now on.
+        BandFileWriter.shared.refresh(quitting: true)
     }
 
     // LSUIElement apps never get this called, but set it false anyway.
@@ -348,7 +368,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showStatusMenu(from button: NSStatusBarButton) {
         let menu = NSMenu()
-        addMenuItems(to: menu, menuBarModes: true)
+        addMenuItems(to: menu)
 
         // Briefly attach, pop, detach — so default L-click behavior stays
         // as "toggle panel" rather than "always show menu".
@@ -359,15 +379,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// The shared menu (SanduhrMenu) as AppKit items, for the menu bar item's menu and Desk's
     /// clock menu. The widget's own two-finger menu (RootView) renders the same groups.
-    /// `accounts` false leaves the Accounts submenu out, for a limit menu that already has it;
-    /// `menuBarModes` adds Menu Bar Shows after it, in the menu bar item's own menu only;
-    /// `showHide` false leaves Show or Hide Widget out, for a Desk limit menu that has it on top.
-    func addMenuItems(to menu: NSMenu, accounts withAccounts: Bool = true, menuBarModes: Bool = false,
-                      showHide: Bool = true) {
+    /// `accounts` false leaves the Accounts submenu out, for a limit menu that already has it.
+    /// Menu Bar Shows follows it in every menu (SanduhrMenu.submenus, Settings v2's slice 1).
+    /// `showHide` false leaves Show or Hide Widget out, for a Desk limit menu that has it on top;
+    /// the submenus then open the shared items.
+    /// `allSettings` names Settings… "All Settings…", for a menu with a page's own Settings item.
+    func addMenuItems(to menu: NSMenu, accounts withAccounts: Bool = true,
+                      showHide: Bool = true, allSettings: Bool = false) {
         let accounts = withAccounts ? currentAccountsMenu() : nil
-        var groups = currentMenu(widgetVisible: panel?.isVisible ?? false)
+        var groups = currentMenu(widgetVisible: panel?.isVisible ?? false, allSettings: allSettings)
         // A Desk limit menu has Show or Hide Widget at its top already.
-        if !showHide { groups = SanduhrMenu.without(.showHide, in: groups) }
+        if !showHide {
+            groups = SanduhrMenu.without(.showHide, in: groups)
+            addSubmenus(to: menu, accounts: accounts)
+            menu.addItem(.separator())
+        }
         for (i, group) in groups.enumerated() {
             if i > 0 { menu.addItem(.separator()) }
             if let header = group.header { menu.addItem(.sectionHeader(title: header)) }
@@ -377,16 +403,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 m.target = self
                 m.tag = entry.command.rawValue
                 m.state = entry.checked ? .on : .off
+                // An item that is off has no action, so the menu's auto-enabling leaves it off;
+                // its reason shows under it and as its tooltip.
+                if !entry.enabled { m.action = nil }
+                if let note = entry.note {
+                    m.toolTip = note
+                    if #available(macOS 14.4, *) { m.subtitle = note }
+                }
                 menu.addItem(m)
             }
-            // The Accounts submenu sits after Show/Hide, with two or more accounts.
-            if i == 0, let accounts {
+            // The submenus sit after Show/Hide.
+            if i == 0, showHide {
                 menu.addItem(.separator())
-                menu.addItem(accountsMenuItem(accounts))
+                addSubmenus(to: menu, accounts: accounts)
             }
-            // Menu Bar Shows sits with the Accounts submenu, or after Show/Hide on its own.
-            if i == 0, menuBarModes {
-                if accounts == nil { menu.addItem(.separator()) }
+        }
+    }
+
+    /// SanduhrMenu.submenus as AppKit items: Accounts (with two or more), then Menu Bar Shows.
+    private func addSubmenus(to menu: NSMenu, accounts: AccountsMenu?) {
+        for title in SanduhrMenu.submenus(accounts: accounts) {
+            if title == AccountsMenu.title, let accounts { menu.addItem(accountsMenuItem(accounts)) }
+            if title == MenuBarModeMenu.title {
                 menu.addItem(menuBarModesMenuItem(SanduhrMenu.menuBarModes(current: .saved())))
             }
         }
@@ -416,7 +454,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// A Desk meter row's two-finger menu (LimitMenu): Show or Hide Widget, Accounts, Hide and the
-    /// warnings item for `tier`, Meter Settings…, then the shared menu under a separator, less its
+    /// warnings item for `tier`, Alerts Settings…, then the shared menu under a separator, less its
     /// own Show or Hide Widget. `tier` nil, a click beside the rows, leaves the limit's own items out.
     func addLimitMenuItems(to menu: NSMenu, tier: Tier?) {
         let groups = LimitMenu.groups(tier: tier, accounts: currentAccountsMenu(), store: UserDefaults.desk,
@@ -426,7 +464,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             for entry in group { menu.addItem(limitMenuItem(entry)) }
         }
         menu.addItem(.separator())
-        addMenuItems(to: menu, accounts: false, showHide: false)
+        addMenuItems(to: menu, accounts: false, showHide: false, allSettings: true)
     }
 
     private func limitMenuItem(_ entry: LimitMenuEntry) -> NSMenuItem {
@@ -452,15 +490,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// What a limit menu's items do, from Desk and the widget alike: Hide, a Hidden Limits item
-    /// and the warnings item write the desk-suite keys Settings, Desk, Meters reads (both refresh
-    /// on the change notice; Hide records the limit's current numbers), Meter Settings… opens
-    /// that page.
+    /// and the warnings item write the desk-suite keys Settings, Alerts, Each limit reads (both refresh
+    /// on the change notice; Hide records the limit's current numbers), Alerts Settings… opens
+    /// that page at Each limit.
     func performLimit(_ entry: LimitMenuEntry) {
         switch entry {
         case .widget(let visible):
             if visible { hidePanel() } else { DeskController.shared.showWidgetBesideMeters() }
         case .accounts, .hiddenLimits: break
-        case .meterSettings: SettingsWindowController.shared.show(.deskMeters)
+        case .meterSettings: SettingsWindowController.shared.show(LimitMenu.meterSection, anchor: LimitMenu.meterAnchor)
         case .hide, .show, .warnings: LimitMenu.apply(entry, to: UserDefaults.desk, usage: viewModel.usage)
         }
     }
@@ -485,12 +523,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// The shared menu with the tools' current checkmarks.
-    func currentMenu(widgetVisible: Bool) -> [MenuGroup] {
+    func currentMenu(widgetVisible: Bool, allSettings: Bool = false) -> [MenuGroup] {
         SanduhrMenu.groups(widgetVisible: widgetVisible,
                            deepWork: viewModel.activeTool == .deepWork,
                            pacing: viewModel.pacingPinned,
                            snake: viewModel.activeTool == .snake,
-                           cameraLight: CameraLightController.shared.manual)
+                           cameraLight: CameraLightController.shared.manual,
+                           deskOn: DeskController.shared.running,
+                           allSettings: allSettings)
     }
 
     /// The Accounts submenu as it stands, nil with fewer than two accounts.
@@ -532,6 +572,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         case .refresh: refreshNow()
         case .settings: SettingsWindowController.shared.show()
+        // After the menu has closed, so nothing is tracking when the bar's panel takes the key.
+        case .arrangeDesk: DispatchQueue.main.async { DeskController.shared.arrangeDesk() }
         case .checkForUpdates: updaterController.checkForUpdates(nil)
         case .whatsNew: WhatsNewWindowController.shared.show()
         case .tour: WelcomeTourWindowController.shared.show()

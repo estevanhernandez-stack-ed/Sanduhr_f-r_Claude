@@ -152,7 +152,7 @@ struct AVIndicatorMenuItems: View {
         ForEach(Array(AVIndicatorMenu.items(shown).enumerated()), id: \.offset) { _, item in
             if item.separatorBefore { Divider() }
             if item.enabled {
-                Button(item.title) { SettingsWindowController.shared.show(.notch) }
+                Button(item.title) { SettingsWindowController.shared.show(AVIndicatorMenu.settingsSection) }
             } else {
                 Button(item.title) {}.disabled(true)
             }
@@ -189,7 +189,7 @@ extension AVIndicatorMenu {
 final class AVIndicatorMenuTarget: NSObject {
     static let shared = AVIndicatorMenuTarget()
     // Menu items act on the main thread.
-    @objc func settings() { MainActor.assumeIsolated { SettingsWindowController.shared.show(.notch) } }
+    @objc func settings() { MainActor.assumeIsolated { SettingsWindowController.shared.show(AVIndicatorMenu.settingsSection) } }
 }
 
 /// Runs the camera and mic indicators while Desk runs and they are switched on: the camera signal

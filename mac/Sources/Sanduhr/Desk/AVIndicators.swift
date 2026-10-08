@@ -10,7 +10,10 @@ import CoreGraphics
 ///                                                                            hiddenLight or always; never by default)
 ///   defaults write com.626labs.sanduhr.desk avMicGlyph -bool true      (the mic glyph; off by default)
 ///   defaults write com.626labs.sanduhr.desk avPulse -bool false        (the dot's gentle pulse; on)
-///   defaults write com.626labs.sanduhr.desk avSide -string left        (beside the camera: left or right)
+///   defaults write com.626labs.sanduhr.desk avPlace -string left       (where they show: besideLeft,
+///                                                                      besideRight, left, right or strip)
+///   defaults write com.626labs.sanduhr.desk avSide -string left        (beside the camera: left or right;
+///                                                                      kept in step by avPlace)
 struct AVIndicators: Equatable {
     var camera = false
     var mic = false
@@ -110,6 +113,108 @@ enum AVIndicatorSide: String, CaseIterable, Identifiable {
     static func saved(in defaults: UserDefaults) -> AVIndicatorSide { resolve(raw: defaults.string(forKey: key)) }
 }
 
+/// Where the camera and mic indicators show on the island: Notch, Camera and mic, Where they show
+/// (Settings v2, slice 2). One picker for what was two controls: the "Beside the camera" side and
+/// a wing or the strip set to Camera and mic. A wing or the strip chosen here shows the indicators
+/// while one is in use and its own content otherwise.
+enum AVPlace: String, CaseIterable, Identifiable {
+    case besideLeft, besideRight, left, right, strip
+
+    static let key = "avPlace"
+    /// The picker's name on Notch, Camera and mic.
+    static let pickerTitle = "Where they show"
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .besideLeft: "Beside the camera, left"
+        case .besideRight: "Beside the camera, right"
+        case .left: "In the left wing"
+        case .right: "In the right wing"
+        case .strip: "Under the camera"
+        }
+    }
+
+    /// The notch place it shows in, nil beside the camera.
+    var notchPlace: NotchContent.Place? {
+        switch self {
+        case .besideLeft, .besideRight: nil
+        case .left: .left
+        case .right: .right
+        case .strip: .strip
+        }
+    }
+
+    /// The side beside the camera, nil for a wing or the strip.
+    var side: AVIndicatorSide? {
+        switch self {
+        case .besideLeft: .left
+        case .besideRight: .right
+        default: nil
+        }
+    }
+
+    static func beside(_ side: AVIndicatorSide) -> AVPlace { side == .left ? .besideLeft : .besideRight }
+
+    static func of(_ place: NotchContent.Place) -> AVPlace {
+        switch place {
+        case .left: .left
+        case .right: .right
+        case .strip: .strip
+        }
+    }
+
+    /// The saved choice. Before the migration has run (or with an unknown value) it reads as what
+    /// 2.10.0 showed: the first place set to Camera and mic, else beside the camera on the saved side.
+    static func saved(in d: DefaultsStore) -> AVPlace {
+        if let raw = d.object(forKey: key) as? String, let p = AVPlace(rawValue: raw) { return p }
+        return legacy(in: d)
+    }
+
+    /// What 2.10.0's two controls said: a place set to Camera and mic (left, right, then the strip
+    /// under the camera), else the side picker's value.
+    static func legacy(in d: DefaultsStore) -> AVPlace {
+        for place in [NotchContent.Place.left, .right, .strip]
+        where NotchContent.resolve(place, raw: d.object(forKey: place.key) as? String) == .avIndicators {
+            return of(place)
+        }
+        return beside(AVIndicatorSide.resolve(raw: d.object(forKey: AVIndicatorSide.key) as? String))
+    }
+
+    /// Writes the choice; a side beside the camera also writes `avSide`, which an older build reads.
+    static func write(_ p: AVPlace, to d: DefaultsStore) {
+        d.set(p.rawValue, forKey: key)
+        if let side = p.side { d.set(side.rawValue, forKey: AVIndicatorSide.key) }
+    }
+
+    /// One time, idempotent (SettingsMigrations): a wing or the strip set to Camera and mic becomes
+    /// that placement and the place goes back to its default content; otherwise the side picker's
+    /// value becomes "Beside the camera, left" or "right". Returns whether it wrote anything.
+    @discardableResult
+    static func migrate(_ d: DefaultsStore) -> Bool {
+        var changed = false
+        if !(d.object(forKey: key) is String) {
+            write(legacy(in: d), to: d)
+            changed = true
+        }
+        // Camera and mic is no longer a place's content: any left over (an older build wrote it
+        // after the first migration) goes back to the place's default.
+        for place in [NotchContent.Place.left, .right, .strip]
+        where d.object(forKey: place.key) as? String == NotchContent.avIndicators.rawValue {
+            d.set(nil, forKey: place.key)
+            changed = true
+        }
+        return changed
+    }
+
+    /// The content `place` draws from: Camera and mic while they show and are placed there, else
+    /// the place's saved content. NotchContent.effective takes it from there.
+    static func content(_ saved: NotchContent, at place: NotchContent.Place, placed: AVPlace,
+                        showing: Bool) -> NotchContent {
+        showing && placed.notchPlace == place ? .avIndicators : saved
+    }
+}
+
 /// Where the indicators draw now.
 enum AVIndicatorSpot: Equatable {
     /// Nothing to show (switches off, or nothing in use).
@@ -137,12 +242,15 @@ enum AVIndicatorSpot: Equatable {
 enum AVIndicatorPlacement {
     /// The notch places set to Camera and mic that can draw them: a wing while the wings show
     /// text, the strip while it has height and shows text.
+    /// `placed` is Where they show (AVPlace); a place whose content is still Camera and mic (written
+    /// by an older build) counts too.
     static func chosen(left: NotchContent, right: NotchContent, strip: NotchContent,
-                       wingText: Bool, chinText: Bool, chin: Double) -> [NotchContent.Place] {
+                       wingText: Bool, chinText: Bool, chin: Double,
+                       placed: AVPlace? = nil) -> [NotchContent.Place] {
         var out: [NotchContent.Place] = []
-        if wingText, left == .avIndicators { out.append(.left) }
-        if wingText, right == .avIndicators { out.append(.right) }
-        if chinText, chin > 0, strip == .avIndicators { out.append(.strip) }
+        if wingText, left == .avIndicators || placed == .left { out.append(.left) }
+        if wingText, right == .avIndicators || placed == .right { out.append(.right) }
+        if chinText, chin > 0, strip == .avIndicators || placed == .strip { out.append(.strip) }
         return out
     }
 
@@ -158,13 +266,15 @@ enum AVIndicatorPlacement {
     /// `spot` with the places and the side as saved in `desk`: what the controller and Settings'
     /// Notch preview (item 68) both ask.
     static func spot(_ shown: AVIndicators, islandUp: Bool, in desk: UserDefaults) -> AVIndicatorSpot {
+        let place = AVPlace.saved(in: desk)
         let places = chosen(
             left: NotchContent.saved(.left, in: desk), right: NotchContent.saved(.right, in: desk),
             strip: NotchContent.saved(.strip, in: desk),
             wingText: desk.object(forKey: "notchText") as? Bool ?? true,
             chinText: desk.bool(forKey: "notchChinText"),
-            chin: desk.object(forKey: "notchChin") as? Double ?? 26)
-        return spot(shown, islandUp: islandUp, side: .saved(in: desk), chosen: places)
+            chin: desk.object(forKey: "notchChin") as? Double ?? 26,
+            placed: place)
+        return spot(shown, islandUp: islandUp, side: place.side ?? .saved(in: desk), chosen: places)
     }
 }
 
@@ -218,13 +328,15 @@ enum AVIndicatorLayout {
     }
 }
 
-/// The indicators' click menu: read-only lines naming what Sanduhr can see, then Indicator
+/// The indicators' click menu: read-only lines naming what Sanduhr can see, then Notch
 /// Settings…. Nothing in it mutes or changes a device.
 enum AVIndicatorMenu {
     static let cameraLine = "Camera in use"
     static let micLine = "Microphone in use"
     static let noneLine = "Camera and microphone not in use"
-    static let settingsTitle = "Indicator Settings…"
+    /// The page its last item opens, and that item's title.
+    static let settingsSection = SettingsSection.notch
+    static let settingsTitle = settingsSection.linkTitle
 
     struct Item: Equatable {
         var title: String

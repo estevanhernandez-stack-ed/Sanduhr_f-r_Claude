@@ -317,11 +317,37 @@ module Smoke
       if watcher_count(before).zero? && watcher_count(after).positive?
         steps << ['watch-test', 'clear']
       end
+      # Lines a scenario added in Settings, Message's editor (item 69) go, unsaved as they were;
+      # edits that were unsaved before are left alone.
+      if !editor_unsaved(before) && editor_unsaved(after)
+        steps << ['message-editor', 'revert']
+      end
+      # A shortcut's keys a scenario changed (General, Shortcuts) go back to what they were.
+      %w[settings join].each do |which|
+        was = hot_keys(before, which)
+        steps << ['hot-key', "#{which} #{was}"] if was && was != hot_keys(after, which)
+      end
+      # Arrange mode (item 60) a scenario left on ends with Cancel, saving nothing.
+      if !arranging(before) && arranging(after)
+        steps << ['desk-arrange', 'cancel']
+      end
       steps
+    end
+
+    def hot_keys(state, which)
+      state['hot_keys'].is_a?(Hash) ? state['hot_keys']["#{which}_keys"] : nil
+    end
+
+    def arranging(state)
+      state['desk_arrange'].is_a?(Hash) && state['desk_arrange']['active'] == true
     end
 
     def av_flag(state, which)
       state['av_indicators'].is_a?(Hash) && state['av_indicators'][which] == true
+    end
+
+    def editor_unsaved(state)
+      state['message_editor'].is_a?(Hash) && state['message_editor']['unsaved'] == true
     end
 
     def watcher_count(state)

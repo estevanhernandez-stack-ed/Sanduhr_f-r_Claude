@@ -232,7 +232,7 @@ struct DeskMetersPreview: View {
 // MARK: - Message
 
 /// Today's line with its effects; Replay writes a `{write}` line in again and sweeps a
-/// `{shimmer}` line at once.
+/// `{shimmer}` or `{sweep}` line at once.
 struct DeskMessagePreview: View {
     var live: DeskModel
     @State private var preview = DeskModel()
@@ -242,28 +242,36 @@ struct DeskMessagePreview: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        SettingsPreviewCard(kind: .message, label: Self.spoken(preview.message), samples: samples,
-                            accessory: Self.replays(preview.message) ? AnyView(replayButton) : nil) {
+        SettingsPreviewCard(kind: .message, label: Self.spoken(Self.lines(preview)), samples: samples,
+                            accessory: Self.lines(preview).contains(where: { Self.replays($0) }) ? AnyView(replayButton) : nil) {
             DeskPiece(widget: .message, model: preview, alignment: .leading, sweepFirst: replay > 0)
                 .id(replay)
                 .frame(maxWidth: messageSize * 9, alignment: .leading)
                 .padding(messageSize * 0.2)
         }
-        .modifier(PreviewModelSync(preview: preview, live: live, samples: $samples))
+        .modifier(PreviewModelSync(preview: preview, live: live, sampleSpecialDay: true, samples: $samples))
     }
 
     private var replayButton: some View {
         Button("Replay") { replay += 1 }
             .controlSize(.small)
             .disabled(reduceMotion)
-            .help(reduceMotion ? "Reduce Motion is on: the line stays still" : "Plays the line's {write} and {shimmer} again")
+            .help(reduceMotion ? "Reduce Motion is on: the line stays still" : "Plays the line's {write}, {shimmer} and {sweep} again")
     }
 
-    /// A line with `{write}` or `{shimmer}` has something to replay.
+    /// A line with `{write}`, `{shimmer}` or `{sweep}` has something to replay.
     static func replays(_ raw: String?) -> Bool {
         guard let raw else { return false }
         let e = MessageMarkup.parse(raw).effects
-        return e.write || e.shimmer
+        return e.write || e.shimmer || e.sweep
+    }
+
+    /// What the piece draws: the date's own lines, then the usual one (item 69).
+    static func lines(_ m: DeskModel) -> [String] { m.specialMessages + [m.message].compactMap { $0 } }
+
+    static func spoken(_ lines: [String]) -> String {
+        guard !lines.isEmpty else { return "No message today." }
+        return "Today's message as the Desk draws it: " + lines.map { MessageMarkup.parse($0).text }.joined(separator: " / ")
     }
 
     static func spoken(_ raw: String?) -> String {

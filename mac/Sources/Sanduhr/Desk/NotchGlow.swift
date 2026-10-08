@@ -332,7 +332,7 @@ struct NotchGlowView: View {
     @AppStorage("notchChin", store: .desk) private var savedChin = 26.0
     @AppStorage("notchText", store: .desk) private var showText = true
     @AppStorage("font", store: .desk) private var savedFont: String?
-    /// The Desk font as drawn: EsteFont 26 unless a font was picked (DeskFont, item 58).
+    /// The Desk font as drawn: EsteFont Pro unless a font was picked (DeskFont, item 58).
     private var font: String { DeskFont.resolve(saved: savedFont) }
     @AppStorage(NotchContent.Place.left.key, store: .desk) private var leftContent = NotchContent.Place.left.fallback
     @AppStorage(NotchContent.Place.right.key, store: .desk) private var rightContent = NotchContent.Place.right.fallback
@@ -409,8 +409,8 @@ final class NotchGlowController {
         if NotchGlowRules.decide(event, switches: switches, memory: &memory, now: Date()) { fire() }
     }
 
-    /// Claude Code's hook opened `sanduhr://claude-code?event=…` (item 51): glow when its switch
-    /// is on, no terminal is in front (when that option is on) and the rate limit allows. Screens
+    /// Claude Code's hook posted ClaudeCodeSignal, or `sanduhr://claude-code?event=…` was opened
+    /// (item 51): glow when its switch is on, no terminal is in front (when that option is on) and the rate limit allows. Screens
     /// without a notch get the glow at the top center.
     func claudeCode(_ event: ClaudeCodeEvent) {
         let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier

@@ -30,11 +30,17 @@ enum NotchContent: String, CaseIterable, Identifiable {
     case watchers
     /// The camera and mic indicators (item 67): the red dot and the mic glyph while they are in use
     /// and switched on; no text. With nothing to show the place shows its own default (`effective`).
-    /// Choosing it for a place moves them there from beside the camera (AVIndicatorPlacement).
+    /// No longer a choice in Settings (slice 2): Camera and mic, Where they show (AVPlace) places
+    /// them, and `effective` draws them in that place. A value saved by 2.10.0 still parses and
+    /// still draws; the launch migration moves it to AVPlace.
     case avIndicators
     case nothing
 
     var id: String { rawValue }
+
+    /// What the Notch page's place pickers offer: every content but Camera and mic, which has its
+    /// own placement picker since slice 2 (AVPlace).
+    static let choices: [NotchContent] = allCases.filter { $0 != .avIndicators }
 
     var label: String {
         switch self {
@@ -97,11 +103,13 @@ enum NotchContent: String, CaseIterable, Identifiable {
         return idle.content(at: place)
     }
 
-    /// `effective` with the line taken from what plays and the watchers that show.
+    /// `effective` with the line taken from what plays and the watchers that show. `avPlace` is
+    /// Notch, Camera and mic, Where they show: the place it names shows them while they show.
     static func effective(_ content: NotchContent, at place: Place, nowPlaying: NowPlayingInfo?,
                           idle: NowPlayingIdle, watchers: [Watcher] = [],
-                          indicators: AVIndicators = AVIndicators()) -> NotchContent {
-        effective(content, at: place, hasLine: NowPlayingText.line(nowPlaying, at: place) != nil, idle: idle,
+                          indicators: AVIndicators = AVIndicators(), avPlace: AVPlace? = nil) -> NotchContent {
+        let content = avPlace.map { AVPlace.content(content, at: place, placed: $0, showing: indicators.any) } ?? content
+        return effective(content, at: place, hasLine: NowPlayingText.line(nowPlaying, at: place) != nil, idle: idle,
                   hasWatcher: !watchers.isEmpty, hasIndicators: indicators.any)
     }
 
@@ -121,7 +129,8 @@ enum NotchContent: String, CaseIterable, Identifiable {
         case .meters:
             return Self.nonEmpty(meters)
         case .message:
-            return Self.nonEmpty(message?.trimmingCharacters(in: .whitespacesAndNewlines))
+            // The line as it reads: its effect tags gone, a Unicode letter style applied (item 65).
+            return Self.nonEmpty(message.map { MessageTypography.characters(MessageMarkup.parse($0.trimmingCharacters(in: .whitespacesAndNewlines))) })
         case .nowPlaying:
             return NowPlayingText.line(nowPlaying, at: place)
         case .watchers:

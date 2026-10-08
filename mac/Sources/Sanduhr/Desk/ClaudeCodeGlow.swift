@@ -1,4 +1,5 @@
 import Foundation
+import notify
 
 /// What Claude Code tells Sanduhr through its hooks (item 51): only that a session waits on you
 /// or finished a turn. Nothing about the conversation ever comes with it.
@@ -18,7 +19,9 @@ enum ClaudeCodeEvent: String, CaseIterable, Sendable {
 }
 
 /// `sanduhr://claude-code?event=waiting|done`, the one public link that reaches the glow without
-/// the debug gate. Strict on purpose: the host, no path, exactly one query item named `event`
+/// the debug gate. The installed hooks post ClaudeCodeSignal's notifications instead (opening
+/// the link launched Sanduhr when it wasn't running); the link stays for manual tests and hooks
+/// installed before that. Strict on purpose: the host, no path, exactly one query item named `event`
 /// with a known value. Anything else is no event, and the link is dropped.
 enum ClaudeCodeLink {
     static let scheme = "sanduhr"
@@ -42,6 +45,51 @@ enum ClaudeCodeLink {
               let value = items[0].value else { return nil }
         return ClaudeCodeEvent(rawValue: value)
     }
+}
+
+/// The Darwin notifications the installed hooks post (`/usr/bin/notifyutil -p <name>`):
+/// `com.626labs.sanduhr.claude-code.waiting` and `….done`. Unlike opening `sanduhr://`, a post
+/// never launches anything: it reaches whichever Sanduhr is running (a dev build too), and
+/// nothing when none is. The name is the whole message; a notification carries no data.
+final class ClaudeCodeSignal: @unchecked Sendable {
+    static let prefix = "com.626labs.sanduhr.claude-code."
+
+    /// The name the hooks post for `event`.
+    static func name(_ event: ClaudeCodeEvent, prefix: String = ClaudeCodeSignal.prefix) -> String {
+        prefix + event.rawValue
+    }
+
+    /// The event a posted name stands for, nil for any other name.
+    static func event(_ name: String, prefix: String = ClaudeCodeSignal.prefix) -> ClaudeCodeEvent? {
+        guard name.hasPrefix(prefix) else { return nil }
+        return ClaudeCodeEvent(rawValue: String(name.dropFirst(prefix.count)))
+    }
+
+    private let lock = NSLock()
+    private var tokens: [Int32] = []
+
+    /// Registers for both names; `handler` runs on `queue` once per post. Tests pass their own
+    /// prefix so a real Sanduhr on the same Mac never hears them.
+    init(prefix: String = ClaudeCodeSignal.prefix, queue: DispatchQueue = .main,
+         handler: @escaping @Sendable (ClaudeCodeEvent) -> Void) {
+        for event in ClaudeCodeEvent.allCases {
+            var token: Int32 = 0
+            let status = notify_register_dispatch(Self.name(event, prefix: prefix), &token, queue) { @Sendable _ in
+                handler(event)
+            }
+            if status == NOTIFY_STATUS_OK { tokens.append(token) }
+        }
+    }
+
+    /// How many names are registered (2 when both took).
+    var registered: Int { lock.withLock { tokens.count } }
+
+    func cancel() {
+        let t = lock.withLock { () -> [Int32] in defer { tokens = [] }; return tokens }
+        t.forEach { notify_cancel($0) }
+    }
+
+    deinit { tokens.forEach { notify_cancel($0) } }
 }
 
 /// At most one glow per kind of event every 20 seconds, and no "finished" glow within 5 seconds

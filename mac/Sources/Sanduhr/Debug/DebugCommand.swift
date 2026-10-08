@@ -17,8 +17,15 @@ enum DebugGate {
 /// What a hook action does, checked and parsed from the link.
 enum DebugAction: Equatable {
     case showWidget, hideWidget
-    /// Open Settings at a section, or where it was left (nil).
-    case settings(SettingsSection?)
+    /// Open Settings at a section, or where it was left (nil). A retired raw value (`deskMeters`,
+    /// `pacing`) opens the page it merged into, at its anchor (Settings v2, slice 2).
+    case settings(SettingsSection?, anchor: String? = nil)
+    /// Settings at the page a "<Page> Settings…" button names (Settings v2, slice 1), opened the
+    /// way SettingsLinkButton opens it. `settings-names.yaml` checks each button lands where it says.
+    case settingsLink(SettingsSection)
+    /// Settings v2, slice 3: the sidebar search's Return, the best match for these words opened,
+    /// scrolled into view and lit, as a person typing them would get.
+    case settingsSearch(String)
     case closeSettings
     case refresh
     case testAlert
@@ -62,11 +69,33 @@ enum DebugAction: Equatable {
     enum AVTest: String, CaseIterable {
         case camera, mic
     }
+    /// Settings, Message's editor (item 69): add puts in the smoke's own line (Fridays, "ship it.",
+    /// a sunset gradient in script with a sweep), held unsaved; revert drops unsaved edits. Neither
+    /// saves: messages.txt is never written by a hook.
+    case messageEditor(MessageEditorStep)
 
-    static let names = ["show-widget", "hide-widget", "settings", "close-settings", "refresh",
+    enum MessageEditorStep: String, CaseIterable {
+        case add, revert
+    }
+    /// Arrange mode on the Desk (item 60): start enters it as Arrange Desk… does, test makes the
+    /// smoke's own edit (the clock to Top right at 120%, unsaved), done ends it writing the layout
+    /// once when it changed, cancel ends it writing nothing.
+    case deskArrange(DeskArrangeStep)
+
+    enum DeskArrangeStep: String, CaseIterable {
+        case start, test, done, cancel
+    }
+
+    /// A shortcut's keys set as General's recorder sets them (2026-10-08), with its rules: nil is
+    /// the default. Refused (an error, nothing saved) without ⌘, ⌃ or ⌥ or when the other
+    /// shortcut uses them. Writes the two desk keys; Restore puts the keys back after a run.
+    case hotKey(SanduhrHotKeys.Shortcut, HotKeyCombo?)
+
+    static let names = ["show-widget", "hide-widget", "settings", "settings-link", "settings-search", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
                         "theme", "account", "usage", "whats-new", "close-whats-new",
-                        "tour", "tour-step", "close-tour", "watch-test", "av-test"]
+                        "tour", "tour-step", "close-tour", "watch-test", "av-test", "message-editor",
+                        "desk-arrange", "hot-key"]
 }
 
 enum DebugCommand: Equatable {
@@ -127,10 +156,23 @@ enum DebugLink {
         case "hide-widget": return .success(.hideWidget)
         case "settings":
             guard let arg else { return .success(.settings(nil)) }
-            guard let section = section(arg) else {
-                return bad("unknown settings section: \(arg) (one of \(SettingsSection.allCases.map(\.rawValue).joined(separator: ", ")))")
+            // "notch", "notch glow" or "notch#glow" (slice 3: an anchor on the page).
+            switch SettingsLink.parse(arg) {
+            case .success(let page): return .success(.settings(page.section, anchor: page.anchor))
+            case .failure(let e): return .failure(e)
             }
-            return .success(.settings(section))
+        case "settings-search":
+            guard let arg, !SettingsSearch.hits(arg).isEmpty else {
+                return bad("settings-search needs arg=<words> that find something in Settings")
+            }
+            return .success(.settingsSearch(arg))
+        case "settings-link":
+            // "Notch Settings…", or with three dots for a terminal.
+            let title = (arg ?? "").replacingOccurrences(of: "...", with: "…")
+            guard let section = SettingsSection.linked(title) else {
+                return bad("settings-link needs arg=<Page> Settings… (one of \(SettingsSection.allCases.map(\.linkTitle).joined(separator: ", ")))")
+            }
+            return .success(.settingsLink(section))
         case "close-settings": return .success(.closeSettings)
         case "refresh": return .success(.refresh)
         case "test-alert": return .success(.testAlert)
@@ -187,6 +229,26 @@ enum DebugLink {
                 return bad("av-test needs arg=camera on, camera off, mic on or mic off")
             }
             return .success(.avTest(which, on: on))
+        case "message-editor":
+            guard let step = arg.flatMap({ DebugAction.MessageEditorStep(rawValue: $0.lowercased()) }) else {
+                return bad("message-editor needs arg=add or revert")
+            }
+            return .success(.messageEditor(step))
+        case "desk-arrange":
+            guard let step = arg.flatMap({ DebugAction.DeskArrangeStep(rawValue: $0.lowercased()) }) else {
+                return bad("desk-arrange needs arg=start, test, done or cancel")
+            }
+            return .success(.deskArrange(step))
+        case "hot-key":
+            // "settings ctrl-opt-s", "join ⌃⌥J", "settings default".
+            let parts = (arg ?? "").split(separator: " ", maxSplits: 1).map(String.init)
+            let which: [String: SanduhrHotKeys.Shortcut] = ["settings": .settings, "join": .join]
+            guard parts.count == 2, let s = which[parts[0].lowercased()] else {
+                return bad("hot-key needs arg=settings|join <keys> (ctrl-opt-s, ⌃⌥S) or default")
+            }
+            if parts[1].lowercased() == "default" { return .success(.hotKey(s, nil)) }
+            guard let combo = HotKeyCombo.parse(parts[1]) else { return bad("hot-key: unknown keys \(parts[1])") }
+            return .success(.hotKey(s, combo))
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }
@@ -196,5 +258,14 @@ enum DebugLink {
     static func section(_ s: String) -> SettingsSection? {
         let key = s.lowercased().replacingOccurrences(of: "-", with: "")
         return SettingsSection.allCases.first { $0.rawValue.lowercased() == key }
+    }
+
+    /// A raw value or a retired one (SettingsSection.aliases), ignoring case and dashes, as the
+    /// page and anchor it opens.
+    static func page(_ s: String) -> (section: SettingsSection, anchor: String?)? {
+        if let section = section(s) { return (section, nil) }
+        let key = s.lowercased().replacingOccurrences(of: "-", with: "")
+        guard let raw = SettingsSection.aliases.keys.first(where: { $0.lowercased() == key }) else { return nil }
+        return SettingsSection.resolve(raw)
     }
 }

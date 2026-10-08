@@ -103,8 +103,9 @@ enum NowPlayingPlacement {
         let host = placed.contains("meters") ? "meters" : (placed.contains("claude") ? "claude" : nil)
         guard let host, let slot = DeskLayout.parse(layout)[host] else { return nil }
         var words = layout.split(separator: " ").map(String.init)
-        // The host's last word wins in DeskLayout.parse, so insert after that one.
-        guard let at = words.lastIndex(where: { $0 == "\(host):\(slot)" }) else { return nil }
+        // The host's last word wins in DeskLayout.parse, so insert after that one (its word may
+        // carry a size, item 59).
+        guard let at = words.lastIndex(where: { $0 == "\(host):\(slot)" || $0.hasPrefix("\(host):\(slot):") }) else { return nil }
         words.insert("\(widget):\(slot)", at: at + 1)
         return words.joined(separator: " ")
     }

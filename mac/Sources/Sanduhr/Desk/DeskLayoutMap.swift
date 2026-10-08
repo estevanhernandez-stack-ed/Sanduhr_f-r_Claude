@@ -1,9 +1,11 @@
 import SwiftUI
 import AppKit
 
-/// Settings, Desk, Layout's preview (item 68): a screen-shaped map with the menu bar, the Dock
-/// on its edge and every placed piece outlined in its corner, in stacking order, inside the
-/// margins. Its own view so the Dock clearance work (item 59) can extend it.
+/// Settings, Desk, Layout's preview (items 68, 59): a screen-shaped map with the menu bar, the
+/// notch (and the island under it while it draws), the Dock on its edge and every placed piece
+/// outlined at its anchor, in stacking order and at its size, inside the margins. Laid out the
+/// way DeskView lays out the Desk: the sides' columns with their middles centered, the centers'
+/// column with the top center below the notch.
 struct DeskLayoutMap: View {
     /// The screen's size in points (the Desk's screen).
     let screen: CGSize
@@ -11,6 +13,8 @@ struct DeskLayoutMap: View {
     let dock: DockPrefs
     /// The Dock's reach into the screen in points, 0 when it hides.
     let dockReach: CGFloat
+    /// The camera notch in screen points from the top left, nil on a screen without one.
+    var notch: CGRect? = nil
 
     @AppStorage("layout", store: .desk) private var layout = DeskLayout.standard
     @AppStorage("left", store: .desk) private var left = 52.0
@@ -18,50 +22,101 @@ struct DeskLayoutMap: View {
     @AppStorage("top", store: .desk) private var top = 40.0
     @AppStorage("bottom", store: .desk) private var bottom = 60.0
     @AppStorage("showMeetings", store: .desk) private var showMeetings = true
-    @AppStorage("showClaude", store: .desk) private var showClaude = true
+    @AppStorage(DeskController.notchKey, store: .desk) private var island = false
+    @AppStorage("notchChin", store: .desk) private var chin = 26.0
 
     /// The map's height; its width follows the screen's shape.
     static let height: CGFloat = 132
+    /// A piece's label size on the map at size 1.
+    static let labelSize: CGFloat = 9
+
+    /// One piece as the map draws it.
+    struct Piece: Equatable {
+        var name: String
+        var scale: Double
+    }
 
     var body: some View {
         let scale = Self.height / max(1, screen.height)
         let width = screen.width * scale
-        let corners = Self.corners(layout: layout, showMeetings: showMeetings, showClaude: showClaude)
+        let anchors = Self.anchors(layout: layout, showMeetings: showMeetings, showClaude: true)
         let insets = Self.insets(left: left, right: right, top: top + menuBar, bottom: bottom,
                                  dock: dock.side, reach: dockReach, scale: scale)
+        let notchBottom = DeskAnchorGeometry.notchBottom(notch: notch, island: island, chin: chin)
+        let drop = DeskAnchorGeometry.centerDrop(contentTop: CGFloat(top) + menuBar, notchBottom: notchBottom) * scale
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06))
             Rectangle().fill(Color.white.opacity(0.18)).frame(height: max(2, menuBar * scale))
+            notchShape(bottom: notchBottom, scale: scale)
             dockBand(width: width, scale: scale)
             HStack(alignment: .top, spacing: 0) {
-                column(top: corners[.tl] ?? [], bottom: corners[.bl] ?? [], alignment: .leading)
+                column(anchors, .left, alignment: .leading)
                 Spacer(minLength: 8)
-                column(top: corners[.tr] ?? [], bottom: corners[.br] ?? [], alignment: .trailing)
+                column(anchors, .right, alignment: .trailing)
             }
+            .overlay { centerColumn(anchors, drop: drop) }
             .padding(insets)
         }
         .frame(width: width, height: Self.height)
         .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.white.opacity(0.5), lineWidth: 1))
     }
 
-    private func column(top: [String], bottom: [String], alignment: HorizontalAlignment) -> some View {
+    @ViewBuilder
+    private func column(_ anchors: [DeskAnchor: [Piece]], _ side: DeskAnchor.Column,
+                        alignment: HorizontalAlignment) -> some View {
+        let middle = DeskAnchor.at(side, .middle).flatMap { anchors[$0] } ?? []
         VStack(alignment: alignment, spacing: 3) {
-            ForEach(top, id: \.self) { piece($0) }
+            stack(DeskAnchor.at(side, .top).flatMap { anchors[$0] } ?? [])
             Spacer(minLength: 4)
-            ForEach(bottom, id: \.self) { piece($0) }
+            stack(DeskAnchor.at(side, .bottom).flatMap { anchors[$0] } ?? [])
         }
         .frame(maxHeight: .infinity)
+        .overlay(alignment: Alignment(horizontal: alignment, vertical: .center)) {
+            if !middle.isEmpty {
+                VStack(alignment: alignment, spacing: 3) { stack(middle) }.fixedSize()
+            }
+        }
     }
 
-    private func piece(_ name: String) -> some View {
-        Text(name)
-            .font(.system(size: 9, weight: .medium))
+    @ViewBuilder
+    private func centerColumn(_ anchors: [DeskAnchor: [Piece]], drop: CGFloat) -> some View {
+        let top = anchors[.tc] ?? []
+        let bottom = anchors[.bc] ?? []
+        if !top.isEmpty || !bottom.isEmpty {
+            VStack(spacing: 3) {
+                stack(top)
+                Spacer(minLength: 4)
+                stack(bottom)
+            }
+            .padding(.top, drop)
+        }
+    }
+
+    private func stack(_ pieces: [Piece]) -> some View {
+        ForEach(pieces, id: \.name) { piece($0) }
+    }
+
+    private func piece(_ p: Piece) -> some View {
+        Text(p.name)
+            .font(.system(size: Self.labelSize * CGFloat(p.scale), weight: .medium))
             .foregroundStyle(.white.opacity(0.9))
             .lineLimit(1)
             .fixedSize()
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
+            .padding(.horizontal, 5 * CGFloat(p.scale))
+            .padding(.vertical, 2 * CGFloat(p.scale))
             .background(RoundedRectangle(cornerRadius: 3).strokeBorder(Color.white.opacity(0.7), lineWidth: 0.75))
+    }
+
+    /// The notch, and the island's strip under it while the island draws, at the top center.
+    @ViewBuilder
+    private func notchShape(bottom: CGFloat, scale: CGFloat) -> some View {
+        if let notch, bottom > 0 {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color.black)
+                .frame(width: max(6, notch.width * scale), height: max(2, bottom * scale))
+                .frame(maxWidth: .infinity, alignment: .top)
+                .accessibilityHidden(true)
+        }
     }
 
     @ViewBuilder
@@ -82,17 +137,12 @@ struct DeskLayoutMap: View {
         }
     }
 
-    /// Each corner's pieces by name, in stacking order: what DeskView draws for `layout`
-    /// (DeskLayout.placed and DeskLayout.parse, in DeskLayout.widgets' order).
-    static func corners(layout: String, showMeetings: Bool, showClaude: Bool) -> [DeskView.Slot: [String]] {
-        let placed = DeskLayout.placed(layout, showMeetings: showMeetings, showClaude: showClaude)
-        let slots = DeskLayout.parse(layout)
-        var out: [DeskView.Slot: [String]] = [:]
-        for w in DeskLayout.widgets where placed.contains(w.key) {
-            guard let raw = slots[w.key], let slot = DeskView.Slot(rawValue: raw) else { continue }
-            out[slot, default: []].append(w.name)
-        }
-        return out
+    /// Each anchor's pieces by name and size, in stacking order: what DeskView draws for
+    /// `layout` (DeskArrangement.stacks, the same call).
+    static func anchors(layout: String, showMeetings: Bool, showClaude: Bool) -> [DeskAnchor: [Piece]] {
+        let names = Dictionary(uniqueKeysWithValues: DeskLayout.widgets.map { ($0.key, $0.name) })
+        return DeskArrangement(layout).stacks(showMeetings: showMeetings, showClaude: showClaude)
+            .mapValues { stack in stack.map { Piece(name: names[$0.widget] ?? $0.widget, scale: $0.scale) } }
     }
 
     /// The margins on the map: the saved ones (top below the menu bar) and the Dock's reach on its
@@ -115,9 +165,9 @@ struct DeskLayoutPreview: View {
         let menuBar = screen.map { $0.frame.maxY - $0.visibleFrame.maxY } ?? 24
         let prefs = DockFollower.readPrefs()
         let reach = prefs.autohide ? 0 : live.dockInsets.amount(on: prefs.side)
-        SettingsPreviewCard(kind: .layout, label: "A map of the screen with each Desk piece in its corner, the menu bar at the top and the Dock on its edge.",
+        SettingsPreviewCard(kind: .layout, label: "A map of the screen with each Desk piece at its place, in its order and at its size, the menu bar and the notch at the top and the Dock on its edge.",
                             maximum: 1.2) {
-            DeskLayoutMap(screen: frame, menuBar: menuBar, dock: prefs, dockReach: reach)
+            DeskLayoutMap(screen: frame, menuBar: menuBar, dock: prefs, dockReach: reach, notch: live.notchRect)
         }
     }
 }

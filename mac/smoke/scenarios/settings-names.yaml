@@ -1,0 +1,154 @@
+# Settings v2, slice 1 (item 72, docs/settings-v2-spec.md): every button whose title ends in
+# "Settings…" names a page by its sidebar title and opens that page. `settings-link` opens Settings
+# the way a "<Page> Settings…" button does (SettingsLinkButton) and refuses a title that names no
+# page, so "Desk Layout Settings…" or "Watcher Settings…" can't come back. Each step starts on the
+# page that carries the button, and first checks that page shows a button with that exact title
+# (read from the drawn text, where OCR may give the ellipsis as three dots; a plain smoke run has
+# no accessibility tree under the hosting view, and the text holds only what is on screen, so a
+# button below the fold is opened at its anchor first);
+# every Settings-page link is a SettingsLinkButton, so its title and its page come from one
+# SettingsSection. The retired names must be gone from the pages that used them, and the shared
+# Sanduhr menu carries Menu Bar Shows. Slice 2 renamed pages (Desk, Usage, Claude Code, Mods &
+# Config, Widget) and gave Watchers its own page, so the buttons follow.
+name: Every Settings… button opens the page it names
+steps:
+  # Claude Code: the Claude Code glow hook's hint opens Notch; the old Layout and Integrations
+  # titles are gone everywhere.
+  - do: settings
+    arg: integrations
+  - expect:
+      window: settings
+      missing: { text: "/Desk Layout Settings|Layout Settings|Notch glow when Claude needs you/" }
+  # The hint sits under the folder list, below the fold: open the page at it.
+  - do: settings
+    arg: integrations glow-hint
+  - expect_state: { settings_anchor: glow-hint, settings_anchor_visible: true }
+  - expect:
+      window: settings
+      contains: { text: '/^Notch Settings(…|\.\.\.)$/' }
+  - do: settings-link
+    arg: Notch Settings…
+  - expect_state: { settings_section: notch }
+  # Watchers: where they show is inline; Above the prompt opens Mods & Config, where the meters
+  # mod that draws the rows switches (2026-10-08).
+  - do: settings
+    arg: watchers
+  # The link sits under Above the prompt, below the fold.
+  - do: settings
+    arg: watchers above-prompt
+  - expect:
+      window: settings
+      contains: { text: '/^Mods & Config Settings(…|\.\.\.)$/' }
+  - do: settings-link
+    arg: Mods & Config Settings…
+  - expect_state: { settings_section: mods }
+  # Claude Code: each folder box shows the meters mod in one line, with Mods & Config Settings….
+  - do: settings
+    arg: integrations folders
+  - expect:
+      window: settings
+      contains: { text: "/Meters above the prompt: (on|off|not installed|installed)/" }
+  - expect:
+      window: settings
+      contains: { text: '/^Mods & Config Settings(…|\.\.\.)$/' }
+  - do: settings-link
+    arg: Mods & Config Settings…
+  - expect_state: { settings_section: mods }
+  # Mods & Config: Sanduhr's own mod is at the top, and its other half (the watchers' switch)
+  # opens Watchers.
+  - do: settings
+    arg: mods meters
+  - expect_state: { settings_anchor: meters, settings_anchor_visible: true }
+  - expect:
+      window: settings
+      contains: { text: '/^Watchers Settings(…|\.\.\.)$/' }
+  # General: each surface's status links to its page.
+  - do: settings
+    arg: general
+  - expect:
+      window: settings
+      contains: { text: '/^Desk Settings(…|\.\.\.)$/' }
+  - expect:
+      window: settings
+      contains: { text: '/^Widget Settings(…|\.\.\.)$/' }
+  - do: settings-link
+    arg: Desk Settings…
+  - expect_state: { settings_section: deskLayout }
+  - do: settings
+    arg: general
+  - do: settings-link
+    arg: Widget Settings…
+  - expect_state: { settings_section: widgetLook }
+  # Notch: its switch has its one name, and Notch glow points at Claude Code for the hook.
+  - do: settings
+    arg: notch
+  - expect:
+      window: settings
+      contains: { text: "/Notch: the island around the camera/" }
+  - expect:
+      window: settings
+      missing: { text: "/Extend the camera notch|Glow for Claude Code/" }
+  # The link sits in Notch glow, below the fold.
+  - do: settings
+    arg: notch glow
+  - expect:
+      window: settings
+      contains: { text: '/^Claude Code Settings(…|\.\.\.)$/' }
+  - do: settings-link
+    arg: Claude Code Settings…
+  - expect_state: { settings_section: integrations }
+  # Now Playing: the two ways to place it.
+  - do: settings
+    arg: nowPlaying
+  - expect:
+      window: settings
+      contains: { text: '/^Notch Settings(…|\.\.\.)$/' }
+  - expect:
+      window: settings
+      contains: { text: '/^Desk Settings(…|\.\.\.)$/' }
+  - do: settings-link
+    arg: Notch Settings…
+  - expect_state: { settings_section: notch }
+  - do: settings
+    arg: nowPlaying
+  - do: settings-link
+    arg: Desk Settings…
+  - expect_state: { settings_section: deskLayout }
+  # The menus' page items: the limit menus (Alerts, Each limit), the watcher and now playing
+  # menus, the clock's menu.
+  - do: settings-link
+    arg: Alerts Settings…
+  - expect_state: { settings_section: alerts }
+  - do: settings-link
+    arg: Watchers Settings…
+  - expect_state: { settings_section: watchers }
+  - do: settings-link
+    arg: Now Playing Settings…
+  - expect_state: { settings_section: nowPlaying }
+  - do: settings-link
+    arg: Desk Look Settings…
+  - expect_state: { settings_section: deskLook }
+  # Usage's "needs setup" cards open Accounts. The card shows only while an account has no
+  # record; it is a SettingsLinkButton(.credentials), so its title and its page can't part.
+  - do: settings
+    arg: usage
+  - do: settings-link
+    arg: Accounts Settings…
+  - expect_state: { settings_section: credentials }
+  # General: Menu Bar Shows is the one name, and it is in every Sanduhr menu.
+  - do: settings
+    arg: general
+  - expect:
+      window: settings
+      missing: { text: "/Percent beside the hourglass|Desk menu in the menu bar/" }
+  # Last: Accounts comes first with two or more accounts.
+  - expect_state: { menu_submenus.-1: Menu Bar Shows }
+  # Updates: Check for Updates… is the button's name, as in the menus.
+  - do: settings
+    arg: updates
+  - expect:
+      window: settings
+      contains: { text: "/Check for Updates/" }
+  - expect:
+      window: settings
+      missing: { text: "/Check Now/" }

@@ -1,0 +1,57 @@
+# Item 60: Arrange mode on the desktop. Arrange Desk… (here the desk-arrange hook) gives every piece
+# an outline and a handle and the Desk window takes clicks over its whole frame (click_through:
+# whole). The bar with Cancel and Done floats above every window in its own panel (bar_visible),
+# and Settings, where Arrange is often started from, steps aside until it ends and then comes back.
+# The smoke's own edit moves the clock to Top right at 120% in the working layout only: the saved
+# layout is untouched until Done. Cancel drops the edit and the layout stays exactly as it was; Done
+# writes it once. Either way the bar closes and the window goes back to taking clicks only where
+# something is drawn (click_through: drawn). The layout is put back afterwards.
+name: Desk arrange mode moves a piece, Cancel restores, Done saves
+needs: [desk]
+steps:
+  - defaults: { domain: desk, key: layout, type: string, value: "message:tl clock:bl meters:bl meetings:bl" }
+  - expect_state: { desk_arrange.active: false, desk_arrange.click_through: drawn, desk_arrange.bar_visible: false }
+  - do: settings
+    arg: deskLayout
+  - expect_state: { settings_open: true }
+  - do: desk-arrange
+    arg: start
+  - expect_state:
+      desk_arrange.active: true
+      desk_arrange.changed: false
+      desk_arrange.click_through: whole
+      desk_arrange.bar_visible: true
+      desk_arrange.working: "message:tl clock:bl meters:bl meetings:bl"
+      settings_open: false
+  - do: desk-arrange
+    arg: test
+  - expect_state:
+      desk_arrange.changed: true
+      desk_arrange.working: "message:tl clock:tr:1.2 meters:bl meetings:bl"
+      layout: "message:tl clock:bl meters:bl meetings:bl"
+  - snap: desk-arrange
+  - do: desk-arrange
+    arg: cancel
+  - expect_state:
+      desk_arrange.active: false
+      desk_arrange.working: null
+      desk_arrange.click_through: drawn
+      desk_arrange.bar_visible: false
+      settings_open: true
+      layout: "message:tl clock:bl meters:bl meetings:bl"
+      desk_pieces[piece=clock].anchor: bl
+  - do: desk-arrange
+    arg: start
+  - do: desk-arrange
+    arg: test
+  - do: desk-arrange
+    arg: done
+  - expect_state:
+      desk_arrange.active: false
+      desk_arrange.click_through: drawn
+      desk_arrange.bar_visible: false
+      settings_open: true
+      layout: "message:tl clock:tr:1.2 meters:bl meetings:bl"
+      desk_pieces[piece=clock].anchor: tr
+      desk_pieces[piece=clock].scale: 1.2
+  - snap: desk-arrange-done

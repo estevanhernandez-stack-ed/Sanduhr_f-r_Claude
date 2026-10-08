@@ -152,6 +152,20 @@ enum ThemeLint {
         if let o = present(data["opts_out_of_mica"]), !isBool(o) {
             findings.append(error("opts_out_of_mica", "opts_out_of_mica must be true or false, got \(describe(o))."))
         }
+        // Text style (item 65d).
+        if let ink = present(data["title_ink"]), titleInk(ink) == nil {
+            findings.append(error("title_ink", "title_ink must be 2 to 4 #rrggbb colors (the title's gradient, left to right), or null."))
+        }
+        if let s = present(data["title_style"]), (s as? String).flatMap(LetterStyle.init(tag:)) == nil {
+            findings.append(error("title_style", "title_style must be one of \(LetterStyle.tagNames), or null."))
+        }
+    }
+
+    /// `title_ink`'s stops, nil unless it is 2 to 4 `#rrggbb` strings.
+    static func titleInk(_ v: Any?) -> [RGB]? {
+        guard let list = v as? [Any], (2...4).contains(list.count) else { return nil }
+        let stops = list.compactMap { parseHex($0 as? String) }
+        return stops.count == list.count ? stops : nil
     }
 
     // MARK: - Design rules (warnings)
@@ -174,6 +188,13 @@ enum ThemeLint {
         let secondaryRatio = contrast(luminance(c["text_secondary"]!), cardL)
         if secondaryRatio < textSecondaryContrastMin {
             findings.append(warning("text_secondary", "text_secondary reads at \(fmt(secondaryRatio, 1)):1 on the card (needs \(fmt(textSecondaryContrastMin, 1)):1)."))
+        }
+        // Each stop of the title's gradient reads like text (item 65d).
+        for (i, stop) in (titleInk(data["title_ink"]) ?? []).enumerated() {
+            let ratio = contrast(luminance(stop), cardL)
+            if ratio < textContrastMin {
+                findings.append(warning("title_ink", "title_ink stop \(i + 1) reads at \(fmt(ratio, 1)):1 on the card (needs \(fmt(textContrastMin, 1)):1); brighten it or darken glass_on_mica."))
+            }
         }
 
         let ramp = ["text", "text_secondary", "text_dim", "text_muted"]

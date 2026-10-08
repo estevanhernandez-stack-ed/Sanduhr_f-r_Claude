@@ -1,17 +1,24 @@
 import SwiftUI
 import AppKit
 
-/// The desktop layout engine. Four slots, one per corner; each widget lives in one slot and
-/// widgets in the same slot stack in the order listed. The two slots on a side share one
+/// The desktop layout engine. Eight anchors (item 59): the four corners, the top and bottom
+/// centers, and the middle of each side; each widget lives at one anchor, at its own size, and
+/// widgets at the same anchor stack in the order listed. The top and bottom of a side share one
 /// column with a spacer between them, so a growing meeting list pushes against the message
-/// instead of drawing over it, and the message shrinks to fit before anything overlaps.
+/// instead of drawing over it, and the message shrinks to fit before anything overlaps. A
+/// side's middle sits in that column between its top and bottom, pushed by them the same way;
+/// the centers share a column of their own between the sides, which then draw only in the room
+/// it leaves (DeskColumnsLayout), the top center below the notch or the island. A layout with
+/// corners only draws exactly as before.
 ///
 /// Settings live in the com.626labs.sanduhr.desk defaults domain:
 ///   defaults write com.626labs.sanduhr.desk layout "message:tl clock:bl claude:bl meetings:bl"
 ///       widgets: clock (time and date), claude (Sanduhr line), meters (a bar per limit),
 ///                nowPlaying (what plays, item 53b), watchers (item 66), meetings, message
-///       slots:   tl tr bl br; leave a widget out to hide it
-///   defaults write com.626labs.sanduhr.desk font "EsteFont 26"    (any installed font family; EsteFont 26 ships in the app and is the default)
+///       anchors: tl tc tr ml mr bl bc br; leave a widget out to hide it; an unknown anchor
+///                puts the widget where the standard layout has it (message tl, the rest bl)
+///       size:    a third part, 0.6 to 1.6 ("clock:bl:1.2"); none is 1 (DeskArrangement)
+///   defaults write com.626labs.sanduhr.desk font "EsteFont Pro"   (any installed font family; EsteFont Pro and EsteFont 26 ship in the app, Pro is the default)
 ///   defaults write com.626labs.sanduhr.desk timeSize -float 112    (clock size; the rest scales from it)
 ///   defaults write com.626labs.sanduhr.desk messageSize -float 84
 ///   defaults write com.626labs.sanduhr.desk messageColor 9ad7ff    (hex, or "5b8cff,a86bff" for a gradient)
@@ -22,8 +29,8 @@ import AppKit
 ///   defaults write com.626labs.sanduhr.desk top -float 40
 ///   defaults write com.626labs.sanduhr.desk bottom -float 60
 ///   defaults write com.626labs.sanduhr.desk menuIcon -bool true    (bring back the clock menu)
-/// The older showMeetings / showClaude switches still hide those widgets (showClaude hides
-/// both the line and the meters).
+/// showMeetings (Read today's meetings) still hides the meetings. 2.10.0's showClaude is retired:
+/// SettingsMigrations moved it into the layout (both Claude meters pieces Hidden).
 /// Then quit and reopen Desk. Messages themselves: edit
 /// ~/Library/Application Support/Desk/messages.txt (no restart needed).
 struct DeskView: View {
@@ -36,61 +43,155 @@ struct DeskView: View {
     @AppStorage("bottom", store: .desk) private var bottom = 60.0
     @AppStorage("timeSize", store: .desk) private var timeSize = 112.0
     @AppStorage("showMeetings", store: .desk) private var showMeetings = true
-    @AppStorage("showClaude", store: .desk) private var showClaude = true
+
+    @AppStorage(DeskController.notchKey, store: .desk) private var island = false
+    @AppStorage("notchChin", store: .desk) private var chin = 26.0
 
     enum Widget: String, CaseIterable { case clock, claude, meters, nowPlaying, watchers, meetings, message }
-    enum Slot: String { case tl, tr, bl, br }
 
     private var inset: CGFloat { timeSize * 0.18 }
 
-    /// Parses the layout string. Unknown words are skipped, so a typo hides one widget
-    /// instead of blanking the desktop.
-    private var placement: [Slot: [Widget]] {
-        var out: [Slot: [Widget]] = [:]
-        for item in layout.split(separator: " ") {
-            let bits = item.split(separator: ":").map(String.init)
-            guard bits.count == 2, let w = Widget(rawValue: bits[0]), let slot = Slot(rawValue: bits[1]) else { continue }
-            if w == .meetings && !showMeetings { continue }
-            if (w == .claude || w == .meters) && !showClaude { continue }
-            out[slot, default: []].append(w)
-        }
-        return out
+    /// Each anchor's pieces, top to bottom (DeskArrangement). Unknown widgets are skipped, so a
+    /// typo hides one widget instead of blanking the desktop; an unknown anchor falls back to
+    /// the widget's default.
+    /// While arranging (item 60), the layout being edited; nothing is saved until Done.
+    private var stacks: [DeskAnchor: [DeskPlacement]] {
+        (model.arrange.working ?? DeskArrangement(layout)).stacks(showMeetings: showMeetings)
     }
 
     var body: some View {
-        let place = placement
+        let place = stacks
+        let arranging = model.arrange.active
+        let margins = DeskAnchorGeometry.margins(left: left, right: right, top: top, bottom: bottom,
+                                                 topInset: model.topInset, dock: model.dockInsets, inset: inset)
         ZStack(alignment: .topLeading) {
+        // Arrange mode: the whole screen takes clicks (DeskArrangePlate); outside it, only what is drawn.
+        if arranging { DeskArrangePlate() }
         GeometryReader { geo in
             let colWidth = max(200, geo.size.width * 0.46)
-            HStack(alignment: .top, spacing: 0) {
-                column(top: place[.tl] ?? [], bottom: place[.bl] ?? [], alignment: .leading)
-                    .frame(maxWidth: colWidth, alignment: .leading)
-                Spacer(minLength: 24)
-                column(top: place[.tr] ?? [], bottom: place[.br] ?? [], alignment: .trailing)
-                    .frame(maxWidth: colWidth, alignment: .trailing)
-            }
+            let lineInLayout = place.values.contains { $0.contains { $0.widget == Widget.claude.rawValue } }
+            let anchors = arrangeGeometry(geo.size, margins: margins)
+            columns(place, colWidth: colWidth, lineInLayout: lineInLayout, contentTop: margins.top + inset)
             // Handwritten glyphs reach past their own boxes (the left curve of an 8, say), and
             // shadows draw inside those boxes, clipping them. Inner breathing room fixes that;
             // the outer padding gives it back so the margins still mean the visible edge.
             .padding(inset)
-            // The Dock's side moves in by its reach (item 56), so nothing sits under it.
-            .padding(.leading, max(0, left + model.dockInsets.left - inset))
-            .padding(.trailing, max(0, right + model.dockInsets.right - inset))
-            .padding(.top, max(0, model.topInset + top - inset))
-            .padding(.bottom, max(0, bottom + model.dockInsets.bottom - inset))
+            // The Dock's side moves in by its reach (item 56), so nothing sits under it: every
+            // anchor, centers and middles too, is inside these margins.
+            .padding(.leading, margins.leading)
+            .padding(.trailing, margins.trailing)
+            .padding(.top, margins.top)
+            .padding(.bottom, margins.bottom)
+            .environment(\.deskArrangeGeometry, arranging ? anchors : nil)
+            if arranging { DeskArrangeOverlay(mode: model.arrange, geometry: anchors) }
         }
         NotchView(model: model)
         }
+        .coordinateSpace(.named(DeskArrange.space))
     }
 
-    private func column(top: [Widget], bottom: [Widget], alignment: HorizontalAlignment) -> some View {
-        let lineInLayout = placement.values.contains { $0.contains(.claude) }
+    /// The anchors' rectangle and the top center's drop, as the columns below lay them out.
+    private func arrangeGeometry(_ size: CGSize, margins: DeskAnchorGeometry.Margins) -> DeskArrangeGeometry {
+        let notch = DeskAnchorGeometry.notchBottom(notch: model.notchRect, island: island, chin: chin)
+        return DeskArrangeGeometry(
+            content: DeskAnchorGeometry.content(window: size, margins: margins, inset: inset),
+            centerDrop: DeskAnchorGeometry.centerDrop(contentTop: margins.top + inset, notchBottom: notch))
+    }
+
+    /// The columns. Corners and middles only: the two side columns as before item 59, the
+    /// spacer between them. With a piece at a center, the center column sits between the sides
+    /// (DeskColumnsLayout) and the sides draw only in the room it leaves, so nothing at a side
+    /// reaches a center piece: a long message wraps and shrinks instead.
+    @ViewBuilder
+    private func columns(_ place: [DeskAnchor: [DeskPlacement]], colWidth: CGFloat,
+                         lineInLayout: Bool, contentTop: CGFloat) -> some View {
+        let left = column(.left, place, alignment: .leading, lineInLayout: lineInLayout)
+        let right = column(.right, place, alignment: .trailing, lineInLayout: lineInLayout)
+        if (place[.tc] ?? []).isEmpty && (place[.bc] ?? []).isEmpty {
+            HStack(alignment: .top, spacing: 0) {
+                left.frame(maxWidth: colWidth, alignment: .leading)
+                Spacer(minLength: DeskAnchorGeometry.columnGap)
+                right.frame(maxWidth: colWidth, alignment: .trailing)
+            }
+        } else {
+            DeskColumnsLayout(colWidth: colWidth) {
+                left.frame(maxWidth: .infinity, alignment: .leading)
+                centerColumn(place, lineInLayout: lineInLayout, contentTop: contentTop)
+                right.frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        }
+    }
+
+    /// A side's column: its top and bottom stacks as before, and its middle (item 59) between
+    /// them, with a flexible spacer on each side, so it sits halfway between the two stacks and a
+    /// tall corner pushes against it instead of drawing over it. Without a middle it is exactly
+    /// the column from before item 59.
+    private func column(_ side: DeskAnchor.Column, _ place: [DeskAnchor: [DeskPlacement]],
+                        alignment: HorizontalAlignment, lineInLayout: Bool) -> some View {
+        let top = DeskAnchor.at(side, .top).flatMap { place[$0] } ?? []
+        let middle = DeskAnchor.at(side, .middle).flatMap { place[$0] } ?? []
+        let bottom = DeskAnchor.at(side, .bottom).flatMap { place[$0] } ?? []
         return VStack(alignment: alignment, spacing: DeskNowPlaying.columnSpacing) {
-            ForEach(top, id: \.self) { DeskPiece(widget: $0, model: model, alignment: alignment, lineInLayout: lineInLayout) }
+            pieces(top, alignment: alignment, lineInLayout: lineInLayout)
             Spacer(minLength: 32)
-            ForEach(bottom, id: \.self) { DeskPiece(widget: $0, model: model, alignment: alignment, lineInLayout: lineInLayout) }
+            if !middle.isEmpty {
+                pieces(middle, alignment: alignment, lineInLayout: lineInLayout)
+                Spacer(minLength: 32)
+            }
+            pieces(bottom, alignment: alignment, lineInLayout: lineInLayout)
         }
         .frame(maxHeight: .infinity)
+    }
+
+    /// The centers (item 59): top center below the notch or the island, bottom center on the
+    /// bottom margin. Draws nothing when neither has a piece.
+    @ViewBuilder
+    private func centerColumn(_ place: [DeskAnchor: [DeskPlacement]], lineInLayout: Bool, contentTop: CGFloat) -> some View {
+        let top = place[.tc] ?? []
+        let bottom = place[.bc] ?? []
+        if !top.isEmpty || !bottom.isEmpty {
+            let notch = DeskAnchorGeometry.notchBottom(notch: model.notchRect, island: island, chin: chin)
+            VStack(alignment: .center, spacing: DeskNowPlaying.columnSpacing) {
+                pieces(top, alignment: .center, lineInLayout: lineInLayout)
+                Spacer(minLength: 32)
+                pieces(bottom, alignment: .center, lineInLayout: lineInLayout)
+            }
+            .padding(.top, DeskAnchorGeometry.centerDrop(contentTop: contentTop, notchBottom: notch))
+            .frame(maxHeight: .infinity)
+        }
+    }
+
+    private func pieces(_ stack: [DeskPlacement], alignment: HorizontalAlignment, lineInLayout: Bool) -> some View {
+        ForEach(stack, id: \.widget) { p in
+            if let widget = Widget(rawValue: p.widget) {
+                DeskPiece(widget: widget, model: model, alignment: alignment, lineInLayout: lineInLayout, scale: p.scale)
+                    .deskArrangeable(p, mode: model.arrange)
+            }
+        }
+    }
+}
+
+/// Left, center and right columns side by side with no horizontal overlap (item 59): the
+/// center takes its own width, the sides what is left (DeskAnchorGeometry.columnWidths). The
+/// center stays on the screen's middle; each side hugs its edge. Expects three subviews.
+struct DeskColumnsLayout: Layout {
+    let colWidth: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        proposal.replacingUnspecifiedDimensions()
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 3 else { return }
+        let height = bounds.height
+        let ideal = subviews[1].sizeThatFits(ProposedViewSize(width: colWidth, height: height)).width
+        let widths = DeskAnchorGeometry.columnWidths(total: bounds.width, colWidth: colWidth, center: ideal)
+        subviews[0].place(at: CGPoint(x: bounds.minX, y: bounds.minY), anchor: .topLeading,
+                          proposal: ProposedViewSize(width: widths.side, height: height))
+        subviews[1].place(at: CGPoint(x: bounds.midX, y: bounds.minY), anchor: .top,
+                          proposal: ProposedViewSize(width: widths.center, height: height))
+        subviews[2].place(at: CGPoint(x: bounds.maxX, y: bounds.minY), anchor: .topTrailing,
+                          proposal: ProposedViewSize(width: widths.side, height: height))
     }
 }
 
@@ -106,26 +207,33 @@ struct DeskPiece: View {
     var lineInLayout = true
     /// The Message preview's Replay: a `{shimmer}` line sweeps at once instead of after its rest.
     var sweepFirst = false
+    /// The piece's size in the layout (item 59), 0.6 to 1.6: its sizes are the saved ones times this.
+    var scale: Double = 1
 
     @AppStorage("font", store: .desk) private var savedFont: String?
-    /// The Desk font as drawn: EsteFont 26 unless a font was picked (DeskFont, item 58).
+    /// The Desk font as drawn: EsteFont Pro unless a font was picked (DeskFont, item 58).
     private var font: String { DeskFont.resolve(saved: savedFont) }
     @AppStorage("messageFont", store: .desk) private var messageFont = ""
-    @AppStorage("timeSize", store: .desk) private var timeSize = 112.0
-    @AppStorage("messageSize", store: .desk) private var messageSize = 84.0
+    @AppStorage("timeSize", store: .desk) private var savedTimeSize = 112.0
+    @AppStorage("messageSize", store: .desk) private var savedMessageSize = 84.0
+    /// The clock size this piece draws from (every piece but the message scales from it), and
+    /// the message's own size as its base, each times the piece's scale.
+    private var timeSize: Double { savedTimeSize * scale }
+    private var messageSize: Double { savedMessageSize * scale }
     @AppStorage("messageColor", store: .desk) private var messageColor = "9ad7ff"
     @AppStorage(DeskMessageLook.glowKey, store: .desk) private var messageGlow = true
     @AppStorage("inkColor", store: .desk) private var ink = "ffffff"
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         switch widget {
-        case .clock: clock.deskInk()
-        case .claude: claude.deskInk()
+        case .clock: clock.deskPieceClickArea(.clock) { model.clockFrame = $0 }.deskInk()
+        case .claude: claude.deskPieceClickArea(.claudeLine) { model.claudeLineFrame = $0 }.deskInk()
         case .meters: meters.deskInk()
         case .nowPlaying: nowPlaying.deskInk()
         case .watchers: DeskWatchers(model: model, font: font, size: timeSize * 0.17, alignment: alignment).deskInk()
         case .meetings: meetings.deskInk()
-        case .message: message
+        case .message: message.deskPieceClickArea(.message) { model.messageFrame = $0 }
         }
     }
 
@@ -143,7 +251,8 @@ struct DeskPiece: View {
     private var clock: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             VStack(alignment: alignment, spacing: 2) {
-                // The time is the Desk's heading: EsteFont 26 draws it in its Bold face.
+                // The time is the Desk's heading: a bundled family (EsteFont Pro, EsteFont 26)
+                // draws it in its Bold face.
                 Text(Self.format(context.date, "h:mm"))
                     .font(.custom(BundledFonts.face(font, bold: true), size: timeSize))
                 Text(Self.format(context.date, "EEEE, MMMM d"))
@@ -242,7 +351,7 @@ struct DeskPiece: View {
                     }
                     .onGlobalFrame { model.noteFrame = $0 }
             } else if model.meetings.isEmpty {
-                Text("Nothing else on the calendar today").opacity(0.6)
+                Text(model.noMeetingsLine).opacity(0.6)
             } else {
                 ForEach(model.meetings) { meeting in
                     MeetingRow(meeting: meeting)
@@ -257,13 +366,48 @@ struct DeskPiece: View {
     /// The handwritten line with its per-line effects (DeskMessageLine, item 54). messageColor
     /// takes one hex, or two or more separated by commas for a left-to-right gradient (to match
     /// Ice's menu bar tint); a line's {ink:…} replaces it for that line.
+    /// On a date with its own lines (item 69) those stack above the usual line, each with its own
+    /// effects (DeskMessageStack), or take turns with it, one at a time (Take turns, Scroll).
     @ViewBuilder
     private var message: some View {
-        if let text = model.message {
-            DeskMessageLine(raw: text, font: messageFont.isEmpty ? font : messageFont, baseSize: messageSize,
-                            inkSpec: messageColor, globalGlow: messageGlow, alignment: alignment,
-                            paused: model.motionPaused, sweepFirst: sweepFirst)
+        if model.cycling {
+            turns
+        } else if !model.specialMessages.isEmpty || model.message != nil {
+            VStack(alignment: alignment, spacing: messageSize * DeskMessageStack.spacing) {
+                let hasUsual = model.message != nil
+                ForEach(Array(model.specialMessages.enumerated()), id: \.offset) { _, text in
+                    line(text, size: messageSize * (hasUsual ? DeskMessageStack.specialScale : 1))
+                }
+                if let text = model.message { line(text, size: messageSize) }
+            }
         }
+    }
+
+    /// Take turns and Scroll: one line at a time, each at the full message size (its own {size:}
+    /// still applies). Every line is laid out unseen underneath, so the piece keeps the height and
+    /// width of the biggest and nothing around it moves; the line showing comes in by a crossfade,
+    /// glides up (Scroll), or simply swaps with Reduce Motion. A new line is a new view, so its
+    /// {write} plays each time it comes in.
+    private var turns: some View {
+        let lines = model.messageLines
+        let change = MessageSpecialMode.change(model.specialMode, reduceMotion: reduceMotion)
+        return ZStack(alignment: Alignment(horizontal: alignment, vertical: .center)) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, text in
+                line(text, size: messageSize, paused: true).hidden()
+            }
+            if let current = model.cycleLine {
+                line(current, size: messageSize)
+                    .id(model.cycleIndex)
+                    .transition(DeskMessageStack.transition(change))
+            }
+        }
+        .animation(DeskMessageStack.animation(change), value: model.cycleIndex)
+    }
+
+    private func line(_ text: String, size: Double, paused: Bool? = nil) -> some View {
+        DeskMessageLine(raw: text, font: messageFont.isEmpty ? font : messageFont, baseSize: size,
+                        inkSpec: messageColor, globalGlow: messageGlow, alignment: alignment,
+                        paused: paused ?? model.motionPaused, sweepFirst: sweepFirst)
     }
 
     private static func format(_ date: Date, _ pattern: String) -> String {
@@ -277,6 +421,29 @@ private extension View {
     /// The Desk ink: inkColor (one hex, or several for a gradient) with a dark drop shadow,
     /// readable on any wallpaper.
     func deskInk() -> some View { modifier(DeskInk()) }
+
+    /// The clock, the message or the claude line as a click area (DeskPieceClicks): its frame goes
+    /// to the model, and while the switch is on the faint plate behind it, as wide as the kind's
+    /// click slack, gives every point there a drawn pixel, so the window server hands a two-finger
+    /// click to this transparent window instead of the Finder (DeskPointerMenu). Off, nothing is
+    /// drawn behind it and the click goes through, as before.
+    func deskPieceClickArea(_ kind: DeskElement.Kind, report: @escaping (CGRect) -> Void) -> some View {
+        modifier(DeskPieceClickArea(kind: kind, report: report))
+    }
+}
+
+private struct DeskPieceClickArea: ViewModifier {
+    let kind: DeskElement.Kind
+    let report: (CGRect) -> Void
+    @AppStorage(DeskPieceClicks.key, store: .desk) private var on = DeskPieceClicks.defaultOn
+
+    func body(content: Content) -> some View {
+        let s = DeskHitTest.slack(kind)
+        content
+            .background(Color.black.opacity(on ? DeskPointerMenu.hitPlateOpacity : 0)
+                .padding(EdgeInsets(top: -s.height, leading: -s.width, bottom: -s.height, trailing: -s.width)))
+            .onGlobalFrame(report)
+    }
 }
 
 extension View {
@@ -310,6 +477,20 @@ private struct DeskInk: ViewModifier {
             .foregroundStyle(LinearGradient.ink(ink))
             .opacity(0.92)
             .shadow(color: .black.opacity(shadow ? 0.45 : 0), radius: 10, x: 0, y: 2)
+    }
+}
+
+extension HorizontalAlignment {
+    /// A piece's frame alignment: its column's edge, or the middle at a center anchor (item 59).
+    var deskEdge: Alignment {
+        if self == .trailing { return .trailing }
+        return self == .center ? .center : .leading
+    }
+
+    /// A piece's text alignment, the same way.
+    var deskText: TextAlignment {
+        if self == .trailing { return .trailing }
+        return self == .center ? .center : .leading
     }
 }
 
