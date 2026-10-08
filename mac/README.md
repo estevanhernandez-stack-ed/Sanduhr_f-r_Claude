@@ -3,6 +3,9 @@
 Native Mac rewrite of the [Python/tkinter widget](../sanduhr.py). Feature parity
 plus real vibrancy, SF Pro, and no dock icon.
 
+New to Sanduhr? The [setup guide](../docs/setup-guide.md) walks through signing in, the Desk, the notch,
+accounts and Claude Code, one task at a time.
+
 ## Build
 
 Requires macOS 14+ and Xcode 15+ command-line tools (`xcode-select --install`).
