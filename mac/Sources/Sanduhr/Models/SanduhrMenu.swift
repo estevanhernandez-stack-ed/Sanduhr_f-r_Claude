@@ -57,7 +57,7 @@ enum SanduhrMenu {
                 MenuEntry(command: .settings, title: allSettings ? allSettingsTitle : settingsTitle, key: ","),
                 MenuEntry(command: .arrangeDesk, title: DeskArrangeCopy.menuItem, enabled: deskOn,
                           note: deskOn ? nil : DeskArrangeCopy.settingsDeskOff),
-                MenuEntry(command: .checkForUpdates, title: "Check for Updates…"),
+                MenuEntry(command: .checkForUpdates, title: SettingsNames.checkForUpdates),
                 MenuEntry(command: .whatsNew, title: "What's New…"),
                 MenuEntry(command: .tour, title: "Take the Tour…"),
             ]),
@@ -114,15 +114,15 @@ struct MenuBarModeItem: Equatable {
     let mode: MenuBarMode
     var checked = false
 
-    /// The same words as Settings, General, Menu bar.
+    /// The same words as Settings, General, Menu bar, Menu Bar Shows.
     var title: String { mode.label }
 }
 
-/// The menu bar item's own Menu Bar Shows submenu (item 40): the four Menu bar choices, the
-/// current one checked. Choosing one writes the same `menuBarMode` default as Settings, so
-/// Settings follows.
+/// The Menu Bar Shows submenu (item 40): the four Menu bar choices, the current one checked.
+/// Choosing one writes the same `menuBarMode` default as Settings, so Settings follows. Every
+/// Sanduhr menu carries it since Settings v2's slice 1, not only the menu bar item's own.
 struct MenuBarModeMenu: Equatable {
-    static let title = "Menu Bar Shows"
+    static let title = SettingsNames.menuBarShows
     let items: [MenuBarModeItem]
 }
 
@@ -130,5 +130,12 @@ extension SanduhrMenu {
     /// The Menu Bar Shows submenu with `current` checked, in Settings' order.
     static func menuBarModes(current: MenuBarMode) -> MenuBarModeMenu {
         MenuBarModeMenu(items: MenuBarMode.allCases.map { MenuBarModeItem(mode: $0, checked: $0 == current) })
+    }
+
+    /// The submenus every Sanduhr menu shows after Show or Hide Widget (at the top of the shared
+    /// items where a menu leaves Show or Hide out): Accounts with two or more accounts, then Menu
+    /// Bar Shows. AppDelegate.addMenuItems and the widget's SanduhrMenuItems both follow it.
+    static func submenus(accounts: AccountsMenu?) -> [String] {
+        (accounts == nil ? [] : [AccountsMenu.title]) + [MenuBarModeMenu.title]
     }
 }

@@ -1,14 +1,27 @@
-# docs/mac-smoke-test.md section 4: every Settings section opens in the one window. Item 68
-# (section 33): each section that controls something visible shows its preview card, snapped.
+# docs/mac-smoke-test.md section 4: every Settings page opens in the one window. Item 68
+# (section 33): each page that controls something visible shows its preview card, snapped.
+# Settings v2, slice 2 (item 72): sixteen pages in five groups, every one opened here by its raw
+# value, and the two retired raw values (deskMeters, pacing) opening the page they merged into.
 name: Every Settings section opens
 steps:
   - do: settings
     arg: general
-  - expect_state: { settings_open: true, settings_section: general, settings_preview: menuBar }
+  # General shows the surfaces as status lines; their switches are on their own pages.
+  - expect_state: { settings_open: true, settings_section: general, settings_preview: menuBar, settings_anchor: null }
+  - expect:
+      window: settings
+      contains: { text: "/Desk: (on|off)/" }
+  - expect:
+      window: settings
+      missing: { text: "/Show the Claude meters on the desktop|Widget: the floating window/" }
   - snap: preview-general
+  # Shortcuts sits below the full preview: open General at it. The label follows the keys (⌥S
+  # unless changed, 2026-10-08); OCR may misread the symbols.
   - do: settings
-    arg: alerts
-  - expect_state: { settings_section: alerts, settings_preview: null }
+    arg: general shortcuts
+  - expect:
+      window: settings
+      contains: { text: "/S opens Settings/" }
   - do: settings
     arg: credentials
   # Item 36: the section kept its raw value and is now the Accounts page. Its caption names the
@@ -20,42 +33,42 @@ steps:
       contains: { text: "/(own|Paste the) session key/" }
   - do: settings
     arg: usage
-  # Item 48: Claude Usage sits under Accounts.
+  # Item 48: the Usage page (was Claude Usage) sits under Accounts.
   - expect_state: { settings_section: usage, usage_page.open: true }
   - do: settings
-    arg: integrations
-  # Item 49: install and remove happen only by hand on a test folder (docs/mac-smoke-test.md);
-  # the page opening installs nothing. Item 68: its statusline preview always runs on sample
-  # input, so its card always carries the Sample label.
-  - expect_state: { settings_section: integrations, settings_preview: integrations }
-  - expect:
-      window: settings
-      contains: { text: "/MCP server/" }
-  - expect:
-      window: settings
-      contains: { text: "/Sample/" }
-  - snap: preview-integrations
+    arg: alerts
+  # Alerts holds Each limit (was Desk, Meters) under the meter bars' preview.
+  - expect_state: { settings_section: alerts, settings_preview: meters }
+  - snap: preview-meters
+  # Each limit sits below the full preview (2026-10-08): deskMeters opens Alerts at it.
   - do: settings
-    arg: mods
-  # Item 64: the Mods page only reads (no switch, no edit); its summary card counts real mods,
-  # so it never carries the Sample label.
-  - expect_state: { settings_section: mods, settings_preview: mods, mods_page.open: true }
+    arg: deskMeters
+  - expect_state: { settings_section: alerts, settings_anchor: each-limit }
   - expect:
       window: settings
-      contains: { text: "/Mods and plugins/" }
-  - snap: preview-mods
+      contains: { text: Each limit }
   - do: settings
     arg: deskLayout
+  # Desk (raw value deskLayout): its switch is at the top, and Clicks moved here.
   - expect_state: { settings_section: deskLayout, settings_preview: layout }
+  - expect:
+      window: settings
+      contains: { text: "Desk: clock, meters, meetings and the message on the desktop" }
   - snap: preview-layout
+  # Clicks sits below the fold: open Desk at it (the tree holds only what is drawn).
+  - do: settings
+    arg: deskLayout clicks
+  - expect_state: { settings_anchor: clicks, settings_anchor_visible: true }
+  - expect:
+      window: settings
+      contains: { text: Clock and message take clicks }
   - do: settings
     arg: deskLook
   - expect_state: { settings_section: deskLook, settings_preview: look }
+  - expect:
+      window: settings
+      missing: { text: Clock and message take clicks }
   - snap: preview-look
-  - do: settings
-    arg: deskMeters
-  - expect_state: { settings_section: deskMeters, settings_preview: meters }
-  - snap: preview-meters
   - do: settings
     arg: message
   - expect_state: { settings_section: message, settings_preview: message }
@@ -67,30 +80,96 @@ steps:
       window: settings
       contains: { text: Test Glow }
   - snap: preview-notch
+  # Camera and mic sits below the fold: open Notch at it (the tree holds only what is drawn).
+  - do: settings
+    arg: notch camera-mic
+  - expect_state: { settings_anchor: camera-mic, settings_anchor_visible: true }
+  - expect:
+      window: settings
+      contains: { text: Where they show }
   - do: settings
     arg: nowPlaying
   - expect_state: { settings_section: nowPlaying, settings_preview: nowPlaying }
   - snap: preview-now-playing
   - do: settings
+    arg: watchers
+  # Watchers: the switches, where they show and the glow rule, in one place.
+  - expect_state: { settings_section: watchers, settings_preview: watchers }
+  - expect:
+      window: settings
+      contains: { text: Let agents show watchers }
+  - snap: preview-watchers
+  # The glow rule sits below the full preview (2026-10-08): open Watchers at it.
+  - do: settings
+    arg: watchers glow
+  - expect:
+      window: settings
+      contains: { text: "/The notch glows once when a watcher waits on you/" }
+  - do: settings
+    arg: integrations
+  # Claude Code (raw value integrations; item 49): install and remove happen only by hand on a
+  # test folder (docs/mac-smoke-test.md); the page opening installs nothing. Item 68: its statusline
+  # preview always runs on sample input, so its card always carries the Sample label.
+  - expect_state: { settings_section: integrations, settings_preview: integrations }
+  - expect:
+      window: settings
+      contains: { text: "/MCP server/" }
+  - expect:
+      window: settings
+      contains: { text: "/Sample/" }
+  - expect:
+      window: settings
+      contains: { text: '/^Add Folder(…|\.\.\.)$/' }
+  - expect:
+      window: settings
+      missing: { text: Let agents show watchers }
+  - snap: preview-integrations
+  - do: settings
+    arg: mods
+  # Mods & Config (raw value mods; item 64): Sanduhr's own mod, Meters above the prompt, is at the
+  # top with its switch per folder (its one home since 2026-10-08); every other mod only reads.
+  # Its summary card counts real mods, never the Sample label. The page opening changes nothing.
+  - expect_state: { settings_section: mods, settings_preview: mods, mods_page.open: true }
+  - expect:
+      window: settings
+      missing: { text: "/Sanduhr.s mod: /" }
+  - do: settings
+    arg: mods meters
+  - expect_state: { settings_section: mods, settings_anchor: meters, settings_anchor_visible: true }
+  - expect:
+      window: settings
+      contains: { text: Meters above the prompt }
+  - expect:
+      window: settings
+      contains: { text: "/sanduhr-meters, Sanduhr.s own mod/" }
+  - snap: preview-mods
+  - do: settings
     arg: widgetLook
+  # Widget (raw value widgetLook): Show the widget (from General), the font, the pacing calculators.
   - expect_state: { settings_section: widgetLook, settings_preview: widget }
   - snap: preview-widget-look
+  # Show the widget sits below the full preview (2026-10-08): open Widget at it.
+  - do: settings
+    arg: widgetLook show
+  - expect:
+      window: settings
+      contains: { text: "/Show the widget now$/" }
+  - do: settings
+    arg: pacing
+  - expect_state: { settings_section: widgetLook, settings_anchor: pacing, settings_preview: widget }
+  - expect:
+      window: settings
+      contains: { text: "/Pin the pacing calculators on every card$/" }
   - do: settings
     arg: themes
   - expect_state: { settings_section: themes, settings_preview: null }
-  - do: settings
-    arg: pacing
-  - expect_state: { settings_section: pacing, settings_preview: widget }
-  - expect:
-      window: settings
-      contains: { text: Pacing & Focus }
   - snap: last-section
   - do: settings
     arg: updates
   - expect_state: { settings_section: updates }
   - expect:
       window: settings
-      contains: { text: Check Now }
+      contains: { text: "/Check for Updates/" }
   - do: settings
     arg: about
   - expect_state: { settings_section: about }

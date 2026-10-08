@@ -208,7 +208,7 @@ THEME_GUIDE = (
     "as one desktop, and Match Desk itself cannot be replaced. A theme is checked here first: "
     "status rejected with findings (level, field, message) means fix the named fields and call "
     "again, nothing was written; warnings ride along with a theme that goes through. Then Sanduhr "
-    "asks the user, who sees a preview card with the description and chooses Save, Save and Apply "
+    "asks the user, who sees a preview card with the description and chooses Save, Save & Apply "
     "or Dismiss: pending_approval means the user decides (the result arrives later; do not "
     "propose the same theme again). When the user lets Claude change themes directly, Sanduhr saves "
     "it to its themes folder and applies it at once (apply: false saves without switching): "

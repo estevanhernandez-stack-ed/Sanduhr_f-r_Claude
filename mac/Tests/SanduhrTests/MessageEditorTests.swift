@@ -367,13 +367,15 @@ struct MessageEditorModelTests {
         #expect(editor.unsaved)
         #expect(editor.debugAdded == "Fri: {ink:#ff7e5f,#feb47b,#ffd86f} {font:script} {sweep} ship it.")
         editor.showText()
-        #expect(editor.text == handWritten + "\n" + editor.debugAdded!)
+        // Add Line puts it at the top of its day's lines (slice 3): before the first Friday line.
+        let withFriday = handWritten.replacingOccurrences(of: "\nFri:{ink:#FF2A6D", with: "\n" + editor.debugAdded! + "\nFri:{ink:#FF2A6D")
+        #expect(editor.text == withFriday)
         editor.text += "\n{blink} typed by hand"
         editor.showList()
         #expect(editor.document.messageRows.last?.content == .raw("{blink} typed by hand"))
         #expect(editor.save())
         let saved = try String(contentsOf: url, encoding: .utf8)
-        #expect(saved == handWritten + "\nFri: {ink:#ff7e5f,#feb47b,#ffd86f} {font:script} {sweep} ship it.\n{blink} typed by hand")
+        #expect(saved == withFriday + "\n{blink} typed by hand")
         #expect(!editor.unsaved)
     }
 

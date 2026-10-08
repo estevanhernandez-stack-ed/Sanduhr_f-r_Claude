@@ -190,10 +190,30 @@ struct AccountsSubmenu: View {
     }
 }
 
+/// "Menu Bar Shows ▸" in the widget's menus, as AppDelegate draws it in the AppKit ones: the four
+/// choices, the current one checked; a pick saves where Settings reads it and redraws the menu bar.
+struct MenuBarModesSubmenu: View {
+    let app: AppDelegate
+
+    var body: some View {
+        let modes = SanduhrMenu.menuBarModes(current: .saved())
+        Menu(MenuBarModeMenu.title) {
+            ForEach(modes.items, id: \.mode) { item in
+                Toggle(item.title, isOn: Binding(
+                    get: { item.checked },
+                    set: { _ in
+                        MenuBarMode.save(item.mode)
+                        app.menuBarModeDidChange()
+                    }))
+            }
+        }
+    }
+}
+
 /// The shared menu (SanduhrMenu) as SwiftUI items, separators between the groups, the Accounts
-/// submenu after Show/Hide as AppDelegate.addMenuItems puts it. `accounts` false leaves the
+/// and Menu Bar Shows submenus after Show/Hide as AppDelegate.addMenuItems puts them (SanduhrMenu.submenus). `accounts` false leaves the
 /// submenu out, for a card's limit menu that already has it; `allSettings` names Settings…
-/// "All Settings…" there, beside the card's Meter Settings….
+/// "All Settings…" there, beside the card's Alerts Settings….
 struct SanduhrMenuItems: View {
     let app: AppDelegate
     var vm: UsageViewModel
@@ -209,9 +229,12 @@ struct SanduhrMenuItems: View {
             } else {
                 menuRows(groups[i].entries)
             }
-            if i == 0, accounts, let menu = app.currentAccountsMenu() {
+            if i == 0 {
                 Divider()
-                AccountsSubmenu(accounts: menu, vm: vm, onManage: app.manageAccounts)
+                if accounts, let menu = app.currentAccountsMenu() {
+                    AccountsSubmenu(accounts: menu, vm: vm, onManage: app.manageAccounts)
+                }
+                MenuBarModesSubmenu(app: app)
             }
         }
     }
@@ -249,9 +272,9 @@ struct SanduhrMenuItems: View {
 
 /// A tier card's two-finger menu (LimitMenu), in place of the widget's own menu on the card:
 /// Accounts, Hide (temporary limits only) and the warnings item for the card's limit, Hidden
-/// Limits (when something is hidden), Meter Settings…, then the widget's
+/// Limits (when something is hidden), Alerts Settings…, then the widget's
 /// shared items under a separator, so nothing the widget menu offers is lost on a card. The
-/// warning switch is read through @AppStorage on the same key as Settings, Desk, Meters, so the
+/// warning switch is read through @AppStorage on the same key as Settings, Alerts, Each limit, so the
 /// menu reads the current setting whichever side changed it.
 struct LimitContextMenu: ViewModifier {
     let tier: Tier

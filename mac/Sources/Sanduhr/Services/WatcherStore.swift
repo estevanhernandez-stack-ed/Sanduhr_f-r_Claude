@@ -268,4 +268,111 @@ enum WatcherPlacement {
                strip: NotchContent.saved(.strip, in: d),
                layoutPlaced: DeskLayout.placed(d.string(forKey: "layout") ?? DeskLayout.standard))
     }
+
+    // MARK: Settings, Watchers (Settings v2, slice 2)
+
+    /// Watchers, Where they show, On the notch: Off or one place. It reads and writes the notch
+    /// places' own keys, the ones the Notch page's pickers write.
+    enum NotchSpot: String, CaseIterable, Identifiable {
+        case off, left, right, strip
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .off: "Off"
+            case .left: "Left wing"
+            case .right: "Right wing"
+            case .strip: "Under the camera"
+            }
+        }
+
+        var place: NotchContent.Place? {
+            switch self {
+            case .off: nil
+            case .left: .left
+            case .right: .right
+            case .strip: .strip
+            }
+        }
+
+        static func of(_ place: NotchContent.Place) -> NotchSpot {
+            switch place {
+            case .left: .left
+            case .right: .right
+            case .strip: .strip
+            }
+        }
+    }
+
+    static let notchPlaces: [NotchContent.Place] = [.left, .right, .strip]
+
+    /// The first notch place set to Watchers, or Off.
+    static func notchSpot(in d: DefaultsStore) -> NotchSpot {
+        notchPlaces.first { NotchContent.resolve($0, raw: d.object(forKey: $0.key) as? String) == .watchers }
+            .map(NotchSpot.of) ?? .off
+    }
+
+    /// Puts watchers in `spot`: any other place set to Watchers goes back to its default content.
+    static func setNotchSpot(_ spot: NotchSpot, in d: DefaultsStore) {
+        for place in notchPlaces where place != spot.place
+            && NotchContent.resolve(place, raw: d.object(forKey: place.key) as? String) == .watchers {
+            d.set(nil, forKey: place.key)
+        }
+        if let place = spot.place { d.set(NotchContent.watchers.rawValue, forKey: place.key) }
+    }
+
+    /// Why the notch place picked doesn't show watchers now, nil when it does (or none is picked).
+    static func notchHint(spot: NotchSpot, notch: Bool, wingText: Bool, chinText: Bool, chin: Double) -> String? {
+        guard spot != .off else { return nil }
+        if !notch { return "The notch is off, so watchers don't show there." }
+        if spot == .strip, !chinText || chin == 0 {
+            return "Text under the camera is off or has no height, so watchers don't show there."
+        }
+        if spot != .strip, !wingText { return "Text beside the camera is off, so watchers don't show there." }
+        return nil
+    }
+
+    static func notchHint(in d: UserDefaults) -> String? {
+        notchHint(spot: notchSpot(in: d), notch: d.bool(forKey: DeskController.notchKey),
+                  wingText: d.object(forKey: "notchText") as? Bool ?? true,
+                  chinText: d.bool(forKey: "notchChinText"),
+                  chin: d.object(forKey: "notchChin") as? Double ?? 26)
+    }
+
+    /// The rule `WatcherStore.startForApp` follows, as the Watchers page states it.
+    static let glowRule = "The notch glows once when a watcher waits on you, if watchers show somewhere above."
+
+    /// Where `places` are, in words: "on the right wing and the Desk".
+    static func placesText(_ places: [String]) -> String {
+        let words = places.map { p -> String in
+            switch p {
+            case "left": "the left wing"
+            case "right": "the right wing"
+            case "strip": "under the camera"
+            default: "the Desk"
+            }
+        }
+        let joined = words.count > 1 ? words.dropLast().joined(separator: ", ") + " and " + words.last! : words.first ?? ""
+        return joined.hasPrefix("under") ? joined : "on " + joined
+    }
+
+    /// Whether the rule holds now, and why not when it doesn't.
+    static func glowStatus(deskOn: Bool, places: [String]) -> String {
+        if !deskOn { return "Now: the Desk is off, so watchers don't show and a waiting watcher doesn't glow the notch." }
+        if places.isEmpty {
+            return "Now: watchers aren't placed anywhere they can show, so a waiting watcher doesn't glow the notch. Place them above."
+        }
+        return "Now: watchers show \(placesText(places)), so one that waits on you glows the notch once."
+    }
+
+    /// A folder's meters mod, for Above the prompt.
+    static func metersLine(_ status: IntegrationStatus) -> String {
+        switch status {
+        case .installed: "Meters mod installed"
+        case .outdated: "Meters mod installed, update waiting"
+        case .notInstalled, .other: "No meters mod"
+        case .unreadable: "settings.json isn't valid JSON"
+        }
+    }
 }

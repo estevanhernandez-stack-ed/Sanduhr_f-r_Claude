@@ -22,7 +22,6 @@ struct DeskLayoutMap: View {
     @AppStorage("top", store: .desk) private var top = 40.0
     @AppStorage("bottom", store: .desk) private var bottom = 60.0
     @AppStorage("showMeetings", store: .desk) private var showMeetings = true
-    @AppStorage("showClaude", store: .desk) private var showClaude = true
     @AppStorage(DeskController.notchKey, store: .desk) private var island = false
     @AppStorage("notchChin", store: .desk) private var chin = 26.0
 
@@ -40,7 +39,7 @@ struct DeskLayoutMap: View {
     var body: some View {
         let scale = Self.height / max(1, screen.height)
         let width = screen.width * scale
-        let anchors = Self.anchors(layout: layout, showMeetings: showMeetings, showClaude: showClaude)
+        let anchors = Self.anchors(layout: layout, showMeetings: showMeetings, showClaude: true)
         let insets = Self.insets(left: left, right: right, top: top + menuBar, bottom: bottom,
                                  dock: dock.side, reach: dockReach, scale: scale)
         let notchBottom = DeskAnchorGeometry.notchBottom(notch: notch, island: island, chin: chin)

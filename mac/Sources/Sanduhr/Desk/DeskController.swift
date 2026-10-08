@@ -13,8 +13,8 @@ final class DeskController: NSObject, NSMenuDelegate {
     static let enabledKey = "deskEnabled"
     /// The notch island, off until switched on in Settings (General or Notch).
     static let notchKey = "notch"
-    /// Option+J and Option+S while Desk runs, on by default.
-    static let hotKeysKey = "hotKeys"
+    /// 2.10.0's one switch for ⌥J and ⌥S; slice 2 split it (SanduhrHotKeys).
+    static let hotKeysKey = SanduhrHotKeys.legacyKey
     private(set) var running = false
     private(set) var window: NSWindow?
     private var statusItem: NSStatusItem?
@@ -31,6 +31,22 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// The pointer was near a Desk block at the last mouse-through check.
     private var nearBlocks = false
     private let hotKeys = DeskHotKeys()
+    /// The shortcuts asked for now, by switch and keys (applyHotKeys).
+    private var registeredShortcuts: [HotKeyRequest] = []
+    private struct HotKeyRequest: Equatable {
+        let shortcut: SanduhrHotKeys.Shortcut
+        let combo: HotKeyCombo
+    }
+    /// The shortcuts whose keys another app holds, so they did not register (state.yaml
+    /// `hot_keys.<name>_taken`, the note under the switch on General).
+    private(set) var takenShortcuts: Set<SanduhrHotKeys.Shortcut> = []
+    /// While General's recorder listens, nothing is registered, so the keys pressed reach it
+    /// instead of opening Settings or joining a meeting.
+    var hotKeysSuspended = false {
+        didSet { if hotKeysSuspended != oldValue { applyHotKeys() } }
+    }
+    /// How many shortcuts are registered (state.yaml `hot_keys.registered`).
+    var hotKeysRegistered: Int { hotKeys.count }
 
     var enabled: Bool { UserDefaults.desk.bool(forKey: Self.enabledKey) }
 
@@ -46,6 +62,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         NowPlayingController.shared.apply()
         // The camera and mic indicators run only while Desk does (and their switches are on).
         MainActor.assumeIsolated { AVIndicatorController.shared.apply() }
+        // The two shortcuts work whenever Sanduhr runs, Desk or not (slice 2).
+        applyHotKeys()
         let previous = appliedEnabled
         appliedEnabled = enabled
         if let previous, previous != enabled {
@@ -63,7 +81,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         dock.start()
         buildWindow()
         // The clock menu is off by default: Sanduhr owns the menu bar, meetings join from the
-        // desktop or Option+J. `defaults write com.626labs.sanduhr.desk menuIcon -bool true` brings it back.
+        // desktop or the join shortcut. `defaults write com.626labs.sanduhr.desk menuIcon -bool true` brings it back.
         if UserDefaults.desk.bool(forKey: "menuIcon") { buildMenu() }
         model.start()
         watchMouse()
@@ -186,18 +204,32 @@ final class DeskController: NSObject, NSMenuDelegate {
         screensAsleep = false; screenSaver = false; sessionAway = false
     }
 
-    /// Called when Desk starts or stops and when the shortcuts switch flips.
+    /// Called at launch, when Desk starts or stops, when either shortcut's switch flips and when
+    /// its keys change (General, Shortcuts). Each registers its saved keys while its switch is on,
+    /// with or without the Desk.
     func applyHotKeys() {
-        let wanted = running && (UserDefaults.desk.object(forKey: Self.hotKeysKey) as? Bool ?? true)
-        guard wanted != hotKeys.isRegistered else { return }
-        if wanted {
-            let option = UInt32(optionKey)
-            hotKeys.register([
-                .init(keyCode: UInt32(kVK_ANSI_J), modifiers: option) { [weak self] in self?.joinNext() },
-                .init(keyCode: UInt32(kVK_ANSI_S), modifiers: option) { [weak self] in self?.showSettings() },
-            ])
-        } else {
+        let desk = UserDefaults.desk
+        let wanted = hotKeysSuspended ? [] : SanduhrHotKeys.Shortcut.allCases
+            .filter { SanduhrHotKeys.isOn($0, in: desk) }
+            .map { HotKeyRequest(shortcut: $0, combo: SanduhrHotKeys.combo($0, in: desk)) }
+        guard wanted != registeredShortcuts else { return }
+        registeredShortcuts = wanted
+        var taken: Set<SanduhrHotKeys.Shortcut> = []
+        if wanted.isEmpty {
             hotKeys.unregister()
+        } else {
+            let failed = hotKeys.register(wanted.map { r -> DeskHotKeys.Binding in
+                switch r.shortcut {
+                case .join: DeskHotKeys.Binding(keyCode: r.combo.keyCode, modifiers: r.combo.modifiers) { [weak self] in self?.joinNext() }
+                case .settings: DeskHotKeys.Binding(keyCode: r.combo.keyCode, modifiers: r.combo.modifiers) { [weak self] in self?.showSettings() }
+                }
+            })
+            taken = Set(failed.map { wanted[$0].shortcut })
+        }
+        // Suspended for the recorder, the last answer stands.
+        if !hotKeysSuspended, taken != takenShortcuts {
+            takenShortcuts = taken
+            NotificationCenter.default.post(name: .sanduhrHotKeysDidRegister, object: nil)
         }
     }
 
@@ -393,7 +425,7 @@ final class DeskController: NSObject, NSMenuDelegate {
     }
 
     /// A two-finger click on the meters opens the limit menu for the row under the pointer
-    /// (LimitMenu): Accounts, Hide, the warnings item, Meter Settings…, then the shared menu.
+    /// (LimitMenu): Accounts, Hide, the warnings item, Alerts Settings…, then the shared menu.
     /// On now playing (the Desk line or the strip under the camera), its menu instead.
     private func limitMenuUnderPointer(_ event: NSEvent) -> Bool {
         let hit = elementUnderPointer()
@@ -433,8 +465,8 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     /// Desk Look Settings… (the clock's menu) or Edit Messages… (the message's): Settings at that page.
     @objc private func pieceSettingsFromMenu(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let section = SettingsSection(rawValue: raw) else { return }
-        showSettings(section)
+        guard let raw = sender.representedObject as? String, let page = SettingsSection.resolve(raw) else { return }
+        MainActor.assumeIsolated { SettingsWindowController.shared.show(page.section, anchor: page.anchor) }
     }
 
     /// "Arrange Desk…" (item 60), at the end of a Desk menu that has no shared items.
@@ -692,12 +724,17 @@ final class DeskController: NSObject, NSMenuDelegate {
         updateMouseThrough()
     }
 
-    /// estedesk://join-next opens the next meeting's link (Option+J does the same, see applyHotKeys).
+    /// estedesk://join-next opens the next meeting's link (the join shortcut does the same, see applyHotKeys).
     /// estedesk://join-next, estedesk://settings (and the same on sanduhr://), forwarded by
-    /// the app delegate.
+    /// the app delegate. settings/<page>#<anchor> opens a page at a section (Settings v2, slice 3);
+    /// the host alone opens Settings where it was left.
     func handle(_ url: URL) {
         if url.host == "join-next" { joinNext() }
-        if url.host == "settings" || url.host == "desk" { showSettings() }
+        if url.host == "desk" { showSettings() }
+        if url.host == "settings" {
+            let target = SettingsLink.target(url)
+            MainActor.assumeIsolated { SettingsWindowController.shared.show(target.section, anchor: target.anchor) }
+        }
     }
 
     private func joinNext() {
@@ -716,7 +753,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         model.refreshEvents()
         if model.meetings.isEmpty {
-            let none = NSMenuItem(title: model.calendarNote ?? "Nothing else on the calendar today", action: nil, keyEquivalent: "")
+            let none = NSMenuItem(title: model.calendarNote ?? model.noMeetingsLine, action: nil, keyEquivalent: "")
             none.isEnabled = false
             menu.addItem(none)
         }
@@ -738,7 +775,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         addStandardItems(to: menu)
     }
 
-    /// Option+S, …/settings links and the notch island: the one Settings window, at `section`
+    /// The Settings shortcut, …/settings links and the notch island: the one Settings window, at `section`
     /// when given.
     func showSettings(_ section: SettingsSection? = nil) {
         // Hotkeys, links and taps all arrive on the main thread.
@@ -819,4 +856,9 @@ enum MeetingOpener {
         }
         NSWorkspace.shared.open(link)
     }
+}
+
+extension Notification.Name {
+    /// The shortcuts registered again; DeskController.takenShortcuts may have changed.
+    static let sanduhrHotKeysDidRegister = Notification.Name("sanduhrHotKeysDidRegister")
 }

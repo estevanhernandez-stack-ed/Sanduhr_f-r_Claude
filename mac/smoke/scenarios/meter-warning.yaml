@@ -1,5 +1,5 @@
 # Iteration 3 items 25 and 26: a meter warns (red bar, steady glow) when it is nearly full with
-# its reset still far off, set per meter in Settings, Desk, Meters, on the Desk and on the widget
+# its reset still far off, set per meter in Settings, Alerts, Each limit, on the Desk and on the widget
 # alike. A threshold of 0 and no minimum time to reset force the weekly meter into a warning
 # whatever the numbers are. The session meter is left at its default (off), so it must not warn.
 # Switching the weekly warning off clears it on both. The run puts the keys back.
@@ -19,7 +19,8 @@ steps:
   - expect_state: { widget_warnings: [seven_day] }
   - do: settings
     arg: deskMeters
-  - expect_state: { settings_section: deskMeters }
+  # The retired raw value is an alias (Settings v2, slice 2): Alerts, at Each limit.
+  - expect_state: { settings_section: alerts, settings_anchor: each-limit }
   - expect:
       window: settings
       contains: { text: Warn when nearly full }

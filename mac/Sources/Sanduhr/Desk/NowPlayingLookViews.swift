@@ -64,6 +64,7 @@ struct NowPlayingLooksSection: View {
                 NowPlayingLookSuggestionCard(proposal: p, save: { store.approve() }, dismiss: { store.dismiss() })
             }
             Toggle("Style what's playing", isOn: $styleOn)
+                .settingsAnchor(SettingsAnchor.looks)
             Text("Draws each song in its own gradient and letter style on the notch and the Desk. A song gets one of eight palettes and a letter style picked from its name until Claude suggests a look for it.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

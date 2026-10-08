@@ -40,6 +40,12 @@ struct DebugStateInput {
     var menuBar = MenuBarMode.higher
     var settingsOpen = false
     var settingsSection: SettingsSection?
+    /// Where on the page Settings was opened (SettingsAnchor), nil for the top or closed.
+    var settingsAnchor: String?
+    /// Slice 3: the anchor is on screen, inside the page's scrolling area; nil without one.
+    var settingsAnchorVisible: Bool?
+    /// Slice 3: the page's preview is folded to its strip (a window under 600 pt); nil without one.
+    var settingsPreviewFolded: Bool?
     /// The preview card the open Settings section shows (item 68), nil for none or closed.
     var settingsPreview: SettingsPreviewKind?
     /// The Claude Usage page (item 48) shows, and its tab. Never a label, project or number.
@@ -48,7 +54,7 @@ struct DebugStateInput {
     var meters: [DeskMeterRow] = []
     /// The widget's tiers drawing red with a glow (MeterWarning), in display order.
     var widgetWarnings: [Tier] = []
-    /// The limits switched off in Settings, Desk, Meters (MeterVisibility), in display order.
+    /// The limits switched off in Settings, Alerts, Each limit (MeterVisibility), in display order.
     var hiddenLimits: [Tier] = []
     /// The reported limits believed temporary (LimitLifetime), the ones that can be hidden, in
     /// display order.
@@ -108,6 +114,9 @@ struct DebugStateInput {
     var pendingMessages = false
     var pendingTheme = false
     var menu: [MenuGroup] = []
+    /// The submenus every Sanduhr menu shows after Show or Hide Widget, by title (Accounts, Menu Bar
+    /// Shows; Settings v2, slice 1). Titles only: the Accounts submenu's labels never appear.
+    var menuSubmenus: [String] = []
     /// What's New (item 57): the last version seen, the cards the next launch would show, the
     /// window, and Don't show after updates.
     var whatsNew = WhatsNewDebug()
@@ -121,6 +130,8 @@ struct DebugStateInput {
     var modsPage = ModsPageDebug()
     /// Settings, Message's editor (item 69): counts and flags, never a line of the user's.
     var messageEditor = MessageEditorDebug()
+    /// The two shortcuts (slice 2): each switch, whether registered now, and its keys.
+    var hotKeys = HotKeysDebug()
     var version = ""
     var build = ""
 }
@@ -183,6 +194,22 @@ struct AVIndicatorsDebug: Equatable {
     var camera = false
     var mic = false
     var shown = "none"
+    /// Notch, Camera and mic, Where they show (AVPlace raw value).
+    var place = AVPlace.besideRight.rawValue
+}
+
+/// state.yaml's `hot_keys:` (Settings v2, slice 2): General, Shortcuts' two switches and the
+/// shortcuts registered now. They register whenever Sanduhr runs, with or without the Desk.
+struct HotKeysDebug: Equatable {
+    var join = true
+    var settings = true
+    var registered = 0
+    /// Each shortcut's keys as General shows them ("⌥J", "⌃⌥S"; 2026-10-08).
+    var joinKeys = "⌥J"
+    var settingsKeys = "⌥S"
+    /// Its keys are held by another app, so it did not register.
+    var joinTaken = false
+    var settingsTaken = false
 }
 
 /// state.yaml's `mods_page:` (item 64): whether the page shows and has read the folders, the
@@ -311,7 +338,16 @@ enum DebugState {
     /// `av_indicators:` (item 67): two booleans and a place.
     static func avIndicatorsYAML(_ a: AVIndicatorsDebug) -> YAMLNode {
         .map([YAMLPair("camera", .bool(a.camera)), YAMLPair("mic", .bool(a.mic)),
-              YAMLPair("shown", .string(a.shown))])
+              YAMLPair("shown", .string(a.shown)), YAMLPair("place", .string(a.place))])
+    }
+
+    /// `hot_keys:` (slice 2): two switches and a count, then each one's keys and whether another
+    /// app holds them.
+    static func hotKeysYAML(_ h: HotKeysDebug) -> YAMLNode {
+        .map([YAMLPair("join", .bool(h.join)), YAMLPair("settings", .bool(h.settings)),
+              YAMLPair("registered", .int(h.registered)),
+              YAMLPair("join_keys", .string(h.joinKeys)), YAMLPair("settings_keys", .string(h.settingsKeys)),
+              YAMLPair("join_taken", .bool(h.joinTaken)), YAMLPair("settings_taken", .bool(h.settingsTaken))])
     }
 
     /// `message_editor:` (item 69): the view, row counts and flags; `added` is only the smoke's own
@@ -365,6 +401,8 @@ enum DebugState {
         pairs.append(("settings_open", .bool(s.settingsOpen)))
         let section: YAMLNode = s.settingsSection.map { .string($0.rawValue) } ?? .null
         pairs.append(("settings_section", section))
+        pairs.append(("settings_anchor", s.settingsAnchor.map(YAMLNode.string) ?? .null))
+        pairs.append(("settings_anchor_visible", s.settingsAnchorVisible.map(YAMLNode.bool) ?? .null))
         pairs.append(("usage_page", usagePageYAML(open: s.usagePageOpen, tab: s.usageTab)))
         pairs.append(("meters", .list(meters)))
         let widgetWarnings: [YAMLNode] = s.widgetWarnings.map { .string($0.rawValue) }
@@ -397,6 +435,7 @@ enum DebugState {
         pairs.append(("glow_claude_done", .bool(s.glowSwitches.claudeDone)))
         pairs.append(("theme", .string(s.theme)))
         pairs.append(("menu", .list(menu)))
+        pairs.append(("menu_submenus", .list(s.menuSubmenus.map(YAMLNode.string))))
         pairs.append(("credentials_store", .string(s.credentialsStore.rawValue)))
         pairs.append(("account_ref", s.accountRef.map(YAMLNode.string) ?? .null))
         pairs.append(("accounts_count", .int(s.accountsCount)))
@@ -418,8 +457,10 @@ enum DebugState {
         pairs.append(("av_indicators", avIndicatorsYAML(s.avIndicators)))
         // Item 68: which preview card the open Settings section shows (SettingsPreviewKind).
         pairs.append(("settings_preview", s.settingsPreview.map { .string($0.rawValue) } ?? .null))
+        pairs.append(("settings_preview_folded", s.settingsPreviewFolded.map(YAMLNode.bool) ?? .null))
         pairs.append(("mods_page", modsPageYAML(s.modsPage)))
         pairs.append(("message_editor", messageEditorYAML(s.messageEditor)))
+        pairs.append(("hot_keys", hotKeysYAML(s.hotKeys)))
         return .object(pairs)
     }
     

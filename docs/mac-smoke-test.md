@@ -32,16 +32,16 @@ Fresh-install and migration checks stay manual.
 - [ ] The widget appears top right for sign-in. With no session key, the onboarding sheet shows;
   Continue opens Sanduhr Settings at Accounts; paste the key and Save (it becomes the Personal account). (A session key left over from before the wipe skips the sheet.)
 - [ ] After the first successful fetch the widget hides by itself (Desk is on, and a new install's
-  General, Surfaces, Widget is "Hidden while Desk is on") and the meters fill in. The menu bar
+  Widget, Show the widget is "Hidden while Desk is on") and the meters fill in. The menu bar
   hourglass shows the percent; left-click brings the widget back.
 - [ ] `defaults read com.626labs.sanduhr.desk` shows `deskEnabled = 1`, `layout = "message:tl clock:bl meters:bl meetings:bl"`,
   `showMeetings = 0`, `notch = 0` and `migrated = 1`. `defaults read com.626labs.sanduhr` shows
   `deskFirstRunDone = 1`, `panelHidden = 1`, `widgetVisibility = whileDeskOff` and no `tuckAfterFirstFetch`.
 - [ ] Show the widget, quit and relaunch: the widget is hidden again (Desk is on); Desk is unchanged.
-  General, Surfaces, turn Desk off: the widget shows; on: it hides.
+  Desk, turn the Desk switch off: the widget shows; on: it hides.
 - [ ] Existing user: quit Sanduhr, `defaults import` each backed-up domain from `~/sanduhr-smoke/`
   (section 0), relaunch: widget and Desk come back exactly as before the wipe (Desk still off if it
-  was off; the widget not tucked; General, Surfaces, Widget reads "Always shown"). The rest of the
+  was off; the widget not tucked; Widget, Show the widget reads "Always shown"). The rest of the
   run continues from these settings.
 
 ## 2. Widget
@@ -50,10 +50,10 @@ Fresh-install and migration checks stay manual.
 - [ ] Left-click the menu bar hourglass hides the widget; again shows it. Hidden survives a relaunch.
 - [ ] Right-click opens the status menu: Hide (or Show) Widget; Tools: Deep Work, Pacing Calculators, Cooldown Snake; Refresh, Settings…, Check for Updates…, What's New…; Quit Sanduhr für Claude. Two-finger click on the widget lists the same items in the same order (always Hide Widget there). Check for Updates… from the widget's menu opens Sparkle's check.
 - [ ] Refresh updates the footer time; `~/Library/Application Support/Sanduhr/snapshot.json` has a new `captured_at`.
-- [ ] Gear on the widget opens Sanduhr Settings. Widget Look: pick a font and subtle mode, the widget changes as you pick. Themes: Reload lists the installed user themes. Switch a theme on the widget's strip, toggle compact (panel resizes, top edge stays put), open the focus timer and close it.
-- [ ] Warning bars: Settings, Desk, Meters, drop the weekly "At" slider below its percent with a "more than" shorter than its reset. The widget's weekly card turns red at once (bar and percent) with a steady glow in the theme's accent around the bar and a warning triangle before the percent in the theme's text color, and the Desk meter does the same in the Desk ink (triangle included); with VoiceOver on, the warning card and meter read "<n>%, nearly full", the others just the percent; the session card stays as it was. Pick Match Desk: the widget's glow takes the Desk ink. Turn the weekly "Warn when nearly full" off: both go back at once. Put the settings back (weekly: on, 90%, 1 day) and the theme you had.
+- [ ] Gear on the widget opens Sanduhr Settings. Widget: pick a font and subtle mode, the widget changes as you pick. Themes: Reload lists the installed user themes. Switch a theme on the widget's strip, toggle compact (panel resizes, top edge stays put), open the focus timer and close it.
+- [ ] Warning bars: Settings, Alerts, Each limit, drop the weekly "At" slider below its percent with a "more than" shorter than its reset. The widget's weekly card turns red at once (bar and percent) with a steady glow in the theme's accent around the bar and a warning triangle before the percent in the theme's text color, and the Desk meter does the same in the Desk ink (triangle included); with VoiceOver on, the warning card and meter read "<n>%, nearly full", the others just the percent; the session card stays as it was. Pick Match Desk: the widget's glow takes the Desk ink. Turn the weekly "Warn when nearly full" off: both go back at once. Put the settings back (weekly: on, 90%, 1 day) and the theme you had.
 - [ ] Theme deleted outside the app (item 34): Settings, Widget, Themes, paste `docs/themes/examples/626-labs.json` with its `"name"` changed to `Smoke Test` and Save, so `smoke-test.json` is current (a file named after a built-in would fall back to that built-in instead). Open Themes Folder and, in Finder, move `smoke-test.json` to the Trash. Within a second the widget goes back to Obsidian, the gallery marks Obsidian and no longer lists the theme, the Theme menu and the Installed user themes list drop it, all without Reload or a relaunch; Console (process Sanduhr) shows `Theme <id> was removed from the themes folder; using Obsidian`. Put the file back: it reappears in the gallery (not applied). Pick the theme you had.
-- [ ] Settings, Sanduhr, Updates: Installed shows the version and build from About; Last checked shows a date (or "Never" on a fresh install). Check Now opens Sparkle's check (the same window as Check for Updates…) and is disabled until it finishes; Last checked moves to now. Turn "Check for updates automatically" off: `defaults read com.626labs.sanduhr SUEnableAutomaticChecks` prints 0, and after a relaunch the switch is still off; turn it back on. "Download and install updates automatically" sets `SUAutomaticallyUpdate` the same way and is greyed out while automatic checks are off. "Release notes for this version" opens the GitHub release `v<version>-mac`. About: the app icon, "Sanduhr für Claude", "Version X (build N)", the one-line description and the independence line; Website, GitHub, Release Notes, Privacy and License each open their page (License goes to the README's license section until a LICENSE file lands), "Updates by Sparkle" opens sparkle-project.org, and the copyright line reads "MIT License. 626Labs.".
+- [ ] Settings, Sanduhr, Updates: Installed shows the version and build from About; Last checked shows a date (or "Never" on a fresh install). Check for Updates… opens Sparkle's check (the same window as the menus' Check for Updates…) and is disabled until it finishes; Last checked moves to now. Turn "Check for updates automatically" off: `defaults read com.626labs.sanduhr SUEnableAutomaticChecks` prints 0, and after a relaunch the switch is still off; turn it back on. "Download and install updates automatically" sets `SUAutomaticallyUpdate` the same way and is greyed out while automatic checks are off. "Release notes for this version" opens the GitHub release `v<version>-mac`. About: the app icon, "Sanduhr für Claude", "Version X (build N)", the one-line description and the independence line; Website, GitHub, Release Notes, Privacy and License each open their page (License goes to the README's license section until a LICENSE file lands), "Updates by Sparkle" opens sparkle-project.org, and the copyright line reads "MIT License. 626Labs.".
 
 - [ ] Sign out (item 32; this deletes the real key, so back it up first). Save the key:
   release build `(umask 077; security find-generic-password -s com.626labs.sanduhr -a sessionKey:Personal -w > ~/sanduhr-smoke/sessionKey)`,
@@ -84,11 +84,11 @@ Fresh-install and migration checks stay manual.
 
 ## 4. Desk
 
-- [ ] Hide the widget, with Ice hiding the menu bar hourglass: Option+S opens one window titled "Sanduhr Settings", a sidebar with General, Alerts, Accounts; Desk: Layout, Desk Look, Meters, Message, Notch; Widget: Widget Look, Themes, Pacing & Focus; Sanduhr: Updates, About. Every section opens and edits with the widget still hidden. Settings… in the widget's menu and the hourglass's menu bring the same window forward (never a second one); there is no "Sanduhr Desk" window and no settings sheet on the widget.
-- [ ] General, Surfaces: "Show the widget now" off hides the widget and on shows it (the switch follows the hourglass too); Notch flips the island (Desk on).
-- [ ] General, Surfaces, Widget picker: "Hidden while Desk is on" hides it at once with Desk on; turn Desk off, it shows; on, it hides. Show it from the hourglass: it stays until Desk next flips. "Only when I open it": hidden after every Desk flip and after a relaunch until Show Widget (any menu, a Desk meter's two-finger menu included) or Tools brings it. "Always shown": choosing it brings a hidden widget back; Desk flips leave it where it is. Put back "Always shown" (or what it was). Pacing & Focus, "Pin the pacing calculators" and Tools, Pacing Calculators show the same state: flip one, the other follows.
-- [ ] After section 1, Desk is already on: clock, date, message and the meters (a bar per limit with a pace tick and reset time). General, Surfaces, Desk is on. The notch stays plain (its own switch, off).
-- [ ] General, "Read today's meetings" (off on a fresh install): switch it on and the Calendar prompt appears right away, no restart. Allow: today's remaining timed meetings show. Switch it off: they go.
+- [ ] Hide the widget, with Ice hiding the menu bar hourglass: Option+S opens one window titled "Sanduhr Settings", a sidebar with General, Accounts, Usage, Alerts; Desktop: Desk, Desk Look, Message, Notch, Now Playing, Watchers; Claude Code: Claude Code, Mods & Config; Widget: Widget, Themes; Help: Updates, About. Every section opens and edits with the widget still hidden. Settings… in the widget's menu and the hourglass's menu bring the same window forward (never a second one); there is no "Sanduhr Desk" window and no settings sheet on the widget.
+- [ ] Widget: "Show the widget now" off hides the widget and on shows it (the switch follows the hourglass too). Notch, "Notch: the island around the camera" flips the island (Desk on). General, Surfaces shows each one's state, with no switches.
+- [ ] Widget, Show the widget: "Hidden while Desk is on" hides it at once with Desk on; turn Desk off, it shows; on, it hides. Show it from the hourglass: it stays until Desk next flips. "Only when I open it": hidden after every Desk flip and after a relaunch until Show Widget (any menu, a Desk meter's two-finger menu included) or Tools brings it. "Always shown": choosing it brings a hidden widget back; Desk flips leave it where it is. Put back "Always shown" (or what it was). Widget, "Pin the pacing calculators" and Tools, Pacing Calculators show the same state: flip one, the other follows.
+- [ ] After section 1, Desk is already on: clock, date, message and the meters (a bar per limit with a pace tick and reset time). Desk, the Desk switch is on. The notch stays plain (its own switch, off).
+- [ ] Desk, "Read today's meetings" (under the Meetings row) (off on a fresh install): switch it on and the Calendar prompt appears right away, no restart. Allow: today's remaining timed meetings show. Switch it off: they go.
 - [ ] Meters: their pace ticks sit where the widget's do; hide the widget and refresh from the menu, and the meters still update.
 - [ ] No hint: nothing is written under the meters (the old "Click the meters for history and tools" line is gone, item 41).
 - [ ] Passive meters (item 41): hide the widget, point at the meters: the pointer stays an arrow. Click a meter, a bar, the gap between the label and the percent, and beside the rows: nothing happens: no widget, no menu. Two-finger click (or Control-click) a meter: the menu starts with Show Widget; choose it and the widget appears beside the meters (to their right in a left corner, to their left in a right corner), fully on screen, in front. With the widget showing the same item reads Hide Widget and hides it, and the widget's usual items below have no second Show or Hide Widget.
@@ -96,16 +96,16 @@ Fresh-install and migration checks stay manual.
 - [ ] Click empty desktop beside the meters: Finder gets it (desktop icons select). Put a Finder window over the meters and click it there: the window takes the click, no widget.
 - [ ] Tools with Ice hiding the hourglass and the widget hidden: two-finger click a Desk meter, Show Widget, two-finger click the widget, Tools: Deep Work opens the hourglass overlay, Cooldown Snake the game, Pacing Calculators keeps cool-down or surplus showing on every card (checked; choose again to put them back under the pointer), Hide Widget hides it.
 - [ ] Tools from the menu bar hourglass's menu, widget hidden first each time: Show Widget shows it; Deep Work, Cooldown Snake and Pacing Calculators each show the widget with that tool open. With `menuIcon` on, Desk's clock menu lists today's meetings and Join next meeting, then the same items as the hourglass's menu in the same order. A tool open on the widget shows checked in all three menus.
-- [ ] Meters: Settings, Desk, Meters lists Session and Weekly — All Models (plus any other weekly limit the account reports), each with "Warn when nearly full", an "At" slider (50 to 100%) and "Only while the reset is more than". Drop the weekly slider below its current percent with a "more than" shorter than its reset: the weekly bar turns red at once with a steady glow in the Desk ink around it, and its percent turns red. Raise the slider back, or pick a "more than" longer than the time to reset: it goes back to the ink. The session bar never turns red until its own switch is on. Put the settings back (weekly: on, 90%, 1 day).
+- [ ] Meters: Settings, Alerts, Each limit lists Session and Weekly — All Models (plus any other weekly limit the account reports), each with "Warn when nearly full", an "At" slider (50 to 100%) and "Only while the reset is more than". Drop the weekly slider below its current percent with a "more than" shorter than its reset: the weekly bar turns red at once with a steady glow in the Desk ink around it, and its percent turns red. Raise the slider back, or pick a "more than" longer than the time to reset: it goes back to the ink. The session bar never turns red until its own switch is on. Put the settings back (weekly: on, 90%, 1 day).
 - [ ] Layout: move Clock to Top right; it moves live. Hide Meetings; they go. Put both back.
 - [ ] Look: ink `9ad7ff, 012089` (space after the comma) on the message draws blue to navy, no gray.
 - [ ] Message: `~/Library/Application Support/Desk/messages.txt` exists with the starter lines; add a `MM-DD: smoke test` line for today, and within a minute the desktop shows it.
 - [ ] Meeting rows with a Teams/Zoom/Meet link: pointer turns into a hand; click opens it. Clicking empty desktop still reaches Finder.
-- [ ] General, Surfaces, turn Desk off: desktop layer (and notch, if on) go. On again: they come back (repeat twice; no doubled refreshes in Console).
+- [ ] Desk, turn the Desk switch off: desktop layer (and notch, if on) go. On again: they come back (repeat twice; no doubled refreshes in Console).
 
 ## 5. Notch (Mac with a notch only)
 
-- [ ] Settings, Notch shows "Extend the camera notch" off. Turn it on: black wings extend the notch left and right; left wing shows the time or the next meeting within the hour, right wing shows `5h N%  wk N%`.
+- [ ] Settings, Notch shows "Notch: the island around the camera" off. Turn it on: black wings extend the notch left and right; left wing shows the time or the next meeting within the hour, right wing shows `5h N%  wk N%`.
 - [ ] Strip under the notch draws when Notch, "Extra height below" is above 0; its text appears with "Text under the camera too".
 - [ ] Notch, Text: set Right wing to Message: the right wing shows today's message within 15 seconds, growing to fit. Set Left wing to Nothing: a plain black wing. "Under the camera" to Time: the strip shows the time. Put all three back to their first choices (Next meeting, or the time; Claude meters; Next meeting, or the Claude meters).
 - [ ] Click the island: Sanduhr Settings opens.
@@ -113,9 +113,9 @@ Fresh-install and migration checks stay manual.
 - [ ] Full-screen an app: wings stay above it. Switch Spaces: wings stay.
 - [ ] External display as main: no island drawn.
 - [ ] Camera fill light: Notch, Camera fill light, "Light up for the camera" on. Open Photo Booth: within a second a soft white light glows around the notch (over the island, the menu bar beside it and a band below). Click through it: the click reaches the app underneath. Brightness and "Reach below the menu bar" change it live. Full-screen Photo Booth: the light stays above it. Quit Photo Booth: it fades out. With Desk off, same result. Tools, Camera Fill Light shows it with no camera and shows checked; chosen again it goes. Switch off: a camera no longer lights it.
-- [ ] Glow: Notch, Glow, turn on "For Sanduhr alerts". Settings, Alerts, Send a Test: a soft halo in the notch text color fades in around the island (wings and strip) and out within about three seconds, once. The wings' text stays readable, and clicking the island during the glow still opens Settings, while a click on the menu bar beside it reaches the menu bar. Switch it off and send another test: no glow. "A minute before a meeting" on, with a calendar event starting in two minutes: one glow between 60 and 45 seconds before it starts, none after. "When the camera fill light comes on" on: Tools, Camera Fill Light glows once as the light comes on. All three off: nothing glows.
+- [ ] Notch glow: Notch, Notch glow, turn on "For Sanduhr alerts". Settings, Alerts, Send a Test: a soft halo in the notch text color fades in around the island (wings and strip) and out within about three seconds, once. The wings' text stays readable, and clicking the island during the glow still opens Settings, while a click on the menu bar beside it reaches the menu bar. Switch it off and send another test: no glow. "A minute before a meeting" on, with a calendar event starting in two minutes: one glow between 60 and 45 seconds before it starts, none after. "When the camera fill light comes on" on: Tools, Camera Fill Light glows once as the light comes on. All three off: nothing glows.
 - [ ] One glow (item 27): Desk on, notch on, Desk pulse chosen. Send a Test (or `smoke/smoke do pulse`): one soft halo down the island's sides and along its bottom, the same look as the Glow switches; no light above the wings, beside their top corners or along the screen edge, and no outline stroke on the island. Glow switches all off: a pulse still glows.
-- [ ] Plain notch glow (item 27): turn the notch island off (Notch, "Extend the camera notch" off). The Glow section stays usable. Test Glow (or `smoke/smoke do glow`, or an enabled alert): a halo hugs the hardware notch itself, its width and height with rounded bottom corners, no wings, nothing at the screen edge, the camera area untouched. Turn Desk off too: Tools, Camera Fill Light with "When the camera fill light comes on" on still glows the plain notch. Put the notch back on: the glow goes back around the island.
+- [ ] Plain notch glow (item 27): turn the notch island off (Notch, "Notch: the island around the camera" off). The Notch glow section stays usable. Test Glow (or `smoke/smoke do glow`, or an enabled alert): a halo hugs the hardware notch itself, its width and height with rounded bottom corners, no wings, nothing at the screen edge, the camera area untouched. Turn Desk off too: Tools, Camera Fill Light with "When the camera fill light comes on" on still glows the plain notch. Put the notch back on: the glow goes back around the island.
 - [ ] Covered strip (item 34): Desk on, notch on, "Extra height" above 0 so the strip shows under the camera. Move an app window (Finder will do) so it covers the strip, or maximize one (not full screen). Glow, **Test Glow** (or `smoke/smoke do glow`, or Send a Test with Desk pulse): the halo hugs the wings only, its bottom edge level with the menu bar, nothing traced around the hidden strip. Move the window away and glow again: the halo goes around wings and strip.
 
 ## 6. Links and keys
@@ -196,7 +196,7 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
 
 ## 10. Menu bar, hidden limits, duplicate names (item 38)
 
-- [ ] Menu bar: Settings, General, Menu bar shows "Percent beside the hourglass" set to Whichever
+- [ ] Menu bar: Settings, General, Menu bar shows "Menu Bar Shows" set to Whichever
   is higher (`smoke/smoke state` reads `menu_bar: higher`). With a model-specific or promo limit
   (say Weekly — Special) above both the session and the weekly limit, the hourglass shows the
   higher of those two, never the special one. Session: the session percent; Weekly: the weekly
@@ -204,7 +204,7 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   so on, also while a menu is open; nothing else in the menu bar moves. Back to Whichever is
   higher: the letters go and the text stops changing.
 - [ ] Hidden limits: with a temporary limit reported (Weekly — Special, or another limit listed
-  under `temporary_limits` since item 42), Settings, Desk, Meters shows "Show this limit" on in
+  under `temporary_limits` since item 42), Settings, Alerts, Each limit shows "Show this limit" on in
   its group (none on Session, Weekly — All Models or a model limit with a weekly reset). Switch it off: its card leaves the widget and its row the Desk meters at
   once (the widget shrinks to fit), its warning controls grey out, and `smoke/smoke state` lists
   it under `hidden_limits`. Settings, Alerts, a line low enough to cross it: no alert for it on
@@ -226,7 +226,7 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   line starts with "claude" and nothing on it is clickable.
 - [ ] Limit menu on Desk: two-finger click (or Control-click) the Weekly — All Models meter: an
   Accounts submenu (two accounts, the active one checked), then "Stop warnings for this limit"
-  (no Hide), then "Meter Settings…", then the widget's usual items (Tools, Refresh, All Settings…,
+  (no Hide), then "Alerts Settings…", then the widget's usual items (Tools, Refresh, All Settings…,
   Quit) with no second Accounts submenu. On the Session meter the warnings item reads
   "Warn again for this limit" (off by default). On a temporary limit (under `temporary_limits`,
   say Weekly — Special) "Hide Weekly — …" shows too; never on a model limit with a weekly reset
@@ -236,7 +236,7 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   desktop menu never opens over the meters.
 - [ ] Switch from the menu: pick the other account in the Accounts submenu: its numbers come in
   (`account_ref` changes), as from the chip.
-- [ ] Silence: with Settings, Desk, Meters open beside it, choose "Stop warnings for this limit"
+- [ ] Silence: with Settings, Alerts, Each limit open beside it, choose "Stop warnings for this limit"
   on the weekly meter: its "Warn when nearly full" switch turns off at once, and
   `smoke/smoke state` lists `seven_day` under `silenced_limits`. Open the menu again: "Warn again
   for this limit"; choose it: the switch is back on. Turn the switch off in Settings: the menu
@@ -247,7 +247,7 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   Settings.
 - [ ] Widget cards: two-finger click a tier card: the same items as the Desk meter, then the widget
   menu's items. Two-finger click elsewhere on the widget (the title, the action row): the widget
-  menu as before, with its Accounts submenu. "Meter Settings…" from either opens Settings on
+  menu as before, with its Accounts submenu. "Alerts Settings…" from either opens Settings on
   Desk, Meters.
 
 ## 12. Desk meter menu, menu bar submenu, graceful switch (item 40)
@@ -269,7 +269,8 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   open: the percent beside the hourglass changes at once and the Menu bar picker reads Weekly;
   `smoke/smoke state` shows `menu_bar: weekly`. Choose Rotate: "S 12%" now, "W 96%" 8 s later.
   Change the picker in Settings: the submenu checks the new choice next time. The widget's
-  two-finger menu and Desk's clock menu have no Menu Bar Shows. Put back Whichever is higher.
+  two-finger menu, a widget card, Desk's clock and a Desk meter row carry the same Menu Bar Shows
+  submenu (section 42, step 4). Put back Whichever is higher.
 - [ ] Graceful switch: two signed-in accounts, the widget and the Desk meters and Claude line in
   view. Click the chip: the cards fade out gently (about 0.6 s since item 41), the widget keeps
   its height, then the other account's cards fade in where they were; the Desk meters and line do
@@ -301,7 +302,7 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   read at that moment, and `limitFirstSeen` lists each reported limit with the date it first
   showed (re-hiding never changes those dates).
 - [ ] Hidden Limits submenu: with Weekly — Special hidden, two-finger click any Desk meter, beside
-  the rows, or a widget card: "Hidden Limits ▸" sits above Meter Settings… and lists Weekly —
+  the rows, or a widget card: "Hidden Limits ▸" sits above Alerts Settings… and lists Weekly —
   Special. Pick it: it is back on the widget and the Desk at once, Settings shows its switch on,
   `hidden_limits` is empty and the `meterHidden.iguana_necktie` key is gone. With nothing hidden
   the submenu is not there.
@@ -486,7 +487,7 @@ cc_line_at "$(date -u -v-10d +%Y-%m-%dT10:00:00.000Z)" claude-opus-4-1 20000 0 w
   show each tab. Tools, Claude Usage… in the widget's menu, the menu bar menu and a Desk meter's
   two-finger menu each open Settings at Claude Usage; `state.yaml` shows `usage_page: {open: true,
   tab: overview}` and nothing else about the page.
-- [ ] Activity Not tracked: Overview says to choose a folder and activity, with Data Settings…,
+- [ ] Activity Not tracked: Overview says to choose a folder and activity, with Accounts Settings…,
   which opens Accounts on that account scrolled to Data. Trends and Sessions say they come from
   the record, with the same button.
 - [ ] Live only: Overview's status line says Live only; Today shows the `cc_line` tokens with sent
@@ -653,11 +654,13 @@ S=~/Library/Application\ Support/Sanduhr/integrations
 
 - [ ] `claude plugin test mac/integrations/mods/sanduhr-meters` and `claude plugin validate
   mac/integrations/mods/sanduhr-meters` pass.
-- [ ] Settings, Integrations: `~/.claude-smoketest` has a third row, Meters above the prompt, Not
-  installed. Its Install… works even where the page says Python is missing.
-- [ ] Install…: the sheet says the band shows the session and weekly bars, reads only
+- [ ] Settings, Claude Code: `~/.claude-smoketest`'s box ends "Meters above the prompt: not
+  installed" with **Mods & Config Settings…**, which opens Mods & Config at Meters above the prompt.
+  There, `~/.claude-smoketest` reads Not installed; its switch works even where Claude Code says
+  Python is missing.
+- [ ] Switch it on: the sheet says the band shows the session and weekly bars, reads only
   `snapshot.json`, and that Sanduhr adds its folder to `env.CLAUDE_CODE_PLUGIN_DIRS` in
-  `~/.claude-smoketest/settings.json`, keeping the folders already listed. Install: Installed;
+  `~/.claude-smoketest/settings.json`, keeping the folders already listed. Install: On;
   `jq -r '.env.CLAUDE_CODE_PLUGIN_DIRS' ~/.claude-smoketest/settings.json` prints
   `/tmp/other-mod:<…>/integrations/current/mods/sanduhr-meters`, `"model"` is still there, and
   `ls "$S/current/mods/sanduhr-meters"` shows `.claude-plugin`, `hooks`, `types` and no tests.
@@ -698,7 +701,7 @@ printf '{\n  "hooks": {\n    "Stop": [\n      {\n        "hooks": [\n          {
 cp ~/.claude-smoketest/settings.json /tmp/st-hooks.json
 ```
 
-- [ ] The link alone, before any install: Settings, Notch, Glow for Claude Code, both switches
+- [ ] The link alone, before any install: Settings, Notch, Notch glow, the two Claude Code switches
   off. Bring Finder to the front and run `open -g 'sanduhr://claude-code?event=waiting'` from a
   script or another Mac app (or with "Not while a terminal is in front" off): nothing glows.
   Turn "When Claude Code is waiting on you" on: the same command glows the notch once within a
@@ -710,9 +713,9 @@ cp ~/.claude-smoketest/settings.json /tmp/st-hooks.json
   glow, no window, no error.
 - [ ] "Not while a terminal is in front" on: run the waiting command in Terminal (Terminal stays
   in front): no glow. Switch it off: it glows from Terminal too. Put it back on.
-- [ ] Settings, Integrations: `~/.claude-smoketest` has a fourth row, Notch glow when Claude needs
+- [ ] Settings, Claude Code: `~/.claude-smoketest` has a fourth row, Notch glow when Claude needs
   you, Not installed, and Install… works even where the page says Python is missing. Under the
-  folders, a line says the glow is off until turned on in Notch, Glow, and Notch Settings… opens
+  folders, a line says the glow is off until turned on in Notch, Notch glow, and Notch Settings… opens
   the Notch page.
 - [ ] Install…: the sheet says Claude Code tells Sanduhr only that it is waiting or finished,
   nothing about the conversation, and that Sanduhr adds one entry to each of
@@ -758,7 +761,7 @@ playback yourself. Never put titles in a bug report: `state.yaml` carries only f
   and `lipo -archs mac/Sanduhr.app/Contents/Helpers/MediaRemoteAdapterTestClient` print
   `x86_64 arm64`; `codesign --verify --strict mac/Sanduhr.app` passes.
 - [ ] Placed nowhere by default: Settings, Desk, Now Playing has no on/off switch and reads Source:
-  Not placed anywhere, with "Notch Settings…" and "Desk Layout Settings…" (each opens that
+  Not placed anywhere, with "Notch Settings…" and "Desk Settings…" (each opens that
   page); `pgrep -fl mediaremote-adapter` finds nothing; `state.yaml` shows
   `now_playing: {enabled: false, placed: [], source: off, state: none}`. Settings, Notch lists Now
   playing as a choice for both wings and the strip; Settings, Layout lists Now playing as Hidden.
@@ -926,7 +929,7 @@ themes folder: `T=~/Library/Application\ Support/Sanduhr/themes; cp -R "$T" /tmp
   answers `pending_approval` within a second with `key: "tidepool"`. A quiet banner "Claude
   suggested a theme: Tidepool" shows (body: the description); clicking it opens Settings, Themes.
   The sidebar's Themes has a badge; the page's banner shows a teal card like the gallery's, the name,
-  the description, Dismiss, Save and Save and Apply. Save and Apply: the widget turns teal, the card
+  the description, Dismiss, Save and Save & Apply. Save & Apply: the widget turns teal, the card
   appears in the gallery marked as yours with the description in its tooltip, the badge goes, and
   `jq .result ~/Library/Application\ Support/Sanduhr/theme-result.json` reads `applied`,
   `previous_key` the theme you had and `saved_path` ending `tidepool.json`. Pick your old theme
@@ -1007,7 +1010,7 @@ switched off.
 - [ ] Font Book still shows EsteFont Pro and EsteFont 26 off (or absent): Sanduhr did not install
   them. TextEdit's font list does not have them.
 - [ ] Both pickers list EsteFont Pro first and EsteFont 26 right after it, under System:
-  Settings, Desk Look (Desk font and Message font) and Settings, Widget Look. Pick EsteFont Pro
+  Settings, Desk Look (Desk font and Message font) and Settings, Widget. Pick EsteFont Pro
   for the widget: the cards draw in it, the semibold lines in Bold. Pick EsteFont 26: the same,
   in its own Bold. Use System Font brings the widget back.
 - [ ] Pick EsteFont 26 for the Desk: the clock's time draws in EsteFont 26 Bold, the rest in its
@@ -1080,7 +1083,7 @@ the installed app starts again.
    browser; Paste a Key Instead ends the window; Back to Sign-In Choices returns to the login.
 4. Settings → Accounts → Add Account…: with a label, Sign In to Claude… adds the account when
    the window closes; with no label, it says to name the account, and Add Account finishes.
-5. An account's page: a working account shows **Replace Sign-In…** (never "Sign In Again"), which replaces its key in place; an expired one shows **Sign In Again…** and "Session expired"; after either, the page says Signed in.
+5. An account's page: a working account shows a green **Signed in** pill beside its name (and a green **Active** on the active one) and folds **Replace Sign-In…** under **Change Sign-In** (never "Sign In Again"), which replaces its key in place; an expired one shows **Sign In Again…** and "Session expired"; after either, the page says Signed in.
 6. Close the window without signing in: nothing changes. Unplug the network: the error panel
    offers Try Again and Paste a Key Instead.
 7. Nothing persists: after the window closes, sign in again opens a fresh login (not signed in).
@@ -1114,7 +1117,7 @@ before each `defaults` command.
    shows changes the menu bar at once. Back to a step shows the choice as made.
 6. Show me on each card leaves the tour open: step 1 shows the widget, step 2 opens Settings,
    Layout, the menu bar card Settings, General, the notch card Settings, Notch, step 4 Settings,
-   Accounts, step 5 Settings, Integrations.
+   Accounts, step 5 Settings, Claude Code.
 7. Skip the Tour (or Escape, or the close button) on step 3: the window closes, every setting stays
    as it is, and `defaults read com.626labs.sanduhr welcomeTourState` prints `skipped`;
    `whatsNewLastSeen` is this version. Quit and open: no tour, no What's New.
@@ -1136,7 +1139,7 @@ Use the test folder from §22 (`~/.claude-smoketest`, never your real `~/.claude
 (aim links at it as §22 says). Turn the island on (Settings, Notch) and set the right wing to
 Watchers; in Settings, Desk, Layout put Watchers in the top right corner.
 
-1. Both switches off (Settings, Integrations, Watchers): `cat ~/Library/Application\
+1. Both switches off (Settings, Watchers): `cat ~/Library/Application\
    Support/Sanduhr/watchers.json` prints `{"agents":false,"background":false,"schema_version":1}`.
    The right wing shows its default (the meters) and no Desk row draws.
 2. Agents, switch off: in `CLAUDE_CONFIG_DIR=~/.claude-smoketest claude` with the MCP server
@@ -1156,10 +1159,10 @@ Watchers; in Settings, Desk, Layout put Watchers in the top right corner.
    and end it failed: it stays, marked with a red exclamation mark in a triangle (never a red
    dot, which means the camera; §32), and VoiceOver on the wing or the row says "failed";
    two-finger click it (wing or row) and Dismiss. Start two and
-   Dismiss All. Watcher Settings… opens Settings, Integrations.
+   Dismiss All. Watchers Settings… opens Settings, Watchers.
 6. Lost touch: start one and wait 10 minutes without an update: it greys and reads "lost touch";
    an update brings it back.
-7. Background work: Settings, Integrations shows the notch glow hooks as **Outdated** for a folder
+7. Background work: Settings, Claude Code shows the notch glow hooks as **Outdated** for a folder
    installed before this version; Install updates it (`jq -r '.hooks.Stop[0].hooks[0].command'
    ~/.claude-smoketest/settings.json` names `watchers.json`, `osascript` and
    `notifyutil -p com.626labs.sanduhr.claude-code.done`, and no `sanduhr://`). Turn **Show Claude
@@ -1215,7 +1218,7 @@ at any step.
    text under the camera on): they show there, centered; a click opens the menu.
 8. Headset: with a call running on the built-in mic, connect a Bluetooth headset and make it the
    input: the glyph stays (it follows the default input); end the call: it goes.
-9. Turn the island off (Extend the camera notch off): during a call the indicators show in a small
+9. Turn the island off (Notch: the island around the camera off): during a call the indicators show in a small
    black tab against the notch on the chosen side. On a Mac without a notch (or an external main
    display with the lid closed) they show in a small tab at the top center.
 10. With a watcher running, now playing in the left wing and a call going: all three show; the
@@ -1252,11 +1255,12 @@ Desk on. Go pane by pane; each card sits at the top, about 160 points tall, and 
    **Replay** writes it in again or sweeps it at once. Pin a line: the card shows it.
 7. **Now Playing**: a wing playing, paused (with Next; with Hide while paused on, the stand-in)
    and with nothing playing (the When nothing is playing choice), and the Desk line.
-8. **Widget Look** and **Pacing & Focus**: the widget's cards in the theme and font; Subtle mode
+8. **Widget**: the widget's cards in the theme and font; Subtle mode
    drops the glass; Pin the pacing calculators shows them on every card.
 9. **General**: the menu bar item as it will read; Rotate shows both readings ("S 42%" then
    "W 91%").
-10. **Integrations**: Sanduhr's statusline in a terminal frame (sample input) and a watcher card.
+10. **Claude Code**: Sanduhr's statusline in a terminal frame (sample input). **Watchers**: a
+    watcher card (since Settings v2, slice 2).
     Without Python: "No preview: Python or the scripts weren't found."
 11. Reduce Motion on: the message's write-in and shimmer, the camera dot's pulse and the glow
     hold still. VoiceOver reads each card as one sentence.
@@ -1315,7 +1319,7 @@ never your real settings, and remove it afterwards. Copy `mac/integrations/mods/
 to `~/modtest/meters` and give `~/.claude-modtest/settings.json`
 `{"env": {"CLAUDE_CODE_PLUGIN_DIRS": "~/modtest/meters:~/modtest/gone"}}`.
 
-1. Settings, Mods (under Integrations, cube symbol) opens with a summary card: mods, plugins, on,
+1. Settings, Mods & Config (under Claude Code, cube symbol) opens with a summary card: mods, plugins, on,
    folders, and missing when one is; "Sanduhr's own mod switches here; other mods are read-only." No Sample
    label. VoiceOver reads it as one sentence with the counts.
 2. One box per Claude Code folder, its path on top. `~/.claude-modtest` lists **sanduhr-meters**
@@ -1353,12 +1357,12 @@ and `keep building.` (CRLF endings in one copy of the test, no final newline in 
 its `shasum`.
 
 1. Settings, Message: Claude's card (when a suggestion waits) on top, then Once a day / Every hour,
-   **Edit as text…**, Save and Revert (both off), "Today: …", and one row per message line, each
+   **List | Text**, Save and Revert (both off), "Today: …", and one row per message line, each
    with its day ("Every day", "Mondays", "Fridays") over the line drawn as the Desk draws it, in
    the Desk's font, color, glow and effects. The note and blank line are not rows; "Notes (#) and
    blank lines in the file stay where they are." The `{blink}` and two-motion lines show as written
    in monospace with "Kept as written…", and their previews draw them as the Desk does.
-2. Save stays off. Switch to Edit as text… and back: still nothing unsaved, and `shasum` is
+2. Save stays off. Switch to Text and back: still nothing unsaved, and `shasum` is
    unchanged, CRLF and the missing final newline included.
 3. **Add Line**: a new row opens its controls. Set When to Friday, Text "ship it.", Color Gradient,
    Palette sunset, Letters Script, Motion Sweep: the row's picture changes with each, and no brace
@@ -1377,7 +1381,7 @@ its `shasum`.
    the pin is filled; Unpin (or Pin again) gives the list back.
 8. Type `#1 fan` as an Every day line's text: the row warns that the Desk reads it as a note; add a
    glow and the warning goes. `{x} hi`, and `Mon: hi` on an Every day line, warn too.
-9. **Edit as text…**: the file with the tag reference beside it (every tag, the font names) and the
+9. **Text**: the file with the tag reference beside it (every tag, the font names) and the
    pin field. Type a line there, switch back to the list: it is a row; edit a row, switch to text:
    the change is there. Unsaved edits survive the switches; Save from either view writes them.
 10. With unsaved edits, have Claude suggest lines (`propose_desk_messages`): the card's Add is off;
@@ -1424,42 +1428,46 @@ its `shasum`.
 Put your list back: `cp ~/messages.txt.bak ~/Library/Application\ Support/Desk/messages.txt`.
 
 
-## 37. Switch Sanduhr's own mod on the Mods page (item 64, slice 2)
+## 37. Switch Sanduhr's own mod (item 64, slice 2; on Mods & Config again since 2026-10-08)
 
 Use throwaway Claude Code folders only (`mkdir -p ~/.claude-modtest/projects ~/.claude-modtest2/projects`)
 and remove them afterwards. Give `~/.claude-modtest/settings.json` `{"model": "opus"}` and note its
-`shasum`. Settings, Integrations: install **Meters above the prompt** into `~/.claude-modtest`.
+`shasum`. Settings, Mods & Config: turn on **Meters above the prompt** for `~/.claude-modtest`
+(Install in the sheet).
 
-1. Settings, Mods: a box at the top, "Sanduhr's mod: sanduhr-meters" and the app's version, one
-   row per Claude Code folder with a switch. `~/.claude-modtest` is on: "Version …, through
-   Sanduhr's current folder: it follows Sanduhr's updates (installed from Integrations)." In the
-   folder list below, its sanduhr-meters row says "Sanduhr's own mod: switch it under Sanduhr's
-   mod at the top of this page." Other mods carry no switch.
+1. Settings, Mods & Config: **Meters above the prompt** sits at the top, above Mods and plugins,
+   with a row per folder: its path, On/Off/Not installed, Update and Remove when they apply, and a
+   switch. Its intro says how Off differs from Remove. `~/.claude-modtest` is on: "Version …,
+   through Sanduhr's current folder: it follows Sanduhr's updates." Under the rows, "Show watchers
+   above the prompt: off. …" with **Watchers Settings…**. The sanduhr-meters row in the inventory
+   below says "Sanduhr's own mod. It switches per folder at the top of this page, Meters above the
+   prompt." Settings, Claude Code has no switch for it: each folder box ends "Meters above the
+   prompt: on" (off, not installed) with **Mods & Config Settings…**, which opens Mods & Config
+   scrolled to the mod (`smoke/smoke do settings "mods meters"` does the same).
 2. Switch it off: the row reads "… Off: enabledPlugins sets sanduhr-meters@inline to false here."
    and "Takes effect in new Claude Code sessions (or after /reload-plugins)." settings.json now has
    `"enabledPlugins": {"sanduhr-meters@inline": false}` and the plugin list entry is still there;
    the inventory row below reads Off.
-3. Switch it on: settings.json is byte for byte what Integrations wrote (`shasum` as after the
+3. Switch it on: settings.json is byte for byte what the install wrote (`shasum` as after the
    install).
 4. A project override: add `"/tmp/modtest-project": {}` under `projects` in
    `~/.claude-modtest/.claude.json` (create it as `{"projects": {...}}` if missing) and
    `{"enabledPlugins": {"sanduhr-meters@inline": true}}` in
    `/tmp/modtest-project/.claude/settings.json`. Switch it off: the orange line reads "A project
    setting keeps it on in /tmp/modtest-project (.claude/settings.json)."
-5. `~/.claude-modtest2` (no settings.json yet) reads "Not in this folder's plugin folder list. On
-   adds it." Switch it on: a question, "Turn on sanduhr-meters in ~/.claude-modtest2?", with Turn
-   On and Cancel. Cancel leaves the switch off and writes nothing. Turn On: its settings.json lists
-   `…/Sanduhr/integrations/<12 hex>/mods/sanduhr-meters` and the row reads "Version …, kept by the
-   Mods page: Update moves it to a new version."
+5. `~/.claude-modtest2` (no settings.json yet) reads Not installed. Switch it on: the install
+   sheet ("Show the meters above Claude Code's prompt?") with Not Now and Install. Not Now leaves
+   the switch off and writes nothing. Install: its settings.json lists Sanduhr's mod folder and the
+   row reads On.
 6. Update (needs two builds): with a build whose mod differs installed over this one, the
    `~/.claude-modtest2` row shows "Update to <version>". If the new mod calls something the old
    didn't, Update asks "The new version of sanduhr-meters can do more" listing the new calls;
    "Keep the Version in Use" leaves settings.json alone; Update moves the entry to the new stamp.
 7. Remove on both rows: each settings.json is back to its first `shasum` (`~/.claude-modtest2`'s
-   is gone again), and Integrations shows the meters as not installed.
-8. Integrations, Statusline, Install over an existing statusline in a folder that loads a mod
-   with a status entry: under "From your mods", "Switch it on the Mods page" closes the sheet and
-   opens Settings, Mods.
+   is gone again), and the row reads Not installed.
+8. Claude Code, Statusline, Install over an existing statusline in a folder that loads a mod
+   with a status entry: under "From your mods", "See It in Mods & Config" closes the sheet and
+   opens Settings, Mods & Config.
 ## 38. A look per song and themes with a title style (item 65, parts c and d)
 
 Back up your saved looks if you have any:
@@ -1569,13 +1577,13 @@ the end.
 ## 40. The animated band and watchers above the prompt (items 65f, 66)
 
 Use a throwaway Claude Code folder (`mkdir -p ~/.claude-bandtest/projects`), never your real
-settings, and remove it afterwards. Install the meters mod and the statusline for it in Settings,
-Integrations. For the Combine steps give it a statusline of its own first
+settings, and remove it afterwards. Turn on the meters mod for it in Settings, Mods & Config
+(Meters above the prompt), and install the statusline in Settings, Claude Code. For the Combine steps give it a statusline of its own first
 (`{"statusLine": {"type": "command", "command": "echo mine"}}` in its `settings.json`).
 
 1. Nothing set: `ls ~/Library/Application\ Support/Sanduhr/band.json` finds no file. Settings,
    Integrations, Watchers shows **Show watchers above the prompt**, off, under the Notch Settings… and Desk
-   Layout Settings… row, with its caption about band.json.
+   Desk Settings… row, with its caption about band.json.
 2. Install the statusline: the sheet offers Combine. Open a Sanduhr chip's **Style…**: the caption
    ends "the meters mod's band above the prompt draws Sanduhr's segments in this look and moves it
    (sweep, shimmer, glow)". Give Session a two-stop gradient, Script letters and Bold.
@@ -1650,3 +1658,149 @@ desktop well away from every piece.
    clock or message now opens the Finder's desktop menu, a plain click does nothing to Sanduhr,
    and the icon under the clock clicks again. Switch it back on.
 9. `smoke/smoke run smoke/scenarios/desk-layout.yaml` (from `mac/`) passes (it flips the switch and checks the clock's frame).
+
+## 42. Settings v2, slice 1: one name per control, buttons that name their page (item 72)
+
+`docs/settings-v2-spec.md`, Slice 1. No page moves; only names, links and copy.
+
+1. `smoke/smoke run smoke/scenarios/settings-names.yaml` (from `mac/`) passes: Claude Code, Watchers,
+   General, Notch and Now Playing each show their "<Page> Settings…" buttons by those exact titles
+   (read from the drawn text; a button below the fold is opened at its anchor first, as
+   `settings integrations glow-hint` and `settings notch glow` do), each title opens
+   its page through `settings-link`, the retired names are missing from the pages that
+   had them, and `menu_submenus` ends with `Menu Bar Shows`.
+2. Every Settings… button, by hand (page names as of slice 2): Claude Code's **Notch Settings…**
+   (beside the Claude Code glow hook line); Watchers' **Claude Code Settings…**; General's **Desk
+   Settings…**, **Notch Settings…** and **Widget Settings…**; Now Playing's **Notch Settings…** and
+   **Desk Settings…**; Notch, Notch glow's **Claude Code Settings…**; Usage's **Accounts Settings…**
+   (Overview with activity Not tracked); a Desk meter row's or widget card's **Alerts Settings…**; a
+   watcher's **Watchers Settings…**; now playing's **Now Playing Settings…**; the camera and mic
+   indicators' **Notch Settings…**; the clock's **Desk Look Settings…**. Each opens the page whose
+   sidebar title it reads. No button says Desk Layout, Layout, Meter, Meters, Watcher, Integrations
+   or Data Settings….
+3. Click the notch island (not a wing's own control) with Settings left on another page: Settings opens
+   at Notch, and the island's tooltip reads "Notch Settings…".
+4. Menu Bar Shows: right-click the hourglass, two-finger click the widget, a widget card, the Desk's
+   clock and a Desk meter row. Each menu has **Menu Bar Shows ▸** after Show or Hide Widget (after
+   Accounts with two accounts; at the top of the shared items on a Desk meter row). Pick Rotate in the
+   widget's menu: the hourglass rotates and Settings, General, Menu bar, **Menu Bar Shows** reads Rotate.
+5. Names: Settings, General reads **Menu Bar Shows**, **Meetings menu in the menu bar** and **Notch: the
+   island around the camera**; Notch has the same notch switch name and one **Notch glow** section with
+   all six switches and Test Glow; Integrations' fourth row is **Claude Code glow hook**; Layout lists
+   **Claude meters (line)** and **Claude meters (bars)**; Updates has **Check for Updates…**; a theme
+   suggestion's card has **Save & Apply**; Message has a **List | Text** switch, and its Text view's
+   reference reads "Mon: text: a line for Mondays (Mon to Sun): it replaces the every-day lines, or with
+   Mix on takes turns with them".
+6. Existing choices read the same after the update: with a 2.10 profile's `menuBarMode`, `menuIcon`,
+   `notch` and glow switches set, every renamed control shows the same value (no key changed).
+7. Copy: About and the tour's last step say "Works with a paid Claude plan (Pro, Max, Team or
+   Enterprise)". The Desk's meetings and the meetings menu say "Nothing on the calendar today" on a day
+   with no timed meeting, and "Nothing else on the calendar today" after the day's last one. Settings,
+   Mods & Config: the **Mods and plugins** heading right above the folder list (since slice 2 the
+   page has no switch; Sanduhr's mod switches in Claude Code); the card reads "N mods", "N plugins", "N enabled
+   plugins", "N folders".
+
+## 43. Settings v2, slice 2: one home per feature (item 72)
+
+`docs/settings-v2-spec.md`, Slice 2. Do it on a profile copied from a 2.10 install, then on a fresh one.
+
+1. `smoke/smoke run smoke/scenarios/settings-sections.yaml` (from `mac/`) passes: sixteen pages open by
+   raw value, `deskMeters` opens Alerts with `settings_anchor: each-limit`, `pacing` opens Widget with
+   `settings_anchor: pacing`. `hide-limit.yaml`, `silence-limit.yaml` and `meter-warning.yaml` pass
+   with `settings_section: alerts`; `av-indicators.yaml` passes with `av_indicators.place: right`.
+2. The sidebar: General, Accounts, Usage, Alerts; **Desktop**: Desk, Desk Look, Message, Notch, Now
+   Playing, Watchers; **Claude Code**: Claude Code, Mods & Config; **Widget**: Widget, Themes;
+   **Help**: Updates, About. Desk Look has a paintbrush, Widget the text symbol.
+3. General: Surfaces is four status lines (Desk, Notch, Widget, Menu bar) with **Desk Settings…**,
+   **Notch Settings…** and **Widget Settings…**; no switch for any surface. Shortcuts has **⌥S
+   opens Settings** and **⌥J joins the next meeting** (with the default keys). Turn the Desk off on
+   the Desk page and press ⌥S in another app: Settings comes forward. Switch **⌥S opens Settings**
+   off: ⌥S types ß again; ⌥J still joins. Put both back. `hot_keys` in state.yaml follows.
+4. Desk: the Desk switch at the top, Arrange Desk…, Where each piece sits (Meetings with **Read
+   today's meetings** under it; Now playing and Watchers with their page links), Order, **Clicks**
+   (Clock and message take clicks) and Margins (under Advanced since slice 3). Desk Look no longer
+   has Clicks or Notch text.
+5. Notch: the notch switch at the top (with **Needs the Desk.** and Desk Settings… while the Desk is
+   off), **Notch text color** with Size (both under Advanced since slice 3). The wing pickers no longer offer Camera and mic; Camera and
+   mic's **Where they show** offers Beside the camera, left and right, In the left or right wing and
+   Under the camera. Set it to In the right wing and run `smoke/smoke do av-test "mic on"`: the right wing
+   shows the mic; `smoke/smoke do av-test "mic off"`: the right wing shows its own text again.
+6. Watchers: the two switches (with a **Claude Code Settings…** hint while no folder has the Claude
+   Code glow hook), **On the notch** and **On the Desk** (set On the notch to Right wing: Notch's Right
+   wing reads Watchers; set On the Desk to Middle left: Desk's Watchers row reads it), the glow
+   rule and its Now line (Desk off, or nothing placed, says so), Above the prompt with each folder's
+   meters mod and **Mods & Config Settings…** (opens Mods & Config at the mod). With On the notch set and the Desk on, `smoke/smoke do watch-test start` then `smoke/smoke do watch-test wait`: the
+   notch glows once (`glow_count` up by one). Set both places off and repeat: no glow, and the Now
+   line says why. `smoke/smoke do watch-test clear`.
+7. Alerts: Notifications, then **Each limit** with a group per limit (Warn when nearly full, At,
+   Only while the reset is more than; Show this limit for a temporary one) under the meter bars'
+   preview. A Desk meter row's two-finger menu **Alerts Settings…** opens Alerts at Each limit.
+8. Widget: Show the widget, Show the widget now, Font, Subtle mode, then Pacing calculators.
+9. Claude Code: **Folders** with **Add Folder…** beside the heading; each folder box starts with
+   **Account** (the linked account, or Follows the active account) and **Change in Accounts…**
+   (opens Accounts with that account selected), and ends with "Meters above the prompt: …" and
+   **Mods & Config Settings…**, no switch. On Mods & Config, for a scratch folder, **Meters above
+   the prompt**: switch on (install sheet the first time), off (the entry goes, the mod's files
+   stay), on, then Remove (settings.json back to its first `shasum`); Claude Code's line follows
+   each step. Search **meters above**, **mod** or **prompt**: each lists Meters above the prompt
+   under Mods & Config.
+10. A 2.10 profile: before updating, note `layout`, `notchLeft`/`notchRight`/`notchStrip`,
+    `avSide`, `hotKeys`, `showClaude` and `menuBarMode` (`defaults read com.626labs.sanduhr.desk`).
+    After the update: the Desk draws the same pieces in the same places (with Show the Claude meters
+    off, both Claude meters pieces read Hidden on Desk), a wing that was Camera and mic now reads
+    that place under Where they show, the shortcuts are on only if the old switch was on (or never set) and the Desk was on (a profile with the Desk off reads both off), and Menu Bar Shows
+    is unchanged. Quit and relaunch: nothing changes again.
+11. Changing the keys (2026-10-08): `smoke/smoke run smoke/scenarios/shortcut-keys.yaml` passes
+    (`hot_keys.settings_keys` reads `⌃⌥S`, then `⌥S`, and the run leaves the keys as found). By
+    hand: click **⌥S** beside **⌥S opens Settings** (it reads "Type keys…"), press ⌃⌥S: the label
+    reads **⌃⌥S opens Settings**, **Reset to ⌥S** appears, ⌃⌥S in another app opens Settings and ⌥S
+    types ß. Click the keys and press Escape: nothing changes. Press ⇧S: "Add ⌘, ⌃ or ⌥: Shift alone
+    isn't enough.", nothing saved. Press ⌥J: "⌥J already joins the next meeting.", nothing saved.
+    When macOS refuses to register the keys, the note under the switch says another app uses them
+    (`hot_keys.<name>_taken: true`). macOS does not refuse system shortcuts such as ⌘Space or keys
+    another app registered the same way, so those register and both fire: pick keys you know are free. The caption names ß and ∆ only while both keys are the defaults. **Reset
+    to ⌥S**: back to the default, and `defaults read com.626labs.sanduhr.desk` has no
+    `hotKeySettingsKeyCode`. The menus, the tour and What's New name no keys.
+
+## 44. Settings v2, slice 3: reach (item 72)
+
+`docs/settings-v2-spec.md`, Slice 3. On a 13-inch screen, with the Settings window dragged down to
+560 pt tall (`smoke/smoke state` shows `settings_preview_folded: true` on a page with a preview;
+the default 680 pt window shows full previews, `settings_preview_folded: false`).
+
+1. `smoke/smoke run smoke/scenarios/settings-reach.yaml` (from `mac/`) passes: `settings notch glow`,
+   `settings watchers above-prompt` and the searches `glow`, `percent` and `margins` each report
+   `settings_anchor_visible: true`; `settings watchers` opens the page at its top
+   (`settings_anchor: null`). `message-editor.yaml` passes with `settings_anchor: new-line` and
+   `settings_anchor_visible: true` after `message-editor add`. Every anchor in `SettingsIndex.swift`
+   (`smoke/smoke do settings "<page> <anchor>"`, then `smoke/smoke state`) reports
+   `settings_anchor_visible: true`, Advanced ones included, and so does the search **glow** right
+   after `settings watchers above-prompt` (Watchers and Notch both have a `glow`).
+2. Search: type **glow** in the field over the sidebar. The sidebar shows Notch with **Notch glow**
+   under it, Watchers with **Glow when a watcher waits on you**, Claude Code with **Turning the glow
+   on** and **Claude Code glow hook**, then Desk Look (Colors, a synonym match). Press Return: Notch opens scrolled to Notch glow,
+   lit for about a second and a half. Type **percent**: General, **Menu Bar Shows**. Type
+   **margins**, click **Margins**: Desk opens with **Advanced** open and Margins on screen. Escape
+   clears the field and the sidebar shows every page again.
+3. Links: `open "sanduhr://settings/notch#glow"` opens Notch at Notch glow; `open
+   "estedesk://settings/watchers#above-prompt"` opens Watchers at Above the prompt; `open
+   "sanduhr://settings/deskMeters"` opens Alerts at Each limit; `open "sanduhr://settings"` opens
+   Settings where it was left. An anchor the page doesn't have (`notch#nope`) opens the page's top.
+4. Previews: at 560 pt each preview is a 44 pt strip ("Notch preview", an arrow, Show). Click it:
+   the card opens and pushes the controls down; go to another page and back, it stays open; close
+   and reopen the window, it is folded again. Drag the window to 600 pt or taller: every card shows
+   in full, as it does when Settings first opens. Claude Code's strip reads "Sample: statusline input".
+5. Advanced: Desk, Desk Look and Notch end with a folded **Advanced**. Desk's holds Margins; Desk
+   Look's the two hex fields (Colors above keeps the presets and a swatch; pick Custom in the hex
+   field and the preset reads Custom); Notch's Size (Extra width each side, Extra height below) and
+   Notch text color. Every value reads as before the update (`defaults read
+   com.626labs.sanduhr.desk left`, `notchChin`, `messageColor`, `notchTextColor` unchanged).
+6. Message: Add Line, List | Text, Save and Revert stay at the top while the list scrolls. Scroll
+   to the bottom of a long list and click **Add Line**: the new line appears at the top of the
+   every-day lines with its editor open, on screen. In Text, Add Line switches to List first.
+   Rotation reads "Once a day, Mix off, special days: stack" folded; set Every hour and it opens on
+   the next visit. Revert drops the new line.
+7. Notch, Text: with Extra height below at 0 (Advanced), switch **Text under the camera too** on:
+   the island grows a strip under the camera at once, Extra height below reads 18, and the hint
+   under the switch says where the height lives. Set it back to 0: the hint says nothing shows under
+   the camera. Put your values back.

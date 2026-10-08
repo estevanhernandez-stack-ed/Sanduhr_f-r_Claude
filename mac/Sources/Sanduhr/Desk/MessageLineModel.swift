@@ -229,7 +229,7 @@ struct MessageLine: Hashable {
         if when == .everyDay, MessageEngine.splitPrefix(t).kind != .plain {
             return "Text that starts like a day (\"Mon:\" or \"10-31:\") shows only on that day."
         }
-        return "The Desk would read this line differently. Edit as text… to see it."
+        return "The Desk would read this line differently. Switch to Text to see it."
     }
 
     /// As it reads back: text cleaned, size 1 as none.
@@ -355,6 +355,19 @@ struct MessageDocument: Equatable {
     mutating func add(_ line: MessageLine = MessageLine()) -> UUID {
         let row = MessageRow(content: .line(line), crlf: rows.last?.crlf ?? false)
         rows.append(row)
+        return row.id
+    }
+
+    /// Add Line (Settings v2, slice 3): a new line at the top of its day's lines, before the
+    /// first message row with the same When; with none, before the first message row; with no
+    /// message rows, after the last row. Notes and blank lines stay where they are. Its id.
+    @discardableResult
+    mutating func insertAtTopOfGroup(_ line: MessageLine = MessageLine()) -> UUID {
+        let row = MessageRow(content: .line(line), crlf: rows.last?.crlf ?? false)
+        let at = rows.firstIndex { $0.isMessage && Self.when(of: $0) == line.when }
+            ?? rows.firstIndex(where: \.isMessage)
+            ?? rows.count
+        rows.insert(row, at: at)
         return row.id
     }
 

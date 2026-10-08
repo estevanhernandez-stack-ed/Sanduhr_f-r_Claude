@@ -20,7 +20,7 @@ extension WhatsNew {
             version: "2.10.0", id: "above-the-prompt",
             title: "Meters and watchers above the prompt",
             body: "In Claude Code, Sanduhr's meters can sit above the prompt with your styles and real motion, and watchers can show there as rows.",
-            art: .symbol("rectangle.topthird.inset.filled"), destination: .integrations),
+            art: .symbol("rectangle.topthird.inset.filled"), destination: .mods),
         WhatsNewCard(
             version: "2.10.0", id: "song-looks",
             title: "A look for every song",
@@ -29,12 +29,12 @@ extension WhatsNew {
         WhatsNewCard(
             version: "2.10.0", id: "desk-clicks",
             title: "The clock and message answer clicks",
-            body: "Two-finger click the clock or the message for Sanduhr's menu, or click once to open their settings. A switch in Desk Look lets clicks through instead.",
-            art: .symbol("cursorarrow.click"), destination: .deskLook),
+            body: "Two-finger click the clock or the message for Sanduhr's menu, or click once to open their settings. A switch on the Desk page lets clicks through instead.",
+            art: .symbol("cursorarrow.click"), destination: .deskLayout),
         WhatsNewCard(
             version: "2.10.0", id: "mod-switches",
             title: "Switch Sanduhr's mod per folder",
-            body: "The Mods page now turns Sanduhr's meters mod on or off for each Claude Code folder, and removes it cleanly.",
+            body: "Meters above the prompt, at the top of Mods & Config, turns Sanduhr's meters mod on or off for each folder, and removes it cleanly.",
             art: .symbol("cube"), destination: .mods),
     ]
 
@@ -62,7 +62,7 @@ extension WhatsNew {
         WhatsNewCard(
             version: "2.9.0", id: "mods-page",
             title: "Your Claude Code mods, in one place",
-            body: "The Mods page lists what each Claude Code folder loads and what every mod can touch. Check runs Claude Code's own validation without running the mod.",
+            body: "Mods & Config lists what each Claude Code folder loads and what every mod can touch. Check runs Claude Code's own validation without running the mod.",
             art: .symbol("cube"), destination: .mods),
         WhatsNewCard(
             version: "2.9.0", id: "camera-mic",
@@ -75,8 +75,8 @@ extension WhatsNew {
         WhatsNewCard(
             version: "2.8.0", id: "watchers",
             title: "Watchers on the notch and the Desk",
-            body: "When an agent waits on a build, a release or a long task, a live card shows its progress, glows when it needs you and fades when it passes. Turn it on in Integrations.",
-            art: .symbol("eye"), destination: .integrations),
+            body: "When an agent waits on a build, a release or a long task, a live card shows its progress, glows when it needs you and fades when it passes. Turn it on in Watchers.",
+            art: .symbol("eye"), destination: .watchers),
         WhatsNewCard(
             version: "2.8.0", id: "combine-statusline",
             title: "Your statusline and Sanduhr's, combined",
@@ -123,13 +123,13 @@ extension WhatsNew {
     static let release250: [WhatsNewCard] = [
         WhatsNewCard(
             version: "2.5.0", id: "usage-page",
-            title: "The Claude Usage page",
+            title: "The Usage page",
             body: "See each account's Claude Code tokens by day, week and session, with its top projects. You choose what Sanduhr keeps for each account.",
             art: .symbol("chart.bar.xaxis"), destination: .usage),
         WhatsNewCard(
             version: "2.5.0", id: "integrations",
             title: "Claude Code integrations",
-            body: "Install the MCP tools, the statusline, the meters above the prompt and the notch glow for when Claude needs you, from one page. Each one says what it adds before it installs.",
+            body: "Install the MCP tools, the statusline, the meters above the prompt and the Claude Code glow hook, which lights the notch when Claude needs you. Each one says what it adds before it installs.",
             art: .symbol("puzzlepiece.extension"), destination: .integrations),
     ]
 

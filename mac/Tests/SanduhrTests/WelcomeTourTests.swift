@@ -68,7 +68,7 @@ struct WelcomeTourStepTests {
             "claude-code": .settings(.integrations),
         ])
         #expect(TourCardView.showMeHelp(.widget) == "Shows the widget")
-        #expect(TourCardView.showMeHelp(.settings(.integrations)) == "Opens Settings, Integrations")
+        #expect(TourCardView.showMeHelp(.settings(.integrations)) == "Opens Settings, Claude Code")
     }
 
     @Test func copyIsShortAndPlain() {

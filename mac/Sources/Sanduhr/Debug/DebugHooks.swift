@@ -56,6 +56,9 @@ enum DebugHooks {
             }
         case .action(.theme(let id), _) where ThemeRegistry.theme(id: id) == nil:
             finish(dir, error: "unknown theme: \(id) (one of \(ThemeRegistry.themes.map(\.id).joined(separator: ", ")))")
+        case .action(.hotKey(let s, let combo), _)
+            where SanduhrHotKeys.check(combo ?? s.defaultCombo, for: s) != nil:
+            finish(dir, error: "hot-key refused: \(SanduhrHotKeys.check(combo ?? s.defaultCombo, for: s)!.note)")
         case .action(let action, _):
             perform(action, app: app) { finish(dir) }
         }
@@ -95,7 +98,9 @@ enum DebugHooks {
         switch action {
         case .showWidget: app.showPanel()
         case .hideWidget: app.hidePanel()
-        case .settings(let section): SettingsWindowController.shared.show(section)
+        case .settings(let section, let anchor): SettingsWindowController.shared.show(section, anchor: anchor)
+        case .settingsLink(let section): SettingsWindowController.shared.show(section)
+        case .settingsSearch(let query): SettingsWindowController.shared.search(query)
         case .closeSettings: SettingsWindowController.shared.close()
         case .refresh:
             Task { @MainActor in
@@ -129,11 +134,13 @@ enum DebugHooks {
         case .messageEditor(.add):
             SettingsWindowController.shared.show(.message)
             SettingsWindowController.shared.messageEditor.debugAdd()
+            SettingsWindowController.shared.revealNewLine()
         case .messageEditor(.revert): SettingsWindowController.shared.messageEditor.load()
         case .deskArrange(.start): DeskController.shared.arrangeDesk()
         case .deskArrange(.test): DeskController.shared.model.arrange.smokeEdit()
         case .deskArrange(.done): DeskController.shared.endArrange(keep: true)
         case .deskArrange(.cancel): DeskController.shared.endArrange(keep: false)
+        case .hotKey(let s, let combo): ShortcutRecorderModel.shared.save(combo ?? s.defaultCombo, for: s)
         }
         settle()
     }
@@ -291,8 +298,7 @@ enum DebugHooks {
         s.deskRunning = desk.running
         s.layout = UserDefaults.desk.string(forKey: "layout")
         s.deskPieces = DeskArrangement(s.layout ?? DeskLayout.standard).shown(
-            showMeetings: UserDefaults.desk.object(forKey: "showMeetings") as? Bool ?? true,
-            showClaude: UserDefaults.desk.object(forKey: "showClaude") as? Bool ?? true)
+            showMeetings: UserDefaults.desk.object(forKey: "showMeetings") as? Bool ?? true)
         let arrange = desk.model.arrange
         s.deskArrange = DeskArrangeDebug(active: arrange.active, changed: arrange.session?.changed ?? false,
                                          working: arrange.working?.string, clickThrough: desk.clickThrough,
@@ -315,18 +321,33 @@ enum DebugHooks {
         av.apply()
         s.avIndicators = AVIndicatorsDebug(camera: av.cameraInUse, mic: av.micInUse, shown: av.spot.name)
         let playing = desk.model.nowPlaying
+        let avPlace = AVPlace.saved(in: UserDefaults.desk)
+        s.avIndicators.place = avPlace.rawValue
         s.notchShows = NotchShowsDebug(
             left: NotchContent.effective(s.notchLeft, at: .left, nowPlaying: playing, idle: s.nowPlayingIdle,
-                                         watchers: desk.model.watchers, indicators: desk.model.avIndicators),
+                                         watchers: desk.model.watchers, indicators: desk.model.avIndicators,
+                                         avPlace: avPlace),
             right: NotchContent.effective(s.notchRight, at: .right, nowPlaying: playing, idle: s.nowPlayingIdle,
-                                          watchers: desk.model.watchers, indicators: desk.model.avIndicators),
+                                          watchers: desk.model.watchers, indicators: desk.model.avIndicators,
+                                          avPlace: avPlace),
             strip: NotchContent.effective(s.notchStrip, at: .strip, nowPlaying: playing, idle: s.nowPlayingIdle,
-                                          watchers: desk.model.watchers, indicators: desk.model.avIndicators))
+                                          watchers: desk.model.watchers, indicators: desk.model.avIndicators,
+                                          avPlace: avPlace))
         s.widgetVisible = widgetVisible
         s.widgetVisibility = .saved()
         s.menuBar = .saved()
         s.settingsOpen = settings.isOpen
         s.settingsSection = settings.window == nil ? nil : settings.section
+        s.settingsAnchor = settings.window == nil ? nil : settings.anchor
+        s.settingsAnchorVisible = settings.anchorVisible
+        s.settingsPreviewFolded = settings.previewFolded
+        s.hotKeys = HotKeysDebug(join: SanduhrHotKeys.isOn(.join, in: UserDefaults.desk),
+                                 settings: SanduhrHotKeys.isOn(.settings, in: UserDefaults.desk),
+                                 registered: desk.hotKeysRegistered,
+                                 joinKeys: SanduhrHotKeys.combo(.join).display,
+                                 settingsKeys: SanduhrHotKeys.combo(.settings).display,
+                                 joinTaken: desk.takenShortcuts.contains(.join),
+                                 settingsTaken: desk.takenShortcuts.contains(.settings))
         s.settingsPreview = settings.isOpen ? SettingsPreviewKind.of(settings.section) : nil
         s.usagePageOpen = settings.isOpen && settings.section == .usage
         s.usageTab = settings.usageTab
@@ -370,6 +391,7 @@ enum DebugHooks {
         s.glowSwitches = NotchGlowController.shared.switches
         s.theme = vm.theme.id
         s.menu = app.currentMenu(widgetVisible: widgetVisible)
+        s.menuSubmenus = SanduhrMenu.submenus(accounts: app.currentAccountsMenu())
         s.credentialsStore = KeychainStore.kind
         s.accountRef = AccountRef.of(KeychainStore.accounts.active)
         s.accountsCount = KeychainStore.accounts.labels.count

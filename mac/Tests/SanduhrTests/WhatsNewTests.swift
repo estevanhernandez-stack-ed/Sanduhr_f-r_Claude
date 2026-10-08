@@ -195,11 +195,11 @@ struct WhatsNewTableTests {
     @Test func showMeLandsOnTheRightPage() {
         let dest = Dictionary(uniqueKeysWithValues: table.map { ($0.id, $0.destination) })
         #expect(dest == [
-            "arrange-desk": .deskLayout, "above-the-prompt": .integrations, "song-looks": .nowPlaying,
-            "desk-clicks": .deskLook, "mod-switches": .mods,
+            "arrange-desk": .deskLayout, "above-the-prompt": .mods, "song-looks": .nowPlaying,
+            "desk-clicks": .deskLayout, "mod-switches": .mods,
             "message-editor": .message, "desk-layout": .deskLayout, "settings-previews": .notch,
             "estefont-pro": .deskLook, "mods-page": .mods, "camera-mic": .notch,
-            "watchers": .integrations, "combine-statusline": .integrations,
+            "watchers": .watchers, "combine-statusline": .integrations,
             "sign-in": .credentials, "tour": .about,
             "now-playing": .nowPlaying, "claude-suggests": .message,
             "dock-aware-desk": .deskLayout, "estefont": .deskLook,

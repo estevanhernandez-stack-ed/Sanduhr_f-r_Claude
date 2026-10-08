@@ -1,6 +1,6 @@
 import Foundation
 
-/// Which limits show (Settings, Desk, Meters, Show this limit; a limit's two-finger menu). Only a
+/// Which limits show (Settings, Alerts, Each limit, Show this limit; a limit's two-finger menu). Only a
 /// limit believed temporary (LimitLifetime) can be hidden; the session, the all-models weekly
 /// limit and the known model limits always show. Saved in the desk suite beside the warning
 /// settings:

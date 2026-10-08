@@ -10,23 +10,25 @@ import Combine
 
 /// Which preview a Settings section shows; state.yaml's `settings_preview`.
 enum SettingsPreviewKind: String, CaseIterable {
-    case notch, layout, look, meters, message, nowPlaying, widget, menuBar, integrations, mods
+    case notch, layout, look, meters, message, nowPlaying, watchers, widget, menuBar, integrations, mods
 
     /// The preview `section` shows, nil for a section without one (Themes has its gallery;
-    /// Alerts, Accounts, Claude Usage, Updates and About draw nothing on screen).
+    /// Accounts, Usage, Updates and About draw nothing on screen). Alerts shows the meter bars in
+    /// their states (was Desk, Meters, slice 2).
     static func of(_ section: SettingsSection) -> SettingsPreviewKind? {
         switch section {
         case .notch: .notch
         case .deskLayout: .layout
         case .deskLook: .look
-        case .deskMeters: .meters
+        case .alerts: .meters
         case .message: .message
         case .nowPlaying: .nowPlaying
-        case .widgetLook, .pacing: .widget
+        case .watchers: .watchers
+        case .widgetLook: .widget
         case .general: .menuBar
         case .integrations: .integrations
         case .mods: .mods
-        case .alerts, .credentials, .usage, .themes, .updates, .about: nil
+        case .credentials, .usage, .themes, .updates, .about: nil
         }
     }
 
@@ -39,7 +41,8 @@ enum SettingsPreviewKind: String, CaseIterable {
         case .meters, .widget, .menuBar: [.meters]
         case .message: [.message, .specialDay]
         case .nowPlaying: [.track]
-        case .integrations: [.watcher, .statusline]
+        case .watchers: [.watcher]
+        case .integrations: [.statusline]
         }
     }
 }
@@ -151,14 +154,16 @@ struct SettingsPreviewCard<Content: View>: View {
 }
 
 extension View {
-    /// The pane with its preview card on top, the card outside the pane's scrolling form.
-    func withPreview<Card: View>(@ViewBuilder _ card: () -> Card) -> some View {
+    /// The pane with its preview card on top, the card outside the pane's scrolling form. Below
+    /// 600 pt of window height the card folds to a strip (PreviewFold, slice 3); the pane under it
+    /// is the page's viewport for `settings_anchor_visible`.
+    func withPreview<Card: View>(_ page: SettingsSection, @ViewBuilder _ card: @escaping () -> Card) -> some View {
         VStack(spacing: 0) {
-            card()
+            PreviewFold(page: page, card: card)
                 .padding(.horizontal, 20)
                 .padding(.top, 14)
                 .padding(.bottom, 2)
-            self
+            self.settingsViewport()
         }
     }
 }

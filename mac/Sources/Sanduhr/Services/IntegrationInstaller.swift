@@ -17,7 +17,7 @@ enum IntegrationKind: String, Codable, CaseIterable, Sendable {
         case .mcp: "MCP server"
         case .statusline: "Statusline"
         case .meters: "Meters above the prompt"
-        case .hooks: "Notch glow when Claude needs you"
+        case .hooks: SettingsNames.claudeCodeGlowHook
         }
     }
 
