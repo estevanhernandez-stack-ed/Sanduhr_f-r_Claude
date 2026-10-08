@@ -227,6 +227,7 @@ struct DeskLookSection: View {
     @AppStorage("inkColor", store: .desk) private var inkColor = "ffffff"
     @AppStorage("inkShadow", store: .desk) private var inkShadow = true
     @AppStorage("notchTextColor", store: .desk) private var notchTextColor = "ffffff"
+    @AppStorage(DeskPieceClicks.key, store: .desk) private var piecesTakeClicks = DeskPieceClicks.defaultOn
     @State private var families: [String] = []
 
     /// The Desk font as drawn (EsteFont Pro until one is picked, or when the picked one is gone);
@@ -267,6 +268,11 @@ struct DeskLookSection: View {
                 ColorRow(title: "Clock, date, meetings, Claude", value: $inkColor)
                 Toggle("Drop shadow under the clock text", isOn: $inkShadow)
                 ColorRow(title: "Notch text", value: $notchTextColor)
+            }
+            Section("Clicks") {
+                Toggle(DeskPieceClicks.title, isOn: $piecesTakeClicks)
+                Text(DeskPieceClicks.caption)
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

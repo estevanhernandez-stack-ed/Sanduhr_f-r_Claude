@@ -228,13 +228,13 @@ struct DeskPiece: View {
 
     var body: some View {
         switch widget {
-        case .clock: clock.deskInk()
-        case .claude: claude.deskInk()
+        case .clock: clock.deskPieceClickArea(.clock) { model.clockFrame = $0 }.deskInk()
+        case .claude: claude.deskPieceClickArea(.claudeLine) { model.claudeLineFrame = $0 }.deskInk()
         case .meters: meters.deskInk()
         case .nowPlaying: nowPlaying.deskInk()
         case .watchers: DeskWatchers(model: model, font: font, size: timeSize * 0.17, alignment: alignment).deskInk()
         case .meetings: meetings.deskInk()
-        case .message: message
+        case .message: message.deskPieceClickArea(.message) { model.messageFrame = $0 }
         }
     }
 
@@ -422,6 +422,29 @@ private extension View {
     /// The Desk ink: inkColor (one hex, or several for a gradient) with a dark drop shadow,
     /// readable on any wallpaper.
     func deskInk() -> some View { modifier(DeskInk()) }
+
+    /// The clock, the message or the claude line as a click area (DeskPieceClicks): its frame goes
+    /// to the model, and while the switch is on the faint plate behind it, as wide as the kind's
+    /// click slack, gives every point there a drawn pixel, so the window server hands a two-finger
+    /// click to this transparent window instead of the Finder (DeskPointerMenu). Off, nothing is
+    /// drawn behind it and the click goes through, as before.
+    func deskPieceClickArea(_ kind: DeskElement.Kind, report: @escaping (CGRect) -> Void) -> some View {
+        modifier(DeskPieceClickArea(kind: kind, report: report))
+    }
+}
+
+private struct DeskPieceClickArea: ViewModifier {
+    let kind: DeskElement.Kind
+    let report: (CGRect) -> Void
+    @AppStorage(DeskPieceClicks.key, store: .desk) private var on = DeskPieceClicks.defaultOn
+
+    func body(content: Content) -> some View {
+        let s = DeskHitTest.slack(kind)
+        content
+            .background(Color.black.opacity(on ? DeskPointerMenu.hitPlateOpacity : 0)
+                .padding(EdgeInsets(top: -s.height, leading: -s.width, bottom: -s.height, trailing: -s.width)))
+            .onGlobalFrame(report)
+    }
 }
 
 extension View {

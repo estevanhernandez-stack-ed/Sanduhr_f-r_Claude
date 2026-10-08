@@ -299,6 +299,19 @@ final class DeskController: NSObject, NSMenuDelegate {
         }) {
             mouseMonitors.append(l)
         }
+        // A drag ends (DeskPointerDrag): the window was held as it was while the button was down,
+        // so it catches up with the pointer now, wherever the drop landed.
+        let released: (NSEvent) -> Void = { [weak self] _ in
+            DispatchQueue.main.async { [weak self] in self?.updateMouseThrough() }
+        }
+        if let g = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp, .rightMouseUp], handler: released) {
+            mouseMonitors.append(g)
+        }
+        if let l = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseUp, .rightMouseUp], handler: { event in
+            released(event); return event
+        }) {
+            mouseMonitors.append(l)
+        }
         // Clicks: whichever app macOS gives the click to, if it landed on a meeting row with a
         // link, open the meeting (DeskHitTest decides what is under the pointer). A plain click
         // on the meters does nothing. A click that reaches Desk itself is consumed.
@@ -402,10 +415,24 @@ final class DeskController: NSObject, NSMenuDelegate {
         }
         if DeskHitTest.hasSharedMenu(hit) {
             let menu = NSMenu()
+            // The clock's Desk Settings… and the message's Message… (DeskPieceClicks), above the shared items.
+            if let kind = hit?.kind, let extra = DeskPieceClicks.menuItem(kind) {
+                let item = NSMenuItem(title: extra.title, action: #selector(pieceSettingsFromMenu(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = extra.section.rawValue
+                menu.addItem(item)
+                menu.addItem(.separator())
+            }
             addStandardItems(to: menu)
             return menu
         }
         return limitMenu(for: hit)
+    }
+
+    /// Desk Settings… (the clock's menu) or Message… (the message's): Settings at that page.
+    @objc private func pieceSettingsFromMenu(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let section = SettingsSection(rawValue: raw) else { return }
+        showSettings(section)
     }
 
     /// "Arrange Desk…" (item 60), at the end of a Desk menu that has no shared items.
@@ -506,6 +533,12 @@ final class DeskController: NSObject, NSMenuDelegate {
             // The window holds the mouse over the meters so a two-finger click reaches the limit
             // menu; a plain click is swallowed there, so nothing reacts to it.
             break
+        case .clock, .message, .claudeLine:
+            // DeskPieceClicks: the clock opens Settings, Desk, Look, the message Settings, Desk,
+            // Message; the claude line, like the meters, takes the click and does nothing.
+            if let section = DeskPieceClicks.plainClick(hit.kind) {
+                DispatchQueue.main.async { [weak self] in self?.showSettings(section) }
+            }
         case .meetings:
             return false
         }
@@ -537,12 +570,20 @@ final class DeskController: NSObject, NSMenuDelegate {
             return
         }
         // Arrange mode (item 60) takes the whole frame; otherwise only the click areas, as before.
-        let over = DeskArrange.takesMouse(arranging: model.arrange.active,
-                                          overElement: DeskHitTest.element(at: point, in: model.elements()) != nil)
+        let arranging = model.arrange.active
+        let wanted = DeskArrange.takesMouse(arranging: arranging,
+                                            overElement: DeskHitTest.element(at: point, in: model.elements()) != nil)
+        // Outside Arrange mode, a button held down (a file dragged from the desktop) keeps the
+        // window as it was, so a drag that started elsewhere crosses the plates to the Finder
+        // (DeskPointerDrag); the button coming up runs this again.
+        let over = arranging ? wanted
+            : DeskPointerDrag.takesMouse(wanted: wanted, buttonDown: NSEvent.pressedMouseButtons != 0,
+                                         takingNow: !w.ignoresMouseEvents)
         if w.ignoresMouseEvents == over { w.ignoresMouseEvents = !over }
         let blocks = [model.metersFrame, model.accountFrame, model.noteFrame, model.meetingsFrame,
                       model.nowPlayingFrame, model.stripFrame, model.stripNextFrame,
                       model.watchersFrame, model.stripWatcherFrame, model.stripAVFrame]
+            + (DeskPieceClicks.isOn(in: UserDefaults.desk) ? [model.clockFrame, model.messageFrame, model.claudeLineFrame] : [])
         nearBlocks = DeskPointerWatch.near(point, frames: blocks)
         // The auto-hiding Dock's edge (item 56) runs the same watch, which reads the window list.
         watchApproach(nearBlocks || dock.wantsWatch(pointer: point, size: w.frame.size))

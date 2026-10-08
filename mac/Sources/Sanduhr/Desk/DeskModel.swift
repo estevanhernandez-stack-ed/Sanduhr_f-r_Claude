@@ -189,6 +189,11 @@ final class DeskModel {
     var avDrawn = AVIndicators()
     /// Where the strip under the camera draws them, same coordinates: a click opens their menu.
     @ObservationIgnored var stripAVFrame: CGRect = .zero { didSet { if stripAVFrame != oldValue { onHitAreasChange?() } } }
+    /// Where the clock, the message and the claude line sit, same coordinates. Click areas only
+    /// while "Clock and message take clicks" is on (DeskPieceClicks).
+    @ObservationIgnored var clockFrame: CGRect = .zero { didSet { if clockFrame != oldValue { onHitAreasChange?() } } }
+    @ObservationIgnored var messageFrame: CGRect = .zero { didSet { if messageFrame != oldValue { onHitAreasChange?() } } }
+    @ObservationIgnored var claudeLineFrame: CGRect = .zero { didSet { if claudeLineFrame != oldValue { onHitAreasChange?() } } }
     /// Called when a clickable piece moves or comes and goes (DeskController takes the mouse there).
     @ObservationIgnored var onHitAreasChange: (() -> Void)?
     /// Arrange mode (item 60): the layout being edited on the desktop, nil-session outside it.
@@ -520,6 +525,12 @@ final class DeskModel {
         input.stripWatcherFrame = stripWatcherFrame
         input.avStrip = notch && notchRect != nil && chin > 0 && chinText && strip == .avIndicators
         input.stripAVFrame = stripAVFrame
+        input.piecesTakeClicks = DeskPieceClicks.isOn(in: desk)
+        input.clockFrame = clockFrame
+        input.messageDrawn = cycling || !specialMessages.isEmpty || message != nil
+        input.messageFrame = messageFrame
+        input.claudeLineDrawn = claudeLine != nil || claudeParts?.account != nil || switchNote
+        input.claudeLineFrame = claudeLineFrame
         return DeskElements.build(input)
     }
 

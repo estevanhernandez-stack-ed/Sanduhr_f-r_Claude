@@ -1611,3 +1611,42 @@ Integrations. For the Combine steps give it a statusline of its own first
 11. Junk: write `{` into `band.json` while Sanduhr is quit: the band draws the meters as before,
     no rows, nothing logged.
 12. Clean up: Remove both integrations, delete `~/.claude-bandtest`.
+
+## 41. The clock, the message and the claude line take clicks
+
+Standard layout (message top left; clock, claude line and meters bottom left), Desk on, a message
+showing today. Put a desktop icon (a scratch file) right under the clock first, and another on the
+desktop well away from every piece.
+
+1. Settings, Desk, Look ends with **Clicks**: **Clock and message take clicks**, on, captioned "On:
+   two-finger click them for Sanduhr's menu. Desktop icons right beneath them can't be clicked
+   there while it's on." `smoke/smoke state` shows `desk_piece_clicks: true` and `desk_frames`
+   lists `clock`, `message` and `claude_line` with non-empty frames; `desk_frames_ok: true`.
+2. Close Settings. Two-finger click (or Control-click) the time, the date, the gap between the
+   hour and the minutes, and the space between two words of the message: each time Sanduhr's menu
+   opens (Arrange Desk…, Settings…, Quit…), never the Finder's (no New Folder, no Change Desktop
+   Background). The clock's menu starts with **Desk Settings…**, the message's with **Message…**;
+   each opens Settings at that page. Two-finger click the claude line: the shared menu, no extra
+   item. With two accounts, a plain click on the account name still switches accounts.
+3. Plain click the clock: Settings opens at Desk, Look. Plain click the message: Settings, Desk,
+   Message. Plain click the claude line (not the account name): nothing happens, no Finder
+   selection box starts.
+4. The same with a special day's stack (`10-31: test` in messages.txt with the Mac's date on
+   10-31, or a date line for today), and with On special days set to Take turns and to Scroll: a
+   two-finger click anywhere on the stack or the line taking its turn opens the menu.
+5. Desktop icons: the icon under the clock can't be clicked through it (the caption says so); the
+   icon away from the pieces clicks, double-clicks and drags as always. Move the pointer slowly
+   from the icon onto the clock and two-finger click without stopping: Sanduhr's menu.
+6. File drags: drag the far icon slowly across the clock, then the message, and drop it on an
+   empty part of the desktop beyond them: it lands there. Drag it onto a Finder window's sidebar
+   folder that sits over the clock: it files. Drop it right on top of the clock: Finder places it
+   there (under the clock), it never springs back. Record what you see in the PR; the drag
+   behaviour has not been checked against a live Finder drag before this step. Then drag from the
+   clock itself: nothing moves (the press is Desk's), and the next click elsewhere works.
+7. Arrange Desk…: the whole screen takes clicks as before, the clock and message drag to new
+   places, Done keeps them; afterwards steps 2 and 3 work at the new places.
+8. Switch **Clock and message take clicks** off: `desk_piece_clicks: false`, no `clock`,
+   `message` or `claude_line` in `desk_frames`, `desk_frames_ok: true`. A two-finger click on the
+   clock or message now opens the Finder's desktop menu, a plain click does nothing to Sanduhr,
+   and the icon under the clock clicks again. Switch it back on.
+9. `smoke/smoke run smoke/scenarios/desk-layout.yaml` (from `mac/`) passes (it flips the switch and checks the clock's frame).

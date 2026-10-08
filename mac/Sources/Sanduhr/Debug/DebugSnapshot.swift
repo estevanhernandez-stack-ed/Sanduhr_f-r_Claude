@@ -60,6 +60,8 @@ struct DebugStateInput {
     var deskFrames: [DeskElement] = []
     /// DeskFrameCheck's answer for `deskFrames`: nil when the geometry holds.
     var deskFramesProblem: String?
+    /// "Clock and message take clicks" (DeskPieceClicks), Settings, Desk, Look.
+    var deskPieceClicks = DeskPieceClicks.defaultOn
     /// The Dock as the Desk sees it (item 56): its side, auto-hide, and the inset applied now.
     var dock = DockDebug()
     var alerts = AlertSettings()
@@ -378,6 +380,7 @@ enum DebugState {
         pairs.append(("desk_frames", .list(frames)))
         pairs.append(("desk_frames_ok", .bool(s.deskFramesProblem == nil)))
         pairs.append(("desk_frames_problem", s.deskFramesProblem.map(YAMLNode.string) ?? .null))
+        pairs.append(("desk_piece_clicks", .bool(s.deskPieceClicks)))
         pairs.append(("dock", dockYAML(s.dock)))
         pairs.append(("alerts", alerts(s.alerts)))
         let fetched: YAMLNode = s.lastFetch.map { .string(iso.string(from: $0)) } ?? .null

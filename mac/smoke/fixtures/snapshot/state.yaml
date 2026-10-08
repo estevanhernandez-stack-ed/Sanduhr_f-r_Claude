@@ -80,8 +80,15 @@ desk_frames:
   - kind: meetings
     clickable: false
     frame: [52, 898, 260, 22]
+  - kind: clock
+    clickable: true
+    frame: [52, 580, 300, 152]
+  - kind: message
+    clickable: true
+    frame: [52, 60, 700, 100]
 desk_frames_ok: true
 desk_frames_problem: null
+desk_piece_clicks: true
 dock:
   side: bottom
   autohide: false

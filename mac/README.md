@@ -1038,10 +1038,10 @@ menu), at the end of now playing's, a watcher's and the camera and mic indicator
 shared menu a two-finger click on a meeting row, the calendar note or the account name opens
 (`DeskHitTest.hasSharedMenu`), and on Settings, Desk, Layout's **On the desktop** row. While Desk
 is off the menu item is off and says why ("Turn on Desk to arrange it on the desktop.", under the
-item and as its tooltip), as the Settings button does. The clock, the message and a claude line
-without an account name let every click through to the Finder, so they have no two-finger menu of
-their own; the menu bar and widget menus cover them. The pure pieces are in `DeskArrange.swift`,
-the views and the bar's panel in `DeskArrangeViews.swift`.
+item and as its tooltip), as the Settings button does. The clock, the message and the claude line
+open the same shared menu while **Clock and message take clicks** is on (see Desk clicks below);
+off, they let every click through to the Finder and the menu bar and widget menus cover them. The
+pure pieces are in `DeskArrange.swift`, the views and the bar's panel in `DeskArrangeViews.swift`.
 
 - **What shows.** Every piece gets a dashed outline with its name and a round resize handle on the
   corner facing the middle of the screen (`DeskArrange.handle`). A piece with nothing to draw (now
@@ -1087,6 +1087,34 @@ edited), `click_through` (`whole` or `drawn`) and `bar_visible` (the floating ba
 the `desk-arrange start|test|done|cancel` hook drives it, and `scenarios/desk-arrange.yaml` starts
 it from Settings, checks that Settings steps aside and comes back, that the bar shows only while
 arranging, that Cancel leaves `layout` alone and that Done writes it.
+
+### Desk clicks
+
+The Desk window is transparent and sits just below app windows, and the window server hands a
+transparent window a click only where a pixel is drawn and only while it takes the mouse. So Desk
+takes the mouse only over its click areas (`DeskHitTest`, from the frames the pieces report through
+`onGlobalFrame`), and a near-invisible plate behind each one (`DeskPointerMenu.hitPlateOpacity`,
+alpha 3 of 255) makes the gaps between letters count. Everywhere else clicks go to the desktop.
+
+**Clock and message take clicks** (Settings, Desk, Look, Clicks; desk suite key
+`piecesTakeClicks`, on by default) adds the clock (time and date), the message (the day's line, a
+special day's stack, or the line taking its turn with Take turns or Scroll) and the claude line to
+those areas (`DeskPieceClicks`; kinds `clock`, `message` and `claude_line`). A two-finger click on
+any of them opens the shared Sanduhr menu (Arrange Desk…, Settings… and the rest) instead of the
+Finder's desktop menu; the clock's adds **Desk Settings…** and the message's **Message…** at the
+top. A plain click on the clock opens Settings, Desk, Look, on the message Settings, Desk, Message;
+on the claude line it does nothing, like the meters (the account name inside the line still
+switches accounts). The cost: a desktop icon right beneath one of them can't be clicked there while
+the switch is on. Off, nothing is drawn behind them and they are not click areas, exactly as before.
+
+File drags: while a mouse button is down, Desk never changes whether its window takes the mouse
+(`DeskPointerDrag`). A file picked up elsewhere on the desktop is dragged with the window still
+ignoring the mouse, so passing over the clock or the message never makes the plates a drop target,
+and the drop lands on whatever is beneath. The button coming up lets the window catch up with the
+pointer. A drag that starts on a piece itself is Desk's until the button comes up. This rests on
+`ignoresMouseEvents` being set before the drag starts, not on toggling it mid-drag, which
+the window server is not documented to honour for a drag already under way; it has not been
+checked against a live Finder drag in a test (see the smoke test).
 
 ## Desk and the Dock
 
@@ -1337,6 +1365,8 @@ terminal previews. state.yaml's `settings_preview` names the card the open page 
 | Two-finger click a tier card | Accounts, Hide (temporary limits), Stop warnings, Hidden Limits, Meter Settings, then the widget menu |
 | Click a Desk meter          | Nothing: the meters are passive, clicks there do nothing |
 | Two-finger click a Desk meter | Show or Hide Widget, then the same limit menu |
+| Click the Desk clock / message | Settings, Desk, Look / Settings, Desk, Message (while "Clock and message take clicks" is on) |
+| Two-finger click the Desk clock, message or claude line | Desk Settings… (clock) or Message… (message), then the shared menu |
 | Click now playing (notch or Desk) | Play or pause (item 53) |
 | Click Next on a paused wing or strip | Next track (item 53b) |
 | Two-finger click now playing | Previous, Play/Pause, Next, Now Playing Settings… |

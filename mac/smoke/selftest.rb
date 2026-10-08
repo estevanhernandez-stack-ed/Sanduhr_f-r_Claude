@@ -174,7 +174,14 @@ eq('desk pieces follow the layout', state['desk_pieces'].map { |p| [p['piece'], 
 eq('desk pieces at size 1 in the fixture', state['desk_pieces'].map { |p| p['scale'] }.uniq, [1])
 eq('select a piece by name', State.dig(state, 'desk_pieces[piece=meters].order'), [true, 1])
 eq('desk frames ok in the fixture', [state['desk_frames_ok'], state['desk_frames_problem']], [true, nil])
-eq('desk frame kinds', state['desk_frames'].map { |f| f['kind'] }, %w[meters meter_row meter_row meetings])
+eq('desk frame kinds', state['desk_frames'].map { |f| f['kind'] }, %w[meters meter_row meter_row meetings clock message])
+# "Clock and message take clicks": on in the fixture; desk-layout.yaml's check that, off, neither
+# the clock nor the message is a click area.
+eq('piece clicks on in the fixture', state['desk_piece_clicks'], true)
+no_pieces = { 'desk_frames' => '/\A(?!.*(clock|message))/m' }
+check('the clock and message are click areas in the fixture', State.check(state, no_pieces).length == 1)
+check('off, neither is a click area',
+      State.check(state.merge('desk_frames' => state['desk_frames'].reject { |f| %w[clock message].include?(f['kind']) }), no_pieces).empty?)
 check('desk frames are [x, y, w, h] in whole points',
       state['desk_frames'].all? { |f| f['frame'].length == 4 && f['frame'].all? { |n| n.is_a?(Integer) } })
 check('desk frames carry no labels or titles',

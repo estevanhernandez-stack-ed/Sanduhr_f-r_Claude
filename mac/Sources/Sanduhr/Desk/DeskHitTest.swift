@@ -25,6 +25,15 @@ struct DeskElement: Equatable {
         /// The camera and mic indicators in the strip under the camera (item 67, key "strip"). A click
         /// or a two-finger click opens their read-only menu.
         case avIndicators = "av_indicators"
+        /// The clock, time and date. Only while "Clock and message take clicks" is on
+        /// (DeskPieceClicks): a click opens Settings, Desk, Look; a two-finger click the shared menu.
+        case clock
+        /// The message piece as a whole: the usual line, a special day's stack, or the line taking
+        /// its turn. Only while the switch is on: a click opens Settings, Desk, Message.
+        case message
+        /// The claude line, the account name inside it keeping its own click. Only while the
+        /// switch is on: a plain click does nothing, a two-finger click opens the shared menu.
+        case claudeLine = "claude_line"
     }
 
     var kind: Kind
@@ -41,14 +50,19 @@ struct DeskElement: Equatable {
 /// left clicks and two-finger clicks, so they can never disagree about what the pointer is over.
 enum DeskHitTest {
     /// First match wins, in this order: the small targets sit inside or beside the big ones.
-    static let priority: [DeskElement.Kind] = [.meetingRow, .note, .account, .meterRow, .meters, .watcher, .avIndicators, .nowPlayingNext, .nowPlaying]
+    /// The clock, the message and the claude line come last: the account name sits inside the line.
+    static let priority: [DeskElement.Kind] = [.meetingRow, .note, .account, .meterRow, .meters, .watcher, .avIndicators, .nowPlayingNext, .nowPlaying,
+                                               .clock, .message, .claudeLine]
 
     /// How far past its frame each kind still takes the click, in points (horizontal, vertical):
     /// a little slack, so the gaps between letters and the line above or below still count.
     static func slack(_ kind: DeskElement.Kind) -> CGSize {
         switch kind {
-        case .meetingRow, .note, .meterRow, .nowPlaying, .watcher, .avIndicators: return CGSize(width: 8, height: 4)
+        case .meetingRow, .note, .meterRow, .nowPlaying, .watcher, .avIndicators, .clock, .message:
+            return CGSize(width: 8, height: 4)
         case .account: return CGSize(width: 4, height: 2)
+        // The line sits one column gap (10) above the meters, whose slack is 6.
+        case .claudeLine: return CGSize(width: 8, height: 2)
         case .nowPlayingNext: return CGSize(width: 4, height: 4)
         case .meters, .meetings: return CGSize(width: 8, height: 6)
         }
@@ -85,9 +99,13 @@ enum DeskHitTest {
     }
 
     /// True when a two-finger click on the hit opens the shared menu (SanduhrMenu, with Arrange
-    /// Desk…): a meeting row, the calendar note and the claude line's account name (item 60).
+    /// Desk…): a meeting row, the calendar note and the claude line's account name (item 60), and
+    /// the clock, the message and the claude line while they take clicks.
     static func hasSharedMenu(_ element: DeskElement?) -> Bool {
-        element?.kind == .meetingRow || element?.kind == .note || element?.kind == .account
+        switch element?.kind {
+        case .meetingRow, .note, .account, .clock, .message, .claudeLine: return true
+        default: return false
+        }
     }
 
     /// The watcher a hit on a watcher element stands for: the strip's is the most urgent, a Desk
@@ -145,6 +163,16 @@ enum DeskElements {
         /// The strip under the camera shows the camera and mic indicators (item 67).
         var avStrip = false
         var stripAVFrame: CGRect = .zero
+        /// "Clock and message take clicks" (DeskPieceClicks): off, none of the three below is an
+        /// element and they let every click through, as before.
+        var piecesTakeClicks = false
+        var clockFrame: CGRect = .zero
+        /// The message piece draws something: a usual line, a special day's lines, or turns.
+        var messageDrawn = false
+        var messageFrame: CGRect = .zero
+        /// The claude line draws something: the line, or a switch's note on its own.
+        var claudeLineDrawn = false
+        var claudeLineFrame: CGRect = .zero
     }
 
     /// Every element DeskView draws, block before its rows, frames as reported (.zero when none
@@ -193,6 +221,17 @@ enum DeskElements {
         if input.avStrip {
             out.append(DeskElement(kind: .avIndicators, key: "strip", frame: input.stripAVFrame))
         }
+        if input.piecesTakeClicks {
+            if input.placed.contains("clock") {
+                out.append(DeskElement(kind: .clock, frame: input.clockFrame))
+            }
+            if input.placed.contains("message"), input.messageDrawn {
+                out.append(DeskElement(kind: .message, frame: input.messageFrame))
+            }
+            if input.placed.contains("claude"), input.claudeLineDrawn {
+                out.append(DeskElement(kind: .claudeLine, frame: input.claudeLineFrame))
+            }
+        }
         return out
     }
 }
@@ -210,6 +249,8 @@ enum DeskFrameCheck {
         switch kind {
         case .meterRow: return .meters
         case .meetingRow, .note: return .meetings
+        // The account name is part of the claude line, when the line is an element at all.
+        case .account: return .claudeLine
         default: return nil
         }
     }
@@ -271,5 +312,59 @@ enum DeskPointerWatch {
     /// meters, the account name, the calendar note, the meeting list). Empty frames never count.
     static func near(_ point: CGPoint, frames: [CGRect]) -> Bool {
         frames.contains { !$0.isEmpty && $0.insetBy(dx: -reach, dy: -reach).contains(point) }
+    }
+}
+
+/// "Clock and message take clicks" (Settings, Desk, Look). On, the clock, the message and the
+/// claude line draw the faint hit plate (DeskPointerMenu) and become click areas, so a two-finger
+/// click there opens Sanduhr's menu instead of the Finder's. The price is the desktop icons right
+/// beneath them, which the window covers while the pointer is there. Off, all three let every
+/// click through, exactly as before.
+enum DeskPieceClicks {
+    /// Desk suite key (com.626labs.sanduhr.desk).
+    static let key = "piecesTakeClicks"
+    static let defaultOn = true
+
+    static let title = "Clock and message take clicks"
+    static let caption = "On: two-finger click them for Sanduhr's menu. Desktop icons right beneath them can't be clicked there while it's on."
+
+    static func isOn(in store: DefaultsStore) -> Bool {
+        store.object(forKey: key) as? Bool ?? defaultOn
+    }
+
+    static func set(_ on: Bool, in store: DefaultsStore) {
+        store.set(on, forKey: key)
+    }
+
+    /// Where a plain click on the piece goes: the clock to Settings, Desk, Look, the message to
+    /// Settings, Desk, Message. The claude line takes the click and does nothing, as the meters do.
+    static func plainClick(_ kind: DeskElement.Kind) -> SettingsSection? {
+        switch kind {
+        case .clock: return .deskLook
+        case .message: return .message
+        default: return nil
+        }
+    }
+
+    /// The item a piece's two-finger menu has above the shared items, and the Settings page it opens.
+    static func menuItem(_ kind: DeskElement.Kind) -> (title: String, section: SettingsSection)? {
+        switch kind {
+        case .clock: return ("Desk Settings…", .deskLook)
+        case .message: return ("Message…", .message)
+        default: return nil
+        }
+    }
+}
+
+/// File drags across the Desk. A drag that started somewhere else (a file picked up on the
+/// desktop) must reach whatever lies under the plates when it is dropped, so while a mouse button
+/// is down the window keeps whatever it was doing when the button went down: ignoring the mouse
+/// stays ignoring, and the plates never become a drop target mid-drag. A press on a piece itself
+/// keeps the window taking the mouse until the button comes up.
+enum DeskPointerDrag {
+    /// Whether the window takes the mouse now: `wanted` (over a click area) when no button is
+    /// down, else what it was already doing.
+    static func takesMouse(wanted: Bool, buttonDown: Bool, takingNow: Bool) -> Bool {
+        buttonDown ? takingNow : wanted
     }
 }
