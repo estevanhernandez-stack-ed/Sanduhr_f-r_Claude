@@ -101,26 +101,19 @@ private struct MenuBarItemPreview: View {
 /// in a terminal frame; and a watcher as the Desk draws it.
 struct IntegrationsPreview: View {
     var model: IntegrationsModel
-    var live: DeskModel
-    @State private var preview = DeskModel()
-    @State private var samples: PreviewSamples = []
     @State private var statusline: String?
     @State private var ran = false
 
     var body: some View {
         SettingsPreviewCard(kind: .integrations,
-                            label: "Sanduhr's statusline in a terminal, run on sample input, and a watcher as the Desk shows it.",
-                            samples: samples.union(.statusline)) {
-            VStack(alignment: .leading, spacing: 14) {
-                TerminalPreviewFrame(statusline, title: "Claude Code",
-                                     placeholder: Self.placeholder(loaded: model.loaded, ran: ran, python: model.pythonPath),
-                                     maxLines: 3)
-                    .frame(width: 560)
-                DeskPiece(widget: .watchers, model: preview, alignment: .leading)
-            }
-            .padding(8)
+                            label: "Sanduhr's statusline in a terminal, run on sample input.",
+                            samples: .statusline) {
+            TerminalPreviewFrame(statusline, title: "Claude Code",
+                                 placeholder: Self.placeholder(loaded: model.loaded, ran: ran, python: model.pythonPath),
+                                 maxLines: 3)
+                .frame(width: 560)
+                .padding(8)
         }
-        .modifier(PreviewModelSync(preview: preview, live: live, samples: $samples))
         .task(id: model.pythonPath) {
             guard model.pythonPath != nil else { return }
             statusline = await model.sampleStatusline()
@@ -131,5 +124,21 @@ struct IntegrationsPreview: View {
     static func placeholder(loaded: Bool, ran: Bool, python: String?) -> String {
         if !loaded || (python != nil && !ran) { return "Running…" }
         return "No preview: Python or the scripts weren't found."
+    }
+}
+
+/// Settings, Watchers (slice 2): a watcher as the Desk draws it, the user's own while one shows,
+/// else a labeled sample (moved here from Claude Code's preview).
+struct WatchersPreview: View {
+    var live: DeskModel
+    @State private var preview = DeskModel()
+    @State private var samples: PreviewSamples = []
+
+    var body: some View {
+        SettingsPreviewCard(kind: .watchers, label: "A watcher as the Desk shows it.", samples: samples) {
+            DeskPiece(widget: .watchers, model: preview, alignment: .leading)
+                .padding(8)
+        }
+        .modifier(PreviewModelSync(preview: preview, live: live, samples: $samples))
     }
 }

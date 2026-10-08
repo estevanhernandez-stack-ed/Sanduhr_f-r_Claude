@@ -496,12 +496,12 @@ private struct ModChips: View {
                         ForEach(mods) { mod in ModChip(mod: mod, badge: badges.text(.mod(mod.path))) }
                     }
                     if let openModsPage {
-                        Button("Switch it on the Mods page", action: openModsPage)
+                        Button("See It in Mods & Config", action: openModsPage)
                             .buttonStyle(.link)
                             .font(.caption)
-                            .help("Opens Settings, Mods. Sanduhr's own mod has a switch per folder there; switches for other mods come later.")
+                            .help("Opens Settings, Mods & Config, which lists every mod each folder loads. Sanduhr's own mod switches per folder in Claude Code.")
                     }
-                    HelpCaption("Claude Code draws these mods' status entries in its status area, beside the statusline, so Combine can't keep, drop or style them. To hide one, use the mod's own settings (/config in Claude Code) or turn the mod off for this folder: Sanduhr's own mod switches on the Mods page, and switches for other mods come later.")
+                    HelpCaption("Claude Code draws these mods' status entries in its status area, beside the statusline, so Combine can't keep, drop or style them. To hide one, use the mod's own settings (/config in Claude Code) or turn the mod off for this folder: Sanduhr's own mod switches per folder in Claude Code (Meters above the prompt), and switches for other mods come later.")
                 }
             }
         }
@@ -517,7 +517,7 @@ private struct ModChip: View {
         let draws = mod.drawsStatus ? "Claude Code draws its status entry, not the statusline" : "it draws Sanduhr's meters above the prompt"
         var text = "\(mod.name): a mod from \(from); \(draws), so Sanduhr can't keep, drop or style it."
         if let setting = mod.statusSetting { text += " Its own setting \u{201C}\(setting)\u{201D} may switch the entry." }
-        if badge != nil { text += " To remove the duplicate, change the mod's own settings or turn it off on the Mods page." }
+        if badge != nil { text += " To remove the duplicate, change the mod's own settings or turn it off for this folder." }
         return text
     }
 
@@ -557,7 +557,7 @@ private struct DuplicatesPanel: View {
                     .help("Drops your \(d.what) segment.")
             }
         } else {
-            Caption("\(d.what): \(side(d.a)) and \(side(d.b)) both show it. A mod's entry changes only in its own settings (/config in Claude Code) or on the Mods page.")
+            Caption("\(d.what): \(side(d.a)) and \(side(d.b)) both show it. A mod's entry changes only in its own settings (/config in Claude Code) or by turning the mod off for this folder.")
         }
     }
 

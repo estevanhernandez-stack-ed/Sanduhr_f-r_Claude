@@ -64,7 +64,7 @@ final class DeskModel {
     /// One row per Claude limit for the meters piece, in the widget's order, hidden limits left out.
     var meters: [DeskMeterRow] = []
     /// Every limit the server reported with a utilization, hidden or not, in the widget's order:
-    /// Settings, Desk, Meters lists these, so a hidden limit can be shown again.
+    /// Settings, Alerts, Each limit lists these, so a hidden limit can be shown again.
     var reportedTiers: [Tier] = []
     /// The reported limits believed temporary (LimitLifetime): only these get Settings' "Show
     /// this limit" switch.
@@ -479,7 +479,7 @@ final class DeskModel {
         }
     }
 
-    /// The meter rows for the limits that show, with the saved warning settings (Settings, Desk, Meters).
+    /// The meter rows for the limits that show, with the saved warning settings (Settings, Alerts, Each limit).
     private static func meterRows(_ usage: UsageResponse?, now: Date) -> [DeskMeterRow] {
         let desk = UserDefaults.desk
         let shown = MeterVisibility.visible(usage, hidden: MeterVisibility.hidden(in: desk))
@@ -507,8 +507,7 @@ final class DeskModel {
         let desk = UserDefaults.desk
         var input = DeskElements.Input()
         input.placed = DeskLayout.placed(desk.string(forKey: "layout") ?? DeskLayout.standard,
-                                         showMeetings: desk.object(forKey: "showMeetings") as? Bool ?? true,
-                                         showClaude: desk.object(forKey: "showClaude") as? Bool ?? true)
+                                         showMeetings: desk.object(forKey: "showMeetings") as? Bool ?? true)
         input.meterTiers = meters.map(\.tier)
         input.signInNeeded = signInNeeded
         input.switchNote = switchNote
@@ -525,7 +524,8 @@ final class DeskModel {
         input.nowPlayingFrame = nowPlayingFrame
         let strip = NotchContent.effective(NotchContent.saved(.strip, in: desk), at: .strip,
                                            nowPlaying: nowPlaying, idle: NowPlayingIdle.saved(in: desk),
-                                           watchers: watchers, indicators: avIndicators)
+                                           watchers: watchers, indicators: avIndicators,
+                                           avPlace: AVPlace.saved(in: desk))
         let notch = desk.bool(forKey: DeskController.notchKey)
         let chin = desk.object(forKey: "notchChin") as? Double ?? 26
         let chinText = desk.bool(forKey: "notchChinText")

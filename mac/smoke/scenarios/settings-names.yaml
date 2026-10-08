@@ -5,30 +5,50 @@
 # page that carries the button, and first checks that page shows a button with that exact title;
 # every Settings-page link is a SettingsLinkButton, so its title and its page come from one
 # SettingsSection. The retired names must be gone from the pages that used them, and the shared
-# Sanduhr menu carries Menu Bar Shows.
+# Sanduhr menu carries Menu Bar Shows. Slice 2 renamed pages (Desk, Usage, Claude Code, Mods &
+# Config, Widget) and gave Watchers its own page, so the buttons follow.
 name: Every Settings… button opens the page it names
 steps:
-  # Integrations: the Claude Code glow hook's hint and Watchers' placement buttons.
+  # Claude Code: the Claude Code glow hook's hint opens Notch; the old Layout and Integrations
+  # titles are gone everywhere.
   - do: settings
     arg: integrations
   - expect:
       window: settings
-      missing: { text: "/Desk Layout Settings|Notch glow when Claude needs you/" }
+      missing: { text: "/Desk Layout Settings|Layout Settings|Notch glow when Claude needs you/" }
   - expect:
       window: settings
       contains: { role: AXButton, label: "Notch Settings…" }
-  - expect:
-      window: settings
-      contains: { role: AXButton, label: "Layout Settings…" }
   - do: settings-link
     arg: Notch Settings…
   - expect_state: { settings_section: notch }
+  # Watchers: where they show is inline; the hint and Above the prompt open Claude Code.
   - do: settings
-    arg: integrations
+    arg: watchers
+  - expect:
+      window: settings
+      contains: { role: AXButton, label: "Claude Code Settings…" }
   - do: settings-link
-    arg: Layout Settings…
+    arg: Claude Code Settings…
+  - expect_state: { settings_section: integrations }
+  # General: each surface's status links to its page.
+  - do: settings
+    arg: general
+  - expect:
+      window: settings
+      contains: { role: AXButton, label: "Desk Settings…" }
+  - expect:
+      window: settings
+      contains: { role: AXButton, label: "Widget Settings…" }
+  - do: settings-link
+    arg: Desk Settings…
   - expect_state: { settings_section: deskLayout }
-  # Notch: its switch has General's name, and Notch glow points at Integrations for the hook.
+  - do: settings
+    arg: general
+  - do: settings-link
+    arg: Widget Settings…
+  - expect_state: { settings_section: widgetLook }
+  # Notch: its switch has its one name, and Notch glow points at Claude Code for the hook.
   - do: settings
     arg: notch
   - expect:
@@ -39,9 +59,9 @@ steps:
       missing: { text: "/Extend the camera notch|Glow for Claude Code/" }
   - expect:
       window: settings
-      contains: { role: AXButton, label: "Integrations Settings…" }
+      contains: { role: AXButton, label: "Claude Code Settings…" }
   - do: settings-link
-    arg: Integrations Settings…
+    arg: Claude Code Settings…
   - expect_state: { settings_section: integrations }
   # Now Playing: the two ways to place it.
   - do: settings
@@ -51,26 +71,30 @@ steps:
       contains: { role: AXButton, label: "Notch Settings…" }
   - expect:
       window: settings
-      contains: { role: AXButton, label: "Layout Settings…" }
+      contains: { role: AXButton, label: "Desk Settings…" }
   - do: settings-link
     arg: Notch Settings…
   - expect_state: { settings_section: notch }
   - do: settings
     arg: nowPlaying
   - do: settings-link
-    arg: Layout Settings…
+    arg: Desk Settings…
   - expect_state: { settings_section: deskLayout }
-  # The menus' page items: the limit menus, the watcher and now playing menus, the clock's menu.
+  # The menus' page items: the limit menus (Alerts, Each limit), the watcher and now playing
+  # menus, the clock's menu.
   - do: settings-link
-    arg: Meters Settings…
-  - expect_state: { settings_section: deskMeters }
+    arg: Alerts Settings…
+  - expect_state: { settings_section: alerts }
+  - do: settings-link
+    arg: Watchers Settings…
+  - expect_state: { settings_section: watchers }
   - do: settings-link
     arg: Now Playing Settings…
   - expect_state: { settings_section: nowPlaying }
   - do: settings-link
     arg: Desk Look Settings…
   - expect_state: { settings_section: deskLook }
-  # Claude Usage's "needs setup" cards open Accounts. The card shows only while an account has no
+  # Usage's "needs setup" cards open Accounts. The card shows only while an account has no
   # record; it is a SettingsLinkButton(.credentials), so its title and its page can't part.
   - do: settings
     arg: usage

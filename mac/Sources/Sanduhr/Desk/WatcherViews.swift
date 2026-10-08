@@ -210,11 +210,10 @@ private struct DeskWatcherRow: View {
 }
 
 /// The watcher menu (a two-finger click on a watcher, on the Desk or the notch): Dismiss,
-/// Dismiss All, Integrations Settings…. And the click: a watcher's link, https only.
+/// Dismiss All, Watchers Settings…. And the click: a watcher's link, https only.
 enum WatcherMenu {
-    /// Where the watchers are switched on, and the menu's last item opens: Integrations, until
-    /// Settings v2's slice 2 gives them their own page.
-    static let settingsSection = SettingsSection.integrations
+    /// The watchers' one home (Settings v2, slice 2), which the menu's last item opens.
+    static let settingsSection = SettingsSection.watchers
 
     /// Opens the watcher's link when it has an https one; nothing otherwise.
     static func open(_ w: Watcher?) {

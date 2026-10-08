@@ -6,29 +6,29 @@ import ServiceManagement
 /// Every Desk control writes the same com.626labs.sanduhr.desk defaults the desktop reads, so
 /// changes show on the desktop as you make them.
 
-// MARK: - Layout
+// MARK: - Desk
 
+/// Settings, Desk (Settings v2, slice 2; raw value `deskLayout`): the Desk's one home. Its switch,
+/// Arrange Desk…, where each piece sits, the order, how the pieces take clicks and the margins.
 struct DeskLayoutSection: View {
     @AppStorage("layout", store: .desk) private var layout = "message:tl clock:bl claude:bl meetings:bl"
-    @AppStorage("left", store: .desk) private var left = 52.0
-    @AppStorage("right", store: .desk) private var right = 52.0
-    @AppStorage("top", store: .desk) private var top = 40.0
-    @AppStorage("bottom", store: .desk) private var bottom = 60.0
-
     @AppStorage(DeskController.enabledKey, store: .desk) private var deskOn = false
 
     var body: some View {
         let arranging = DeskController.shared.model.arrange.active
         Form {
-            Section("On the desktop") {
+            Section {
+                Toggle(SettingsNames.deskSwitch, isOn: $deskOn)
+                    .onChange(of: deskOn) { _, _ in DeskController.shared.apply() }
                 DeskArrangeRow(deskOn: deskOn, arranging: arranging)
             }
             Section("Where each piece sits") {
                 ForEach(DeskLayout.widgets, id: \.key) { w in
                     DeskPlaceRow(widget: w.key, name: w.name, layout: $layout)
+                        .disabled(arranging)
+                    DeskPieceExtra(widget: w.key)
                 }
-                .disabled(arranging)
-                Text("Eight places: the four corners, the top and bottom centers, and the middle of each side. Top center sits below the notch. Size scales a piece from 60% to 160%; the message starts from its own size in Desk Look. Now playing shows only while something plays; its other settings are in Now Playing. Watchers show only while there is one; they are switched on in Integrations.")
+                Text(DeskLayout.placesCaption)
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Order") {
@@ -37,18 +37,98 @@ struct DeskLayoutSection: View {
                 Text("Pieces in the same place stack top to bottom in this order. Drag a piece up or down to reorder it, or onto a piece in another place to move it there. The top, middle and bottom of a side share a column, and a side keeps clear of the centers, so places never overlap.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section("Margins") {
-                slider("Left", $left, 0...300)
-                slider("Right", $right, 0...300)
-                slider("Top (below the menu bar)", $top, 0...300)
-                slider("Bottom", $bottom, 0...300)
-            }
+            DeskClicksSection()
+            DeskMarginsSection()
         }
         .formStyle(.grouped)
     }
 }
 
-/// Layout's Arrange Desk… button (item 60). While arranging, the places and the order here wait:
+/// Desk, Clicks (moved from Desk Look in slice 2: it is behavior, not look).
+private struct DeskClicksSection: View {
+    @AppStorage(DeskPieceClicks.key, store: .desk) private var piecesTakeClicks = DeskPieceClicks.defaultOn
+
+    var body: some View {
+        Section("Clicks") {
+            Toggle(DeskPieceClicks.title, isOn: $piecesTakeClicks)
+            Text(DeskPieceClicks.caption)
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Desk, Margins. Slice 3 folds it under Advanced.
+private struct DeskMarginsSection: View {
+    @AppStorage("left", store: .desk) private var left = 52.0
+    @AppStorage("right", store: .desk) private var right = 52.0
+    @AppStorage("top", store: .desk) private var top = 40.0
+    @AppStorage("bottom", store: .desk) private var bottom = 60.0
+
+    var body: some View {
+        Section("Margins") {
+            slider("Left", $left, 0...300)
+            slider("Right", $right, 0...300)
+            slider("Top (below the menu bar)", $top, 0...300)
+            slider("Bottom", $bottom, 0...300)
+        }
+    }
+}
+
+/// What a piece's row carries under it on the Desk page: Meetings has Read today's meetings (was
+/// General), Now playing and Watchers link to their own pages.
+private struct DeskPieceExtra: View {
+    let widget: String
+    @AppStorage("showMeetings", store: .desk) private var showMeetings = true
+
+    var body: some View {
+        switch widget {
+        case "meetings":
+            Toggle("Read today's meetings", isOn: $showMeetings)
+                .onChange(of: showMeetings) { _, on in
+                    let desk = DeskController.shared
+                    if on, desk.running { desk.model.requestCalendar() }
+                    if !on { desk.model.meetings = [] }
+                }
+                .padding(.leading, 16)
+        case NowPlayingPlacement.widget:
+            link("Shows only while something plays.", .nowPlaying)
+        case WatcherPlacement.widget:
+            link("Shows only while there is a watcher.", .watchers)
+        default:
+            EmptyView()
+        }
+    }
+
+    private func link(_ text: String, _ page: SettingsSection) -> some View {
+        HStack {
+            Text(text).font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            SettingsLinkButton(page)
+        }
+        .padding(.leading, 16)
+    }
+}
+
+/// A page that needs the Desk says so at its top while the Desk is off, with the way to its
+/// switch (Settings v2: one home per feature, every other mention a link).
+struct NeedsDeskRow: View {
+    @AppStorage(DeskController.enabledKey, store: .desk) private var deskOn = false
+    static let text = "Needs the Desk."
+
+    var body: some View {
+        if !deskOn {
+            HStack {
+                Label(Self.text, systemImage: "exclamationmark.circle")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                SettingsLinkButton(.deskLayout)
+            }
+        }
+    }
+}
+
+/// Desk's Arrange Desk… button (item 60). While arranging, the places and the order here wait:
 /// Done on the desktop writes the layout, so an edit here would be overwritten.
 private struct DeskArrangeRow: View {
     let deskOn: Bool
@@ -67,7 +147,7 @@ private struct DeskArrangeRow: View {
     }
 }
 
-/// One piece's row in Layout: where it sits (or Hidden) and its size.
+/// One piece's row on the Desk page: where it sits (or Hidden) and its size.
 private struct DeskPlaceRow: View {
     let widget: String
     let name: String
@@ -114,7 +194,7 @@ private struct DeskPlaceRow: View {
     }
 }
 
-/// Layout's Order list: each place that has pieces, its pieces top to bottom. A piece drags
+/// Desk's Order list: each place that has pieces, its pieces top to bottom. A piece drags
 /// onto another to take its place (DeskArrangement.move); VoiceOver gets Move Up and Move Down.
 private struct DeskOrderList: View {
     @Binding var layout: String
@@ -186,6 +266,9 @@ enum DeskLayout {
     /// The layout DeskView draws when none is saved.
     static let standard = "message:tl clock:bl claude:bl meetings:bl"
 
+    /// Desk, Where each piece sits: what the places are, under the rows.
+    static let placesCaption = "Eight places: the four corners, the top and bottom centers, and the middle of each side. Top center sits below the notch. Size scales a piece from 60% to 160%; the message starts from its own size in Desk Look. Hidden takes a piece off the desktop."
+
     static let widgets: [(key: String, name: String)] = [
         ("message", "Message"), ("clock", "Clock and date"), ("claude", SettingsNames.claudeMetersLine),
         ("meters", SettingsNames.claudeMetersBars), ("nowPlaying", "Now playing"), ("watchers", "Watchers"),
@@ -200,8 +283,9 @@ enum DeskLayout {
         return out
     }
 
-    /// The widgets DeskView draws for `layout`, less the meetings with the older showMeetings
-    /// switch off and the claude line and meters with showClaude off.
+    /// The widgets DeskView draws for `layout`, less the meetings with Read today's meetings off.
+    /// `showClaude` is 2.10.0's retired switch, kept for the now playing upgrade that reads it
+    /// (SettingsMigrations moves it into the layout).
     static func placed(_ layout: String, showMeetings: Bool = true, showClaude: Bool = true) -> Set<String> {
         Set(DeskArrangement(layout).shown(showMeetings: showMeetings, showClaude: showClaude).map(\.widget))
     }
@@ -226,8 +310,6 @@ struct DeskLookSection: View {
     @AppStorage(DeskMessageLook.glowKey, store: .desk) private var messageGlow = true
     @AppStorage("inkColor", store: .desk) private var inkColor = "ffffff"
     @AppStorage("inkShadow", store: .desk) private var inkShadow = true
-    @AppStorage("notchTextColor", store: .desk) private var notchTextColor = "ffffff"
-    @AppStorage(DeskPieceClicks.key, store: .desk) private var piecesTakeClicks = DeskPieceClicks.defaultOn
     @State private var families: [String] = []
 
     /// The Desk font as drawn (EsteFont Pro until one is picked, or when the picked one is gone);
@@ -246,6 +328,7 @@ struct DeskLookSection: View {
 
     var body: some View {
         Form {
+            NeedsDeskRow()
             Section("Fonts") {
                 Picker("Desk font", selection: font) {
                     Text("System").tag("")
@@ -264,14 +347,10 @@ struct DeskLookSection: View {
             }
             Section("Colors (one hex, or several with commas for a gradient)") {
                 ColorRow(title: "Message", value: $messageColor)
-                Toggle("Glow around the message ({glow} and {noglow} change one line)", isOn: $messageGlow)
+                Toggle("Glow around the message", isOn: $messageGlow)
                 ColorRow(title: "Clock, date, meetings, Claude", value: $inkColor)
                 Toggle("Drop shadow under the clock text", isOn: $inkShadow)
-                ColorRow(title: "Notch text", value: $notchTextColor)
-            }
-            Section("Clicks") {
-                Toggle(DeskPieceClicks.title, isOn: $piecesTakeClicks)
-                Text(DeskPieceClicks.caption)
+                Text("Notch text color is on Notch; how the clock and the message take clicks is on Desk.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -283,7 +362,7 @@ struct DeskLookSection: View {
     }
 }
 
-private struct ColorRow: View {
+struct ColorRow: View {
     let title: String
     @Binding var value: String
 
@@ -320,11 +399,13 @@ private struct Swatch: View {
     }
 }
 
-// MARK: - Meters
+// MARK: - Alerts, Each limit
 
-/// Warnings on the meters, on Desk and the widget alike, set per meter: a group for the session, the all-models weekly
-/// limit, and every other weekly limit the server reports, each of those with a Show switch (MeterVisibility).
-struct DeskMetersSection: View {
+/// Settings, Alerts, Each limit (was Desk, Meters; Settings v2, slice 2): a group per limit, the
+/// session, the all-models weekly limit and every other weekly limit the server reports, each with
+/// its warning and, for a temporary limit, Show this limit (MeterVisibility). One home for what
+/// warns about limits, on the widget, the Desk, the notch and the alerts.
+struct EachLimitSection: View {
     var model: DeskModel
 
     /// Session and weekly always; the other weekly limits once the server has reported them.
@@ -332,19 +413,22 @@ struct DeskMetersSection: View {
         Tier.allCases.filter { $0 == .fiveHour || $0 == .sevenDay || present.contains($0) }
     }
 
+    static let title = "Each limit"
+    static let caption = "These change the widget, the Desk and the notch. A meter that is nearly full while its reset is still far off draws its bar in red with a soft glow around it, on the Desk (in the Desk ink) and on the widget (in the theme's color)."
+
     var body: some View {
-        Form {
-            Section {
-                Text("A meter that is nearly full while its reset is still far off draws its bar in red with a soft glow around it, on the Desk (in the Desk ink) and on the widget (in the theme's color). Each meter has its own setting; changes show at once on both.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Text("A limit that looks temporary (a promotion, or a new limit whose reset is far off) can be hidden: it leaves the widget, the Desk meters and the alerts, and comes back on its own when it resets or refills. Session, Weekly and the model limits always show.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
+        VStack(alignment: .leading, spacing: 10) {
+            Text(Self.title).font(.headline)
+            Text(Self.caption)
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("A limit that looks temporary (a promotion, or a new limit whose reset is far off) can be hidden: it leaves the widget, the Desk meters and the alerts, and comes back on its own when it resets or refills. Session, Weekly and the model limits always show.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             ForEach(Self.tiers(present: model.reportedTiers), id: \.self) { tier in
                 MeterWarningGroup(tier: tier, model: model)
             }
         }
-        .formStyle(.grouped)
     }
 }
 
@@ -367,14 +451,20 @@ private struct MeterWarningGroup: View {
     }
 
     var body: some View {
-        Section(tier.label) {
-            // Only a temporary limit can be hidden (item 42); a permanent one keeps just its
-            // warning settings.
-            if temporary {
-                Toggle("Show this limit", isOn: showBinding)
+        GroupBox {
+            VStack(alignment: .leading, spacing: 8) {
+                // Only a temporary limit can be hidden (item 42); a permanent one keeps just its
+                // warning settings.
+                if temporary {
+                    Toggle("Show this limit", isOn: showBinding)
+                }
+                warningControls
+                    .disabled(!shown && temporary)
             }
-            warningControls
-                .disabled(!shown && temporary)
+            .padding(4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Text(tier.label).font(.subheadline.weight(.semibold))
         }
     }
 
@@ -425,6 +515,7 @@ struct DeskMessageSection: View {
                                             add: { handoff.approve() },
                                             dismiss: { handoff.dismiss() })
                 }
+                NeedsDeskRow()
                 MessageEditorBar(editor: editor, saved: refreshDesk)
                 if editor.mode == .list {
                     MessageListEditor(editor: editor, pinChanged: refreshDesk)
@@ -585,20 +676,21 @@ struct DeskNotchSection: View {
         Form {
             Section {
                 Toggle(SettingsNames.notchSwitch, isOn: $enabled)
-                Text("Widens the notch into one black island while Desk is on. Click it to open these settings. Screens without a notch are left alone.")
+                NeedsDeskRow()
+                Text("Widens the notch into one black island while the Desk is on. Click it to open these settings. Screens without a notch are left alone.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Text") {
                 Toggle("Text beside the camera", isOn: $wingText)
-                contentPicker("Left wing", $left).disabled(!wingText)
+                contentPicker("Left wing", $left, .left).disabled(!wingText)
                 if left == .nowPlaying { NowPlayingIdleCaption(place: .left).disabled(!wingText) }
-                contentPicker("Right wing", $right).disabled(!wingText)
+                contentPicker("Right wing", $right, .right).disabled(!wingText)
                 if right == .nowPlaying { NowPlayingIdleCaption(place: .right).disabled(!wingText) }
                 Toggle("Text under the camera too (desktop only)", isOn: $chinText)
                     .disabled(chin == 0)
-                contentPicker("Under the camera", $strip).disabled(!chinText || chin == 0)
+                contentPicker("Under the camera", $strip, .strip).disabled(!chinText || chin == 0)
                 if strip == .nowPlaying { NowPlayingIdleCaption(place: .strip).disabled(!chinText || chin == 0) }
-                Text("Nothing leaves that part plain black. A wing grows to fit its text. Watchers show the most urgent watcher while there is one (switched on in Integrations), else that place's default. Camera and mic shows the indicators below while one is in use, else that place's default.")
+                Text("Nothing leaves that part plain black. A wing grows to fit its text. Watchers show the most urgent watcher while there is one (switched on in Watchers), else that place's default. Where the camera and mic indicators show is under Camera and mic, below.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             .disabled(!enabled)
@@ -607,6 +699,7 @@ struct DeskNotchSection: View {
                 slider("Extra height below (0 = none)", $chin, 0...56)
             }
             .disabled(!enabled)
+            NotchTextColorSection()
             Section("Camera fill light") {
                 Toggle("Light up for the camera", isOn: $cameraLight)
                     .onChange(of: cameraLight) { _, _ in CameraLightController.shared.apply() }
@@ -627,20 +720,46 @@ struct DeskNotchSection: View {
         .formStyle(.grouped)
     }
 
-    private func contentPicker(_ title: String, _ selection: Binding<NotchContent>) -> some View {
-        Picker(title, selection: selection) {
-            ForEach(NotchContent.allCases) { Text($0.label).tag($0) }
+    /// A place's content. Camera and mic is no longer a choice here (Camera and mic, Where they
+    /// show, places them); a value 2.10.0 saved reads as the place's default until the launch
+    /// migration clears it.
+    private func contentPicker(_ title: String, _ selection: Binding<NotchContent>, _ place: NotchContent.Place) -> some View {
+        Picker(title, selection: Binding(
+            get: { selection.wrappedValue == .avIndicators ? place.fallback : selection.wrappedValue },
+            set: { selection.wrappedValue = $0 })) {
+            ForEach(NotchContent.choices) { Text($0.label).tag($0) }
         }
     }
 }
 
-/// Notch, Camera and mic (item 67): when the red dot shows, the mic switch, the pulse and the side.
-/// Its own view so the Notch page's body stays small enough for Swift 6.0 and 6.1 to type-check.
+/// Notch text color (moved from Desk Look in slice 2). Slice 3 folds it under Advanced with Size.
+private struct NotchTextColorSection: View {
+    @AppStorage("notchTextColor", store: .desk) private var notchTextColor = "ffffff"
+
+    var body: some View {
+        Section("Notch text color") {
+            ColorRow(title: "Notch text", value: $notchTextColor)
+        }
+    }
+}
+
+/// Notch, Camera and mic (item 67): when the red dot shows, the mic switch, the pulse and, since
+/// slice 2, one placement picker, Where they show (AVPlace). Its own view so the Notch page's body
+/// stays small enough for Swift 6.0 and 6.1 to type-check.
 private struct AVIndicatorSection: View {
     @AppStorage(AVCameraDotMode.key, store: .desk) private var dot = AVCameraDotMode.never
     @AppStorage(AVIndicators.micKey, store: .desk) private var mic = false
     @AppStorage(AVIndicators.pulseKey, store: .desk) private var pulse = true
-    @AppStorage(AVIndicatorSide.key, store: .desk) private var side = AVIndicatorSide.right
+    @AppStorage(AVPlace.key, store: .desk) private var placeRaw: String?
+
+    private var place: Binding<AVPlace> {
+        Binding(
+            get: { placeRaw.flatMap(AVPlace.init(rawValue:)) ?? AVPlace.saved(in: UserDefaults.desk) },
+            set: { p in
+                AVPlace.write(p, to: UserDefaults.desk)
+                AVIndicatorController.shared.apply()
+            })
+    }
 
     var body: some View {
         Section("Camera and mic") {
@@ -653,11 +772,11 @@ private struct AVIndicatorSection: View {
             Toggle("Pulse the dot gently", isOn: $pulse)
                 .disabled(dot == .never)
             Toggle("Show a mic while the microphone is on", isOn: $mic)
-            Picker("Beside the camera", selection: $side) {
-                ForEach(AVIndicatorSide.allCases) { Text($0.label).tag($0) }
+            Picker(AVPlace.pickerTitle, selection: place) {
+                ForEach(AVPlace.allCases) { Text($0.label).tag($0) }
             }
             .disabled(dot == .never && !mic)
-            Text("Indicators only: Sanduhr sees that a camera or the microphone is in use, never which app or anything captured, and never mutes or changes a device. No permission is asked and nothing is saved. They sit on the island beside the camera, or where you pick Camera and mic above; with the island off, or on a screen without a notch, in a small tab at the top. Click one for what is in use. Needs Desk. With Reduce Motion the dot holds still and they come and go without a fade.")
+            Text("Indicators only: Sanduhr sees that a camera or the microphone is in use, never which app or anything captured, and never mutes or changes a device. No permission is asked and nothing is saved. In a wing or under the camera they show while one is in use, and that place shows its own text the rest of the time; a place whose text is off shows them beside the camera instead. With the island off, or on a screen without a notch, they show in a small tab at the top. Click one for what is in use. Needs the Desk. With Reduce Motion the dot holds still and they come and go without a fade.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -722,7 +841,7 @@ private struct NotchGlowSection: View {
         Toggle("Not while a terminal is in front", isOn: $skipTerminal)
             .disabled(!claudeWaiting && !claudeDone)
         HStack(alignment: .firstTextBaseline) {
-            Text("The two Claude Code rows need the \(SettingsNames.claudeCodeGlowHook) in a Claude Code folder, installed in Integrations. Claude Code tells Sanduhr only that it waits or finished, nothing about the conversation. At most one glow of each kind every 20 seconds. With a terminal or an editor that runs Claude Code in front (Terminal, iTerm2, Ghostty, Warp, WezTerm, Alacritty, kitty, VS Code, Cursor, Zed), you are already looking, so it doesn't glow. Screens without a notch glow at the top center.")
+            Text("The two Claude Code rows need the \(SettingsNames.claudeCodeGlowHook) in a Claude Code folder, installed in Claude Code. Claude Code tells Sanduhr only that it waits or finished, nothing about the conversation. At most one glow of each kind every 20 seconds. With a terminal or an editor that runs Claude Code in front (Terminal, iTerm2, Ghostty, Warp, WezTerm, Alacritty, kitty, VS Code, Cursor, Zed), you are already looking, so it doesn't glow. Screens without a notch glow at the top center.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
@@ -733,49 +852,18 @@ private struct NotchGlowSection: View {
 
 // MARK: - General
 
-/// Which surfaces show, open at login, the shortcuts. The Widget picker is WidgetVisibility;
-/// the switch under it mirrors panelHidden, which AppDelegate writes whenever the widget shows
-/// or hides.
+/// What the app is doing and how to reach it (Settings v2, slice 2): the surfaces as status lines
+/// with a link to each one's page (their switches live there), Startup, the menu bar, the
+/// shortcuts and Quit.
 struct GeneralSection: View {
-    @AppStorage(WidgetVisibility.key) private var widgetVisibility = WidgetVisibility.always
-    @AppStorage(DeskController.enabledKey, store: .desk) private var deskEnabled = false
-    @AppStorage(DeskController.notchKey, store: .desk) private var notch = false
-    @AppStorage(AppDelegate.panelHiddenKey) private var panelHidden = false
     @AppStorage("menuIcon", store: .desk) private var menuIcon = false
     @AppStorage(MenuBarMode.key) private var menuBarMode = MenuBarMode.higher
-    @AppStorage("showMeetings", store: .desk) private var showMeetings = true
-    @AppStorage("showClaude", store: .desk) private var showClaude = true
-    @AppStorage(DeskController.hotKeysKey, store: .desk) private var hotKeys = true
     @State private var atLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         Form {
-            Section("Surfaces") {
-                Toggle(SettingsNames.deskSwitch, isOn: $deskEnabled)
-                    .onChange(of: deskEnabled) { _, _ in DeskController.shared.apply() }
-                Toggle(SettingsNames.notchSwitch, isOn: $notch)
-                // A choice made here, not any change to the key: onChange also fired for writes
-                // from outside (a smoke run's defaults step), even with Settings closed, and
-                // treated them as a pick (issue #105's "Always shown shows the widget").
-                Picker("Widget: the floating window with the tools", selection: Binding(
-                    get: { widgetVisibility },
-                    set: { choice in
-                        guard choice != widgetVisibility else { return }
-                        widgetVisibility = choice
-                        (NSApp.delegate as? AppDelegate)?.widgetVisibilityDidChange()
-                    })) {
-                    ForEach(WidgetVisibility.allCases) { Text($0.label).tag($0) }
-                }
-                Toggle("Show the widget now", isOn: Binding(
-                    get: { !panelHidden },
-                    set: { show in
-                        let app = NSApp.delegate as? AppDelegate
-                        if show { app?.showPanel() } else { app?.hidePanel() }
-                    }))
-                Text("The notch needs the Desk. Showing or hiding the widget by hand lasts until Desk turns on or off or Sanduhr starts again; then the choice above takes over. Sanduhr keeps fetching and alerting with every surface off. Every setting stays here, and Option+S opens this window while Desk is on.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Section {
+            SurfacesStatusSection()
+            Section("Startup") {
                 Toggle("Open Sanduhr at login", isOn: $atLogin)
                     .onChange(of: atLogin) { _, on in
                         do { if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() } }
@@ -783,21 +871,7 @@ struct GeneralSection: View {
                     }
             }
             menuBarSection
-            Section("Calendar and Claude") {
-                Toggle("Read today's meetings", isOn: $showMeetings)
-                    .onChange(of: showMeetings) { _, on in
-                        let desk = DeskController.shared
-                        if on, desk.running { desk.model.requestCalendar() }
-                        if !on { desk.model.meetings = [] }
-                    }
-                Toggle("Show the Claude meters on the desktop", isOn: $showClaude)
-            }
-            Section("Shortcuts") {
-                Toggle("Option+J joins the next meeting, Option+S opens these settings", isOn: $hotKeys)
-                    .onChange(of: hotKeys) { _, _ in DeskController.shared.applyHotKeys() }
-                Text("Work in every app while Desk is on. While they are on, Option+J and Option+S no longer type ∆ and ß.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
+            ShortcutsSection()
             Section {
                 HStack {
                     Button("Quit Sanduhr für Claude") { NSApp.terminate(nil) }
@@ -825,6 +899,65 @@ struct GeneralSection: View {
                 .font(.caption).foregroundStyle(.secondary)
             Toggle(SettingsNames.meetingsMenu, isOn: $menuIcon)
                 .onChange(of: menuIcon) { _, on in DeskController.shared.setMenuIcon(on) }
+        }
+    }
+}
+
+/// The one-line status General shows for each surface; the switches are on each surface's page.
+enum SurfaceStatus {
+    static func desk(on: Bool) -> String { on ? "Desk: on" : "Desk: off" }
+
+    static func notch(on: Bool, deskOn: Bool) -> String {
+        guard on else { return "Notch: off" }
+        return deskOn ? "Notch: on" : "Notch: on, waiting for the Desk"
+    }
+
+    static func widget(_ visibility: WidgetVisibility, shown: Bool) -> String {
+        "Widget: \(visibility.label.lowercased()), \(shown ? "showing now" : "hidden now")"
+    }
+
+    static func menuBar(_ mode: MenuBarMode) -> String { "Menu bar: \(mode.label)" }
+}
+
+/// General, Surfaces: status, not switches (Settings v2, F2). Each row names the page that holds
+/// the switch.
+private struct SurfacesStatusSection: View {
+    @AppStorage(DeskController.enabledKey, store: .desk) private var deskEnabled = false
+    @AppStorage(DeskController.notchKey, store: .desk) private var notch = false
+    @AppStorage(WidgetVisibility.key) private var widgetVisibility = WidgetVisibility.always
+    @AppStorage(AppDelegate.panelHiddenKey) private var panelHidden = false
+    @AppStorage(MenuBarMode.key) private var menuBarMode = MenuBarMode.higher
+
+    var body: some View {
+        Section("Surfaces") {
+            row(SurfaceStatus.desk(on: deskEnabled), .deskLayout)
+            row(SurfaceStatus.notch(on: notch, deskOn: deskEnabled), .notch)
+            row(SurfaceStatus.widget(widgetVisibility, shown: !panelHidden), .widgetLook)
+            LabeledContent(SurfaceStatus.menuBar(menuBarMode)) { Text("Below").foregroundStyle(.secondary) }
+            Text("Each surface is switched on its own page. Sanduhr keeps fetching and alerting with every surface off.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private func row(_ status: String, _ page: SettingsSection) -> some View {
+        LabeledContent(status) { SettingsLinkButton(page) }
+    }
+}
+
+/// General, Shortcuts (slice 2): Option+S and Option+J, one switch each, registered whenever
+/// Sanduhr runs (SanduhrHotKeys).
+private struct ShortcutsSection: View {
+    @AppStorage(SanduhrHotKeys.Shortcut.settings.key, store: .desk) private var settings = true
+    @AppStorage(SanduhrHotKeys.Shortcut.join.key, store: .desk) private var join = true
+
+    var body: some View {
+        Section("Shortcuts") {
+            Toggle(SanduhrHotKeys.Shortcut.settings.title, isOn: $settings)
+                .onChange(of: settings) { _, _ in DeskController.shared.applyHotKeys() }
+            Toggle(SanduhrHotKeys.Shortcut.join.title, isOn: $join)
+                .onChange(of: join) { _, _ in DeskController.shared.applyHotKeys() }
+            Text(SanduhrHotKeys.caption)
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 }

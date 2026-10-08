@@ -10,23 +10,25 @@ import Combine
 
 /// Which preview a Settings section shows; state.yaml's `settings_preview`.
 enum SettingsPreviewKind: String, CaseIterable {
-    case notch, layout, look, meters, message, nowPlaying, widget, menuBar, integrations, mods
+    case notch, layout, look, meters, message, nowPlaying, watchers, widget, menuBar, integrations, mods
 
     /// The preview `section` shows, nil for a section without one (Themes has its gallery;
-    /// Alerts, Accounts, Claude Usage, Updates and About draw nothing on screen).
+    /// Accounts, Usage, Updates and About draw nothing on screen). Alerts shows the meter bars in
+    /// their states (was Desk, Meters, slice 2).
     static func of(_ section: SettingsSection) -> SettingsPreviewKind? {
         switch section {
         case .notch: .notch
         case .deskLayout: .layout
         case .deskLook: .look
-        case .deskMeters: .meters
+        case .alerts: .meters
         case .message: .message
         case .nowPlaying: .nowPlaying
-        case .widgetLook, .pacing: .widget
+        case .watchers: .watchers
+        case .widgetLook: .widget
         case .general: .menuBar
         case .integrations: .integrations
         case .mods: .mods
-        case .alerts, .credentials, .usage, .themes, .updates, .about: nil
+        case .credentials, .usage, .themes, .updates, .about: nil
         }
     }
 
@@ -39,7 +41,8 @@ enum SettingsPreviewKind: String, CaseIterable {
         case .meters, .widget, .menuBar: [.meters]
         case .message: [.message, .specialDay]
         case .nowPlaying: [.track]
-        case .integrations: [.watcher, .statusline]
+        case .watchers: [.watcher]
+        case .integrations: [.statusline]
         }
     }
 }

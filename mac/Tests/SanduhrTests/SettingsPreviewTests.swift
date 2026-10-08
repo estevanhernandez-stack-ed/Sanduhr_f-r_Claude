@@ -20,18 +20,18 @@ struct SettingsPreviewTests {
         #expect(SettingsPreviewKind.of(.notch) == .notch)
         #expect(SettingsPreviewKind.of(.deskLayout) == .layout)
         #expect(SettingsPreviewKind.of(.deskLook) == .look)
-        #expect(SettingsPreviewKind.of(.deskMeters) == .meters)
+        #expect(SettingsPreviewKind.of(.alerts) == .meters)
+        #expect(SettingsPreviewKind.of(.watchers) == .watchers)
         #expect(SettingsPreviewKind.of(.message) == .message)
         #expect(SettingsPreviewKind.of(.nowPlaying) == .nowPlaying)
         #expect(SettingsPreviewKind.of(.widgetLook) == .widget)
-        #expect(SettingsPreviewKind.of(.pacing) == .widget)
         #expect(SettingsPreviewKind.of(.general) == .menuBar)
         #expect(SettingsPreviewKind.of(.integrations) == .integrations)
         // Item 64: the Mods page's summary card, all real counts, never sample data.
         #expect(SettingsPreviewKind.of(.mods) == .mods)
         #expect(SettingsPreviewKind.mods.relevantSamples.isEmpty)
         // Themes has its gallery; the rest draw nothing on screen.
-        for s in [SettingsSection.themes, .alerts, .credentials, .usage, .updates, .about] {
+        for s in [SettingsSection.themes, .credentials, .usage, .updates, .about] {
             #expect(SettingsPreviewKind.of(s) == nil)
         }
         // Every kind is reachable from some section.

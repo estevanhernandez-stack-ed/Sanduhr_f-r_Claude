@@ -1,6 +1,6 @@
 import Foundation
 
-/// One meter's warning setting (Settings, Desk, Meters): a switch, the fill that counts as
+/// One meter's warning setting (Settings, Alerts, Each limit): a switch, the fill that counts as
 /// nearly full, and how far away the reset must still be. Saved in the desk suite per tier:
 ///   defaults write com.626labs.sanduhr.desk meterWarn.seven_day.on -bool true
 ///   defaults write com.626labs.sanduhr.desk meterWarn.seven_day.pct -float 90

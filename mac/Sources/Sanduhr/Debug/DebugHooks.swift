@@ -95,7 +95,7 @@ enum DebugHooks {
         switch action {
         case .showWidget: app.showPanel()
         case .hideWidget: app.hidePanel()
-        case .settings(let section): SettingsWindowController.shared.show(section)
+        case .settings(let section, let anchor): SettingsWindowController.shared.show(section, anchor: anchor)
         case .settingsLink(let section): SettingsWindowController.shared.show(section)
         case .closeSettings: SettingsWindowController.shared.close()
         case .refresh:
@@ -292,8 +292,7 @@ enum DebugHooks {
         s.deskRunning = desk.running
         s.layout = UserDefaults.desk.string(forKey: "layout")
         s.deskPieces = DeskArrangement(s.layout ?? DeskLayout.standard).shown(
-            showMeetings: UserDefaults.desk.object(forKey: "showMeetings") as? Bool ?? true,
-            showClaude: UserDefaults.desk.object(forKey: "showClaude") as? Bool ?? true)
+            showMeetings: UserDefaults.desk.object(forKey: "showMeetings") as? Bool ?? true)
         let arrange = desk.model.arrange
         s.deskArrange = DeskArrangeDebug(active: arrange.active, changed: arrange.session?.changed ?? false,
                                          working: arrange.working?.string, clickThrough: desk.clickThrough,
@@ -316,18 +315,27 @@ enum DebugHooks {
         av.apply()
         s.avIndicators = AVIndicatorsDebug(camera: av.cameraInUse, mic: av.micInUse, shown: av.spot.name)
         let playing = desk.model.nowPlaying
+        let avPlace = AVPlace.saved(in: UserDefaults.desk)
+        s.avIndicators.place = avPlace.rawValue
         s.notchShows = NotchShowsDebug(
             left: NotchContent.effective(s.notchLeft, at: .left, nowPlaying: playing, idle: s.nowPlayingIdle,
-                                         watchers: desk.model.watchers, indicators: desk.model.avIndicators),
+                                         watchers: desk.model.watchers, indicators: desk.model.avIndicators,
+                                         avPlace: avPlace),
             right: NotchContent.effective(s.notchRight, at: .right, nowPlaying: playing, idle: s.nowPlayingIdle,
-                                          watchers: desk.model.watchers, indicators: desk.model.avIndicators),
+                                          watchers: desk.model.watchers, indicators: desk.model.avIndicators,
+                                          avPlace: avPlace),
             strip: NotchContent.effective(s.notchStrip, at: .strip, nowPlaying: playing, idle: s.nowPlayingIdle,
-                                          watchers: desk.model.watchers, indicators: desk.model.avIndicators))
+                                          watchers: desk.model.watchers, indicators: desk.model.avIndicators,
+                                          avPlace: avPlace))
         s.widgetVisible = widgetVisible
         s.widgetVisibility = .saved()
         s.menuBar = .saved()
         s.settingsOpen = settings.isOpen
         s.settingsSection = settings.window == nil ? nil : settings.section
+        s.settingsAnchor = settings.window == nil ? nil : settings.anchor
+        s.hotKeys = HotKeysDebug(join: SanduhrHotKeys.isOn(.join, in: UserDefaults.desk),
+                                 settings: SanduhrHotKeys.isOn(.settings, in: UserDefaults.desk),
+                                 registered: desk.hotKeysRegistered)
         s.settingsPreview = settings.isOpen ? SettingsPreviewKind.of(settings.section) : nil
         s.usagePageOpen = settings.isOpen && settings.section == .usage
         s.usageTab = settings.usageTab

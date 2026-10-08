@@ -29,8 +29,8 @@ import AppKit
 ///   defaults write com.626labs.sanduhr.desk top -float 40
 ///   defaults write com.626labs.sanduhr.desk bottom -float 60
 ///   defaults write com.626labs.sanduhr.desk menuIcon -bool true    (bring back the clock menu)
-/// The older showMeetings / showClaude switches still hide those widgets (showClaude hides
-/// both the line and the meters).
+/// showMeetings (Read today's meetings) still hides the meetings. 2.10.0's showClaude is retired:
+/// SettingsMigrations moved it into the layout (both Claude meters pieces Hidden).
 /// Then quit and reopen Desk. Messages themselves: edit
 /// ~/Library/Application Support/Desk/messages.txt (no restart needed).
 struct DeskView: View {
@@ -43,7 +43,6 @@ struct DeskView: View {
     @AppStorage("bottom", store: .desk) private var bottom = 60.0
     @AppStorage("timeSize", store: .desk) private var timeSize = 112.0
     @AppStorage("showMeetings", store: .desk) private var showMeetings = true
-    @AppStorage("showClaude", store: .desk) private var showClaude = true
 
     @AppStorage(DeskController.notchKey, store: .desk) private var island = false
     @AppStorage("notchChin", store: .desk) private var chin = 26.0
@@ -57,7 +56,7 @@ struct DeskView: View {
     /// the widget's default.
     /// While arranging (item 60), the layout being edited; nothing is saved until Done.
     private var stacks: [DeskAnchor: [DeskPlacement]] {
-        (model.arrange.working ?? DeskArrangement(layout)).stacks(showMeetings: showMeetings, showClaude: showClaude)
+        (model.arrange.working ?? DeskArrangement(layout)).stacks(showMeetings: showMeetings)
     }
 
     var body: some View {

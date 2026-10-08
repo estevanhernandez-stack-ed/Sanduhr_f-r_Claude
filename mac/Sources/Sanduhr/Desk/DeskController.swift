@@ -13,8 +13,8 @@ final class DeskController: NSObject, NSMenuDelegate {
     static let enabledKey = "deskEnabled"
     /// The notch island, off until switched on in Settings (General or Notch).
     static let notchKey = "notch"
-    /// Option+J and Option+S while Desk runs, on by default.
-    static let hotKeysKey = "hotKeys"
+    /// 2.10.0's one switch for Option+J and Option+S; slice 2 split it (SanduhrHotKeys).
+    static let hotKeysKey = SanduhrHotKeys.legacyKey
     private(set) var running = false
     private(set) var window: NSWindow?
     private var statusItem: NSStatusItem?
@@ -31,6 +31,10 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// The pointer was near a Desk block at the last mouse-through check.
     private var nearBlocks = false
     private let hotKeys = DeskHotKeys()
+    /// The shortcuts registered now, by switch (applyHotKeys).
+    private var registeredShortcuts: [SanduhrHotKeys.Shortcut] = []
+    /// How many shortcuts are registered (state.yaml `hot_keys.registered`).
+    var hotKeysRegistered: Int { hotKeys.count }
 
     var enabled: Bool { UserDefaults.desk.bool(forKey: Self.enabledKey) }
 
@@ -46,6 +50,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         NowPlayingController.shared.apply()
         // The camera and mic indicators run only while Desk does (and their switches are on).
         MainActor.assumeIsolated { AVIndicatorController.shared.apply() }
+        // Option+J and Option+S work whenever Sanduhr runs, Desk or not (slice 2).
+        applyHotKeys()
         let previous = appliedEnabled
         appliedEnabled = enabled
         if let previous, previous != enabled {
@@ -186,19 +192,23 @@ final class DeskController: NSObject, NSMenuDelegate {
         screensAsleep = false; screenSaver = false; sessionAway = false
     }
 
-    /// Called when Desk starts or stops and when the shortcuts switch flips.
+    /// Called at launch, when Desk starts or stops and when either shortcut's switch flips
+    /// (General, Shortcuts). Each registers while its switch is on, with or without the Desk.
     func applyHotKeys() {
-        let wanted = running && (UserDefaults.desk.object(forKey: Self.hotKeysKey) as? Bool ?? true)
-        guard wanted != hotKeys.isRegistered else { return }
-        if wanted {
-            let option = UInt32(optionKey)
-            hotKeys.register([
-                .init(keyCode: UInt32(kVK_ANSI_J), modifiers: option) { [weak self] in self?.joinNext() },
-                .init(keyCode: UInt32(kVK_ANSI_S), modifiers: option) { [weak self] in self?.showSettings() },
-            ])
-        } else {
+        let wanted = SanduhrHotKeys.Shortcut.allCases.filter { SanduhrHotKeys.isOn($0, in: UserDefaults.desk) }
+        guard wanted != registeredShortcuts else { return }
+        registeredShortcuts = wanted
+        guard !wanted.isEmpty else {
             hotKeys.unregister()
+            return
         }
+        let option = UInt32(optionKey)
+        hotKeys.register(wanted.map { s -> DeskHotKeys.Binding in
+            switch s {
+            case .join: DeskHotKeys.Binding(keyCode: UInt32(kVK_ANSI_J), modifiers: option) { [weak self] in self?.joinNext() }
+            case .settings: DeskHotKeys.Binding(keyCode: UInt32(kVK_ANSI_S), modifiers: option) { [weak self] in self?.showSettings() }
+            }
+        })
     }
 
     @objc private func screensChanged() { if running { buildWindow() } }
@@ -393,7 +403,7 @@ final class DeskController: NSObject, NSMenuDelegate {
     }
 
     /// A two-finger click on the meters opens the limit menu for the row under the pointer
-    /// (LimitMenu): Accounts, Hide, the warnings item, Meters Settings…, then the shared menu.
+    /// (LimitMenu): Accounts, Hide, the warnings item, Alerts Settings…, then the shared menu.
     /// On now playing (the Desk line or the strip under the camera), its menu instead.
     private func limitMenuUnderPointer(_ event: NSEvent) -> Bool {
         let hit = elementUnderPointer()
@@ -433,8 +443,8 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     /// Desk Look Settings… (the clock's menu) or Edit Messages… (the message's): Settings at that page.
     @objc private func pieceSettingsFromMenu(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let section = SettingsSection(rawValue: raw) else { return }
-        showSettings(section)
+        guard let raw = sender.representedObject as? String, let page = SettingsSection.resolve(raw) else { return }
+        MainActor.assumeIsolated { SettingsWindowController.shared.show(page.section, anchor: page.anchor) }
     }
 
     /// "Arrange Desk…" (item 60), at the end of a Desk menu that has no shared items.

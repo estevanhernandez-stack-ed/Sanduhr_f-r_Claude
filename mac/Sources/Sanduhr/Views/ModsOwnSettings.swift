@@ -13,7 +13,8 @@ struct AppModVersion: Equatable, Sendable {
     }
 }
 
-/// Sanduhr's own mod in one Claude Code folder, as the Mods page shows it (item 64, slice 2).
+/// Sanduhr's own mod in one Claude Code folder (item 64, slice 2), as Claude Code's Meters above
+/// the prompt row shows it (Settings v2, slice 2).
 struct OwnModRow: Identifiable, Equatable, Sendable {
     let state: OwnModState
     /// The manifest version of the folder the entry names, when it is there.
@@ -44,8 +45,8 @@ struct OwnModRow: Identifiable, Equatable, Sendable {
         guard state.listed else { return "Not among the plugin folders this folder's settings list. On adds it." }
         let v = version.map { "Version \($0)" } ?? "Its version"
         var text = state.pinned != nil
-            ? "\(v), kept by the Mods page: Update moves it to a new version."
-            : "\(v), through Sanduhr's current folder: it follows Sanduhr's updates (installed from Integrations)."
+            ? "\(v), pinned when it was switched on: Update moves it to a new version."
+            : "\(v), through Sanduhr's current folder: it follows Sanduhr's updates."
         if missing { text = "Its folder isn't there any more. Remove takes the entry out." }
         if !state.isOn { text += " Off: enabledPlugins sets sanduhr-meters@inline to false here." }
         return text
@@ -86,102 +87,9 @@ struct OwnModUpdateQuestion: Identifiable, Equatable {
     var id: String { folder }
 }
 
-/// Settings, Mods: Sanduhr's own mod with a switch per Claude Code folder, Update and Remove.
-struct OwnModBox: View {
-    var model: ModsPageModel
-    let linked: [String]
-
-    var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Sanduhr's meters above Claude Code's prompt. The switch turns it on or off for each Claude Code folder by editing that folder's settings.json. Sanduhr keeps a record in its own folder, so switching back or Remove can put the file back exactly as it was.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                if model.loaded && model.own.isEmpty {
-                    Text("No Claude Code folder to switch it in.").font(.caption).foregroundStyle(.secondary)
-                }
-                ForEach(model.own) { row in
-                    OwnModFolderRow(row: row, model: model, linked: linked)
-                    if row.id != model.own.last?.id { Divider() }
-                }
-            }
-            .padding(4)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        } label: {
-            HStack(spacing: 6) {
-                Text("Sanduhr's mod: \(IntegrationScripts.modName)").font(.headline)
-                if let v = model.appMod?.version, !v.isEmpty {
-                    Text(v).font(.caption.monospaced()).foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-}
-
-private struct OwnModFolderRow: View {
-    let row: OwnModRow
-    var model: ModsPageModel
-    let linked: [String]
-
-    private var busy: Bool { model.ownBusy.contains(row.folder) }
-    private var canAdd: Bool { row.state.listed || model.appMod != nil }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Text(model.display(row.folder)).font(.body.monospaced())
-                Spacer(minLength: 8)
-                if busy { ProgressView().controlSize(.small) }
-                Toggle("On", isOn: Binding(get: { row.state.isOn },
-                                           set: { model.requestSwitch(row, on: $0, linked: linked) }))
-                    .toggleStyle(.switch)
-                    .labelsHidden()
-                    .disabled(busy || !row.state.readable || !canAdd)
-                    .accessibilityLabel("\(IntegrationScripts.modName) in \(model.display(row.folder))")
-                    .help(row.state.isOn ? "Turn it off for this folder" : "Turn it on for this folder")
-            }
-            Text(row.summary)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            OwnModActions(row: row, model: model, linked: linked, busy: busy)
-            if let note = model.ownNotes[row.folder], !note.text.isEmpty {
-                Text(note.text)
-                    .font(.caption)
-                    .foregroundStyle(note.kind == .info ? Color.secondary : (note.kind == .warning ? Color.orange : Color.hex("f87171")))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-}
-
-private struct OwnModActions: View {
-    let row: OwnModRow
-    var model: ModsPageModel
-    let linked: [String]
-    let busy: Bool
-
-    var body: some View {
-        if row.updateAvailable || row.state.listed || row.state.hasReceipt {
-            HStack(spacing: 8) {
-                if row.updateAvailable, !row.missing {
-                    Button("Update to \(model.appMod?.version.isEmpty == false ? model.appMod!.version : "this Sanduhr's version")") {
-                        Task { await model.update(folder: row.folder, confirmed: false, linked: linked) }
-                    }
-                    .help("Moves this folder's entry to the version this copy of Sanduhr carries. If it can do something the version in use can't, Sanduhr asks first.")
-                }
-                Button("Remove") { Task { await model.remove(folder: row.folder, linked: linked) } }
-                    .help("Takes Sanduhr's mod out of this folder: the switch, then its entry among the plugin folders, back to the bytes from before.")
-            }
-            .disabled(busy || !row.state.readable)
-        }
-    }
-}
-
 extension View {
-    /// The Mods page's two questions: On in a folder without the mod, and an update that can
-    /// do more.
+    /// The meters mod's two questions, on Claude Code: On in a folder without the mod, and an
+    /// update that can do more.
     func ownModQuestions(_ model: ModsPageModel, linked: [String]) -> some View {
         modifier(OwnModQuestions(model: model, linked: linked))
     }

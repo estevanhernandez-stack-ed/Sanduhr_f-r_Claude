@@ -119,10 +119,10 @@ final class UsageViewModel {
         didSet { refreshMeterWarnings() }
     }
     /// The tiers whose card bar draws red with a glow: the same rule and settings as the Desk
-    /// meters (MeterWarning, Settings, Desk, Meters). Re-applied when the numbers arrive, on the
+    /// meters (MeterWarning, Settings, Alerts, Each limit). Re-applied when the numbers arrive, on the
     /// countdown tick (the reset draws nearer) and at once when a Meters setting changes.
     private(set) var warningTiers: Set<Tier> = []
-    /// The limits switched off in Settings, Desk, Meters (MeterVisibility): left off the cards
+    /// The limits switched off in Settings, Alerts, Each limit (MeterVisibility): left off the cards
     /// and out of `warningTiers`. Re-read with the warnings; a change resizes the panel.
     private(set) var hiddenTiers: Set<Tier> = MeterVisibility.hidden(in: UserDefaults.desk)
     /// The limits believed temporary with the current numbers (LimitLifetime): the only ones a
@@ -212,7 +212,7 @@ final class UsageViewModel {
     /// Tools items in every menu set it and show it checked.
     var activeTool: WidgetTool?
     /// The pacing calculators (cool down, surplus) stay showing on every card instead of only
-    /// under the pointer. Turned on and off from the Tools items and Settings, Pacing & Focus; not saved.
+    /// under the pointer. Turned on and off from the Tools items and Settings, Widget; not saved.
     var pacingPinned: Bool = false
 
     /// The widget overlays a menu can ask for.

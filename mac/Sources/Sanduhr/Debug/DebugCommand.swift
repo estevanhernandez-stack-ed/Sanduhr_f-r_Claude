@@ -17,8 +17,9 @@ enum DebugGate {
 /// What a hook action does, checked and parsed from the link.
 enum DebugAction: Equatable {
     case showWidget, hideWidget
-    /// Open Settings at a section, or where it was left (nil).
-    case settings(SettingsSection?)
+    /// Open Settings at a section, or where it was left (nil). A retired raw value (`deskMeters`,
+    /// `pacing`) opens the page it merged into, at its anchor (Settings v2, slice 2).
+    case settings(SettingsSection?, anchor: String? = nil)
     /// Settings at the page a "<Page> Settings…" button names (Settings v2, slice 1), opened the
     /// way SettingsLinkButton opens it. `settings-names.yaml` checks each button lands where it says.
     case settingsLink(SettingsSection)
@@ -147,10 +148,11 @@ enum DebugLink {
         case "hide-widget": return .success(.hideWidget)
         case "settings":
             guard let arg else { return .success(.settings(nil)) }
-            guard let section = section(arg) else {
-                return bad("unknown settings section: \(arg) (one of \(SettingsSection.allCases.map(\.rawValue).joined(separator: ", ")))")
+            guard let page = page(arg) else {
+                let names = SettingsSection.allCases.map(\.rawValue) + SettingsSection.aliases.keys.sorted()
+                return bad("unknown settings section: \(arg) (one of \(names.joined(separator: ", ")))")
             }
-            return .success(.settings(section))
+            return .success(.settings(page.section, anchor: page.anchor))
         case "settings-link":
             // "Notch Settings…", or with three dots for a terminal.
             let title = (arg ?? "").replacingOccurrences(of: "...", with: "…")
@@ -233,5 +235,14 @@ enum DebugLink {
     static func section(_ s: String) -> SettingsSection? {
         let key = s.lowercased().replacingOccurrences(of: "-", with: "")
         return SettingsSection.allCases.first { $0.rawValue.lowercased() == key }
+    }
+
+    /// A raw value or a retired one (SettingsSection.aliases), ignoring case and dashes, as the
+    /// page and anchor it opens.
+    static func page(_ s: String) -> (section: SettingsSection, anchor: String?)? {
+        if let section = section(s) { return (section, nil) }
+        let key = s.lowercased().replacingOccurrences(of: "-", with: "")
+        guard let raw = SettingsSection.aliases.keys.first(where: { $0.lowercased() == key }) else { return nil }
+        return SettingsSection.resolve(raw)
     }
 }

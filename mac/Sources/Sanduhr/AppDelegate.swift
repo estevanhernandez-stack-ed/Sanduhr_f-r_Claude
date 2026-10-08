@@ -136,6 +136,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DeskMigration.run()
         // Item 53's Now Playing switch becomes a place in the Desk layout, once (item 53b).
         NowPlayingPlacement.upgrade(UserDefaults.desk)
+        // Settings v2's moves (item 72, slice 2): the Claude meters switch into the layout, the
+        // shortcuts split in two, Camera and mic's one placement. Idempotent; after the upgrade
+        // above, which still reads the retired Claude meters switch.
+        SettingsMigrations.run(UserDefaults.desk)
         DeskController.shared.apply()
         // The camera light watches the cameras while its switch is on, with or without Desk.
         CameraLightController.shared.apply()
@@ -450,7 +454,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// A Desk meter row's two-finger menu (LimitMenu): Show or Hide Widget, Accounts, Hide and the
-    /// warnings item for `tier`, Meters Settings…, then the shared menu under a separator, less its
+    /// warnings item for `tier`, Alerts Settings…, then the shared menu under a separator, less its
     /// own Show or Hide Widget. `tier` nil, a click beside the rows, leaves the limit's own items out.
     func addLimitMenuItems(to menu: NSMenu, tier: Tier?) {
         let groups = LimitMenu.groups(tier: tier, accounts: currentAccountsMenu(), store: UserDefaults.desk,
@@ -486,15 +490,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// What a limit menu's items do, from Desk and the widget alike: Hide, a Hidden Limits item
-    /// and the warnings item write the desk-suite keys Settings, Desk, Meters reads (both refresh
-    /// on the change notice; Hide records the limit's current numbers), Meters Settings… opens
-    /// that page.
+    /// and the warnings item write the desk-suite keys Settings, Alerts, Each limit reads (both refresh
+    /// on the change notice; Hide records the limit's current numbers), Alerts Settings… opens
+    /// that page at Each limit.
     func performLimit(_ entry: LimitMenuEntry) {
         switch entry {
         case .widget(let visible):
             if visible { hidePanel() } else { DeskController.shared.showWidgetBesideMeters() }
         case .accounts, .hiddenLimits: break
-        case .meterSettings: SettingsWindowController.shared.show(.deskMeters)
+        case .meterSettings: SettingsWindowController.shared.show(LimitMenu.meterSection, anchor: LimitMenu.meterAnchor)
         case .hide, .show, .warnings: LimitMenu.apply(entry, to: UserDefaults.desk, usage: viewModel.usage)
         }
     }

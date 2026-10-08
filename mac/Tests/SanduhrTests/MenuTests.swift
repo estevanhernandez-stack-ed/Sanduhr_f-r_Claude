@@ -140,7 +140,7 @@ struct SettingsSidebarTests {
     @Test func everySectionOnceInOrder() {
         let listed = SettingsSection.groups.flatMap(\.sections)
         #expect(listed == SettingsSection.allCases)
-        #expect(SettingsSection.groups.map(\.header) == [nil, "Desk", "Widget", "Sanduhr"])
+        #expect(SettingsSection.groups.map(\.header) == [nil, "Desktop", "Claude Code", "Widget", "Help"])
         #expect(SettingsSection.groups.last?.sections == [.updates, .about])
         #expect(SettingsSection.allCases.suffix(2).map(\.title) == ["Updates", "About"])
     }
@@ -149,16 +149,21 @@ struct SettingsSidebarTests {
         // Item 36: Accounts replaced Credentials; the raw value stays for links and smoke.
         #expect(SettingsSection(rawValue: "credentials") == .credentials)
         #expect(SettingsSection.credentials.title == "Accounts")
-        #expect(SettingsSection.groups.first?.sections == [.general, .alerts, .credentials, .usage, .integrations, .mods])
-        // Item 49: Integrations follows Claude Usage. Item 64: Mods follows Integrations.
-        #expect(SettingsSection(rawValue: "integrations")?.title == "Integrations")
-        #expect(SettingsSection(rawValue: "mods")?.title == "Mods")
+        #expect(SettingsSection.groups.first?.sections == [.general, .credentials, .usage, .alerts])
+        // Settings v2, slice 2: Integrations is Claude Code and Mods is Mods & Config, under their
+        // own group; the raw values stay.
+        #expect(SettingsSection(rawValue: "integrations")?.title == "Claude Code")
+        #expect(SettingsSection(rawValue: "mods")?.title == "Mods & Config")
+        #expect(SettingsSection.groups[2].sections == [.integrations, .mods])
     }
 
     @Test func lookPagesNameTheirGroup() {
         // Opener items name a page as the sidebar does; the two Look pages carry their group.
         #expect(SettingsSection.deskLook.title == "Desk Look")
-        #expect(SettingsSection.widgetLook.title == "Widget Look")
+        #expect(SettingsSection.widgetLook.title == "Widget")
+        // One symbol each: Desk Look and Widget shared textformat (F6).
+        #expect(SettingsSection.deskLook.symbol == "paintbrush")
+        #expect(Set(SettingsSection.allCases.map(\.symbol)).count == SettingsSection.allCases.count)
         #expect(SettingsSection(rawValue: "deskLook") == .deskLook)
         #expect(SettingsSection(rawValue: "widgetLook") == .widgetLook)
     }
@@ -166,7 +171,7 @@ struct SettingsSidebarTests {
     @Test func claudeUsageSitsUnderAccounts() {
         // Item 48: the page is per account; its setup is in Accounts, Data, one row up.
         #expect(SettingsSection(rawValue: "usage") == .usage)
-        #expect(SettingsSection.usage.title == "Claude Usage")
+        #expect(SettingsSection.usage.title == "Usage")
         #expect(SanduhrMenu.groups(widgetVisible: true, deepWork: false, pacing: false, snake: false)[1]
             .entries.last == MenuEntry(command: .usage, title: "Claude Usage…"))
     }

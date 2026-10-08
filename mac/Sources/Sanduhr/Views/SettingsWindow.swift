@@ -1,15 +1,19 @@
 import AppKit
 import SwiftUI
 
-/// The sections of the Settings window, in sidebar order.
+/// The pages of the Settings window, in sidebar order (Settings v2, item 72, slice 2: sixteen
+/// pages in five groups, each feature with one home).
 ///
-/// `credentials` is the Accounts page (item 36 replaced Settings, Credentials with it). The case
-/// and its raw value stay, so `sanduhr://debug/action?name=settings&arg=credentials`, the smoke
-/// scenarios and state.yaml's `settings_section` keep working unchanged.
+/// Raw values are a public contract: `sanduhr://debug/action?name=settings&arg=<raw>`, the smoke
+/// scenarios, state.yaml's `settings_section`, the tour's and What's New's Show me and the Desk
+/// menu items. A page keeps its raw value when its title changes: `credentials` is Accounts,
+/// `usage` is Usage, `integrations` is Claude Code, `mods` is Mods & Config, `deskLayout` is Desk
+/// and `widgetLook` is Widget. The two retired pages parse as aliases (`resolve`).
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case general, alerts, credentials, usage, integrations, mods
-    case deskLayout, deskLook, deskMeters, message, notch, nowPlaying
-    case widgetLook, themes, pacing
+    case general, credentials, usage, alerts
+    case deskLayout, deskLook, message, notch, nowPlaying, watchers
+    case integrations, mods
+    case widgetLook, themes
     case updates, about
 
     var id: String { rawValue }
@@ -17,20 +21,19 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: "General"
-        case .alerts: "Alerts"
         case .credentials: "Accounts"
-        case .usage: "Claude Usage"
-        case .integrations: "Integrations"
-        case .mods: "Mods"
-        case .deskLayout: "Layout"
+        case .usage: "Usage"
+        case .alerts: "Alerts"
+        case .deskLayout: "Desk"
         case .deskLook: "Desk Look"
-        case .deskMeters: "Meters"
         case .message: "Message"
         case .notch: "Notch"
         case .nowPlaying: "Now Playing"
-        case .widgetLook: "Widget Look"
+        case .watchers: "Watchers"
+        case .integrations: "Claude Code"
+        case .mods: "Mods & Config"
+        case .widgetLook: "Widget"
         case .themes: "Themes"
-        case .pacing: "Pacing & Focus"
         case .updates: "Updates"
         case .about: "About"
         }
@@ -39,36 +42,55 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .general: "gearshape"
-        case .alerts: "bell"
         case .credentials: "person.2"
         case .usage: "chart.bar.xaxis"
-        case .integrations: "puzzlepiece.extension"
-        case .mods: "cube"
+        case .alerts: "bell"
         case .deskLayout: "rectangle.3.group"
-        case .deskLook: "textformat"
-        case .deskMeters: "gauge.with.dots.needle.67percent"
+        case .deskLook: "paintbrush"
         case .message: "text.quote"
         case .notch: "rectangle.topthird.inset.filled"
         case .nowPlaying: "music.note"
+        case .watchers: "eye"
+        case .integrations: "puzzlepiece.extension"
+        case .mods: "cube"
         case .widgetLook: "textformat"
         case .themes: "paintpalette"
-        case .pacing: "speedometer"
         case .updates: "arrow.triangle.2.circlepath"
         case .about: "info.circle"
         }
     }
 
-    /// Sidebar groups: a header (nil for the first) and its sections. Claude Usage (item 48)
-    /// sits under Accounts: it is per account, and its setup lives in each account's Data.
-    /// Integrations (item 49) follows: installing the MCP server is the other half of Share with
-    /// Claude, and its consent points back at Accounts. Mods (item 64) follows Integrations:
-    /// Sanduhr's meters mod is one of the mods it lists.
+    /// Sidebar groups: a header (nil for the first) and its pages.
     static let groups: [(header: String?, sections: [SettingsSection])] = [
-        (nil, [.general, .alerts, .credentials, .usage, .integrations, .mods]),
-        ("Desk", [.deskLayout, .deskLook, .deskMeters, .message, .notch, .nowPlaying]),
-        ("Widget", [.widgetLook, .themes, .pacing]),
-        ("Sanduhr", [.updates, .about]),
+        (nil, [.general, .credentials, .usage, .alerts]),
+        ("Desktop", [.deskLayout, .deskLook, .message, .notch, .nowPlaying, .watchers]),
+        ("Claude Code", [.integrations, .mods]),
+        ("Widget", [.widgetLook, .themes]),
+        ("Help", [.updates, .about]),
     ]
+
+    /// Raw values of pages that merged into another (slice 2), with the page and the anchor they
+    /// open now. They still parse, so old links and scenarios keep working.
+    static let aliases: [String: (section: SettingsSection, anchor: String)] = [
+        "deskMeters": (.alerts, SettingsAnchor.eachLimit),
+        "pacing": (.widgetLook, SettingsAnchor.pacing),
+    ]
+
+    /// A raw value or an alias as the page and anchor it opens, nil for neither.
+    static func resolve(_ raw: String) -> (section: SettingsSection, anchor: String?)? {
+        if let s = SettingsSection(rawValue: raw) { return (s, nil) }
+        if let a = aliases[raw] { return (a.section, a.anchor) }
+        return nil
+    }
+}
+
+/// Anchors inside a page: a section a link or an alias opens the page at. Slice 3 gives every
+/// section one; these are the ones links use today.
+enum SettingsAnchor {
+    /// Alerts, Each limit (was the Meters page, raw value `deskMeters`).
+    static let eachLimit = "each-limit"
+    /// Widget, Pacing calculators (was the Pacing & Focus page, raw value `pacing`).
+    static let pacing = "pacing"
 }
 
 /// The one Settings window: every Sanduhr, Desk and widget setting, reachable with the widget
@@ -84,6 +106,8 @@ final class SettingsWindowController {
     var isOpen: Bool { window?.isVisible ?? false }
     /// The section showing, or the one it reopens at.
     var section: SettingsSection { navigation.selection }
+    /// The anchor the page was last opened at, nil for its top (state.yaml `settings_anchor`).
+    var anchor: String? { navigation.anchor }
     /// The Claude Usage page's tab (state.yaml `usage_page.tab`).
     var usageTab: UsageTab { navigation.usageTab }
     /// The Mods page's state (state.yaml `mods_page`).
@@ -95,8 +119,11 @@ final class SettingsWindowController {
 
     /// Shows the window at `section`, or where it was left (General the first time), and
     /// brings it forward. One window, reused.
-    func show(_ section: SettingsSection? = nil, usageTab: UsageTab? = nil) {
-        if let section { navigation.selection = section }
+    func show(_ section: SettingsSection? = nil, anchor: String? = nil, usageTab: UsageTab? = nil) {
+        if let section {
+            navigation.selection = section
+            navigation.anchor = anchor
+        }
         if let usageTab { navigation.usageTab = usageTab }
         // A Calendar grant made in System Settings shows here and on the Desk.
         DeskController.shared.recheckCalendar()
@@ -141,17 +168,19 @@ final class SettingsWindowController {
 /// The smoke action `settings-link "<title>"` opens the same page the same way.
 struct SettingsLinkButton: View {
     let section: SettingsSection
+    var anchor: String?
     var before: () -> Void = {}
 
-    init(_ section: SettingsSection, before: @escaping () -> Void = {}) {
+    init(_ section: SettingsSection, anchor: String? = nil, before: @escaping () -> Void = {}) {
         self.section = section
+        self.anchor = anchor
         self.before = before
     }
 
     var body: some View {
         Button(section.linkTitle) {
             before()
-            SettingsWindowController.shared.show(section)
+            SettingsWindowController.shared.show(section, anchor: anchor)
         }
     }
 }
@@ -160,7 +189,11 @@ struct SettingsLinkButton: View {
 @MainActor
 @Observable
 final class SettingsNavigation {
-    var selection: SettingsSection = .general
+    var selection: SettingsSection = .general {
+        didSet { if selection != oldValue { anchor = nil } }
+    }
+    /// Where on the page it was opened (SettingsAnchor), nil for the top.
+    var anchor: String?
     /// The Claude Usage page's tab, kept while other sections show.
     var usageTab: UsageTab = .overview
     /// An account for Accounts to select on arrival (the Claude Usage page's "Accounts Settings…").
@@ -238,15 +271,15 @@ struct SettingsRoot: View {
     @ViewBuilder
     private var detail: some View {
         // Each pane that controls something visible has its live preview on top (item 68,
-        // SettingsPreviewKind); Integrations draws its own, which needs the page's model.
+        // SettingsPreviewKind); Claude Code draws its own, which needs the page's model.
         switch navigation.selection {
         case .general: GeneralSection().withPreview { MenuBarPreview(vm: vm) }
         case .deskLayout: DeskLayoutSection().withPreview { DeskLayoutPreview(live: deskModel) }
         case .deskLook: DeskLookSection().withPreview { DeskLookPreview(live: deskModel) }
-        case .deskMeters: DeskMetersSection(model: deskModel).withPreview { DeskMetersPreview(live: deskModel) }
         case .message: DeskMessageSection(model: deskModel, editor: navigation.messageEditor).withPreview { DeskMessagePreview(live: deskModel) }
         case .notch: DeskNotchSection().withPreview { NotchPreview(live: deskModel) }
         case .nowPlaying: NowPlayingSection().withPreview { NowPlayingPreview(live: deskModel) }
+        case .watchers: WatchersSection().withPreview { WatchersPreview(live: deskModel) }
         case .updates: UpdatesSection(updates: updates)
         case .about: AboutSection()
         case .credentials: AccountsSettings(vm: vm, navigation: navigation)
@@ -254,10 +287,15 @@ struct SettingsRoot: View {
         case .integrations: IntegrationsSettings(vm: vm, navigation: navigation)
         case .mods:
             ModsSettings(vm: vm, model: navigation.modsPage).withPreview { ModsSummaryCard(model: navigation.modsPage) }
-        case .widgetLook, .pacing:
-            WidgetSettings(vm: vm, section: navigation.selection).id(navigation.selection)
+        case .widgetLook:
+            WidgetSettings(vm: vm, section: .widgetLook, anchor: navigation.anchor).id(navigation.selection)
                 .withPreview { WidgetPreview(vm: vm) }
-        case .themes, .alerts:
+        case .alerts:
+            // Notifications, then Each limit (was Desk, Meters) under the meter bars' preview.
+            WidgetSettings(vm: vm, section: .alerts, deskModel: deskModel, anchor: navigation.anchor)
+                .id(navigation.selection)
+                .withPreview { DeskMetersPreview(live: deskModel) }
+        case .themes:
             // A fresh view per section, so a section's unsaved fields start empty.
             WidgetSettings(vm: vm, section: navigation.selection).id(navigation.selection)
         }

@@ -173,8 +173,8 @@ struct MeterWarningTests {
     }
 
     @Test func settingsPageListsSessionWeeklyAndReportedTiers() {
-        #expect(DeskMetersSection.tiers(present: []) == [.fiveHour, .sevenDay])
-        #expect(DeskMetersSection.tiers(present: [.sevenDayOpus, .fiveHour, .sevenDay])
+        #expect(EachLimitSection.tiers(present: []) == [.fiveHour, .sevenDay])
+        #expect(EachLimitSection.tiers(present: [.sevenDayOpus, .fiveHour, .sevenDay])
                 == [.fiveHour, .sevenDay, .sevenDayOpus])
     }
 }

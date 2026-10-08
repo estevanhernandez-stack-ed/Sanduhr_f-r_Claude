@@ -181,9 +181,10 @@ enum ModSketch {
     }
 }
 
-/// Settings, Mods (item 64): Sanduhr's own mod with a switch per Claude Code folder, Update and
-/// Remove (slice 2), then every mod and plugin each folder loads, what each draws and can reach,
-/// and Check (Claude Code's own validator) for a risk card. Other mods are read-only.
+/// Settings, Mods & Config (item 64; raw value `mods`): every mod and plugin each Claude Code
+/// folder loads, what each draws and can reach, and Check (Claude Code's own validator) for a risk
+/// card. Every mod is read-only here, Sanduhr's own included: its switch, Update and Remove live
+/// in Claude Code, Meters above the prompt (Settings v2, slice 2).
 struct ModsSettings: View {
     var vm: UsageViewModel
     var model: ModsPageModel
@@ -199,7 +200,6 @@ struct ModsSettings: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                OwnModBox(model: model, linked: linked)
                 // The heading sits right above the list it describes (Settings v2, slice 1).
                 ModsIntro()
                 folders
@@ -211,7 +211,6 @@ struct ModsSettings: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task { await model.load(linked: linked) }
-        .ownModQuestions(model, linked: linked)
     }
 
     @ViewBuilder
@@ -233,7 +232,7 @@ private struct ModsIntro: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Mods and plugins").font(.headline)
-            Text("Everything each Claude Code folder loads: mods (plugins with a hooks module that draw in Claude Code) and plain plugins, from the plugin folders its settings list, its installed plugins, its skills folder and the mods a session made. Sanduhr finds them by reading files: no mod runs. Sanduhr's own mod switches on and off per folder above; switching other mods comes later, so they are read-only here. Check asks Claude Code's own validator, which reads a mod without running it, what the mod hooks and calls.")
+            Text("Everything each Claude Code folder loads: mods (plugins with a hooks module that draw in Claude Code) and plain plugins, from the plugin folders its settings list, its installed plugins, its skills folder and the mods a session made. Sanduhr finds them by reading files: no mod runs. Every mod is read-only here: Sanduhr's own switches per folder in Claude Code, Meters above the prompt, and switching other mods comes later. Check asks Claude Code's own validator, which reads a mod without running it, what the mod hooks and calls.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -344,16 +343,20 @@ private struct ModRowWhere: View {
     }
 }
 
-/// Which mods the page switches: Sanduhr's own, at the top; the rest later.
+/// Whose mod it is. Sanduhr's own switches in Claude Code; the rest are read-only for now.
 private struct ModRowOwnership: View {
     let item: ModItem
 
     var body: some View {
         switch item.ownership {
         case .sanduhrs:
-            Text("Sanduhr's own mod: switch it under Sanduhr's mod, above this list.")
-                .font(.caption)
-                .foregroundStyle(Color.hex("a78bfa"))
+            HStack(alignment: .firstTextBaseline) {
+                Text("Sanduhr's own mod. It switches per folder in Claude Code, \(SettingsNames.metersAbovePrompt).")
+                    .font(.caption)
+                    .foregroundStyle(Color.hex("a78bfa"))
+                Spacer(minLength: 8)
+                SettingsLinkButton(.integrations)
+            }
         case .copyOfSanduhrs:
             Text("A copy of Sanduhr's mod outside Sanduhr's folder: read-only here.")
                 .font(.caption)
@@ -513,7 +516,7 @@ struct ModsSummaryCard: View {
                 } else {
                     Text("Reading your Claude Code folders…").foregroundStyle(.white.opacity(0.8))
                 }
-                Text("Sanduhr's own mod switches here; other mods are read-only.")
+                Text("Every mod is read-only here; Sanduhr's own switches in Claude Code.")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.7))
             }

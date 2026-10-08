@@ -19,12 +19,18 @@ struct SettingsNamesTests {
 
     @Test func linksThatNamedPagesThatDontExistNowNameTheirs() {
         // W1, W4: "Desk Layout Settings…" opened a page titled Layout, "Meter Settings…" Meters,
-        // "Watcher Settings…" Integrations and "Data Settings…" Accounts.
-        #expect(SettingsSection.deskLayout.linkTitle == "Layout Settings…")
-        #expect(LimitMenu.meterSettings == "Meters Settings…")
-        #expect(LimitMenuEntry.meterSettings.title == SettingsSection.deskMeters.linkTitle)
-        #expect(WatcherMenu.settingsSection.linkTitle == "Integrations Settings…")
+        // "Watcher Settings…" Integrations and "Data Settings…" Accounts. Slice 2 moved each
+        // feature to its one home: Desk, Alerts (Each limit) and Watchers.
+        #expect(SettingsSection.deskLayout.linkTitle == "Desk Settings…")
+        #expect(LimitMenu.meterSettings == "Alerts Settings…")
+        #expect(LimitMenu.meterSection == .alerts)
+        #expect(LimitMenu.meterAnchor == SettingsAnchor.eachLimit)
+        #expect(LimitMenuEntry.meterSettings.title == SettingsSection.alerts.linkTitle)
+        #expect(WatcherMenu.settingsSection.linkTitle == "Watchers Settings…")
         #expect(SettingsSection.credentials.linkTitle == "Accounts Settings…")
+        #expect(SettingsSection.integrations.linkTitle == "Claude Code Settings…")
+        #expect(SettingsSection.mods.linkTitle == "Mods & Config Settings…")
+        #expect(SettingsSection.widgetLook.linkTitle == "Widget Settings…")
     }
 
     @Test func menuItemsThatOpenSettingsNameThePageTheyOpen() {
@@ -71,7 +77,8 @@ struct SettingsNamesTests {
         #expect(SettingsNames.retiredNames(in: "Choose what the menu bar shows.").isEmpty)
         #expect(SettingsNames.unknownLinks(in: "Click Desk Layout Settings… or Notch Settings…") == ["Click Desk Layout Settings…"])
         #expect(SettingsNames.unknownLinks(in: "Notch Settings…, Desk Look Settings… and All Settings…").isEmpty)
-        #expect(SettingsNames.unknownLinks(in: "Pacing & Focus Settings…").isEmpty)
+        #expect(SettingsNames.unknownLinks(in: "Pacing & Focus Settings…") == ["Pacing & Focus Settings…"])
+        #expect(SettingsNames.unknownLinks(in: "Mods & Config Settings… and Claude Code Settings…").isEmpty)
         #expect(SettingsNames.unknownLinks(in: "arg=<Page> Settings…").isEmpty)
     }
 }
@@ -191,10 +198,12 @@ struct SettingsLinkActionTests {
         // As the smoke CLI encodes it: UTF-8, percent-escaped.
         #expect(parse("sanduhr://debug/action?name=settings-link&arg=Notch%20Settings%E2%80%A6").command
                 == .action(.settingsLink(.notch), dir: nil))
-        #expect(parse("sanduhr://debug/action?name=settings-link&arg=Layout%20Settings...").command
+        #expect(parse("sanduhr://debug/action?name=settings-link&arg=Desk%20Settings...").command
                 == .action(.settingsLink(.deskLayout), dir: nil))
-        #expect(parse("sanduhr://debug/action?name=settings-link&arg=Integrations%20Settings%E2%80%A6").command
+        #expect(parse("sanduhr://debug/action?name=settings-link&arg=Claude%20Code%20Settings%E2%80%A6").command
                 == .action(.settingsLink(.integrations), dir: nil))
+        #expect(parse("sanduhr://debug/action?name=settings-link&arg=Watchers%20Settings%E2%80%A6").command
+                == .action(.settingsLink(.watchers), dir: nil))
         let wrong = parse("sanduhr://debug/action?name=settings-link&arg=Desk%20Layout%20Settings%E2%80%A6")
         #expect(wrong.command == nil)
         #expect(wrong.error?.hasPrefix("settings-link needs") == true)

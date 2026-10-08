@@ -37,6 +37,10 @@ struct NotchView: View {
     @AppStorage(NowPlayingIdle.key, store: .desk) private var idle = NowPlayingIdle.automatic
     /// Settings, Now Playing's "Style what's playing" (item 65c).
     @AppStorage(NowPlayingLooks.styleKey, store: .desk) private var styleSongs = false
+    /// Notch, Camera and mic, Where they show (slice 2). Read through AVPlace.saved so a value
+    /// 2.10.0 saved still draws where it drew; the stored key redraws the island on a change.
+    @AppStorage(AVPlace.key, store: .desk) private var avPlaceRaw: String?
+    private var avPlace: AVPlace { avPlaceRaw.flatMap(AVPlace.init(rawValue:)) ?? AVPlace.saved(in: UserDefaults.desk) }
 
     var body: some View {
         // Extra height 0 means no strip under the camera at all: just the wings.
@@ -54,10 +58,11 @@ struct NotchView: View {
                 let w = NotchWingsView.layout(model: model, now: context.date, wings: wings,
                                               showText: wingText, left: leftContent, right: rightContent,
                                               idle: idle, font: font, notchHeight: notch.height,
-                                              styleSongs: styleSongs)
+                                              styleSongs: styleSongs, avPlace: avPlace)
                 // Now playing with nothing to show stands aside for the When nothing is playing choice.
                 let strip = NotchContent.effective(stripContent, at: .strip, nowPlaying: model.nowPlaying, idle: idle,
-                                                   watchers: model.watchers, indicators: model.avIndicators)
+                                                   watchers: model.watchers, indicators: model.avIndicators,
+                                                   avPlace: avPlace)
                 let width = notch.width + w.totalLeft + w.totalRight
                 ZStack(alignment: .bottom) {
                     IslandShape(flare: 8, radius: min(16, chin * 0.7))
@@ -216,6 +221,10 @@ struct NotchWingsView: View {
     @AppStorage(NowPlayingIdle.key, store: .desk) private var idle = NowPlayingIdle.automatic
     /// Settings, Now Playing's "Style what's playing" (item 65c).
     @AppStorage(NowPlayingLooks.styleKey, store: .desk) private var styleSongs = false
+    /// Notch, Camera and mic, Where they show (slice 2). Read through AVPlace.saved so a value
+    /// 2.10.0 saved still draws where it drew; the stored key redraws the island on a change.
+    @AppStorage(AVPlace.key, store: .desk) private var avPlaceRaw: String?
+    private var avPlace: AVPlace { avPlaceRaw.flatMap(AVPlace.init(rawValue:)) ?? AVPlace.saved(in: UserDefaults.desk) }
     /// Settings, Now Playing's preview (item 68): the wings drawn with the island on, text on and
     /// these contents, whatever the Notch page says; nil everywhere else.
     var showing: Showing? = nil
@@ -237,7 +246,8 @@ struct NotchWingsView: View {
             TimelineView(.periodic(from: .now, by: 15)) { context in
                 let w = Self.layout(model: model, now: context.date, wings: wings, showText: showText || showing != nil,
                                     left: showing?.left ?? leftContent, right: showing?.right ?? rightContent, idle: idle,
-                                    font: font, notchHeight: notchHeight, styleSongs: styleSongs)
+                                    font: font, notchHeight: notchHeight, styleSongs: styleSongs,
+                                    avPlace: avPlace)
                 let left = w.leftText, right = w.rightText, size = w.size
                 let wingL = w.left, wingR = w.right
                 if w.totalLeft > 0 || w.totalRight > 0 {
@@ -340,7 +350,7 @@ struct NotchWingsView: View {
     }
 
     /// The most urgent watcher in a wing (item 66): a click opens its link (https only), a
-    /// two-finger click opens Dismiss, Dismiss All and Integrations Settings…. The whole wing takes the
+    /// two-finger click opens Dismiss, Dismiss All and Watchers Settings…. The whole wing takes the
     /// click, so a watcher without a link never opens Settings by accident.
     private func watcherWing(_ text: String, _ size: CGFloat, place: NotchContent.Place, width: CGFloat) -> some View {
         let top = model.watchers.first
@@ -436,11 +446,14 @@ struct NotchWingsView: View {
     static func layout(model: DeskModel, now: Date, wings: Double, showText: Bool,
                        left savedLeft: NotchContent, right savedRight: NotchContent, idle: NowPlayingIdle,
                        font: String, notchHeight: CGFloat,
-                       styleSongs: Bool = NowPlayingStyled.savedOn) -> Layout {
+                       styleSongs: Bool = NowPlayingStyled.savedOn,
+                       avPlace: AVPlace = AVPlace.saved(in: UserDefaults.desk)) -> Layout {
         let leftContent = NotchContent.effective(savedLeft, at: .left, nowPlaying: model.nowPlaying, idle: idle,
-                                                 watchers: model.watchers, indicators: model.avIndicators)
+                                                 watchers: model.watchers, indicators: model.avIndicators,
+                                                 avPlace: avPlace)
         let rightContent = NotchContent.effective(savedRight, at: .right, nowPlaying: model.nowPlaying, idle: idle,
-                                                  watchers: model.watchers, indicators: model.avIndicators)
+                                                  watchers: model.watchers, indicators: model.avIndicators,
+                                                  avPlace: avPlace)
         // Camera and mic draws no text: "" marks a wing that shows them (sized below).
         let left = showText ? (leftContent == .avIndicators ? "" : text(leftContent, at: .left, model: model, now: now)) : nil
         let right = showText ? (rightContent == .avIndicators ? "" : text(rightContent, at: .right, model: model, now: now)) : nil

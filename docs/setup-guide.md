@@ -12,7 +12,7 @@ Sanduhr is an independent tool. It is not made by or affiliated with Anthropic.
 | Widget | A small floating window. | Your limits as bars, with a row of buttons at the bottom. Two-finger click it for the Sanduhr menu. |
 | Desk | Your desktop, under every window. Off until you turn it on. | A clock, your meters, today's meetings and a message, drawn on the wallpaper. |
 | Notch | Around the camera at the top of a MacBook screen. Needs the Desk. | Black "wings" beside the camera that show the time, your meters, a meeting, a song and more. |
-| Settings | Settings… in any Sanduhr menu, the gear on the widget, or Option+S while the Desk is on. | Every setting, in one window. The sidebar lists the pages. |
+| Settings | Settings… in any Sanduhr menu, the gear on the widget, or Option+S. | Every setting, in one window. The sidebar lists the pages in five groups: the first four pages, then Desktop, Claude Code, Widget and Help. |
 | The Sanduhr menu | The same menu everywhere: menu bar icon, widget, the Desk's pieces. | Show or hide the widget, Menu Bar Shows, Tools, Refresh, Settings…, Arrange Desk…, Check for Updates…, What's New…, Take the Tour…, Quit. |
 
 In this guide, "Settings, Accounts" means: open Settings, then click **Accounts** in the sidebar.
@@ -51,7 +51,7 @@ You get every limit as a bar, with a mark that says whether you're ahead of pace
 - Under the bar, **Resets in** counts down to the reset. Beside it, the pace reads **On pace**, a percent **ahead** (orange) or a percent **under** (blue).
 - Hover a card to see **Cool down** (how long to wait to get back on pace) or **Surplus** (how much room you have).
 - When you're on track to run out early, a red line says **At current pace, expires in** and a time.
-- A bar that turns red with a glow is nearly full with the reset still far off.
+- A bar that turns red with a glow is nearly full with the reset still far off. Settings, **Alerts**, under **Each limit**, sets that warning per limit (**Warn when nearly full**, **At**, **Only while the reset is more than**) and, for a limit that looks temporary, **Show this limit**. The same page holds the notifications.
 
 **In the menu bar**, the hourglass shows one percent. It turns orange at 75% and red at 90%.
 
@@ -69,26 +69,28 @@ You get a clock, your meters, your meetings and a message on the wallpaper, unde
 
 **Turn it on**
 
-1. Open Settings, **General**.
-2. Under Surfaces, turn on **Desk: clock, meters, meetings and the message on the desktop**.
+1. Open Settings, **Desk**.
+2. At the top, turn on **Desk: clock, meters, meetings and the message on the desktop**.
 
-The pieces are: **Message** (a line of your own, see task 5), **Clock and date**, **Claude meters (line)** (your numbers in one line), **Claude meters (bars)**, **Now playing**, **Watchers** and **Meetings** (today's calendar; macOS asks for Calendar access the first time).
+Settings, **General** shows each surface's state under Surfaces, with a button to its page (**Desk Settings…**, **Notch Settings…**, **Widget Settings…**).
+
+The pieces are: **Message** (a line of your own, see task 5), **Clock and date**, **Claude meters (line)** (your numbers in one line), **Claude meters (bars)**, **Now playing**, **Watchers** and **Meetings** (today's calendar; macOS asks for Calendar access the first time, and **Read today's meetings** under the Meetings row turns it off).
 
 **Move pieces right on the desktop**
 
-1. In any Sanduhr menu, choose **Arrange Desk…**. (Or open Settings, **Layout** and click **Arrange Desk…**.)
+1. In any Sanduhr menu, choose **Arrange Desk…**. (Or open Settings, **Desk** and click **Arrange Desk…**.)
 2. Every piece gets an outline and a round handle. A bar with **Cancel** and **Done** floats in the middle of the screen.
 3. Drag a piece toward any of the eight places: the four corners, the top and bottom centers, and the middle of each side. It snaps to the nearest.
 4. Drag a piece up or down its stack to reorder it. Drag its round handle to resize it.
 5. Press Return (or click **Done**) to keep it. Press Escape (or click **Cancel**) to put everything back.
 
-**Move pieces from Settings.** Settings, **Layout** has the same choices as menus. **Where each piece sits** picks a place (or **Hidden**) and a size for each piece. **Order** lists the stacks; drag to reorder. **Margins** keeps pieces away from the screen edges.
+**Move pieces from Settings.** Settings, **Desk** has the same choices as menus. **Where each piece sits** picks a place (or **Hidden**) and a size for each piece; to keep your meters off the desktop, set both Claude meters pieces to **Hidden**. **Order** lists the stacks; drag to reorder. **Margins** keeps pieces away from the screen edges.
 
 **Change the look.** Settings, **Desk Look** sets the **Desk font**, the **Message font**, the sizes of the clock and message, and the colors. EsteFont Pro, a handwriting font, is the Desk font on new installs.
 
 **Clicks on the clock and message.** Click the clock once to open Desk Look. Click the message once to open its editor. Two-finger click either one for the Sanduhr menu, plus **Desk Look Settings…** or **Edit Messages…**.
 
-If it doesn't work: desktop icons right under the clock or message can't be clicked while those pieces take clicks. Turn off **Clock and message take clicks** in Settings, Desk Look.
+If it doesn't work: desktop icons right under the clock or message can't be clicked while those pieces take clicks. Turn off **Clock and message take clicks** in Settings, Desk, under Clicks.
 
 ## 4. Use the notch
 
@@ -96,16 +98,16 @@ You get a black island around the camera, with information on either side.
 
 1. Turn on the Desk first (task 3).
 2. Open Settings, **Notch**.
-3. Turn on **Notch: the island around the camera**. (Settings, General has the same switch, under the same name.)
+3. Turn on **Notch: the island around the camera**, at the top. While the Desk is off, the page says **Needs the Desk.** with a **Desk Settings…** button.
 
 The island has three places:
 
 - **Left wing** and **Right wing**, beside the camera. They need **Text beside the camera** on.
 - **Under the camera**, a strip below it. Turn on **Text under the camera too (desktop only)**. It needs **Extra height below** above 0.
 
-Each place shows one thing: **Next meeting, or the time**, **Next meeting, or the Claude meters**, **Time**, **Claude meters**, **Message**, **Now playing**, **Watchers**, **Camera and mic** or **Nothing**. With nothing to show, Watchers, Now playing, and Camera and mic give way to that place's usual content.
+Each place shows one thing: **Next meeting, or the time**, **Next meeting, or the Claude meters**, **Time**, **Claude meters**, **Message**, **Now playing**, **Watchers** or **Nothing**. With nothing to show, Watchers and Now playing give way to that place's usual content.
 
-**Size** sets **Extra width each side** and **Extra height below (0 = none)**.
+**Size** sets **Extra width each side** and **Extra height below (0 = none)**. **Notch text color** sets the color of the island's text.
 
 **Notch glow.** The notch's edge can glow softly for a few seconds. Under **Notch glow**, pick **For Sanduhr alerts**, **A minute before a meeting** or **When the camera fill light comes on**. Click **Test Glow** to see it. The two Claude Code rows in the same section are in task 7.
 
@@ -113,7 +115,7 @@ Each place shows one thing: **Next meeting, or the time**, **Next meeting, or th
 
 1. **Show the red dot**: choose **For cameras without a visible light** for an external camera or a closed lid, or **Always**.
 2. Turn on **Show a mic while the microphone is on**.
-3. **Beside the camera** picks the side.
+3. **Where they show** picks one place: **Beside the camera, left**, **Beside the camera, right**, **In the left wing**, **In the right wing** or **Under the camera**. In a wing or under the camera they show while one is in use, and that place shows its own text the rest of the time.
 
 These are indicators only. Sanduhr never mutes, records or changes a device. Click one to see what's in use, with **Notch Settings…** at the bottom.
 
@@ -172,20 +174,21 @@ You get your meters inside Claude Code, a notch that glows when Claude needs you
 
 **Install, per Claude Code folder**
 
-1. Open Settings, **Integrations**.
-2. Each Claude Code folder has its own box (most people have one, `~/.claude`). Use **Add Folder…** at the bottom if yours isn't listed.
-3. In the box, click **Install…** beside what you want:
+1. Open Settings, **Claude Code**.
+2. Under **Folders**, each Claude Code folder has its own box (most people have one, `~/.claude`). Use **Add Folder…** beside the Folders heading if yours isn't listed.
+3. The box's first row, **Account**, says which account the folder belongs to, or **Follows the active account**. **Change in Accounts…** opens the account's Data, where the link is set.
+4. Click **Install…** beside what you want:
    - **MCP server**: lets Claude Code ask Sanduhr about your usage, and suggest Desk messages, themes and song looks.
    - **Statusline**: your meters on a line under Claude Code's prompt.
-   - **Meters above the prompt**: your meters as animated bars above the prompt.
    - **Claude Code glow hook**: tells Sanduhr when Claude Code waits on you or finishes, so the notch can glow.
-4. A sheet says what it adds. Click **Install**.
+5. A sheet says what it adds. Click **Install**.
+6. **Meters above the prompt** (your meters as animated bars above the prompt, Sanduhr's sanduhr-meters mod) has a switch instead. Turn it on; the first time, a sheet says what it adds. **Off** takes the folder's entry out and keeps the mod's files. **Remove** also puts the folder's settings back exactly as before.
 
 Remove takes out exactly what Sanduhr added.
 
 **Already have a statusline?** The sheet offers **Combine** (keeps yours and adds Sanduhr's), **Replace** or **Cancel**. Combine lets you pick which pieces of each line stay and how they join. Check **Show Sanduhr's meters above the prompt instead (animated)** to keep your line as it is and put Sanduhr's meters above the prompt (install Meters above the prompt in the same folder).
 
-**Turn on the glow.** The Claude Code glow hook only tells Sanduhr. To see it, open Settings, **Notch** (or click **Notch Settings…** right there in Integrations), and under **Notch glow** turn on **When Claude Code is waiting on you** or **When Claude Code finishes**. **Not while a terminal is in front** skips it when you're already looking.
+**Turn on the glow.** The Claude Code glow hook only tells Sanduhr. To see it, open Settings, **Notch** (or click **Notch Settings…** right there in Claude Code), and under **Notch glow** turn on **When Claude Code is waiting on you** or **When Claude Code finishes**. **Not while a terminal is in front** skips it when you're already looking.
 
 **Share with your agents.** The MCP server shares nothing until you say so, per account:
 
@@ -193,25 +196,25 @@ Remove takes out exactly what Sanduhr added.
 2. Scroll to **Data**.
 3. Set **Share with your agents** to **Meters** or **Meters and activity**. **Off** is the default.
 
-If it doesn't work: the integrations need Python 3.9 or later. When Integrations says none was found, click **Install Command Line Tools…**, then **Check Again**. Changes reach new Claude Code sessions.
+If it doesn't work: the integrations need Python 3.9 or later. When Claude Code says none was found, click **Install Command Line Tools…**, then **Check Again**. Changes reach new Claude Code sessions.
 
 ## 8. Watch a long run
 
 You get a live card for a build, a release or a long task, which glows when it needs you.
 
-1. Open Settings, **Integrations** and scroll to **Watchers**.
+1. Open Settings, **Watchers**.
 2. Turn on **Let agents show watchers**. Claude Code (with the MCP server installed) can then start a card, update its progress and end it.
-3. Optional: turn on **Show Claude Code's background work** to see Claude Code's background tasks as cards too. This needs the Claude Code glow hook from task 7.
-4. Place them. Pick **Watchers** for a wing or the strip in Settings, **Notch**, or place the **Watchers** piece in Settings, **Layout**. Both have buttons right there: **Notch Settings…** and **Layout Settings…**.
-5. Optional: turn on **Show watchers above the prompt** to see them as rows above Claude Code's prompt (needs Meters above the prompt).
+3. Optional: turn on **Show Claude Code's background work** to see Claude Code's background tasks as cards too. This needs the Claude Code glow hook from task 7; until a folder has it, the page says so with a **Claude Code Settings…** button.
+4. Place them, under **Where they show**: **On the notch** picks **Left wing**, **Right wing** or **Under the camera**, and **On the Desk** picks one of the eight places. They are the same choices as in Settings, Notch and Settings, Desk.
+5. Optional: turn on **Show watchers above the prompt** to see them as rows above Claude Code's prompt (needs Meters above the prompt; the page lists which folders have it).
 
-A card shows a title, a state dot (running, waiting on you, passed, failed), the time so far and the progress. Waiting on you pulses and glows the notch once. Click a card to open its link. Cards live in memory only, so quitting Sanduhr clears them.
+A card shows a title, a state dot (running, waiting on you, passed, failed), the time so far and the progress. Waiting on you pulses, and glows the notch once if watchers show somewhere: **Glow when a watcher waits on you** says whether they do now, and why not. Click a card to open its link. Cards live in memory only, so quitting Sanduhr clears them.
 
 ## 9. Now playing
 
 You get the song or video playing on your Mac on the notch or the desktop. Click it to play or pause.
 
-1. Place it. In Settings, **Notch**, set a wing or **Under the camera** to **Now playing**. Or in Settings, **Layout**, give the **Now playing** piece a place.
+1. Place it. In Settings, **Notch**, set a wing or **Under the camera** to **Now playing**. Or in Settings, **Desk**, give the **Now playing** piece a place.
 2. Open Settings, **Now Playing** for the rest:
    - **Hide while paused** under Show.
    - **When nothing is playing** picks what that spot shows instead.
@@ -230,21 +233,23 @@ You get the widget in your colors and font.
 2. Click a theme to use it: Obsidian, Aurora, Ember, Mint, 626 Labs, Matrix, Blueprint, or Match Desk (the widget in the Desk's ink, without the glass).
 3. To add your own, paste a theme's JSON under **Your own themes**, type a **Filename** and click **Save & Apply**. **Copy Agent Prompt** copies a prompt you can give any AI chat, with a picture, to make one.
 
-**Fonts and Widget Look**
+**The widget**
 
-1. Open Settings, **Widget Look**.
-2. Pick a **Font**. EsteFont Pro and EsteFont 26 come with Sanduhr and sit at the top of the list. **Use System Font** goes back.
-3. Turn on **Subtle mode** for just the numbers, with no background.
+1. Open Settings, **Widget**.
+2. **Show the widget** picks when it shows on its own: **Always shown**, **Hidden while Desk is on** or **Only when I open it**. **Show the widget now** shows or hides it until the Desk turns on or off.
+3. Pick a **Font**. EsteFont Pro and EsteFont 26 come with Sanduhr and sit at the top of the list. **Use System Font** goes back.
+4. Turn on **Subtle mode** for just the numbers, with no background.
+5. Under **Pacing calculators**, **Pin the pacing calculators on every card** keeps them on every card until Sanduhr quits.
 
 The Desk has its own fonts in Desk Look (task 3).
 
 ## 11. Mods
 
-You get one page that lists what each Claude Code folder loads, and a switch for Sanduhr's own mod.
+You get one page that lists what each Claude Code folder loads.
 
-1. Open Settings, **Mods**.
-2. At the top, **Sanduhr's mod: sanduhr-meters** has a switch per Claude Code folder. Turn it **On** or off. Sanduhr keeps a record in its own folder, so Off and **Remove** can put the folder's settings back exactly as before.
-3. Below, under the heading **Mods and plugins**, the list shows every mod and plugin each folder loads, and what it can touch. The card at the top counts them: mods, plugins, enabled plugins and folders.
+1. Open Settings, **Mods & Config**.
+2. Under the heading **Mods and plugins**, the list shows every mod and plugin each folder loads, and what it can touch. The card at the top counts them: mods, plugins, enabled plugins and folders.
+3. Every mod is read-only here. Sanduhr's own mod, sanduhr-meters, switches per folder in Settings, **Claude Code**, as **Meters above the prompt** (task 7); its row here has a **Claude Code Settings…** button.
 4. Click **Check** on a mod to run Claude Code's own validation. It reads the files and never runs the mod.
 
 If it doesn't work: Check needs Claude Code's command line (`claude`) installed. Changes reach new Claude Code sessions, or run /reload-plugins.
@@ -254,6 +259,7 @@ If it doesn't work: Check needs Claude Code's command line (`claude`) installed.
 - **What's New…** (any Sanduhr menu, or Settings, **About**) shows what each version added. **Show me** on a card opens its Settings page.
 - **Take the Tour…** (same places) replays the welcome tour with your own numbers.
 - **Check for Updates…** (any Sanduhr menu, or the same button in Settings, **Updates**) checks now. Updates also has the automatic update switches.
+- **Shortcuts.** Settings, **General**, under Shortcuts: **Option+S opens Settings** and **Option+J joins the next meeting**, one switch each. They work in every app whenever Sanduhr runs, with or without the Desk. While one is on, Option+S no longer types ß (or Option+J ∆).
 - **Where settings live.** Your choices are in two preferences files, `com.626labs.sanduhr` and `com.626labs.sanduhr.desk`. History, themes and integration files are in `~/Library/Application Support/Sanduhr/`. Desk messages are in `~/Library/Application Support/Desk/messages.txt`. Your key is in the Keychain.
 - **How to reset.** In Settings, **Accounts**, select each account and click **Remove Account…**. Quit Sanduhr. Delete the folder `~/Library/Application Support/Sanduhr/`. Then, in Terminal, type:
 

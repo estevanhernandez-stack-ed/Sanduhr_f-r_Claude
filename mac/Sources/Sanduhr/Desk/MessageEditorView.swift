@@ -553,7 +553,7 @@ struct MessageAskClaude: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Ask Claude").font(.headline)
-            Text("Claude Code can suggest lines through Sanduhr's MCP server (Settings, Integrations). Its suggestions wait at the top of this page for you to add.")
+            Text("Claude Code can suggest lines through Sanduhr's MCP server (Settings, Claude Code). Its suggestions wait at the top of this page for you to add.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .firstTextBaseline) {

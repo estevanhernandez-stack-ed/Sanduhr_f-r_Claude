@@ -4,15 +4,16 @@ import AppKit
 /// Settings, Desk, Now Playing (item 53): the source the self-test chose (or that it is placed
 /// nowhere), Hide while paused, which apps, the AppleScript fallback and the adapter's credit.
 /// Where it shows is arranged with everything else (item 53b): the wings and the strip in Notch,
-/// the element in Layout; the two buttons go there.
+/// the piece on Desk; the two buttons go there.
 struct NowPlayingSection: View {
     @AppStorage(DeskController.enabledKey, store: .desk) private var deskEnabled = false
 
     var body: some View {
         Form {
+            NeedsDeskRow()
             Section {
                 NowPlayingSourceRow(deskEnabled: deskEnabled)
-                Text("Shows the song or video playing in any app, browsers included, wherever you place it: a notch wing or the strip under the camera (Notch), or the Desk (Layout). Click it to play or pause; two-finger click for Previous and Next. Nothing leaves your Mac, and titles are never saved (only the songs of looks you save from Claude, below). Runs only while it is placed somewhere and Desk is on.")
+                Text("Shows the song or video playing in any app, browsers included, wherever you place it: a notch wing or the strip under the camera (Notch), or a place on the Desk (Desk). Click it to play or pause; two-finger click for Previous and Next. Nothing leaves your Mac, and titles are never saved (only the songs of looks you save from Claude, below). Runs only while it is placed somewhere and Desk is on.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 NowPlayingArrangeRow()
@@ -45,7 +46,7 @@ private struct NowPlayingSourceRow: View {
     }
 }
 
-/// The two ways to place it: the Notch page (wings, strip) and the Layout page (the Desk element).
+/// The two ways to place it: the Notch page (wings, strip) and the Desk page (the Desk piece).
 private struct NowPlayingArrangeRow: View {
     var body: some View {
         HStack {

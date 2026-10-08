@@ -152,7 +152,7 @@ with the label. The notch stays as it is. A switch never needs a relaunch: the m
   a link, the account list or the active account lands, atomically (a temp file renamed over it,
   mode 0600) and only when its bytes change. The Project names picker is enabled for Keep a record
   or Meters and activity.
-- **The Claude Usage page (item 48).** A Settings section under Accounts (`SettingsSection.usage`;
+- **The Usage page (item 48; "Claude Usage" before Settings v2).** A Settings section under Accounts (`SettingsSection.usage`;
   Tools, Claude Usage… in every menu opens it), chosen over a separate window because the choices
   that decide what it can show are in Accounts, Data one row up, and Settings is already the one
   window every menu, Option+S and the notch open. One account at a time (the active one, a picker
@@ -231,7 +231,7 @@ Most accounts don't need this.
 library only, and the `sanduhr-meters` Claude Code mod. The statusline and the mod read only
 `snapshot.json`.
 
-**Installing from Settings (item 49).** Settings, Integrations lists the Claude Code folders
+**Installing from Settings (item 49).** Settings, Claude Code (Integrations before Settings v2; raw value `integrations`) lists the Claude Code folders
 (`ClaudeCodeFolders.discover`, the accounts' linked folders, folders installed into, and Add
 Folder…) with Install, Update or Remove for each integration, behind a consent sheet. No `claude`
 CLI: `IntegrationInstaller` writes the entries itself, the way Windows' `McpIntegrationInstaller`
@@ -772,7 +772,7 @@ clean.
 
 ## Mods
 
-Item 64, slice 1: Settings, Mods (under Integrations) lists every mod and plugin each Claude Code
+Item 64, slice 1: Settings, Mods & Config (Mods before Settings v2; under Claude Code) lists every mod and plugin each Claude Code
 folder loads, read-only. The folders are the ones Integrations lists: `~/.claude`, the
 `~/.claude-*` folders and `CLAUDE_CONFIG_DIR`'s (`ClaudeCodeFolders.discover`, which now skips
 `*.config-backup-*` copies a config tool leaves beside a home, unless `CLAUDE_CONFIG_DIR` names
@@ -860,7 +860,7 @@ doesn't, pinned stamps surviving refresh, Remove back to the original bytes).
 ## Camera and mic indicators
 
 Item 67. Indicators only, read-only: a red recording dot while any app uses a camera, and an
-orange mic glyph while any app uses the microphone. In Settings, Desk, Notch, Camera and mic (all
+orange mic glyph while any app uses the microphone. In Settings, Notch, Camera and mic (all
 in `com.626labs.sanduhr.desk`):
 
 - **Show the red dot** (`avCameraDotMode`): Never (the default), For cameras without a visible
@@ -872,8 +872,15 @@ in `com.626labs.sanduhr.desk`):
   on every camera reading and screen change). `CameraLightVisibility` decides, pure. The switch
   before the picker (`avCameraDot`, a Bool) migrates once: on becomes `hiddenLight`.
 - **Show a mic while the microphone is on** (`avMicGlyph`), off by default.
-- **Pulse the dot gently** (`avPulse`, on) and **Beside the camera** (`avSide`, left or right,
-  right by default).
+- **Pulse the dot gently** (`avPulse`, on).
+- **Where they show** (`avPlace`, Settings v2 slice 2): `besideLeft`, `besideRight` (the default),
+  `left`, `right` or `strip`. One picker for what were two controls, the side picker (`avSide`,
+  still written for a side, so an older build reads it) and a wing or the strip set to Camera and
+  mic (`NotchContent.avIndicators`). In a wing or the strip they show while one is in use and the
+  place's own content the rest of the time (`AVPlace.content`, then `NotchContent.effective`); a
+  place whose text is off puts them beside the camera. `SettingsMigrations` moves a 2.10 profile
+  once: a place on Camera and mic becomes that placement and goes back to its default content,
+  otherwise `avSide` becomes Beside the camera, left or right.
 
 They run only while Desk runs and they are on.
 
@@ -923,14 +930,18 @@ off hands back the real one). `state.yaml` has
 Live cards for work in flight (item 66, slice 1), on a notch place or in a Desk corner: a state mark
 (running blue, waiting on you amber, passed green with a check, failed a red exclamation-mark
 triangle rather than a dot, since a red dot means the camera is on, finished and lost touch
-grey), the title, the time so far, `done/total` when there is a total, and a one-line note. Two
-switches in Settings, Integrations, Watchers, both off by default (`watchersAgents`,
-`watchersBackground` in `com.626labs.sanduhr`). Placement is the usual: Watchers as a notch wing's
-or the strip's content (Settings, Notch; the most urgent watcher plus "+N", the place's default
-while there is none), or the Watchers element in Settings, Desk, Layout (the stack, up to four, then
-"+N more"). A click opens the watcher's link (https only); a two-finger click opens Dismiss, Dismiss
-All and Integrations Settings…. "Waiting on you" pulses (not with Reduce Motion) and fires the notch glow
-once, when watchers show somewhere and Desk runs. Passed and finished fade after 6 seconds; failed
+grey), the title, the time so far, `done/total` when there is a total, and a one-line note. Settings,
+Watchers (its own page since Settings v2 slice 2; was a section of Integrations) is their one home:
+two switches, both off by default (`watchersAgents`, `watchersBackground` in `com.626labs.sanduhr`),
+Where they show, the glow rule and Above the prompt. Placement is the usual: Watchers as a notch
+wing's or the strip's content (the most urgent watcher plus "+N", the place's default while there
+is none), or the Watchers piece on the Desk (the stack, up to four, then "+N more"). The Watchers
+page edits both inline, **On the notch** and **On the Desk**, on the same keys as the Notch page's
+pickers and the Desk page's row (`WatcherPlacement.notchSpot`, `setNotchSpot`), and says whether a
+waiting watcher can glow the notch now and why not (`WatcherPlacement.glowStatus`). A click opens
+the watcher's link (https only); a two-finger click opens Dismiss, Dismiss All and Watchers
+Settings…. "Waiting on you" pulses (not with Reduce Motion) and fires the notch glow once, when
+watchers show somewhere and Desk runs. Passed and finished fade after 6 seconds; failed
 stays until dismissed; a watcher with no update for its window greys as lost touch (10 minutes for
 an agent's; an automatic one is confirmed at each Stop and greys only after an hour without one, the
 session closed mid-task). Most urgent first: waiting, failed, running, lost touch, then the rest.
@@ -996,7 +1007,7 @@ through the same decoding, whatever the switches say; `scenarios/watchers.yaml` 
 
 ## Desk layout
 
-Settings, Desk, Layout places each Desk piece (item 59; the pure pieces in `DeskArrangement.swift`):
+Settings, Desk places each Desk piece (item 59; the pure pieces in `DeskArrangement.swift`):
 
 - **Eight places.** The four corners, Top center, Bottom center, Middle left and Middle right.
   The top and bottom of a side share a column with a spacer between them, as before, so a growing
@@ -1039,7 +1050,7 @@ from **Arrange Desk…**, which is in the shared menu (`MenuCommand.arrangeDesk`
 menu, the widget's menu, the Desk's clock menu in the menu bar, and the shared part of the meters'
 menu), at the end of now playing's, a watcher's and the camera and mic indicators' menus, in the
 shared menu a two-finger click on a meeting row, the calendar note or the account name opens
-(`DeskHitTest.hasSharedMenu`), and on Settings, Desk, Layout's **On the desktop** row. While Desk
+(`DeskHitTest.hasSharedMenu`), and on Settings, Desk's Arrange Desk… row. While Desk
 is off the menu item is off and says why ("Turn on Desk to arrange it on the desktop.", under the
 item and as its tooltip), as the Settings button does. The clock, the message and the claude line
 open the same shared menu while **Clock and message take clicks** is on (see Desk clicks below);
@@ -1099,7 +1110,7 @@ takes the mouse only over its click areas (`DeskHitTest`, from the frames the pi
 `onGlobalFrame`), and a near-invisible plate behind each one (`DeskPointerMenu.hitPlateOpacity`,
 alpha 3 of 255) makes the gaps between letters count. Everywhere else clicks go to the desktop.
 
-**Clock and message take clicks** (Settings, Desk Look, Clicks; desk suite key
+**Clock and message take clicks** (Settings, Desk, Clicks; desk suite key
 `piecesTakeClicks`, on by default) adds the clock (time and date), the message (the day's line, a
 special day's stack, or the line taking its turn with Take turns or Scroll) and the claude line to
 those areas (`DeskPieceClicks`; kinds `clock`, `message` and `claude_line`). A two-finger click on
@@ -1163,7 +1174,7 @@ of the screen's.
 Now playing (items 53, 53b) shows what plays on the Mac, in any app that publishes now playing
 (Music, Spotify, Pandora, browser players such as YouTube Music): "▶ Title · Artist" wherever it is
 placed, like the rest of Desk: a notch wing or the strip under the camera (pick Now playing in
-Settings, Notch) and the `nowPlaying` element in Settings, Desk, Layout (a line with a position bar,
+Settings, Notch) and the `nowPlaying` element in Settings, Desk (a line with a position bar,
 in a corner like the other elements; off by default). There is no switch: it runs while it is placed
 somewhere and Desk is on (`NowPlayingPlacement`). Click it to play or pause; two-finger click for
 Previous, Play/Pause, Next and Now Playing Settings…. It hides when nothing plays, optionally while
@@ -1270,7 +1281,7 @@ Bold face (`BundledFonts.face`, `FontSettings.wantsBold`).
 - **The widget** (`UserDefaults` `fontFamily`) keeps its theme fonts (the system font) unless you pick
   one; with EsteFont Pro or EsteFont 26 picked, its semibold and bold text draws in that family's Bold
   face. Match Desk draws in the Desk's font, either bundled family included.
-- Both font pickers (Settings, Desk Look and Settings, Widget Look) list EsteFont Pro first and
+- Both font pickers (Settings, Desk Look and Settings, Widget) list EsteFont Pro first and
   EsteFont 26 right after it, after System.
 
 EsteFont Pro and EsteFont 26 are © 2009-2026 Estevan Hernandez / 626Labs LLC and licensed only for
@@ -1297,7 +1308,7 @@ A fresh install gets a short tour once, after its first sign-in, as soon as the 
 succeeds, so its first card shows your own meters. It uses the What's New window's look, one step
 at a time ("Welcome to Sanduhr", "1 of 5"): your limits and the pace tick, the Desk (with Show the
 Desk and Match Desk switches), the menu bar (with what it shows) and, on a Mac with a notch, the
-notch, more than one account, and Claude Code (the Claude Usage page and Integrations). Choices are
+notch, more than one account, and Claude Code (the Usage page and Claude Code). Choices are
 the real settings, written as you make them; Show me opens the widget or the right Settings page
 and leaves the tour open. Next and Return move on, Back goes back, Skip the Tour (or Escape) closes
 it with every setting as it is, and the last step's Finish ends it. It never installs anything.
@@ -1312,8 +1323,8 @@ again any time with the current settings, recording nothing. The cards live in
 ## Settings previews
 
 Every Settings page that controls something visible opens with a preview card about 160 points
-tall (Notch, Layout, Desk Look, Meters, Message, Now Playing, Widget Look, Pacing & Focus, General,
-Integrations; Themes keeps its gallery; Mods has a summary card of its counts). Each card is drawn by the surface's own views, never a
+tall (Notch, Desk, Desk Look, Alerts, Message, Now Playing, Watchers, Widget, General, Claude Code;
+Themes keeps its gallery; Mods & Config has a summary card of its counts). Each card is drawn by the surface's own views, never a
 mock: NotchView, NotchWingsView, NotchGlowView and AVIndicatorBadge for the notch, DeskPiece (the
 Desk's pieces, factored out of DeskView) for Desk Look, Meters, Message and Now Playing,
 WidgetCardStack in WidgetGlass (factored out of RootView) for the widget, MenuBarText and
@@ -1337,14 +1348,51 @@ the menus, the tour, What's New and the setup guide. `Models/SettingsNames.swift
 (Menu Bar Shows, Meetings menu in the menu bar, Notch: the island around the camera, Notch glow,
 Claude Code glow hook, Claude meters (line) and (bars), Check for Updates…, Save & Apply, List and
 Text) and the retired ones each replaced. A button or menu item that opens Settings reads
-`SettingsSection.linkTitle`, "<Page> Settings…" with the sidebar title exactly (Layout Settings…,
-Meters Settings…, Integrations Settings…, Accounts Settings…), through `SettingsLinkButton` in
-SwiftUI. A click on the notch island opens Settings at Notch. Menu Bar Shows is a submenu of every
+`SettingsSection.linkTitle`, "<Page> Settings…" with the sidebar title exactly (Desk Settings…,
+Alerts Settings…, Watchers Settings…, Claude Code Settings…, Accounts Settings…), through
+`SettingsLinkButton` in SwiftUI. A click on the notch island opens Settings at Notch. Menu Bar Shows is a submenu of every
 Sanduhr menu (`SanduhrMenu.submenus`), not only the menu bar item's. `SettingsNamesTests` checks
 the tour, What's New, every menu and every string literal under `Sources/` against the retired
-names, and that every "<Page> Settings…" names a real page. No storage key, section raw value or
-`sanduhr://` link changed. Smoke: `settings-link "<Page> Settings…"`, state.yaml's `menu_submenus`
-and `scenarios/settings-names.yaml`.
+names, and that every "<Page> Settings…" names a real page. Smoke: `settings-link "<Page> Settings…"`,
+state.yaml's `menu_submenus` and `scenarios/settings-names.yaml`.
+
+## Settings pages
+
+Settings v2, slice 2 (item 72): sixteen pages in five groups, each feature with one home and every
+other mention a status line and a "<Page> Settings…" link.
+
+| Group | Pages (raw value) |
+| --- | --- |
+| (none) | General (`general`), Accounts (`credentials`), Usage (`usage`), Alerts (`alerts`) |
+| Desktop | Desk (`deskLayout`), Desk Look (`deskLook`), Message (`message`), Notch (`notch`), Now Playing (`nowPlaying`), Watchers (`watchers`) |
+| Claude Code | Claude Code (`integrations`), Mods & Config (`mods`) |
+| Widget | Widget (`widgetLook`), Themes (`themes`) |
+| Help | Updates (`updates`), About (`about`) |
+
+What moved: General shows the surfaces as status lines (the Desk switch is on Desk, the notch
+switch only on Notch, Show the widget and Show the widget now on Widget); Read today's meetings sits
+under Desk's Meetings row; Clock and message take clicks moved from Desk Look to Desk, and Notch text
+color from Desk Look to Notch; each limit's warning and Show this limit (was Desk, Meters) are
+Alerts, Each limit; Pin the pacing calculators (was Pacing & Focus) is on Widget; Watchers is its own
+page (was a section of Integrations); the meters mod's switch, Update and Remove are only on Claude
+Code, as each folder's Meters above the prompt row (Mods & Config lists it read-only); each Claude
+Code folder box starts with the account the folder follows; Add Folder… sits beside the Folders
+heading; Camera and mic has one placement picker, Where they show. A page that needs the Desk says
+"Needs the Desk." with Desk Settings… while it is off.
+
+Raw values are a contract (`sanduhr://debug/action?name=settings&arg=<raw>`, the smoke scenarios,
+state.yaml's `settings_section`, the tour's and What's New's Show me, the Desk menus), so every page
+kept its raw value, and the two that merged parse as aliases (`SettingsSection.resolve`):
+`deskMeters` opens Alerts at `each-limit` and `pacing` opens Widget at `pacing`; state.yaml then
+reports `settings_section: alerts` (or `widgetLook`) and the new `settings_anchor`.
+
+Launch migrations (`Models/SettingsMigrations.swift`, each idempotent, run after the now playing
+upgrade): Show the Claude meters on the desktop (`showClaude`) is retired, and off it hides both
+Claude meters pieces in `layout` before the key goes; the shortcuts switch (`hotKeys`) splits into
+`hotKeyJoin` and `hotKeySettings`, each seeded from it (the old key stays), and both register
+whenever Sanduhr runs, not only with the Desk (state.yaml `hot_keys`); Camera and mic's two controls
+become `avPlace` (above). `SettingsHomesTests` covers the pages, the aliases and each migration,
+including a 2.10 profile that reads the same after two runs.
 
 ## Files
 
@@ -1359,6 +1407,7 @@ and `scenarios/settings-names.yaml`.
 - Watchers (item 66) → `watchers.json` (the two switches, written by the app), `watch-request-*.json` (MCP server) and `watch-stop-*.json` (the Stop hook), mode 0600 in `~/Library/Application Support/Sanduhr/`, each deleted as the app reads it; the switches `watchersAgents` and `watchersBackground` in `com.626labs.sanduhr`; the work mark in the account's `accountData` entry (`"work": "true"`). Watchers themselves are in memory only
 - Claude Code integrations (items 49 to 51) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json` (the notch glow hooks in its `hooks`), with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed, hooks_installed}`
 - Window position → `UserDefaults` (`windowFrame`)
+- Shortcuts (Settings v2) → desk preferences `hotKeySettings` and `hotKeyJoin`, seeded once from 2.10's `hotKeys`, which stays for an older build; Camera and mic's placement → `avPlace`; 2.10's `showClaude` is removed once its choice is in `layout`
 - Now playing (items 53, 53b) → where it shows is the desk preferences `notchLeft`, `notchRight`, `notchStrip` and the `nowPlaying` word in `layout`; the rest is `nowPlayingHidePaused`, `nowPlayingAskApps`, `nowPlayingExcluded` (bundle ids switched off) and `nowPlayingIdle` (When nothing is playing: `automatic` when unset, or a notch content's raw value). Item 53's `nowPlaying` and `nowPlayingDesk` are read once by the upgrade (`nowPlayingPlacementUpgraded`); what plays stays in memory
 - EsteFont Pro and EsteFont 26 → `Sanduhr.app/Contents/Resources/Fonts/`, from `mac/Resources/Fonts/` (see Fonts); the Desk's choice in the desk preference `font`
 - Third-party notices (Sparkle, mediaremote-adapter, EsteFont Pro, EsteFont 26) → `Sanduhr.app/Contents/Resources/THIRD-PARTY-NOTICES.txt`, from `mac/THIRD-PARTY-NOTICES.txt`; Settings, About opens it

@@ -10,10 +10,19 @@ enum SettingsNames {
     static let menuBarShows = "Menu Bar Shows"
     /// General, Menu bar: the Desk's meetings menu as its own menu bar item (desk key `menuIcon`).
     static let meetingsMenu = "Meetings menu in the menu bar"
-    /// The Desk's switch (desk key `deskEnabled`).
+    /// The Desk's switch, at the top of the Desk page (desk key `deskEnabled`).
     static let deskSwitch = "Desk: clock, meters, meetings and the message on the desktop"
-    /// The notch island's switch, on General and Notch alike (desk key `notch`).
+    /// The notch island's switch, at the top of the Notch page (desk key `notch`).
     static let notchSwitch = "Notch: the island around the camera"
+    /// Widget: when the widget shows on its own (key `widgetVisibility`), moved from General.
+    static let showWidget = "Show the widget"
+    /// Notch, Camera and mic: the one placement picker (desk key `avPlace`).
+    static let cameraMicPlace = AVPlace.pickerTitle
+    /// Watchers, Where they show: the notch place and the Desk place, one stored value each.
+    static let watchersOnNotch = "On the notch"
+    static let watchersOnDesk = "On the Desk"
+    /// Claude Code, each folder: the meters mod's row (was also Mods' "Sanduhr's mod").
+    static let metersAbovePrompt = "Meters above the prompt"
     /// Notch's one glow section: Sanduhr alerts, meetings, the camera light and Claude Code.
     static let notchGlow = "Notch glow"
     /// The hooks Claude Code runs to tell Sanduhr it waits or finished (IntegrationKind.hooks).
@@ -31,10 +40,14 @@ enum SettingsNames {
 
     /// Every current name, with the page it lives on.
     static let table: [(name: String, page: SettingsSection)] = [
-        (menuBarShows, .general), (meetingsMenu, .general), (deskSwitch, .general),
-        (notchSwitch, .notch), (notchGlow, .notch), (claudeCodeGlowHook, .integrations),
+        (menuBarShows, .general), (meetingsMenu, .general),
+        (SanduhrHotKeys.Shortcut.settings.title, .general), (SanduhrHotKeys.Shortcut.join.title, .general),
+        (deskSwitch, .deskLayout),
+        (notchSwitch, .notch), (notchGlow, .notch), (cameraMicPlace, .notch),
+        (claudeCodeGlowHook, .integrations), (metersAbovePrompt, .integrations),
         (claudeMetersLine, .deskLayout), (claudeMetersBars, .deskLayout),
-        (checkForUpdates, .updates), (saveAndApply, .themes),
+        (watchersOnNotch, .watchers), (watchersOnDesk, .watchers),
+        (showWidget, .widgetLook), (checkForUpdates, .updates), (saveAndApply, .themes),
         (listMode, .message), (textMode, .message),
     ]
 
@@ -56,9 +69,21 @@ enum SettingsNames {
         ("Edit as text", textMode),
         ("Edit as a list", listMode),
         ("Desk Layout Settings…", SettingsSection.deskLayout.linkTitle),
-        ("Meter Settings…", SettingsSection.deskMeters.linkTitle),
-        ("Watcher Settings…", SettingsSection.integrations.linkTitle),
+        ("Meter Settings…", SettingsSection.alerts.linkTitle),
+        ("Watcher Settings…", SettingsSection.watchers.linkTitle),
         ("Data Settings…", SettingsSection.credentials.linkTitle),
+        // Slice 2: pages that merged or were renamed, and controls that moved into another.
+        ("Layout Settings…", SettingsSection.deskLayout.linkTitle),
+        ("Meters Settings…", SettingsSection.alerts.linkTitle),
+        ("Integrations Settings…", SettingsSection.integrations.linkTitle),
+        ("Claude Usage Settings…", SettingsSection.usage.linkTitle),
+        ("Mods Settings…", SettingsSection.mods.linkTitle),
+        ("Widget Look Settings…", SettingsSection.widgetLook.linkTitle),
+        ("Pacing & Focus Settings…", SettingsSection.widgetLook.linkTitle),
+        ("Show the Claude meters on the desktop", SettingsSection.deskLayout.linkTitle),
+        ("Widget: the floating window with the tools", showWidget),
+        ("Option+J joins the next meeting, Option+S opens these settings", SanduhrHotKeys.Shortcut.settings.title),
+        ("Sanduhr's mod: ", metersAbovePrompt),
     ]
 
     /// The retired names `text` still uses, empty when it uses none.

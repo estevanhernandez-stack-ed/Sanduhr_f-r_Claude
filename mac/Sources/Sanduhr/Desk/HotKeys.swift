@@ -1,10 +1,10 @@
 import Carbon.HIToolbox
 
-/// Desk's global shortcuts: Option+J joins the next meeting, Option+S opens Desk settings.
-/// Registered with Carbon's RegisterEventHotKey, which needs no Accessibility permission, and
-/// only while Desk runs with the shortcuts switch on (Desk settings, General). A registered
-/// hotkey takes the keystroke from every app, so while they are on, Option+J and Option+S no
-/// longer type ∆ and ß; switching them off gives those back.
+/// Sanduhr's global shortcuts: Option+J joins the next meeting, Option+S opens Settings.
+/// Registered with Carbon's RegisterEventHotKey, which needs no Accessibility permission, while
+/// Sanduhr runs and each one's switch is on (Settings, General, Shortcuts; SanduhrHotKeys). A
+/// registered hotkey takes the keystroke from every app, so while one is on, Option+J or Option+S
+/// no longer types ∆ or ß; switching it off gives that back.
 final class DeskHotKeys {
     struct Binding {
         let keyCode: UInt32
@@ -19,6 +19,8 @@ final class DeskHotKeys {
     private static let signature: OSType = 0x4465_736B
 
     var isRegistered: Bool { !refs.isEmpty }
+    /// How many are registered now (state.yaml `hot_keys.registered`).
+    var count: Int { refs.count }
 
     func register(_ bindings: [Binding]) {
         unregister()
