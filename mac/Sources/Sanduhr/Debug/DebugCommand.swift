@@ -19,6 +19,9 @@ enum DebugAction: Equatable {
     case showWidget, hideWidget
     /// Open Settings at a section, or where it was left (nil).
     case settings(SettingsSection?)
+    /// Settings at the page a "<Page> Settings…" button names (Settings v2, slice 1), opened the
+    /// way SettingsLinkButton opens it. `settings-names.yaml` checks each button lands where it says.
+    case settingsLink(SettingsSection)
     case closeSettings
     case refresh
     case testAlert
@@ -79,7 +82,7 @@ enum DebugAction: Equatable {
         case start, test, done, cancel
     }
 
-    static let names = ["show-widget", "hide-widget", "settings", "close-settings", "refresh",
+    static let names = ["show-widget", "hide-widget", "settings", "settings-link", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
                         "theme", "account", "usage", "whats-new", "close-whats-new",
                         "tour", "tour-step", "close-tour", "watch-test", "av-test", "message-editor",
@@ -148,6 +151,13 @@ enum DebugLink {
                 return bad("unknown settings section: \(arg) (one of \(SettingsSection.allCases.map(\.rawValue).joined(separator: ", ")))")
             }
             return .success(.settings(section))
+        case "settings-link":
+            // "Notch Settings…", or with three dots for a terminal.
+            let title = (arg ?? "").replacingOccurrences(of: "...", with: "…")
+            guard let section = SettingsSection.linked(title) else {
+                return bad("settings-link needs arg=<Page> Settings… (one of \(SettingsSection.allCases.map(\.linkTitle).joined(separator: ", ")))")
+            }
+            return .success(.settingsLink(section))
         case "close-settings": return .success(.closeSettings)
         case "refresh": return .success(.refresh)
         case "test-alert": return .success(.testAlert)

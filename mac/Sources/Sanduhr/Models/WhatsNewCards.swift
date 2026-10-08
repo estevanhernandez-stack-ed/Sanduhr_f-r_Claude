@@ -129,7 +129,7 @@ extension WhatsNew {
         WhatsNewCard(
             version: "2.5.0", id: "integrations",
             title: "Claude Code integrations",
-            body: "Install the MCP tools, the statusline, the meters above the prompt and the notch glow for when Claude needs you, from one page. Each one says what it adds before it installs.",
+            body: "Install the MCP tools, the statusline, the meters above the prompt and the Claude Code glow hook, which lights the notch when Claude needs you. Each one says what it adds before it installs.",
             art: .symbol("puzzlepiece.extension"), destination: .integrations),
     ]
 

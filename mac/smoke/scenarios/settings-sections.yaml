@@ -38,11 +38,12 @@ steps:
   - do: settings
     arg: mods
   # Item 64: the Mods page only reads (no switch, no edit); its summary card counts real mods,
-  # so it never carries the Sample label.
+  # so it never carries the Sample label. Settings v2, slice 1: Sanduhr's own mod opens the page and
+  # the "Mods and plugins" heading sits right above the list, below it.
   - expect_state: { settings_section: mods, settings_preview: mods, mods_page.open: true }
   - expect:
       window: settings
-      contains: { text: "/Mods and plugins/" }
+      contains: { text: "/Sanduhr.s mod/" }
   - snap: preview-mods
   - do: settings
     arg: deskLayout
@@ -90,7 +91,7 @@ steps:
   - expect_state: { settings_section: updates }
   - expect:
       window: settings
-      contains: { text: Check Now }
+      contains: { text: "/Check for Updates/" }
   - do: settings
     arg: about
   - expect_state: { settings_section: about }

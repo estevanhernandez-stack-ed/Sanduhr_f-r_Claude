@@ -193,7 +193,6 @@ struct ModsSettings: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                ModsIntro()
                 if model.loaded && model.claude == nil {
                     Text(ModsPageModel.cliMissing)
                         .font(.caption)
@@ -201,6 +200,8 @@ struct ModsSettings: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 OwnModBox(model: model, linked: linked)
+                // The heading sits right above the list it describes (Settings v2, slice 1).
+                ModsIntro()
                 folders
                 Button(model.loading ? "Reading…" : "Read Again") { Task { await model.load(linked: linked) } }
                     .disabled(model.loading)
@@ -232,7 +233,7 @@ private struct ModsIntro: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Mods and plugins").font(.headline)
-            Text("Everything each Claude Code folder loads: mods (plugins with a hooks module that draw in Claude Code) and plain plugins, from its plugin folder list, its installed plugins, its skills folder and the mods a session made. Sanduhr finds them by reading files: no mod runs. Sanduhr's own mod switches on and off per folder at the top, by receipt; switching other mods comes later, so they are read-only here. Check asks Claude Code's own validator, which reads a mod without running it, what the mod hooks and calls.")
+            Text("Everything each Claude Code folder loads: mods (plugins with a hooks module that draw in Claude Code) and plain plugins, from the plugin folders its settings list, its installed plugins, its skills folder and the mods a session made. Sanduhr finds them by reading files: no mod runs. Sanduhr's own mod switches on and off per folder above; switching other mods comes later, so they are read-only here. Check asks Claude Code's own validator, which reads a mod without running it, what the mod hooks and calls.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -350,7 +351,7 @@ private struct ModRowOwnership: View {
     var body: some View {
         switch item.ownership {
         case .sanduhrs:
-            Text("Sanduhr's own mod: switch it under Sanduhr's mod at the top of this page.")
+            Text("Sanduhr's own mod: switch it under Sanduhr's mod, above this list.")
                 .font(.caption)
                 .foregroundStyle(Color.hex("a78bfa"))
         case .copyOfSanduhrs:
@@ -520,18 +521,11 @@ struct ModsSummaryCard: View {
         }
     }
 
-    private var tiles: [(Int, String)] {
-        let c = model.counts
-        var out = [(c.mods, c.mods == 1 ? "mod" : "mods"), (c.plugins, c.plugins == 1 ? "plugin" : "plugins"),
-                   (c.on, "on"), (c.folders, c.folders == 1 ? "folder" : "folders")]
-        if c.missing > 0 { out.append((c.missing, "missing")) }
-        return out
-    }
+    private var tiles: [(number: Int, title: String)] { model.counts.tiles }
 
     private var label: String {
         guard model.loaded else { return "Reading your Claude Code folders." }
-        let c = model.counts
-        return "\(c.mods) mods and \(c.plugins) plugins across \(c.folders) Claude Code folders, \(c.on) of them on."
+        return model.counts.summary
     }
 }
 

@@ -13,7 +13,7 @@ final class MessageEditorModel {
 
     var mode: Mode = .list
     var document = MessageDocument()
-    /// Edit as text…'s buffer.
+    /// The Text view's buffer.
     var text = ""
     /// The styled row whose controls show.
     var expanded: UUID?
@@ -75,7 +75,7 @@ final class MessageEditorModel {
         return true
     }
 
-    /// Edit as text…: the list's rows as text, unsaved edits included.
+    /// The Text view: the list's rows as text, unsaved edits included.
     func showText() {
         guard mode == .list else { return }
         text = document.text

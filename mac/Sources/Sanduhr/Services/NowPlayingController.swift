@@ -427,7 +427,7 @@ final class NowPlayingController {
             menu.addItem(item)
         }
         menu.addItem(.separator())
-        let settings = NSMenuItem(title: "Now Playing Settings…", action: #selector(NowPlayingMenuTarget.settings), keyEquivalent: "")
+        let settings = NSMenuItem(title: SettingsSection.nowPlaying.linkTitle, action: #selector(NowPlayingMenuTarget.settings), keyEquivalent: "")
         settings.target = NowPlayingMenuTarget.shared
         menu.addItem(settings)
         return menu

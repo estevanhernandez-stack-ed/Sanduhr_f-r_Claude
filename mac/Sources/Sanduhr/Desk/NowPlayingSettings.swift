@@ -49,8 +49,8 @@ private struct NowPlayingSourceRow: View {
 private struct NowPlayingArrangeRow: View {
     var body: some View {
         HStack {
-            Button("Notch Settings…") { SettingsWindowController.shared.show(.notch) }
-            Button("Desk Layout Settings…") { SettingsWindowController.shared.show(.deskLayout) }
+            SettingsLinkButton(.notch)
+            SettingsLinkButton(.deskLayout)
             Spacer()
         }
     }

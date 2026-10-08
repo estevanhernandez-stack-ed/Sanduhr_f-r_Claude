@@ -42,12 +42,25 @@ enum CalendarAccess {
     static func shouldRequest(_ status: EKAuthorizationStatus) -> Bool { status == .notDetermined }
 }
 
+/// What the meetings piece and the meetings menu say with no meeting left today.
+enum MeetingsCopy {
+    /// "Nothing else on the calendar today" after the day's last meeting; "Nothing on the
+    /// calendar today" on a day that had none (Settings v2, slice 1).
+    static func none(hadEarlier: Bool) -> String {
+        hadEarlier ? "Nothing else on the calendar today" : "Nothing on the calendar today"
+    }
+}
+
 /// Today's remaining timed meetings, read straight from macOS Calendar (no icalBuddy).
 /// Refreshes every 5 minutes and whenever Calendar reports a change.
 @Observable
 final class DeskModel {
     var meetings: [Meeting] = []
+    /// Today had a timed meeting that has already ended, so an empty list says "else".
+    var hadEarlierMeetings = false
     var calendarNote: String?
+    /// The line where the meetings go when none is left today.
+    var noMeetingsLine: String { MeetingsCopy.none(hadEarlier: hadEarlierMeetings) }
     /// One row per Claude limit for the meters piece, in the widget's order, hidden limits left out.
     var meters: [DeskMeterRow] = []
     /// Every limit the server reported with a utilization, hidden or not, in the widget's order:
@@ -406,11 +419,16 @@ final class DeskModel {
         guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return }
         let now = Date()
         let endOfDay = Calendar.current.startOfDay(for: now).addingTimeInterval(24 * 60 * 60)
-        let predicate = store.predicateForEvents(withStart: now, end: endOfDay, calendars: nil)
+        // From midnight, so a day whose meetings are over can say "else" and one without can't.
+        let predicate = store.predicateForEvents(withStart: Calendar.current.startOfDay(for: now),
+                                                 end: endOfDay, calendars: nil)
         let fmt = DateFormatter()
         fmt.dateFormat = "h:mm"
-        let upcoming = store.events(matching: predicate)
-            .filter { !$0.isAllDay && $0.endDate > now }
+        let timed = store.events(matching: predicate).filter { !$0.isAllDay }
+        let earlier = timed.contains { $0.endDate <= now }
+        if hadEarlierMeetings != earlier { hadEarlierMeetings = earlier }
+        let upcoming = timed
+            .filter { $0.endDate > now }
             .sorted { $0.startDate < $1.startDate }
         meetings = upcoming.prefix(3).map { event in
             let link = Self.joinLink(event)

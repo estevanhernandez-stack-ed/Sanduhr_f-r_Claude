@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBarStep = 0
     private let updaterController = SPUStandardUpdaterController(
         startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
-    /// Sparkle's settings and Check Now for Settings, Updates; the same updater the menus use.
+    /// Sparkle's settings and Check for Updates… for Settings, Updates; the same updater the menus use.
     private(set) lazy var updates = UpdaterSettings(controller: updaterController)
     /// Keeps Sanduhr out of App Nap. Its windows sit on the desktop layer, under every app window,
     /// so macOS counts them as hidden and naps the app: the five-minute refresh timer then stops
@@ -364,7 +364,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showStatusMenu(from button: NSStatusBarButton) {
         let menu = NSMenu()
-        addMenuItems(to: menu, menuBarModes: true)
+        addMenuItems(to: menu)
 
         // Briefly attach, pop, detach — so default L-click behavior stays
         // as "toggle panel" rather than "always show menu".
@@ -375,16 +375,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// The shared menu (SanduhrMenu) as AppKit items, for the menu bar item's menu and Desk's
     /// clock menu. The widget's own two-finger menu (RootView) renders the same groups.
-    /// `accounts` false leaves the Accounts submenu out, for a limit menu that already has it;
-    /// `menuBarModes` adds Menu Bar Shows after it, in the menu bar item's own menu only;
-    /// `showHide` false leaves Show or Hide Widget out, for a Desk limit menu that has it on top.
+    /// `accounts` false leaves the Accounts submenu out, for a limit menu that already has it.
+    /// Menu Bar Shows follows it in every menu (SanduhrMenu.submenus, Settings v2's slice 1).
+    /// `showHide` false leaves Show or Hide Widget out, for a Desk limit menu that has it on top;
+    /// the submenus then open the shared items.
     /// `allSettings` names Settings… "All Settings…", for a menu with a page's own Settings item.
-    func addMenuItems(to menu: NSMenu, accounts withAccounts: Bool = true, menuBarModes: Bool = false,
+    func addMenuItems(to menu: NSMenu, accounts withAccounts: Bool = true,
                       showHide: Bool = true, allSettings: Bool = false) {
         let accounts = withAccounts ? currentAccountsMenu() : nil
         var groups = currentMenu(widgetVisible: panel?.isVisible ?? false, allSettings: allSettings)
         // A Desk limit menu has Show or Hide Widget at its top already.
-        if !showHide { groups = SanduhrMenu.without(.showHide, in: groups) }
+        if !showHide {
+            groups = SanduhrMenu.without(.showHide, in: groups)
+            addSubmenus(to: menu, accounts: accounts)
+            menu.addItem(.separator())
+        }
         for (i, group) in groups.enumerated() {
             if i > 0 { menu.addItem(.separator()) }
             if let header = group.header { menu.addItem(.sectionHeader(title: header)) }
@@ -403,14 +408,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 menu.addItem(m)
             }
-            // The Accounts submenu sits after Show/Hide, with two or more accounts.
-            if i == 0, let accounts {
+            // The submenus sit after Show/Hide.
+            if i == 0, showHide {
                 menu.addItem(.separator())
-                menu.addItem(accountsMenuItem(accounts))
+                addSubmenus(to: menu, accounts: accounts)
             }
-            // Menu Bar Shows sits with the Accounts submenu, or after Show/Hide on its own.
-            if i == 0, menuBarModes {
-                if accounts == nil { menu.addItem(.separator()) }
+        }
+    }
+
+    /// SanduhrMenu.submenus as AppKit items: Accounts (with two or more), then Menu Bar Shows.
+    private func addSubmenus(to menu: NSMenu, accounts: AccountsMenu?) {
+        for title in SanduhrMenu.submenus(accounts: accounts) {
+            if title == AccountsMenu.title, let accounts { menu.addItem(accountsMenuItem(accounts)) }
+            if title == MenuBarModeMenu.title {
                 menu.addItem(menuBarModesMenuItem(SanduhrMenu.menuBarModes(current: .saved())))
             }
         }
@@ -440,7 +450,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// A Desk meter row's two-finger menu (LimitMenu): Show or Hide Widget, Accounts, Hide and the
-    /// warnings item for `tier`, Meter Settings…, then the shared menu under a separator, less its
+    /// warnings item for `tier`, Meters Settings…, then the shared menu under a separator, less its
     /// own Show or Hide Widget. `tier` nil, a click beside the rows, leaves the limit's own items out.
     func addLimitMenuItems(to menu: NSMenu, tier: Tier?) {
         let groups = LimitMenu.groups(tier: tier, accounts: currentAccountsMenu(), store: UserDefaults.desk,
@@ -477,7 +487,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// What a limit menu's items do, from Desk and the widget alike: Hide, a Hidden Limits item
     /// and the warnings item write the desk-suite keys Settings, Desk, Meters reads (both refresh
-    /// on the change notice; Hide records the limit's current numbers), Meter Settings… opens
+    /// on the change notice; Hide records the limit's current numbers), Meters Settings… opens
     /// that page.
     func performLimit(_ entry: LimitMenuEntry) {
         switch entry {

@@ -96,6 +96,7 @@ enum DebugHooks {
         case .showWidget: app.showPanel()
         case .hideWidget: app.hidePanel()
         case .settings(let section): SettingsWindowController.shared.show(section)
+        case .settingsLink(let section): SettingsWindowController.shared.show(section)
         case .closeSettings: SettingsWindowController.shared.close()
         case .refresh:
             Task { @MainActor in
@@ -370,6 +371,7 @@ enum DebugHooks {
         s.glowSwitches = NotchGlowController.shared.switches
         s.theme = vm.theme.id
         s.menu = app.currentMenu(widgetVisible: widgetVisible)
+        s.menuSubmenus = SanduhrMenu.submenus(accounts: app.currentAccountsMenu())
         s.credentialsStore = KeychainStore.kind
         s.accountRef = AccountRef.of(KeychainStore.accounts.active)
         s.accountsCount = KeychainStore.accounts.labels.count

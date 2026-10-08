@@ -45,7 +45,7 @@ extension WelcomeTour {
         TourCard(
             id: "claude-code", step: 5,
             title: "Claude Code, connected",
-            body: "The Claude Usage page shows your Claude Code tokens by day and project. Integrations adds the MCP tools, the statusline and the notch glow, each after you say yes.",
+            body: "The Claude Usage page shows your Claude Code tokens by day and project. Integrations adds the MCP tools, the statusline and the Claude Code glow hook, each after you say yes.",
             art: .symbol("puzzlepiece.extension"), showMe: .settings(.integrations)),
     ]
 }

@@ -197,11 +197,14 @@ struct MenuBarModeMenuTests {
         #expect(SanduhrMenu.menuBarModes(current: .saved(in: d)).items.first { $0.checked }?.mode == .session)
     }
 
-    @Test func staysOutOfTheSharedGroups() {
-        // The widget's menu and Desk's clock menu render the shared groups; the submenu is the
-        // menu bar item's own.
+    @Test func everyMenuCarriesItAsASubmenu() {
+        // Settings v2, slice 1: the guide's "the same menu everywhere". It is a submenu after
+        // Show or Hide Widget (after Accounts when there are two), never an item of the groups.
         let titles = SanduhrMenu.groups(widgetVisible: true, deepWork: false, pacing: false, snake: false)
             .flatMap(\.entries).map(\.title)
         #expect(!titles.contains(MenuBarModeMenu.title))
+        #expect(SanduhrMenu.submenus(accounts: nil) == ["Menu Bar Shows"])
+        let two = SanduhrMenu.accounts(["Personal", "Work"], active: "Work")
+        #expect(SanduhrMenu.submenus(accounts: two) == ["Accounts", "Menu Bar Shows"])
     }
 }

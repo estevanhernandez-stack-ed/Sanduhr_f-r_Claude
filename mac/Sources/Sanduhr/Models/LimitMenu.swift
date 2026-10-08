@@ -40,14 +40,15 @@ enum LimitMenuEntry: Equatable {
 enum LimitMenu {
     static let stopWarnings = "Stop warnings for this limit"
     static let warnAgain = "Warn again for this limit"
-    static let meterSettings = "Meter Settings…"
+    /// "Meters Settings…": the page it opens, by its sidebar title (Settings v2).
+    static let meterSettings = SettingsSection.deskMeters.linkTitle
     static let hiddenLimits = "Hidden Limits"
 
     static func hideTitle(_ tier: Tier) -> String { "Hide \(tier.label)" }
 
     /// The items in runs between separators: Show or Hide Widget (Desk only: `widgetVisible` is
     /// nil on a widget card), the Accounts submenu (two or more accounts), then the limit's own
-    /// items, then the Hidden Limits submenu (when something is hidden) and Meter Settings….
+    /// items, then the Hidden Limits submenu (when something is hidden) and Meters Settings….
     /// `tier` is the row or card the menu opened on; nil (a click beside the rows) leaves the
     /// limit's own items out. Hide shows only for a limit in `temporary` that still shows;
     /// `warningsOn` is the limit's "Warn when nearly full".
@@ -82,7 +83,7 @@ enum LimitMenu {
 
     /// Does what Hide, a Hidden Limits item and the warnings item say, in `store`. Hide records
     /// what the limit reads in `usage`, and does nothing for a limit that is not temporary. The
-    /// widget item, the Accounts submenu and Meter Settings… are the caller's (a window, a
+    /// widget item, the Accounts submenu and Meters Settings… are the caller's (a window, a
     /// switch), so they change nothing here.
     static func apply(_ entry: LimitMenuEntry, to store: DefaultsStore,
                       usage: UsageResponse? = nil, now: Date = Date()) {

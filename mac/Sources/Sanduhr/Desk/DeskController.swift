@@ -393,7 +393,7 @@ final class DeskController: NSObject, NSMenuDelegate {
     }
 
     /// A two-finger click on the meters opens the limit menu for the row under the pointer
-    /// (LimitMenu): Accounts, Hide, the warnings item, Meter Settings…, then the shared menu.
+    /// (LimitMenu): Accounts, Hide, the warnings item, Meters Settings…, then the shared menu.
     /// On now playing (the Desk line or the strip under the camera), its menu instead.
     private func limitMenuUnderPointer(_ event: NSEvent) -> Bool {
         let hit = elementUnderPointer()
@@ -716,7 +716,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         model.refreshEvents()
         if model.meetings.isEmpty {
-            let none = NSMenuItem(title: model.calendarNote ?? "Nothing else on the calendar today", action: nil, keyEquivalent: "")
+            let none = NSMenuItem(title: model.calendarNote ?? model.noMeetingsLine, action: nil, keyEquivalent: "")
             none.isEnabled = false
             menu.addItem(none)
         }

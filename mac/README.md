@@ -497,7 +497,7 @@ was. The mod needs no python3. The mod's files ride in the stamped folder (`buil
 without its tests); Claude Code writes its type declarations into `.claude-plugin/types/` of a mod
 folder it loads, and the stamp covers only the shipped files, so that never reads as altered.
 
-**The notch glow hooks (item 51).** The fourth kind needs no scripts and no python3: Install adds
+**The Claude Code glow hook (item 51; "the notch glow hooks" before Settings v2).** The fourth kind needs no scripts and no python3: Install adds
 one matcher group to each of `hooks.Notification` and `hooks.Stop` in the chosen folder's
 `settings.json`, in the shape of Claude Code's settings schema (`{matcher?, hooks: [{type:
 "command", command, async, timeout}]}`):
@@ -704,8 +704,8 @@ and drag to reorder. Add Line, the rotation (Once a day, Every hour), the mix sw
 day", and "· 3 at a time, taking turns hourly" past three), "Fridays · takes turns with N others"
 or "Fridays · shows instead of the every-day lines" ("· mixes with every-day lines" with the switch
 on), "Every day · takes turns with N others · steps aside on days with their own line" ("· mixes in
-on days with their own line" with the switch on). **Edit as text…** shows the file itself with the tag reference beside it and the
-free pin field; Edit as a list goes back. Both views edit one document (`MessageEditorModel`), and
+on days with their own line" with the switch on). The **List | Text** switch shows the file itself (Text) with the tag reference beside it and the
+free pin field; List goes back. Both views edit one document (`MessageEditorModel`), and
 switching carries unsaved edits across. `MessageLineModel` reads the file into rows: a styled row
 (when, text, look) for each line the controls can represent; a raw row, shown as written and kept
 verbatim, for one they can't (a tag Sanduhr doesn't know or that is malformed, two motions on one
@@ -746,7 +746,7 @@ again with `ThemeLint` (the Swift port; errors refuse, warnings ride along) and 
 key (`ThemeRegistry.builtIn`, Match Desk included). With Settings, Widget, Themes, "Let Claude
 change themes directly" on (`themeClaudeDirect`, off by default) it saves and applies as asked;
 otherwise the Themes page shows "Claude suggested a theme" with the theme's gallery card, its name
-and description, the lint's notes (hover), and Dismiss, Save, Save and Apply; Themes in the sidebar
+and description, the lint's notes (hover), and Dismiss, Save, Save & Apply; Themes in the sidebar
 gets a badge and a notification posts as for Desk messages. **A user theme is never overwritten:**
 when the key's file holds a different theme the next free key is used (`tidepool-2`, up to `-99`)
 and the result names `renamed_from`; a file already holding the same theme is reused. A partial
@@ -929,7 +929,7 @@ switches in Settings, Integrations, Watchers, both off by default (`watchersAgen
 or the strip's content (Settings, Notch; the most urgent watcher plus "+N", the place's default
 while there is none), or the Watchers element in Settings, Desk, Layout (the stack, up to four, then
 "+N more"). A click opens the watcher's link (https only); a two-finger click opens Dismiss, Dismiss
-All and Watcher Settings…. "Waiting on you" pulses (not with Reduce Motion) and fires the notch glow
+All and Integrations Settings…. "Waiting on you" pulses (not with Reduce Motion) and fires the notch glow
 once, when watchers show somewhere and Desk runs. Passed and finished fade after 6 seconds; failed
 stays until dismissed; a watcher with no update for its window greys as lost touch (10 minutes for
 an agent's; an automatic one is confirmed at each Stop and greys only after an hour without one, the
@@ -1168,7 +1168,7 @@ in a corner like the other elements; off by default). There is no switch: it run
 somewhere and Desk is on (`NowPlayingPlacement`). Click it to play or pause; two-finger click for
 Previous, Play/Pause, Next and Now Playing Settings…. It hides when nothing plays, optionally while
 paused, and for apps switched off on the Now Playing page (which also has the source, the AppleScript
-switch and "Notch Settings…" / "Desk Layout Settings…").
+switch and "Notch Settings…" / "Layout Settings…").
 
 - **When nothing is playing.** A notch wing or the strip on Now playing doesn't go blank when there
   is no line (nothing plays, Hide while paused while paused, the app switched off, now playing
@@ -1330,6 +1330,22 @@ Nothing captures the screen. `TerminalPreviewFrame` (a dark terminal frame, mono
 by ANSIText, powerline glyphs by PowerlineGlyph, an optional animation clock) is shared for later
 terminal previews. state.yaml's `settings_preview` names the card the open page shows.
 
+## Settings names
+
+Settings v2 (item 72, `docs/settings-v2-spec.md`) gives each control one name across Settings,
+the menus, the tour, What's New and the setup guide. `Models/SettingsNames.swift` holds the names
+(Menu Bar Shows, Meetings menu in the menu bar, Notch: the island around the camera, Notch glow,
+Claude Code glow hook, Claude meters (line) and (bars), Check for Updates…, Save & Apply, List and
+Text) and the retired ones each replaced. A button or menu item that opens Settings reads
+`SettingsSection.linkTitle`, "<Page> Settings…" with the sidebar title exactly (Layout Settings…,
+Meters Settings…, Integrations Settings…, Accounts Settings…), through `SettingsLinkButton` in
+SwiftUI. A click on the notch island opens Settings at Notch. Menu Bar Shows is a submenu of every
+Sanduhr menu (`SanduhrMenu.submenus`), not only the menu bar item's. `SettingsNamesTests` checks
+the tour, What's New, every menu and every string literal under `Sources/` against the retired
+names, and that every "<Page> Settings…" names a real page. No storage key, section raw value or
+`sanduhr://` link changed. Smoke: `settings-link "<Page> Settings…"`, state.yaml's `menu_submenus`
+and `scenarios/settings-names.yaml`.
+
 ## Files
 
 - `sessionKey:{label}` + `cf_clearance:{label}` per account → the Keychain, service `com.626labs.sanduhr` (release builds), or `~/Library/Application Support/Sanduhr/credentials.json` (mode `0600`, dev builds); see First run and Accounts above
@@ -1364,8 +1380,8 @@ terminal previews. state.yaml's `settings_preview` names the card the open page 
 | **Refresh** button          | Fetch usage now                     |
 | **Gear** button             | Open Sanduhr Settings               |
 | Hover a tier card           | Reveal cooldown / surplus metrics   |
-| Two-finger click widget     | Tools, Refresh, Settings, Quit menu |
-| Two-finger click a tier card | Accounts, Hide (temporary limits), Stop warnings, Hidden Limits, Meter Settings, then the widget menu |
+| Two-finger click widget     | Menu Bar Shows, Tools, Refresh, Settings, Quit menu |
+| Two-finger click a tier card | Accounts, Hide (temporary limits), Stop warnings, Hidden Limits, Meters Settings…, then the widget menu |
 | Click a Desk meter          | Nothing: the meters are passive, clicks there do nothing |
 | Two-finger click a Desk meter | Show or Hide Widget, then the same limit menu |
 | Click the Desk clock / message | Settings, Desk Look / Settings, Desk, Message (while "Clock and message take clicks" is on) |

@@ -108,6 +108,9 @@ struct DebugStateInput {
     var pendingMessages = false
     var pendingTheme = false
     var menu: [MenuGroup] = []
+    /// The submenus every Sanduhr menu shows after Show or Hide Widget, by title (Accounts, Menu Bar
+    /// Shows; Settings v2, slice 1). Titles only: the Accounts submenu's labels never appear.
+    var menuSubmenus: [String] = []
     /// What's New (item 57): the last version seen, the cards the next launch would show, the
     /// window, and Don't show after updates.
     var whatsNew = WhatsNewDebug()
@@ -397,6 +400,7 @@ enum DebugState {
         pairs.append(("glow_claude_done", .bool(s.glowSwitches.claudeDone)))
         pairs.append(("theme", .string(s.theme)))
         pairs.append(("menu", .list(menu)))
+        pairs.append(("menu_submenus", .list(s.menuSubmenus.map(YAMLNode.string))))
         pairs.append(("credentials_store", .string(s.credentialsStore.rawValue)))
         pairs.append(("account_ref", s.accountRef.map(YAMLNode.string) ?? .null))
         pairs.append(("accounts_count", .int(s.accountsCount)))

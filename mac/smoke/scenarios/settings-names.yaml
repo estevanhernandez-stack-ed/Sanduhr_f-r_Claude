@@ -1,0 +1,78 @@
+# Settings v2, slice 1 (item 72, docs/settings-v2-spec.md): every button whose title ends in
+# "Settings…" names a page by its sidebar title and opens that page. `settings-link` opens Settings
+# the way a "<Page> Settings…" button does (SettingsLinkButton) and refuses a title that names no
+# page, so "Desk Layout Settings…" or "Watcher Settings…" can't come back. Each step starts on the
+# page that carries the button. The retired names must be gone from the pages that used them, and
+# the shared Sanduhr menu carries Menu Bar Shows.
+name: Every Settings… button opens the page it names
+steps:
+  # Integrations: the Claude Code glow hook's hint and Watchers' placement buttons.
+  - do: settings
+    arg: integrations
+  - expect:
+      window: settings
+      missing: { text: "/Desk Layout Settings|Notch glow when Claude needs you/" }
+  - do: settings-link
+    arg: Notch Settings…
+  - expect_state: { settings_section: notch }
+  - do: settings
+    arg: integrations
+  - do: settings-link
+    arg: Layout Settings…
+  - expect_state: { settings_section: deskLayout }
+  # Notch: its switch has General's name, and Notch glow points at Integrations for the hook.
+  - do: settings
+    arg: notch
+  - expect:
+      window: settings
+      contains: { text: "/Notch: the island around the camera/" }
+  - expect:
+      window: settings
+      missing: { text: "/Extend the camera notch|Glow for Claude Code/" }
+  - do: settings-link
+    arg: Integrations Settings…
+  - expect_state: { settings_section: integrations }
+  # Now Playing: the two ways to place it.
+  - do: settings
+    arg: nowPlaying
+  - do: settings-link
+    arg: Notch Settings…
+  - expect_state: { settings_section: notch }
+  - do: settings
+    arg: nowPlaying
+  - do: settings-link
+    arg: Layout Settings…
+  - expect_state: { settings_section: deskLayout }
+  # The menus' page items: the limit menus, the watcher and now playing menus, the clock's menu.
+  - do: settings-link
+    arg: Meters Settings…
+  - expect_state: { settings_section: deskMeters }
+  - do: settings-link
+    arg: Now Playing Settings…
+  - expect_state: { settings_section: nowPlaying }
+  - do: settings-link
+    arg: Desk Look Settings…
+  - expect_state: { settings_section: deskLook }
+  # Claude Usage's "needs setup" cards open Accounts.
+  - do: settings
+    arg: usage
+  - do: settings-link
+    arg: Accounts Settings…
+  - expect_state: { settings_section: credentials }
+  # General: Menu Bar Shows is the one name, and it is in every Sanduhr menu.
+  - do: settings
+    arg: general
+  - expect:
+      window: settings
+      missing: { text: "/Percent beside the hourglass|Desk menu in the menu bar/" }
+  # Last: Accounts comes first with two or more accounts.
+  - expect_state: { menu_submenus.-1: Menu Bar Shows }
+  # Updates: Check for Updates… is the button's name, as in the menus.
+  - do: settings
+    arg: updates
+  - expect:
+      window: settings
+      contains: { text: "/Check for Updates/" }
+  - expect:
+      window: settings
+      missing: { text: "/Check Now/" }

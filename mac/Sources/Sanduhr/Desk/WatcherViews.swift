@@ -210,8 +210,12 @@ private struct DeskWatcherRow: View {
 }
 
 /// The watcher menu (a two-finger click on a watcher, on the Desk or the notch): Dismiss,
-/// Dismiss All, Watcher Settings…. And the click: a watcher's link, https only.
+/// Dismiss All, Integrations Settings…. And the click: a watcher's link, https only.
 enum WatcherMenu {
+    /// Where the watchers are switched on, and the menu's last item opens: Integrations, until
+    /// Settings v2's slice 2 gives them their own page.
+    static let settingsSection = SettingsSection.integrations
+
     /// Opens the watcher's link when it has an https one; nothing otherwise.
     static func open(_ w: Watcher?) {
         guard let link = w?.link, link.scheme?.lowercased() == "https" else { return }
@@ -231,7 +235,7 @@ enum WatcherMenu {
         all.target = WatcherMenuTarget.shared
         menu.addItem(all)
         menu.addItem(.separator())
-        let settings = NSMenuItem(title: "Watcher Settings…", action: #selector(WatcherMenuTarget.settings), keyEquivalent: "")
+        let settings = NSMenuItem(title: WatcherMenu.settingsSection.linkTitle, action: #selector(WatcherMenuTarget.settings), keyEquivalent: "")
         settings.target = WatcherMenuTarget.shared
         menu.addItem(settings)
         return menu
@@ -246,7 +250,7 @@ final class WatcherMenuTarget: NSObject {
         MainActor.assumeIsolated { WatcherStore.shared.dismiss(id) }
     }
     @objc func dismissAll() { MainActor.assumeIsolated { WatcherStore.shared.dismissAll() } }
-    @objc func settings() { MainActor.assumeIsolated { SettingsWindowController.shared.show(.integrations) } }
+    @objc func settings() { MainActor.assumeIsolated { SettingsWindowController.shared.show(WatcherMenu.settingsSection) } }
 }
 
 /// The same menu as SwiftUI items, for the notch wings' context menu.
@@ -258,6 +262,6 @@ struct WatcherMenuItems: View {
             .disabled(id == nil)
         Button("Dismiss All") { WatcherStore.shared.dismissAll() }
         Divider()
-        Button("Watcher Settings…") { SettingsWindowController.shared.show(.integrations) }
+        SettingsLinkButton(WatcherMenu.settingsSection)
     }
 }

@@ -107,7 +107,7 @@ struct WidgetSettings: View {
             }
 
             HStack(spacing: 8) {
-                Button("Save & Apply", action: saveAndApplyTheme)
+                Button(SettingsNames.saveAndApply, action: saveAndApplyTheme)
                     .keyboardShortcut(.defaultAction)
                     .disabled(themePaste.trimmingCharacters(in: .whitespaces).isEmpty)
                 Button("Copy Agent Prompt", action: copyAgentPrompt)

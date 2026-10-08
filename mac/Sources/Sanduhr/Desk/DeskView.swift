@@ -352,7 +352,7 @@ struct DeskPiece: View {
                     }
                     .onGlobalFrame { model.noteFrame = $0 }
             } else if model.meetings.isEmpty {
-                Text("Nothing else on the calendar today").opacity(0.6)
+                Text(model.noMeetingsLine).opacity(0.6)
             } else {
                 ForEach(model.meetings) { meeting in
                     MeetingRow(meeting: meeting)

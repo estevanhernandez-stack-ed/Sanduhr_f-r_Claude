@@ -187,8 +187,8 @@ enum DeskLayout {
     static let standard = "message:tl clock:bl claude:bl meetings:bl"
 
     static let widgets: [(key: String, name: String)] = [
-        ("message", "Message"), ("clock", "Clock and date"), ("claude", "Claude line"),
-        ("meters", "Claude meters (bars)"), ("nowPlaying", "Now playing"), ("watchers", "Watchers"),
+        ("message", "Message"), ("clock", "Clock and date"), ("claude", SettingsNames.claudeMetersLine),
+        ("meters", SettingsNames.claudeMetersBars), ("nowPlaying", "Now playing"), ("watchers", "Watchers"),
         ("meetings", "Meetings"),
     ]
 
@@ -584,7 +584,7 @@ struct DeskNotchSection: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Extend the camera notch", isOn: $enabled)
+                Toggle(SettingsNames.notchSwitch, isOn: $enabled)
                 Text("Widens the notch into one black island while Desk is on. Click it to open these settings. Screens without a notch are left alone.")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -681,7 +681,8 @@ private struct NowPlayingIdleCaption: View {
     }
 }
 
-/// Notch, Glow: which events glow the notch. Its own view so the Notch page's body stays small
+/// Notch, Notch glow: which events glow the notch, Sanduhr's and Claude Code's in one section
+/// under one name (Settings v2, slice 1). Its own view so the Notch page's body stays small
 /// enough for Swift 6.0 and 6.1 to type-check.
 private struct NotchGlowSection: View {
     @AppStorage(NotchGlowSwitches.alertsKey, store: .desk) private var glowAlerts = false
@@ -692,33 +693,40 @@ private struct NotchGlowSection: View {
     @AppStorage(NotchGlowSwitches.claudeSkipTerminalKey, store: .desk) private var skipTerminal = true
 
     var body: some View {
-        Section("Glow") {
-            Toggle("For Sanduhr alerts", isOn: $glowAlerts)
-            Toggle("A minute before a meeting", isOn: $glowMeetings)
-                .onChange(of: glowMeetings) { _, _ in NotchGlowController.shared.apply() }
-            Toggle("When the camera fill light comes on", isOn: $glowCamera)
-            HStack {
-                Text("The notch's edge glows softly in the notch text color for a few seconds, once per event: around the island when it is on, around the notch itself when it is off. A Desk pulse always glows it. It never takes a click.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                // Glows once whatever the switches say, so the look can be checked before
-                // turning any of them on.
-                Button("Test Glow") { NotchGlowController.shared.fire() }
-            }
+        Section(SettingsNames.notchGlow) {
+            sanduhrRows
+            claudeRows
         }
-        claudeSection
     }
 
-    /// Claude Code's events (item 51).
-    private var claudeSection: some View {
-        Section("Glow for Claude Code") {
-            Toggle("When Claude Code is waiting on you", isOn: $claudeWaiting)
-            Toggle("When Claude Code finishes", isOn: $claudeDone)
-            Toggle("Not while a terminal is in front", isOn: $skipTerminal)
-                .disabled(!claudeWaiting && !claudeDone)
-            Text("Needs the notch glow hooks in the Claude Code folder (Settings, Integrations). Claude Code tells Sanduhr only that it waits or finished, nothing about the conversation. At most one glow of each kind every 20 seconds. With a terminal or an editor that runs Claude Code in front (Terminal, iTerm2, Ghostty, Warp, WezTerm, Alacritty, kitty, VS Code, Cursor, Zed), you are already looking, so it doesn't glow. Screens without a notch glow at the top center.")
+    /// Sanduhr's own events, and Test Glow.
+    @ViewBuilder private var sanduhrRows: some View {
+        Toggle("For Sanduhr alerts", isOn: $glowAlerts)
+        Toggle("A minute before a meeting", isOn: $glowMeetings)
+            .onChange(of: glowMeetings) { _, _ in NotchGlowController.shared.apply() }
+        Toggle("When the camera fill light comes on", isOn: $glowCamera)
+        HStack {
+            Text("The notch's edge glows softly in the notch text color for a few seconds, once per event: around the island when it is on, around the notch itself when it is off. A Desk pulse always glows it. It never takes a click.")
+                .font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            // Glows once whatever the switches say, so the look can be checked before
+            // turning any of them on.
+            Button("Test Glow") { NotchGlowController.shared.fire() }
+        }
+    }
+
+    /// Claude Code's events (item 51), fed by the Claude Code glow hook.
+    @ViewBuilder private var claudeRows: some View {
+        Toggle("When Claude Code is waiting on you", isOn: $claudeWaiting)
+        Toggle("When Claude Code finishes", isOn: $claudeDone)
+        Toggle("Not while a terminal is in front", isOn: $skipTerminal)
+            .disabled(!claudeWaiting && !claudeDone)
+        HStack(alignment: .firstTextBaseline) {
+            Text("The two Claude Code rows need the \(SettingsNames.claudeCodeGlowHook) in a Claude Code folder, installed in Integrations. Claude Code tells Sanduhr only that it waits or finished, nothing about the conversation. At most one glow of each kind every 20 seconds. With a terminal or an editor that runs Claude Code in front (Terminal, iTerm2, Ghostty, Warp, WezTerm, Alacritty, kitty, VS Code, Cursor, Zed), you are already looking, so it doesn't glow. Screens without a notch glow at the top center.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            SettingsLinkButton(.integrations)
         }
     }
 }
@@ -743,9 +751,9 @@ struct GeneralSection: View {
     var body: some View {
         Form {
             Section("Surfaces") {
-                Toggle("Desk: clock, meters, meetings and the message on the desktop", isOn: $deskEnabled)
+                Toggle(SettingsNames.deskSwitch, isOn: $deskEnabled)
                     .onChange(of: deskEnabled) { _, _ in DeskController.shared.apply() }
-                Toggle("Notch: the island around the camera (needs Desk)", isOn: $notch)
+                Toggle(SettingsNames.notchSwitch, isOn: $notch)
                 // A choice made here, not any change to the key: onChange also fired for writes
                 // from outside (a smoke run's defaults step), even with Settings closed, and
                 // treated them as a pick (issue #105's "Always shown shows the widget").
@@ -764,7 +772,7 @@ struct GeneralSection: View {
                         let app = NSApp.delegate as? AppDelegate
                         if show { app?.showPanel() } else { app?.hidePanel() }
                     }))
-                Text("Showing or hiding the widget by hand lasts until Desk turns on or off or Sanduhr starts again; then the choice above takes over. Sanduhr keeps fetching and alerting with every surface off. Every setting stays here, and Option+S opens this window while Desk is on.")
+                Text("The notch needs the Desk. Showing or hiding the widget by hand lasts until Desk turns on or off or Sanduhr starts again; then the choice above takes over. Sanduhr keeps fetching and alerting with every surface off. Every setting stays here, and Option+S opens this window while Desk is on.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section {
@@ -804,18 +812,18 @@ struct GeneralSection: View {
         .formStyle(.grouped)
     }
 
-    /// The percent beside the hourglass and the Desk menu's icon.
+    /// Menu Bar Shows (the percent beside the hourglass) and the meetings menu's item.
     private var menuBarSection: some View {
         Section("Menu bar") {
-            Picker("Percent beside the hourglass", selection: $menuBarMode) {
+            Picker(SettingsNames.menuBarShows, selection: $menuBarMode) {
                 ForEach(MenuBarMode.allCases) { Text($0.label).tag($0) }
             }
             .onChange(of: menuBarMode) { _, _ in
                 (NSApp.delegate as? AppDelegate)?.menuBarModeDidChange()
             }
-            Text("Only the session and the weekly all-models limit show here; Rotate switches between them every 8 seconds (S for session, W for weekly).")
+            Text("The percent beside the hourglass, also in every Sanduhr menu. Only the session and the weekly all-models limit show here; Rotate switches between them every 8 seconds (S for session, W for weekly). The meetings menu is a second menu bar item with today's meetings, Join and Settings.")
                 .font(.caption).foregroundStyle(.secondary)
-            Toggle("Desk menu in the menu bar (meetings, join, settings)", isOn: $menuIcon)
+            Toggle(SettingsNames.meetingsMenu, isOn: $menuIcon)
                 .onChange(of: menuIcon) { _, on in DeskController.shared.setMenuIcon(on) }
         }
     }

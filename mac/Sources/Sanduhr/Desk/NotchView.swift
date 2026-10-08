@@ -1,6 +1,12 @@
 import SwiftUI
 import AppKit
 
+/// What a click on the island itself does: Settings at the Notch page (Settings v2, slice 1),
+/// not wherever Settings was left. Its tooltip names the page.
+enum NotchIsland {
+    static let clickOpens = SettingsSection.notch
+}
+
 /// The notch, extended. On a Mac with a camera notch, Desk draws pure black that continues the
 /// cutout a little wider and a little lower, with soft rounded corners, so it reads as one
 /// bigger island. Inside the extra strip under the hardware notch it prints one short line,
@@ -249,8 +255,8 @@ struct NotchWingsView: View {
                     }
                     .frame(width: notchWidth + w.totalLeft + w.totalRight, height: barHeight)
                     .contentShape(Rectangle())
-                    .onTapGesture { DeskController.shared.showSettings() }
-                    .help("Sanduhr Settings")
+                    .onTapGesture { DeskController.shared.showSettings(NotchIsland.clickOpens) }
+                    .help(NotchIsland.clickOpens.linkTitle)
                     // Last, so the island's click area moves with its drawing: an offset before
                     // contentShape left the click area at the unshifted place, so the far end of
                     // the wider wing (a paused Next button) drew where nothing took the click.
@@ -334,7 +340,7 @@ struct NotchWingsView: View {
     }
 
     /// The most urgent watcher in a wing (item 66): a click opens its link (https only), a
-    /// two-finger click opens Dismiss, Dismiss All and Watcher Settings…. The whole wing takes the
+    /// two-finger click opens Dismiss, Dismiss All and Integrations Settings…. The whole wing takes the
     /// click, so a watcher without a link never opens Settings by accident.
     private func watcherWing(_ text: String, _ size: CGFloat, place: NotchContent.Place, width: CGFloat) -> some View {
         let top = model.watchers.first
@@ -505,6 +511,6 @@ struct NowPlayingMenuItems: View {
         Button(controller.state == .playing ? "Pause" : "Play") { controller.togglePlayPause() }
         Button("Next") { controller.next() }
         Divider()
-        Button("Now Playing Settings…") { DeskController.shared.showSettings(.nowPlaying) }
+        SettingsLinkButton(.nowPlaying)
     }
 }

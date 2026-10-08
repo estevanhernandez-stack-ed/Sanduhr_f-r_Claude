@@ -282,7 +282,7 @@ struct DebugStateTests {
                          "menu_bar", "settings_open", "settings_section", "usage_page", "meters", "widget_warnings", "hidden_limits",
                          "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "desk_piece_clicks", "dock", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
-                         "glow_camera", "glow_claude_waiting", "glow_claude_done", "theme", "menu", "credentials_store", "account_ref", "accounts_count", "history_days", "data",
+                         "glow_camera", "glow_claude_waiting", "glow_claude_done", "theme", "menu", "menu_submenus", "credentials_store", "account_ref", "accounts_count", "history_days", "data",
                          "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "version", "build", "whats_new", "tour", "watchers", "av_indicators", "settings_preview", "mods_page", "message_editor"])
         #expect(yaml.contains("settings_section: notch\nusage_page:\n  open: false\n  tab: overview\nmeters:"))
         #expect(yaml.contains("settings_preview: notch"))

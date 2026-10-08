@@ -136,6 +136,26 @@ final class SettingsWindowController {
     }
 }
 
+/// A button that opens Settings at a page, titled "<Page> Settings…" with the page's exact sidebar
+/// title (Settings v2, slice 1). `before` runs first, for a sheet that closes on the way.
+/// The smoke action `settings-link "<title>"` opens the same page the same way.
+struct SettingsLinkButton: View {
+    let section: SettingsSection
+    var before: () -> Void = {}
+
+    init(_ section: SettingsSection, before: @escaping () -> Void = {}) {
+        self.section = section
+        self.before = before
+    }
+
+    var body: some View {
+        Button(section.linkTitle) {
+            before()
+            SettingsWindowController.shared.show(section)
+        }
+    }
+}
+
 /// The selected section, kept outside the view so `show(_:)` can move it on an open window.
 @MainActor
 @Observable
@@ -143,7 +163,7 @@ final class SettingsNavigation {
     var selection: SettingsSection = .general
     /// The Claude Usage page's tab, kept while other sections show.
     var usageTab: UsageTab = .overview
-    /// An account for Accounts to select on arrival (the Claude Usage page's "Data Settings…").
+    /// An account for Accounts to select on arrival (the Claude Usage page's "Accounts Settings…").
     var accountToShow: String?
     /// The Claude Usage page's state, kept while the window lives.
     let usagePage = UsagePageModel()

@@ -224,7 +224,9 @@ enum AVIndicatorMenu {
     static let cameraLine = "Camera in use"
     static let micLine = "Microphone in use"
     static let noneLine = "Camera and microphone not in use"
-    static let settingsTitle = "Notch Settings…"
+    /// The page its last item opens, and that item's title.
+    static let settingsSection = SettingsSection.notch
+    static let settingsTitle = settingsSection.linkTitle
 
     struct Item: Equatable {
         var title: String

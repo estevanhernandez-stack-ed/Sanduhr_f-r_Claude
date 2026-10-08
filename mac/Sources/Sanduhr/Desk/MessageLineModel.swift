@@ -229,7 +229,7 @@ struct MessageLine: Hashable {
         if when == .everyDay, MessageEngine.splitPrefix(t).kind != .plain {
             return "Text that starts like a day (\"Mon:\" or \"10-31:\") shows only on that day."
         }
-        return "The Desk would read this line differently. Edit as text… to see it."
+        return "The Desk would read this line differently. Switch to Text to see it."
     }
 
     /// As it reads back: text cleaned, size 1 as none.

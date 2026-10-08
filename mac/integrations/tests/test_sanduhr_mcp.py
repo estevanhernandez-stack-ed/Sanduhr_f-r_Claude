@@ -1464,7 +1464,7 @@ class ProposeTheme(Base):
         for word in mcp.THEME_COLOR_FIELDS + ["name", "description", "glass_alpha", "border_alpha", "border_tint",
                                              "title_ink", "title_style", "small-caps", "fraktur",
                                              "accent_bloom", "inner_highlight", "#rrggbb", "4.5:1", "pace_marker",
-                                             "Match Desk", "Save and Apply", "pending_approval", "applied", "saved",
+                                             "Match Desk", "Save & Apply", "pending_approval", "applied", "saved",
                                              "rejected", "queued", "renamed_from", "previous_key", "never writes"]:
             self.assertIn(word, d, word)
 

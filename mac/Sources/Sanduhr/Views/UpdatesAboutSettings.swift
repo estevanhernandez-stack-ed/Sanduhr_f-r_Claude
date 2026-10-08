@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Settings, Sanduhr, Updates: the installed version, Sparkle's last check and Check Now, and
+/// Settings, Sanduhr, Updates: the installed version, Sparkle's last check and Check for Updates…, and
 /// Sparkle's own two switches (the menus' Check for Updates… uses the same updater).
 struct UpdatesSection: View {
     var updates: UpdaterSettings
@@ -13,7 +13,7 @@ struct UpdatesSection: View {
                 LabeledContent("Installed", value: info.versionAndBuild)
                 LabeledContent("Last checked", value: UpdateCheckText.lastChecked(updates.lastCheck))
                 HStack {
-                    Button("Check Now") { updates.checkNow() }
+                    Button(SettingsNames.checkForUpdates) { updates.checkNow() }
                         .disabled(!updates.canCheck)
                     Spacer()
                     Link("Release notes for this version",

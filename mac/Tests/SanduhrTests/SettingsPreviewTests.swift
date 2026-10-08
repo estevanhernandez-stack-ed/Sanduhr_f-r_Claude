@@ -192,7 +192,7 @@ struct SettingsPreviewTests {
         let names = { (pieces: [DeskLayoutMap.Piece]?) in pieces?.map(\.name) }
         let corners = DeskLayoutMap.anchors(layout: layout, showMeetings: true, showClaude: true)
         #expect(names(corners[.tl]) == ["Message"])
-        #expect(names(corners[.bl]) == ["Clock and date", "Claude line", "Meetings"])
+        #expect(names(corners[.bl]) == ["Clock and date", "Claude meters (line)", "Meetings"])
         #expect(names(corners[.br]) == ["Claude meters (bars)"])
         #expect(names(corners[.tr]) == ["Now playing"])
         // The same pieces DeskLayout.placed says DeskView draws, whatever the switches.

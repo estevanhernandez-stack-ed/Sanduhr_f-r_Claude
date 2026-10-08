@@ -41,7 +41,7 @@ struct OwnModRow: Identifiable, Equatable, Sendable {
     /// Where it stands, in words.
     var summary: String {
         guard state.readable else { return "settings.json isn't JSON Sanduhr can edit, so it is left alone." }
-        guard state.listed else { return "Not in this folder's plugin folder list. On adds it." }
+        guard state.listed else { return "Not among the plugin folders this folder's settings list. On adds it." }
         let v = version.map { "Version \($0)" } ?? "Its version"
         var text = state.pinned != nil
             ? "\(v), kept by the Mods page: Update moves it to a new version."
@@ -94,7 +94,7 @@ struct OwnModBox: View {
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Sanduhr's meters above Claude Code's prompt. The switch turns it on or off for each Claude Code folder by editing that folder's settings.json; Sanduhr keeps a receipt, so switching back or Remove puts the file back exactly as it was.")
+                Text("Sanduhr's meters above Claude Code's prompt. The switch turns it on or off for each Claude Code folder by editing that folder's settings.json. Sanduhr keeps a record in its own folder, so switching back or Remove can put the file back exactly as it was.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -172,7 +172,7 @@ private struct OwnModActions: View {
                     .help("Moves this folder's entry to the version this copy of Sanduhr carries. If it can do something the version in use can't, Sanduhr asks first.")
                 }
                 Button("Remove") { Task { await model.remove(folder: row.folder, linked: linked) } }
-                    .help("Takes Sanduhr's mod out of this folder: the switch, then the plugin folder list entry, back to the bytes from before.")
+                    .help("Takes Sanduhr's mod out of this folder: the switch, then its entry among the plugin folders, back to the bytes from before.")
             }
             .disabled(busy || !row.state.readable)
         }

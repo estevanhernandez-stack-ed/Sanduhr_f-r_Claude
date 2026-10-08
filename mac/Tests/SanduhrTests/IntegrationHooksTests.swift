@@ -435,7 +435,7 @@ struct IntegrationHooksTests {
     @Test func theKindNeedsNoPythonAndNoScripts() {
         #expect(!IntegrationKind.hooks.needsPython)
         #expect(!IntegrationKind.hooks.needsScripts)
-        #expect(IntegrationKind.hooks.title == "Notch glow when Claude needs you")
+        #expect(IntegrationKind.hooks.title == "Claude Code glow hook")
         #expect(IntegrationKind.hooks.keyPath == "hooks.Notification and hooks.Stop")
     }
 

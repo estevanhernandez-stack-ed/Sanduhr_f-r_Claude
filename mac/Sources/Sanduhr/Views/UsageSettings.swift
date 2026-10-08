@@ -515,10 +515,8 @@ struct UsageNeedsSetup: View {
             Text(text)
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("Data Settings…") {
-                navigation.accountToShow = label
-                navigation.selection = .credentials
-            }
+            // Accounts, scrolled to this account's Data.
+            SettingsLinkButton(.credentials) { navigation.accountToShow = label }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)

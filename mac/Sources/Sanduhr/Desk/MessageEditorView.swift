@@ -2,11 +2,30 @@ import SwiftUI
 import AppKit
 
 /// Settings, Message's line editor (item 69): each line a row drawn as the Desk draws it, its
-/// When, Text and Look set with menus, wells and sliders; Edit as text… for the file itself. The
+/// When, Text and Look set with menus, wells and sliders; the Text view for the file itself. The
 /// rows and the text are one document (MessageEditorModel, MessageLineModel). Each piece is its
 /// own small view so Swift 6.0 and 6.1 type-check the bodies.
 
 // MARK: - The bar: rotation, the view switch, Save
+
+/// List | Text, the editor's two views of one document (Settings v2, slice 1: one shape, no
+/// ellipsis, where "Edit as text…" and "Edit as a list" were two differently named buttons).
+struct MessageModePicker: View {
+    @Bindable var editor: MessageEditorModel
+
+    var body: some View {
+        Picker("View", selection: Binding(
+            get: { editor.mode },
+            set: { $0 == .text ? editor.showText() : editor.showList() })) {
+            Text(SettingsNames.listMode).tag(MessageEditorModel.Mode.list)
+            Text(SettingsNames.textMode).tag(MessageEditorModel.Mode.text)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+        .help("List: each line as the Desk draws it. Text: the file itself, tags and all. Your edits carry over either way.")
+    }
+}
 
 struct MessageEditorBar: View {
     @Bindable var editor: MessageEditorModel
@@ -25,12 +44,7 @@ struct MessageEditorBar: View {
                 .fixedSize()
                 .help("How often the Desk picks another line from today's lines.")
                 Spacer()
-                Button(editor.mode == .list ? "Edit as text…" : "Edit as a list") {
-                    if editor.mode == .list { editor.showText() } else { editor.showList() }
-                }
-                .help(editor.mode == .list
-                      ? "The file itself, tags and all; your edits carry over."
-                      : "Back to the rows; your edits carry over.")
+                MessageModePicker(editor: editor)
             }
             Toggle("Mix every-day lines in on days with their own line", isOn: $mix)
                 .help("Off: on a day with its own lines (Fridays), only those show. On: they take turns with the every-day lines.")
@@ -157,7 +171,7 @@ private struct MessageRowView: View {
             if case .raw(let source) = row.content {
                 Text(source).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
                     .lineLimit(2).textSelection(.enabled)
-                Text("Kept as written: the editor can't set everything on this line. Edit as text… changes it.")
+                Text("Kept as written: the editor can't set everything on this line. Text, at the top, changes it.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if open { MessageLineControls(line: lineBinding) }
@@ -471,7 +485,7 @@ private struct MessageLookControls: View {
     }
 }
 
-// MARK: - Edit as text…
+// MARK: - The Text view
 
 struct MessageTextEditorPane: View {
     @Bindable var editor: MessageEditorModel
@@ -497,7 +511,7 @@ struct MessageTextEditorPane: View {
 /// The grammar, beside the text: prefixes, notes and every tag.
 struct MessageTagReference: View {
     static let entries: [(tag: String, meaning: String)] = [
-        ("Mon: text", "on Mondays, instead of every-day lines (Mon to Sun)"),
+        ("Mon: text", "a line for Mondays (Mon to Sun): it replaces the every-day lines, or with Mix on takes turns with them"),
         ("10-31: text", "on that date, above the day's line; several all show"),
         ("# note", "a note; the Desk skips it"),
         ("{ink:#ff2a6d,#05d9e8}", "1 to 4 colors; two or more make a gradient"),

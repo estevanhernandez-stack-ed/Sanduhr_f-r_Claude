@@ -318,7 +318,7 @@ private struct IntegrationsIntro: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Claude Code").font(.headline)
-            Text("The MCP server lets Claude Code ask Sanduhr about your usage, as each account's Share with your agents choice allows. The statusline shows the active account's meters under Claude Code's prompt; the meters mod draws them as bars above it. The notch glow hooks let Claude Code tell Sanduhr when a session waits on you or finishes, so the notch can glow. Each is installed per Claude Code folder: Sanduhr adds one entry to that folder's settings, keeps a backup of the file beside it, and Remove takes the entry out again. Nothing leaves this Mac.")
+            Text("The MCP server lets Claude Code ask Sanduhr about your usage, as each account's Share with your agents choice allows. The statusline shows the active account's meters under Claude Code's prompt; the meters mod draws them as bars above it. The Claude Code glow hook lets Claude Code tell Sanduhr when a session waits on you or finishes, so the notch can glow. Each is installed per Claude Code folder: Sanduhr adds one entry to that folder's settings, keeps a backup of the file beside it, and Remove takes the entry out again. Nothing leaves this Mac.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -369,12 +369,12 @@ private struct GlowHint: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("The notch glow hooks only tell Sanduhr; the glow itself is off until you turn it on in Notch, Glow.")
+            Text("The Claude Code glow hook only tells Sanduhr; the glow itself is off until you turn it on in Notch, Notch glow.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
-            Button("Notch Settings…", action: openNotch)
+            Button(SettingsSection.notch.linkTitle, action: openNotch)
         }
     }
 }
@@ -642,7 +642,7 @@ private struct HooksConsentBody: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Claude Code sessions using \(folder) tell Sanduhr when they wait on you (a permission prompt or a question) and when a turn finishes, so the notch can glow.")
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Claude Code tells Sanduhr only that it is waiting or finished, with a system notification whose name is that one word. Nothing about the conversation or the project is sent, and nothing leaves this Mac. The hooks never start Sanduhr: while it isn't running, they do nothing.")
+            Text("Claude Code tells Sanduhr only that it is waiting or finished, with a system notification whose name is that one word. Nothing about the conversation or the project is sent, and nothing leaves this Mac. The hook never starts Sanduhr: while it isn't running, it does nothing.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -651,11 +651,11 @@ private struct HooksConsentBody: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .firstTextBaseline) {
-                Text("The glow stays off until you turn it on in Notch, Glow.")
+                Text("The glow stays off until you turn it on in Notch, Notch glow.")
                     .font(.caption)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
-                Button("Notch Settings…", action: openNotch)
+                Button(SettingsSection.notch.linkTitle, action: openNotch)
             }
         }
     }

@@ -139,6 +139,25 @@ struct ModCounts: Equatable, Sendable {
         on = items.filter { $0.state == .on || $0.state == .session }.count
         missing = items.filter { $0.state == .missing }.count
     }
+
+    /// The summary card's tiles, each a number and what it counts in words that say it on their
+    /// own: "1 mod", "27 plugins", "27 enabled plugins", "2 folders", then "1 missing" when one
+    /// is (Settings v2, slice 1: "27 on" didn't say what was on). Mods are plugins too, so
+    /// enabled counts both.
+    var tiles: [(number: Int, title: String)] {
+        func noun(_ n: Int, _ one: String, _ many: String) -> String { n == 1 ? one : many }
+        var out = [(mods, noun(mods, "mod", "mods")),
+                   (plugins, noun(plugins, "plugin", "plugins")),
+                   (on, noun(on, "enabled plugin", "enabled plugins")),
+                   (folders, noun(folders, "folder", "folders"))]
+        if missing > 0 { out.append((missing, "missing")) }
+        return out
+    }
+
+    /// The card's spoken summary, from the same words as the tiles.
+    var summary: String {
+        tiles.map { "\($0.number) \($0.title)" }.joined(separator: ", ") + "."
+    }
 }
 
 /// One Claude Code folder and what it loads.
