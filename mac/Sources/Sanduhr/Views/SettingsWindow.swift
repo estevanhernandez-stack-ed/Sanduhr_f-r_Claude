@@ -150,6 +150,11 @@ final class SettingsWindowController {
                 let height = (note.object as? NSWindow)?.frame.height ?? 0
                 MainActor.assumeIsolated { nav.windowHeight = height }
             }
+            // Closing the window folds what was opened on it: the next open starts as documented
+            // (previews folded on a short window, Advanced collapsed).
+            NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { _ in
+                MainActor.assumeIsolated { nav.windowClosed() }
+            }
         }
         if let w = window {
             Self.fitToScreen(w)
@@ -227,9 +232,9 @@ final class SettingsNavigation {
     private(set) var scrollRequest = 0
     /// The anchor a search pick lights for 1.5 s.
     private(set) var highlight: String?
-    /// Pages whose Advanced disclosure is open, kept while the window lives.
+    /// Pages whose Advanced disclosure is open, kept until the window closes.
     var openAdvanced: Set<SettingsSection> = []
-    /// Pages whose folded preview was opened, kept while the window lives (slice 3).
+    /// Pages whose folded preview was opened, kept until the window closes (slice 3).
     var openPreviews: Set<SettingsSection> = []
     /// The window's height; below 720 pt the previews fold.
     var windowHeight: CGFloat = 0
@@ -249,6 +254,12 @@ final class SettingsNavigation {
         guard let anchor else { return nil }
         guard let frame = anchorFrames[anchor], let viewport else { return false }
         return SettingsAnchorVisibility.isVisible(frame, in: viewport)
+    }
+
+    /// The window closed: opened previews and Advanced disclosures fold again for the next open.
+    func windowClosed() {
+        openPreviews = []
+        openAdvanced = []
     }
 
     /// Opens `section` at `anchor`: an anchor under Advanced opens the disclosure first, and the

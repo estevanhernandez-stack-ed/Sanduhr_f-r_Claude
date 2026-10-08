@@ -1,4 +1,4 @@
-| Every setting, in one window. The sidebar lists the pages in five groups: the first four pages, then Desktop, Claude Code, Widget and Help. Type in **Search**, above the sidebar, to find any setting by name: Return opens the best match, scrolled into view. |# Sanduhr for Mac: setup guide
+# Sanduhr for Mac: setup guide
 
 You just installed Sanduhr für Claude. Start with task 1, then pick the tasks you want.
 
@@ -12,7 +12,7 @@ Sanduhr is an independent tool. It is not made by or affiliated with Anthropic.
 | Widget | A small floating window. | Your limits as bars, with a row of buttons at the bottom. Two-finger click it for the Sanduhr menu. |
 | Desk | Your desktop, under every window. Off until you turn it on. | A clock, your meters, today's meetings and a message, drawn on the wallpaper. |
 | Notch | Around the camera at the top of a MacBook screen. Needs the Desk. | Black "wings" beside the camera that show the time, your meters, a meeting, a song and more. |
-| Settings | Settings… in any Sanduhr menu, the gear on the widget, or Option+S. | Every setting, in one window. The sidebar lists the pages in five groups: the first four pages, then Desktop, Claude Code, Widget and Help. |
+| Settings | Settings… in any Sanduhr menu, the gear on the widget, or Option+S. | Every setting, in one window. The sidebar lists the pages in five groups: the first four pages, then Desktop, Claude Code, Widget and Help. Type in **Search**, above the sidebar, to find any setting by name: Return opens the best match, scrolled into view. |
 | The Sanduhr menu | The same menu everywhere: menu bar icon, widget, the Desk's pieces. | Show or hide the widget, Menu Bar Shows, Tools, Refresh, Settings…, Arrange Desk…, Check for Updates…, What's New…, Take the Tour…, Quit. |
 
 In this guide, "Settings, Accounts" means: open Settings, then click **Accounts** in the sidebar. A setting the guide names is also one search away: type **glow**, **percent** or **margins** and press Return. On a short window, each page's preview folds to a strip at the top; click it to see the preview. A few expert settings sit under **Advanced**, folded, at the bottom of their page.

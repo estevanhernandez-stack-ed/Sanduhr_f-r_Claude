@@ -1421,11 +1421,11 @@ without scrolling blind.
   `settings-search <words>`.
 - **Previews fold.** Below 720 pt of window height a page's preview is a 44 pt strip with its
   title ("Notch preview") and an arrow; opening it pushes the controls down and is remembered per
-  page while the window lives. The window opens 680 pt tall where the screen allows (was 600), so on
+  page until the window closes; reopened, it starts folded again. The window opens 680 pt tall where the screen allows (was 600), so on
   the default window the previews start folded. Claude Code's strip says its card is sample input.
 - **Advanced.** A collapsed **Advanced** section on Desk (Margins), Desk Look (the hex fields; the
   Colors section keeps the presets and a swatch) and Notch (Size and Notch text color). Search and
-  an anchor link open it.
+  an anchor link open it; closing the window collapses it again.
 - **Message's bar.** Add Line, List | Text, Save and Revert sit above the list and never scroll
   away, with "Unsaved changes" (or today's lines) under them; Rotation (Change the line, Mix, On
   special days) folds to a summary line while all three are as shipped. Add Line puts the new line at

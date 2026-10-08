@@ -135,6 +135,15 @@ struct SettingsAnchorLinkTests {
         #expect(DebugAction.names.contains("settings-search"))
     }
 
+    @Test func closingTheWindowFoldsPreviewsAndAdvancedAgain() {
+        let nav = SettingsNavigation()
+        nav.open(.deskLayout, anchor: SettingsAnchor.margins)
+        nav.openPreviews.insert(.notch)
+        nav.windowClosed()
+        #expect(nav.openPreviews.isEmpty && nav.openAdvanced.isEmpty)
+        #expect(nav.selection == .deskLayout)
+    }
+
     @Test func openingAnAnchorScrollsLightsAndOpensAdvanced() {
         let nav = SettingsNavigation()
         nav.open(.deskLayout, anchor: SettingsAnchor.margins, highlight: true)

@@ -49,8 +49,8 @@ private struct SettingsViewportMark: ViewModifier {
 }
 
 /// A page's preview card, or below 720 pt of window height a 44 pt strip with its title and a
-/// disclosure arrow; opening the strip pushes the controls down and is remembered per page while
-/// the window lives (SettingsNavigation.openPreviews).
+/// disclosure arrow; opening the strip pushes the controls down and is remembered per page until
+/// the window closes (SettingsNavigation.openPreviews).
 struct PreviewFold<Card: View>: View {
     let page: SettingsSection
     /// Shown on the strip when the card is folded: what the card would say it shows, for a card
