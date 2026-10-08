@@ -75,6 +75,16 @@ Added 2026-10-08 from the owner: "we need to be able to see what all we have ava
 
 **Wall:** chips carry labels and badges only. A work seat's project-scope items show as "In N projects", never with project names, and the whole card row for work-only items hides in demo mode. In slice 1 the catalog is read-only except Sanduhr's own mod switch. When slice 3 adds installs, a chip's menu offers Install, Enable and Disable in that seat through the CLI. It never offers to copy from a work seat into a personal one; copying the other way is allowed.
 
+### Build a mod with an agent, and let agents add mods
+
+Added 2026-10-08 from the owner: "Catalog with a prompt for building and MCP tool to allow desktop or code agent to add mods".
+
+- **Build with Claude…** on the Catalog copies a ready prompt for Claude Code or Claude Desktop. It covers what a mod is (a plugin folder with `.claude-plugin/plugin.json`), what it may draw (statusline, the band above the prompt, hooks, skills, commands), the effects grammar Sanduhr already speaks, the rules (no network unless asked, no secrets, read-only by default), and to finish with `propose_mod`. A field above it takes the idea in a sentence ("a band that shows my CI runs"). The prompt names no seat path and carries no settings values.
+- **`propose_mod`** (item 64, slice 4) in Sanduhr's MCP server: the agent sends the files inline (count and size caps, no paths), and Sanduhr stages them read-only, refuses name collisions, runs `claude plugin validate --json` and answers `pending_review`. The proposal shows as a card at the top of the Catalog with a **Proposed** badge, its files, the risk card and **Install in…** with a seat picker. Nothing installs until the user picks seats and approves; turning it on per folder stays a separate switch. `get_mod_status` reports pending, approved (with seats), refused (with the reason) or failed.
+- **`propose_install`**: the agent asks to install a card that already exists (a marketplace plugin, or a mod installed in another seat) into a seat, by name and source. It shows on that card as a pending chip with Approve and Decline. Approving runs `claude plugin install --scope <s>` in that seat (slice 3).
+- **`list_catalog`**: read-only, the cards with their seat chips (labels and states only), so an agent can answer "what do I have, and where" and avoid proposing a duplicate.
+- **Wall:** an agent never learns a work seat's project names or paths through these tools, and a proposal from a session in a personal seat can't target a work seat unless the user picks it at approval. Switch off **Let agents propose mods** and the tools refuse. The switch is on Mods & Config and off by default, like the watcher and suggestion switches.
+
 ## The page, seat by seat
 
 Settings, Mods becomes Settings, **Mods & Config**. A seat picker sits at the top: one chip per discovered seat with its user-chosen label, a work or personal badge in a fixed color, and a dot for "Claude Code running". Below it, eight sections for the selected seat. Each section has a one-line summary that is visible collapsed, so the page reads as a health report before anything is opened.
