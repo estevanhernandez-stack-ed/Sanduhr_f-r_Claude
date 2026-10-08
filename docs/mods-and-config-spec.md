@@ -56,6 +56,25 @@ A seat can be marked **work**. The mark comes from the account link Sanduhr alre
 
 The seats' own wall (an identity file checked against the remote, a prompt-blocking guard, a memory hold keyed on the work projects folder, a capability-based pre-commit check) stays the enforcement. Sanduhr shows its results and never reimplements it [repo dotclaude-personal:.seat/README.md] [local work seat repo: `.githooks/pre-commit`, decision log entry "the wall is enforced on capability, not on the string"].
 
+## The catalog: everything available, and where each is installed
+
+Added 2026-10-08 from the owner: "we need to be able to see what all we have available and then on their cards where they are installed (work, personal, etc)". The page opens on a **Catalog**; the seat-by-seat view below becomes its second tab (**Catalog | By Seat**), remembered per window.
+
+**What counts as available**, read from files only (no network, no marketplace refresh):
+
+- every plugin and mod installed, enabled or declared in any seat, at any scope (user, project, local, inline);
+- every plugin listed by a marketplace any seat has added (the marketplace's cached `marketplace.json` in that seat), installed or not;
+- Sanduhr's own mod, `sanduhr-meters`;
+- the seats' agents, skills, commands, output styles and MCP servers, grouped by name.
+
+**One card per extension**: name, kind, where it comes from (marketplace and its name, inline folder, seat-local, project), version, the description from its manifest or frontmatter, and the risk line from `claude plugin validate --json` when it was checked. A same-named plugin from two marketplaces is one card with both sources and a duplicate badge.
+
+**Where it's installed**: a row of seat chips on each card, one per discovered seat, with the seat's user-chosen label and its work or personal badge (the seat picker's colors). Each chip says the state in that seat: **On**, **Off** (installed, disabled), **Declared, not installed** (enabled in settings but missing on this machine), **In N projects** (project scope only), or no chip when the seat lacks it. A card with no chips is **Available**: listed by a marketplace, installed nowhere. Clicking a chip opens By Seat at that seat and that extension.
+
+**Filters** across the top: kind (mods and plugins, skills, agents, commands, output styles, MCP servers), seat, Installed somewhere, Available only, and Needs a look (duplicates, declared but not installed, a parity problem, a failed check). Search finds a card by name, description or marketplace.
+
+**Wall:** chips carry labels and badges only. A work seat's project-scope items show as "In N projects", never with project names, and the whole card row for work-only items hides in demo mode. In slice 1 the catalog is read-only except Sanduhr's own mod switch. When slice 3 adds installs, a chip's menu offers Install, Enable and Disable in that seat through the CLI. It never offers to copy from a work seat into a personal one; copying the other way is allowed.
+
 ## The page, seat by seat
 
 Settings, Mods becomes Settings, **Mods & Config**. A seat picker sits at the top: one chip per discovered seat with its user-chosen label, a work or personal badge in a fixed color, and a dot for "Claude Code running". Below it, eight sections for the selected seat. Each section has a one-line summary that is visible collapsed, so the page reads as a health report before anything is opened.
@@ -135,9 +154,9 @@ Verify: swift-testing for the placement rule (stub plus live, live only, inner o
 
 ### Slice 1: read-only Mods & Config
 
-All eight sections for every seat, reading files only. No new writes. Wall: work badge from the account link or a per-seat toggle (the toggle is a Sanduhr preference, not a seat write), user-chosen labels, work rows hidden in demo mode, cross-wall drift by name only. The secret mask applies to every rendered value.
+The Catalog (every extension available, each card's seat chips, filters, search), then all eight sections for every seat, reading files only. No new writes. Wall: work badge from the account link or a per-seat toggle (the toggle is a Sanduhr preference, not a seat write), user-chosen labels, work rows hidden in demo mode, cross-wall drift by name only. The secret mask applies to every rendered value.
 
-Acceptance: the owner's seats each show settings with source and honored badges, the instruction tree, extensions with parity checks, MCP across scopes, retention with the 30-day warning, leftovers, seat repo state from `state.json`, and drift; no env value or secret-named value appears anywhere on screen, in logs or in `state.yaml`; an unparseable `settings.json` shows as unreadable; nothing in any seat changes (mtime check over every seat before and after).
+Acceptance: the Catalog lists every plugin, mod, skill, agent, command, output style and MCP server across the owner's seats and the marketplaces they added, each card with a chip per seat that holds it and the right state, a duplicate plugin as one card with two sources, and marketplace plugins installed nowhere as Available; the owner's seats each show settings with source and honored badges, the instruction tree, extensions with parity checks, MCP across scopes, retention with the 30-day warning, leftovers, seat repo state from `state.json`, and drift; no env value or secret-named value appears anywhere on screen, in logs or in `state.yaml`; an unparseable `settings.json` shows as unreadable; nothing in any seat changes (mtime check over every seat before and after).
 Verify: swift-testing for the precedence walker (list merge, `enabledPlugins` per key, strict-wins table), the scope badge table, the mask (env, nested secret paths, MCP headers), the parity checks, the never-list buckets from fixture `.gitignore` files, `state.json` parsing, drift with the wall; a smoke action that opens the page per seat and reports counts in `state.yaml`; by hand on the owner's seats.
 
 ### Slice 2: edits with undo, safest keys first
@@ -149,7 +168,7 @@ Verify: swift-testing for each key's plan and verify, the receipt round trip, co
 
 ### Slice 3: plugins and MCP through the CLI
 
-Plugin enable, disable, install and uninstall through `claude plugin ... --scope <s> --json` with `CLAUDE_CONFIG_DIR=<seat>`, interpreting `failureCode`; MCP add and remove through `claude mcp add|add-json|remove -s <scope>`, with secrets entered into a field that is passed to the CLI and never stored or logged. Every CLI write is blocked while a Claude Code process runs, and the page says why. Sanduhr's own mod switch moves to the CLI if it accepts `@inline` ids [unverified]. Fixes offered by the parity checks (install the missing plugin, disable the duplicate) become one-click CLI actions.
+The Catalog's seat chips gain Install, Enable and Disable (never a copy out of a work seat). Plugin enable, disable, install and uninstall through `claude plugin ... --scope <s> --json` with `CLAUDE_CONFIG_DIR=<seat>`, interpreting `failureCode`; MCP add and remove through `claude mcp add|add-json|remove -s <scope>`, with secrets entered into a field that is passed to the CLI and never stored or logged. Every CLI write is blocked while a Claude Code process runs, and the page says why. Sanduhr's own mod switch moves to the CLI if it accepts `@inline` ids [unverified]. Fixes offered by the parity checks (install the missing plugin, disable the duplicate) become one-click CLI actions.
 
 Acceptance: a duplicate plugin is disabled from the page and `claude plugin list --json` agrees; an MCP server added from the page appears in `claude mcp list` for that seat only; no CLI write runs while a session is open; no secret reaches disk outside Claude Code's own store.
 Verify: swift-testing with a fake `claude` binary recording argv and env (seat selection, scope, `--json` parsing, refusal while running, refusal of unknown subcommands); by hand with a scratch seat.
