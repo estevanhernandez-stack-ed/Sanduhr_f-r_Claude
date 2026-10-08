@@ -421,12 +421,14 @@ private struct SettingsSidebar: View {
 
 private struct SettingsSearchField: View {
     @Bindable var navigation: SettingsNavigation
+    @FocusState private var focused: Bool
 
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
-            TextField("Search", text: $navigation.searchText)
+            TextField("Search Settings", text: $navigation.searchText)
                 .textFieldStyle(.plain)
+                .focused($focused)
                 .onSubmit { navigation.openFirstHit(navigation.searchText) }
                 .onExitCommand { navigation.searchText = "" }
                 .accessibilityLabel("Search Settings")
@@ -437,9 +439,16 @@ private struct SettingsSearchField: View {
                     .accessibilityLabel("Clear the search")
             }
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
-        .background(RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.6)))
+        .padding(.horizontal, 7)
+        .padding(.vertical, 5)
+        // A field that reads as one (2026-10-08: the faint fill read as empty space): the text
+        // background with a hairline, the accent ring while typing. Command-F jumps into it.
+        .background(RoundedRectangle(cornerRadius: 7).fill(Color(nsColor: .textBackgroundColor)))
+        .overlay(RoundedRectangle(cornerRadius: 7)
+            .strokeBorder(focused ? Color.accentColor : Color.secondary.opacity(0.35), lineWidth: focused ? 2 : 1))
+        .background(Button("Search Settings") { focused = true }
+            .keyboardShortcut("f", modifiers: .command)
+            .hidden())
     }
 }
 
