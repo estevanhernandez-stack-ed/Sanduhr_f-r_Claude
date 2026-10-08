@@ -654,11 +654,13 @@ S=~/Library/Application\ Support/Sanduhr/integrations
 
 - [ ] `claude plugin test mac/integrations/mods/sanduhr-meters` and `claude plugin validate
   mac/integrations/mods/sanduhr-meters` pass.
-- [ ] Settings, Claude Code: `~/.claude-smoketest` has a third row, Meters above the prompt, Not
-  installed. Its Install… works even where the page says Python is missing.
-- [ ] Install…: the sheet says the band shows the session and weekly bars, reads only
+- [ ] Settings, Claude Code: `~/.claude-smoketest`'s box ends "Meters above the prompt: not
+  installed" with **Mods & Config Settings…**, which opens Mods & Config at Meters above the prompt.
+  There, `~/.claude-smoketest` reads Not installed; its switch works even where Claude Code says
+  Python is missing.
+- [ ] Switch it on: the sheet says the band shows the session and weekly bars, reads only
   `snapshot.json`, and that Sanduhr adds its folder to `env.CLAUDE_CODE_PLUGIN_DIRS` in
-  `~/.claude-smoketest/settings.json`, keeping the folders already listed. Install: Installed;
+  `~/.claude-smoketest/settings.json`, keeping the folders already listed. Install: On;
   `jq -r '.env.CLAUDE_CODE_PLUGIN_DIRS' ~/.claude-smoketest/settings.json` prints
   `/tmp/other-mod:<…>/integrations/current/mods/sanduhr-meters`, `"model"` is still there, and
   `ls "$S/current/mods/sanduhr-meters"` shows `.claude-plugin`, `hooks`, `types` and no tests.
@@ -1426,17 +1428,22 @@ its `shasum`.
 Put your list back: `cp ~/messages.txt.bak ~/Library/Application\ Support/Desk/messages.txt`.
 
 
-## 37. Switch Sanduhr's own mod (item 64, slice 2; in Claude Code since Settings v2, slice 2)
+## 37. Switch Sanduhr's own mod (item 64, slice 2; on Mods & Config again since 2026-10-08)
 
 Use throwaway Claude Code folders only (`mkdir -p ~/.claude-modtest/projects ~/.claude-modtest2/projects`)
 and remove them afterwards. Give `~/.claude-modtest/settings.json` `{"model": "opus"}` and note its
-`shasum`. Settings, Claude Code: install **Meters above the prompt** into `~/.claude-modtest`.
+`shasum`. Settings, Mods & Config: turn on **Meters above the prompt** for `~/.claude-modtest`
+(Install in the sheet).
 
-1. Settings, Claude Code: each folder box's **Meters above the prompt** row has a switch, with
-   Update and Remove. `~/.claude-modtest` is on: "Version …, through Sanduhr's current folder: it
-   follows Sanduhr's updates." and a line saying how Off differs from Remove. Settings, Mods &
-   Config has no switch at all: its sanduhr-meters row says "Sanduhr's own mod. It switches per
-   folder in Claude Code, Meters above the prompt." with a **Claude Code Settings…** button.
+1. Settings, Mods & Config: **Meters above the prompt** sits at the top, above Mods and plugins,
+   with a row per folder: its path, On/Off/Not installed, Update and Remove when they apply, and a
+   switch. Its intro says how Off differs from Remove. `~/.claude-modtest` is on: "Version …,
+   through Sanduhr's current folder: it follows Sanduhr's updates." Under the rows, "Show watchers
+   above the prompt: off. …" with **Watchers Settings…**. The sanduhr-meters row in the inventory
+   below says "Sanduhr's own mod. It switches per folder at the top of this page, Meters above the
+   prompt." Settings, Claude Code has no switch for it: each folder box ends "Meters above the
+   prompt: on" (off, not installed) with **Mods & Config Settings…**, which opens Mods & Config
+   scrolled to the mod (`smoke/smoke do settings "mods meters"` does the same).
 2. Switch it off: the row reads "… Off: enabledPlugins sets sanduhr-meters@inline to false here."
    and "Takes effect in new Claude Code sessions (or after /reload-plugins)." settings.json now has
    `"enabledPlugins": {"sanduhr-meters@inline": false}` and the plugin list entry is still there;
@@ -1570,8 +1577,8 @@ the end.
 ## 40. The animated band and watchers above the prompt (items 65f, 66)
 
 Use a throwaway Claude Code folder (`mkdir -p ~/.claude-bandtest/projects`), never your real
-settings, and remove it afterwards. Install the meters mod and the statusline for it in Settings,
-Integrations. For the Combine steps give it a statusline of its own first
+settings, and remove it afterwards. Turn on the meters mod for it in Settings, Mods & Config
+(Meters above the prompt), and install the statusline in Settings, Claude Code. For the Combine steps give it a statusline of its own first
 (`{"statusLine": {"type": "command", "command": "echo mine"}}` in its `settings.json`).
 
 1. Nothing set: `ls ~/Library/Application\ Support/Sanduhr/band.json` finds no file. Settings,
@@ -1722,7 +1729,7 @@ desktop well away from every piece.
    Code glow hook), **On the notch** and **On the Desk** (set On the notch to Right wing: Notch's Right
    wing reads Watchers; set On the Desk to Middle left: Desk's Watchers row reads it), the glow
    rule and its Now line (Desk off, or nothing placed, says so), Above the prompt with each folder's
-   meters mod. With On the notch set and the Desk on, `smoke/smoke do watch-test start` then `smoke/smoke do watch-test wait`: the
+   meters mod and **Mods & Config Settings…** (opens Mods & Config at the mod). With On the notch set and the Desk on, `smoke/smoke do watch-test start` then `smoke/smoke do watch-test wait`: the
    notch glows once (`glow_count` up by one). Set both places off and repeat: no glow, and the Now
    line says why. `smoke/smoke do watch-test clear`.
 7. Alerts: Notifications, then **Each limit** with a group per limit (Warn when nearly full, At,
@@ -1731,9 +1738,12 @@ desktop well away from every piece.
 8. Widget: Show the widget, Show the widget now, Font, Subtle mode, then Pacing calculators.
 9. Claude Code: **Folders** with **Add Folder…** beside the heading; each folder box starts with
    **Account** (the linked account, or Follows the active account) and **Change in Accounts…**
-   (opens Accounts with that account selected). On a scratch folder, **Meters above the prompt**:
-   switch on (install sheet the first time), off (the entry goes, the mod's files stay), on, then
-   Remove (settings.json back to its first `shasum`). Mods & Config shows the mod read-only.
+   (opens Accounts with that account selected), and ends with "Meters above the prompt: …" and
+   **Mods & Config Settings…**, no switch. On Mods & Config, for a scratch folder, **Meters above
+   the prompt**: switch on (install sheet the first time), off (the entry goes, the mod's files
+   stay), on, then Remove (settings.json back to its first `shasum`); Claude Code's line follows
+   each step. Search **meters above**, **mod** or **prompt**: each lists Meters above the prompt
+   under Mods & Config.
 10. A 2.10 profile: before updating, note `layout`, `notchLeft`/`notchRight`/`notchStrip`,
     `avSide`, `hotKeys`, `showClaude` and `menuBarMode` (`defaults read com.626labs.sanduhr.desk`).
     After the update: the Desk draws the same pieces in the same places (with Show the Claude meters

@@ -117,8 +117,8 @@ The sidebar groups and every page name the guide uses match; the General surface
 | | **Notch** | `rectangle.topthird.inset.filled` | Notch, the notch switch, Desk Look's Notch text color |
 | | **Now Playing** | `music.note` | Now Playing |
 | | **Watchers** | `eye` | Integrations' Watchers, plus watcher placement |
-| Claude Code | **Claude Code** | `puzzlepiece.extension` | Integrations, including the meters mod |
-| | **Mods & Config** | `cube` | Mods, per item 71 |
+| Claude Code | **Claude Code** | `puzzlepiece.extension` | Integrations (the meters mod shows there as a status line) |
+| | **Mods & Config** | `cube` | Mods, per item 71, with Sanduhr's meters mod's controls at the top |
 | Widget | **Widget** | `textformat` | Widget Look plus Pacing & Focus |
 | | **Themes** | `paintpalette` | Themes |
 | Help | **Updates** | `arrow.triangle.2.circlepath` | Updates |
@@ -214,24 +214,30 @@ The watchers' one home, switches and placement together (F3).
 - **Let agents show watchers**, **Show Claude Code's background work** (with "Needs the Claude Code glow hook. Claude Code Settings…" until installed).
 - **Where they show**, inline: **On the notch** (Off, Left wing, Right wing, Under the camera), writing the same notch keys as the Notch page's wing pickers; **On the Desk** (Hidden or one of the eight places), writing the same layout string as Desk. One stored value each, two editors on purpose: this is the exception to "one control", and the Notch and Desk pages show Watchers as a choice that reads and writes the same key, so they never disagree.
 - **Glow when a watcher waits on you**: a line stating the rule the code already follows: "The notch glows once when a watcher waits on you, if watchers show somewhere above." Turned into a switch only if someone asks.
-- **Above the prompt**: **Show watchers above the prompt**, with the meters mod's status per folder and "Claude Code Settings…".
+- **Above the prompt**: **Show watchers above the prompt** (the watcher-side switch: what `band.json` carries, so it stays here), with the meters mod's status per folder and "Mods & Config Settings…" to the mod's anchor.
 - Preview: a sample watcher card (exists in Integrations today), moved here.
 
 ### Claude Code
 
-Was Integrations. One home for what Sanduhr installs into Claude Code folders, the meters mod included (F4).
+Was Integrations. One home for what Sanduhr installs into Claude Code folders, except the meters mod, which is a mod and lives on Mods & Config (F4, revised 2026-10-08).
 
 - **Intro and Python**: the trust copy as today, Python found, Install Command Line Tools…, Check Again.
 - **Folders**, at the top with **Add Folder…** beside the heading (F14). One box per folder:
   - **Account**: the linked account from Accounts' Data, or "Follows the active account", with "Change in Accounts…" (F18).
-  - **MCP server**, **Statusline**, **Meters above the prompt**, **Claude Code glow hook** (the one name for "notch glow hooks" and "Notch glow when Claude needs you", F9). Each row: status, Install… or On/Off, Update, Remove.
-  - **Meters above the prompt is the sanduhr-meters mod**, and its row is its only control: **On** and **Off** switch the mod for the folder (Off keeps Sanduhr's mod files and takes the folder's entry out), **Remove** also deletes the receipt and restores the folder's `settings.json` byte for byte. The row says so in one line.
+  - **MCP server**, **Statusline**, **Claude Code glow hook** (the one name for "notch glow hooks" and "Notch glow when Claude needs you", F9). Each row: status, Install…, Update, Remove.
+  - **Meters above the prompt: on / off / not installed**, one status line with **Mods & Config Settings…** to the mod's anchor (`mods#meters`), no controls. The switch, Update and Remove are on Mods & Config.
   - Each installed row names the file it edits (`<folder>/settings.json`, or `~/.claude.json` for the MCP server) and where the backup and receipt are kept (Sanduhr's Application Support folder, per item 71's slice 0).
 - Deep links to each folder box and each row.
 
 ### Mods & Config
 
-Item 71, unchanged in substance. This spec only fixes where it sits and what it no longer does: the Sanduhr mod switch leaves the page (it lives in Claude Code, F4) and the page lists sanduhr-meters read-only, like every other mod, with "Claude Code Settings…". Copy changes from F21: "receipt" becomes "a record in Sanduhr's folder, so Remove can put the file back exactly"; the banner tiles read "1 mod", "27 plugins", "27 enabled plugins", "2 folders"; the "Mods and plugins" heading sits directly above the list it describes (F14). Item 71's seat picker, eight sections, wall and secret rules apply as written there.
+Item 71, unchanged in substance, plus Sanduhr's own mod at the top (anchor `meters`):
+
+- **Meters above the prompt**, the sanduhr-meters mod, per Claude Code folder: its switch, **Update** and **Remove**, with where it stands, what the last action said and a project's override when one keeps it on or off. **On** in a folder without the entry opens the consent sheet ("Show the meters above Claude Code's prompt?") and installs; **Off** switches the mod off for the folder (`enabledPlugins` false) and keeps its entry and files; **Remove** takes the entry out, deletes the receipt and restores the folder's `settings.json` byte for byte. An entry naming older scripts shows **Update** too.
+- Its options: the watchers' rows are switched by **Show watchers above the prompt** on Watchers (a line here gives its state and **Watchers Settings…**); the looks of Sanduhr's meters in the band come from the statusline's Combine sheet, and its "Show Sanduhr's meters above the prompt instead (animated)" stays there because it changes the statusline command (`--band`).
+- **Why it moved (2026-10-08).** Slice 2 put the mod's controls on Claude Code, beside the other things Sanduhr installs into a folder. The owner's call: the meters above the prompt are a mod, and a person looking for a mod looks on the mods page, so its controls belong with Mods. One home per control still holds: Claude Code and Watchers show its state with a link, never a switch. Nothing stored changed: the same receipts, the same `env.CLAUDE_CODE_PLUGIN_DIRS` and `enabledPlugins` entries.
+
+The rest of sanduhr-meters' inventory row stays read-only, like every other mod. Copy changes from F21: "receipt" becomes "a record in Sanduhr's folder, so Remove can put the file back exactly"; the banner tiles read "1 mod", "27 plugins", "27 enabled plugins", "2 folders"; the "Mods and plugins" heading sits directly above the list it describes (F14). Item 71's seat picker, eight sections, wall and secret rules apply as written there.
 
 ### Widget
 
@@ -319,11 +325,11 @@ Nothing is dropped. Storage keys stay unless stated, so existing installs keep e
 | Integrations | Python, Install Command Line Tools…, Check Again | Claude Code | Same. |
 | Integrations | Add Folder… | Claude Code, beside Folders heading | Same action. |
 | Integrations | MCP server, Statusline (Combine/Replace) | Claude Code, folder box | Same receipts. |
-| Integrations | Meters above the prompt | Claude Code, folder box, as the sanduhr-meters row with On/Off, Update, Remove | Receipts unchanged; the Mods page's switch and this row already write the same entries (item 64's ModSwitch). |
+| Integrations | Meters above the prompt | Mods & Config, top, **Meters above the prompt** per folder with the switch, Update, Remove (2026-10-08; slice 2 had it in Claude Code's folder box, which now shows a status line and Mods & Config Settings…) | Receipts unchanged; the Mods page's switch and the install write the same entries (item 64's ModSwitch). |
 | Integrations | Notch glow when Claude needs you | Claude Code, folder box, **Claude Code glow hook** | Same receipt; renamed. |
 | Integrations | Watchers section (Let agents show watchers, Show Claude Code's background work, Show watchers above the prompt, Notch Settings…, Desk Layout Settings…) | Watchers | Same keys; placement buttons replaced by inline pickers on the same keys. |
 | Mods | inventory, Check, risk card | Mods & Config | Per item 71. |
-| Mods | Sanduhr's mod: On, Update, Remove | Claude Code, folder box | Same receipts; Mods & Config lists it read-only. |
+| Mods | Sanduhr's mod: On, Update, Remove | Mods & Config, top, **Meters above the prompt** | Same receipts. It was in Claude Code's folder box in slice 2, and moved back with the meters mod's whole set of controls (2026-10-08): it is a mod. |
 | Layout | Arrange Desk… | Desk | Same. |
 | Layout | Where each piece sits, Order | Desk | Same layout string; pieces renamed (Claude line → Claude meters (line)). |
 | Layout | Margins | Desk, Advanced | Same keys. |
@@ -384,7 +390,7 @@ Verify: swift-testing that every menu item, tour step and What's New card referr
 
 ### Slice 2: one home per feature
 
-The sidebar of this spec: the Desk and Notch switches on their pages with General showing status; Watchers as its own page with inline placement and the glow rule stated; Meters folded into Alerts; Pacing & Focus into Widget; Notch text color and Clicks moved; the meters mod's controls only in Claude Code; Camera and mic's one placement picker with its migration; the folder-to-account line in each Claude Code box; Add Folder… beside the folder list; Show the Claude meters on the desktop migrated into the layout.
+The sidebar of this spec: the Desk and Notch switches on their pages with General showing status; Watchers as its own page with inline placement and the glow rule stated; Meters folded into Alerts; Pacing & Focus into Widget; Notch text color and Clicks moved; the meters mod's controls only in Claude Code (moved to Mods & Config on 2026-10-08: it is a mod); Camera and mic's one placement picker with its migration; the folder-to-account line in each Claude Code box; Add Folder… beside the folder list; Show the Claude meters on the desktop migrated into the layout.
 
 Acceptance: each control in the mapping table appears as a control on exactly one page; an existing install's choices all read the same after the update (layout, wings, camera and mic placement, hotkeys, menu bar); a watcher set to waiting glows the notch when placed, and the Watchers page says why it doesn't when it isn't.
 Verify: swift-testing for the migrations (Claude meters switch to Hidden pieces, Camera and mic wing to placement, the hotkey split, each idempotent on a second run) and for the section aliases; smoke scenarios updated (`deskMeters` → `alerts`), `settings-sections.yaml` covering every page; by hand on a profile copied from a 2.10.0 install.
@@ -429,6 +435,6 @@ Item 71, in its own slices 0 to 5, built on this page structure. Not repeated he
 
 - [ ] **72. Settings v2: pages by task, one home and one name per control, search, reset**
   Spec ref: `docs/settings-v2-spec.md` (2026-10-07), from the 20 writer inputs in `docs/settings-v2-inputs.md` and a fresh-agent pass of four personas on 2.10.0. Follows items 68 (previews), 69 (Message editor) and 71 (Mods & Config, which this places).
-  What to build, in slices that each ship: (0) Arrange Desk can always be ended: the Cancel and Done bar gets a real frame, the Desk rises above windows while arranging, empty pieces get placeholder outlines, labels never overlap; (1) names and links: one names table, every "<Page> Settings…" button opens the page it names, the island opens Notch, Menu Bar Shows in the shared menu, Notch glow and Claude Code glow hook as the one names, copy fixes (Max, the calendar line, `Mon:`, Mods' "receipt"); (2) one home per feature: sixteen pages in five groups (General, Accounts, Usage, Alerts; Desk, Desk Look, Message, Notch, Now Playing, Watchers; Claude Code, Mods & Config; Widget, Themes; Updates, About), the Desk and Notch switches on their pages, Watchers with inline placement, Meters into Alerts, the meters mod only in Claude Code, one Camera and mic placement, the folder's account shown per folder, with migrations that keep every existing choice; (3) reach: sidebar search with synonyms, section anchors and `sanduhr://settings/<page>#<anchor>`, collapsing previews below 600 pt, Advanced disclosures, Add Line at the top with the new row in view, Text under the camera setting its height; (4) signed out and demo: Label on first sign-in, plain Chrome and Safari key help, Data defaults shown before sign-in, "Not signed in" and Not Now on the widget, empty wings collapse, Sanduhr Tour title, Highlights on first run, demo mode on every surface; (5) Reset Sanduhr… on About, removing Claude Code entries through their receipts first.
+  What to build, in slices that each ship: (0) Arrange Desk can always be ended: the Cancel and Done bar gets a real frame, the Desk rises above windows while arranging, empty pieces get placeholder outlines, labels never overlap; (1) names and links: one names table, every "<Page> Settings…" button opens the page it names, the island opens Notch, Menu Bar Shows in the shared menu, Notch glow and Claude Code glow hook as the one names, copy fixes (Max, the calendar line, `Mon:`, Mods' "receipt"); (2) one home per feature: sixteen pages in five groups (General, Accounts, Usage, Alerts; Desk, Desk Look, Message, Notch, Now Playing, Watchers; Claude Code, Mods & Config; Widget, Themes; Updates, About), the Desk and Notch switches on their pages, Watchers with inline placement, Meters into Alerts, the meters mod's controls in one place (Claude Code in slice 2, Mods & Config since 2026-10-08), one Camera and mic placement, the folder's account shown per folder, with migrations that keep every existing choice; (3) reach: sidebar search with synonyms, section anchors and `sanduhr://settings/<page>#<anchor>`, collapsing previews below 600 pt, Advanced disclosures, Add Line at the top with the new row in view, Text under the camera setting its height; (4) signed out and demo: Label on first sign-in, plain Chrome and Safari key help, Data defaults shown before sign-in, "Not signed in" and Not Now on the widget, empty wings collapse, Sanduhr Tour title, Highlights on first run, demo mode on every surface; (5) Reset Sanduhr… on About, removing Claude Code entries through their receipts first.
   Acceptance: Arrange Desk shows a visible bar over a full-screen window; every control in the spec's mapping table is a control on exactly one page and an existing install keeps every choice; every "Settings…" button lands on the page it names; search finds Glow, Margins and Menu Bar Shows on a 628 pt window; a fresh profile never says "Connecting..." without an account; Reset leaves every Claude Code folder's `settings.json` byte-identical to before Sanduhr.
   Verify: swift-testing for the names table against menus, the tour and What's New, the migrations (each idempotent), the section aliases, the search index, anchors, signed-out states, demo coverage and the reset order; smoke: `desk_arrange.bar_frame_ok`, `settings-names.yaml`, `settings-sections.yaml` over every page, `settings_anchor_visible`, `reset --dry-run`, the `deskMeters` scenarios moved to `alerts`; by hand on a 13-inch screen, a profile copied from 2.10.0, and a scratch macOS user with a scratch Claude Code folder. The setup guide is updated in each slice's PR.

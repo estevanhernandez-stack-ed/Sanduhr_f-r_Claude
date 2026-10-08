@@ -181,11 +181,18 @@ You get your meters inside Claude Code, a notch that glows when Claude needs you
    - **Statusline**: your meters on a line under Claude Code's prompt.
    - **Claude Code glow hook**: tells Sanduhr when Claude Code waits on you or finishes, so the notch can glow.
 5. A sheet says what it adds. Click **Install**.
-6. **Meters above the prompt** (your meters as animated bars above the prompt, Sanduhr's sanduhr-meters mod) has a switch instead. Turn it on; the first time, a sheet says what it adds. **Off** switches the mod off for that folder (its `enabledPlugins` entry turns false) and keeps the entry and the mod's files. **Remove** takes the entry out, deletes Sanduhr's record and puts the folder's settings back exactly as before.
+6. The box's last line, **Meters above the prompt: on** (or off, or not installed), is Sanduhr's mod that draws your meters as animated bars above the prompt. It is a mod, so it switches on Settings, **Mods & Config**: click **Mods & Config Settings…** right there.
+
+**Meters above the prompt, per Claude Code folder**
+
+1. Open Settings, **Mods & Config** (or search **meters above**). Sanduhr's own mod, sanduhr-meters, is at the top, one row per Claude Code folder.
+2. Turn its switch on. The first time in a folder, a sheet says what it adds; click **Install**.
+3. **Off** switches the mod off for that folder (its `enabledPlugins` entry turns false) and keeps the entry and the mod's files. **Remove** takes the entry out, deletes Sanduhr's record and puts the folder's settings back exactly as before. **Update** shows when this Sanduhr carries a newer version; if the new one can do more, it asks first.
+4. If a project's own settings keep the mod on or off, the row says so.
 
 Remove takes out exactly what Sanduhr added.
 
-**Already have a statusline?** The sheet offers **Combine** (keeps yours and adds Sanduhr's), **Replace** or **Cancel**. Combine lets you pick which pieces of each line stay and how they join. Check **Show Sanduhr's meters above the prompt instead (animated)** to keep your line as it is and put Sanduhr's meters above the prompt (install Meters above the prompt in the same folder).
+**Already have a statusline?** The sheet offers **Combine** (keeps yours and adds Sanduhr's), **Replace** or **Cancel**. Combine lets you pick which pieces of each line stay and how they join. Check **Show Sanduhr's meters above the prompt instead (animated)** to keep your line as it is and put Sanduhr's meters above the prompt (turn on Meters above the prompt for the same folder, on Mods & Config).
 
 **Turn on the glow.** The Claude Code glow hook only tells Sanduhr. To see it, open Settings, **Notch** (or click **Notch Settings…** right there in Claude Code), and under **Notch glow** turn on **When Claude Code is waiting on you** or **When Claude Code finishes**. **Not while a terminal is in front** skips it when you're already looking.
 
@@ -205,7 +212,7 @@ You get a live card for a build, a release or a long task, which glows when it n
 2. Turn on **Let agents show watchers**. Claude Code (with the MCP server installed) can then start a card, update its progress and end it.
 3. Optional: turn on **Show Claude Code's background work** to see Claude Code's background tasks as cards too. This needs the Claude Code glow hook from task 7; until a folder has it, the page says so with a **Claude Code Settings…** button.
 4. Place them, under **Where they show**: **On the notch** picks **Left wing**, **Right wing** or **Under the camera**, and **On the Desk** picks one of the eight places. They are the same choices as in Settings, Notch and Settings, Desk.
-5. Optional: turn on **Show watchers above the prompt** to see them as rows above Claude Code's prompt (needs Meters above the prompt; the page lists which folders have it).
+5. Optional: turn on **Show watchers above the prompt** to see them as rows above Claude Code's prompt (needs Meters above the prompt; the page lists which folders have it, and **Mods & Config Settings…** opens the mod's switches).
 
 A card shows a title, a state dot (running, waiting on you, passed, failed), the time so far and the progress. Waiting on you pulses, and glows the notch once if watchers show somewhere: **Glow when a watcher waits on you** says whether they do now, and why not. Click a card to open its link. Cards live in memory only, so quitting Sanduhr clears them.
 
@@ -248,7 +255,7 @@ You get one page that lists what each Claude Code folder loads.
 
 1. Open Settings, **Mods & Config**.
 2. Under the heading **Mods and plugins**, the list shows every mod and plugin each folder loads, and what it can touch. The card at the top counts them: mods, plugins, enabled plugins and folders.
-3. Every mod is read-only here. Sanduhr's own mod, sanduhr-meters, switches per folder in Settings, **Claude Code**, as **Meters above the prompt** (task 7); its row here has a **Claude Code Settings…** button.
+3. Sanduhr's own mod, sanduhr-meters, sits at the top as **Meters above the prompt**, with a switch, **Update** and **Remove** per folder (task 7). Every other mod is read-only here.
 4. Click **Check** on a mod to run Claude Code's own validation. It reads the files and never runs the mod.
 
 If it doesn't work: Check needs Claude Code's command line (`claude`) installed. Changes reach new Claude Code sessions, or run /reload-plugins.

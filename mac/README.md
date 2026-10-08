@@ -816,9 +816,20 @@ Without `claude` the button is off and the page says why.
 Other mods are read-only: the page says switching them comes later, and a copy of Sanduhr's mod
 outside Sanduhr's folder (a checkout) is marked read-only too.
 
-**Sanduhr's own mod** (slice 2, `ModSwitch.swift`, `ModsOwnSettings.swift`): a box at the top for
-`sanduhr-meters` with a switch per Claude Code folder, Update and Remove, all through the receipt
-in `integrations/installs.json`, so each undoes byte for byte. A row in the inventory is Sanduhr's
+**Sanduhr's own mod** (slice 2, `ModSwitch.swift`, `ModsOwnSettings.swift`): a section at the top,
+**Meters above the prompt** (anchor `mods#meters`), for `sanduhr-meters` with a switch per Claude
+Code folder, Update and Remove, all through the receipt in `integrations/installs.json`, so each
+undoes byte for byte. It is the mod's one home: Settings v2's slice 2 had moved these controls to
+Claude Code's folder boxes, and on 2026-10-08 they came back here, because the meters above the
+prompt are a mod and people look for a mod on the mods page. Claude Code's folder boxes and
+Watchers' Above the prompt show its state per folder ("Meters above the prompt: on",
+`MetersModStatus`) with **Mods & Config Settings…**, no controls. On in a folder without the
+entry opens the install consent sheet (`MetersConsentSheet`), then installs through
+`IntegrationInstaller.install(.meters…)` like the old Install…; an entry naming older scripts
+(`.outdated`) shows Update, which installs again. The watchers' rows in the band stay switched on
+Watchers (Show watchers above the prompt decides what `band.json` carries), and the band's looks
+come from the statusline's Combine sheet, whose "…instead (animated)" stays there because it
+changes the statusline command. A row in the inventory is Sanduhr's
 when its path is a `…/Sanduhr/integrations/…/mods/sanduhr-meters` entry (`isOurModEntry`).
 
 - **Off** writes `enabledPlugins["sanduhr-meters@inline"]: false` into the folder's settings.json
@@ -837,7 +848,7 @@ when its path is a `…/Sanduhr/integrations/…/mods/sanduhr-meters` entry (`is
   update for a question ("The new version can also: …"); the version in use stays until you
   agree. Then the entry moves in place and the old stamp goes once nothing pins it. An entry
   through the `current` link (installed from Integrations) follows the app's updates as before.
-- **Remove** is Integrations' Remove for the mod, which now undoes the switch first: the folder's
+- **Remove** is the installer's Remove for the mod, which now undoes the switch first: the folder's
   settings.json is back to its bytes from before Sanduhr touched it. A member someone changed
   since is left as it is.
 - **What else decides.** Claude Code merges `enabledPlugins` key by key, and a project's value
@@ -1374,8 +1385,9 @@ switch only on Notch, Show the widget and Show the widget now on Widget); Read t
 under Desk's Meetings row; Clock and message take clicks moved from Desk Look to Desk, and Notch text
 color from Desk Look to Notch; each limit's warning and Show this limit (was Desk, Meters) are
 Alerts, Each limit; Pin the pacing calculators (was Pacing & Focus) is on Widget; Watchers is its own
-page (was a section of Integrations); the meters mod's switch, Update and Remove are only on Claude
-Code, as each folder's Meters above the prompt row (Mods & Config lists it read-only); each Claude
+page (was a section of Integrations); the meters mod's switch, Update and Remove are only on Mods &
+Config, as Meters above the prompt at the top (slice 2 had them on Claude Code; each Claude Code
+folder box now shows a status line with Mods & Config Settings…); each Claude
 Code folder box starts with the account the folder follows; Add Folder… sits beside the Folders
 heading; Camera and mic has one placement picker, Where they show. A page that needs the Desk says
 "Needs the Desk." with Desk Settings… while it is off.
@@ -1405,8 +1417,8 @@ without scrolling blind.
   `SettingsWindowController.show(_:anchor:)` opens a page scrolled to one: one `ScrollViewReader`
   around the page scrolls to it twice (just after the page appears and again 0.3 s later, for
   rows a lazy form hadn't built yet). In-page links pass one: Needs the Desk opens Desk at its
-  switch, the Claude Code glow hook hints open Notch at Notch glow, the meters mod lines open Claude
-  Code at Folders, Now Playing's links open Notch at Text and Desk at Where each piece sits.
+  switch, the Claude Code glow hook hints open Notch at Notch glow, the meters mod lines (Claude
+  Code's folder boxes, Watchers) open Mods & Config at `meters`, Now Playing's links open Notch at Text and Desk at Where each piece sits.
 - **Links.** `sanduhr://settings/<page>#<anchor>` (and `estedesk://`) open there, `<page>` a raw
   value or an alias; an anchor the page lacks is dropped, and the host alone still opens Settings
   where it was left (`SettingsLink.target`). The smoke hook's `settings` takes the same anchor:
