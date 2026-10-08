@@ -51,6 +51,12 @@ struct SettingsSearchTests {
         #expect(first("statusline")?.page == .integrations)
         #expect(first("prompt")?.page == .integrations || first("prompt")?.page == .watchers)
         #expect(SettingsSearch.hits("prompt").contains { $0.entry.page == .integrations })
+        // The meters mod lives on Mods & Config (2026-10-08): its words find it there.
+        let meters = first("meters above")
+        #expect(meters?.page == .mods && meters?.anchor == SettingsAnchor.metersMod)
+        #expect(SettingsSearch.hits("prompt").contains { $0.entry.page == .mods && $0.entry.anchor == SettingsAnchor.metersMod })
+        #expect(SettingsSearch.hits("mod").contains { $0.entry.page == .mods && $0.entry.anchor == SettingsAnchor.metersMod })
+        #expect(first("sanduhr-meters")?.anchor == SettingsAnchor.metersMod)
         #expect(first("Option+S")?.anchor == SettingsAnchor.shortcuts)
         #expect(first("hex")?.page == .deskLook && first("hex")?.advanced == true)
         #expect(first("Add Line")?.page == .message)

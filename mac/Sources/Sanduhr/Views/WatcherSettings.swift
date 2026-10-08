@@ -154,7 +154,8 @@ private struct WatcherGlowSection: View {
     }
 }
 
-/// Above Claude Code's prompt: the switch and the meters mod per folder, which draws the rows.
+/// Above Claude Code's prompt: the watchers' switch (what band.json carries), and the meters mod's
+/// state per folder, which draws the rows; the mod switches on Mods & Config.
 private struct WatcherBandSection: View {
     var page: WatchersPageModel
     @AppStorage(BandFile.watchersKey) private var inBand = false
@@ -173,10 +174,10 @@ private struct WatcherBandSection: View {
                 .font(.caption)
             }
             HStack {
-                Text("\(SettingsNames.metersAbovePrompt) is switched per folder in Claude Code.")
+                Text("\(SettingsNames.metersAbovePrompt), the mod, is switched per folder on Mods & Config.")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                SettingsLinkButton(.integrations, anchor: SettingsAnchor.folders)
+                SettingsLinkButton(.mods, anchor: SettingsAnchor.metersMod)
             }
         }
     }

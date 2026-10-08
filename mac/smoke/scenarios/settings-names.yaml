@@ -29,7 +29,8 @@ steps:
   - do: settings-link
     arg: Notch Settings…
   - expect_state: { settings_section: notch }
-  # Watchers: where they show is inline; the hint and Above the prompt open Claude Code.
+  # Watchers: where they show is inline; Above the prompt opens Mods & Config, where the meters
+  # mod that draws the rows switches (2026-10-08).
   - do: settings
     arg: watchers
   # The link sits under Above the prompt, below the fold.
@@ -37,10 +38,30 @@ steps:
     arg: watchers above-prompt
   - expect:
       window: settings
-      contains: { text: '/^Claude Code Settings(…|\.\.\.)$/' }
+      contains: { text: '/^Mods & Config Settings(…|\.\.\.)$/' }
   - do: settings-link
-    arg: Claude Code Settings…
-  - expect_state: { settings_section: integrations }
+    arg: Mods & Config Settings…
+  - expect_state: { settings_section: mods }
+  # Claude Code: each folder box shows the meters mod in one line, with Mods & Config Settings….
+  - do: settings
+    arg: integrations folders
+  - expect:
+      window: settings
+      contains: { text: "/Meters above the prompt: (on|off|not installed|installed)/" }
+  - expect:
+      window: settings
+      contains: { text: '/^Mods & Config Settings(…|\.\.\.)$/' }
+  - do: settings-link
+    arg: Mods & Config Settings…
+  - expect_state: { settings_section: mods }
+  # Mods & Config: Sanduhr's own mod is at the top, and its other half (the watchers' switch)
+  # opens Watchers.
+  - do: settings
+    arg: mods meters
+  - expect_state: { settings_anchor: meters, settings_anchor_visible: true }
+  - expect:
+      window: settings
+      contains: { text: '/^Watchers Settings(…|\.\.\.)$/' }
   # General: each surface's status links to its page.
   - do: settings
     arg: general

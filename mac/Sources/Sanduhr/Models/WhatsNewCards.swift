@@ -20,7 +20,7 @@ extension WhatsNew {
             version: "2.10.0", id: "above-the-prompt",
             title: "Meters and watchers above the prompt",
             body: "In Claude Code, Sanduhr's meters can sit above the prompt with your styles and real motion, and watchers can show there as rows.",
-            art: .symbol("rectangle.topthird.inset.filled"), destination: .integrations),
+            art: .symbol("rectangle.topthird.inset.filled"), destination: .mods),
         WhatsNewCard(
             version: "2.10.0", id: "song-looks",
             title: "A look for every song",
@@ -34,8 +34,8 @@ extension WhatsNew {
         WhatsNewCard(
             version: "2.10.0", id: "mod-switches",
             title: "Switch Sanduhr's mod per folder",
-            body: "Claude Code's Meters above the prompt now turns Sanduhr's meters mod on or off for each folder, and removes it cleanly.",
-            art: .symbol("cube"), destination: .integrations),
+            body: "Meters above the prompt, at the top of Mods & Config, turns Sanduhr's meters mod on or off for each folder, and removes it cleanly.",
+            art: .symbol("cube"), destination: .mods),
     ]
 
     static let release290: [WhatsNewCard] = [

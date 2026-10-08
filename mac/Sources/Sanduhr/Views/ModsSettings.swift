@@ -126,6 +126,15 @@ final class ModsPageModel {
         }
     }
 
+    /// Installs the mod's entry after the consent sheet, or (`updating`) moves an older entry to
+    /// this Sanduhr's scripts. The mod runs inside Claude Code, so no python3 is needed.
+    func install(folder: String, updating: Bool, linked: [String]) async {
+        await act(folder, linked: linked) { installer, _ in
+            try installer.install(.meters, folder: folder, python: "")
+            return OwnModNote(text: (updating ? "Updated. " : "Installed. ") + ModsPageModel.takesEffect, kind: .info)
+        }
+    }
+
     /// Runs one write off the main thread, then reads the page again. A note carrying `added`
     /// is a question, not a note.
     @discardableResult
@@ -181,19 +190,23 @@ enum ModSketch {
     }
 }
 
-/// Settings, Mods & Config (item 64; raw value `mods`): every mod and plugin each Claude Code
-/// folder loads, what each draws and can reach, and Check (Claude Code's own validator) for a risk
-/// card. Every mod is read-only here, Sanduhr's own included: its switch, Update and Remove live
-/// in Claude Code, Meters above the prompt (Settings v2, slice 2).
+/// Settings, Mods & Config (item 64; raw value `mods`): Sanduhr's own mod first, Meters above the
+/// prompt, with its switch, Update and Remove per folder (its one home since 2026-10-08; slice 2
+/// had it on Claude Code), then every mod and plugin each Claude Code folder loads, what each
+/// draws and can reach, and Check (Claude Code's own validator) for a risk card. Other mods are
+/// read-only.
 struct ModsSettings: View {
     var vm: UsageViewModel
     var model: ModsPageModel
+    @State private var consent: MetersConsent?
 
     private var linked: [String] { vm.accountLabels.compactMap { vm.dataChoices(for: $0).folder } }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                SanduhrModSection(model: model, linked: linked, install: { consent = MetersConsent(folder: $0) })
+                    .settingsAnchor(SettingsAnchor.metersMod)
                 if model.loaded && model.claude == nil {
                     Text(ModsPageModel.cliMissing)
                         .font(.caption)
@@ -212,6 +225,16 @@ struct ModsSettings: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task { await model.load(linked: linked) }
+        .ownModQuestions(model, linked: linked)
+        .sheet(item: $consent) { c in
+            MetersConsentSheet(folder: model.display(c.folder),
+                               file: model.display(model.installer.configFile(.meters, folder: c.folder)),
+                               install: {
+                                   consent = nil
+                                   Task { await model.install(folder: c.folder, updating: false, linked: linked) }
+                               },
+                               cancel: { consent = nil })
+        }
     }
 
     @ViewBuilder
@@ -233,7 +256,7 @@ private struct ModsIntro: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Mods and plugins").font(.headline)
-            Text("Everything each Claude Code folder loads: mods (plugins with a hooks module that draw in Claude Code) and plain plugins, from the plugin folders its settings list, its installed plugins, its skills folder and the mods a session made. Sanduhr finds them by reading files: no mod runs. Every mod is read-only here: Sanduhr's own switches per folder in Claude Code, Meters above the prompt, and switching other mods comes later. Check asks Claude Code's own validator, which reads a mod without running it, what the mod hooks and calls.")
+            Text("Everything each Claude Code folder loads: mods (plugins with a hooks module that draw in Claude Code) and plain plugins, from the plugin folders its settings list, its installed plugins, its skills folder and the mods a session made. Sanduhr finds them by reading files: no mod runs. Other mods are read-only here: Sanduhr's own switches per folder above, and switching other mods comes later. Check asks Claude Code's own validator, which reads a mod without running it, what the mod hooks and calls.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -344,20 +367,17 @@ private struct ModRowWhere: View {
     }
 }
 
-/// Whose mod it is. Sanduhr's own switches in Claude Code; the rest are read-only for now.
+/// Whose mod it is. Sanduhr's own switches at the top of this page; the rest are read-only for now.
 private struct ModRowOwnership: View {
     let item: ModItem
 
     var body: some View {
         switch item.ownership {
         case .sanduhrs:
-            HStack(alignment: .firstTextBaseline) {
-                Text("Sanduhr's own mod. It switches per folder in Claude Code, \(SettingsNames.metersAbovePrompt).")
-                    .font(.caption)
-                    .foregroundStyle(Color.hex("a78bfa"))
-                Spacer(minLength: 8)
-                SettingsLinkButton(.integrations, anchor: SettingsAnchor.folders)
-            }
+            Text("Sanduhr's own mod. It switches per folder at the top of this page, \(SettingsNames.metersAbovePrompt).")
+                .font(.caption)
+                .foregroundStyle(Color.hex("a78bfa"))
+                .fixedSize(horizontal: false, vertical: true)
         case .copyOfSanduhrs:
             Text("A copy of Sanduhr's mod outside Sanduhr's folder: read-only here.")
                 .font(.caption)
@@ -517,7 +537,7 @@ struct ModsSummaryCard: View {
                 } else {
                     Text("Reading your Claude Code folders…").foregroundStyle(.white.opacity(0.8))
                 }
-                Text("Every mod is read-only here; Sanduhr's own switches in Claude Code.")
+                Text("Sanduhr's own mod switches here, per folder; other mods are read-only.")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.7))
             }

@@ -25,6 +25,13 @@ steps:
   - expect:
       window: settings
       contains: { text: Show watchers above the prompt }
+  # The meters mod is a mod (2026-10-08): its name, "meters above", finds it on Mods & Config.
+  - do: settings-search
+    arg: meters above
+  - expect_state: { settings_section: mods, settings_anchor: meters, settings_anchor_visible: true }
+  - expect:
+      window: settings
+      contains: { text: Meters above the prompt }
   - do: settings-search
     arg: glow
   - expect_state: { settings_section: notch, settings_anchor: glow, settings_anchor_visible: true }

@@ -21,7 +21,8 @@ enum SettingsNames {
     /// Watchers, Where they show: the notch place and the Desk place, one stored value each.
     static let watchersOnNotch = "On the notch"
     static let watchersOnDesk = "On the Desk"
-    /// Claude Code, each folder: the meters mod's row (was also Mods' "Sanduhr's mod").
+    /// Mods & Config, Sanduhr's own mod at the top: the meters mod's switch, Update and Remove per
+    /// folder (was Claude Code's folder row in slice 2, and Mods' "Sanduhr's mod" before that).
     static let metersAbovePrompt = "Meters above the prompt"
     /// Notch's one glow section: Sanduhr alerts, meetings, the camera light and Claude Code.
     static let notchGlow = "Notch glow"
@@ -44,7 +45,7 @@ enum SettingsNames {
         (SanduhrHotKeys.Shortcut.settings.name, .general), (SanduhrHotKeys.Shortcut.join.name, .general),
         (deskSwitch, .deskLayout),
         (notchSwitch, .notch), (notchGlow, .notch), (cameraMicPlace, .notch),
-        (claudeCodeGlowHook, .integrations), (metersAbovePrompt, .integrations),
+        (claudeCodeGlowHook, .integrations), (metersAbovePrompt, .mods),
         (claudeMetersLine, .deskLayout), (claudeMetersBars, .deskLayout),
         (watchersOnNotch, .watchers), (watchersOnDesk, .watchers),
         (showWidget, .widgetLook), (checkForUpdates, .updates), (saveAndApply, .themes),

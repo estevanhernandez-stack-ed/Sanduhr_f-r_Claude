@@ -126,12 +126,22 @@ steps:
   - snap: preview-integrations
   - do: settings
     arg: mods
-  # Mods & Config (raw value mods; item 64) only reads: Sanduhr's own mod switches in Claude Code
-  # now, so the page has no switch. Its summary card counts real mods, never the Sample label.
+  # Mods & Config (raw value mods; item 64): Sanduhr's own mod, Meters above the prompt, is at the
+  # top with its switch per folder (its one home since 2026-10-08); every other mod only reads.
+  # Its summary card counts real mods, never the Sample label. The page opening changes nothing.
   - expect_state: { settings_section: mods, settings_preview: mods, mods_page.open: true }
   - expect:
       window: settings
       missing: { text: "/Sanduhr.s mod: /" }
+  - do: settings
+    arg: mods meters
+  - expect_state: { settings_section: mods, settings_anchor: meters, settings_anchor_visible: true }
+  - expect:
+      window: settings
+      contains: { text: Meters above the prompt }
+  - expect:
+      window: settings
+      contains: { text: "/sanduhr-meters, Sanduhr.s own mod/" }
   - snap: preview-mods
   - do: settings
     arg: widgetLook

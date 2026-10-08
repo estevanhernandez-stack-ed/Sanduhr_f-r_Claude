@@ -70,7 +70,7 @@ class FakeApp
     when 'settings-search'
       # The sidebar search's best match, as SettingsSearch ranks it.
       page, anchor = { 'glow' => %w[notch glow], 'percent' => %w[general menu-bar-shows],
-                       'margins' => %w[deskLayout margins] }.fetch(arg)
+                       'margins' => %w[deskLayout margins], 'meters above' => %w[mods meters] }.fetch(arg)
       s.merge!('settings_open' => true, 'settings_section' => page, 'settings_anchor' => anchor,
                'settings_anchor_visible' => true)
     when 'message-editor'
@@ -413,7 +413,8 @@ r = Runner.new(app_reach, MemoryDefaults.new, File.join(Smoke::OUT, '.selftest-r
     .run_file(reach_file)
 eq('settings reach scenario passes', [r['status'], r['reason']], ['pass', nil])
 eq('settings reach scenario opens anchors and searches, then closes Settings', app_reach.actions,
-   ['settings notch glow', 'settings watchers', 'settings watchers above-prompt', 'settings-search glow',
+   ['settings notch glow', 'settings watchers', 'settings watchers above-prompt', 'settings-search meters above',
+    'settings-search glow',
     'settings-search percent', 'settings-search margins', 'close-settings'])
 app_hidden = FakeApp.new('settings_open' => false, 'settings_section' => 'general')
 def app_hidden.action(name, arg = nil)

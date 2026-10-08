@@ -99,8 +99,23 @@ struct SettingsPagesTests {
         for (name, pages) in homes { #expect(pages.count == 1, "\(name)") }
         #expect(SettingsNames.table.first { $0.name == SettingsNames.deskSwitch }?.page == .deskLayout)
         #expect(SettingsNames.table.first { $0.name == SettingsNames.showWidget }?.page == .widgetLook)
-        #expect(SettingsNames.table.first { $0.name == SettingsNames.metersAbovePrompt }?.page == .integrations)
+        // The meters mod is a mod: its one home is Mods & Config (2026-10-08).
+        #expect(SettingsNames.table.first { $0.name == SettingsNames.metersAbovePrompt }?.page == .mods)
+        #expect(SettingsNames.anchors[SettingsNames.metersAbovePrompt] == SettingsAnchor.metersMod)
         #expect(SettingsNames.table.first { $0.name == AVPlace.pickerTitle }?.page == .notch)
+    }
+
+    /// Claude Code's folder boxes show the meters mod in one line, no controls (2026-10-08).
+    @Test func metersModStatusLine() {
+        let on = OwnModRow(state: OwnModState(folder: "/f", entry: "/m"), status: .installed)
+        #expect(MetersModStatus.text(on, fallback: .notInstalled) == "Meters above the prompt: on")
+        let off = OwnModRow(state: OwnModState(folder: "/f", entry: "/m", inline: false), status: .installed)
+        #expect(MetersModStatus.word(off, fallback: .installed) == "off")
+        #expect(MetersModStatus.word(OwnModRow(state: OwnModState(folder: "/f")), fallback: .notInstalled) == "not installed")
+        #expect(MetersModStatus.word(nil, fallback: .notInstalled) == "not installed")
+        let old = OwnModRow(state: OwnModState(folder: "/f", entry: "/m"), status: .outdated)
+        #expect(MetersModStatus.word(old, fallback: .outdated) == "on, update waiting")
+        #expect(!IntegrationFolderKinds.withControls.contains(.meters))
     }
 
     @Test func notchPlacesNoLongerOfferCameraAndMic() {

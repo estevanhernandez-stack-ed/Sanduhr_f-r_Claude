@@ -79,6 +79,8 @@ enum SettingsAnchor {
     /// Claude Code, the line under the folders that links to where the notch glow is switched on.
     static let glowHint = "glow-hint"
     // Mods & Config
+    /// Sanduhr's own mod, Meters above the prompt, at the top (its one home since 2026-10-08).
+    static let metersMod = "meters"
     static let inventory = "inventory"
     // Widget
     /// Widget, Pacing calculators (was the Pacing & Focus page, raw value `pacing`).
@@ -178,9 +180,12 @@ enum SettingsAnchor {
     private static let claudeCodePages: [SettingsEntry] = [
         SettingsEntry(title: "Python", page: .integrations, anchor: python, synonyms: ["python3", "Command Line Tools"]),
         SettingsEntry(title: "Folders", page: .integrations, anchor: folders,
-                      synonyms: ["Add Folder", "MCP server", "statusline", "prompt", "hooks", "install", "mod", "account"]),
+                      synonyms: ["Add Folder", "MCP server", "statusline", "prompt", "hooks", "install", "account"]),
         SettingsEntry(title: "Turning the glow on", page: .integrations, anchor: glowHint,
                       synonyms: ["Notch Settings…", "glow hook"]),
+        SettingsEntry(title: SettingsNames.metersAbovePrompt, page: .mods, anchor: metersMod,
+                      synonyms: [IntegrationScripts.modName, "Sanduhr's own mod", "mod", "band", "bars", "animated",
+                                 "Update", "Remove", "enabledPlugins"]),
         SettingsEntry(title: "Mods and plugins", page: .mods, anchor: inventory, synonyms: ["mods", "plugins", "Check", "risk"]),
     ]
 
@@ -223,7 +228,7 @@ extension SettingsNames {
         SanduhrHotKeys.Shortcut.join.name: SettingsAnchor.shortcuts,
         deskSwitch: SettingsAnchor.desk, notchSwitch: SettingsAnchor.notch, notchGlow: SettingsAnchor.glow,
         cameraMicPlace: SettingsAnchor.cameraMic,
-        claudeCodeGlowHook: SettingsAnchor.folders, metersAbovePrompt: SettingsAnchor.folders,
+        claudeCodeGlowHook: SettingsAnchor.folders, metersAbovePrompt: SettingsAnchor.metersMod,
         claudeMetersLine: SettingsAnchor.pieces, claudeMetersBars: SettingsAnchor.pieces,
         watchersOnNotch: SettingsAnchor.whereTheyShow, watchersOnDesk: SettingsAnchor.whereTheyShow,
         showWidget: SettingsAnchor.show, checkForUpdates: SettingsAnchor.check, saveAndApply: SettingsAnchor.ownThemes,

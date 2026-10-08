@@ -117,7 +117,7 @@ private struct BandChoice: View {
     }
 
     static let title = "Show Sanduhr's meters above the prompt instead (animated)"
-    static let onCaption = "Your segments stay in the statusline; Sanduhr's session, weekly and reset segments move to the band the meters mod draws above the prompt, with their styles, a sweep when a meter crosses a warning line, a shimmer before a limit resets and a glow while one is nearly full. Needs the meters mod in this folder."
+    static let onCaption = "Your segments stay in the statusline; Sanduhr's session, weekly and reset segments move to the band the meters mod draws above the prompt, with their styles, a sweep when a meter crosses a warning line, a shimmer before a limit resets and a glow while one is nearly full. Needs the meters mod in this folder, switched on Mods & Config."
     static let offCaption = "Off, Sanduhr's meters stay in the statusline. Their styles reach the meters mod's band either way."
 }
 
@@ -154,7 +154,7 @@ extension EnvironmentValues {
         set { self[ShowHelpKey.self] = newValue }
     }
 
-    /// Closes the sheet and opens Settings, Mods (item 64, slice 2); nil where there is none.
+    /// Closes the sheet and opens Settings, Mods & Config (item 64, slice 2); nil where there is none.
     var openModsPage: (() -> Void)? {
         get { self[OpenModsPageKey.self] }
         set { self[OpenModsPageKey.self] = newValue }
@@ -499,9 +499,9 @@ private struct ModChips: View {
                         Button("See It in Mods & Config", action: openModsPage)
                             .buttonStyle(.link)
                             .font(.caption)
-                            .help("Opens Settings, Mods & Config, which lists every mod each folder loads. Sanduhr's own mod switches per folder in Claude Code.")
+                            .help("Opens Settings, Mods & Config, which lists every mod each folder loads. Sanduhr's own mod switches per folder there too.")
                     }
-                    HelpCaption("Claude Code draws these mods' status entries in its status area, beside the statusline, so Combine can't keep, drop or style them. To hide one, use the mod's own settings (/config in Claude Code) or turn the mod off for this folder: Sanduhr's own mod switches per folder in Claude Code (Meters above the prompt), and switches for other mods come later.")
+                    HelpCaption("Claude Code draws these mods' status entries in its status area, beside the statusline, so Combine can't keep, drop or style them. To hide one, use the mod's own settings (/config in Claude Code) or turn the mod off for this folder: Sanduhr's own mod switches per folder on Mods & Config (Meters above the prompt), and switches for other mods come later.")
                 }
             }
         }

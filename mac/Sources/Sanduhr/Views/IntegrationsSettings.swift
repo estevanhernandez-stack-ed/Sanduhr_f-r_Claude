@@ -150,7 +150,6 @@ final class IntegrationsModel {
     /// shown with Sanduhr's (item 63). Returns the other entry when one turned up unasked.
     func install(_ kind: IntegrationKind, folder: String, replaceOther: Bool, combine: StatuslineJoin? = nil,
                  selection: StatuslineSelection = StatuslineSelection(), linked: [String]) async -> String? {
-        // The mod runs inside Claude Code: no python3 needed.
         // The mod and the hooks run inside Claude Code: no python3 needed.
         guard let python = kind.needsPython ? pythonPath : (pythonPath ?? "") else { return nil }
         busy = folder
@@ -216,9 +215,10 @@ final class IntegrationsModel {
 }
 
 /// Settings, Claude Code (raw value `integrations`; item 49, Settings v2 slice 2): one home for
-/// what Sanduhr installs into Claude Code folders: the MCP server, the statusline, the meters mod
-/// (its only controls, was also on Mods) and the Claude Code glow hook, per folder, with the
-/// account each folder follows. Its consent points at the accounts' Share with your agents choices.
+/// what Sanduhr installs into Claude Code folders: the MCP server, the statusline and the Claude
+/// Code glow hook, per folder, with the account each folder follows. The meters mod is a mod, so
+/// its controls live on Mods & Config (2026-10-08); each folder shows its state in one line with
+/// the way there. Its consent points at the accounts' Share with your agents choices.
 struct IntegrationsSettings: View {
     var vm: UsageViewModel
     @Bindable var navigation: SettingsNavigation
@@ -227,7 +227,7 @@ struct IntegrationsSettings: View {
 
     /// The accounts' linked folders, listed even where discovery wouldn't find them.
     private var linked: [String] { vm.accountLabels.compactMap { vm.dataChoices(for: $0).folder } }
-    /// The meters mod's switch, Update and Remove per folder (ModSwitch), kept by the window.
+    /// Mods & Config's model, kept by the window: each folder's meters mod state, read only here.
     private var mods: ModsPageModel { navigation.modsPage }
 
     var body: some View {
@@ -264,7 +264,6 @@ struct IntegrationsSettings: View {
             await model.load(linked: linked)
             await mods.load(linked: linked)
         }
-        .ownModQuestions(mods, linked: linked)
         .sheet(item: $consent) { c in
             IntegrationConsentSheet(consent: c, vm: vm, model: model,
                                     install: { join, selection in confirm(c, combine: join, selection: selection) },
@@ -290,14 +289,10 @@ struct IntegrationsSettings: View {
         }
         ForEach(model.folders) { f in
             IntegrationFolderBox(folder: f, model: model, owner: vm.account(linkedTo: f.path),
-                                 meters: MetersModContext(row: mods.own.first { $0.folder == f.path }, mods: mods,
-                                                          linked: linked, reload: reload),
+                                 meters: MetersModStatus.text(mods.own.first { $0.folder == f.path }, fallback: f.meters),
                                  install: { kind in ask(kind, folder: f.path) },
                                  update: { kind in Task { await run(kind, folder: f.path, replace: false, combine: nil) } },
-                                 remove: { kind in Task {
-                                     await model.remove(kind, folder: f.path, linked: linked)
-                                     await mods.load(linked: linked)
-                                 } },
+                                 remove: { kind in Task { await model.remove(kind, folder: f.path, linked: linked) } },
                                  openAccounts: { owner in
                                      navigation.accountToShow = owner
                                      navigation.selection = .credentials
@@ -305,7 +300,7 @@ struct IntegrationsSettings: View {
         }
     }
 
-    /// Reads both models again: an install, a switch or a remove changes what each shows.
+    /// Reads both models again: Add Folder… and Check Again can change what each shows.
     private func reload() {
         Task {
             await model.load(linked: linked)
@@ -332,7 +327,6 @@ struct IntegrationsSettings: View {
                                            selection: selection, linked: linked) {
             consent = IntegrationConsent(kind: kind, folder: folder, other: other)
         }
-        if kind == .meters { await mods.load(linked: linked) }
     }
 }
 
@@ -340,7 +334,7 @@ private struct IntegrationsIntro: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Claude Code").font(.headline)
-            Text("The MCP server lets Claude Code ask Sanduhr about your usage, as each account's Share with your agents choice allows. The statusline shows the active account's meters under Claude Code's prompt, whichever account a folder is linked to; the meters mod draws them as bars above it. The Claude Code glow hook lets Claude Code tell Sanduhr when a session waits on you or finishes, so the notch can glow. Each is installed per Claude Code folder: Sanduhr adds one entry to that folder's settings, keeps a backup of the file beside it, and Remove takes the entry out again. Nothing leaves this Mac.")
+            Text("The MCP server lets Claude Code ask Sanduhr about your usage, as each account's Share with your agents choice allows. The statusline shows the active account's meters under Claude Code's prompt, whichever account a folder is linked to; Sanduhr's meters mod draws them as bars above it, switched on Mods & Config. The Claude Code glow hook lets Claude Code tell Sanduhr when a session waits on you or finishes, so the notch can glow. Each is installed per Claude Code folder: Sanduhr adds one entry to that folder's settings, keeps a backup of the file beside it, and Remove takes the entry out again. Nothing leaves this Mac.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -400,13 +394,14 @@ private struct GlowHint: View {
     }
 }
 
-/// One folder: the account it follows, then its MCP server, statusline, meters mod and Claude
-/// Code glow hook rows.
+/// One folder: the account it follows, then its MCP server, statusline and Claude Code glow hook
+/// rows, and the meters mod's state with the way to Mods & Config.
 private struct IntegrationFolderBox: View {
     let folder: IntegrationFolderState
     var model: IntegrationsModel
     let owner: String?
-    let meters: MetersModContext
+    /// "Meters above the prompt: on" (MetersModStatus).
+    let meters: String
     let install: (IntegrationKind) -> Void
     let update: (IntegrationKind) -> Void
     let remove: (IntegrationKind) -> Void
@@ -416,30 +411,26 @@ private struct IntegrationFolderBox: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 8) {
                 FolderAccountRow(owner: owner, open: { openAccounts(owner) })
-                ForEach(IntegrationKind.allCases, id: \.self) { kind in
-                    row(kind)
+                ForEach(IntegrationFolderKinds.withControls, id: \.self) { kind in
+                    IntegrationRow(kind: kind, status: folder.status(kind),
+                                   combined: kind == .statusline && folder.statuslineCombined,
+                                   file: model.configDisplay(kind, folder: folder.path),
+                                   enabled: model.canRun(kind),
+                                   install: { install(kind) }, update: { update(kind) },
+                                   remove: { remove(kind) })
                 }
+                MetersModLine(text: meters)
             }
             .padding(4)
         } label: {
             Text(model.display(folder.path)).font(.body.monospaced())
         }
     }
+}
 
-    @ViewBuilder
-    private func row(_ kind: IntegrationKind) -> some View {
-        if kind == .meters, let own = meters.row {
-            MetersModRow(row: own, status: folder.meters, context: meters, enabled: model.canRun(.meters),
-                         install: { install(.meters) }, update: { update(.meters) })
-        } else {
-            IntegrationRow(kind: kind, status: folder.status(kind),
-                           combined: kind == .statusline && folder.statuslineCombined,
-                           file: model.configDisplay(kind, folder: folder.path),
-                           enabled: model.canRun(kind),
-                           install: { install(kind) }, update: { update(kind) },
-                           remove: { remove(kind) })
-        }
-    }
+/// The rows with controls in a Claude Code folder box: the meters mod's are on Mods & Config.
+enum IntegrationFolderKinds {
+    static let withControls = IntegrationKind.allCases.filter { $0 != .meters }
 }
 
 /// The account a folder follows (Settings v2, F18): the one Accounts' Data links to it, or the
@@ -461,90 +452,15 @@ private struct FolderAccountRow: View {
     static func text(_ owner: String?) -> String { owner ?? "Follows the active account" }
 }
 
-/// What a folder's meters mod row needs from the page.
-struct MetersModContext {
-    /// The folder's own-mod state, nil until the folders are read.
-    let row: OwnModRow?
-    var mods: ModsPageModel
-    let linked: [String]
-    let reload: () -> Void
-}
-
-/// Meters above the prompt is the sanduhr-meters mod, and this row is its only control (Settings
-/// v2, F4): On and Off switch it for the folder, Update moves it to this Sanduhr's version, Remove
-/// also deletes Sanduhr's record and puts settings.json back byte for byte.
-private struct MetersModRow: View {
-    let row: OwnModRow
-    let status: IntegrationStatus
-    let context: MetersModContext
-    let enabled: Bool
-    /// Install… with its consent sheet, for a folder whose list has no entry yet.
-    let install: () -> Void
-    /// Updates an installed entry that names older scripts.
-    let update: () -> Void
-
-    private var mods: ModsPageModel { context.mods }
-    private var busy: Bool { mods.ownBusy.contains(row.folder) }
+/// The meters mod's state in a folder, no controls: they live on Mods & Config (2026-10-08).
+private struct MetersModLine: View {
+    let text: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(SettingsNames.metersAbovePrompt).frame(width: 150, alignment: .leading)
-                Text(row.state.isOn ? "On" : (row.state.listed ? "Off" : "Not installed"))
-                    .font(.caption)
-                    .foregroundStyle(row.state.isOn ? Color.hex("4ade80") : .secondary)
-                Spacer(minLength: 8)
-                if busy { ProgressView().controlSize(.small) }
-                buttons
-                Toggle("On", isOn: Binding(get: { row.state.isOn }, set: { switchTo($0) }))
-                    .toggleStyle(.switch)
-                    .labelsHidden()
-                    .disabled(busy || !enabled || !row.state.readable)
-                    .accessibilityLabel("\(SettingsNames.metersAbovePrompt) in \(mods.display(row.folder))")
-            }
-            Text(row.summary + " " + Self.explainer)
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if let note = mods.ownNotes[row.folder], !note.text.isEmpty {
-                Text(note.text)
-                    .font(.caption)
-                    .foregroundStyle(note.kind == .info ? Color.secondary : (note.kind == .warning ? Color.orange : Color.hex("f87171")))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    static let explainer = "The sanduhr-meters mod. Off switches it off for this folder (enabledPlugins false) and keeps its entry and files; Remove takes the entry out, deletes Sanduhr's record and puts settings.json back byte for byte."
-
-    @ViewBuilder private var buttons: some View {
-        if status == .outdated || (row.updateAvailable && !row.missing) {
-            Button("Update") {
-                if status == .outdated { update() } else {
-                    Task {
-                        await mods.update(folder: row.folder, confirmed: false, linked: context.linked)
-                        context.reload()
-                    }
-                }
-            }
-            .disabled(busy || !enabled)
-        }
-        if row.state.listed || row.state.hasReceipt {
-            Button("Remove") {
-                Task {
-                    await mods.remove(folder: row.folder, linked: context.linked)
-                    context.reload()
-                }
-            }
-            .disabled(busy || !row.state.readable)
-        }
-    }
-
-    private func switchTo(_ on: Bool) {
-        // A folder without the entry installs through the consent sheet, as Install… did.
-        if on && !row.state.listed { return install() }
-        Task {
-            await mods.setOwn(on: on, folder: row.folder, linked: context.linked)
-            context.reload()
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(text).font(.caption).foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            SettingsLinkButton(.mods, anchor: SettingsAnchor.metersMod)
         }
     }
 }
@@ -665,8 +581,6 @@ private struct IntegrationConsentSheet: View {
             .font(.headline)
         if consent.kind == .mcp {
             MCPConsentBody(vm: vm, folder: model.display(consent.folder), openAccounts: openAccounts)
-        } else if consent.kind == .meters {
-            MetersConsentBody(folder: model.display(consent.folder))
         } else if consent.kind == .hooks {
             HooksConsentBody(folder: model.display(consent.folder), closeSheet: closeSheet)
         } else {
@@ -703,7 +617,7 @@ private struct IntegrationConsentSheet: View {
         switch kind {
         case .mcp: "Let Claude Code ask Sanduhr about your usage?"
         case .statusline: "Show the meters in Claude Code?"
-        case .meters: "Show the meters above Claude Code's prompt?"
+        case .meters: MetersConsentSheet.headline
         case .hooks: "Glow the notch when Claude Code needs you?"
         }
     }
@@ -713,9 +627,6 @@ private struct IntegrationConsentSheet: View {
         let file = model.configDisplay(consent.kind, folder: consent.folder)
         if consent.kind == .hooks {
             return "Sanduhr adds one entry to each of \(consent.kind.keyPath) in \(file), keeping every hook already there, and keeps a copy of the file as it was, with .sanduhr-backup added to its name. Remove takes out only those two entries."
-        }
-        if consent.kind == .meters {
-            return "Sanduhr adds its mod's folder to \(consent.kind.keyPath) in \(file), keeping any folders already listed, and keeps a copy of the file as it was, with .sanduhr-backup added to its name. Remove takes out only that folder."
         }
         if offersCombine {
             return "Either way Sanduhr sets \(consent.kind.keyPath) in \(file), keeping your line's padding, refresh interval and vim setting, and keeps a copy of the file as it was, with .sanduhr-backup added to its name. Remove puts your statusline back exactly as it is now."
@@ -752,22 +663,6 @@ struct OtherCommandBox: View {
             .padding(6)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.12)))
-    }
-}
-
-/// What the meters mod shows and reads (item 50).
-private struct MetersConsentBody: View {
-    let folder: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Claude Code sessions using \(folder) draw the active account's session and weekly bars above the prompt, with the pace mark and reset countdowns, and show a short notice when a limit nearly fills or the session resets. It is a Claude Code mod, so it needs a Claude Code version that loads mods.")
-                .fixedSize(horizontal: false, vertical: true)
-            Text("The mod reads only the numbers Sanduhr saves on this Mac (snapshot.json). It never uses the network, never calls a model and adds nothing to the conversation.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
     }
 }
 
