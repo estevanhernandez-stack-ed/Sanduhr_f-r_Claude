@@ -50,7 +50,7 @@ Fresh-install and migration checks stay manual.
 - [ ] Left-click the menu bar hourglass hides the widget; again shows it. Hidden survives a relaunch.
 - [ ] Right-click opens the status menu: Hide (or Show) Widget; Tools: Deep Work, Pacing Calculators, Cooldown Snake; Refresh, Settings…, Check for Updates…, What's New…; Quit Sanduhr für Claude. Two-finger click on the widget lists the same items in the same order (always Hide Widget there). Check for Updates… from the widget's menu opens Sparkle's check.
 - [ ] Refresh updates the footer time; `~/Library/Application Support/Sanduhr/snapshot.json` has a new `captured_at`.
-- [ ] Gear on the widget opens Sanduhr Settings. Widget, Look: pick a font and subtle mode, the widget changes as you pick. Themes: Reload lists the installed user themes. Switch a theme on the widget's strip, toggle compact (panel resizes, top edge stays put), open the focus timer and close it.
+- [ ] Gear on the widget opens Sanduhr Settings. Widget Look: pick a font and subtle mode, the widget changes as you pick. Themes: Reload lists the installed user themes. Switch a theme on the widget's strip, toggle compact (panel resizes, top edge stays put), open the focus timer and close it.
 - [ ] Warning bars: Settings, Desk, Meters, drop the weekly "At" slider below its percent with a "more than" shorter than its reset. The widget's weekly card turns red at once (bar and percent) with a steady glow in the theme's accent around the bar and a warning triangle before the percent in the theme's text color, and the Desk meter does the same in the Desk ink (triangle included); with VoiceOver on, the warning card and meter read "<n>%, nearly full", the others just the percent; the session card stays as it was. Pick Match Desk: the widget's glow takes the Desk ink. Turn the weekly "Warn when nearly full" off: both go back at once. Put the settings back (weekly: on, 90%, 1 day) and the theme you had.
 - [ ] Theme deleted outside the app (item 34): Settings, Widget, Themes, paste `docs/themes/examples/626-labs.json` with its `"name"` changed to `Smoke Test` and Save, so `smoke-test.json` is current (a file named after a built-in would fall back to that built-in instead). Open Themes Folder and, in Finder, move `smoke-test.json` to the Trash. Within a second the widget goes back to Obsidian, the gallery marks Obsidian and no longer lists the theme, the Theme menu and the Installed user themes list drop it, all without Reload or a relaunch; Console (process Sanduhr) shows `Theme <id> was removed from the themes folder; using Obsidian`. Put the file back: it reappears in the gallery (not applied). Pick the theme you had.
 - [ ] Settings, Sanduhr, Updates: Installed shows the version and build from About; Last checked shows a date (or "Never" on a fresh install). Check Now opens Sparkle's check (the same window as Check for Updates…) and is disabled until it finishes; Last checked moves to now. Turn "Check for updates automatically" off: `defaults read com.626labs.sanduhr SUEnableAutomaticChecks` prints 0, and after a relaunch the switch is still off; turn it back on. "Download and install updates automatically" sets `SUAutomaticallyUpdate` the same way and is greyed out while automatic checks are off. "Release notes for this version" opens the GitHub release `v<version>-mac`. About: the app icon, "Sanduhr für Claude", "Version X (build N)", the one-line description and the independence line; Website, GitHub, Release Notes, Privacy and License each open their page (License goes to the README's license section until a LICENSE file lands), "Updates by Sparkle" opens sparkle-project.org, and the copyright line reads "MIT License. 626Labs.".
@@ -84,7 +84,7 @@ Fresh-install and migration checks stay manual.
 
 ## 4. Desk
 
-- [ ] Hide the widget, with Ice hiding the menu bar hourglass: Option+S opens one window titled "Sanduhr Settings", a sidebar with General, Alerts, Accounts; Desk: Layout, Look, Meters, Message, Notch; Widget: Look, Themes, Pacing & Focus; Sanduhr: Updates, About. Every section opens and edits with the widget still hidden. Settings… in the widget's menu and the hourglass's menu bring the same window forward (never a second one); there is no "Sanduhr Desk" window and no settings sheet on the widget.
+- [ ] Hide the widget, with Ice hiding the menu bar hourglass: Option+S opens one window titled "Sanduhr Settings", a sidebar with General, Alerts, Accounts; Desk: Layout, Desk Look, Meters, Message, Notch; Widget: Widget Look, Themes, Pacing & Focus; Sanduhr: Updates, About. Every section opens and edits with the widget still hidden. Settings… in the widget's menu and the hourglass's menu bring the same window forward (never a second one); there is no "Sanduhr Desk" window and no settings sheet on the widget.
 - [ ] General, Surfaces: "Show the widget now" off hides the widget and on shows it (the switch follows the hourglass too); Notch flips the island (Desk on).
 - [ ] General, Surfaces, Widget picker: "Hidden while Desk is on" hides it at once with Desk on; turn Desk off, it shows; on, it hides. Show it from the hourglass: it stays until Desk next flips. "Only when I open it": hidden after every Desk flip and after a relaunch until Show Widget (any menu, a Desk meter's two-finger menu included) or Tools brings it. "Always shown": choosing it brings a hidden widget back; Desk flips leave it where it is. Put back "Always shown" (or what it was). Pacing & Focus, "Pin the pacing calculators" and Tools, Pacing Calculators show the same state: flip one, the other follows.
 - [ ] After section 1, Desk is already on: clock, date, message and the meters (a bar per limit with a pace tick and reset time). General, Surfaces, Desk is on. The notch stays plain (its own switch, off).
@@ -112,10 +112,10 @@ Fresh-install and migration checks stay manual.
 - [ ] Quit and relaunch: the notch is still on (the switch saved). Turn it off: wings and strip go, Desk layer stays.
 - [ ] Full-screen an app: wings stay above it. Switch Spaces: wings stay.
 - [ ] External display as main: no island drawn.
-- [ ] Camera light: Notch, "Light up for the camera" on. Open Photo Booth: within a second a soft white light glows around the notch (over the island, the menu bar beside it and a band below). Click through it: the click reaches the app underneath. Brightness and "Reach below the menu bar" change it live. Full-screen Photo Booth: the light stays above it. Quit Photo Booth: it fades out. With Desk off, same result. Tools, Camera Light shows it with no camera and shows checked; chosen again it goes. Switch off: a camera no longer lights it.
-- [ ] Glow: Notch, Glow, turn on "For Sanduhr alerts". Settings, Alerts, Send a Test: a soft halo in the notch text color fades in around the island (wings and strip) and out within about three seconds, once. The wings' text stays readable, and clicking the island during the glow still opens Settings, while a click on the menu bar beside it reaches the menu bar. Switch it off and send another test: no glow. "A minute before a meeting" on, with a calendar event starting in two minutes: one glow between 60 and 45 seconds before it starts, none after. "When the camera light comes on" on: Tools, Camera Light glows once as the light comes on. All three off: nothing glows.
+- [ ] Camera fill light: Notch, Camera fill light, "Light up for the camera" on. Open Photo Booth: within a second a soft white light glows around the notch (over the island, the menu bar beside it and a band below). Click through it: the click reaches the app underneath. Brightness and "Reach below the menu bar" change it live. Full-screen Photo Booth: the light stays above it. Quit Photo Booth: it fades out. With Desk off, same result. Tools, Camera Fill Light shows it with no camera and shows checked; chosen again it goes. Switch off: a camera no longer lights it.
+- [ ] Glow: Notch, Glow, turn on "For Sanduhr alerts". Settings, Alerts, Send a Test: a soft halo in the notch text color fades in around the island (wings and strip) and out within about three seconds, once. The wings' text stays readable, and clicking the island during the glow still opens Settings, while a click on the menu bar beside it reaches the menu bar. Switch it off and send another test: no glow. "A minute before a meeting" on, with a calendar event starting in two minutes: one glow between 60 and 45 seconds before it starts, none after. "When the camera fill light comes on" on: Tools, Camera Fill Light glows once as the light comes on. All three off: nothing glows.
 - [ ] One glow (item 27): Desk on, notch on, Desk pulse chosen. Send a Test (or `smoke/smoke do pulse`): one soft halo down the island's sides and along its bottom, the same look as the Glow switches; no light above the wings, beside their top corners or along the screen edge, and no outline stroke on the island. Glow switches all off: a pulse still glows.
-- [ ] Plain notch glow (item 27): turn the notch island off (Notch, "Extend the camera notch" off). The Glow section stays usable. Test Glow (or `smoke/smoke do glow`, or an enabled alert): a halo hugs the hardware notch itself, its width and height with rounded bottom corners, no wings, nothing at the screen edge, the camera area untouched. Turn Desk off too: Tools, Camera Light with "When the camera light comes on" on still glows the plain notch. Put the notch back on: the glow goes back around the island.
+- [ ] Plain notch glow (item 27): turn the notch island off (Notch, "Extend the camera notch" off). The Glow section stays usable. Test Glow (or `smoke/smoke do glow`, or an enabled alert): a halo hugs the hardware notch itself, its width and height with rounded bottom corners, no wings, nothing at the screen edge, the camera area untouched. Turn Desk off too: Tools, Camera Fill Light with "When the camera fill light comes on" on still glows the plain notch. Put the notch back on: the glow goes back around the island.
 - [ ] Covered strip (item 34): Desk on, notch on, "Extra height" above 0 so the strip shows under the camera. Move an app window (Finder will do) so it covers the strip, or maximize one (not full screen). Glow, **Test Glow** (or `smoke/smoke do glow`, or Send a Test with Desk pulse): the halo hugs the wings only, its bottom edge level with the menu bar, nothing traced around the hidden strip. Move the window away and glow again: the halo goes around wings and strip.
 
 ## 6. Links and keys
@@ -226,7 +226,7 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   line starts with "claude" and nothing on it is clickable.
 - [ ] Limit menu on Desk: two-finger click (or Control-click) the Weekly — All Models meter: an
   Accounts submenu (two accounts, the active one checked), then "Stop warnings for this limit"
-  (no Hide), then "Meter Settings…", then the widget's usual items (Tools, Refresh, Settings…,
+  (no Hide), then "Meter Settings…", then the widget's usual items (Tools, Refresh, All Settings…,
   Quit) with no second Accounts submenu. On the Session meter the warnings item reads
   "Warn again for this limit" (off by default). On a temporary limit (under `temporary_limits`,
   say Weekly — Special) "Hide Weekly — …" shows too; never on a model limit with a weekly reset
@@ -712,11 +712,11 @@ cp ~/.claude-smoketest/settings.json /tmp/st-hooks.json
   in front): no glow. Switch it off: it glows from Terminal too. Put it back on.
 - [ ] Settings, Integrations: `~/.claude-smoketest` has a fourth row, Notch glow when Claude needs
   you, Not installed, and Install… works even where the page says Python is missing. Under the
-  folders, a line says the glow is off until turned on in Notch, Glow, and Glow Settings… opens
+  folders, a line says the glow is off until turned on in Notch, Glow, and Notch Settings… opens
   the Notch page.
 - [ ] Install…: the sheet says Claude Code tells Sanduhr only that it is waiting or finished,
   nothing about the conversation, and that Sanduhr adds one entry to each of
-  `hooks.Notification and hooks.Stop` in `~/.claude-smoketest/settings.json`; Glow Settings…
+  `hooks.Notification and hooks.Stop` in `~/.claude-smoketest/settings.json`; Notch Settings…
   there opens the Notch page. Install: Installed;
   `jq '.hooks.Stop | length, .[0].hooks[0].command' ~/.claude-smoketest/settings.json` prints 2
   and `"say done"`, and `jq '.hooks.Notification[0]' ~/.claude-smoketest/settings.json` shows the
@@ -758,7 +758,7 @@ playback yourself. Never put titles in a bug report: `state.yaml` carries only f
   and `lipo -archs mac/Sanduhr.app/Contents/Helpers/MediaRemoteAdapterTestClient` print
   `x86_64 arm64`; `codesign --verify --strict mac/Sanduhr.app` passes.
 - [ ] Placed nowhere by default: Settings, Desk, Now Playing has no on/off switch and reads Source:
-  Not placed anywhere, with "Arrange on the Notch…" and "Arrange on the Desk…" (each opens that
+  Not placed anywhere, with "Notch Settings…" and "Desk Layout Settings…" (each opens that
   page); `pgrep -fl mediaremote-adapter` finds nothing; `state.yaml` shows
   `now_playing: {enabled: false, placed: [], source: off, state: none}`. Settings, Notch lists Now
   playing as a choice for both wings and the strip; Settings, Layout lists Now playing as Hidden.
@@ -881,7 +881,7 @@ mcp() { printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\
 - [ ] The effects on the Desk: pin each of these in turn (Pin one line): `{write} hello.` draws in
   over about a second and a half, once; `{shimmer} hi.` sweeps every 8 seconds; `{ink:#ffd08a}
   {noglow} {size:1.5} big.` is gold, larger, without glow; `{blink} {glow} odd.` shows the text
-  `{blink} {glow} odd.` as written. Settings, Desk, Look, "Glow around the message" off: lines
+  `{blink} {glow} odd.` as written. Settings, Desk Look, "Glow around the message" off: lines
   lose the glow except a `{glow}` line. With Reduce motion on, `{write}` shows at once and nothing
   shimmers. With a `{shimmer}` line showing and Activity Monitor on Sanduhr: CPU is 0.0 between
   sweeps and with the Desk covered by a full-screen window (the sweep pauses); a plain line costs
@@ -1002,12 +1002,12 @@ switched off.
   fails without them).
 - [ ] Fresh install (a new user account, or `defaults delete com.626labs.sanduhr` and
   `defaults delete com.626labs.sanduhr.desk` on a test account only): the Desk's clock, date,
-  meters and message draw in EsteFont Pro, the time in Bold. Settings, Desk, Look shows Desk font
+  meters and message draw in EsteFont Pro, the time in Bold. Settings, Desk Look shows Desk font
   EsteFont Pro.
 - [ ] Font Book still shows EsteFont Pro and EsteFont 26 off (or absent): Sanduhr did not install
   them. TextEdit's font list does not have them.
 - [ ] Both pickers list EsteFont Pro first and EsteFont 26 right after it, under System:
-  Settings, Desk, Look (Desk font and Message font) and Settings, Widget, Look. Pick EsteFont Pro
+  Settings, Desk Look (Desk font and Message font) and Settings, Widget Look. Pick EsteFont Pro
   for the widget: the cards draw in it, the semibold lines in Bold. Pick EsteFont 26: the same,
   in its own Bold. Use System Font brings the widget back.
 - [ ] Pick EsteFont 26 for the Desk: the clock's time draws in EsteFont 26 Bold, the rest in its
@@ -1042,7 +1042,7 @@ the build afterwards.
   { last_seen: <this version>, pending: 0, open: true }`.
 - [ ] Show me on each card closes the window and opens Settings at its page: sign-in at Accounts,
   the tour at About (Take the Tour… is there), Now playing at Now
-  Playing, Claude's messages and themes at Message, the Dock at Layout, EsteFont 26 at Desk, Look,
+  Playing, Claude's messages and themes at Message, the Dock at Layout, EsteFont 26 at Desk Look,
   Claude Usage at Claude Usage, integrations at Integrations, accounts at Accounts, the menu bar
   and limits at General.
 - [ ] Quit and open again: no window (`defaults read com.626labs.sanduhr whatsNewLastSeen` prints
@@ -1206,7 +1206,7 @@ at any step.
 4. Turn on **Show a mic while the microphone is on**. Start a Voice Memo recording (or a FaceTime
    or browser call): an orange mic glyph shows beside the dot (or alone). Stop: it goes within a
    second. Sanduhr's log (`log show --last 5m --predicate 'process == "Sanduhr"'`) names no app.
-5. Click the dot: a menu with "Camera in use" and "Microphone in use" (greyed) and Indicator
+5. Click the dot: a menu with "Camera in use" and "Microphone in use" (greyed) and Notch
    Settings…, which opens Settings, Notch. Two-finger click: the same. Nothing mutes, the call
    keeps its camera and microphone.
 6. **Beside the camera**: Left of the camera moves them to the left of the cutout.
@@ -1574,8 +1574,8 @@ Integrations. For the Combine steps give it a statusline of its own first
 (`{"statusLine": {"type": "command", "command": "echo mine"}}` in its `settings.json`).
 
 1. Nothing set: `ls ~/Library/Application\ Support/Sanduhr/band.json` finds no file. Settings,
-   Integrations, Watchers shows **Show watchers above the prompt**, off, under the Notch… and Desk
-   Layout… row, with its caption about band.json.
+   Integrations, Watchers shows **Show watchers above the prompt**, off, under the Notch Settings… and Desk
+   Layout Settings… row, with its caption about band.json.
 2. Install the statusline: the sheet offers Combine. Open a Sanduhr chip's **Style…**: the caption
    ends "the meters mod's band above the prompt draws Sanduhr's segments in this look and moves it
    (sweep, shimmer, glow)". Give Session a two-stop gradient, Script letters and Bold.
@@ -1618,17 +1618,17 @@ Standard layout (message top left; clock, claude line and meters bottom left), D
 showing today. Put a desktop icon (a scratch file) right under the clock first, and another on the
 desktop well away from every piece.
 
-1. Settings, Desk, Look ends with **Clicks**: **Clock and message take clicks**, on, captioned "On:
+1. Settings, Desk Look ends with **Clicks**: **Clock and message take clicks**, on, captioned "On:
    two-finger click them for Sanduhr's menu. Desktop icons right beneath them can't be clicked
    there while it's on." `smoke/smoke state` shows `desk_piece_clicks: true` and `desk_frames`
    lists `clock`, `message` and `claude_line` with non-empty frames; `desk_frames_ok: true`.
 2. Close Settings. Two-finger click (or Control-click) the time, the date, the gap between the
    hour and the minutes, and the space between two words of the message: each time Sanduhr's menu
-   opens (Arrange Desk…, Settings…, Quit…), never the Finder's (no New Folder, no Change Desktop
-   Background). The clock's menu starts with **Desk Settings…**, the message's with **Message…**;
+   opens (Arrange Desk…, All Settings… on the clock and the message, Settings… on the claude line, Quit…), never the Finder's (no New Folder, no Change Desktop
+   Background). The clock's menu starts with **Desk Look Settings…**, the message's with **Edit Messages…**;
    each opens Settings at that page. Two-finger click the claude line: the shared menu, no extra
    item. With two accounts, a plain click on the account name still switches accounts.
-3. Plain click the clock: Settings opens at Desk, Look. Plain click the message: Settings, Desk,
+3. Plain click the clock: Settings opens at Desk Look. Plain click the message: Settings, Desk,
    Message. Plain click the claude line (not the account name): nothing happens, no Finder
    selection box starts.
 4. The same with a special day's stack (`10-31: test` in messages.txt with the Mac's date on

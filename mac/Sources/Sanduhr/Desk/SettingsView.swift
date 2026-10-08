@@ -28,7 +28,7 @@ struct DeskLayoutSection: View {
                     DeskPlaceRow(widget: w.key, name: w.name, layout: $layout)
                 }
                 .disabled(arranging)
-                Text("Eight places: the four corners, the top and bottom centers, and the middle of each side. Top center sits below the notch. Size scales a piece from 60% to 160%; the message starts from its own size in Look. Now playing shows only while something plays; its other settings are in Now Playing. Watchers show only while there is one; they are switched on in Integrations.")
+                Text("Eight places: the four corners, the top and bottom centers, and the middle of each side. Top center sits below the notch. Size scales a piece from 60% to 160%; the message starts from its own size in Desk Look. Now playing shows only while something plays; its other settings are in Now Playing. Watchers show only while there is one; they are switched on in Integrations.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Order") {
@@ -607,7 +607,7 @@ struct DeskNotchSection: View {
                 slider("Extra height below (0 = none)", $chin, 0...56)
             }
             .disabled(!enabled)
-            Section("Camera light") {
+            Section("Camera fill light") {
                 Toggle("Light up for the camera", isOn: $cameraLight)
                     .onChange(of: cameraLight) { _, _ in CameraLightController.shared.apply() }
                 HStack {
@@ -618,7 +618,7 @@ struct DeskNotchSection: View {
                         .frame(width: 48, alignment: .trailing)
                 }
                 slider("Reach below the menu bar", $lightSize, CameraLightLayout.sizeRange)
-                Text("While any app uses a camera, a soft white light around the notch lights your face, above every app. It ends when the camera stops, with or without Desk or the island. Tools, Camera Light shows it by hand. Screens without a notch get it at the top center.")
+                Text("While any app uses a camera, a soft white light around the notch lights your face, above every app. It ends when the camera stops, with or without Desk or the island. Tools, Camera Fill Light shows it by hand. Screens without a notch get it at the top center.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             AVIndicatorSection()
@@ -696,7 +696,7 @@ private struct NotchGlowSection: View {
             Toggle("For Sanduhr alerts", isOn: $glowAlerts)
             Toggle("A minute before a meeting", isOn: $glowMeetings)
                 .onChange(of: glowMeetings) { _, _ in NotchGlowController.shared.apply() }
-            Toggle("When the camera light comes on", isOn: $glowCamera)
+            Toggle("When the camera fill light comes on", isOn: $glowCamera)
             HStack {
                 Text("The notch's edge glows softly in the notch text color for a few seconds, once per event: around the island when it is on, around the notch itself when it is off. A Desk pulse always glows it. It never takes a click.")
                     .font(.caption).foregroundStyle(.secondary)

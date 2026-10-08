@@ -92,8 +92,8 @@ skipped; `pending`, a fresh install's tour waiting for its first successful fetc
 Actions: `show-widget`, `hide-widget`, `settings [section]` (a `SettingsSection` raw value such
 as `notch` or `deskLayout`), `close-settings`, `refresh` (waits for the fetch), `test-alert`,
 `pulse [tier]` (`five_hour` by default; it glows the notch too), `tool deep-work|pacing|snake` (as the Tools menu: chosen
-again it closes), `desk on|off`, `notch on|off`, `camera-light on|off` (the light by hand, as Tools, Camera Light;
-its window is kind `camera` in tree.yaml, one node labeled `Camera light`), `glow [alert|meeting|camera|claude-waiting|claude-done]`
+again it closes), `desk on|off`, `notch on|off`, `camera-light on|off` (the light by hand, as Tools, Camera Fill Light;
+its window is kind `camera` in tree.yaml, one node labeled `Camera fill light`), `glow [alert|meeting|camera|claude-waiting|claude-done]`
 (the notch glow once, whatever its switches; around the island while Desk runs with it on, else around
 the plain hardware notch on a notched screen, in a click-through window of kind `glow` labeled `Notch glow` that fades out after about three seconds),
 `theme <id>` (the widget theme by id, as the Theme menu and the gallery pick it, such as `obsidian`

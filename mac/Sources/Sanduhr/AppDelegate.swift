@@ -378,10 +378,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `accounts` false leaves the Accounts submenu out, for a limit menu that already has it;
     /// `menuBarModes` adds Menu Bar Shows after it, in the menu bar item's own menu only;
     /// `showHide` false leaves Show or Hide Widget out, for a Desk limit menu that has it on top.
+    /// `allSettings` names Settings… "All Settings…", for a menu with a page's own Settings item.
     func addMenuItems(to menu: NSMenu, accounts withAccounts: Bool = true, menuBarModes: Bool = false,
-                      showHide: Bool = true) {
+                      showHide: Bool = true, allSettings: Bool = false) {
         let accounts = withAccounts ? currentAccountsMenu() : nil
-        var groups = currentMenu(widgetVisible: panel?.isVisible ?? false)
+        var groups = currentMenu(widgetVisible: panel?.isVisible ?? false, allSettings: allSettings)
         // A Desk limit menu has Show or Hide Widget at its top already.
         if !showHide { groups = SanduhrMenu.without(.showHide, in: groups) }
         for (i, group) in groups.enumerated() {
@@ -449,7 +450,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             for entry in group { menu.addItem(limitMenuItem(entry)) }
         }
         menu.addItem(.separator())
-        addMenuItems(to: menu, accounts: false, showHide: false)
+        addMenuItems(to: menu, accounts: false, showHide: false, allSettings: true)
     }
 
     private func limitMenuItem(_ entry: LimitMenuEntry) -> NSMenuItem {
@@ -508,13 +509,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// The shared menu with the tools' current checkmarks.
-    func currentMenu(widgetVisible: Bool) -> [MenuGroup] {
+    func currentMenu(widgetVisible: Bool, allSettings: Bool = false) -> [MenuGroup] {
         SanduhrMenu.groups(widgetVisible: widgetVisible,
                            deepWork: viewModel.activeTool == .deepWork,
                            pacing: viewModel.pacingPinned,
                            snake: viewModel.activeTool == .snake,
                            cameraLight: CameraLightController.shared.manual,
-                           deskOn: DeskController.shared.running)
+                           deskOn: DeskController.shared.running,
+                           allSettings: allSettings)
     }
 
     /// The Accounts submenu as it stands, nil with fewer than two accounts.

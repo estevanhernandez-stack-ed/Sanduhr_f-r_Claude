@@ -130,7 +130,7 @@ menu:
         checked: false
       - title: Cooldown Snake
         checked: false
-      - title: Camera Light
+      - title: Camera Fill Light
         checked: false
 credentials_store: file
 account_ref: "104ab921"

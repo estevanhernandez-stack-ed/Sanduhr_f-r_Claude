@@ -28,14 +28,19 @@ struct MenuGroup: Equatable {
 /// AppKit menus (AppDelegate.addMenuItems) and the widget's SwiftUI context menu (RootView)
 /// both render it, separators between the groups.
 enum SanduhrMenu {
+    static let settingsTitle = "Settings…"
+    static let allSettingsTitle = "All Settings…"
+
     /// `widgetVisible` picks Show or Hide; `deepWork`, `pacing` and `snake` are the tools'
     /// checkmarks (Deep Work or Cooldown Snake open on the widget, the pacing calculators pinned);
     /// `cameraLight` is the camera light switched on by hand. Claude Usage… opens Settings at the
     /// Claude Usage page (item 48). What's New… (item 57) reopens the release highlights, Take the Tour… (item 61) the welcome tour.
     /// Arrange Desk… (item 60) starts Arrange mode on the desktop; with `deskOn` false it is off,
-    /// and says why.
+    /// and says why. `allSettings` names Settings… "All Settings…", for a menu that also has a
+    /// page's own Settings item (the Desk clock's and message's menus, the meter menus).
     static func groups(widgetVisible: Bool, deepWork: Bool, pacing: Bool, snake: Bool,
-                       cameraLight: Bool = false, deskOn: Bool = true) -> [MenuGroup] {
+                       cameraLight: Bool = false, deskOn: Bool = true,
+                       allSettings: Bool = false) -> [MenuGroup] {
         [
             MenuGroup(entries: [
                 MenuEntry(command: .showHide, title: widgetVisible ? "Hide Widget" : "Show Widget"),
@@ -44,12 +49,12 @@ enum SanduhrMenu {
                 MenuEntry(command: .deepWork, title: "Deep Work", key: "p", checked: deepWork),
                 MenuEntry(command: .pacing, title: "Pacing Calculators", checked: pacing),
                 MenuEntry(command: .snake, title: "Cooldown Snake", checked: snake),
-                MenuEntry(command: .cameraLight, title: "Camera Light", checked: cameraLight),
+                MenuEntry(command: .cameraLight, title: "Camera Fill Light", checked: cameraLight),
                 MenuEntry(command: .usage, title: "Claude Usage…"),
             ]),
             MenuGroup(entries: [
                 MenuEntry(command: .refresh, title: "Refresh", key: "r"),
-                MenuEntry(command: .settings, title: "Settings…", key: ","),
+                MenuEntry(command: .settings, title: allSettings ? allSettingsTitle : settingsTitle, key: ","),
                 MenuEntry(command: .arrangeDesk, title: DeskArrangeCopy.menuItem, enabled: deskOn,
                           note: deskOn ? nil : DeskArrangeCopy.settingsDeskOff),
                 MenuEntry(command: .checkForUpdates, title: "Check for Updates…"),

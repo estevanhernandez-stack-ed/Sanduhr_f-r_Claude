@@ -904,7 +904,7 @@ moves them there instead; with nothing in use that place shows its own default, 
 With the island off, or on a screen without a notch, they get their own small black tab at the
 top (`badge`): against the notch on the chosen side, or at the top center like the camera light.
 A click or a two-finger click opens a menu of read-only lines ("Camera in use", "Microphone in
-use", disabled) and Indicator Settings…, which opens Settings, Notch. Nothing mutes or changes a
+use", disabled) and Notch Settings…, which opens Settings, Notch. Nothing mutes or changes a
 device. The strip takes its clicks through `DeskHitTest` (`av_indicators`, key `strip`).
 
 The camera dot is the only red dot in Sanduhr: a failed watcher draws a red triangle instead.
@@ -1011,7 +1011,7 @@ Settings, Desk, Layout places each Desk piece (item 59; the pure pieces in `Desk
   and Move Down. Picking a new place for a piece keeps the other pieces' order: it goes before the
   first piece there that Settings lists after it.
 - **A size per piece.** 60% to 160% in 10% steps, kept when the piece moves. Every piece scales
-  from the clock size in Look, the message from its own size.
+  from the clock size in Desk Look, the message from its own size.
 - **The map.** The Layout card (`DeskLayoutMap`) draws the screen with the menu bar, the notch (and
   the island), the Dock on its edge and each piece outlined at its place, in its order and at its
   size, live, from the same `DeskArrangement.stacks` call the Desk draws from.
@@ -1096,13 +1096,13 @@ takes the mouse only over its click areas (`DeskHitTest`, from the frames the pi
 `onGlobalFrame`), and a near-invisible plate behind each one (`DeskPointerMenu.hitPlateOpacity`,
 alpha 3 of 255) makes the gaps between letters count. Everywhere else clicks go to the desktop.
 
-**Clock and message take clicks** (Settings, Desk, Look, Clicks; desk suite key
+**Clock and message take clicks** (Settings, Desk Look, Clicks; desk suite key
 `piecesTakeClicks`, on by default) adds the clock (time and date), the message (the day's line, a
 special day's stack, or the line taking its turn with Take turns or Scroll) and the claude line to
 those areas (`DeskPieceClicks`; kinds `clock`, `message` and `claude_line`). A two-finger click on
 any of them opens the shared Sanduhr menu (Arrange Desk…, Settings… and the rest) instead of the
-Finder's desktop menu; the clock's adds **Desk Settings…** and the message's **Message…** at the
-top. A plain click on the clock opens Settings, Desk, Look, on the message Settings, Desk, Message;
+Finder's desktop menu; the clock's adds **Desk Look Settings…** and the message's **Edit Messages…** at the
+top, and the shared Settings… reads All Settings… there. A plain click on the clock opens Settings, Desk Look, on the message Settings, Desk, Message;
 on the claude line it does nothing, like the meters (the account name inside the line still
 switches accounts). The cost: a desktop icon right beneath one of them can't be clicked there while
 the switch is on. Off, nothing is drawn behind them and they are not click areas, exactly as before.
@@ -1165,7 +1165,7 @@ in a corner like the other elements; off by default). There is no switch: it run
 somewhere and Desk is on (`NowPlayingPlacement`). Click it to play or pause; two-finger click for
 Previous, Play/Pause, Next and Now Playing Settings…. It hides when nothing plays, optionally while
 paused, and for apps switched off on the Now Playing page (which also has the source, the AppleScript
-switch and "Arrange on the Notch…" / "Arrange on the Desk…").
+switch and "Notch Settings…" / "Desk Layout Settings…").
 
 - **When nothing is playing.** A notch wing or the strip on Now playing doesn't go blank when there
   is no line (nothing plays, Hide while paused while paused, the app switched off, now playing
@@ -1267,7 +1267,7 @@ Bold face (`BundledFonts.face`, `FontSettings.wantsBold`).
 - **The widget** (`UserDefaults` `fontFamily`) keeps its theme fonts (the system font) unless you pick
   one; with EsteFont Pro or EsteFont 26 picked, its semibold and bold text draws in that family's Bold
   face. Match Desk draws in the Desk's font, either bundled family included.
-- Both font pickers (Settings, Desk, Look and Settings, Widget, Look) list EsteFont Pro first and
+- Both font pickers (Settings, Desk Look and Settings, Widget Look) list EsteFont Pro first and
   EsteFont 26 right after it, after System.
 
 EsteFont Pro and EsteFont 26 are © 2009-2026 Estevan Hernandez / 626Labs LLC and licensed only for
@@ -1309,10 +1309,10 @@ again any time with the current settings, recording nothing. The cards live in
 ## Settings previews
 
 Every Settings page that controls something visible opens with a preview card about 160 points
-tall (Notch, Layout, Look, Meters, Message, Now Playing, Widget Look, Pacing & Focus, General,
+tall (Notch, Layout, Desk Look, Meters, Message, Now Playing, Widget Look, Pacing & Focus, General,
 Integrations; Themes keeps its gallery; Mods has a summary card of its counts). Each card is drawn by the surface's own views, never a
 mock: NotchView, NotchWingsView, NotchGlowView and AVIndicatorBadge for the notch, DeskPiece (the
-Desk's pieces, factored out of DeskView) for Look, Meters, Message and Now Playing,
+Desk's pieces, factored out of DeskView) for Desk Look, Meters, Message and Now Playing,
 WidgetCardStack in WidgetGlass (factored out of RootView) for the widget, MenuBarText and
 MenuBarItemLook (shared with the status item) for the menu bar, and TerminalPreviewFrame for
 Sanduhr's statusline. The views read the same saved settings the page writes, so a change shows
@@ -1365,8 +1365,8 @@ terminal previews. state.yaml's `settings_preview` names the card the open page 
 | Two-finger click a tier card | Accounts, Hide (temporary limits), Stop warnings, Hidden Limits, Meter Settings, then the widget menu |
 | Click a Desk meter          | Nothing: the meters are passive, clicks there do nothing |
 | Two-finger click a Desk meter | Show or Hide Widget, then the same limit menu |
-| Click the Desk clock / message | Settings, Desk, Look / Settings, Desk, Message (while "Clock and message take clicks" is on) |
-| Two-finger click the Desk clock, message or claude line | Desk Settings… (clock) or Message… (message), then the shared menu |
+| Click the Desk clock / message | Settings, Desk Look / Settings, Desk, Message (while "Clock and message take clicks" is on) |
+| Two-finger click the Desk clock, message or claude line | Desk Look Settings… (clock) or Edit Messages… (message), then the shared menu (its Settings… as All Settings…) |
 | Click now playing (notch or Desk) | Play or pause (item 53) |
 | Click Next on a paused wing or strip | Next track (item 53b) |
 | Two-finger click now playing | Previous, Play/Pause, Next, Now Playing Settings… |

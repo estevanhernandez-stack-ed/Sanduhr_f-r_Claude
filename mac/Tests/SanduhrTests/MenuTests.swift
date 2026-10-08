@@ -20,11 +20,23 @@ struct SanduhrMenuTests {
     @Test func itemsInOrder() {
         #expect(flat(menu()) == [
             "Hide Widget", "-",
-            "Deep Work", "Pacing Calculators", "Cooldown Snake", "Camera Light", "Claude Usage…", "-",
+            "Deep Work", "Pacing Calculators", "Cooldown Snake", "Camera Fill Light", "Claude Usage…", "-",
             "Refresh", "Settings…", "Arrange Desk…", "Check for Updates…", "What's New…", "Take the Tour…", "-",
             "Quit Sanduhr für Claude",
         ])
         #expect(menu().map(\.header) == [nil, "Tools", nil, nil])
+    }
+
+    /// A menu that also has a page's own Settings item (the Desk clock's and message's, the meter
+    /// menus) names the shared one All Settings…; the menu bar item's and the widget's keep Settings….
+    @Test func allSettingsBesideAPageSettingsItem() {
+        func settings(_ g: [MenuGroup]) -> MenuEntry? { g.flatMap(\.entries).first { $0.command == .settings } }
+        #expect(settings(menu())?.title == "Settings…")
+        let all = SanduhrMenu.groups(widgetVisible: true, deepWork: false, pacing: false, snake: false, allSettings: true)
+        #expect(settings(all)?.title == "All Settings…")
+        #expect(settings(all)?.key == ",")
+        // Nothing else changes.
+        #expect(flat(all).filter { $0 != "All Settings…" } == flat(menu()).filter { $0 != "Settings…" })
     }
 
     @Test func showOrHideFollowsTheWidget() {
@@ -141,6 +153,14 @@ struct SettingsSidebarTests {
         // Item 49: Integrations follows Claude Usage. Item 64: Mods follows Integrations.
         #expect(SettingsSection(rawValue: "integrations")?.title == "Integrations")
         #expect(SettingsSection(rawValue: "mods")?.title == "Mods")
+    }
+
+    @Test func lookPagesNameTheirGroup() {
+        // Opener items name a page as the sidebar does; the two Look pages carry their group.
+        #expect(SettingsSection.deskLook.title == "Desk Look")
+        #expect(SettingsSection.widgetLook.title == "Widget Look")
+        #expect(SettingsSection(rawValue: "deskLook") == .deskLook)
+        #expect(SettingsSection(rawValue: "widgetLook") == .widgetLook)
     }
 
     @Test func claudeUsageSitsUnderAccounts() {

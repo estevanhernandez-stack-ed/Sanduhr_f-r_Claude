@@ -332,9 +332,9 @@ struct DeskPieceClicksTests {
         #expect(DeskPieceClicks.plainClick(.clock) == .deskLook)
         #expect(DeskPieceClicks.plainClick(.message) == .message)
         #expect(DeskPieceClicks.plainClick(.claudeLine) == nil)
-        #expect(DeskPieceClicks.menuItem(.clock)?.title == "Desk Settings…")
+        #expect(DeskPieceClicks.menuItem(.clock)?.title == "Desk Look Settings…")
         #expect(DeskPieceClicks.menuItem(.clock)?.section == .deskLook)
-        #expect(DeskPieceClicks.menuItem(.message)?.title == "Message…")
+        #expect(DeskPieceClicks.menuItem(.message)?.title == "Edit Messages…")
         #expect(DeskPieceClicks.menuItem(.message)?.section == .message)
         #expect(DeskPieceClicks.menuItem(.claudeLine) == nil)
         for kind in [DeskElement.Kind.clock, .message, .claudeLine] {

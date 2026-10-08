@@ -349,8 +349,8 @@ enum DeskPieceClicks {
     /// The item a piece's two-finger menu has above the shared items, and the Settings page it opens.
     static func menuItem(_ kind: DeskElement.Kind) -> (title: String, section: SettingsSection)? {
         switch kind {
-        case .clock: return ("Desk Settings…", .deskLook)
-        case .message: return ("Message…", .message)
+        case .clock: return ("Desk Look Settings…", .deskLook)
+        case .message: return ("Edit Messages…", .message)
         default: return nil
         }
     }

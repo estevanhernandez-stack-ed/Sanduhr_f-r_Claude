@@ -192,14 +192,16 @@ struct AccountsSubmenu: View {
 
 /// The shared menu (SanduhrMenu) as SwiftUI items, separators between the groups, the Accounts
 /// submenu after Show/Hide as AppDelegate.addMenuItems puts it. `accounts` false leaves the
-/// submenu out, for a card's limit menu that already has it.
+/// submenu out, for a card's limit menu that already has it; `allSettings` names Settings…
+/// "All Settings…" there, beside the card's Meter Settings….
 struct SanduhrMenuItems: View {
     let app: AppDelegate
     var vm: UsageViewModel
     var accounts = true
+    var allSettings = false
 
     var body: some View {
-        let groups = app.currentMenu(widgetVisible: true)
+        let groups = app.currentMenu(widgetVisible: true, allSettings: allSettings)
         ForEach(groups.indices, id: \.self) { i in
             if i > 0 { Divider() }
             if let header = groups[i].header {
@@ -276,7 +278,7 @@ struct LimitContextMenu: ViewModifier {
                     }
                 }
                 Divider()
-                SanduhrMenuItems(app: app, vm: vm, accounts: false)
+                SanduhrMenuItems(app: app, vm: vm, accounts: false, allSettings: true)
             }
         }
     }

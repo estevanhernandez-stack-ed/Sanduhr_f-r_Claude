@@ -415,21 +415,23 @@ final class DeskController: NSObject, NSMenuDelegate {
         }
         if DeskHitTest.hasSharedMenu(hit) {
             let menu = NSMenu()
-            // The clock's Desk Settings… and the message's Message… (DeskPieceClicks), above the shared items.
-            if let kind = hit?.kind, let extra = DeskPieceClicks.menuItem(kind) {
+            // The clock's Desk Look Settings… and the message's Edit Messages… (DeskPieceClicks), above
+            // the shared items, whose Settings… then reads All Settings….
+            let extra = hit.flatMap { DeskPieceClicks.menuItem($0.kind) }
+            if let extra {
                 let item = NSMenuItem(title: extra.title, action: #selector(pieceSettingsFromMenu(_:)), keyEquivalent: "")
                 item.target = self
                 item.representedObject = extra.section.rawValue
                 menu.addItem(item)
                 menu.addItem(.separator())
             }
-            addStandardItems(to: menu)
+            addStandardItems(to: menu, allSettings: extra != nil)
             return menu
         }
         return limitMenu(for: hit)
     }
 
-    /// Desk Settings… (the clock's menu) or Message… (the message's): Settings at that page.
+    /// Desk Look Settings… (the clock's menu) or Edit Messages… (the message's): Settings at that page.
     @objc private func pieceSettingsFromMenu(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let section = SettingsSection(rawValue: raw) else { return }
         showSettings(section)
@@ -753,9 +755,10 @@ final class DeskController: NSObject, NSMenuDelegate {
     }
 
     /// The same items as the menu bar item's menu and the widget's menu (SanduhrMenu).
-    private func addStandardItems(to menu: NSMenu) {
+    /// `allSettings` names Settings… "All Settings…", for a menu with a page's own Settings item.
+    private func addStandardItems(to menu: NSMenu, allSettings: Bool = false) {
         // Menus are built on the main thread.
-        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.addMenuItems(to: menu) }
+        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.addMenuItems(to: menu, allSettings: allSettings) }
     }
 
     private func buildMenu() {

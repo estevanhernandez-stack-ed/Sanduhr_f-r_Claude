@@ -374,7 +374,7 @@ private struct GlowHint: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
-            Button("Glow Settings…", action: openNotch)
+            Button("Notch Settings…", action: openNotch)
         }
     }
 }
@@ -655,7 +655,7 @@ private struct HooksConsentBody: View {
                     .font(.caption)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
-                Button("Glow Settings…", action: openNotch)
+                Button("Notch Settings…", action: openNotch)
             }
         }
     }
