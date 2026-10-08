@@ -510,7 +510,7 @@ private struct MetersModRow: View {
         }
     }
 
-    static let explainer = "The sanduhr-meters mod. Off takes this folder's entry out and keeps the mod's files; Remove also deletes Sanduhr's record of the change and puts settings.json back byte for byte."
+    static let explainer = "The sanduhr-meters mod. Off switches it off for this folder (enabledPlugins false) and keeps its entry and files; Remove takes the entry out, deletes Sanduhr's record and puts settings.json back byte for byte."
 
     @ViewBuilder private var buttons: some View {
         if status == .outdated || (row.updateAvailable && !row.missing) {

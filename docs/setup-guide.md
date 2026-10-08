@@ -182,7 +182,7 @@ You get your meters inside Claude Code, a notch that glows when Claude needs you
    - **Statusline**: your meters on a line under Claude Code's prompt.
    - **Claude Code glow hook**: tells Sanduhr when Claude Code waits on you or finishes, so the notch can glow.
 5. A sheet says what it adds. Click **Install**.
-6. **Meters above the prompt** (your meters as animated bars above the prompt, Sanduhr's sanduhr-meters mod) has a switch instead. Turn it on; the first time, a sheet says what it adds. **Off** takes the folder's entry out and keeps the mod's files. **Remove** also puts the folder's settings back exactly as before.
+6. **Meters above the prompt** (your meters as animated bars above the prompt, Sanduhr's sanduhr-meters mod) has a switch instead. Turn it on; the first time, a sheet says what it adds. **Off** switches the mod off for that folder (its `enabledPlugins` entry turns false) and keeps the entry and the mod's files. **Remove** takes the entry out, deletes Sanduhr's record and puts the folder's settings back exactly as before.
 
 Remove takes out exactly what Sanduhr added.
 
