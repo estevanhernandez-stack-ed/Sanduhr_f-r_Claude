@@ -270,6 +270,8 @@ export type Meter = {
   pace: string | null
   isWarning: boolean
   reset: string | null
+  // How long until the limit resets (ms), null without a reset time or once it passed.
+  resetLeft: number | null
 }
 
 export type Band =
@@ -322,6 +324,7 @@ export function bandFor(snap: Snapshot | null, now: number, opts: BandOptions): 
       pace: isCrossed ? null : paceWords(t.utilization, fraction),
       isWarning: !isCrossed && snap.status === 'ok' && isWarning(t.key, t.utilization, t.resetsAt, now),
       reset: isCrossed ? null : resetWords(t.resetsAt, now, opts.style, opts.tzOffsetMinutes),
+      resetLeft: isCrossed || t.resetsAt === null ? null : t.resetsAt - now,
     })
   }
 

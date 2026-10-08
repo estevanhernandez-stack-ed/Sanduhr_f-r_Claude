@@ -20,6 +20,9 @@ tools the same way on either machine:
   watch_start, watch_update, watch_end
                              a live watcher card on the notch or the Desk for work in flight (a CI
                              run, a deploy), when the user lets agents show watchers
+  propose_now_playing_looks  suggests a gradient and letter style per song for now playing; Sanduhr
+                             asks the user (or saves them when the user lets Claude style songs
+                             directly)
 
 What each tool may read is decided per account in Sanduhr (Settings, Accounts, Data, Share
 with Claude) and handed over in ~/Library/Application Support/Sanduhr/mcp-access.json. No
@@ -35,9 +38,10 @@ the desktop already, and a proposal only asks (Sanduhr checks it again and the u
 unless they chose to let Claude change the messages directly). Never reads Sanduhr's settings,
 the Keychain or account names; never calls claude.ai or anything else on the network; never
 logs. The files it writes are desk-messages-request.json (propose_desk_messages),
-theme-request.json (propose_theme) and watch-request-<ms>-<seq>-<id>.json (the watch tools, only
-while watchers.json, written by Sanduhr, says agents may show watchers), atomically and
-owner-only; it never writes messages.txt or a theme. No tool takes a path. Failures are typed results (status/reason/remedy), never protocol
+theme-request.json (propose_theme), now-playing-looks-request.json (propose_now_playing_looks) and
+watch-request-<ms>-<seq>-<id>.json (the watch tools, only while watchers.json, written by Sanduhr,
+says agents may show watchers), atomically and owner-only; it never writes messages.txt, a theme or
+the saved looks. No tool takes a path. Failures are typed results (status/reason/remedy), never protocol
 errors. Python 3.9 standard library only.
 
 publish_usage is dropped on the Mac (nothing leaves this Mac).
@@ -186,8 +190,12 @@ THEME_GUIDE = (
     "({blur: 0 to 20, alpha: 0 to 1}, 3 to 8 and 0.25 to 0.65 read well), inner_highlight "
     "({color: '#rrggbb', alpha: 0.15 to 0.30} or null), card_corner_radius (0 to 24, default 10), "
     "breath_period_ms (500 to 20000, the bar's slow breathing, default 2800), ghost_alpha (0 to 1, "
-    "the pace ghost tick), opts_out_of_mica (true makes the cards opaque; then set glass_alpha 1) "
-    "and monospace_font (any string gives monospaced numbers). What makes a good theme, measured "
+    "the pace ghost tick), opts_out_of_mica (true makes the cards opaque; then set glass_alpha 1), "
+    "monospace_font (any string gives monospaced numbers), and the title's text style: title_ink (2 to "
+    "4 '#rrggbb' colors, the widget title's gradient left to right; each stop needs 4.5:1 on the card "
+    "like text) and title_style (its letters: bold, italic, bold-italic and small-caps in the widget "
+    "font, sans, mono, double-struck, script and fraktur as Unicode letters), so a synthwave theme can "
+    "carry its text too. What makes a good theme, measured "
     "by the lint: a dark base (bg, glass and glass_on_mica luminance under 0.25: light glass does "
     "not layer); text at 4.5:1 or better on the card (glass_on_mica at glass_alpha over a mid-gray "
     "desktop) and text_secondary at 3:1; the text ramp one hue at decreasing luminance; one accent "
@@ -239,6 +247,24 @@ WATCH_ANNOTATIONS = {"readOnlyHint": False, "destructiveHint": False, "idempoten
                      "openWorldHint": False}
 WATCH_ID_SCHEMA = {"type": "string", "pattern": "^w[0-9a-f]{12}$", "description": "The id watch_start returned."}
 WATCH_NOTE_SCHEMA = {"type": "string", "maxLength": 140, "description": "One line for the user, up to 140 characters."}
+
+LOOKS_GUIDE = (
+    "Suggest a look for songs the user plays: a gradient and a letter style per song, drawn on the "
+    "now playing line on the user's notch and Desk while Sanduhr's Style what's playing is on "
+    "(Settings, Desk, Now Playing). Until a song has a look it wears one picked from its name out of "
+    "eight palettes. Pass looks: 1 to 50 of {artist, title, colors, font, mood}: artist and title "
+    "exactly as the player shows them (matched ignoring case and extra spaces), colors 2 to 4 hex "
+    "colors left to right (each must read on the black notch: 3:1 or better against black, so no "
+    "dark shades), font one letter style (bold, italic, bold-italic, small-caps drawn in the user's "
+    "handwriting font; sans, mono, double-struck, script, fraktur as Unicode letters; omit for plain), "
+    "mood up to 3 words for the user ('neon night drive'). Pick songs you know the user plays (they "
+    "said so, or ask them); a look should feel like the song: its era, its cover, its energy. "
+    "Sanduhr checks the looks again and, unless the user lets Claude style songs directly, shows "
+    "them as a suggestion to Save or Dismiss: pending_approval means the user decides, applied "
+    "means they are saved (looks_saved), rejected comes with reasons. style_on says whether Style "
+    "what's playing is on; when it is false, tell the user where to switch it on. A saved look "
+    "replaces an older one for the same song. queued means Sanduhr did not answer: it is not "
+    "running. This server never writes the saved looks and never reads what is playing.")
 
 READ_ONLY = {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False}
 NO_ARGS = {"type": "object", "properties": {}, "additionalProperties": False}
@@ -418,6 +444,39 @@ TOOLS = [
         },
         "annotations": WATCH_ANNOTATIONS,
     },
+    {
+        "name": "propose_now_playing_looks",
+        "description": LOOKS_GUIDE,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "looks": {
+                    "type": "array", "minItems": 1, "maxItems": 50,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "artist": {"type": "string", "maxLength": 100},
+                            "title": {"type": "string", "maxLength": 200},
+                            "colors": {"type": "array", "minItems": 2, "maxItems": 4,
+                                       "items": {"type": "string", "pattern": "^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"},
+                                       "description": "2 to 4 hex colors, left to right, each 3:1 or better on black."},
+                            "font": {"type": "string",
+                                     "enum": ["bold", "italic", "bold-italic", "sans", "mono", "double-struck",
+                                              "script", "fraktur", "small-caps"]},
+                            "mood": {"type": "string", "maxLength": 40, "description": "Up to 3 words."},
+                        },
+                        "required": ["artist", "title", "colors"],
+                        "additionalProperties": False,
+                    },
+                    "description": "One look per song.",
+                },
+            },
+            "required": ["looks"],
+            "additionalProperties": False,
+        },
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True,
+                        "openWorldHint": False},
+    },
 ]
 TOOL_NAMES = [t["name"] for t in TOOLS]
 # The Desk messages handoff (item 54). The app mirrors these names (DeskMessageHandoff); a test on
@@ -442,6 +501,19 @@ THEME_WAIT_SECONDS = 10.0
 THEME_MAX_BYTES = 16 * 1024
 # The widget's compiled-in themes (ThemeRegistry.builtIn): a proposal never takes their key.
 BUILT_IN_THEME_IDS = ["obsidian", "aurora", "ember", "mint", "626-labs", "matrix", "blueprint", "match-desk"]
+# The now playing looks handoff (item 65c). The app mirrors these names and limits
+# (NowPlayingLookProposal); a test on each side pins them.
+LOOKS_REQUEST_FILE = "now-playing-looks-request.json"
+LOOKS_RESULT_FILE = "now-playing-looks-result.json"
+LOOKS_FILE = "now-playing-looks.json"
+LOOKS_MAX = 50
+LOOKS_MAX_ARTIST = 100
+LOOKS_MAX_TITLE = 200
+LOOKS_MAX_MOOD_WORDS = 3
+LOOKS_MAX_MOOD_CHARS = 40
+LOOKS_MIN_CONTRAST_ON_BLACK = 3.0
+LOOKS_FIELDS = ("artist", "title", "colors", "font", "mood")
+LOOKS_WAIT_SECONDS = 10.0
 # The watchers handoff (item 66). The app mirrors these names (WatcherStore); a test on each side
 # pins them.
 WATCH_SWITCH_FILE = "watchers.json"
@@ -475,6 +547,8 @@ class Paths:
         self.theme_request = os.path.join(self.support_dir, THEME_REQUEST_FILE)
         self.theme_result = os.path.join(self.support_dir, THEME_RESULT_FILE)
         self.watch_switch = os.path.join(self.support_dir, WATCH_SWITCH_FILE)
+        self.looks_request = os.path.join(self.support_dir, LOOKS_REQUEST_FILE)
+        self.looks_result = os.path.join(self.support_dir, LOOKS_RESULT_FILE)
 
     def history_file(self, name):
         return os.path.join(self.support_dir, name)
@@ -1652,6 +1726,14 @@ def is_number(v):
     return isinstance(v, (int, float)) and not isinstance(v, bool)
 
 
+def title_ink(v):
+    """title_ink's stops as (r, g, b), or None unless it is 2 to 4 '#rrggbb' strings."""
+    if not isinstance(v, list) or not 2 <= len(v) <= 4:
+        return None
+    stops = [theme_hex(c) for c in v]
+    return None if any(c is None for c in stops) else stops
+
+
 def lint_theme(data):
     """Findings for a theme dict: [{level, field, message}]. Errors block it; warnings ride along."""
     findings = []
@@ -1741,6 +1823,12 @@ def lint_theme(data):
     if oom is not None and not isinstance(oom, bool):
         err("opts_out_of_mica", "opts_out_of_mica must be true or false, got %s." % describe_json(oom))
     opts_out = oom is True
+    # Text style (item 65d).
+    if data.get("title_ink") is not None and title_ink(data["title_ink"]) is None:
+        err("title_ink", "title_ink must be 2 to 4 #rrggbb colors (the title's gradient, left to right), or null.")
+    ts = data.get("title_style")
+    if ts is not None and (not isinstance(ts, str) or font_style(ts) is None):
+        err("title_style", "title_style must be one of %s, or null." % FONT_STYLES)
 
     if any(f["level"] == "error" for f in findings):
         return findings
@@ -1761,6 +1849,11 @@ def lint_theme(data):
     if ratio2 < THEME_TEXT_SECONDARY_CONTRAST_MIN:
         warn("text_secondary", "text_secondary reads at %s:1 on the card (needs %s:1)."
              % (fmt(ratio2, 1), fmt(THEME_TEXT_SECONDARY_CONTRAST_MIN, 1)))
+    for i, stop in enumerate(title_ink(data.get("title_ink")) or []):
+        r = contrast(luminance(stop), card_l)
+        if r < THEME_TEXT_CONTRAST_MIN:
+            warn("title_ink", "title_ink stop %d reads at %s:1 on the card (needs %s:1); brighten it or darken glass_on_mica."
+                 % (i + 1, fmt(r, 1), fmt(THEME_TEXT_CONTRAST_MIN, 1)))
 
     ramp = ["text", "text_secondary", "text_dim", "text_muted"]
     for i in range(1, len(ramp)):
@@ -1886,6 +1979,132 @@ def build_propose_theme(args, now=None, paths=None, wait=THEME_WAIT_SECONDS, pol
             "findings": findings,
             "remedy": "Sanduhr did not answer within %d seconds. Start Sanduhr: it picks the request up within "
                       "ten minutes of when it was made." % int(wait)}
+
+
+# -- propose_now_playing_looks (item 65c) ------------------------------------------------------
+#
+# The looks are checked here (an instant refusal writes nothing) with the app's rules and wording
+# (NowPlayingLookProposal), then handed over in now-playing-looks-request.json. The app checks them
+# again, and saves them to now-playing-looks.json when the user approves (or lets Claude style
+# songs directly). This server never reads what is playing.
+
+LOOK_HEX_RE = re.compile(r"#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})")
+
+
+def look_hex(v):
+    """'#FF2A6D', 'ff2a6d' or '#f2d' as 'ff2a6d'; None for anything else."""
+    if not isinstance(v, str) or not LOOK_HEX_RE.fullmatch(v):
+        return None
+    h = v.lower().lstrip("#")
+    return "".join(c * 2 for c in h) if len(h) == 3 else h
+
+
+def look_line(v, cap):
+    """A one-line string of 1 to `cap` characters, trimmed, or None."""
+    if not isinstance(v, str) or any(is_control(c) for c in v):
+        return None
+    t = v.strip()
+    return t if t and len(t) <= cap else None
+
+
+def check_look(item, n):
+    """(look, reasons) for one look; reasons start 'look N'."""
+    if not isinstance(item, dict):
+        return None, ["look %d must be an object with artist, title and colors" % n]
+    reasons = []
+    extra = sorted(str(k) for k in item if k not in LOOKS_FIELDS)
+    if extra:
+        reasons.append("look %d has an unknown field: %s" % (n, extra[0][:20]))
+    artist = look_line(item.get("artist"), LOOKS_MAX_ARTIST)
+    if artist is None:
+        reasons.append("look %d artist must be one line of 1 to %d characters" % (n, LOOKS_MAX_ARTIST))
+    title = look_line(item.get("title"), LOOKS_MAX_TITLE)
+    if title is None:
+        reasons.append("look %d title must be one line of 1 to %d characters" % (n, LOOKS_MAX_TITLE))
+    raw = item.get("colors")
+    raw = raw if isinstance(raw, list) else []
+    colors = [look_hex(c) for c in raw]
+    if 2 <= len(raw) <= 4 and all(colors):
+        for h in colors:
+            ratio = contrast(luminance(theme_hex("#" + h)), 0)
+            if ratio < LOOKS_MIN_CONTRAST_ON_BLACK:
+                reasons.append("look %d color #%s is too dark for the black notch (%s:1, needs %s:1)"
+                               % (n, h, fmt(ratio, 1), fmt(LOOKS_MIN_CONTRAST_ON_BLACK, 1)))
+    else:
+        reasons.append('look %d colors must be 2 to 4 hex colors, like ["#ff2a6d", "#05d9e8"]' % n)
+    font = None
+    if item.get("font") is not None:
+        font = font_style(item["font"]) if isinstance(item["font"], str) else None
+        if font is None:
+            reasons.append("look %d font must be one of: %s" % (n, FONT_STYLES))
+    mood = None
+    if item.get("mood") is not None:
+        m = item["mood"]
+        t = m.strip() if isinstance(m, str) else None
+        if (t is not None and len(t) <= LOOKS_MAX_MOOD_CHARS and len(t.split()) <= LOOKS_MAX_MOOD_WORDS
+                and not any(is_control(c) for c in m)):
+            mood = t or None
+        else:
+            reasons.append("look %d mood must be at most %d words and %d characters"
+                           % (n, LOOKS_MAX_MOOD_WORDS, LOOKS_MAX_MOOD_CHARS))
+    if reasons:
+        return None, reasons
+    return {"artist": artist, "title": title, "colors": ["#" + h for h in colors], "font": font, "mood": mood}, []
+
+
+def validate_looks(looks):
+    """(looks, reasons): the looks cleaned, and why they are refused ([] when they may go)."""
+    if not isinstance(looks, list) or not 1 <= len(looks) <= LOOKS_MAX:
+        return [], ["looks must be a list of 1 to %d looks" % LOOKS_MAX]
+    out, reasons = [], []
+    for i, item in enumerate(looks):
+        look, why = check_look(item, i + 1)
+        if look is not None:
+            out.append(look)
+        reasons += why
+    return out, reasons[:20]
+
+
+def build_propose_now_playing_looks(args, now=None, paths=None, wait=LOOKS_WAIT_SECONDS, poll=DESK_POLL_SECONDS,
+                                    sleep=time.sleep, clock=time.monotonic):
+    """Checks the looks here (an instant refusal writes nothing), then hands them to the app through
+    now-playing-looks-request.json and waits briefly for its answer. Never writes the saved looks."""
+    now = now or datetime.now(timezone.utc)
+    paths = paths or Paths()
+    args = args if isinstance(args, dict) else {}
+    unknown = sorted(str(k) for k in args if k != "looks")
+    if unknown:
+        return {"status": "rejected", "reasons": ["unknown argument(s): " + ", ".join(k[:20] for k in unknown[:5])]}
+    looks, reasons = validate_looks(args.get("looks"))
+    if reasons:
+        return {"status": "rejected", "reasons": reasons}
+
+    request_id = uuid.uuid4().hex
+    request = {"schema_version": 1, "id": request_id, "requested_at": iso_o(now), "looks": looks}
+    try:
+        os.makedirs(paths.support_dir, mode=0o700, exist_ok=True)
+        tmp = paths.looks_request + ".tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(request, f, ensure_ascii=False)
+        os.replace(tmp, paths.looks_request)   # atomic: the app never reads half a file
+    except OSError as e:
+        return {"status": "error", "reason": "request_write_failed",
+                "remedy": "Could not queue the request (%s)." % type(e).__name__}
+
+    deadline = clock() + wait
+    while True:
+        res = read_desk_result(paths.looks_result, request_id)
+        if res is not None:
+            out = {k: res[k] for k in ("status", "reasons", "looks_saved", "style_on") if k in res}
+            out["request_id"] = request_id
+            return out
+        if clock() >= deadline:
+            break
+        sleep(poll)
+    return {"status": "queued", "reason": "app_not_responding", "request_id": request_id,
+            "remedy": "Sanduhr did not answer within %d seconds. Start Sanduhr: it picks the request up "
+                      "within ten minutes of when it was made and shows it as a suggestion." % int(wait)}
 
 
 # -- Watchers (item 66) ------------------------------------------------------------------------
@@ -2119,6 +2338,8 @@ def call_tool(name, args):
         return build_watch_update(args)
     if name == "watch_end":
         return build_watch_end(args)
+    if name == "propose_now_playing_looks":
+        return build_propose_now_playing_looks(args)
     return None
 
 

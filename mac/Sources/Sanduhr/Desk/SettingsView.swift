@@ -15,17 +15,25 @@ struct DeskLayoutSection: View {
     @AppStorage("top", store: .desk) private var top = 40.0
     @AppStorage("bottom", store: .desk) private var bottom = 60.0
 
+    @AppStorage(DeskController.enabledKey, store: .desk) private var deskOn = false
+
     var body: some View {
+        let arranging = DeskController.shared.model.arrange.active
         Form {
+            Section("On the desktop") {
+                DeskArrangeRow(deskOn: deskOn, arranging: arranging)
+            }
             Section("Where each piece sits") {
                 ForEach(DeskLayout.widgets, id: \.key) { w in
                     DeskPlaceRow(widget: w.key, name: w.name, layout: $layout)
                 }
-                Text("Eight places: the four corners, the top and bottom centers, and the middle of each side. Top center sits below the notch. Size scales a piece from 60% to 160%; the message starts from its own size in Look. Now playing shows only while something plays; its other settings are in Now Playing. Watchers show only while there is one; they are switched on in Integrations.")
+                .disabled(arranging)
+                Text("Eight places: the four corners, the top and bottom centers, and the middle of each side. Top center sits below the notch. Size scales a piece from 60% to 160%; the message starts from its own size in Desk Look. Now playing shows only while something plays; its other settings are in Now Playing. Watchers show only while there is one; they are switched on in Integrations.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Order") {
                 DeskOrderList(layout: $layout)
+                    .disabled(arranging)
                 Text("Pieces in the same place stack top to bottom in this order. Drag a piece up or down to reorder it, or onto a piece in another place to move it there. The top, middle and bottom of a side share a column, and a side keeps clear of the centers, so places never overlap.")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -37,6 +45,25 @@ struct DeskLayoutSection: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Layout's Arrange Desk… button (item 60). While arranging, the places and the order here wait:
+/// Done on the desktop writes the layout, so an edit here would be overwritten.
+private struct DeskArrangeRow: View {
+    let deskOn: Bool
+    let arranging: Bool
+
+    var body: some View {
+        LabeledContent {
+            Button(DeskArrangeCopy.settingsButton) { DeskController.shared.arrangeDesk() }
+                .disabled(!deskOn || arranging)
+        } label: {
+            Text(arranging ? DeskArrangeCopy.settingsArranging
+                 : deskOn ? DeskArrangeCopy.settingsNote : DeskArrangeCopy.settingsDeskOff)
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
@@ -200,6 +227,7 @@ struct DeskLookSection: View {
     @AppStorage("inkColor", store: .desk) private var inkColor = "ffffff"
     @AppStorage("inkShadow", store: .desk) private var inkShadow = true
     @AppStorage("notchTextColor", store: .desk) private var notchTextColor = "ffffff"
+    @AppStorage(DeskPieceClicks.key, store: .desk) private var piecesTakeClicks = DeskPieceClicks.defaultOn
     @State private var families: [String] = []
 
     /// The Desk font as drawn (EsteFont Pro until one is picked, or when the picked one is gone);
@@ -240,6 +268,11 @@ struct DeskLookSection: View {
                 ColorRow(title: "Clock, date, meetings, Claude", value: $inkColor)
                 Toggle("Drop shadow under the clock text", isOn: $inkShadow)
                 ColorRow(title: "Notch text", value: $notchTextColor)
+            }
+            Section("Clicks") {
+                Toggle(DeskPieceClicks.title, isOn: $piecesTakeClicks)
+                Text(DeskPieceClicks.caption)
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -574,7 +607,7 @@ struct DeskNotchSection: View {
                 slider("Extra height below (0 = none)", $chin, 0...56)
             }
             .disabled(!enabled)
-            Section("Camera light") {
+            Section("Camera fill light") {
                 Toggle("Light up for the camera", isOn: $cameraLight)
                     .onChange(of: cameraLight) { _, _ in CameraLightController.shared.apply() }
                 HStack {
@@ -585,7 +618,7 @@ struct DeskNotchSection: View {
                         .frame(width: 48, alignment: .trailing)
                 }
                 slider("Reach below the menu bar", $lightSize, CameraLightLayout.sizeRange)
-                Text("While any app uses a camera, a soft white light around the notch lights your face, above every app. It ends when the camera stops, with or without Desk or the island. Tools, Camera Light shows it by hand. Screens without a notch get it at the top center.")
+                Text("While any app uses a camera, a soft white light around the notch lights your face, above every app. It ends when the camera stops, with or without Desk or the island. Tools, Camera Fill Light shows it by hand. Screens without a notch get it at the top center.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             AVIndicatorSection()
@@ -663,7 +696,7 @@ private struct NotchGlowSection: View {
             Toggle("For Sanduhr alerts", isOn: $glowAlerts)
             Toggle("A minute before a meeting", isOn: $glowMeetings)
                 .onChange(of: glowMeetings) { _, _ in NotchGlowController.shared.apply() }
-            Toggle("When the camera light comes on", isOn: $glowCamera)
+            Toggle("When the camera fill light comes on", isOn: $glowCamera)
             HStack {
                 Text("The notch's edge glows softly in the notch text color for a few seconds, once per event: around the island when it is on, around the notch itself when it is off. A Desk pulse always glows it. It never takes a click.")
                     .font(.caption).foregroundStyle(.secondary)

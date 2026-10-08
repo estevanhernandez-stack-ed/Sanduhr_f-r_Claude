@@ -1,8 +1,8 @@
 {
   "name": "sanduhr-meters",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": { "name": "626Labs LLC" },
-  "description": "Sanduhr's session and weekly meters above the prompt: bars with the pace mark, reset countdowns, a toast when a limit nearly fills or the session resets. Reads only Sanduhr's snapshot.json on this machine.",
+  "description": "Sanduhr's session and weekly meters above the prompt: bars with the pace mark, reset countdowns, your Style popover looks animated (sweep, shimmer, glow), Sanduhr's watchers as rows, and a toast when a limit nearly fills or the session resets. Reads only Sanduhr's snapshot.json and band.json on this machine.",
   "types": "./types/index.d.ts",
   "userConfig": {
     "bars": {
@@ -18,6 +18,13 @@
       "description": "compact: one line. full: a line per meter with pace words and the reset time.",
       "options": ["compact", "full"],
       "default": "compact"
+    },
+    "motion": {
+      "type": "string",
+      "title": "Motion",
+      "description": "on: a bar sweeps when it crosses a warning line, a limit about to reset shimmers, a nearly full one glows, a watcher waiting on you pulses (all still while macOS Reduce Motion is on). off: the band stays still.",
+      "options": ["on", "off"],
+      "default": "on"
     },
     "label": {
       "type": "string",

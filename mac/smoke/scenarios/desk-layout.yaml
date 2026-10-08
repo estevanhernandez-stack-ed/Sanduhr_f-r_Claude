@@ -43,3 +43,20 @@ steps:
       desk_frames_ok: true
       desk_frames_problem: null
   - snap: desk-layout-side-and-center
+  # "Clock and message take clicks" (Settings, Desk, Look): on, the clock is a click area with a
+  # drawn frame (and the message too, on a day with a line); off, neither is in desk_frames, so
+  # the Desk lets every click there through to the desktop as before. Both ways the frames hold.
+  - defaults: { domain: desk, key: layout, type: string, value: "message:tl clock:bl meters:bl meetings:bl" }
+  - defaults: { domain: desk, key: piecesTakeClicks, type: bool, value: true }
+  - expect_state:
+      desk_piece_clicks: true
+      desk_frames[kind=clock].clickable: true
+      desk_frames[kind=clock].frame.3: "/^[1-9]\\d*$/"
+      desk_frames_ok: true
+      desk_frames_problem: null
+  - snap: desk-layout-piece-clicks
+  - defaults: { domain: desk, key: piecesTakeClicks, type: bool, value: false }
+  - expect_state:
+      desk_piece_clicks: false
+      desk_frames: "/\\A(?!.*(clock|message))/m"
+      desk_frames_ok: true

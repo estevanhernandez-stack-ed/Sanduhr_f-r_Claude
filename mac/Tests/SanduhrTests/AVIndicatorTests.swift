@@ -318,10 +318,10 @@ struct AVIndicatorLayoutTests {
 struct AVIndicatorMenuTests {
     @Test func readOnlyLinesThenSettings() {
         let both = AVIndicatorMenu.items(AVIndicators(camera: true, mic: true))
-        #expect(both.map(\.title) == ["Camera in use", "Microphone in use", "Indicator Settings…"])
+        #expect(both.map(\.title) == ["Camera in use", "Microphone in use", "Notch Settings…"])
         #expect(both.map(\.enabled) == [false, false, true])
         #expect(both.last?.separatorBefore == true)
-        #expect(AVIndicatorMenu.items(AVIndicators(mic: true)).map(\.title) == ["Microphone in use", "Indicator Settings…"])
+        #expect(AVIndicatorMenu.items(AVIndicators(mic: true)).map(\.title) == ["Microphone in use", "Notch Settings…"])
         #expect(AVIndicatorMenu.items(AVIndicators()).first?.title == "Camera and microphone not in use")
     }
 
@@ -335,7 +335,7 @@ struct AVIndicatorMenuTests {
     @Test func theNSMenuMatches() {
         let menu = AVIndicatorMenu.menu(AVIndicators(camera: true, mic: true))
         let rows = menu.items.filter { !$0.isSeparatorItem }
-        #expect(rows.map(\.title) == ["Camera in use", "Microphone in use", "Indicator Settings…"])
+        #expect(rows.map(\.title) == ["Camera in use", "Microphone in use", "Notch Settings…"])
         #expect(rows.map(\.isEnabled) == [false, false, true])
         #expect(rows[0].action == nil && rows[1].action == nil)
         #expect(menu.items.filter(\.isSeparatorItem).count == 1)

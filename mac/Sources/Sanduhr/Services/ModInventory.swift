@@ -89,6 +89,21 @@ struct ModItem: Identifiable, Equatable, Sendable {
 
     var id: String { folder + "\n" + (path ?? key ?? name) }
 
+    /// Whose it is, for what the page lets you do with it (item 64, slice 2).
+    enum Ownership: Equatable, Sendable {
+        /// Sanduhr's meters mod in Sanduhr's integrations folder: switched by receipt.
+        case sanduhrs
+        /// Named like Sanduhr's mod but somewhere else (a checkout, a copy): read-only.
+        case copyOfSanduhrs
+        /// Anyone else's: read-only for now.
+        case others
+    }
+
+    var ownership: Ownership {
+        if let path, IntegrationInstaller.isOurModEntry(path) { return .sanduhrs }
+        return name == IntegrationScripts.modName ? .copyOfSanduhrs : .others
+    }
+
     /// Where it loads from, in words.
     var originTitle: String {
         switch origin {

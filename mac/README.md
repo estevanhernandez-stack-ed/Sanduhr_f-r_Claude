@@ -382,7 +382,18 @@ double-struck C H N P Q R Z), digits only in bold, double-struck, sans and mono,
 the IPA and Latin Extended letters (x stays x); widths are unchanged; a reset ends it. Sanduhr's
 parts are styled the same way. The chip's brush or its context menu opens the popover: Keep its
 own colors (default), One color or Gradient (2 to 4 stops), Bold/Italic/Dim/Underline, Letters,
-"Statuslines can't animate; the Desk can." Mods' chips have no popover.
+"Statuslines can't animate; the meters mod's band above the prompt draws Sanduhr's segments in
+this look and moves it (sweep, shimmer, glow)." Mods' chips have no popover. Sanduhr's own looks
+(session, weekly, resets) also reach the meters mod's band through `band.json` (below).
+
+**Sanduhr's meters above the prompt instead (item 65f).** The Combine sheet's checkbox "Show
+Sanduhr's meters above the prompt instead (animated)" adds a trailing `--band` to the combined
+command (`StatuslineSelection.band`; the runner and `parseStatusline` both read it, and Update keeps
+it): the runner then prints only their line, plus Sanduhr's context and model when `--mine` picks
+them, and the session, weekly and reset segments (with any notice) are left to the meters mod's
+band. Their segments are untouched; re-running their command in the band is out of scope. The mod
+must be installed in the same folder (the caption says so); without it, Sanduhr's meters simply
+don't show in that folder.
 
 **Powerline glyphs.** U+E0B0 to U+E0B3 are Private Use Area glyphs only Nerd Fonts have, so
 `PowerlineGlyph` draws them: menu items get a drawn icon and the label "Powerline arrow (needs a
@@ -428,6 +439,48 @@ tick, and the tick redraws only when a countdown or age it shows changed. Window
 `%APPDATA%\Sanduhr\snapshot.json`; `SANDUHR_SNAPSHOT` names another file for testing. Tests:
 `claude plugin test mac/integrations/mods/sanduhr-meters` (the engine's own test kit; the band is
 mounted on the terminal surface with the file system, clock, env and store beneath mocked).
+
+**The animated band and the watcher band (items 65f, 66; mod 0.2.0).** The mod also reads
+`band.json` beside the snapshot every 2 seconds (`hooks/band.ts`, pure; `SANDUHR_BAND` names
+another file for testing). The app writes it (`BandFile`, `BandFileWriter`), owner-only (0600) and
+atomically, only when what it says changed, and deletes it when it would say nothing:
+
+```json
+{"meters":{"styles":{"session":{"bold":true,"font":"script","ink":["#ff2a6d","#05d9e8"]}}},
+ "reduce_motion":false,"schema_version":1,
+ "watchers":[{"done":4,"short":"CI","source":"agent","started_at":"…","state":"waiting","title":"CI on main","total":12},
+             {"kind":"shell","source":"automatic","state":"running"}],
+ "written_at":"2026-10-07T15:00:00.000Z"}
+```
+
+`meters.styles` are the Combine sheet's Style popover looks for Sanduhr's session, weekly and reset
+segments (the statusline's style grammar; kept in `bandMeterStyles` in `com.626labs.sanduhr`, set
+at each Combine, cleared by Replace): the band draws the meter's name and percent (session, weekly)
+and the reset words (resets) in that look, one Text per character run with the ink's gradient,
+the letter style mapped as the statusline maps it, bold, italic, dim and underline as Text props;
+the bars keep the widget's usage colors. `reduce_motion` is macOS's Reduce Motion (rewritten when
+it changes). `watchers` is there only while **Show watchers above the prompt** is on (Settings,
+Integrations, Watchers; `watchersInBand`, off by default): the shown watchers in the board's order
+(work ones left out in demo mode), an agent's as `title`, `short`, `state`, `done`/`total` and
+`started_at`/`ended_at`, Claude Code's background work as `kind` and `state` only, never its
+description, note or link. While watchers show the file is written again each minute; the mod
+ignores watchers in a file older than three minutes (Sanduhr quit or crashed), and quitting writes
+them empty.
+
+What moves, drawn the way the owner's now-playing mod draws: a bar **sweeps** once when its limit
+crosses a warning line (50, 75 or 90%) between two readings, a three-character light brightening
+toward white across the bar and its percent in 1.1 s; a limit within ten minutes of its reset
+**shimmers** (the light passes over its reset words every 4 s); a limit that warns **glows** (its
+percent and ⚠ brighten and fade every 4 s). Watcher rows, one per watcher under the meters (at
+most six, then "+N more", folding to what the band's rows allow): the state mark (● running, ◉
+waiting on you pulsing amber, ✓ passed in green fading toward grey over its last seconds before
+Sanduhr drops it, ⚠ failed in red, ○ lost touch and ✓ finished in grey), the title (the short one
+below 60 columns; background work reads "background shell"), the time so far and `done/total`.
+Frames: 80 ms (12.5 a second, under the engine's 30) only while a light, pulse or fade moves,
+else once a second, and a frame redraws only when what the band shows changed (a minute's
+countdown, a pace mark's cell, a watcher's seconds). Motion stops with Reduce Motion or the mod's
+own `motion` option (`on`, `off`; Claude Code's config menu). A malformed `band.json` is ignored
+whole (the meters draw as before); a malformed watcher row or style is dropped alone.
 
 Install adds the mod's folder, `~/Library/Application Support/Sanduhr/integrations/current/mods/sanduhr-meters`,
 to `env.CLAUDE_CODE_PLUGIN_DIRS` in the chosen folder's `settings.json` (the user settings, where
@@ -497,7 +550,8 @@ Outdated, and Update moves it to the app's copy.
 
 The server (`sanduhr_mcp.py`) speaks the Windows `sanduhr-mcp` protocol with the same tool names
 and result shapes: `get_usage`, `get_local_burn_by_project`, `get_model_usage`,
-`get_usage_history`, `ping`, `propose_theme` (below), plus two Mac tools for Desk messages (below).
+`get_usage_history`, `ping`, `propose_theme` (below), plus two Mac tools for Desk messages (below),
+the watcher tools and `propose_now_playing_looks` (Now playing, below).
 `publish_usage` is dropped on the Mac. What it may read comes from
 `mcp-access.json`, which the app writes:
 
@@ -697,6 +751,17 @@ and the result names `renamed_from`; a file already holding the same theme is re
 so the Mac's loader reads what Windows reads. `glass_on_mica` is required here as on Windows, though
 a hand-written Mac theme may leave it out. The theme's name and description are never logged.
 
+**Themes with a title style (item 65d).** A theme may carry `title_ink` (2 to 4 `#rrggbb` stops,
+the widget title's gradient left to right) and `title_style` (a letter style by the `{font:…}`
+names: `bold`, `italic`, `bold-italic`, `small-caps` drawn by the widget font, `sans`, `mono`,
+`double-struck`, `script`, `fraktur` as Unicode letters in the system font). `TitleBarView` draws
+the title through `ThemeTitleText`; without them it draws as before, in `text`, semibold. Both
+lints check the shape (an error names the field) and each stop's contrast on the card, as for
+`text` (a warning at under 4.5:1, "title_ink stop 2 reads at 2.1:1 on the card"). A hand-written
+file with a value the widget can't draw (one stop, a style it doesn't know) still loads, with the
+title as before. `propose_theme` passes them through; `docs/themes/template.json` lists both as
+`null` and `docs/themes/AGENT_PROMPT.md` explains them.
+
 Tests: `python3 -m unittest discover -s mac/integrations/tests` (also a Mac CI step), over temp
 folders: each sharing level, no access file, hidden names, and the Windows MCP tests' cases. The
 two lints share `mac/Tests/SanduhrTests/Fixtures/theme-builtins.json`, the built-ins they must pass
@@ -745,11 +810,49 @@ high for programs, the network, writing files or settings, gating or rewriting w
 secret-looking environment names; medium for reading files or the environment; low otherwise.
 Without `claude` the button is off and the page says why.
 
-Nothing on the page writes: no switch, no edit to any settings file (turning Sanduhr's own mods
-on and off by receipt is slice 2). A summary card (item 68's pattern) counts mods, plugins, how
+Other mods are read-only: the page says switching them comes later, and a copy of Sanduhr's mod
+outside Sanduhr's folder (a checkout) is marked read-only too.
+
+**Sanduhr's own mod** (slice 2, `ModSwitch.swift`, `ModsOwnSettings.swift`): a box at the top for
+`sanduhr-meters` with a switch per Claude Code folder, Update and Remove, all through the receipt
+in `integrations/installs.json`, so each undoes byte for byte. A row in the inventory is Sanduhr's
+when its path is a `…/Sanduhr/integrations/…/mods/sanduhr-meters` entry (`isOurModEntry`).
+
+- **Off** writes `enabledPlugins["sanduhr-meters@inline"]: false` into the folder's settings.json
+  (the documented switch for a plugin folder mod), keeping the list entry, the version and the
+  mod's own options. The receipt's `switched` (`SwitchReceipt`) records the member as it was:
+  its old value's bytes, or that the key (and `enabledPlugins` itself) was made, and what sat
+  between empty braces.
+- **On** undoes that switch. Where the user's own `false` is there, it writes `true` and records
+  the `false`, which Off puts back. Where the folder's list has no entry, it asks, then adds one
+  pinned to the app's stamped version, `integrations/<stamp>/mods/sanduhr-meters` (the receipt's
+  `pinned`), through the same JSONEdit splice as Integrations' Install. Refresh keeps every stamp
+  a receipt pins, so an app update never pulls a pinned version out from under a folder.
+- **Update** shows when a pinned entry names a stamp other than the app's. It compares what the
+  two versions can do: the validator's `$` calls and gating hooks when `claude` answers for both,
+  else the static scan's capabilities for both (`ModCapabilities.added`). Anything new stops the
+  update for a question ("The new version can also: …"); the version in use stays until you
+  agree. Then the entry moves in place and the old stamp goes once nothing pins it. An entry
+  through the `current` link (installed from Integrations) follows the app's updates as before.
+- **Remove** is Integrations' Remove for the mod, which now undoes the switch first: the folder's
+  settings.json is back to its bytes from before Sanduhr touched it. A member someone changed
+  since is left as it is.
+- **What else decides.** Claude Code merges `enabledPlugins` key by key, and a project's value
+  beats the user's. After each switch the page re-reads the managed settings
+  (`/Library/Application Support/ClaudeCode/managed-settings.json`) and every project the folder's
+  `.claude.json` lists (`.claude/settings.json` and `.claude/settings.local.json`, at most 400)
+  and says so when one disagrees: "A project setting keeps it on in ~/code/app
+  (.claude/settings.json)." Otherwise: "Takes effect in new Claude Code sessions (or after
+  /reload-plugins)."
+
+The Combine sheet's mod chips (Integrations, Statusline) link to the page: "Switch it on the Mods
+page". A summary card (item 68's pattern) counts mods, plugins, how
 many are on, the folders and any missing. state.yaml's `mods_page` holds flags and counts only.
 Tests: `ModsPageTests` (temp folders and the validator's JSON captured as fixtures under
-`Tests/SanduhrTests/Fixtures/mods-validate/`; Check against a stand-in `claude` script).
+`Tests/SanduhrTests/Fixtures/mods-validate/`; Check against a stand-in `claude` script) and
+`ModSwitchTests` (temp folders: off and on round trips byte for byte, the user's own off, a
+member changed meanwhile, project and managed overrides, an update that asks and one that
+doesn't, pinned stamps surviving refresh, Remove back to the original bytes).
 
 ## Camera and mic indicators
 
@@ -801,7 +904,7 @@ moves them there instead; with nothing in use that place shows its own default, 
 With the island off, or on a screen without a notch, they get their own small black tab at the
 top (`badge`): against the notch on the chosen side, or at the top center like the camera light.
 A click or a two-finger click opens a menu of read-only lines ("Camera in use", "Microphone in
-use", disabled) and Indicator Settings…, which opens Settings, Notch. Nothing mutes or changes a
+use", disabled) and Notch Settings…, which opens Settings, Notch. Nothing mutes or changes a
 device. The strip takes its clicks through `DeskHitTest` (`av_indicators`, key `strip`).
 
 The camera dot is the only red dot in Sanduhr: a failed watcher draws a red triangle instead.
@@ -878,6 +981,12 @@ finished (result unknown). The glow notification is posted either way, so item 5
 unchanged.
 Installs from before this version show **Outdated**; Install rewrites the Stop entry in place.
 
+**Above Claude Code's prompt.** **Show watchers above the prompt** (off by default) hands the
+watchers to the meters mod through `band.json` (see the meters mod above): a row each above the
+prompt in every Claude Code folder with the mod installed. Only an agent's watcher's title, short
+title, state, progress and times are written, and for background work its kind and state; it is
+rewritten on each change and each minute while watchers show, and switching off takes them out.
+
 `state.yaml` has `watchers: {count, states, placements, agents, background}`, never a title, note,
 link or description. `smoke do watch-test start|wait|pass|fail|clear` drives a made-up watcher
 through the same decoding, whatever the switches say; `scenarios/watchers.yaml` runs it.
@@ -902,7 +1011,7 @@ Settings, Desk, Layout places each Desk piece (item 59; the pure pieces in `Desk
   and Move Down. Picking a new place for a piece keeps the other pieces' order: it goes before the
   first piece there that Settings lists after it.
 - **A size per piece.** 60% to 160% in 10% steps, kept when the piece moves. Every piece scales
-  from the clock size in Look, the message from its own size.
+  from the clock size in Desk Look, the message from its own size.
 - **The map.** The Layout card (`DeskLayoutMap`) draws the screen with the menu bar, the notch (and
   the island), the Dock on its edge and each piece outlined at its place, in its order and at its
   size, live, from the same `DeskArrangement.stacks` call the Desk draws from.
@@ -919,6 +1028,93 @@ back to one hides the sized pieces until they are placed again.
 `desk_pieces` in the smoke state lists each drawn piece's `piece`, `anchor`, `order` (its place in
 the stack, 0 at the top) and `scale`; `scenarios/desk-layout.yaml` reorders a corner and moves
 pieces to the new places, checking `desk_frames_ok` each time.
+
+### Arrange on the desktop
+
+Arrange mode (item 60) edits the same layout on the desktop itself, without Settings. It starts
+from **Arrange Desk…**, which is in the shared menu (`MenuCommand.arrangeDesk`: the menu bar item's
+menu, the widget's menu, the Desk's clock menu in the menu bar, and the shared part of the meters'
+menu), at the end of now playing's, a watcher's and the camera and mic indicators' menus, in the
+shared menu a two-finger click on a meeting row, the calendar note or the account name opens
+(`DeskHitTest.hasSharedMenu`), and on Settings, Desk, Layout's **On the desktop** row. While Desk
+is off the menu item is off and says why ("Turn on Desk to arrange it on the desktop.", under the
+item and as its tooltip), as the Settings button does. The clock, the message and the claude line
+open the same shared menu while **Clock and message take clicks** is on (see Desk clicks below);
+off, they let every click through to the Finder and the menu bar and widget menus cover them. The
+pure pieces are in `DeskArrange.swift`, the views and the bar's panel in `DeskArrangeViews.swift`.
+
+- **What shows.** Every piece gets a dashed outline with its name and a round resize handle on the
+  corner facing the middle of the screen (`DeskArrange.handle`). A piece with nothing to draw (now
+  playing while nothing plays) still gets a small box to grab.
+- **The bar floats.** The bar with what to do, Cancel and Done is not on the Desk window (which sits
+  just below normal windows, so any app window covered it). It is its own small borderless panel
+  (`DeskArrangeBarController`, an `NSPanel` at the floating level on every Space) centered on the
+  visible frame of the Desk's screen (`DeskArrange.barOrigin`), shown while arranging, moved with
+  the Desk on a display change, and closed when Arrange ends. It reads "Return or Done keeps the
+  new layout. Escape or Cancel puts it back." Sanduhr activates and the panel takes the key.
+- **Keys.** While arranging, a local key monitor ends Arrange mode wherever the key focus is in
+  Sanduhr (the panel, the Desk window after a click on a piece, the widget): Return and keypad
+  Enter are Done, Escape is Cancel (`DeskArrange.endKey`, which answers `DeskArrangeEnd`).
+- **Settings steps aside.** An open Settings window (where Arrange is often started) is ordered out
+  for the duration and brought back, key and in front, when Arrange ends by any route
+  (`DeskArrangeStash`).
+- **Move and reorder.** Dragging a piece fades it, an outline follows the pointer, and the eight
+  anchors light up as dots, the one it would land on bigger. A drop over a stack (its pieces'
+  frames plus 26 points for the outline and the name, `DeskArrange.stackBounds`) goes to that
+  stack, the dragged piece's own first (`DeskArrange.target`), so a tall stack whose top reaches
+  past the halfway line to the next anchor still reorders. Anywhere else it goes to the nearest
+  anchor (`DeskArrange.nearest`, measured as shares of the content's width and height so every
+  screen shape has the same zones). It lands in front of the first piece there whose middle is
+  below the pointer (`DeskArrange.pieceAfter`, `DeskArrangement.put`).
+  Anchors, not free placement: a layout survives other displays and Dock moves.
+- **Resize.** The handle's drag grows or shrinks the piece by its share of the piece's width plus
+  height, snapped live to Settings' 10% steps within 60% to 160% (`DeskArrange.scale`).
+- **Nothing saved until Done.** `DeskArrangeMode` (on `DeskModel`) holds the saved string verbatim
+  and a working copy that DeskView draws. Done or Return write the working layout once, and only
+  when it differs; Cancel or Escape drop it, so the saved string is exactly as it was. Settings' places
+  and order are greyed meanwhile. Desk turning off cancels it.
+- **Clicks.** While arranging, a full-screen plate at the hit-plate alpha (`DeskArrangePlate`) gives
+  every point a drawn pixel and the window takes the mouse over its whole frame
+  (`DeskArrange.takesMouse`); the pieces' join, account and menu clicks are off. The window may take
+  the key only then (`DeskWindow.takesKey`). Afterwards it goes back to clicks only where something
+  is drawn, exactly as before.
+- **Same rules.** The Desk lays the working layout out with the same margins, Dock clearance and
+  notch drop, and the anchor dots use the same geometry (`DeskAnchorGeometry`). With Reduce Motion a
+  drop has no snap animation. VoiceOver gets Move Up, Move Down, Bigger and Smaller on each piece.
+
+`desk_arrange` in the smoke state has `active`, `changed`, `working` (the layout string being
+edited), `click_through` (`whole` or `drawn`) and `bar_visible` (the floating bar is on screen);
+the `desk-arrange start|test|done|cancel` hook drives it, and `scenarios/desk-arrange.yaml` starts
+it from Settings, checks that Settings steps aside and comes back, that the bar shows only while
+arranging, that Cancel leaves `layout` alone and that Done writes it.
+
+### Desk clicks
+
+The Desk window is transparent and sits just below app windows, and the window server hands a
+transparent window a click only where a pixel is drawn and only while it takes the mouse. So Desk
+takes the mouse only over its click areas (`DeskHitTest`, from the frames the pieces report through
+`onGlobalFrame`), and a near-invisible plate behind each one (`DeskPointerMenu.hitPlateOpacity`,
+alpha 3 of 255) makes the gaps between letters count. Everywhere else clicks go to the desktop.
+
+**Clock and message take clicks** (Settings, Desk Look, Clicks; desk suite key
+`piecesTakeClicks`, on by default) adds the clock (time and date), the message (the day's line, a
+special day's stack, or the line taking its turn with Take turns or Scroll) and the claude line to
+those areas (`DeskPieceClicks`; kinds `clock`, `message` and `claude_line`). A two-finger click on
+any of them opens the shared Sanduhr menu (Arrange Desk…, Settings… and the rest) instead of the
+Finder's desktop menu; the clock's adds **Desk Look Settings…** and the message's **Edit Messages…** at the
+top, and the shared Settings… reads All Settings… there. A plain click on the clock opens Settings, Desk Look, on the message Settings, Desk, Message;
+on the claude line it does nothing, like the meters (the account name inside the line still
+switches accounts). The cost: a desktop icon right beneath one of them can't be clicked there while
+the switch is on. Off, nothing is drawn behind them and they are not click areas, exactly as before.
+
+File drags: while a mouse button is down, Desk never changes whether its window takes the mouse
+(`DeskPointerDrag`). A file picked up elsewhere on the desktop is dragged with the window still
+ignoring the mouse, so passing over the clock or the message never makes the plates a drop target,
+and the drop lands on whatever is beneath. The button coming up lets the window catch up with the
+pointer. A drag that starts on a piece itself is Desk's until the button comes up. This rests on
+`ignoresMouseEvents` being set before the drag starts, not on toggling it mid-drag, which
+the window server is not documented to honour for a drag already under way; it has not been
+checked against a live Finder drag in a test (see the smoke test).
 
 ## Desk and the Dock
 
@@ -969,7 +1165,7 @@ in a corner like the other elements; off by default). There is no switch: it run
 somewhere and Desk is on (`NowPlayingPlacement`). Click it to play or pause; two-finger click for
 Previous, Play/Pause, Next and Now Playing Settings…. It hides when nothing plays, optionally while
 paused, and for apps switched off on the Now Playing page (which also has the source, the AppleScript
-switch and "Arrange on the Notch…" / "Arrange on the Desk…").
+switch and "Notch Settings…" / "Desk Layout Settings…").
 
 - **When nothing is playing.** A notch wing or the strip on Now playing doesn't go blank when there
   is no line (nothing plays, Hide while paused while paused, the app switched off, now playing
@@ -984,6 +1180,33 @@ switch and "Arrange on the Notch…" / "Arrange on the Desk…").
   Now playing shows meanwhile ("When nothing plays: Claude meters (its default).").
   `state.yaml` has `now_playing_idle` and `notch_shows: {left, right, strip}` (each place's
   effective content, never its text).
+
+- **Style what's playing (item 65c).** A switch on the Now Playing page, off by default. On, each
+  song draws in its own gradient and letter style on the notch wings, the strip and the Desk line
+  (its position bar too). A song without a saved look wears one seeded from a hash of its app,
+  title and artist (FNV-1a, so the same song looks the same on every launch): one of the eight
+  named palettes (`MessagePalette`: synthwave, sunset, ocean, aurora, ember, bubblegum, toxic,
+  gold) and small caps, italic, bold or bold italic (`NowPlayingLooks.seedStyles`, the styles the
+  hand font draws itself). Resolved looks are cached per song in memory only
+  (`NowPlayingLookStore`, keyed by app, title and artist, at most 200, never on disk). The play
+  glyph stays plain; a styled title is measured as drawn (`MessageTypography.width`), so a wing
+  grows and scrolls for it as for a plain one.
+  Looks come from Claude: `propose_now_playing_looks {looks: [{artist, title, colors, font?,
+  mood?}]}`, 1 to 50 looks, artist up to 100 and title up to 200 characters on one line, 2 to 4
+  hex colors each 3:1 or better on black (the notch), a `{font:…}` style name, a mood of at most 3
+  words and 40 characters. The server checks them (`rejected` with reasons, writing nothing),
+  writes `now-playing-looks-request.json` (atomic, 0600) and waits up to 10 seconds for
+  `now-playing-looks-result.json` (`{status: pending_approval | applied | rejected, reasons?,
+  looks_saved?, style_on}`; no answer is `queued`). The app checks again with the same rules and
+  wording (`NowPlayingLookProposal`; a test on each side pins them) and either saves at once ("Let
+  Claude style songs directly", off by default) or shows "Claude suggested looks for N songs" at
+  the top of the page's Looks section, each song drawn in its look with its mood, with Save and
+  Dismiss (a newer suggestion replaces a waiting one, which is answered `rejected`). Saved looks
+  go to `now-playing-looks.json` (owner-only, `{schema_version: 1, looks: [...]}`, at most 500,
+  the oldest dropped) and match by artist and title, ignoring case and extra spaces, in any app.
+  This file is the only place a song name is kept: the user's own approved data. **Clear Looks…**
+  deletes it. The server never reads what is playing. Desk preferences: `nowPlayingStyle`,
+  `nowPlayingLooksClaudeDirect`.
 
 - **Long titles.** A title that doesn't fit its wing (or the strip) scrolls through once when a new
   track starts or the place first shows it: 1.2 s at the beginning, 30 pt/s with ease in and out
@@ -1044,7 +1267,7 @@ Bold face (`BundledFonts.face`, `FontSettings.wantsBold`).
 - **The widget** (`UserDefaults` `fontFamily`) keeps its theme fonts (the system font) unless you pick
   one; with EsteFont Pro or EsteFont 26 picked, its semibold and bold text draws in that family's Bold
   face. Match Desk draws in the Desk's font, either bundled family included.
-- Both font pickers (Settings, Desk, Look and Settings, Widget, Look) list EsteFont Pro first and
+- Both font pickers (Settings, Desk Look and Settings, Widget Look) list EsteFont Pro first and
   EsteFont 26 right after it, after System.
 
 EsteFont Pro and EsteFont 26 are © 2009-2026 Estevan Hernandez / 626Labs LLC and licensed only for
@@ -1086,10 +1309,10 @@ again any time with the current settings, recording nothing. The cards live in
 ## Settings previews
 
 Every Settings page that controls something visible opens with a preview card about 160 points
-tall (Notch, Layout, Look, Meters, Message, Now Playing, Widget Look, Pacing & Focus, General,
+tall (Notch, Layout, Desk Look, Meters, Message, Now Playing, Widget Look, Pacing & Focus, General,
 Integrations; Themes keeps its gallery; Mods has a summary card of its counts). Each card is drawn by the surface's own views, never a
 mock: NotchView, NotchWingsView, NotchGlowView and AVIndicatorBadge for the notch, DeskPiece (the
-Desk's pieces, factored out of DeskView) for Look, Meters, Message and Now Playing,
+Desk's pieces, factored out of DeskView) for Desk Look, Meters, Message and Now Playing,
 WidgetCardStack in WidgetGlass (factored out of RootView) for the widget, MenuBarText and
 MenuBarItemLook (shared with the status item) for the menu bar, and TerminalPreviewFrame for
 Sanduhr's statusline. The views read the same saved settings the page writes, so a change shows
@@ -1142,6 +1365,8 @@ terminal previews. state.yaml's `settings_preview` names the card the open page 
 | Two-finger click a tier card | Accounts, Hide (temporary limits), Stop warnings, Hidden Limits, Meter Settings, then the widget menu |
 | Click a Desk meter          | Nothing: the meters are passive, clicks there do nothing |
 | Two-finger click a Desk meter | Show or Hide Widget, then the same limit menu |
+| Click the Desk clock / message | Settings, Desk Look / Settings, Desk, Message (while "Clock and message take clicks" is on) |
+| Two-finger click the Desk clock, message or claude line | Desk Look Settings… (clock) or Edit Messages… (message), then the shared menu (its Settings… as All Settings…) |
 | Click now playing (notch or Desk) | Play or pause (item 53) |
 | Click Next on a paused wing or strip | Next track (item 53b) |
 | Two-finger click now playing | Previous, Play/Pause, Next, Now Playing Settings… |

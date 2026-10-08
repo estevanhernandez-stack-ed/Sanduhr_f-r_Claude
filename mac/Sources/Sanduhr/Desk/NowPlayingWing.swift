@@ -125,6 +125,9 @@ struct ScrollOnceText: View {
     let textWidth: CGFloat
     let room: CGFloat
     let font: Font
+    /// A song's letter style (item 65c), drawn at `size`; nil draws `text` in `font`.
+    var plan: MessageTypography.Plan? = nil
+    var size: CGFloat = 0
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var offset: CGFloat = 0
@@ -132,8 +135,7 @@ struct ScrollOnceText: View {
 
     var body: some View {
         let overflow = !NowPlayingScroll.fits(textWidth: textWidth, room: room)
-        Text(text)
-            .font(font)
+        StyledLineText(text: text, plan: plan, size: size, font: font)
             .lineLimit(1)
             .fixedSize()
             .offset(x: offset)

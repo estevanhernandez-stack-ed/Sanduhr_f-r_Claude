@@ -89,6 +89,15 @@ commentary — just the raw JSON.
 
 **If you opt out of Mica, set `glass_alpha: 1.0` so cards stay opaque.**
 
+**Title text style** (optional, macOS; other builds ignore it):
+
+| Field         | Value                                   | What it does                                                    |
+| ------------- | --------------------------------------- | --------------------------------------------------------------- |
+| `title_ink`   | 2 to 4 `"#rrggbb"`, or `null`           | The widget title's gradient, left to right. Each stop needs 4.5:1 on the card, like `text` |
+| `title_style` | a letter style, or `null`               | The title's letters: `bold`, `italic`, `bold-italic`, `small-caps` in the widget font; `sans`, `mono`, `double-struck`, `script`, `fraktur` as Unicode letters |
+
+A synthwave theme can carry its text too: `"title_ink": ["#ff9ac1", "#9ff3ff"], "title_style": "small-caps"`.
+
 ### Design rules to follow
 
 1. **Contrast first.** `text` must be legible on `glass_on_mica`. Simulate α-blending over a medium-gray desktop wallpaper — if text is hard to read, pick a brighter `text` or a darker `glass_on_mica`.

@@ -430,7 +430,7 @@ private struct MessageLookControls: View {
                     Text("As the Desk").tag(Bool?.none)
                 }
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
-                .help("The soft glow around the line: on, off, or as the Desk's Look page sets it.")
+                .help("The soft glow around the line: on, off, or as the Desk Look page sets it.")
             }
             LabeledContent("Size") { size }
             LabeledContent("Letters") {

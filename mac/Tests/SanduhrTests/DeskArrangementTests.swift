@@ -345,7 +345,7 @@ struct DeskArrangementFrameTests {
             anchor: mr
             order: 0
             scale: 1
-        notch:
+        desk_arrange:
         """))
         #expect(YAMLEmitter.emit(DebugState.yaml(DebugStateInput())).contains("desk_pieces: []\n"))
     }

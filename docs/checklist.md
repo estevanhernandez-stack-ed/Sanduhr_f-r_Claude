@@ -399,7 +399,7 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: every piece can sit at any of the eight anchors, in any order, at its own size; an existing layout looks identical after the update; the map matches the Desk.
   Verify: swift-testing (string parse and upgrade, ordering, anchor geometry against the notch and the Dock, scale bounds, frames); smoke state for anchors and order; a scenario that reorders a corner and checks `desk_frames_ok`; by hand on a notched and a plain screen.
 
-- [ ] **60. Desk layout, step 2: arrange on the desktop**
+- [x] **60. Desk layout, step 2: arrange on the desktop**
   Spec ref: session 2026-10-05, follows item 59.
   What to build: an Arrange mode (Arrange Desk… in the Desk's two-finger menu and on Settings, Desk, Layout; Escape or Done ends it) where each piece shows an outline and a handle: drag a piece to any anchor (they light up as you drag, and it snaps), drag within a stack to reorder, drag the corner handle to resize (snaps to the scale steps). Snap anchors, not free placement, so a layout survives other displays and Dock moves. While arranging, the Desk window takes clicks over its whole frame (the hit plate covers the screen), and returns to clicks-only-where-drawn when done; nothing is saved until Done, and Cancel restores the layout. Writes the same layout string as item 59.
   Acceptance: a piece can be moved, reordered and resized on the desktop without opening Settings; Cancel leaves the layout as it was; outside Arrange mode, clicks pass through to the desktop exactly as before.
