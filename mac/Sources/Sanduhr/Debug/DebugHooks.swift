@@ -113,7 +113,9 @@ enum DebugHooks {
             UserDefaults.desk.set(on, forKey: DeskController.notchKey)
         case .cameraLight(let on): CameraLightController.shared.setManual(on)
         case .glow: NotchGlowController.shared.fire()
-        case .demo(let on): DeskController.shared.model.setDemo(on)
+        case .demo(let on):
+            DeskController.shared.model.setDemo(on)
+            BandFileWriter.shared.refresh()
         case .theme(let id): app.viewModel.selectTheme(id: id)
         case .cycleAccount: app.viewModel.cycleAccount()
         case .usage(let tab): SettingsWindowController.shared.show(.usage, usageTab: tab)

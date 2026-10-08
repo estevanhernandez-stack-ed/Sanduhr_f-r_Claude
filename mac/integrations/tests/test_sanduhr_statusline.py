@@ -113,9 +113,9 @@ class GrammarTests(unittest.TestCase):
     def test_plain_and_combined(self):
         self.assertEqual(sl.parse_args([]), [])
         self.assertEqual(sl.parse_args(["--chain-b64", b64("~/bin/line.sh"), "--join", "line"]),
-                         ("~/bin/line.sh", "line", 0, None, None))
+                         ("~/bin/line.sh", "line", 0, None, None, False))
         self.assertEqual(sl.parse_args(["--chain-b64", b64("a | b"), "--join", "same", "--padding", "2"]),
-                         ("a | b", "same", 2, None, None))
+                         ("a | b", "same", 2, None, None, False))
 
     def test_anything_else_is_refused(self):
         good = b64("echo hi")
@@ -468,7 +468,7 @@ class PicksGrammarTests(unittest.TestCase):
         args = sl.parse_args(["--chain-b64", self.good, "--join", "same", "--padding", "2",
                               "--keep-theirs-b64", k, "--mine", "session,resets,model"])
         self.assertEqual(args, ("my.sh", "same", 2, {"keep": ["~"], "drop": ["⎇"], "new": False, "sep": [None, "pipe"]},
-                                ("session", "resets", "model")))
+                                ("session", "resets", "model"), False))
         self.assertEqual(sl.parse_args(["--chain-b64", self.good, "--join", "line", "--mine", "weekly"])[4], ("weekly",))
         self.assertEqual(sl.parse_args(["--chain-b64", self.good, "--join", "line", "--keep-theirs-b64", picks_b64()])[3], {})
 
@@ -496,6 +496,9 @@ class PicksGrammarTests(unittest.TestCase):
             ["--chain-b64", self.good, "--join", "line", "--mine", "session,"],
             ["--chain-b64", self.good, "--join", "line", "--padding", "²"],
             ["--mine", "session"],
+            ["--chain-b64", self.good, "--join", "line", "--band", "--mine", "session"],    # order
+            ["--chain-b64", self.good, "--join", "line", "--band", "--band"],
+            ["--chain-b64", self.good, "--join", "line", "--band=1"],
         ):
             self.assertIsNone(sl.parse_args(argv), argv)
 
@@ -522,6 +525,21 @@ class MineTests(unittest.TestCase):
         self.assertEqual(p.stdout.decode(), "mine\nwk 18% | ctx 8% | Opus\n")
         p, _ = self.r.run(["--chain-b64", b64("echo mine"), "--join", "line", "--mine", "session"], session_json())
         self.assertEqual(p.stdout.decode(), "mine\n5h 42%\n")
+
+    def test_the_band_takes_the_meters(self):
+        self.assertTrue(sl.parse_args(["--chain-b64", b64("echo mine"), "--join", "line", "--band"])[5])
+        self.assertTrue(sl.parse_args(["--chain-b64", b64("echo mine"), "--join", "line", "--mine", "weekly,model",
+                                       "--band"])[5])
+        p, _ = self.r.run(["--chain-b64", b64("echo mine"), "--join", "line", "--band"], session_json())
+        self.assertEqual(p.stdout.decode(), "mine\n")
+        p, _ = self.r.run(["--chain-b64", b64("echo mine"), "--join", "same", "--mine", "session,context,model",
+                           "--band"], session_json())
+        self.assertEqual(p.stdout.decode(), "mine" + sl.RESET + sl.SEPARATOR + "ctx 8% | Opus\n")
+
+    def test_the_band_carries_the_notice_too(self):
+        self.r.dead()
+        p, _ = self.r.run(["--chain-b64", b64("echo mine"), "--join", "line", "--band"], session_json())
+        self.assertNotIn("sanduhr", p.stdout.decode())
 
     def test_a_notice_always_shows(self):
         now = datetime.now(timezone.utc)

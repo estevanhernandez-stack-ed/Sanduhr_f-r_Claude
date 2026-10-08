@@ -34,9 +34,13 @@ doubt (an unfinished escape, a carriage return, an empty segment) keeps the line
 `--mine <list>` picks Sanduhr's own: session, weekly, resets (the default three), context,
 model (the last two from Claude Code's stdin).
 
+The band (item 65f): a trailing `--band` moves Sanduhr's meters (session, weekly, resets, with
+any notice) out of the statusline into the sanduhr-meters mod's animated band above the prompt;
+context and model, when `--mine` picks them, stay here. Their segments are untouched.
+
 Usage: sanduhr_statusline.py                                    print the Sanduhr segment
        sanduhr_statusline.py --chain-b64 B --join line|same [--padding N]
-                             [--keep-theirs-b64 K] [--mine M]
+                             [--keep-theirs-b64 K] [--mine M] [--band]
        sanduhr_statusline.py --inspect-b64 B                    the Combine sheet's pieces (JSON)
        sanduhr_statusline.py --compose-b64 O --join ...         the sheet's preview from output O
        SANDUHR_SNAPSHOT=path ...                                read another snapshot (tests)
@@ -979,11 +983,11 @@ def run_chain(command, data, budget=CHAIN_BUDGET, cap=CHAIN_CAP):
 
 
 def parse_args(argv, flag="--chain-b64", blank=False):
-    """`[]` for plain mode, `(command, join, padding, picks, mine)` for Combine, or None when the
-    arguments aren't exactly the grammar:
-        --chain-b64 B --join line|same [--padding N] [--keep-theirs-b64 K] [--mine M]
+    """`[]` for plain mode, `(command, join, padding, picks, mine, band)` for Combine, or None when
+    the arguments aren't exactly the grammar:
+        --chain-b64 B --join line|same [--padding N] [--keep-theirs-b64 K] [--mine M] [--band]
     `picks` is None (keep all of theirs) or `parse_picks`'s object, `mine` None (the default
-    three) or `parse_mine`'s names. `flag` and `blank` serve the preview's compose mode, whose
+    three) or `parse_mine`'s names, `band` whether Sanduhr's meters moved to the band. `flag` and `blank` serve the preview's compose mode, whose
     payload is their output (possibly empty) instead of a command."""
     if not argv:
         return []
@@ -1020,18 +1024,27 @@ def parse_args(argv, flag="--chain-b64", blank=False):
         if mine is None:
             return None
         rest = rest[2:]
+    band = rest[:1] == ["--band"]
+    if band:
+        rest = rest[1:]
     if rest:
         return None
-    return (command, mode, padding, picks, mine)
+    return (command, mode, padding, picks, mine, band)
 
 
-def combined(theirs, data, now, mode, padding, picks, mine, cols):
+def combined(theirs, data, now, mode, padding, picks, mine, cols, band=False):
     """What a combined statusline prints: their output (text) with `picks` applied, joined
     with Sanduhr's segment, its parts filtered by `mine`. A `with` pick (Join with) sets the
-    glyph between segments everywhere in the line: theirs, Sanduhr's and the seam."""
+    glyph between segments everywhere in the line: theirs, Sanduhr's and the seam. With `band`,
+    Sanduhr's meters show in the mod's band instead: only context and model stay here."""
     glue = (picks or {}).get("with")
     sep = _glue(glue) if glue else " | "
-    ours = segment(lambda: data, now, mine or MINE_DEFAULT, sep, (picks or {}).get("ours"))
+    styles = (picks or {}).get("ours") or {}
+    if band:
+        _, extra = segment_parts(lambda: data, now, mine or ())
+        ours = sep.join(styled_text(text, styles.get(name)) for name, text in extra if name in (mine or ()))
+    else:
+        ours = segment(lambda: data, now, mine or MINE_DEFAULT, sep, styles)
     return join(filter_theirs(theirs, picks), ours, mode, padding, cols, _glue(glue) if glue else SEPARATOR)
 
 
@@ -1124,14 +1137,14 @@ def main(argv=None):
         if not args:
             say("--compose-b64 takes the combined grammar with their output")
             return 0
-        theirs, mode, padding, picks, mine = args
-        write(combined(theirs, read_stdin_all(), now, mode, padding, picks, mine, columns()))
+        theirs, mode, padding, picks, mine, band = args
+        write(combined(theirs, read_stdin_all(), now, mode, padding, picks, mine, columns(), band))
         return 0
 
     args = parse_args(argv)
     if args is None:
         say("arguments aren't --chain-b64 <base64> --join line|same [--padding n] "
-            "[--keep-theirs-b64 <base64>] [--mine <list>]; showing Sanduhr only")
+            "[--keep-theirs-b64 <base64>] [--mine <list>] [--band]; showing Sanduhr only")
         args = []
     if not args:
         out = segment(read_stdin_patiently, now)
@@ -1139,7 +1152,7 @@ def main(argv=None):
             print(out)
         return 0
 
-    command, mode, padding, picks, mine = args
+    command, mode, padding, picks, mine, band = args
     signal.signal(signal.SIGTERM, _on_signal)
     signal.signal(signal.SIGINT, _on_signal)
     data = read_stdin_all()
@@ -1150,7 +1163,7 @@ def main(argv=None):
         theirs, reason = run_chain(command, data)
         if reason:
             say("your statusline " + reason)
-    write(combined(theirs.decode("utf-8", "replace"), data, now, mode, padding, picks, mine, columns()))
+    write(combined(theirs.decode("utf-8", "replace"), data, now, mode, padding, picks, mine, columns(), band))
     return 0
 
 

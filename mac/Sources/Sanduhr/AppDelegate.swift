@@ -150,6 +150,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         WatcherStore.shared.startForApp()
         // Per-song looks (item 65c): propose_now_playing_looks' requests, on the same folder watch.
         NowPlayingLookStore.shared.start()
+        // The meters mod's band (items 65f, 66): band.json, the looks and the watchers it draws.
+        BandFileWriter.shared.startForApp()
         // Claude Code's hooks (items 51, 66): their Darwin notifications go where the
         // sanduhr://claude-code link goes.
         claudeCodeSignal = ClaudeCodeSignal { event in
@@ -270,6 +272,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Now playing's adapter runs as a child process (item 53): it goes when Sanduhr quits.
     func applicationWillTerminate(_ notification: Notification) {
         NowPlayingController.shared.shutdown()
+        // Watchers go with Sanduhr: the band shows none from now on.
+        BandFileWriter.shared.refresh(quitting: true)
     }
 
     // LSUIElement apps never get this called, but set it false anyway.

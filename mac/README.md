@@ -382,7 +382,18 @@ double-struck C H N P Q R Z), digits only in bold, double-struck, sans and mono,
 the IPA and Latin Extended letters (x stays x); widths are unchanged; a reset ends it. Sanduhr's
 parts are styled the same way. The chip's brush or its context menu opens the popover: Keep its
 own colors (default), One color or Gradient (2 to 4 stops), Bold/Italic/Dim/Underline, Letters,
-"Statuslines can't animate; the Desk can." Mods' chips have no popover.
+"Statuslines can't animate; the meters mod's band above the prompt draws Sanduhr's segments in
+this look and moves it (sweep, shimmer, glow)." Mods' chips have no popover. Sanduhr's own looks
+(session, weekly, resets) also reach the meters mod's band through `band.json` (below).
+
+**Sanduhr's meters above the prompt instead (item 65f).** The Combine sheet's checkbox "Show
+Sanduhr's meters above the prompt instead (animated)" adds a trailing `--band` to the combined
+command (`StatuslineSelection.band`; the runner and `parseStatusline` both read it, and Update keeps
+it): the runner then prints only their line, plus Sanduhr's context and model when `--mine` picks
+them, and the session, weekly and reset segments (with any notice) are left to the meters mod's
+band. Their segments are untouched; re-running their command in the band is out of scope. The mod
+must be installed in the same folder (the caption says so); without it, Sanduhr's meters simply
+don't show in that folder.
 
 **Powerline glyphs.** U+E0B0 to U+E0B3 are Private Use Area glyphs only Nerd Fonts have, so
 `PowerlineGlyph` draws them: menu items get a drawn icon and the label "Powerline arrow (needs a
@@ -428,6 +439,48 @@ tick, and the tick redraws only when a countdown or age it shows changed. Window
 `%APPDATA%\Sanduhr\snapshot.json`; `SANDUHR_SNAPSHOT` names another file for testing. Tests:
 `claude plugin test mac/integrations/mods/sanduhr-meters` (the engine's own test kit; the band is
 mounted on the terminal surface with the file system, clock, env and store beneath mocked).
+
+**The animated band and the watcher band (items 65f, 66; mod 0.2.0).** The mod also reads
+`band.json` beside the snapshot every 2 seconds (`hooks/band.ts`, pure; `SANDUHR_BAND` names
+another file for testing). The app writes it (`BandFile`, `BandFileWriter`), owner-only (0600) and
+atomically, only when what it says changed, and deletes it when it would say nothing:
+
+```json
+{"meters":{"styles":{"session":{"bold":true,"font":"script","ink":["#ff2a6d","#05d9e8"]}}},
+ "reduce_motion":false,"schema_version":1,
+ "watchers":[{"done":4,"short":"CI","source":"agent","started_at":"…","state":"waiting","title":"CI on main","total":12},
+             {"kind":"shell","source":"automatic","state":"running"}],
+ "written_at":"2026-10-07T15:00:00.000Z"}
+```
+
+`meters.styles` are the Combine sheet's Style popover looks for Sanduhr's session, weekly and reset
+segments (the statusline's style grammar; kept in `bandMeterStyles` in `com.626labs.sanduhr`, set
+at each Combine, cleared by Replace): the band draws the meter's name and percent (session, weekly)
+and the reset words (resets) in that look, one Text per character run with the ink's gradient,
+the letter style mapped as the statusline maps it, bold, italic, dim and underline as Text props;
+the bars keep the widget's usage colors. `reduce_motion` is macOS's Reduce Motion (rewritten when
+it changes). `watchers` is there only while **Show watchers above the prompt** is on (Settings,
+Integrations, Watchers; `watchersInBand`, off by default): the shown watchers in the board's order
+(work ones left out in demo mode), an agent's as `title`, `short`, `state`, `done`/`total` and
+`started_at`/`ended_at`, Claude Code's background work as `kind` and `state` only, never its
+description, note or link. While watchers show the file is written again each minute; the mod
+ignores watchers in a file older than three minutes (Sanduhr quit or crashed), and quitting writes
+them empty.
+
+What moves, drawn the way the owner's now-playing mod draws: a bar **sweeps** once when its limit
+crosses a warning line (50, 75 or 90%) between two readings, a three-character light brightening
+toward white across the bar and its percent in 1.1 s; a limit within ten minutes of its reset
+**shimmers** (the light passes over its reset words every 4 s); a limit that warns **glows** (its
+percent and ⚠ brighten and fade every 4 s). Watcher rows, one per watcher under the meters (at
+most six, then "+N more", folding to what the band's rows allow): the state mark (● running, ◉
+waiting on you pulsing amber, ✓ passed in green fading toward grey over its last seconds before
+Sanduhr drops it, ⚠ failed in red, ○ lost touch and ✓ finished in grey), the title (the short one
+below 60 columns; background work reads "background shell"), the time so far and `done/total`.
+Frames: 80 ms (12.5 a second, under the engine's 30) only while a light, pulse or fade moves,
+else once a second, and a frame redraws only when what the band shows changed (a minute's
+countdown, a pace mark's cell, a watcher's seconds). Motion stops with Reduce Motion or the mod's
+own `motion` option (`on`, `off`; Claude Code's config menu). A malformed `band.json` is ignored
+whole (the meters draw as before); a malformed watcher row or style is dropped alone.
 
 Install adds the mod's folder, `~/Library/Application Support/Sanduhr/integrations/current/mods/sanduhr-meters`,
 to `env.CLAUDE_CODE_PLUGIN_DIRS` in the chosen folder's `settings.json` (the user settings, where
@@ -927,6 +980,12 @@ Each task becomes a watcher (`b:<session>:<task id>`, the description as title, 
 finished (result unknown). The glow notification is posted either way, so item 51's glow is
 unchanged.
 Installs from before this version show **Outdated**; Install rewrites the Stop entry in place.
+
+**Above Claude Code's prompt.** **Show watchers above the prompt** (off by default) hands the
+watchers to the meters mod through `band.json` (see the meters mod above): a row each above the
+prompt in every Claude Code folder with the mod installed. Only an agent's watcher's title, short
+title, state, progress and times are written, and for background work its kind and state; it is
+rewritten on each change and each minute while watchers show, and switching off takes them out.
 
 `state.yaml` has `watchers: {count, states, placements, agents, background}`, never a title, note,
 link or description. `smoke do watch-test start|wait|pass|fail|clear` drives a made-up watcher
