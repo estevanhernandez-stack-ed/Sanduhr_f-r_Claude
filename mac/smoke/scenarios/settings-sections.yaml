@@ -13,11 +13,15 @@ steps:
       contains: { text: "/Desk: (on|off)/" }
   - expect:
       window: settings
-      contains: { text: "Option+S opens Settings" }
-  - expect:
-      window: settings
       missing: { text: "/Show the Claude meters on the desktop|Widget: the floating window/" }
   - snap: preview-general
+  # Shortcuts sits below the full preview: open General at it. The label follows the keys (⌥S
+  # unless changed, 2026-10-08); OCR may misread the symbols.
+  - do: settings
+    arg: general shortcuts
+  - expect:
+      window: settings
+      contains: { text: "/S opens Settings/" }
   - do: settings
     arg: credentials
   # Item 36: the section kept its raw value and is now the Accounts page. Its caption names the
@@ -35,13 +39,14 @@ steps:
     arg: alerts
   # Alerts holds Each limit (was Desk, Meters) under the meter bars' preview.
   - expect_state: { settings_section: alerts, settings_preview: meters }
-  - expect:
-      window: settings
-      contains: { text: Each limit }
   - snap: preview-meters
+  # Each limit sits below the full preview (2026-10-08): deskMeters opens Alerts at it.
   - do: settings
     arg: deskMeters
   - expect_state: { settings_section: alerts, settings_anchor: each-limit }
+  - expect:
+      window: settings
+      contains: { text: Each limit }
   - do: settings
     arg: deskLayout
   # Desk (raw value deskLayout): its switch is at the top, and Clicks moved here.
@@ -93,10 +98,13 @@ steps:
   - expect:
       window: settings
       contains: { text: Let agents show watchers }
+  - snap: preview-watchers
+  # The glow rule sits below the full preview (2026-10-08): open Watchers at it.
+  - do: settings
+    arg: watchers glow
   - expect:
       window: settings
       contains: { text: "/The notch glows once when a watcher waits on you/" }
-  - snap: preview-watchers
   - do: settings
     arg: integrations
   # Claude Code (raw value integrations; item 49): install and remove happen only by hand on a
@@ -129,10 +137,13 @@ steps:
     arg: widgetLook
   # Widget (raw value widgetLook): Show the widget (from General), the font, the pacing calculators.
   - expect_state: { settings_section: widgetLook, settings_preview: widget }
+  - snap: preview-widget-look
+  # Show the widget sits below the full preview (2026-10-08): open Widget at it.
+  - do: settings
+    arg: widgetLook show
   - expect:
       window: settings
-      contains: { text: Show the widget now }
-  - snap: preview-widget-look
+      contains: { text: "/Show the widget now$/" }
   - do: settings
     arg: pacing
   - expect_state: { settings_section: widgetLook, settings_anchor: pacing, settings_preview: widget }
