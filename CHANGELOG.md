@@ -2,6 +2,7 @@
 
 ## Unreleased (mac)
 
+- **Fixed: the Arrange Desk panel was invisible in 2.10.0.** Its window opened at zero size, so Cancel and Done never showed (Return and Escape still worked). It now opens at its full size, centered above your windows.
 ## v2.10.0-mac — 2026-10-07
 
 - **Menu items and buttons say where they go.** An item that opens Settings now names the page as the sidebar does: the two Look pages are **Desk Look** and **Widget Look**; the clock's two-finger menu has **Desk Look Settings…**; the camera and mic indicators' menu, Integrations' notch glow rows and the Now Playing and Watchers pages have **Notch Settings…**; Now Playing and Watchers open the Layout page with **Desk Layout Settings…** (Arrange Desk… is only Arrange mode now). An item that does something else says what: the message's menu has **Edit Messages…**. In a menu that also has a page's own Settings item (the clock, the message, the meters and the widget's cards), the shared Settings… reads **All Settings…**; the menu bar item's and the widget's menus keep Settings…. Tools, Camera Light is now **Camera Fill Light**, and so is its section on the Notch page.
