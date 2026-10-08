@@ -84,7 +84,9 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   Message shows; `mode`, `list` or `text`; `rows`, `styled` and `raw` message lines and `notes`, comments
   and blank lines, in the editor's document; `unsaved`; `today_special`, how many date lines the Desk draws above the
   usual line today; `added`, the line `message-editor add` put in, else
-  null; never one of your lines), `meters` (tier, label, percent, fill,
+  null; never one of your lines), `hot_keys` (General, Shortcuts: `join` and `settings`, each switch; `registered`, how
+  many shortcuts are registered now; `join_keys` and `settings_keys`, each one's keys as the switch's label shows them,
+  `⌥J` and `⌥S` unless changed; `join_taken` and `settings_taken`, another app holds those keys so it did not register), `meters` (tier, label, percent, fill,
   pace, reset, `warning`: the row draws red with the ink glow, per Settings, Desk, Meters), `widget_warnings` (the
   widget's tiers drawing red with a glow, same rule and settings, in display order), `meetings_count`, `desk_frames` (every interactive Desk element while Desk runs: `kind` is `meters`, `meter_row`, `account`, `note`, `meeting_row`, `meetings`, `now_playing`, `now_playing_next`, `watcher`, `av_indicators`, or, while "Clock and message take clicks" is on, `clock`, `message` and `claude_line` (the account name nests inside the claude line); `key` is the limit's tier for a meter row, the row's index for a meeting row and `desk` or `strip` for now playing, never a title or a label; `clickable`; `frame` as `[x, y, w, h]` in whole points from the Desk window's top left), `desk_frames_ok` (the app's own check of those frames: each drawn element has a non-empty frame inside the Desk window, rows lie within their block, and no two click areas of different kinds overlap, slack included) and `desk_frames_problem` (why not, such as `meters frame empty`; null when ok), `desk_piece_clicks` (Settings, Desk, Look's "Clock and message take clicks", desk suite key `piecesTakeClicks`; `scenarios/desk-layout.yaml` flips it and checks the clock's frame comes and goes), `dock` (item 56: `side` `bottom`, `left` or `right` and `autohide`, the Dock's own settings, read only; `inset`, the points the Desk's corners on that side are moved in now: the Dock's reach when always shown, its depth while an auto-hiding Dock shows, 0 otherwise), `alerts`, `last_fetch`, `active_tool`, `pacing_pinned`,
   `pulse_count`, `glow_count` (notch glows fired so far, drawn or not; a pulse fires one too), `glow_shape` (what the last
@@ -116,7 +118,11 @@ Fridays, "ship it." in a sunset gradient in script with a sweep, as the controls
 unsaved edits. Neither saves, so `messages.txt` is never written; a run reverts what it added),
 `desk-arrange start|test|done|cancel` (item 60: Arrange mode on the Desk, as Arrange Desk… enters it; test
 makes the smoke's own edit, the clock to Top right at 120%, in the working layout only; done ends it writing
-the layout once when it changed, cancel ends it writing nothing. A run that leaves it on cancels it).
+the layout once when it changed, cancel ends it writing nothing. A run that leaves it on cancels it),
+`hot-key settings|join <keys>|default` (General, Shortcuts: a shortcut's keys set as the recorder sets them,
+written as `ctrl-opt-s` or `⌃⌥S`; refused with an error, nothing saved, without ⌘, ⌃ or ⌥ or when the other
+shortcut has them. It writes the desk keys `hotKey<Settings|Join>KeyCode` and `…Modifiers`; a run puts changed
+keys back).
 
 ## Scenarios
 

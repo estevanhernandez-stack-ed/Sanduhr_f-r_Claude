@@ -202,3 +202,11 @@ message_editor:
   unsaved: false
   today_special: 0
   added: null
+hot_keys:
+  join: true
+  settings: true
+  registered: 2
+  join_keys: ⌥J
+  settings_keys: ⌥S
+  join_taken: false
+  settings_taken: false

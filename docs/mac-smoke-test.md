@@ -1705,10 +1705,10 @@ desktop well away from every piece.
    Playing, Watchers; **Claude Code**: Claude Code, Mods & Config; **Widget**: Widget, Themes;
    **Help**: Updates, About. Desk Look has a paintbrush, Widget the text symbol.
 3. General: Surfaces is four status lines (Desk, Notch, Widget, Menu bar) with **Desk Settings…**,
-   **Notch Settings…** and **Widget Settings…**; no switch for any surface. Shortcuts has **Option+S
-   opens Settings** and **Option+J joins the next meeting**. Turn the Desk off on the Desk page and
-   press Option+S in another app: Settings comes forward. Switch **Option+S opens Settings** off:
-   Option+S types ß again; Option+J still joins. Put both back. `hot_keys` in state.yaml follows.
+   **Notch Settings…** and **Widget Settings…**; no switch for any surface. Shortcuts has **⌥S
+   opens Settings** and **⌥J joins the next meeting** (with the default keys). Turn the Desk off on
+   the Desk page and press ⌥S in another app: Settings comes forward. Switch **⌥S opens Settings**
+   off: ⌥S types ß again; ⌥J still joins. Put both back. `hot_keys` in state.yaml follows.
 4. Desk: the Desk switch at the top, Arrange Desk…, Where each piece sits (Meetings with **Read
    today's meetings** under it; Now playing and Watchers with their page links), Order, **Clicks**
    (Clock and message take clicks) and Margins (under Advanced since slice 3). Desk Look no longer
@@ -1740,6 +1740,17 @@ desktop well away from every piece.
     off, both Claude meters pieces read Hidden on Desk), a wing that was Camera and mic now reads
     that place under Where they show, the shortcuts are on only if the old switch was on (or never set) and the Desk was on (a profile with the Desk off reads both off), and Menu Bar Shows
     is unchanged. Quit and relaunch: nothing changes again.
+11. Changing the keys (2026-10-08): `smoke/smoke run smoke/scenarios/shortcut-keys.yaml` passes
+    (`hot_keys.settings_keys` reads `⌃⌥S`, then `⌥S`, and the run leaves the keys as found). By
+    hand: click **⌥S** beside **⌥S opens Settings** (it reads "Type keys…"), press ⌃⌥S: the label
+    reads **⌃⌥S opens Settings**, **Reset to ⌥S** appears, ⌃⌥S in another app opens Settings and ⌥S
+    types ß. Click the keys and press Escape: nothing changes. Press ⇧S: "Add ⌘, ⌃ or ⌥: Shift alone
+    isn't enough.", nothing saved. Press ⌥J: "⌥J already joins the next meeting.", nothing saved.
+    When macOS refuses to register the keys, the note under the switch says another app uses them
+    (`hot_keys.<name>_taken: true`). macOS does not refuse system shortcuts such as ⌘Space or keys
+    another app registered the same way, so those register and both fire: pick keys you know are free. The caption names ß and ∆ only while both keys are the defaults. **Reset
+    to ⌥S**: back to the default, and `defaults read com.626labs.sanduhr.desk` has no
+    `hotKeySettingsKeyCode`. The menus, the tour and What's New name no keys.
 
 ## 44. Settings v2, slice 3: reach (item 72)
 

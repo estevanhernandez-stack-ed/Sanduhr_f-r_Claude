@@ -56,6 +56,9 @@ enum DebugHooks {
             }
         case .action(.theme(let id), _) where ThemeRegistry.theme(id: id) == nil:
             finish(dir, error: "unknown theme: \(id) (one of \(ThemeRegistry.themes.map(\.id).joined(separator: ", ")))")
+        case .action(.hotKey(let s, let combo), _)
+            where SanduhrHotKeys.check(combo ?? s.defaultCombo, for: s) != nil:
+            finish(dir, error: "hot-key refused: \(SanduhrHotKeys.check(combo ?? s.defaultCombo, for: s)!.note)")
         case .action(let action, _):
             perform(action, app: app) { finish(dir) }
         }
@@ -137,6 +140,7 @@ enum DebugHooks {
         case .deskArrange(.test): DeskController.shared.model.arrange.smokeEdit()
         case .deskArrange(.done): DeskController.shared.endArrange(keep: true)
         case .deskArrange(.cancel): DeskController.shared.endArrange(keep: false)
+        case .hotKey(let s, let combo): ShortcutRecorderModel.shared.save(combo ?? s.defaultCombo, for: s)
         }
         settle()
     }
@@ -339,7 +343,11 @@ enum DebugHooks {
         s.settingsPreviewFolded = settings.previewFolded
         s.hotKeys = HotKeysDebug(join: SanduhrHotKeys.isOn(.join, in: UserDefaults.desk),
                                  settings: SanduhrHotKeys.isOn(.settings, in: UserDefaults.desk),
-                                 registered: desk.hotKeysRegistered)
+                                 registered: desk.hotKeysRegistered,
+                                 joinKeys: SanduhrHotKeys.combo(.join).display,
+                                 settingsKeys: SanduhrHotKeys.combo(.settings).display,
+                                 joinTaken: desk.takenShortcuts.contains(.join),
+                                 settingsTaken: desk.takenShortcuts.contains(.settings))
         s.settingsPreview = settings.isOpen ? SettingsPreviewKind.of(settings.section) : nil
         s.usagePageOpen = settings.isOpen && settings.section == .usage
         s.usageTab = settings.usageTab

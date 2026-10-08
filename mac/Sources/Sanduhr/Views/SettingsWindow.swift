@@ -85,7 +85,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 }
 
 /// The one Settings window: every Sanduhr, Desk and widget setting, reachable with the widget
-/// hidden. Option+S, sanduhr:// and estedesk:// settings links, the notch island, every menu's
+/// hidden. The Settings shortcut, sanduhr:// and estedesk:// settings links, the notch island, every menu's
 /// Settings… item and the widget's gear all open it; onboarding opens it at Accounts.
 @MainActor
 final class SettingsWindowController {

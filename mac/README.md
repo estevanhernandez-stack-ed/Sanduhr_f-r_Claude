@@ -155,7 +155,7 @@ with the label. The notch stays as it is. A switch never needs a relaunch: the m
 - **The Usage page (item 48; "Claude Usage" before Settings v2).** A Settings section under Accounts (`SettingsSection.usage`;
   Tools, Claude Usage… in every menu opens it), chosen over a separate window because the choices
   that decide what it can show are in Accounts, Data one row up, and Settings is already the one
-  window every menu, Option+S and the notch open. One account at a time (the active one, a picker
+  window every menu, the Settings shortcut (⌥S unless changed) and the notch open. One account at a time (the active one, a picker
   with two or more), three tabs. Overview: `CCLogReader.days` (one pass, per local day) for the
   live side, the vault's rollups for closed days. The hot-day rule: days before the local date of
   the record's last finished pass come from the record, that day and later from the live reader,

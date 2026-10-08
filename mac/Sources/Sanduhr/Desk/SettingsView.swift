@@ -1061,22 +1061,25 @@ private struct SurfacesStatusSection: View {
     }
 }
 
-/// General, Shortcuts (slice 2): Option+S and Option+J, one switch each, registered whenever
-/// Sanduhr runs (SanduhrHotKeys).
+/// General, Shortcuts (slice 2): open Settings and join the next meeting, one switch each,
+/// registered whenever Sanduhr runs (SanduhrHotKeys), each with its keys beside it to change
+/// (ShortcutRecorderModel, 2026-10-08).
 private struct ShortcutsSection: View {
     @AppStorage(SanduhrHotKeys.Shortcut.settings.key, store: .desk) private var settings = true
     @AppStorage(SanduhrHotKeys.Shortcut.join.key, store: .desk) private var join = true
+    @ObservedObject private var recorder = ShortcutRecorderModel.shared
 
     var body: some View {
         Section("Shortcuts") {
-            Toggle(SanduhrHotKeys.Shortcut.settings.title, isOn: $settings)
+            ShortcutRow(shortcut: .settings, isOn: $settings, model: recorder)
                 .onChange(of: settings) { _, _ in DeskController.shared.applyHotKeys() }
                 .settingsAnchor(SettingsAnchor.shortcuts)
-            Toggle(SanduhrHotKeys.Shortcut.join.title, isOn: $join)
+            ShortcutRow(shortcut: .join, isOn: $join, model: recorder)
                 .onChange(of: join) { _, _ in DeskController.shared.applyHotKeys() }
-            Text(SanduhrHotKeys.caption)
+            Text(SanduhrHotKeys.caption(settings: recorder.combo(.settings), join: recorder.combo(.join)))
                 .font(.caption).foregroundStyle(.secondary)
         }
+        .onAppear { recorder.reload() }
     }
 }
 

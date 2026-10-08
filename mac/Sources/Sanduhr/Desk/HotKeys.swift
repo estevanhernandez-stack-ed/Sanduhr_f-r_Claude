@@ -1,10 +1,10 @@
 import Carbon.HIToolbox
 
-/// Sanduhr's global shortcuts: Option+J joins the next meeting, Option+S opens Settings.
-/// Registered with Carbon's RegisterEventHotKey, which needs no Accessibility permission, while
-/// Sanduhr runs and each one's switch is on (Settings, General, Shortcuts; SanduhrHotKeys). A
-/// registered hotkey takes the keystroke from every app, so while one is on, Option+J or Option+S
-/// no longer types ∆ or ß; switching it off gives that back.
+/// Sanduhr's global shortcuts: one joins the next meeting, one opens Settings (⌥J and ⌥S unless
+/// changed on General; HotKeyCombo). Registered with Carbon's RegisterEventHotKey, which needs no
+/// Accessibility permission, while Sanduhr runs and each one's switch is on (Settings, General,
+/// Shortcuts; SanduhrHotKeys). A registered hotkey takes the keystroke from every app, so while
+/// one is on its keys no longer type (⌥J ∆, ⌥S ß); switching it off gives that back.
 final class DeskHotKeys {
     struct Binding {
         let keyCode: UInt32
@@ -22,7 +22,10 @@ final class DeskHotKeys {
     /// How many are registered now (state.yaml `hot_keys.registered`).
     var count: Int { refs.count }
 
-    func register(_ bindings: [Binding]) {
+    /// Registers each binding; returns the indexes of those another app already holds.
+    @discardableResult
+    func register(_ bindings: [Binding]) -> [Int] {
+        var failed: [Int] = []
         unregister()
         installHandlerIfNeeded()
         for (index, binding) in bindings.enumerated() {
@@ -36,8 +39,10 @@ final class DeskHotKeys {
             } else {
                 // Another app holds the combination (eventHotKeyExistsErr); it keeps it.
                 NSLog("Desk hotkey \(binding.keyCode) not registered: \(status)")
+                failed.append(index)
             }
         }
+        return failed
     }
 
     func unregister() {

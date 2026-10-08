@@ -41,7 +41,7 @@ enum SettingsNames {
     /// Every current name, with the page it lives on.
     static let table: [(name: String, page: SettingsSection)] = [
         (menuBarShows, .general), (meetingsMenu, .general),
-        (SanduhrHotKeys.Shortcut.settings.title, .general), (SanduhrHotKeys.Shortcut.join.title, .general),
+        (SanduhrHotKeys.Shortcut.settings.name, .general), (SanduhrHotKeys.Shortcut.join.name, .general),
         (deskSwitch, .deskLayout),
         (notchSwitch, .notch), (notchGlow, .notch), (cameraMicPlace, .notch),
         (claudeCodeGlowHook, .integrations), (metersAbovePrompt, .integrations),
@@ -82,7 +82,10 @@ enum SettingsNames {
         ("Pacing & Focus Settings…", SettingsSection.widgetLook.linkTitle),
         ("Show the Claude meters on the desktop", SettingsSection.deskLayout.linkTitle),
         ("Widget: the floating window with the tools", showWidget),
-        ("Option+J joins the next meeting, Option+S opens these settings", SanduhrHotKeys.Shortcut.settings.title),
+        ("Option+J joins the next meeting, Option+S opens these settings", SanduhrHotKeys.Shortcut.settings.name),
+        // 2026-10-08: the keys can be changed, so a label naming them is read from the saved combo.
+        ("Option+S opens Settings", SanduhrHotKeys.Shortcut.settings.name),
+        ("Option+J joins the next meeting", SanduhrHotKeys.Shortcut.join.name),
         ("Sanduhr's mod: ", metersAbovePrompt),
     ]
 

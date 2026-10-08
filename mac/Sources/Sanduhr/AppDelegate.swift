@@ -200,7 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// estedesk:// and sanduhr:// links (Option+J joins the next meeting, …/settings opens
+    /// estedesk:// and sanduhr:// links (the join shortcut joins the next meeting, …/settings opens
     /// Sanduhr Settings). sanduhr://debug/… goes to the smoke tools' hooks, which ignore it
     /// unless they are switched on (DebugGate). sanduhr://claude-code?event=… is what Claude
     /// Code's hooks opened before they posted ClaudeCodeSignal (item 51); it stays for those and

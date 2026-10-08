@@ -212,8 +212,11 @@ struct SettingsMigrationTests {
     }
 
     @Test func shortcutNames() {
-        #expect(SanduhrHotKeys.Shortcut.settings.title == "Option+S opens Settings")
-        #expect(SanduhrHotKeys.Shortcut.join.title == "Option+J joins the next meeting")
+        let s = HotKeyCombo(keyCode: 1, modifiers: HotKeyCombo.control | HotKeyCombo.option)
+        #expect(SanduhrHotKeys.Shortcut.settings.title(s) == "⌃⌥S opens Settings")
+        #expect(SanduhrHotKeys.Shortcut.settings.title(SanduhrHotKeys.Shortcut.settings.defaultCombo) == "⌥S opens Settings")
+        #expect(SanduhrHotKeys.Shortcut.join.title(SanduhrHotKeys.Shortcut.join.defaultCombo) == "⌥J joins the next meeting")
+        #expect(SanduhrHotKeys.Shortcut.settings.name == "Shortcut to open Settings")
         #expect(DeskController.hotKeysKey == "hotKeys")
     }
 

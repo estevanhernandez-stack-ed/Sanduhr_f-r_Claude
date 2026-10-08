@@ -86,11 +86,16 @@ enum DebugAction: Equatable {
         case start, test, done, cancel
     }
 
+    /// A shortcut's keys set as General's recorder sets them (2026-10-08), with its rules: nil is
+    /// the default. Refused (an error, nothing saved) without ⌘, ⌃ or ⌥ or when the other
+    /// shortcut uses them. Writes the two desk keys; Restore puts the keys back after a run.
+    case hotKey(SanduhrHotKeys.Shortcut, HotKeyCombo?)
+
     static let names = ["show-widget", "hide-widget", "settings", "settings-link", "settings-search", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
                         "theme", "account", "usage", "whats-new", "close-whats-new",
                         "tour", "tour-step", "close-tour", "watch-test", "av-test", "message-editor",
-                        "desk-arrange"]
+                        "desk-arrange", "hot-key"]
 }
 
 enum DebugCommand: Equatable {
@@ -234,6 +239,16 @@ enum DebugLink {
                 return bad("desk-arrange needs arg=start, test, done or cancel")
             }
             return .success(.deskArrange(step))
+        case "hot-key":
+            // "settings ctrl-opt-s", "join ⌃⌥J", "settings default".
+            let parts = (arg ?? "").split(separator: " ", maxSplits: 1).map(String.init)
+            let which: [String: SanduhrHotKeys.Shortcut] = ["settings": .settings, "join": .join]
+            guard parts.count == 2, let s = which[parts[0].lowercased()] else {
+                return bad("hot-key needs arg=settings|join <keys> (ctrl-opt-s, ⌃⌥S) or default")
+            }
+            if parts[1].lowercased() == "default" { return .success(.hotKey(s, nil)) }
+            guard let combo = HotKeyCombo.parse(parts[1]) else { return bad("hot-key: unknown keys \(parts[1])") }
+            return .success(.hotKey(s, combo))
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }

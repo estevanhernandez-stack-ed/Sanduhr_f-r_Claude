@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import Foundation
 
 /// Settings v2's one-time moves (item 72, slice 2), run at launch before the Desk starts. Each one
@@ -51,6 +52,9 @@ enum SettingsMigrations {
 ///
 ///   defaults write com.626labs.sanduhr.desk hotKeyJoin -bool false
 ///   defaults write com.626labs.sanduhr.desk hotKeySettings -bool false
+///
+/// Each one's keys can be changed beside its switch (HotKeyCombo, 2026-10-08); none saved means
+/// the default, ⌥S and ⌥J.
 enum SanduhrHotKeys {
     enum Shortcut: CaseIterable {
         case join, settings
@@ -62,20 +66,40 @@ enum SanduhrHotKeys {
             }
         }
 
-        /// The switch's name on General.
-        var title: String {
+        /// What it does, after its keys: "opens Settings".
+        var action: String {
             switch self {
-            case .join: "Option+J joins the next meeting"
-            case .settings: "Option+S opens Settings"
+            case .join: "joins the next meeting"
+            case .settings: "opens Settings"
             }
         }
+
+        /// The keys it starts with, and goes back to on Reset: ⌥J, ⌥S.
+        var defaultCombo: HotKeyCombo {
+            switch self {
+            case .join: HotKeyCombo(keyCode: UInt32(kVK_ANSI_J), modifiers: HotKeyCombo.option)
+            case .settings: HotKeyCombo(keyCode: UInt32(kVK_ANSI_S), modifiers: HotKeyCombo.option)
+            }
+        }
+
+        /// Its name wherever the keys can't be known (the names table, search): neutral, since
+        /// the keys can be changed (2026-10-08).
+        var name: String {
+            switch self {
+            case .join: "Shortcut to join the next meeting"
+            case .settings: "Shortcut to open Settings"
+            }
+        }
+
+        /// The switch's label on General, with its keys: "⌃⌥S opens Settings".
+        func title(_ combo: HotKeyCombo) -> String { "\(combo.display) \(action)" }
+
+        /// The label with the keys saved now.
+        var title: String { title(SanduhrHotKeys.combo(self)) }
     }
 
     /// 2.10.0's one switch for both.
     static let legacyKey = "hotKeys"
-
-    /// General, Shortcuts' caption.
-    static let caption = "Both work in every app whenever Sanduhr runs, with or without the Desk. While one is on, Option+S no longer types ß, or Option+J ∆."
 
     /// The old switch as it read: on unless switched off.
     static func legacy(in d: DefaultsStore) -> Bool { d.object(forKey: legacyKey) as? Bool ?? true }

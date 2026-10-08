@@ -322,11 +322,20 @@ module Smoke
       if !editor_unsaved(before) && editor_unsaved(after)
         steps << ['message-editor', 'revert']
       end
+      # A shortcut's keys a scenario changed (General, Shortcuts) go back to what they were.
+      %w[settings join].each do |which|
+        was = hot_keys(before, which)
+        steps << ['hot-key', "#{which} #{was}"] if was && was != hot_keys(after, which)
+      end
       # Arrange mode (item 60) a scenario left on ends with Cancel, saving nothing.
       if !arranging(before) && arranging(after)
         steps << ['desk-arrange', 'cancel']
       end
       steps
+    end
+
+    def hot_keys(state, which)
+      state['hot_keys'].is_a?(Hash) ? state['hot_keys']["#{which}_keys"] : nil
     end
 
     def arranging(state)

@@ -130,7 +130,7 @@ struct DebugStateInput {
     var modsPage = ModsPageDebug()
     /// Settings, Message's editor (item 69): counts and flags, never a line of the user's.
     var messageEditor = MessageEditorDebug()
-    /// Option+J and Option+S (slice 2): each switch and whether it is registered now.
+    /// The two shortcuts (slice 2): each switch, whether registered now, and its keys.
     var hotKeys = HotKeysDebug()
     var version = ""
     var build = ""
@@ -204,6 +204,12 @@ struct HotKeysDebug: Equatable {
     var join = true
     var settings = true
     var registered = 0
+    /// Each shortcut's keys as General shows them ("⌥J", "⌃⌥S"; 2026-10-08).
+    var joinKeys = "⌥J"
+    var settingsKeys = "⌥S"
+    /// Its keys are held by another app, so it did not register.
+    var joinTaken = false
+    var settingsTaken = false
 }
 
 /// state.yaml's `mods_page:` (item 64): whether the page shows and has read the folders, the
@@ -335,10 +341,13 @@ enum DebugState {
               YAMLPair("shown", .string(a.shown)), YAMLPair("place", .string(a.place))])
     }
 
-    /// `hot_keys:` (slice 2): two switches and a count.
+    /// `hot_keys:` (slice 2): two switches and a count, then each one's keys and whether another
+    /// app holds them.
     static func hotKeysYAML(_ h: HotKeysDebug) -> YAMLNode {
         .map([YAMLPair("join", .bool(h.join)), YAMLPair("settings", .bool(h.settings)),
-              YAMLPair("registered", .int(h.registered))])
+              YAMLPair("registered", .int(h.registered)),
+              YAMLPair("join_keys", .string(h.joinKeys)), YAMLPair("settings_keys", .string(h.settingsKeys)),
+              YAMLPair("join_taken", .bool(h.joinTaken)), YAMLPair("settings_taken", .bool(h.settingsTaken))])
     }
 
     /// `message_editor:` (item 69): the view, row counts and flags; `added` is only the smoke's own

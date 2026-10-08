@@ -86,6 +86,13 @@ class FakeApp
         e.merge!('rows' => e['rows'].to_i - 1, 'styled' => e['styled'].to_i - 1, 'unsaved' => false, 'added' => nil)
       end
     when 'close-settings' then s['settings_open'] = false
+    when 'hot-key'
+      which, keys = arg.split(' ', 2)
+      defaults = { 'settings' => '⌥S', 'join' => '⌥J' }
+      keys = { 'default' => defaults[which], 'ctrl-opt-s' => '⌃⌥S', 'ctrl-opt-j' => '⌃⌥J' }.fetch(keys, keys)
+      other = which == 'settings' ? 'join' : 'settings'
+      raise Smoke::Failure, 'hot-key refused: already in use' if s['hot_keys']["#{other}_keys"] == keys
+      s['hot_keys']["#{which}_keys"] = keys
     when 'desk-arrange'
       a = (s['desk_arrange'] ||= {})
       case arg
@@ -374,6 +381,24 @@ eq('message editor scenario passes', [r['status'], r['reason']], ['pass', nil])
 eq('message editor scenario adds, reverts, then closes Settings', app_me.actions,
    ['settings message', 'message-editor add', 'message-editor revert', 'close-settings'])
 FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-me'))
+# 2026-10-08: General's shortcut keys, shown as text; a run puts changed keys back.
+eq('hot keys in the fixture', state['hot_keys'].values_at('join_keys', 'settings_keys', 'join_taken', 'settings_taken'),
+   ['⌥J', '⌥S', false, false])
+eq('changed shortcut keys are put back',
+   Restore.plan(base.merge('hot_keys' => { 'settings_keys' => '⌥S' }), base.merge('hot_keys' => { 'settings_keys' => '⌃⌥S' })), [['hot-key', 'settings ⌥S']])
+# The fixture tree holds no Settings page: the state steps run, the tree ones are dropped.
+hk_doc = YAML.safe_load(File.read(File.join(Smoke::SCENARIOS, 'shortcut-keys.yaml')))
+hk_doc['steps'].reject! { |s| s.key?('expect') }
+FileUtils.mkdir_p(File.join(Smoke::OUT, '.selftest-hk'))
+hk_file = File.join(Smoke::OUT, '.selftest-hk', 'shortcut-keys.yaml')
+File.write(hk_file, YAML.dump(hk_doc))
+app_hk = FakeApp.new('settings_open' => false, 'settings_section' => 'general')
+r = Runner.new(app_hk, MemoryDefaults.new, File.join(Smoke::OUT, '.selftest-hk', 'out'), io: StringIO.new, settle: 0, poll: 0.01, within: 0.05)
+    .run_file(hk_file)
+eq('shortcut keys scenario passes', [r['status'], r['reason']], ['pass', nil])
+eq('shortcut keys scenario sets, resets, then closes Settings', app_hk.actions,
+   ['settings general shortcuts', 'hot-key settings ctrl-opt-s', 'hot-key settings default', 'settings general surfaces', 'close-settings'])
+FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-hk'))
 # Item 72, slice 3: anchors, the search and settings_anchor_visible.
 eq('settings anchor keys in the fixture', state.values_at('settings_anchor', 'settings_anchor_visible', 'settings_preview_folded'),
    [nil, nil, nil])
@@ -492,7 +517,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange]
+    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end
