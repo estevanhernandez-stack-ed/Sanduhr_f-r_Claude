@@ -36,7 +36,8 @@ struct DeskHitTestTests {
     }
 
     @Test func priorityPutsMeetingRowsFirst() {
-        #expect(DeskHitTest.priority == [.meetingRow, .note, .account, .meterRow, .meters, .watcher, .avIndicators, .nowPlayingNext, .nowPlaying])
+        #expect(DeskHitTest.priority == [.meetingRow, .note, .account, .meterRow, .meters, .watcher, .avIndicators, .nowPlayingNext, .nowPlaying,
+                                           .clock, .message, .claudeLine])
         // A row laid over the meters (it should never be, but if it is) takes the click.
         let over = DeskElement(kind: .meetingRow, key: "0", frame: CGRect(x: 60, y: 810, width: 100, height: 20))
         #expect(DeskHitTest.element(at: CGPoint(x: 80, y: 820), in: all + [over]) == over)
@@ -243,5 +244,125 @@ struct DeskPointerWatchTests {
             let s = DeskHitTest.slack(kind)
             #expect(DeskPointerWatch.reach > max(s.width, s.height))
         }
+    }
+}
+
+/// "Clock and message take clicks" (DeskPieceClicks): the clock, the message and the claude line
+/// are click areas while the switch is on, and let every click through while it is off.
+@Suite("Desk piece clicks")
+struct DeskPieceClicksTests {
+    let window = CGSize(width: 1512, height: 982)
+    let clockFrame = CGRect(x: 52, y: 560, width: 300, height: 150)
+    let lineFrame = CGRect(x: 52, y: 720, width: 340, height: 24)
+    let messageFrame = CGRect(x: 52, y: 60, width: 700, height: 100)
+
+    /// The standard layout with everything drawn, the switch as given.
+    func input(on: Bool) -> DeskElements.Input {
+        var i = DeskElements.Input()
+        i.placed = DeskLayout.placed(DeskLayout.standard)
+        i.piecesTakeClicks = on
+        i.clockFrame = clockFrame
+        i.messageDrawn = true
+        i.messageFrame = messageFrame
+        i.claudeLineDrawn = true
+        i.claudeLineFrame = lineFrame
+        return i
+    }
+
+    @Test func onTheThreePiecesAreClickAreas() {
+        let out = DeskElements.build(input(on: true))
+        #expect(out.map(\.kind) == [.meetings, .clock, .message, .claudeLine])
+        #expect(out.first { $0.kind == .clock }?.frame == clockFrame)
+        let pieces = out.filter { [.clock, .message, .claudeLine].contains($0.kind) }
+        #expect(pieces.map(\.clickable) == [true, true, true])
+        #expect(DeskHitTest.element(at: CGPoint(x: 100, y: 600), in: out)?.kind == .clock)
+        #expect(DeskHitTest.element(at: CGPoint(x: 100, y: 100), in: out)?.kind == .message)
+        #expect(DeskHitTest.element(at: CGPoint(x: 100, y: 730), in: out)?.kind == .claudeLine)
+    }
+
+    @Test func offTheyLetEveryClickThrough() {
+        let out = DeskElements.build(input(on: false))
+        #expect(out.map(\.kind) == [.meetings])
+        #expect(DeskHitTest.element(at: CGPoint(x: 100, y: 600), in: out) == nil)
+        #expect(DeskHitTest.element(at: CGPoint(x: 100, y: 100), in: out) == nil)
+        #expect(DeskHitTest.element(at: CGPoint(x: 100, y: 730), in: out) == nil)
+    }
+
+    @Test func onlyWhatIsPlacedAndDrawn() {
+        var i = input(on: true)
+        i.placed = DeskLayout.placed("meters:bl")
+        #expect(DeskElements.build(i).isEmpty)
+        var nothing = input(on: true)
+        nothing.messageDrawn = false
+        nothing.claudeLineDrawn = false
+        #expect(DeskElements.build(nothing).map(\.kind) == [.meetings, .clock])
+    }
+
+    @Test func theAccountNameKeepsItsOwnClickInsideTheLine() {
+        var i = input(on: true)
+        i.hasAccount = true
+        i.accountFrame = CGRect(x: 52, y: 722, width: 60, height: 20)
+        let out = DeskElements.build(i)
+        #expect(DeskHitTest.element(at: CGPoint(x: 70, y: 730), in: out)?.kind == .account)
+        #expect(DeskHitTest.element(at: CGPoint(x: 300, y: 730), in: out)?.kind == .claudeLine)
+        // Nested in the line, not an overlap; outside the line, a problem.
+        var sound = out
+        sound.removeAll { $0.kind == .meetings }
+        #expect(DeskFrameCheck.problem(sound, window: window) == nil)
+        var stray = sound
+        if let a = stray.firstIndex(where: { $0.kind == .account }) { stray[a].frame.origin.y = 500 }
+        #expect(DeskFrameCheck.problem(stray, window: window) == "account outside claude_line")
+    }
+
+    @Test func soundFramesWithTheMetersBelowTheLine() {
+        // The standard bottom left: the clock, the claude line, then the meters a column gap (10)
+        // below the line. The slack (2 under the line, 6 over the meters) only comes close.
+        let meters = DeskElement(kind: .meters, frame: CGRect(x: 52, y: 754, width: 358, height: 120))
+        let clock = DeskElement(kind: .clock, frame: clockFrame)
+        let line = DeskElement(kind: .claudeLine, frame: lineFrame)
+        let message = DeskElement(kind: .message, frame: messageFrame)
+        #expect(DeskFrameCheck.problem([message, clock, line, meters], window: window) == nil)
+        // A clock ten points lower runs into the line.
+        var low = clock
+        low.frame.origin.y = 570
+        #expect(DeskFrameCheck.problem([low, line], window: window) == "clock overlaps claude_line")
+    }
+
+    @Test func plainClicksAndMenus() {
+        #expect(DeskPieceClicks.plainClick(.clock) == .deskLook)
+        #expect(DeskPieceClicks.plainClick(.message) == .message)
+        #expect(DeskPieceClicks.plainClick(.claudeLine) == nil)
+        #expect(DeskPieceClicks.menuItem(.clock)?.title == "Desk Look Settings…")
+        #expect(DeskPieceClicks.menuItem(.clock)?.section == .deskLook)
+        #expect(DeskPieceClicks.menuItem(.message)?.title == "Edit Messages…")
+        #expect(DeskPieceClicks.menuItem(.message)?.section == .message)
+        #expect(DeskPieceClicks.menuItem(.claudeLine) == nil)
+        for kind in [DeskElement.Kind.clock, .message, .claudeLine] {
+            #expect(DeskHitTest.hasSharedMenu(DeskElement(kind: kind, frame: .zero)))
+            #expect(DeskHitTest.hasMenu(DeskElement(kind: kind, frame: .zero)))
+            #expect(!DeskHitTest.isMeters(DeskElement(kind: kind, frame: .zero)))
+        }
+    }
+
+    @Test func theSwitchIsOnByDefaultAndRoundTrips() {
+        let store = MemoryDefaults()
+        #expect(DeskPieceClicks.isOn(in: store))
+        DeskPieceClicks.set(false, in: store)
+        #expect(!DeskPieceClicks.isOn(in: store))
+        #expect(store.values[DeskPieceClicks.key] as? Bool == false)
+        DeskPieceClicks.set(true, in: store)
+        #expect(DeskPieceClicks.isOn(in: store))
+        #expect(DeskPieceClicks.title == "Clock and message take clicks")
+        #expect(DeskPieceClicks.caption == "On: two-finger click them for Sanduhr's menu. Desktop icons right beneath them can't be clicked there while it's on.")
+    }
+
+    @Test func aDragFromElsewhereNeverTurnsThePlatesOn() {
+        // No button down: the window follows the pointer.
+        #expect(DeskPointerDrag.takesMouse(wanted: true, buttonDown: false, takingNow: false))
+        #expect(!DeskPointerDrag.takesMouse(wanted: false, buttonDown: false, takingNow: true))
+        // A file dragged from the desktop onto the clock: the window keeps ignoring the mouse.
+        #expect(!DeskPointerDrag.takesMouse(wanted: true, buttonDown: true, takingNow: false))
+        // A press on a piece itself keeps the window until the button comes up.
+        #expect(DeskPointerDrag.takesMouse(wanted: false, buttonDown: true, takingNow: true))
     }
 }

@@ -218,13 +218,13 @@ enum AVIndicatorLayout {
     }
 }
 
-/// The indicators' click menu: read-only lines naming what Sanduhr can see, then Indicator
+/// The indicators' click menu: read-only lines naming what Sanduhr can see, then Notch
 /// Settings…. Nothing in it mutes or changes a device.
 enum AVIndicatorMenu {
     static let cameraLine = "Camera in use"
     static let micLine = "Microphone in use"
     static let noneLine = "Camera and microphone not in use"
-    static let settingsTitle = "Indicator Settings…"
+    static let settingsTitle = "Notch Settings…"
 
     struct Item: Equatable {
         var title: String

@@ -72,6 +72,31 @@ class FakeApp
         e.merge!('rows' => e['rows'].to_i - 1, 'styled' => e['styled'].to_i - 1, 'unsaved' => false, 'added' => nil)
       end
     when 'close-settings' then s['settings_open'] = false
+    when 'desk-arrange'
+      a = (s['desk_arrange'] ||= {})
+      case arg
+      when 'start'
+        unless a['active']
+          a.merge!('active' => true, 'changed' => false, 'working' => s['layout'], 'click_through' => 'whole',
+                   'bar_visible' => true)
+          # Settings steps aside while arranging and comes back after.
+          @arrange_hid_settings = s['settings_open'] == true
+          s['settings_open'] = false
+        end
+      when 'test'
+        a.merge!('changed' => true, 'working' => s['layout'].sub('clock:bl', 'clock:tr:1.2')) if a['active']
+      when 'done', 'cancel'
+        if a['active'] && a['changed'] && arg == 'done'
+          s['layout'] = a['working']
+          s['desk_pieces'].each { |p| p.merge!('anchor' => 'tr', 'order' => 0, 'scale' => 1.2) if p['piece'] == 'clock' }
+        end
+        if a['active'] && @arrange_hid_settings
+          s['settings_open'] = true
+          @arrange_hid_settings = false
+        end
+        a.merge!('active' => false, 'changed' => false, 'working' => nil, 'click_through' => 'drawn',
+                 'bar_visible' => false)
+      end
     when 'usage'
       s['settings_open'] = true
       s['settings_section'] = 'usage'
@@ -149,7 +174,14 @@ eq('desk pieces follow the layout', state['desk_pieces'].map { |p| [p['piece'], 
 eq('desk pieces at size 1 in the fixture', state['desk_pieces'].map { |p| p['scale'] }.uniq, [1])
 eq('select a piece by name', State.dig(state, 'desk_pieces[piece=meters].order'), [true, 1])
 eq('desk frames ok in the fixture', [state['desk_frames_ok'], state['desk_frames_problem']], [true, nil])
-eq('desk frame kinds', state['desk_frames'].map { |f| f['kind'] }, %w[meters meter_row meter_row meetings])
+eq('desk frame kinds', state['desk_frames'].map { |f| f['kind'] }, %w[meters meter_row meter_row meetings clock message])
+# "Clock and message take clicks": on in the fixture; desk-layout.yaml's check that, off, neither
+# the clock nor the message is a click area.
+eq('piece clicks on in the fixture', state['desk_piece_clicks'], true)
+no_pieces = { 'desk_frames' => '/\A(?!.*(clock|message))/m' }
+check('the clock and message are click areas in the fixture', State.check(state, no_pieces).length == 1)
+check('off, neither is a click area',
+      State.check(state.merge('desk_frames' => state['desk_frames'].reject { |f| %w[clock message].include?(f['kind']) }), no_pieces).empty?)
 check('desk frames are [x, y, w, h] in whole points',
       state['desk_frames'].all? { |f| f['frame'].length == 4 && f['frame'].all? { |n| n.is_a?(Integer) } })
 check('desk frames carry no labels or titles',
@@ -328,6 +360,23 @@ eq('message editor scenario passes', [r['status'], r['reason']], ['pass', nil])
 eq('message editor scenario adds, reverts, then closes Settings', app_me.actions,
    ['settings message', 'message-editor add', 'message-editor revert', 'close-settings'])
 FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-me'))
+# Item 60: Arrange mode, flags and a layout string only; a scenario that leaves it on is cancelled.
+eq('desk arrange keys', state['desk_arrange'].keys, %w[active changed working click_through bar_visible])
+eq('desk arrange in the fixture: off, clicks only where drawn, no bar',
+   state['desk_arrange'].values_at('active', 'working', 'click_through', 'bar_visible'), [false, nil, 'drawn', false])
+eq('arrange mode a scenario left on is cancelled',
+   Restore.plan(base, base.merge('desk_arrange' => { 'active' => true })), [%w[desk-arrange cancel]])
+eq('arrange mode on before is left alone',
+   Restore.plan(base.merge('desk_arrange' => { 'active' => true }), base.merge('desk_arrange' => { 'active' => true })), [])
+app_ar = FakeApp.new
+r = Runner.new(app_ar, MemoryDefaults.new, File.join(Smoke::OUT, '.selftest-ar'), io: StringIO.new, settle: 0, poll: 0.01, within: 0.05)
+    .run_file(File.join(Smoke::SCENARIOS, 'desk-arrange.yaml'))
+eq('desk arrange scenario passes', [r['status'], r['reason']], ['pass', nil])
+eq('desk arrange scenario starts from Settings, cancels, then saves with done, Settings put back',
+   app_ar.actions,
+   ['settings deskLayout', 'desk-arrange start', 'desk-arrange test', 'desk-arrange cancel',
+    'desk-arrange start', 'desk-arrange test', 'desk-arrange done', 'settings notch'])
+FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-ar'))
 app_av = FakeApp.new
 app_av.action('av-test', 'mic on')
 eq('av-test fakes the mic', app_av.state_now['av_indicators']['mic'], true)
@@ -404,7 +453,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor]
+    known = %w[show-widget hide-widget settings close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end

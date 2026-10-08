@@ -12,12 +12,13 @@ struct NowPlayingSection: View {
         Form {
             Section {
                 NowPlayingSourceRow(deskEnabled: deskEnabled)
-                Text("Shows the song or video playing in any app, browsers included, wherever you place it: a notch wing or the strip under the camera (Notch), or the Desk (Layout). Click it to play or pause; two-finger click for Previous and Next. Nothing leaves your Mac, and titles are never saved. Runs only while it is placed somewhere and Desk is on.")
+                Text("Shows the song or video playing in any app, browsers included, wherever you place it: a notch wing or the strip under the camera (Notch), or the Desk (Layout). Click it to play or pause; two-finger click for Previous and Next. Nothing leaves your Mac, and titles are never saved (only the songs of looks you save from Claude, below). Runs only while it is placed somewhere and Desk is on.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 NowPlayingArrangeRow()
             }
             NowPlayingShowSection()
+            NowPlayingLooksSection()
             NowPlayingIdleSection()
             NowPlayingAppsSection()
             NowPlayingAskSection()
@@ -48,8 +49,8 @@ private struct NowPlayingSourceRow: View {
 private struct NowPlayingArrangeRow: View {
     var body: some View {
         HStack {
-            Button("Arrange on the Notch…") { SettingsWindowController.shared.show(.notch) }
-            Button("Arrange on the Desk…") { SettingsWindowController.shared.show(.deskLayout) }
+            Button("Notch Settings…") { SettingsWindowController.shared.show(.notch) }
+            Button("Desk Layout Settings…") { SettingsWindowController.shared.show(.deskLayout) }
             Spacer()
         }
     }

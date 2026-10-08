@@ -20,11 +20,23 @@ struct SanduhrMenuTests {
     @Test func itemsInOrder() {
         #expect(flat(menu()) == [
             "Hide Widget", "-",
-            "Deep Work", "Pacing Calculators", "Cooldown Snake", "Camera Light", "Claude Usage…", "-",
-            "Refresh", "Settings…", "Check for Updates…", "What's New…", "Take the Tour…", "-",
+            "Deep Work", "Pacing Calculators", "Cooldown Snake", "Camera Fill Light", "Claude Usage…", "-",
+            "Refresh", "Settings…", "Arrange Desk…", "Check for Updates…", "What's New…", "Take the Tour…", "-",
             "Quit Sanduhr für Claude",
         ])
         #expect(menu().map(\.header) == [nil, "Tools", nil, nil])
+    }
+
+    /// A menu that also has a page's own Settings item (the Desk clock's and message's, the meter
+    /// menus) names the shared one All Settings…; the menu bar item's and the widget's keep Settings….
+    @Test func allSettingsBesideAPageSettingsItem() {
+        func settings(_ g: [MenuGroup]) -> MenuEntry? { g.flatMap(\.entries).first { $0.command == .settings } }
+        #expect(settings(menu())?.title == "Settings…")
+        let all = SanduhrMenu.groups(widgetVisible: true, deepWork: false, pacing: false, snake: false, allSettings: true)
+        #expect(settings(all)?.title == "All Settings…")
+        #expect(settings(all)?.key == ",")
+        // Nothing else changes.
+        #expect(flat(all).filter { $0 != "All Settings…" } == flat(menu()).filter { $0 != "Settings…" })
     }
 
     @Test func showOrHideFollowsTheWidget() {
@@ -50,7 +62,40 @@ struct SanduhrMenuTests {
     @Test func keyEquivalents() {
         let keys = Dictionary(uniqueKeysWithValues: menu().flatMap(\.entries).map { ($0.command, $0.key) })
         #expect(keys == [.showHide: "", .deepWork: "p", .pacing: "", .snake: "", .cameraLight: "", .usage: "",
-                         .refresh: "r", .settings: ",", .checkForUpdates: "", .whatsNew: "", .tour: "", .quit: "q"])
+                         .refresh: "r", .settings: ",", .arrangeDesk: "", .checkForUpdates: "", .whatsNew: "", .tour: "",
+                         .quit: "q"])
+    }
+
+    /// Item 60: Arrange Desk… in the menu bar item's, the widget's and every Desk menu that carries
+    /// the shared items; off with its reason while Desk is off.
+    @Test func arrangeDeskIsEverywhereAndSaysWhyWhenOff() throws {
+        let on = try #require(menu().flatMap(\.entries).first { $0.command == .arrangeDesk })
+        #expect(on.title == "Arrange Desk…")
+        #expect(on.enabled)
+        #expect(on.note == nil)
+        let offMenu = SanduhrMenu.groups(widgetVisible: true, deepWork: false, pacing: false, snake: false, deskOn: false)
+        let off = try #require(offMenu.flatMap(\.entries).first { $0.command == .arrangeDesk })
+        #expect(!off.enabled)
+        #expect(off.note == "Turn on Desk to arrange it on the desktop.")
+        // Every other item stays on, and the Desk menus' shared part (less Show or Hide) keeps it.
+        #expect(offMenu.flatMap(\.entries).filter { !$0.enabled }.map(\.command) == [.arrangeDesk])
+        #expect(SanduhrMenu.without(.showHide, in: menu()).flatMap(\.entries).contains { $0.command == .arrangeDesk })
+    }
+
+    /// The Desk pieces with a two-finger menu: each one's menu has Arrange Desk…, either from the
+    /// shared items (meters, meetings, the account name) or at its end (now playing, watchers,
+    /// the indicators).
+    @Test func everyDeskPieceWithAMenuOffersArrange() {
+        for kind in [DeskElement.Kind.meterRow, .meters, .meetingRow, .note, .account, .nowPlaying,
+                     .nowPlayingNext, .watcher, .avIndicators] {
+            #expect(DeskHitTest.hasMenu(DeskElement(kind: kind, frame: .zero)), "\(kind)")
+        }
+        #expect(DeskHitTest.hasSharedMenu(DeskElement(kind: .meetingRow, frame: .zero)))
+        #expect(DeskHitTest.hasSharedMenu(DeskElement(kind: .account, frame: .zero)))
+        #expect(!DeskHitTest.hasSharedMenu(DeskElement(kind: .meters, frame: .zero)))
+        // The meetings block as a whole takes no click, so it opens nothing.
+        #expect(!DeskHitTest.hasMenu(DeskElement(kind: .meetings, frame: .zero)))
+        #expect(!DeskHitTest.hasMenu(nil))
     }
 
     @Test func everyCommandOnce() {
@@ -108,6 +153,14 @@ struct SettingsSidebarTests {
         // Item 49: Integrations follows Claude Usage. Item 64: Mods follows Integrations.
         #expect(SettingsSection(rawValue: "integrations")?.title == "Integrations")
         #expect(SettingsSection(rawValue: "mods")?.title == "Mods")
+    }
+
+    @Test func lookPagesNameTheirGroup() {
+        // Opener items name a page as the sidebar does; the two Look pages carry their group.
+        #expect(SettingsSection.deskLook.title == "Desk Look")
+        #expect(SettingsSection.widgetLook.title == "Widget Look")
+        #expect(SettingsSection(rawValue: "deskLook") == .deskLook)
+        #expect(SettingsSection(rawValue: "widgetLook") == .widgetLook)
     }
 
     @Test func claudeUsageSitsUnderAccounts() {

@@ -113,7 +113,9 @@ enum DebugHooks {
             UserDefaults.desk.set(on, forKey: DeskController.notchKey)
         case .cameraLight(let on): CameraLightController.shared.setManual(on)
         case .glow: NotchGlowController.shared.fire()
-        case .demo(let on): DeskController.shared.model.setDemo(on)
+        case .demo(let on):
+            DeskController.shared.model.setDemo(on)
+            BandFileWriter.shared.refresh()
         case .theme(let id): app.viewModel.selectTheme(id: id)
         case .cycleAccount: app.viewModel.cycleAccount()
         case .usage(let tab): SettingsWindowController.shared.show(.usage, usageTab: tab)
@@ -128,6 +130,10 @@ enum DebugHooks {
             SettingsWindowController.shared.show(.message)
             SettingsWindowController.shared.messageEditor.debugAdd()
         case .messageEditor(.revert): SettingsWindowController.shared.messageEditor.load()
+        case .deskArrange(.start): DeskController.shared.arrangeDesk()
+        case .deskArrange(.test): DeskController.shared.model.arrange.smokeEdit()
+        case .deskArrange(.done): DeskController.shared.endArrange(keep: true)
+        case .deskArrange(.cancel): DeskController.shared.endArrange(keep: false)
         }
         settle()
     }
@@ -287,6 +293,10 @@ enum DebugHooks {
         s.deskPieces = DeskArrangement(s.layout ?? DeskLayout.standard).shown(
             showMeetings: UserDefaults.desk.object(forKey: "showMeetings") as? Bool ?? true,
             showClaude: UserDefaults.desk.object(forKey: "showClaude") as? Bool ?? true)
+        let arrange = desk.model.arrange
+        s.deskArrange = DeskArrangeDebug(active: arrange.active, changed: arrange.session?.changed ?? false,
+                                         working: arrange.working?.string, clickThrough: desk.clickThrough,
+                                         barVisible: desk.arrangeBarVisible)
         s.notch = UserDefaults.desk.bool(forKey: DeskController.notchKey)
         s.hasNotch = desk.wingsWindow != nil
         s.notchLeft = NotchContent.saved(.left, in: .desk)
@@ -336,6 +346,7 @@ enum DebugHooks {
         s.temporaryLimits = Tier.allCases.filter(vm.temporaryTiers.contains)
         s.silencedLimits = LimitMenu.silenced(in: UserDefaults.desk)
         s.meetingsCount = desk.model.meetings.count
+        s.deskPieceClicks = DeskPieceClicks.isOn(in: UserDefaults.desk)
         if desk.running, let size = desk.windowSize {
             s.deskFrames = desk.model.elements()
             s.deskFramesProblem = DeskFrameCheck.problem(s.deskFrames, window: size)

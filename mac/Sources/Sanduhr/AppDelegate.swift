@@ -148,6 +148,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Watchers (item 66): the MCP server's watch_* requests and the Stop hook's background
         // work, on the same folder watch; watchers.json follows the two switches.
         WatcherStore.shared.startForApp()
+        // Per-song looks (item 65c): propose_now_playing_looks' requests, on the same folder watch.
+        NowPlayingLookStore.shared.start()
+        // The meters mod's band (items 65f, 66): band.json, the looks and the watchers it draws.
+        BandFileWriter.shared.startForApp()
         // Claude Code's hooks (items 51, 66): their Darwin notifications go where the
         // sanduhr://claude-code link goes.
         claudeCodeSignal = ClaudeCodeSignal { event in
@@ -268,6 +272,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Now playing's adapter runs as a child process (item 53): it goes when Sanduhr quits.
     func applicationWillTerminate(_ notification: Notification) {
         NowPlayingController.shared.shutdown()
+        // Watchers go with Sanduhr: the band shows none from now on.
+        BandFileWriter.shared.refresh(quitting: true)
     }
 
     // LSUIElement apps never get this called, but set it false anyway.
@@ -372,10 +378,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `accounts` false leaves the Accounts submenu out, for a limit menu that already has it;
     /// `menuBarModes` adds Menu Bar Shows after it, in the menu bar item's own menu only;
     /// `showHide` false leaves Show or Hide Widget out, for a Desk limit menu that has it on top.
+    /// `allSettings` names Settings… "All Settings…", for a menu with a page's own Settings item.
     func addMenuItems(to menu: NSMenu, accounts withAccounts: Bool = true, menuBarModes: Bool = false,
-                      showHide: Bool = true) {
+                      showHide: Bool = true, allSettings: Bool = false) {
         let accounts = withAccounts ? currentAccountsMenu() : nil
-        var groups = currentMenu(widgetVisible: panel?.isVisible ?? false)
+        var groups = currentMenu(widgetVisible: panel?.isVisible ?? false, allSettings: allSettings)
         // A Desk limit menu has Show or Hide Widget at its top already.
         if !showHide { groups = SanduhrMenu.without(.showHide, in: groups) }
         for (i, group) in groups.enumerated() {
@@ -387,6 +394,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 m.target = self
                 m.tag = entry.command.rawValue
                 m.state = entry.checked ? .on : .off
+                // An item that is off has no action, so the menu's auto-enabling leaves it off;
+                // its reason shows under it and as its tooltip.
+                if !entry.enabled { m.action = nil }
+                if let note = entry.note {
+                    m.toolTip = note
+                    if #available(macOS 14.4, *) { m.subtitle = note }
+                }
                 menu.addItem(m)
             }
             // The Accounts submenu sits after Show/Hide, with two or more accounts.
@@ -436,7 +450,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             for entry in group { menu.addItem(limitMenuItem(entry)) }
         }
         menu.addItem(.separator())
-        addMenuItems(to: menu, accounts: false, showHide: false)
+        addMenuItems(to: menu, accounts: false, showHide: false, allSettings: true)
     }
 
     private func limitMenuItem(_ entry: LimitMenuEntry) -> NSMenuItem {
@@ -495,12 +509,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// The shared menu with the tools' current checkmarks.
-    func currentMenu(widgetVisible: Bool) -> [MenuGroup] {
+    func currentMenu(widgetVisible: Bool, allSettings: Bool = false) -> [MenuGroup] {
         SanduhrMenu.groups(widgetVisible: widgetVisible,
                            deepWork: viewModel.activeTool == .deepWork,
                            pacing: viewModel.pacingPinned,
                            snake: viewModel.activeTool == .snake,
-                           cameraLight: CameraLightController.shared.manual)
+                           cameraLight: CameraLightController.shared.manual,
+                           deskOn: DeskController.shared.running,
+                           allSettings: allSettings)
     }
 
     /// The Accounts submenu as it stands, nil with fewer than two accounts.
@@ -542,6 +558,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         case .refresh: refreshNow()
         case .settings: SettingsWindowController.shared.show()
+        // After the menu has closed, so nothing is tracking when the bar's panel takes the key.
+        case .arrangeDesk: DispatchQueue.main.async { DeskController.shared.arrangeDesk() }
         case .checkForUpdates: updaterController.checkForUpdates(nil)
         case .whatsNew: WhatsNewWindowController.shared.show()
         case .tour: WelcomeTourWindowController.shared.show()

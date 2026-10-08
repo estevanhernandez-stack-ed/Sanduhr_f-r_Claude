@@ -9,6 +9,9 @@ struct DebugStateInput {
     var layout: String?
     /// The pieces the Desk draws from it (item 59), in order: each anchor's stack top to bottom.
     var deskPieces: [DeskPlacement] = []
+    /// Arrange mode (item 60): on or off, an unsaved change, the layout being edited, and whether
+    /// the Desk window takes clicks over its whole frame or only where it draws.
+    var deskArrange = DeskArrangeDebug()
     /// The notch switch.
     var notch = false
     /// This screen has a camera notch and Desk built the island's window for it.
@@ -57,6 +60,8 @@ struct DebugStateInput {
     var deskFrames: [DeskElement] = []
     /// DeskFrameCheck's answer for `deskFrames`: nil when the geometry holds.
     var deskFramesProblem: String?
+    /// "Clock and message take clicks" (DeskPieceClicks), Settings, Desk, Look.
+    var deskPieceClicks = DeskPieceClicks.defaultOn
     /// The Dock as the Desk sees it (item 56): its side, auto-hide, and the inset applied now.
     var dock = DockDebug()
     var alerts = AlertSettings()
@@ -118,6 +123,16 @@ struct DebugStateInput {
     var messageEditor = MessageEditorDebug()
     var version = ""
     var build = ""
+}
+
+/// state.yaml's `desk_arrange:` (item 60). `working` is a layout string, never anything typed.
+struct DeskArrangeDebug: Equatable {
+    var active = false
+    var changed = false
+    var working: String?
+    var clickThrough = "drawn"
+    /// The bar's floating panel (Cancel and Done) is on screen.
+    var barVisible = false
 }
 
 /// state.yaml's `dock:` (item 56): the Dock's side and auto-hide (its own settings, read only),
@@ -226,6 +241,15 @@ enum DebugState {
         return .list(items)
     }
 
+    /// `desk_arrange:` (item 60): active, changed, the working layout string (null outside Arrange
+    /// mode), click_through (`whole` or `drawn`) and bar_visible (the floating bar is on screen).
+    static func deskArrangeYAML(_ a: DeskArrangeDebug) -> YAMLNode {
+        .map([YAMLPair("active", .bool(a.active)), YAMLPair("changed", .bool(a.changed)),
+              YAMLPair("working", a.working.map(YAMLNode.string) ?? .null),
+              YAMLPair("click_through", .string(a.clickThrough)),
+              YAMLPair("bar_visible", .bool(a.barVisible))])
+    }
+
     /// `dock:` (item 56): side, auto-hide and the inset applied now.
     static func dockYAML(_ d: DockDebug) -> YAMLNode {
         .map([YAMLPair("side", .string(d.side.rawValue)), YAMLPair("autohide", .bool(d.autohide)),
@@ -324,6 +348,7 @@ enum DebugState {
         pairs.append(("desk_running", .bool(s.deskRunning)))
         pairs.append(("layout", s.layout.map(YAMLNode.string) ?? .null))
         pairs.append(("desk_pieces", deskPiecesYAML(s.deskPieces)))
+        pairs.append(("desk_arrange", deskArrangeYAML(s.deskArrange)))
         pairs.append(("notch", .bool(s.notch)))
         pairs.append(("has_notch", .bool(s.hasNotch)))
         pairs.append(("notch_left", .string(s.notchLeft.rawValue)))
@@ -355,6 +380,7 @@ enum DebugState {
         pairs.append(("desk_frames", .list(frames)))
         pairs.append(("desk_frames_ok", .bool(s.deskFramesProblem == nil)))
         pairs.append(("desk_frames_problem", s.deskFramesProblem.map(YAMLNode.string) ?? .null))
+        pairs.append(("desk_piece_clicks", .bool(s.deskPieceClicks)))
         pairs.append(("dock", dockYAML(s.dock)))
         pairs.append(("alerts", alerts(s.alerts)))
         let fetched: YAMLNode = s.lastFetch.map { .string(iso.string(from: $0)) } ?? .null

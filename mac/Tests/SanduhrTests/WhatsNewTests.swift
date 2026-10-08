@@ -156,9 +156,11 @@ struct WhatsNewTableTests {
     }
 
     @Test func releasesSinceTwoFour() {
-        let releases: Set<String> = ["2.4.0", "2.5.0", "2.6.0", "2.7.0", "2.8.0", "2.9.0"]
+        let releases: Set<String> = ["2.4.0", "2.5.0", "2.6.0", "2.7.0", "2.8.0", "2.9.0", "2.10.0"]
         #expect(Set(table.map(\.version)) == releases)
-        #expect(table.count == 18)
+        #expect(table.count == 23)
+        #expect(table.filter { $0.version == "2.10.0" }.map(\.id)
+                == ["arrange-desk", "above-the-prompt", "song-looks", "desk-clicks", "mod-switches"])
         #expect(table.filter { $0.version == "2.9.0" }.map(\.id)
                 == ["message-editor", "desk-layout", "settings-previews", "estefont-pro", "mods-page", "camera-mic"])
         #expect(table.filter { $0.version == "2.8.0" }.map(\.id) == ["watchers", "combine-statusline"])
@@ -193,6 +195,8 @@ struct WhatsNewTableTests {
     @Test func showMeLandsOnTheRightPage() {
         let dest = Dictionary(uniqueKeysWithValues: table.map { ($0.id, $0.destination) })
         #expect(dest == [
+            "arrange-desk": .deskLayout, "above-the-prompt": .integrations, "song-looks": .nowPlaying,
+            "desk-clicks": .deskLook, "mod-switches": .mods,
             "message-editor": .message, "desk-layout": .deskLayout, "settings-previews": .notch,
             "estefont-pro": .deskLook, "mods-page": .mods, "camera-mic": .notch,
             "watchers": .integrations, "combine-statusline": .integrations,
@@ -233,5 +237,11 @@ struct WhatsNewTableTests {
         #expect(fromTwoEight.map(\.id)
                 == ["message-editor", "desk-layout", "settings-previews", "estefont-pro", "mods-page", "camera-mic"])
         #expect(WhatsNew.rangeLabel(fromTwoEight, lastSeen: "2.8.0", current: "2.9.0") == "New in 2.9.0")
+    }
+
+    @Test func updatingToTwoTen() {
+        let fromTwoNine = WhatsNew.cards(lastSeen: "2.9.0", current: "2.10.0")
+        #expect(fromTwoNine.map(\.id) == ["arrange-desk", "above-the-prompt", "song-looks", "desk-clicks", "mod-switches"])
+        #expect(WhatsNew.rangeLabel(fromTwoNine, lastSeen: "2.9.0", current: "2.10.0") == "New in 2.10.0")
     }
 }

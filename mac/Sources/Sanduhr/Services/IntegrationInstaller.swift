@@ -82,6 +82,47 @@ struct IntegrationReceipt: Codable, Equatable, Sendable {
     /// The statusline (item 63): whether the user's line was replaced or combined with
     /// Sanduhr's. Optional so receipts written before Combine still read.
     var mode: StatuslineMode?
+    /// The meters mod (item 64, slice 2): the stamped version the plugin folders entry names
+    /// (`integrations/<stamp>/mods/sanduhr-meters`) when the Mods page switched it on; nil when
+    /// the entry goes through the `current` link and follows the app's updates. Kept stamps
+    /// survive refresh while a receipt names them.
+    var pinned: String?
+    /// The meters mod's switch (item 64, slice 2): what the Mods page wrote in
+    /// `enabledPlugins`, so switching back (or Remove) undoes exactly that.
+    var switched: SwitchReceipt?
+}
+
+/// One `enabledPlugins` member a Mods page switch wrote (item 64, slice 2), byte for byte.
+struct SwitchReceipt: Codable, Equatable, Sendable {
+    /// The key, `<name>@inline`.
+    var key: String
+    /// The value written: false switches the mod off, true overrides an off of the user's own.
+    var value: Bool
+    /// The member's value before, as text; nil when there was none (undo removes the member).
+    var previous: String?
+    /// `enabledPlugins` didn't exist: undo removes it once it is empty again.
+    var createdParent = false
+    /// What sat between the braces of the object the member went into when it was empty.
+    var emptyInner: String?
+
+    init(key: String, value: Bool, previous: String? = nil, createdParent: Bool = false, emptyInner: String? = nil) {
+        self.key = key
+        self.value = value
+        self.previous = previous
+        self.createdParent = createdParent
+        self.emptyInner = emptyInner
+    }
+
+    /// A missing `createdParent` reads as false: one receipt short of a field must not make the
+    /// whole receipts file unreadable (receipts decode as one array, all or nothing).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        key = try c.decode(String.self, forKey: .key)
+        value = try c.decode(Bool.self, forKey: .value)
+        previous = try c.decodeIfPresent(String.self, forKey: .previous)
+        createdParent = try c.decodeIfPresent(Bool.self, forKey: .createdParent) ?? false
+        emptyInner = try c.decodeIfPresent(String.self, forKey: .emptyInner)
+    }
 }
 
 /// What the hooks' install made in `hooks` (item 51).
@@ -371,7 +412,18 @@ struct IntegrationInstaller {
         let parts = list.components(separatedBy: Self.pluginDirsSeparator)
         guard parts.contains(where: Self.isOurModEntry) else { return .notInstalled }
         let exact = parts.filter(Self.isOurModEntry).map { $0.trimmingCharacters(in: .whitespaces) }
+        // A version the Mods page pinned is current while its folder is there: the Mods page
+        // updates it, asking first when the new version can do more (item 64, slice 2).
+        if exact.count == 1, let stamp = scripts.pinnedStamp(of: exact[0]),
+           FileManager.default.fileExists(atPath: scripts.pinnedModPath(stamp)) {
+            return .installed
+        }
         return exact == [scripts.installedModPath] && scripts.isCurrent && scripts.hasMod ? .installed : .outdated
+    }
+
+    /// The plugin folders entry for the mod: a pinned stamped version, else the `current` link.
+    func modEntry(pinned: String?) -> String {
+        pinned.map(scripts.pinnedModPath) ?? scripts.installedModPath
     }
 
     /// The hooks: current when each event's list holds exactly Sanduhr's entry as this version
@@ -451,7 +503,7 @@ struct IntegrationInstaller {
     @discardableResult
     func install(_ kind: IntegrationKind, folder: String, python: String,
                  replaceOther: Bool = false, combine: StatuslineJoin? = nil,
-                 selection: StatuslineSelection = StatuslineSelection()) throws -> Outcome {
+                 selection: StatuslineSelection = StatuslineSelection(), pinned: String? = nil) throws -> Outcome {
         if kind.needsScripts {
             do {
                 try scripts.refresh()
@@ -463,14 +515,14 @@ struct IntegrationInstaller {
         }
         if kind == .meters && !scripts.hasMod { throw Failure.scriptsMissing }
         let file = configFile(kind, folder: folder)
-        let value = entry(kind, python: python)
+        let value = kind == .meters ? .string(modEntry(pinned: pinned)) : entry(kind, python: python)
         var receipts = loadReceipts()
         for _ in 0..<3 {
             let original = try read(file)
+            let prior = receipts.first { $0.file == file && $0.kind == kind }
             let plan = try malformedNamed(file) {
                 try planInstall(kind, bytes: original ?? Array("{}\n".utf8), value: value, python: python,
-                                combine: combine, selection: selection,
-                                prior: receipts.first { $0.file == file && $0.kind == kind },
+                                combine: combine, selection: selection, prior: prior,
                                 createdFile: original == nil)
             }
             if let other = plan.other, !replaceOther, combine == nil { return .needsReplaceConsent(existing: other) }
@@ -478,6 +530,11 @@ struct IntegrationInstaller {
             var receipt = plan.receipt
             receipt.folder = AccountData.normalized(folder)
             receipt.file = file
+            if kind == .meters {
+                // The version the entry names now, and a switch made earlier, which stays.
+                receipt.pinned = pinned
+                receipt.switched = prior?.switched
+            }
             receipts.removeAll { $0.file == file && $0.kind == kind }
             receipts.append(receipt)
             saveReceipts(receipts)
@@ -487,7 +544,7 @@ struct IntegrationInstaller {
     }
 
     /// Runs `body`, naming `file` in a malformed-JSON failure.
-    private func malformedNamed<T>(_ file: String, _ body: () throws -> T) throws -> T {
+    func malformedNamed<T>(_ file: String, _ body: () throws -> T) throws -> T {
         do {
             return try body()
         } catch Failure.malformed {
@@ -515,7 +572,8 @@ struct IntegrationInstaller {
         var other: String?
         switch kind {
         case .meters:
-            return try planInstallMeters(bytes: b, root: root, top: top, receipt: receipt, prior: prior)
+            return try planInstallMeters(bytes: b, root: root, top: top, ours: (value.plain as? String) ?? "",
+                                         receipt: receipt, prior: prior)
         case .hooks:
             return try planInstallHooks(bytes: b, root: root, top: top, receipt: receipt, prior: prior)
         case .statusline:
@@ -596,9 +654,8 @@ struct IntegrationInstaller {
 
     /// The mod's install: its folder joins `env.CLAUDE_CODE_PLUGIN_DIRS`, the object and the key
     /// made when missing, every other entry of the list left as it was.
-    private func planInstallMeters(bytes b: [UInt8], root: [String: Any], top: JSONEdit.Object,
+    private func planInstallMeters(bytes b: [UInt8], root: [String: Any], top: JSONEdit.Object, ours: String,
                                    receipt start: IntegrationReceipt, prior: IntegrationReceipt?) throws -> Plan {
-        let ours = scripts.installedModPath
         var receipt = start
         var result: [UInt8]
         if let m = top.member(Self.envKey) {
@@ -606,7 +663,9 @@ struct IntegrationInstaller {
             let envObject = try JSONEdit.object(b, at: m.valueStart)
             if let km = envObject.member(Self.pluginDirsKey) {
                 guard let list = env[Self.pluginDirsKey] as? String else { throw Failure.malformed(file: "") }
-                if let prior {
+                // Updating Sanduhr's own entry keeps what the first install recorded; a receipt
+                // holding only a switch recorded no list, so this install records it.
+                if let prior, Self.removingPluginDir(from: list) != nil {
                     receipt = prior
                 } else {
                     receipt.previous = String(decoding: JSONEdit.text(b, km), as: UTF8.self)
@@ -628,7 +687,7 @@ struct IntegrationInstaller {
             if let inner = r.emptyInner { receipt.emptyInner = String(decoding: inner, as: UTF8.self) }
             result = r.bytes
         }
-        try verifyMeters(before: b, after: result, installed: true)
+        try verifyMeters(before: b, after: result, ours: ours)
         return Plan(bytes: result, receipt: receipt, other: nil)
     }
 
@@ -718,6 +777,8 @@ struct IntegrationInstaller {
     /// An entry that isn't Sanduhr's stays. With nothing installed anywhere any more, the
     /// scripts go too.
     func remove(_ kind: IntegrationKind, folder: String) throws {
+        // The meters mod's switch comes out first, so the folder is back to what it was.
+        if kind == .meters { try undoModSwitch(folder: folder) }
         let file = configFile(kind, folder: folder)
         var receipts = loadReceipts()
         let receipt = receipts.first { $0.file == file && $0.kind == kind }
@@ -815,7 +876,7 @@ struct IntegrationInstaller {
         } else {
             result = JSONEdit.set(b, in: envObject, key: Self.pluginDirsKey, value: .string(remaining)).bytes
         }
-        try verifyMeters(before: b, after: result, installed: false)
+        try verifyMeters(before: b, after: result, ours: nil)
         return result
     }
 
@@ -854,7 +915,7 @@ struct IntegrationInstaller {
 
     // MARK: Checks
 
-    private func parse(_ b: [UInt8]) throws -> [String: Any] {
+    func parse(_ b: [UInt8]) throws -> [String: Any] {
         do { return try JSONEdit.root(Data(b)) } catch { throw Failure.malformed(file: "") }
     }
 
@@ -894,7 +955,7 @@ struct IntegrationInstaller {
     /// once `env.CLAUDE_CODE_PLUGIN_DIRS` (and an `env` left empty) is set aside, the list's other
     /// entries are the same in the same order, and Sanduhr's entry is there once (Install) or
     /// gone (Remove).
-    private func verifyMeters(before: [UInt8], after: [UInt8], installed: Bool) throws {
+    private func verifyMeters(before: [UInt8], after: [UInt8], ours expected: String?) throws {
         let old = try parse(before)
         guard let new = try? JSONEdit.root(Data(after)) else { throw Failure.malformed(file: "") }
         func split(_ root: [String: Any]) -> (rest: [String: Any], dirs: [String]) {
@@ -912,7 +973,7 @@ struct IntegrationInstaller {
         }
         guard others(oldDirs) == others(newDirs) else { throw Failure.malformed(file: "") }
         let ours = newDirs.filter(Self.isOurModEntry).map { $0.trimmingCharacters(in: .whitespaces) }
-        guard ours == (installed ? [scripts.installedModPath] : []) else { throw Failure.malformed(file: "") }
+        guard ours == (expected.map { [$0] } ?? []) else { throw Failure.malformed(file: "") }
     }
 
     /// The hooks' edit changed Sanduhr's entries and nothing else: the parsed files agree once
@@ -956,7 +1017,7 @@ struct IntegrationInstaller {
     // MARK: Files
 
     /// The file's bytes, nil when it doesn't exist.
-    private func read(_ file: String) throws -> [UInt8]? {
+    func read(_ file: String) throws -> [UInt8]? {
         guard FileManager.default.fileExists(atPath: file) else { return nil }
         guard let data = FileManager.default.contents(atPath: file) else { throw Failure.writeFailed(file: file) }
         return Array(data)
@@ -966,7 +1027,7 @@ struct IntegrationInstaller {
     /// returns false then, for the caller to start over. With `backup` (Install), keeps a copy
     /// of the file before Sanduhr's first change; deletes that copy once the file is back to
     /// what it holds.
-    private func commit(_ file: String, original: [UInt8]?, bytes: [UInt8]?, backup makeBackup: Bool) throws -> Bool {
+    func commit(_ file: String, original: [UInt8]?, bytes: [UInt8]?, backup makeBackup: Bool) throws -> Bool {
         let fm = FileManager.default
         let target = fm.fileExists(atPath: file) ? (file as NSString).resolvingSymlinksInPath : file
         let backup = file + Self.backupSuffix
@@ -1022,7 +1083,7 @@ struct IntegrationInstaller {
         return (try? JSONDecoder().decode([IntegrationReceipt].self, from: data)) ?? []
     }
 
-    private func saveReceipts(_ receipts: [IntegrationReceipt]) {
+    func saveReceipts(_ receipts: [IntegrationReceipt]) {
         let fm = FileManager.default
         if receipts.isEmpty {
             try? fm.removeItem(at: receiptsURL)

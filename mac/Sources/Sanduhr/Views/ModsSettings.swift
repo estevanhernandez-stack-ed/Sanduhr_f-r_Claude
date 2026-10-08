@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// The Mods page's state (item 64, slice 1): every Claude Code folder's mods and plugins, the
-/// `claude` found for Check, and each Check's answer. Reads run off the main thread; nothing on
-/// this page writes anywhere. Kept by SettingsNavigation, so the summary card and state.yaml read
-/// the same model while the window lives.
+/// The Mods page's state (item 64): every Claude Code folder's mods and plugins, the `claude`
+/// found for Check, each Check's answer, and (slice 2) Sanduhr's own mod per folder with its
+/// switch, Update and Remove. Reads and writes run off the main thread; the only writes are the
+/// own mod's, by receipt (`ModSwitch`). Kept by SettingsNavigation, so the summary card and
+/// state.yaml read the same model while the window lives.
 @MainActor
 @Observable
 final class ModsPageModel {
@@ -16,7 +17,18 @@ final class ModsPageModel {
     private(set) var checks: [String: ModCheckOutcome] = [:]
     private(set) var checking: Set<String> = []
 
+    /// Sanduhr's own mod in each folder, the app's version of it, and what the last action said.
+    private(set) var own: [OwnModRow] = []
+    private(set) var appMod: AppModVersion?
+    private(set) var ownNotes: [String: OwnModNote] = [:]
+    private(set) var ownBusy: Set<String> = []
+    /// A folder whose list has no entry, waiting for On's confirmation.
+    var confirmOn: String?
+    /// An update that can do more than the version in use, waiting for an answer.
+    var updateQuestion: OwnModUpdateQuestion?
+
     let home = NSHomeDirectory()
+    var installer = IntegrationInstaller.standard
 
     var counts: ModCounts { ModCounts(inventory) }
 
@@ -37,14 +49,20 @@ final class ModsPageModel {
         loading = true
         defer { loading = false }
         let home = self.home
-        let result = await Task.detached(priority: .userInitiated) { () -> ([ModFolderInventory], String?) in
+        let installer = self.installer
+        let result = await Task.detached(priority: .userInitiated) { () -> ([ModFolderInventory], String?, [OwnModRow], AppModVersion?) in
             let env = ProcessInfo.processInfo.environment
             let paths = ModsPageModel.folders(home: home, environment: env, linked: linked,
-                                              installed: IntegrationInstaller.standard.installedFolders())
-            return (ModInventory.scan(folders: paths, home: home), ModCheck.findClaude(environment: env, home: home))
+                                              installed: installer.installedFolders())
+            let inventory = ModInventory.scan(folders: paths, home: home)
+            let app = AppModVersion.read(installer.scripts)
+            let own = inventory.map { OwnModRow.read(installer, folder: $0.folder, app: app) }
+            return (inventory, ModCheck.findClaude(environment: env, home: home), own, app)
         }.value
         inventory = result.0
         claude = result.1
+        own = result.2
+        appMod = result.3
         let ids = Set(inventory.flatMap(\.items).map(\.id))
         checks = checks.filter { ids.contains($0.key) }
         loaded = true
@@ -61,6 +79,71 @@ final class ModsPageModel {
     }
 
     func display(_ path: String) -> String { ClaudeCodeFolders.Folder(path: path).display(home: home) }
+
+    // MARK: Sanduhr's own mod (slice 2)
+
+    /// The switch: On in a folder whose list has no entry asks first (it adds one).
+    func requestSwitch(_ row: OwnModRow, on: Bool, linked: [String]) {
+        if on && !row.state.listed {
+            confirmOn = row.folder
+            return
+        }
+        Task { await setOwn(on: on, folder: row.folder, linked: linked) }
+    }
+
+    func setOwn(on: Bool, folder: String, linked: [String]) async {
+        await act(folder, linked: linked) { installer, home in
+            try installer.switchOwnMod(on: on, folder: folder)
+            let now = installer.ownModState(folder: folder)
+            let found = ModOverrides.find(key: IntegrationInstaller.ownModKey, folder: folder, home: home)
+            if let text = ModOverrides.message(found, on: now.isOn, home: home) { return OwnModNote(text: text, kind: .warning) }
+            return OwnModNote(text: ModsPageModel.takesEffect, kind: .info)
+        }
+    }
+
+    func update(folder: String, confirmed: Bool, linked: [String]) async {
+        let claude = self.claude
+        let note = await act(folder, linked: linked) { installer, _ in
+            let outcome = try installer.updateOwnMod(folder: folder, confirmed: confirmed) { old, new in
+                ModCapabilities.added(old: old, new: new) { dir in
+                    if case .report(let r) = ModCheck.run(claude: claude, dir: dir), r.passed { return r }
+                    return nil
+                }
+            }
+            switch outcome {
+            case .upToDate: return OwnModNote(text: "Already the version this copy of Sanduhr carries.", kind: .info)
+            case .updated: return OwnModNote(text: "Updated. " + ModsPageModel.takesEffect, kind: .info)
+            case .needsConsent(let added): return OwnModNote(text: "", kind: .info, added: added)
+            }
+        }
+        if let added = note?.added { updateQuestion = OwnModUpdateQuestion(folder: folder, added: added) }
+    }
+
+    func remove(folder: String, linked: [String]) async {
+        await act(folder, linked: linked) { installer, _ in
+            try installer.remove(.meters, folder: folder)
+            return OwnModNote(text: "Removed: this folder's settings.json is back to what it was before Sanduhr's mod. " + ModsPageModel.takesEffect, kind: .info)
+        }
+    }
+
+    /// Runs one write off the main thread, then reads the page again. A note carrying `added`
+    /// is a question, not a note.
+    @discardableResult
+    private func act(_ folder: String, linked: [String],
+                     _ body: @escaping @Sendable (IntegrationInstaller, String) throws -> OwnModNote?) async -> OwnModNote? {
+        guard !ownBusy.contains(folder) else { return nil }
+        ownBusy.insert(folder)
+        let installer = self.installer, home = self.home
+        let note = await Task.detached(priority: .userInitiated) { () -> OwnModNote? in
+            do { return try body(installer, home) } catch { return OwnModNote(failure: error) }
+        }.value
+        ownNotes[folder] = note?.added == nil ? note : nil
+        ownBusy.remove(folder)
+        await load(linked: linked)
+        return note
+    }
+
+    nonisolated static let takesEffect = "Takes effect in new Claude Code sessions (or after /reload-plugins)."
 
     static let cliMissing = "Check needs Claude Code's command line (claude), and it wasn't found on your PATH or in the usual install folders (~/.local/bin, /opt/homebrew/bin, /usr/local/bin)."
 }
@@ -98,8 +181,9 @@ enum ModSketch {
     }
 }
 
-/// Settings, Mods (item 64, slice 1): every mod and plugin each Claude Code folder loads, what
-/// each draws and can reach, and Check (Claude Code's own validator) for a risk card. Read-only.
+/// Settings, Mods (item 64): Sanduhr's own mod with a switch per Claude Code folder, Update and
+/// Remove (slice 2), then every mod and plugin each folder loads, what each draws and can reach,
+/// and Check (Claude Code's own validator) for a risk card. Other mods are read-only.
 struct ModsSettings: View {
     var vm: UsageViewModel
     var model: ModsPageModel
@@ -116,6 +200,7 @@ struct ModsSettings: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                OwnModBox(model: model, linked: linked)
                 folders
                 Button(model.loading ? "Reading…" : "Read Again") { Task { await model.load(linked: linked) } }
                     .disabled(model.loading)
@@ -125,6 +210,7 @@ struct ModsSettings: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task { await model.load(linked: linked) }
+        .ownModQuestions(model, linked: linked)
     }
 
     @ViewBuilder
@@ -146,7 +232,7 @@ private struct ModsIntro: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Mods and plugins").font(.headline)
-            Text("Everything each Claude Code folder loads: mods (plugins with a hooks module that draw in Claude Code) and plain plugins, from its plugin folder list, its installed plugins, its skills folder and the mods a session made. Sanduhr finds them by reading files: no mod runs, and nothing here changes a setting. Check asks Claude Code's own validator, which reads a mod without running it, what the mod hooks and calls.")
+            Text("Everything each Claude Code folder loads: mods (plugins with a hooks module that draw in Claude Code) and plain plugins, from its plugin folder list, its installed plugins, its skills folder and the mods a session made. Sanduhr finds them by reading files: no mod runs. Sanduhr's own mod switches on and off per folder at the top, by receipt; switching other mods comes later, so they are read-only here. Check asks Claude Code's own validator, which reads a mod without running it, what the mod hooks and calls.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -193,6 +279,7 @@ private struct ModRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             ModRowWhere(item: item, model: model)
+            ModRowOwnership(item: item)
             ModRowTouches(touches: item.touches)
             if item.isMod, let sketch = ModSketch.text(name: item.name, touches: item.touches) {
                 ModSketchView(name: item.name, sketch: sketch, lines: ModSketch.lineCount(item.touches))
@@ -252,6 +339,26 @@ private struct ModRowWhere: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+}
+
+/// Which mods the page switches: Sanduhr's own, at the top; the rest later.
+private struct ModRowOwnership: View {
+    let item: ModItem
+
+    var body: some View {
+        switch item.ownership {
+        case .sanduhrs:
+            Text("Sanduhr's own mod: switch it under Sanduhr's mod at the top of this page.")
+                .font(.caption)
+                .foregroundStyle(Color.hex("a78bfa"))
+        case .copyOfSanduhrs:
+            Text("A copy of Sanduhr's mod outside Sanduhr's folder: read-only here.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .others:
+            EmptyView()
         }
     }
 }
@@ -405,7 +512,7 @@ struct ModsSummaryCard: View {
                 } else {
                     Text("Reading your Claude Code folders…").foregroundStyle(.white.opacity(0.8))
                 }
-                Text("Read-only: nothing here turns a mod on or off.")
+                Text("Sanduhr's own mod switches here; other mods are read-only.")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.7))
             }

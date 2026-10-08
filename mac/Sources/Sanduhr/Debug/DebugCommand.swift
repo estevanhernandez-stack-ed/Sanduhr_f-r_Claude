@@ -70,11 +70,20 @@ enum DebugAction: Equatable {
     enum MessageEditorStep: String, CaseIterable {
         case add, revert
     }
+    /// Arrange mode on the Desk (item 60): start enters it as Arrange Desk… does, test makes the
+    /// smoke's own edit (the clock to Top right at 120%, unsaved), done ends it writing the layout
+    /// once when it changed, cancel ends it writing nothing.
+    case deskArrange(DeskArrangeStep)
+
+    enum DeskArrangeStep: String, CaseIterable {
+        case start, test, done, cancel
+    }
 
     static let names = ["show-widget", "hide-widget", "settings", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
                         "theme", "account", "usage", "whats-new", "close-whats-new",
-                        "tour", "tour-step", "close-tour", "watch-test", "av-test", "message-editor"]
+                        "tour", "tour-step", "close-tour", "watch-test", "av-test", "message-editor",
+                        "desk-arrange"]
 }
 
 enum DebugCommand: Equatable {
@@ -200,6 +209,11 @@ enum DebugLink {
                 return bad("message-editor needs arg=add or revert")
             }
             return .success(.messageEditor(step))
+        case "desk-arrange":
+            guard let step = arg.flatMap({ DebugAction.DeskArrangeStep(rawValue: $0.lowercased()) }) else {
+                return bad("desk-arrange needs arg=start, test, done or cancel")
+            }
+            return .success(.deskArrange(step))
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }
