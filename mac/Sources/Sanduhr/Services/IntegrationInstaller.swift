@@ -104,6 +104,25 @@ struct SwitchReceipt: Codable, Equatable, Sendable {
     var createdParent = false
     /// What sat between the braces of the object the member went into when it was empty.
     var emptyInner: String?
+
+    init(key: String, value: Bool, previous: String? = nil, createdParent: Bool = false, emptyInner: String? = nil) {
+        self.key = key
+        self.value = value
+        self.previous = previous
+        self.createdParent = createdParent
+        self.emptyInner = emptyInner
+    }
+
+    /// A missing `createdParent` reads as false: one receipt short of a field must not make the
+    /// whole receipts file unreadable (receipts decode as one array, all or nothing).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        key = try c.decode(String.self, forKey: .key)
+        value = try c.decode(Bool.self, forKey: .value)
+        previous = try c.decodeIfPresent(String.self, forKey: .previous)
+        createdParent = try c.decodeIfPresent(Bool.self, forKey: .createdParent) ?? false
+        emptyInner = try c.decodeIfPresent(String.self, forKey: .emptyInner)
+    }
 }
 
 /// What the hooks' install made in `hooks` (item 51).

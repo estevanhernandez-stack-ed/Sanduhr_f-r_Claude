@@ -1460,7 +1460,7 @@ and remove them afterwards. Give `~/.claude-modtest/settings.json` `{"model": "o
 8. Integrations, Statusline, Install over an existing statusline in a folder that loads a mod
    with a status entry: under "From your mods", "Switch it on the Mods page" closes the sheet and
    opens Settings, Mods.
-## 37. A look per song and themes with a title style (item 65, parts c and d)
+## 38. A look per song and themes with a title style (item 65, parts c and d)
 
 Back up your saved looks if you have any:
 `cp ~/Library/Application\ Support/Sanduhr/now-playing-looks.json ~/looks.bak` (skip when it is
@@ -1503,7 +1503,7 @@ Music.
 
 Put your looks back: `cp ~/looks.bak ~/Library/Application\ Support/Sanduhr/now-playing-looks.json`
 (or leave it cleared).
-## 37. Desk layout: arrange on the desktop (item 60)
+## 39. Desk layout: arrange on the desktop (item 60)
 
 Desk on with the clock, the meters and the meetings at Bottom left and the message at Top left.
 Note the `layout` string first (`defaults read com.626labs.sanduhr.desk layout`) to put it back at
@@ -1552,7 +1552,7 @@ the end.
     while arranging and `drawn` after, the smoke's edit (the clock to Top right at 120%) is only in
     `desk_arrange.working` until Done, Cancel leaves `layout` as it was, and Done writes it.
 14. Put the `layout` string back.
-## 37. The animated band and watchers above the prompt (items 65f, 66)
+## 40. The animated band and watchers above the prompt (items 65f, 66)
 
 Use a throwaway Claude Code folder (`mkdir -p ~/.claude-bandtest/projects`), never your real
 settings, and remove it afterwards. Install the meters mod and the statusline for it in Settings,

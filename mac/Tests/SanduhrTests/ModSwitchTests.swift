@@ -248,4 +248,13 @@ struct ModSwitchTests {
         #expect(copy.ownership == .copyOfSanduhrs)
         #expect(other.ownership == .others)
     }
+
+    @Test func aSwitchReceiptWithoutCreatedParentStillReads() throws {
+        let json = #"{"key":"sanduhr-meters@inline","value":false}"#.data(using: .utf8)!
+        let r = try JSONDecoder().decode(SwitchReceipt.self, from: json)
+        #expect(r.key == "sanduhr-meters@inline")
+        #expect(r.value == false)
+        #expect(r.createdParent == false)
+        #expect(r.previous == nil)
+    }
 }
