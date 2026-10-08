@@ -1,12 +1,9 @@
 import SwiftUI
 
 /// Settings, Integrations, Watchers (item 66): the two switches, both off by default, and where
-/// watchers are placed (the Notch page's places and the Desk Layout page's Watchers element).
+/// watchers are placed (the Notch page's places and the Layout page's Watchers element).
 /// Its own view so the Integrations page's body stays small enough for Swift 6.0 and 6.1.
 struct WatcherSettings: View {
-    let openNotch: () -> Void
-    let openLayout: () -> Void
-
     @AppStorage(WatcherStore.agentsKey) private var agents = false
     @AppStorage(WatcherStore.backgroundKey) private var background = false
     @AppStorage(BandFile.watchersKey) private var inBand = false
@@ -36,8 +33,8 @@ struct WatcherSettings: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
-                Button(SettingsSection.notch.linkTitle, action: openNotch)
-                Button(SettingsSection.deskLayout.linkTitle, action: openLayout)
+                SettingsLinkButton(.notch)
+                SettingsLinkButton(.deskLayout)
             }
             Toggle("Show watchers above the prompt", isOn: $inBand)
             Text("Claude Code draws a row per watcher above its prompt, through the meters mod (install it for a folder below): the state, the title, the time so far and the progress. For the mod, Sanduhr keeps band.json in its folder, readable by you only: an agent's watcher's title, short title, state, progress and times, and for background work only its kind and state, never its description. Off deletes the watchers from it.")

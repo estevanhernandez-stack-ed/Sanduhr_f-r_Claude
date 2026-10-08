@@ -269,7 +269,8 @@ Run it on the dev build, which keeps keys in `credentials.json`, and back up fir
   open: the percent beside the hourglass changes at once and the Menu bar picker reads Weekly;
   `smoke/smoke state` shows `menu_bar: weekly`. Choose Rotate: "S 12%" now, "W 96%" 8 s later.
   Change the picker in Settings: the submenu checks the new choice next time. The widget's
-  two-finger menu and Desk's clock menu have no Menu Bar Shows. Put back Whichever is higher.
+  two-finger menu, a widget card, Desk's clock and a Desk meter row carry the same Menu Bar Shows
+  submenu (section 42, step 4). Put back Whichever is higher.
 - [ ] Graceful switch: two signed-in accounts, the widget and the Desk meters and Claude line in
   view. Click the chip: the cards fade out gently (about 0.6 s since item 41), the widget keeps
   its height, then the other account's cards fade in where they were; the Desk meters and line do
@@ -1655,8 +1656,9 @@ desktop well away from every piece.
 
 `docs/settings-v2-spec.md`, Slice 1. No page moves; only names, links and copy.
 
-1. `smoke/smoke run smoke/scenarios/settings-names.yaml` (from `mac/`) passes: each "<Page> Settings…"
-   title opens its page through `settings-link`, the retired names are missing from the pages that
+1. `smoke/smoke run smoke/scenarios/settings-names.yaml` (from `mac/`) passes: Integrations, Notch and
+   Now Playing each show their "<Page> Settings…" buttons by those exact titles, each title opens
+   its page through `settings-link`, the retired names are missing from the pages that
    had them, and `menu_submenus` ends with `Menu Bar Shows`.
 2. Every Settings… button, by hand: Integrations' **Notch Settings…** (beside the Claude Code glow hook
    line and under Watchers) and **Layout Settings…**; Now Playing's **Notch Settings…** and **Layout

@@ -235,10 +235,9 @@ struct IntegrationsSettings: View {
                 IntegrationsIntro()
                 PythonRow(model: model, reload: reload)
                 folderList
-                GlowHint(openNotch: { navigation.selection = .notch })
+                GlowHint()
                 Divider()
-                WatcherSettings(openNotch: { navigation.selection = .notch },
-                                openLayout: { navigation.selection = .deskLayout })
+                WatcherSettings()
                 Divider()
                 Button("Add Folder…") {
                     model.choose()
@@ -263,10 +262,7 @@ struct IntegrationsSettings: View {
                                         consent = nil
                                         navigation.selection = .credentials
                                     },
-                                    openNotch: {
-                                        consent = nil
-                                        navigation.selection = .notch
-                                    },
+                                    closeSheet: { consent = nil },
                                     cancel: { consent = nil })
                 .environment(\.openModsPage) {
                     consent = nil
@@ -365,8 +361,6 @@ private struct PythonRow: View {
 
 /// Where the glow the hooks feed is switched on (item 51).
 private struct GlowHint: View {
-    let openNotch: () -> Void
-
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text("The Claude Code glow hook only tells Sanduhr; the glow itself is off until you turn it on in Notch, Notch glow.")
@@ -374,7 +368,7 @@ private struct GlowHint: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
-            Button(SettingsSection.notch.linkTitle, action: openNotch)
+            SettingsLinkButton(.notch)
         }
     }
 }
@@ -479,7 +473,8 @@ private struct IntegrationConsentSheet: View {
     /// segments picked (item 63b).
     let install: (StatuslineJoin?, StatuslineSelection) -> Void
     let openAccounts: () -> Void
-    let openNotch: () -> Void
+    /// Closes the sheet on the way to a page a link button opens.
+    let closeSheet: () -> Void
     let cancel: () -> Void
     @State private var join: StatuslineJoin = .line
     @State private var selection = StatuslineSelection()
@@ -530,7 +525,7 @@ private struct IntegrationConsentSheet: View {
         } else if consent.kind == .meters {
             MetersConsentBody(folder: model.display(consent.folder))
         } else if consent.kind == .hooks {
-            HooksConsentBody(folder: model.display(consent.folder), openNotch: openNotch)
+            HooksConsentBody(folder: model.display(consent.folder), closeSheet: closeSheet)
         } else {
             Text("Claude Code sessions using \(model.display(consent.folder)) show the active account's session and weekly meters under the prompt, read from the numbers Sanduhr saves on this Mac. Claude Code shows the line to you; it isn't added to the conversation.")
                 .fixedSize(horizontal: false, vertical: true)
@@ -636,7 +631,7 @@ private struct MetersConsentBody: View {
 /// What the notch glow hooks tell Sanduhr (item 51), and where the glow is switched on.
 private struct HooksConsentBody: View {
     let folder: String
-    let openNotch: () -> Void
+    let closeSheet: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -655,7 +650,7 @@ private struct HooksConsentBody: View {
                     .font(.caption)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
-                Button(SettingsSection.notch.linkTitle, action: openNotch)
+                SettingsLinkButton(.notch, before: closeSheet)
             }
         }
     }
