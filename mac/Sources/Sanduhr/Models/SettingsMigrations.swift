@@ -6,7 +6,8 @@ import Foundation
 ///
 /// - Show the Claude meters on the desktop (`showClaude`) is retired: off, it hides both Claude
 ///   meters pieces in the layout string, then the key goes. The Desk page's places are its one home.
-/// - Option+J and Option+S (`hotKeys`) become two switches, each seeded from the old one.
+/// - Option+J and Option+S (`hotKeys`) become two switches, each on where the old one worked
+///   (the old switch on and the Desk on).
 /// - Camera and mic's two controls become one placement (AVPlace.migrate).
 enum SettingsMigrations {
     /// The retired General switch.
@@ -41,8 +42,12 @@ enum SettingsMigrations {
 
 /// General, Shortcuts (slice 2): Option+J joins the next meeting and Option+S opens Settings, one
 /// switch each, both registered whenever Sanduhr runs (not only with the Desk). 2.10.0 had one
-/// switch for both (`hotKeys`, on by default) that worked only while the Desk ran; each new switch
-/// starts from its value. The old key stays, so an older build reads what it wrote.
+/// switch for both (`hotKeys`, on by default) that worked only while the Desk ran, so each new
+/// switch starts on only where both held: the old switch on (or never set) and the Desk on. An
+/// install with the Desk off had no working shortcut, and starts with both off, so Option+S and
+/// Option+J keep typing ß and ∆ there (spec open question 4, decided 2026-10-08). A brand-new
+/// install takes the same rule: DeskFirstRun switches the Desk on before the migration runs, so
+/// both start on. The old key stays, so an older build reads what it wrote.
 ///
 ///   defaults write com.626labs.sanduhr.desk hotKeyJoin -bool false
 ///   defaults write com.626labs.sanduhr.desk hotKeySettings -bool false
@@ -75,17 +80,23 @@ enum SanduhrHotKeys {
     /// The old switch as it read: on unless switched off.
     static func legacy(in d: DefaultsStore) -> Bool { d.object(forKey: legacyKey) as? Bool ?? true }
 
-    /// A shortcut's switch; before the migration it reads as the old switch.
+    /// What each new switch starts as: on where the old shortcuts worked, the old switch on and
+    /// the Desk on (desk key `deskEnabled`).
+    static func seed(in d: DefaultsStore) -> Bool { legacy(in: d) && d.bool(forKey: DeskController.enabledKey) }
+
+    /// A shortcut's switch; before the migration it reads as its seed.
     static func isOn(_ s: Shortcut, in d: DefaultsStore) -> Bool {
-        d.object(forKey: s.key) as? Bool ?? legacy(in: d)
+        d.object(forKey: s.key) as? Bool ?? seed(in: d)
     }
 
-    /// Seeds each switch that has no value from the old one. Returns whether it wrote anything.
+    /// Seeds each switch that has no value (seed(in:)). Returns whether it wrote anything; a
+    /// second run finds both set and writes nothing, whatever the Desk does after.
     @discardableResult
     static func migrate(_ d: DefaultsStore) -> Bool {
         var changed = false
+        let start = seed(in: d)
         for s in Shortcut.allCases where !(d.object(forKey: s.key) is Bool) {
-            d.set(legacy(in: d), forKey: s.key)
+            d.set(start, forKey: s.key)
             changed = true
         }
         return changed

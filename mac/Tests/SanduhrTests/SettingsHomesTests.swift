@@ -15,7 +15,7 @@ private func scratch(_ name: String = #function) -> UserDefaults {
 
 /// Every key a suite holds, for "a second run writes nothing".
 private func snapshot(_ d: UserDefaults) -> [String: String] {
-    let keys = ["layout", "showClaude", "hotKeys", "hotKeyJoin", "hotKeySettings", "avPlace", "avSide",
+    let keys = ["layout", "showClaude", "hotKeys", "hotKeyJoin", "hotKeySettings", "deskEnabled", "avPlace", "avSide",
                 "notchLeft", "notchRight", "notchStrip"]
     var out: [String: String] = [:]
     for k in keys { if let v = d.object(forKey: k) { out[k] = "\(v)" } }
@@ -162,23 +162,47 @@ struct SettingsMigrationTests {
 
     // MARK: The shortcuts
 
-    @Test func oneShortcutSwitchBecomesTwo() {
-        let off = scratch()
-        off.set(false, forKey: "hotKeys")
-        #expect(SanduhrHotKeys.migrate(off))
-        #expect(off.object(forKey: "hotKeyJoin") as? Bool == false)
-        #expect(off.object(forKey: "hotKeySettings") as? Bool == false)
-        #expect(off.object(forKey: "hotKeys") as? Bool == false)   // kept for an older build
+    /// The old switch worked only while the Desk ran (spec open question 4, 2026-10-08): each new
+    /// switch starts on only where the old switch was on (or never set) and the Desk was on.
+    @Test(arguments: [(desk: true, old: nil as Bool?, on: true), (desk: true, old: true, on: true),
+                      (desk: true, old: false, on: false), (desk: false, old: nil, on: false),
+                      (desk: false, old: true, on: false), (desk: false, old: false, on: false)])
+    func oneShortcutSwitchBecomesTwo(desk: Bool, old: Bool?, on: Bool) {
+        let d = scratch()
+        d.set(desk, forKey: "deskEnabled")
+        if let old { d.set(old, forKey: "hotKeys") }
+        #expect(SanduhrHotKeys.isOn(.join, in: d) == on)   // before the migration, as it will read
+        #expect(SanduhrHotKeys.migrate(d))
+        #expect(d.object(forKey: "hotKeyJoin") as? Bool == on)
+        #expect(d.object(forKey: "hotKeySettings") as? Bool == on)
+        #expect(d.object(forKey: "hotKeys") as? Bool == old)   // kept for an older build
+        // A second run writes nothing, and the Desk switching later doesn't reseed.
+        d.set(!desk, forKey: "deskEnabled")
+        let once = snapshot(d)
+        #expect(!SanduhrHotKeys.migrate(d))
+        #expect(snapshot(d) == once)
+        #expect(SanduhrHotKeys.isOn(.join, in: d) == on && SanduhrHotKeys.isOn(.settings, in: d) == on)
+    }
 
-        let unset = scratch()
-        #expect(SanduhrHotKeys.isOn(.join, in: unset))
-        SanduhrHotKeys.migrate(unset)
-        #expect(unset.object(forKey: "hotKeyJoin") as? Bool == true)
-        #expect(unset.object(forKey: "hotKeySettings") as? Bool == true)
+    /// A Desk suite with no Desk key at all (the Desk never switched on) reads as Desk off.
+    @Test func noDeskKeyMeansBothOff() {
+        let d = scratch()
+        SanduhrHotKeys.migrate(d)
+        #expect(d.object(forKey: "hotKeyJoin") as? Bool == false)
+        #expect(d.object(forKey: "hotKeySettings") as? Bool == false)
+    }
+
+    /// A brand-new install: DeskFirstRun switches the Desk on before the migration, so both start on.
+    @Test func aFreshInstallStartsWithBothOn() {
+        let widget = scratch("widget"), desk = scratch()
+        #expect(DeskFirstRun.run(widget: widget, desk: desk, from: [], reading: { _ in nil }) == .fresh)
+        SettingsMigrations.run(desk)
+        #expect(SanduhrHotKeys.isOn(.join, in: desk) && SanduhrHotKeys.isOn(.settings, in: desk))
     }
 
     @Test func theShortcutSplitIsIdempotent() {
         let d = scratch()
+        d.set(true, forKey: "deskEnabled")
         d.set(true, forKey: "hotKeys")
         SanduhrHotKeys.migrate(d)
         d.set(false, forKey: "hotKeyJoin")
@@ -267,7 +291,9 @@ struct SettingsMigrationTests {
 
     /// An existing install's choices read the same after the update: layout, wings, camera and
     /// mic placement, the shortcuts and the menu bar.
-    @Test func a2100ProfileReadsTheSame() {
+    /// The shortcuts read as they worked: on only with the old switch on (or unset) and the Desk on.
+    @Test(arguments: [true, false], [nil as Bool?, true, false])
+    func a2100ProfileReadsTheSame(desk: Bool, hotKeys: Bool?) {
         let d = scratch()
         let layout = "message:tl:1.4 clock:bl claude:bl meters:br nowPlaying:tr watchers:ml meetings:bl"
         d.set(layout, forKey: "layout")
@@ -275,11 +301,11 @@ struct SettingsMigrationTests {
         d.set("avIndicators", forKey: "notchRight")
         d.set("nowPlaying", forKey: "notchStrip")
         d.set("right", forKey: "avSide")
-        d.set(false, forKey: "hotKeys")
+        if let hotKeys { d.set(hotKeys, forKey: "hotKeys") }
         d.set(true, forKey: "showClaude")
         d.set("rotate", forKey: MenuBarMode.key)
         d.set(true, forKey: "notch")
-        d.set(true, forKey: "deskEnabled")
+        d.set(desk, forKey: "deskEnabled")
 
         SettingsMigrations.run(d)
         let once = snapshot(d)
@@ -291,7 +317,10 @@ struct SettingsMigrationTests {
         #expect(NotchContent.saved(.strip, in: d) == .nowPlaying)
         #expect(AVPlace.saved(in: d) == .right)
         #expect(NotchContent.saved(.right, in: d) == .meters)
-        #expect(!SanduhrHotKeys.isOn(.join, in: d) && !SanduhrHotKeys.isOn(.settings, in: d))
+        let worked = desk && hotKeys != false
+        #expect(SanduhrHotKeys.isOn(.join, in: d) == worked && SanduhrHotKeys.isOn(.settings, in: d) == worked)
+        #expect(d.object(forKey: "hotKeys") as? Bool == hotKeys)
+        #expect(d.bool(forKey: "deskEnabled") == desk)
         #expect(d.string(forKey: MenuBarMode.key) == "rotate")
         #expect(WatcherPlacement.notchSpot(in: d) == .left)
     }

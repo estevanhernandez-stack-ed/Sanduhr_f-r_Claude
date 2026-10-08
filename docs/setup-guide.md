@@ -258,7 +258,7 @@ If it doesn't work: Check needs Claude Code's command line (`claude`) installed.
 - **What's New…** (any Sanduhr menu, or Settings, **About**) shows what each version added. **Show me** on a card opens its Settings page.
 - **Take the Tour…** (same places) replays the welcome tour with your own numbers.
 - **Check for Updates…** (any Sanduhr menu, or the same button in Settings, **Updates**) checks now. Updates also has the automatic update switches.
-- **Shortcuts.** Settings, **General**, under Shortcuts: **Option+S opens Settings** and **Option+J joins the next meeting**, one switch each. They work in every app whenever Sanduhr runs, with or without the Desk. While one is on, Option+S no longer types ß (or Option+J ∆).
+- **Shortcuts.** Settings, **General**, under Shortcuts: **Option+S opens Settings** and **Option+J joins the next meeting**, one switch each. They work in every app whenever Sanduhr runs, with or without the Desk. While one is on, Option+S no longer types ß (or Option+J ∆). After updating from 2.10 they start on only if the Desk was on, since that is the only time they worked before.
 - **Where settings live.** Your choices are in two preferences files, `com.626labs.sanduhr` and `com.626labs.sanduhr.desk`. History, themes and integration files are in `~/Library/Application Support/Sanduhr/`. Desk messages are in `~/Library/Application Support/Desk/messages.txt`. Your key is in the Keychain.
 - **How to reset.** In Settings, **Accounts**, select each account and click **Remove Account…**. Quit Sanduhr. Delete the folder `~/Library/Application Support/Sanduhr/`. Then, in Terminal, type:
 

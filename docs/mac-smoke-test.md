@@ -1738,7 +1738,7 @@ desktop well away from every piece.
     `avSide`, `hotKeys`, `showClaude` and `menuBarMode` (`defaults read com.626labs.sanduhr.desk`).
     After the update: the Desk draws the same pieces in the same places (with Show the Claude meters
     off, both Claude meters pieces read Hidden on Desk), a wing that was Camera and mic now reads
-    that place under Where they show, the shortcuts read as the old switch did, and Menu Bar Shows
+    that place under Where they show, the shortcuts are on only if the old switch was on (or never set) and the Desk was on (a profile with the Desk off reads both off), and Menu Bar Shows
     is unchanged. Quit and relaunch: nothing changes again.
 
 ## 44. Settings v2, slice 3: reach (item 72)
