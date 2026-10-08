@@ -322,7 +322,15 @@ module Smoke
       if !editor_unsaved(before) && editor_unsaved(after)
         steps << ['message-editor', 'revert']
       end
+      # Arrange mode (item 60) a scenario left on ends with Cancel, saving nothing.
+      if !arranging(before) && arranging(after)
+        steps << ['desk-arrange', 'cancel']
+      end
       steps
+    end
+
+    def arranging(state)
+      state['desk_arrange'].is_a?(Hash) && state['desk_arrange']['active'] == true
     end
 
     def av_flag(state, which)

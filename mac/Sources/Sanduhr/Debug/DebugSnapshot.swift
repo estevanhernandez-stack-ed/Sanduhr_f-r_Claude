@@ -9,6 +9,9 @@ struct DebugStateInput {
     var layout: String?
     /// The pieces the Desk draws from it (item 59), in order: each anchor's stack top to bottom.
     var deskPieces: [DeskPlacement] = []
+    /// Arrange mode (item 60): on or off, an unsaved change, the layout being edited, and whether
+    /// the Desk window takes clicks over its whole frame or only where it draws.
+    var deskArrange = DeskArrangeDebug()
     /// The notch switch.
     var notch = false
     /// This screen has a camera notch and Desk built the island's window for it.
@@ -120,6 +123,14 @@ struct DebugStateInput {
     var build = ""
 }
 
+/// state.yaml's `desk_arrange:` (item 60). `working` is a layout string, never anything typed.
+struct DeskArrangeDebug: Equatable {
+    var active = false
+    var changed = false
+    var working: String?
+    var clickThrough = "drawn"
+}
+
 /// state.yaml's `dock:` (item 56): the Dock's side and auto-hide (its own settings, read only),
 /// and how far the Desk's corners on that side are moved in now, in whole points.
 struct DockDebug: Equatable {
@@ -226,6 +237,14 @@ enum DebugState {
         return .list(items)
     }
 
+    /// `desk_arrange:` (item 60): active, changed, the working layout string (null outside Arrange
+    /// mode) and click_through (`whole` or `drawn`).
+    static func deskArrangeYAML(_ a: DeskArrangeDebug) -> YAMLNode {
+        .map([YAMLPair("active", .bool(a.active)), YAMLPair("changed", .bool(a.changed)),
+              YAMLPair("working", a.working.map(YAMLNode.string) ?? .null),
+              YAMLPair("click_through", .string(a.clickThrough))])
+    }
+
     /// `dock:` (item 56): side, auto-hide and the inset applied now.
     static func dockYAML(_ d: DockDebug) -> YAMLNode {
         .map([YAMLPair("side", .string(d.side.rawValue)), YAMLPair("autohide", .bool(d.autohide)),
@@ -324,6 +343,7 @@ enum DebugState {
         pairs.append(("desk_running", .bool(s.deskRunning)))
         pairs.append(("layout", s.layout.map(YAMLNode.string) ?? .null))
         pairs.append(("desk_pieces", deskPiecesYAML(s.deskPieces)))
+        pairs.append(("desk_arrange", deskArrangeYAML(s.deskArrange)))
         pairs.append(("notch", .bool(s.notch)))
         pairs.append(("has_notch", .bool(s.hasNotch)))
         pairs.append(("notch_left", .string(s.notchLeft.rawValue)))

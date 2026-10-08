@@ -970,6 +970,46 @@ back to one hides the sized pieces until they are placed again.
 the stack, 0 at the top) and `scale`; `scenarios/desk-layout.yaml` reorders a corner and moves
 pieces to the new places, checking `desk_frames_ok` each time.
 
+### Arrange on the desktop
+
+Arrange mode (item 60) edits the same layout on the desktop itself, without Settings. It starts
+from **Arrange Desk…**, at the end of every Desk two-finger menu (the meters' menu puts it before
+the shared items) and on Settings, Desk, Layout's **On the desktop** row (off while Desk is off).
+The pure pieces are in `DeskArrange.swift`, the views in `DeskArrangeViews.swift`.
+
+- **What shows.** Every piece gets a dashed outline with its name and a round resize handle on the
+  corner facing the middle of the screen (`DeskArrange.handle`). A bar in the open middle of the
+  screen says what to do and holds Cancel and Done. A piece with nothing to draw (now playing
+  while nothing plays) still gets a small box to grab.
+- **Move and reorder.** Dragging a piece fades it, an outline follows the pointer, and the eight
+  anchors light up as dots, the one it would land on bigger. A drop over a stack (its pieces'
+  frames plus 26 points for the outline and the name, `DeskArrange.stackBounds`) goes to that
+  stack, the dragged piece's own first (`DeskArrange.target`), so a tall stack whose top reaches
+  past the halfway line to the next anchor still reorders. Anywhere else it goes to the nearest
+  anchor (`DeskArrange.nearest`, measured as shares of the content's width and height so every
+  screen shape has the same zones). It lands in front of the first piece there whose middle is
+  below the pointer (`DeskArrange.pieceAfter`, `DeskArrangement.put`).
+  Anchors, not free placement: a layout survives other displays and Dock moves.
+- **Resize.** The handle's drag grows or shrinks the piece by its share of the piece's width plus
+  height, snapped live to Settings' 10% steps within 60% to 160% (`DeskArrange.scale`).
+- **Nothing saved until Done.** `DeskArrangeMode` (on `DeskModel`) holds the saved string verbatim
+  and a working copy that DeskView draws. Done, Escape or Return write the working layout once, and
+  only when it differs; Cancel drops it, so the saved string is exactly as it was. Settings' places
+  and order are greyed meanwhile. Desk turning off cancels it.
+- **Clicks.** While arranging, a full-screen plate at the hit-plate alpha (`DeskArrangePlate`) gives
+  every point a drawn pixel and the window takes the mouse over its whole frame
+  (`DeskArrange.takesMouse`); the pieces' join, account and menu clicks are off. The window may take
+  the key only then (`DeskWindow.takesKey`), for Escape. Afterwards it goes back to clicks only
+  where something is drawn, exactly as before.
+- **Same rules.** The Desk lays the working layout out with the same margins, Dock clearance and
+  notch drop, and the anchor dots use the same geometry (`DeskAnchorGeometry`). With Reduce Motion a
+  drop has no snap animation. VoiceOver gets Move Up, Move Down, Bigger and Smaller on each piece.
+
+`desk_arrange` in the smoke state has `active`, `changed`, `working` (the layout string being
+edited) and `click_through` (`whole` or `drawn`); the `desk-arrange start|test|done|cancel` hook
+drives it, and `scenarios/desk-arrange.yaml` checks that Cancel leaves `layout` alone and Done
+writes it.
+
 ## Desk and the Dock
 
 Desk's pieces stay clear of the Dock on the Desk's screen (item 56, `DockFollower`, the pure

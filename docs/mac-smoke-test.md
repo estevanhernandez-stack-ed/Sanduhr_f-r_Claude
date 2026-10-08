@@ -1503,3 +1503,52 @@ Music.
 
 Put your looks back: `cp ~/looks.bak ~/Library/Application\ Support/Sanduhr/now-playing-looks.json`
 (or leave it cleared).
+## 37. Desk layout: arrange on the desktop (item 60)
+
+Desk on with the clock, the meters and the meetings at Bottom left and the message at Top left.
+Note the `layout` string first (`defaults read com.626labs.sanduhr.desk layout`) to put it back at
+the end.
+
+1. **Two ways in.** A two-finger click on the meters: the menu ends its own items with **Arrange
+   Desk…** before the shared ones; now playing's, a watcher's and the camera and mic indicators'
+   menus end with it too. Settings, Desk, Layout has an **On the desktop** section with
+   "Move, reorder and resize the pieces on the desktop itself. Escape or Done keeps the new layout;
+   Cancel puts it back as it was." and an **Arrange Desk…** button. With Desk off the button is off
+   and the line reads "Turn on Desk to arrange it on the desktop."
+2. **Arrange mode.** Pick either: every piece shows a dashed outline with its name above it and a
+   round handle on the corner facing the middle of the screen (the inner bottom corner at the top
+   and the middles, the inner top corner at the bottom). A bar in the middle of the screen reads
+   "Arrange Desk", "Drag a piece to any of the eight places, or up and down its stack. Drag its
+   round handle to resize it.", "Escape or Done keeps the new layout. Cancel puts it back as it
+   was.", Cancel and Done. In Settings, the line reads "Arranging on the desktop. Finish there with
+   Done or Cancel.", the button is off and the places and the order are greyed.
+3. **Clicks over the whole screen.** While arranging, a click anywhere on the desktop goes to the
+   Desk, not the Finder: no icon selects, no Finder desktop menu opens, and a click on a meeting row
+   does not join it. A two-finger click on the meters opens no menu.
+4. **Move.** Drag the clock: it fades where it was, an outline follows the pointer, and the eight
+   places light up as dots, the one it would land on bigger and in the accent color. Drop it near the top
+   right: it lands at Top right with a short snap. Drop a piece near the top middle: it sits below
+   the notch (and the island, when it shows), as Top center always does.
+5. **Reorder.** Drag the meetings up within Bottom left and drop them above the clock: they land at
+   the top of that stack, and Bottom left's dot stays lit the whole way up the stack (Middle left
+   does not take it). Drag the clock down below the meters: it lands under them.
+6. **Resize.** Drag the clock's handle away from the clock: it grows in steps of 10%, up to 160%;
+   back toward it, it shrinks down to 60%. The pieces stacked with it move to make room.
+7. **The Dock.** With the Dock always shown at the bottom, the bottom places' dots sit above it and
+   a piece dropped at Bottom center clears it. Auto-hide on: the Dock still lifts the bottom pieces
+   while arranging.
+8. **Nothing saved until Done.** While arranging, `defaults read com.626labs.sanduhr.desk layout`
+   still shows the old string, and Settings' map still shows the old layout. Press **Cancel**:
+   every piece goes back exactly where it was, at its size, and the string is unchanged.
+9. **Done.** Arrange again, move and resize a piece, press **Done**: the Desk keeps it and the string
+   now holds it (the same `piece:anchor:size` words as Layout writes). Arrange again and press
+   **Escape**: it ends the same way, keeping what changed. Return does too.
+10. **Clicks back to normal.** After Done, Escape or Cancel, the outlines and the bar go, clicks on
+    the desktop reach the Finder again everywhere except on the meters, the meeting rows, the
+    account name, now playing and the watchers, which work as before.
+11. **Reduce Motion.** With Reduce Motion on, a drop moves the piece without the snap.
+12. **VoiceOver.** While arranging, each piece offers Move Up, Move Down, Bigger and Smaller.
+13. `smoke/smoke run scenarios/desk-arrange.yaml` passes: `desk_arrange.click_through` is `whole`
+    while arranging and `drawn` after, the smoke's edit (the clock to Top right at 120%) is only in
+    `desk_arrange.working` until Done, Cancel leaves `layout` as it was, and Done writes it.
+14. Put the `layout` string back.

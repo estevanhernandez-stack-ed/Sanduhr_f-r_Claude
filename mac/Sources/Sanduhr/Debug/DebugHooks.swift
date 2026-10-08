@@ -128,6 +128,10 @@ enum DebugHooks {
             SettingsWindowController.shared.show(.message)
             SettingsWindowController.shared.messageEditor.debugAdd()
         case .messageEditor(.revert): SettingsWindowController.shared.messageEditor.load()
+        case .deskArrange(.start): DeskController.shared.arrangeDesk()
+        case .deskArrange(.test): DeskController.shared.model.arrange.smokeEdit()
+        case .deskArrange(.done): DeskController.shared.endArrange(keep: true)
+        case .deskArrange(.cancel): DeskController.shared.endArrange(keep: false)
         }
         settle()
     }
@@ -287,6 +291,9 @@ enum DebugHooks {
         s.deskPieces = DeskArrangement(s.layout ?? DeskLayout.standard).shown(
             showMeetings: UserDefaults.desk.object(forKey: "showMeetings") as? Bool ?? true,
             showClaude: UserDefaults.desk.object(forKey: "showClaude") as? Bool ?? true)
+        let arrange = desk.model.arrange
+        s.deskArrange = DeskArrangeDebug(active: arrange.active, changed: arrange.session?.changed ?? false,
+                                         working: arrange.working?.string, clickThrough: desk.clickThrough)
         s.notch = UserDefaults.desk.bool(forKey: DeskController.notchKey)
         s.hasNotch = desk.wingsWindow != nil
         s.notchLeft = NotchContent.saved(.left, in: .desk)

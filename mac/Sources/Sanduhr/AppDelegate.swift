@@ -430,12 +430,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// A Desk meter row's two-finger menu (LimitMenu): Show or Hide Widget, Accounts, Hide and the
     /// warnings item for `tier`, Meter Settings…, then the shared menu under a separator, less its
     /// own Show or Hide Widget. `tier` nil, a click beside the rows, leaves the limit's own items out.
-    func addLimitMenuItems(to menu: NSMenu, tier: Tier?) {
+    func addLimitMenuItems(to menu: NSMenu, tier: Tier?, deskItems: [NSMenuItem] = []) {
         let groups = LimitMenu.groups(tier: tier, accounts: currentAccountsMenu(), store: UserDefaults.desk,
                                       usage: viewModel.usage, now: Date(), widgetVisible: widgetVisible)
         for (i, group) in groups.enumerated() {
             if i > 0 { menu.addItem(.separator()) }
             for entry in group { menu.addItem(limitMenuItem(entry)) }
+        }
+        // The Desk's own items (Arrange Desk…, item 60), before the shared ones.
+        if !deskItems.isEmpty {
+            menu.addItem(.separator())
+            deskItems.forEach(menu.addItem)
         }
         menu.addItem(.separator())
         addMenuItems(to: menu, accounts: false, showHide: false)

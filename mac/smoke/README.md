@@ -58,6 +58,9 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
 - **state.yaml**: `desk_enabled`, `desk_running`, `layout`, `desk_pieces` (item 59: each piece the Desk
   draws, in the layout's order: `piece`, the widget word; `anchor`, `tl`, `tc`, `tr`, `ml`, `mr`, `bl`,
   `bc` or `br`; `order`, its place in that anchor's stack, 0 at the top; `scale`, its size, 0.6 to 1.6),
+  `desk_arrange` (item 60: `active`, Arrange mode is on; `changed`, its edit differs from the saved layout;
+  `working`, the layout string being edited, null outside Arrange mode; `click_through`, `whole` while the
+  Desk window takes clicks over its whole frame, `drawn` when only what is drawn takes them),
   `notch`, `has_notch`,
   `notch_left`, `notch_right`, `notch_strip` (what each place on the island shows, a
   `NotchContent` raw value such as `meetingOrTime`, `meters` or `nothing`; the default when unset),
@@ -102,7 +105,10 @@ welcome tour, item 61, at step 1 or step n, as Take the Tour… opens it; window
 recorded: the tour's state and What's New's last-seen version stay as they were),
 `message-editor add|revert` (item 69: Settings, Message's editor; add opens it and adds the smoke's own line,
 Fridays, "ship it." in a sunset gradient in script with a sweep, as the controls write it; revert drops
-unsaved edits. Neither saves, so `messages.txt` is never written; a run reverts what it added).
+unsaved edits. Neither saves, so `messages.txt` is never written; a run reverts what it added),
+`desk-arrange start|test|done|cancel` (item 60: Arrange mode on the Desk, as Arrange Desk… enters it; test
+makes the smoke's own edit, the clock to Top right at 120%, in the working layout only; done ends it writing
+the layout once when it changed, cancel ends it writing nothing. A run that leaves it on cancels it).
 
 ## Scenarios
 

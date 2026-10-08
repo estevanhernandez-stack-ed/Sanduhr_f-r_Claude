@@ -15,17 +15,25 @@ struct DeskLayoutSection: View {
     @AppStorage("top", store: .desk) private var top = 40.0
     @AppStorage("bottom", store: .desk) private var bottom = 60.0
 
+    @AppStorage(DeskController.enabledKey, store: .desk) private var deskOn = false
+
     var body: some View {
+        let arranging = DeskController.shared.model.arrange.active
         Form {
+            Section("On the desktop") {
+                DeskArrangeRow(deskOn: deskOn, arranging: arranging)
+            }
             Section("Where each piece sits") {
                 ForEach(DeskLayout.widgets, id: \.key) { w in
                     DeskPlaceRow(widget: w.key, name: w.name, layout: $layout)
                 }
+                .disabled(arranging)
                 Text("Eight places: the four corners, the top and bottom centers, and the middle of each side. Top center sits below the notch. Size scales a piece from 60% to 160%; the message starts from its own size in Look. Now playing shows only while something plays; its other settings are in Now Playing. Watchers show only while there is one; they are switched on in Integrations.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Order") {
                 DeskOrderList(layout: $layout)
+                    .disabled(arranging)
                 Text("Pieces in the same place stack top to bottom in this order. Drag a piece up or down to reorder it, or onto a piece in another place to move it there. The top, middle and bottom of a side share a column, and a side keeps clear of the centers, so places never overlap.")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -37,6 +45,25 @@ struct DeskLayoutSection: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Layout's Arrange Desk… button (item 60). While arranging, the places and the order here wait:
+/// Done on the desktop writes the layout, so an edit here would be overwritten.
+private struct DeskArrangeRow: View {
+    let deskOn: Bool
+    let arranging: Bool
+
+    var body: some View {
+        LabeledContent {
+            Button(DeskArrangeCopy.settingsButton) { DeskController.shared.arrangeDesk() }
+                .disabled(!deskOn || arranging)
+        } label: {
+            Text(arranging ? DeskArrangeCopy.settingsArranging
+                 : deskOn ? DeskArrangeCopy.settingsNote : DeskArrangeCopy.settingsDeskOff)
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 

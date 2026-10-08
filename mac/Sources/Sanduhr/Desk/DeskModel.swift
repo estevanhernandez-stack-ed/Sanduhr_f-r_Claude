@@ -191,6 +191,8 @@ final class DeskModel {
     @ObservationIgnored var stripAVFrame: CGRect = .zero { didSet { if stripAVFrame != oldValue { onHitAreasChange?() } } }
     /// Called when a clickable piece moves or comes and goes (DeskController takes the mouse there).
     @ObservationIgnored var onHitAreasChange: (() -> Void)?
+    /// Arrange mode (item 60): the layout being edited on the desktop, nil-session outside it.
+    let arrange = DeskArrangeMode()
     /// Alert pulses so far, per limit (Settings, Alerts, Where alerts show). A meter row pulses
     /// when its count goes up.
     var pulses: [Tier: Int] = [:]
