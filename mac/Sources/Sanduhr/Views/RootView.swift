@@ -223,8 +223,17 @@ struct SanduhrMenuItems: View {
                     Toggle(entry.title, isOn: Binding(
                         get: { entry.checked },
                         set: { _ in withAnimation { app.perform(entry.command) } }))
+                } else if let note = entry.note {
+                    // An item that is off says why (Arrange Desk… while Desk is off).
+                    Button { app.perform(entry.command) } label: {
+                        Text(entry.title)
+                        Text(note)
+                    }
+                    .disabled(!entry.enabled)
+                    .help(note)
                 } else {
                     Button(entry.title) { app.perform(entry.command) }
+                        .disabled(!entry.enabled)
                 }
             }
             if let key = entry.key.first {

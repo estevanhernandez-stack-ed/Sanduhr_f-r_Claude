@@ -295,7 +295,8 @@ enum DebugHooks {
             showClaude: UserDefaults.desk.object(forKey: "showClaude") as? Bool ?? true)
         let arrange = desk.model.arrange
         s.deskArrange = DeskArrangeDebug(active: arrange.active, changed: arrange.session?.changed ?? false,
-                                         working: arrange.working?.string, clickThrough: desk.clickThrough)
+                                         working: arrange.working?.string, clickThrough: desk.clickThrough,
+                                         barVisible: desk.arrangeBarVisible)
         s.notch = UserDefaults.desk.bool(forKey: DeskController.notchKey)
         s.hasNotch = desk.wingsWindow != nil
         s.notchLeft = NotchContent.saved(.left, in: .desk)

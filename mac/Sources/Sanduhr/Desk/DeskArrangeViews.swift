@@ -181,8 +181,9 @@ struct DeskArrangePlate: View {
 }
 
 /// Over the pieces while arranging: the eight anchors, lit while a piece is dragged with the one
-/// it would land on brightest, the dragged piece's ghost under the pointer, and the bar with
-/// Cancel and Done in the open middle of the screen.
+/// it would land on brightest, and the dragged piece's ghost under the pointer. The bar with
+/// Cancel and Done is not here: it floats above every window in its own panel
+/// (DeskArrangeBarController), so an app window can never cover it.
 struct DeskArrangeOverlay: View {
     let mode: DeskArrangeMode
     let geometry: DeskArrangeGeometry
@@ -193,9 +194,6 @@ struct DeskArrangeOverlay: View {
                 lights(drag)
                 ghost(drag)
             }
-            DeskArrangeBar()
-                .fixedSize()
-                .position(x: geometry.content.midX, y: geometry.content.midY)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -227,16 +225,17 @@ struct DeskArrangeOverlay: View {
     }
 }
 
-/// Arrange mode's bar: what to do, Cancel and Done.
+/// Arrange mode's bar: what to do, Cancel and Done. It sits in DeskArrangeBarController's
+/// floating panel, never on the Desk window.
 struct DeskArrangeBar: View {
     var body: some View {
         VStack(spacing: 8) {
-            Text("Arrange Desk").font(.headline)
-            Text("Drag a piece to any of the eight places, or up and down its stack. Drag its round handle to resize it.")
+            Text(DeskArrangeCopy.barTitle).font(.headline)
+            Text(DeskArrangeCopy.barHint)
                 .font(.callout)
                 .multilineTextAlignment(.center)
                 .frame(width: 300)
-            Text("Escape or Done keeps the new layout. Cancel puts it back as it was.")
+            Text(DeskArrangeCopy.barKeys)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -250,9 +249,100 @@ struct DeskArrangeBar: View {
             .padding(.top, 4)
         }
         .padding(18)
+        .fixedSize()
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
         .environment(\.colorScheme, .dark)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Arrange Desk")
+        .accessibilityLabel(DeskArrangeCopy.barTitle)
+    }
+}
+
+/// The bar's panel: borderless, above normal windows (Settings included), on every Space. It
+/// takes the key so Return and Escape reach Sanduhr wherever Arrange mode was started from.
+final class DeskArrangeBarPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+    /// Escape is Arrange mode's Cancel (DeskController's key monitor): the panel never closes itself.
+    override func cancelOperation(_ sender: Any?) {}
+}
+
+/// Shows Arrange mode's bar (item 60) in its own small floating panel at the middle of the screen
+/// the Desk is on, while arranging, and closes it when Arrange mode ends. The drag lights and the
+/// ghost stay on the Desk window.
+final class DeskArrangeBarController {
+    private var panel: DeskArrangeBarPanel?
+
+    /// state.yaml's `desk_arrange.bar_visible`.
+    var isVisible: Bool { panel?.isVisible ?? false }
+
+    /// Opens the panel on `screen` (or moves it there) and makes it key.
+    func show(on screen: NSScreen?) {
+        let p = panel ?? makePanel()
+        panel = p
+        place(on: screen)
+        p.makeKeyAndOrderFront(nil)
+    }
+
+    /// Centers the open panel on `screen`'s visible frame (a display change while arranging).
+    func place(on screen: NSScreen?) {
+        guard let p = panel, let visible = (screen ?? NSScreen.main)?.visibleFrame else { return }
+        let size = p.contentView?.fittingSize ?? p.frame.size
+        p.setFrame(NSRect(origin: DeskArrange.barOrigin(size: size, in: visible), size: size), display: true)
+    }
+
+    func close() {
+        panel?.orderOut(nil)
+        panel?.close()
+        panel = nil
+    }
+
+    private func makePanel() -> DeskArrangeBarPanel {
+        let p = DeskArrangeBarPanel(contentRect: NSRect(x: 0, y: 0, width: 340, height: 180),
+                                    styleMask: [.borderless, .nonactivatingPanel],
+                                    backing: .buffered, defer: false)
+        p.isReleasedWhenClosed = false
+        p.level = .floating
+        p.isFloatingPanel = true
+        p.hidesOnDeactivate = false
+        p.becomesKeyOnlyIfNeeded = false
+        p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+        p.isOpaque = false
+        p.backgroundColor = .clear
+        p.hasShadow = true
+        p.title = DeskArrangeCopy.barTitle
+        let host = FirstClickHostingView(rootView: DeskArrangeBar())
+        p.contentView = host
+        return p
+    }
+}
+
+/// A window Arrange mode puts away while it runs (Settings, where it is often started from) and
+/// brings back after.
+@MainActor
+protocol DeskArrangeHideable: AnyObject {
+    var isVisible: Bool { get }
+    func orderOut(_ sender: Any?)
+    func makeKeyAndOrderFront(_ sender: Any?)
+}
+
+extension NSWindow: DeskArrangeHideable {}
+
+/// The windows Arrange mode put away: `hide` orders out the visible ones and remembers them,
+/// `restore` brings exactly those back (key and in front) and forgets them.
+@MainActor
+final class DeskArrangeStash {
+    private(set) var hidden: [DeskArrangeHideable] = []
+
+    func hide(_ windows: [DeskArrangeHideable?]) {
+        for case let w? in windows where w.isVisible && !hidden.contains(where: { $0 === w }) {
+            w.orderOut(nil)
+            hidden.append(w)
+        }
+    }
+
+    func restore() {
+        let back = hidden
+        hidden = []
+        back.forEach { $0.makeKeyAndOrderFront(nil) }
     }
 }

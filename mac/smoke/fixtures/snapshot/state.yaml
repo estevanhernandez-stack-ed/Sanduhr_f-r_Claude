@@ -23,6 +23,7 @@ desk_arrange:
   changed: false
   working: null
   click_through: drawn
+  bar_visible: false
 notch: false
 has_notch: true
 notch_left: meetingOrTime

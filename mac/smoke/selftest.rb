@@ -76,7 +76,13 @@ class FakeApp
       a = (s['desk_arrange'] ||= {})
       case arg
       when 'start'
-        a.merge!('active' => true, 'changed' => false, 'working' => s['layout'], 'click_through' => 'whole') unless a['active']
+        unless a['active']
+          a.merge!('active' => true, 'changed' => false, 'working' => s['layout'], 'click_through' => 'whole',
+                   'bar_visible' => true)
+          # Settings steps aside while arranging and comes back after.
+          @arrange_hid_settings = s['settings_open'] == true
+          s['settings_open'] = false
+        end
       when 'test'
         a.merge!('changed' => true, 'working' => s['layout'].sub('clock:bl', 'clock:tr:1.2')) if a['active']
       when 'done', 'cancel'
@@ -84,7 +90,12 @@ class FakeApp
           s['layout'] = a['working']
           s['desk_pieces'].each { |p| p.merge!('anchor' => 'tr', 'order' => 0, 'scale' => 1.2) if p['piece'] == 'clock' }
         end
-        a.merge!('active' => false, 'changed' => false, 'working' => nil, 'click_through' => 'drawn')
+        if a['active'] && @arrange_hid_settings
+          s['settings_open'] = true
+          @arrange_hid_settings = false
+        end
+        a.merge!('active' => false, 'changed' => false, 'working' => nil, 'click_through' => 'drawn',
+                 'bar_visible' => false)
       end
     when 'usage'
       s['settings_open'] = true
@@ -343,9 +354,9 @@ eq('message editor scenario adds, reverts, then closes Settings', app_me.actions
    ['settings message', 'message-editor add', 'message-editor revert', 'close-settings'])
 FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-me'))
 # Item 60: Arrange mode, flags and a layout string only; a scenario that leaves it on is cancelled.
-eq('desk arrange keys', state['desk_arrange'].keys, %w[active changed working click_through])
-eq('desk arrange in the fixture: off, clicks only where drawn',
-   state['desk_arrange'].values_at('active', 'working', 'click_through'), [false, nil, 'drawn'])
+eq('desk arrange keys', state['desk_arrange'].keys, %w[active changed working click_through bar_visible])
+eq('desk arrange in the fixture: off, clicks only where drawn, no bar',
+   state['desk_arrange'].values_at('active', 'working', 'click_through', 'bar_visible'), [false, nil, 'drawn', false])
 eq('arrange mode a scenario left on is cancelled',
    Restore.plan(base, base.merge('desk_arrange' => { 'active' => true })), [%w[desk-arrange cancel]])
 eq('arrange mode on before is left alone',
@@ -354,9 +365,10 @@ app_ar = FakeApp.new
 r = Runner.new(app_ar, MemoryDefaults.new, File.join(Smoke::OUT, '.selftest-ar'), io: StringIO.new, settle: 0, poll: 0.01, within: 0.05)
     .run_file(File.join(Smoke::SCENARIOS, 'desk-arrange.yaml'))
 eq('desk arrange scenario passes', [r['status'], r['reason']], ['pass', nil])
-eq('desk arrange scenario starts, cancels, then saves with done', app_ar.actions,
-   ['desk-arrange start', 'desk-arrange test', 'desk-arrange cancel',
-    'desk-arrange start', 'desk-arrange test', 'desk-arrange done'])
+eq('desk arrange scenario starts from Settings, cancels, then saves with done, Settings put back',
+   app_ar.actions,
+   ['settings deskLayout', 'desk-arrange start', 'desk-arrange test', 'desk-arrange cancel',
+    'desk-arrange start', 'desk-arrange test', 'desk-arrange done', 'settings notch'])
 FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-ar'))
 app_av = FakeApp.new
 app_av.action('av-test', 'mic on')

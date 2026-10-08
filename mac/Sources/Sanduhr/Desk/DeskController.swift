@@ -214,7 +214,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         let w = DeskWindow(contentRect: screen.frame, styleMask: [.borderless],
                            backing: .buffered, defer: false)
         w.isReleasedWhenClosed = false
-        // Arrange mode carries over a rebuild (a display change): the window can still take Escape.
+        // Arrange mode carries over a rebuild (a display change): the window can still take the key.
         w.takesKey = model.arrange.active
         // Just below normal windows, not in the desktop layer: on newer macOS a click on the
         // desktop layer counts as clicking the wallpaper, which sweeps the windows away
@@ -233,6 +233,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         w.setFrame(screen.frame, display: true)
         w.orderFront(nil)
         window = w
+        // The bar's panel follows the Desk to its new screen.
+        if model.arrange.active { arrangeBar.place(on: screen) }
         NotificationCenter.default.addObserver(
             self, selector: #selector(occlusionChanged),
             name: NSWindow.didChangeOcclusionStateNotification, object: w)
@@ -387,13 +389,23 @@ final class DeskController: NSObject, NSMenuDelegate {
         return true
     }
 
-    /// The two-finger menu for a hit: now playing's, or the limit menu on the meters.
+    /// The two-finger menu for a hit: now playing's, a watcher's, the indicators', the shared menu
+    /// on the meetings and the account name, or the limit menu on the meters. Every one of them
+    /// has Arrange Desk… (item 60): the shared menu carries it, the others end with it.
     private func menu(for hit: DeskElement?) -> NSMenu {
         if hit?.kind == .watcher {
             return withArrangeItem(WatcherMenu.menu(for: DeskHitTest.watcher(hit, in: model.watchers)?.id))
         }
         if hit?.kind == .avIndicators { return withArrangeItem(AVIndicatorMenu.menu(model.avIndicators)) }
-        return hit?.kind == .nowPlaying ? withArrangeItem(NowPlayingController.shared.menu()) : limitMenu(for: hit)
+        if hit?.kind == .nowPlaying || hit?.kind == .nowPlayingNext {
+            return withArrangeItem(NowPlayingController.shared.menu())
+        }
+        if DeskHitTest.hasSharedMenu(hit) {
+            let menu = NSMenu()
+            addStandardItems(to: menu)
+            return menu
+        }
+        return limitMenu(for: hit)
     }
 
     /// "Arrange Desk…" (item 60), at the end of a Desk menu that has no shared items.
@@ -424,9 +436,9 @@ final class DeskController: NSObject, NSMenuDelegate {
     private func limitMenu(for hit: DeskElement?) -> NSMenu {
         let tier = hit?.kind == .meterRow ? hit?.key.flatMap(Tier.init(rawValue:)) : nil
         let menu = NSMenu()
-        // Event monitors and their follow-ups run on the main thread.
-        let arrange = arrangeMenuItem()
-        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.addLimitMenuItems(to: menu, tier: tier, deskItems: [arrange]) }
+        // Event monitors and their follow-ups run on the main thread. Arrange Desk… comes with
+        // the shared items under the limit's own.
+        MainActor.assumeIsolated { (NSApp.delegate as? AppDelegate)?.addLimitMenuItems(to: menu, tier: tier) }
         return menu
     }
 
@@ -574,6 +586,10 @@ final class DeskController: NSObject, NSMenuDelegate {
     // MARK: Arrange mode (item 60)
 
     private var arrangeKeyMonitor: Any?
+    /// The bar with Cancel and Done, in its own floating panel while arranging.
+    private let arrangeBar = DeskArrangeBarController()
+    /// The windows put away while arranging (Settings), brought back when it ends.
+    private var arrangeStash: DeskArrangeStash?
 
     /// state.yaml's `desk_arrange.click_through`: `whole` while arranging with the window taking
     /// the mouse, `drawn` otherwise.
@@ -581,25 +597,38 @@ final class DeskController: NSObject, NSMenuDelegate {
         DeskArrange.clickThrough(arranging: model.arrange.active, windowTakesMouse: window.map { !$0.ignoresMouseEvents } ?? false)
     }
 
-    /// "Arrange Desk…" in the Desk's two-finger menus and on Settings, Desk, Layout: the pieces get
-    /// outlines and handles, the window takes clicks over the whole screen and can take Escape.
-    /// Nothing is saved until Done. While Desk is off, or already arranging, nothing happens.
+    /// state.yaml's `desk_arrange.bar_visible`: the bar's panel is on screen.
+    var arrangeBarVisible: Bool { arrangeBar.isVisible }
+
+    /// "Arrange Desk…" in every Desk menu, the menu bar item's and the widget's menus, and on
+    /// Settings, Desk, Layout: the pieces get outlines and handles and the window takes clicks over
+    /// the whole screen. Settings steps aside until it ends, and the bar with Cancel and Done floats
+    /// above every window at the middle of the Desk's screen, taking the key: Return is Done,
+    /// Escape is Cancel, wherever the key focus is in Sanduhr. Nothing is saved until Done. While
+    /// Desk is off, or already arranging, nothing happens.
     func arrangeDesk() {
         guard running, !model.arrange.active, let w = window as? DeskWindow else { return }
         model.arrange.begin()
         w.takesKey = true
+        // Arrange runs on the main thread (menus, Settings' button, the debug hooks).
+        arrangeStash = MainActor.assumeIsolated {
+            let stash = DeskArrangeStash()
+            stash.hide([SettingsWindowController.shared.window])
+            return stash
+        }
         NSApp.activate()
-        w.makeKey()
+        arrangeBar.show(on: w.screen ?? NSScreen.main)
         arrangeKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-            guard let self, self.model.arrange.active, event.window === self.window,
-                  let keep = DeskArrange.endKey(event.keyCode) else { return event }
-            self.endArrange(keep: keep)
+            guard let self, self.model.arrange.active,
+                  let end = DeskArrange.endKey(event.keyCode) else { return event }
+            self.endArrange(keep: end.keep)
             return nil
         }
         updateMouseThrough()
     }
 
-    /// Done (or Escape) keeps the edit, writing the layout once; Cancel drops it. Either way the
+    /// Done (or Return) keeps the edit, writing the layout once; Cancel (or Escape) drops it.
+    /// Either way the bar's panel closes, Settings comes back if Arrange put it away, and the
     /// window goes back to taking clicks only where something is drawn.
     func endArrange(keep: Bool) {
         if let m = arrangeKeyMonitor {
@@ -608,9 +637,14 @@ final class DeskController: NSObject, NSMenuDelegate {
         }
         guard model.arrange.active else { return }
         if keep { model.arrange.done() } else { model.arrange.cancel() }
+        arrangeBar.close()
         if let w = window as? DeskWindow {
             w.takesKey = false
             w.resignKey()
+        }
+        if let stash = arrangeStash {
+            arrangeStash = nil
+            MainActor.assumeIsolated { stash.restore() }
         }
         updateMouseThrough()
     }
@@ -694,7 +728,8 @@ final class DeskController: NSObject, NSMenuDelegate {
     }
 }
 
-/// The Desk window. It never takes the key, except in Arrange mode (item 60), where Escape ends it.
+/// The Desk window. It never takes the key, except in Arrange mode (item 60), where a click on a
+/// piece may make it key; Return and Escape still reach the key monitor from there.
 final class DeskWindow: NSWindow {
     var takesKey = false
     override var canBecomeKey: Bool { takesKey }

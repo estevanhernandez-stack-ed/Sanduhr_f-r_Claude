@@ -60,7 +60,8 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   `bc` or `br`; `order`, its place in that anchor's stack, 0 at the top; `scale`, its size, 0.6 to 1.6),
   `desk_arrange` (item 60: `active`, Arrange mode is on; `changed`, its edit differs from the saved layout;
   `working`, the layout string being edited, null outside Arrange mode; `click_through`, `whole` while the
-  Desk window takes clicks over its whole frame, `drawn` when only what is drawn takes them),
+  Desk window takes clicks over its whole frame, `drawn` when only what is drawn takes them; `bar_visible`,
+  the floating panel with Cancel and Done is on screen),
   `notch`, `has_notch`,
   `notch_left`, `notch_right`, `notch_strip` (what each place on the island shows, a
   `NotchContent` raw value such as `meetingOrTime`, `meters` or `nothing`; the default when unset),

@@ -77,11 +77,17 @@ enum DeskHitTest {
         element?.kind == .meters || element?.kind == .meterRow
     }
 
-    /// True when a two-finger click on the hit opens a Desk menu: the meters' limit menu or now
-    /// playing's.
+    /// True when a two-finger click on the hit opens a Desk menu: the meters' limit menu, now
+    /// playing's, a watcher's, the indicators', or the shared menu (hasSharedMenu).
     static func hasMenu(_ element: DeskElement?) -> Bool {
         isMeters(element) || element?.kind == .nowPlaying || element?.kind == .nowPlayingNext
-            || element?.kind == .watcher || element?.kind == .avIndicators
+            || element?.kind == .watcher || element?.kind == .avIndicators || hasSharedMenu(element)
+    }
+
+    /// True when a two-finger click on the hit opens the shared menu (SanduhrMenu, with Arrange
+    /// Desk…): a meeting row, the calendar note and the claude line's account name (item 60).
+    static func hasSharedMenu(_ element: DeskElement?) -> Bool {
+        element?.kind == .meetingRow || element?.kind == .note || element?.kind == .account
     }
 
     /// The watcher a hit on a watcher element stands for: the strip's is the most urgent, a Desk

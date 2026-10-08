@@ -129,6 +129,8 @@ struct DeskArrangeDebug: Equatable {
     var changed = false
     var working: String?
     var clickThrough = "drawn"
+    /// The bar's floating panel (Cancel and Done) is on screen.
+    var barVisible = false
 }
 
 /// state.yaml's `dock:` (item 56): the Dock's side and auto-hide (its own settings, read only),
@@ -238,11 +240,12 @@ enum DebugState {
     }
 
     /// `desk_arrange:` (item 60): active, changed, the working layout string (null outside Arrange
-    /// mode) and click_through (`whole` or `drawn`).
+    /// mode), click_through (`whole` or `drawn`) and bar_visible (the floating bar is on screen).
     static func deskArrangeYAML(_ a: DeskArrangeDebug) -> YAMLNode {
         .map([YAMLPair("active", .bool(a.active)), YAMLPair("changed", .bool(a.changed)),
               YAMLPair("working", a.working.map(YAMLNode.string) ?? .null),
-              YAMLPair("click_through", .string(a.clickThrough))])
+              YAMLPair("click_through", .string(a.clickThrough)),
+              YAMLPair("bar_visible", .bool(a.barVisible))])
     }
 
     /// `dock:` (item 56): side, auto-hide and the inset applied now.

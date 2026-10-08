@@ -419,7 +419,8 @@ struct DeskNowPlayingTests {
         #expect(DeskHitTest.hasMenu(hit))
         #expect(!DeskHitTest.isMeters(hit))
         #expect(DeskHitTest.hasMenu(meters))
-        #expect(!DeskHitTest.hasMenu(DeskElement(kind: .account, frame: .zero)))
+        // The account name opens the shared menu (item 60: it carries Arrange Desk…).
+        #expect(DeskHitTest.hasSharedMenu(DeskElement(kind: .account, frame: .zero)))
         #expect(!DeskHitTest.hasMenu(nil))
         #expect(DeskHitTest.priority.contains(.nowPlaying))
     }

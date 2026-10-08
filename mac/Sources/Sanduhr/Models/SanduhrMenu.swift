@@ -4,15 +4,18 @@ import Foundation
 /// clock menu all hand these to AppDelegate.perform, so one choice does the same thing from
 /// any of them.
 enum MenuCommand: Int, CaseIterable {
-    case showHide, deepWork, pacing, snake, cameraLight, usage, refresh, settings, checkForUpdates, whatsNew, tour, quit
+    case showHide, deepWork, pacing, snake, cameraLight, usage, refresh, settings, arrangeDesk, checkForUpdates, whatsNew, tour, quit
 }
 
-/// One item: its title, its Command-key equivalent ("" for none) and whether it shows a checkmark.
+/// One item: its title, its Command-key equivalent ("" for none), whether it shows a checkmark,
+/// and whether it can be chosen, with the reason when not (`note`, shown under or beside it).
 struct MenuEntry: Equatable {
     let command: MenuCommand
     let title: String
     var key: String = ""
     var checked: Bool = false
+    var enabled: Bool = true
+    var note: String?
 }
 
 /// A run of items between separators, with an optional section header.
@@ -29,8 +32,10 @@ enum SanduhrMenu {
     /// checkmarks (Deep Work or Cooldown Snake open on the widget, the pacing calculators pinned);
     /// `cameraLight` is the camera light switched on by hand. Claude Usage… opens Settings at the
     /// Claude Usage page (item 48). What's New… (item 57) reopens the release highlights, Take the Tour… (item 61) the welcome tour.
+    /// Arrange Desk… (item 60) starts Arrange mode on the desktop; with `deskOn` false it is off,
+    /// and says why.
     static func groups(widgetVisible: Bool, deepWork: Bool, pacing: Bool, snake: Bool,
-                       cameraLight: Bool = false) -> [MenuGroup] {
+                       cameraLight: Bool = false, deskOn: Bool = true) -> [MenuGroup] {
         [
             MenuGroup(entries: [
                 MenuEntry(command: .showHide, title: widgetVisible ? "Hide Widget" : "Show Widget"),
@@ -45,6 +50,8 @@ enum SanduhrMenu {
             MenuGroup(entries: [
                 MenuEntry(command: .refresh, title: "Refresh", key: "r"),
                 MenuEntry(command: .settings, title: "Settings…", key: ","),
+                MenuEntry(command: .arrangeDesk, title: DeskArrangeCopy.menuItem, enabled: deskOn,
+                          note: deskOn ? nil : DeskArrangeCopy.settingsDeskOff),
                 MenuEntry(command: .checkForUpdates, title: "Check for Updates…"),
                 MenuEntry(command: .whatsNew, title: "What's New…"),
                 MenuEntry(command: .tour, title: "Take the Tour…"),

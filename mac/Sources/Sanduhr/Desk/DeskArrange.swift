@@ -100,13 +100,20 @@ enum DeskArrange {
         arranging || overElement
     }
 
-    /// What a key does in Arrange mode: Escape and Return end it keeping the changes (as Done);
-    /// nil for any other key.
-    static func endKey(_ keyCode: UInt16) -> Bool? {
+    /// What a key does in Arrange mode, wherever the key focus is: Return and keypad Enter end it
+    /// as Done (keeping the edit), Escape as Cancel (dropping it); nil for any other key.
+    static func endKey(_ keyCode: UInt16) -> DeskArrangeEnd? {
         switch keyCode {
-        case 53, 36, 76: return true   // Escape, Return, keypad Enter
+        case 36, 76: return .done     // Return, keypad Enter
+        case 53: return .cancel       // Escape
         default: return nil
         }
+    }
+
+    /// Where the bar's floating panel goes: its middle on the middle of `screen` (the visible
+    /// frame of the screen the Desk is on, AppKit coordinates), on whole points.
+    static func barOrigin(size: CGSize, in screen: CGRect) -> CGPoint {
+        CGPoint(x: (screen.midX - size.width / 2).rounded(), y: (screen.midY - size.height / 2).rounded())
     }
 
     /// state.yaml's `desk_arrange.click_through`: `whole` while the window takes clicks over its
@@ -136,11 +143,21 @@ extension DeskArrangement {
     }
 }
 
-/// Arrange mode's words, in one place for the menus, Settings and the tests.
+/// How Arrange mode ends: Done writes the edit, Cancel drops it.
+enum DeskArrangeEnd: Equatable {
+    case done, cancel
+
+    var keep: Bool { self == .done }
+}
+
+/// Arrange mode's words, in one place for the menus, the bar, Settings and the tests.
 enum DeskArrangeCopy {
     static let menuItem = "Arrange Desk…"
     static let settingsButton = "Arrange Desk…"
-    static let settingsNote = "Move, reorder and resize the pieces on the desktop itself. Escape or Done keeps the new layout; Cancel puts it back as it was."
+    static let settingsNote = "Move, reorder and resize the pieces on the desktop itself. Return or Done keeps the new layout; Escape or Cancel puts it back as it was."
+    static let barTitle = "Arrange Desk"
+    static let barHint = "Drag a piece to any of the eight places, or up and down its stack. Drag its round handle to resize it."
+    static let barKeys = "Return or Done keeps the new layout. Escape or Cancel puts it back."
     static let settingsArranging = "Arranging on the desktop. Finish there with Done or Cancel."
     static let settingsDeskOff = "Turn on Desk to arrange it on the desktop."
 }

@@ -341,11 +341,55 @@ struct DeskArrangeClickTests {
         }
     }
 
-    @Test("Escape and Return end it keeping the edit; other keys do nothing")
+    @Test("Return and Enter are Done, Escape is Cancel; other keys do nothing")
     func keys() {
-        #expect(DeskArrange.endKey(53) == true)
-        #expect(DeskArrange.endKey(36) == true)
+        #expect(DeskArrange.endKey(36) == .done)    // Return
+        #expect(DeskArrange.endKey(76) == .done)    // keypad Enter
+        #expect(DeskArrange.endKey(53) == .cancel)  // Escape
         #expect(DeskArrange.endKey(0) == nil)
+        #expect(DeskArrange.endKey(49) == nil)      // Space
+        #expect(DeskArrangeEnd.done.keep)
+        #expect(!DeskArrangeEnd.cancel.keep)
+    }
+
+    @Test("a key ends the edit as its button does: Return writes, Escape leaves the layout alone")
+    func keysDriveTheEdit() throws {
+        let store = CountingDefaults()
+        store.values[DeskArrangeMode.layoutKey] = "message:tl clock:bl"
+        let mode = DeskArrangeMode(store: store)
+
+        mode.begin()
+        mode.smokeEdit()
+        let escape = try #require(DeskArrange.endKey(53))
+        if escape.keep { mode.done() } else { mode.cancel() }
+        #expect(!mode.active)
+        #expect(store.writes.isEmpty)
+        #expect(store.values[DeskArrangeMode.layoutKey] as? String == "message:tl clock:bl")
+
+        mode.begin()
+        mode.smokeEdit()
+        let enter = try #require(DeskArrange.endKey(36))
+        if enter.keep { mode.done() } else { mode.cancel() }
+        #expect(store.writes == ["layout"])
+        #expect(store.values[DeskArrangeMode.layoutKey] as? String == "message:tl clock:tr:1.2")
+    }
+
+    @Test("the bar's panel sits on the middle of the Desk's screen, on whole points")
+    func barOrigin() {
+        let visible = CGRect(x: 0, y: 80, width: 1512, height: 862)
+        let o = DeskArrange.barOrigin(size: CGSize(width: 336, height: 171), in: visible)
+        #expect(o == CGPoint(x: 588, y: 426))
+        // A second screen to the left, below the first.
+        #expect(DeskArrange.barOrigin(size: CGSize(width: 300, height: 100),
+                                      in: CGRect(x: -1920, y: -200, width: 1920, height: 1050))
+                == CGPoint(x: -1110, y: 275))
+    }
+
+    @Test("the bar and Settings say Return is Done and Escape is Cancel")
+    func keyCopy() {
+        #expect(DeskArrangeCopy.barKeys == "Return or Done keeps the new layout. Escape or Cancel puts it back.")
+        #expect(DeskArrangeCopy.settingsNote.contains("Return or Done keeps the new layout; Escape or Cancel puts it back"))
+        #expect(!DeskArrangeCopy.barKeys.contains("Escape or Done"))
     }
 
     @Test("debug link and state.yaml keys")
@@ -356,16 +400,78 @@ struct DeskArrangeClickTests {
         #expect(DebugAction.names.contains("desk-arrange"))
         var input = DebugStateInput()
         #expect(YAMLEmitter.emit(DebugState.yaml(input)).contains(
-            "desk_arrange:\n  active: false\n  changed: false\n  working: null\n  click_through: drawn\n"))
+            "desk_arrange:\n  active: false\n  changed: false\n  working: null\n  click_through: drawn\n  bar_visible: false\n"))
         input.deskArrange = DeskArrangeDebug(active: true, changed: true, working: "message:tl clock:tr:1.2",
-                                             clickThrough: "whole")
+                                             clickThrough: "whole", barVisible: true)
         #expect(YAMLEmitter.emit(DebugState.yaml(input)).contains(
-            "desk_arrange:\n  active: true\n  changed: true\n  working: \"message:tl clock:tr:1.2\"\n  click_through: whole\n"))
+            "desk_arrange:\n  active: true\n  changed: true\n  working: \"message:tl clock:tr:1.2\"\n  click_through: whole\n  bar_visible: true\n"))
     }
 
     @Test("the menu item and the Settings button say Arrange Desk…")
     func copy() {
         #expect(DeskArrangeCopy.menuItem == "Arrange Desk…")
         #expect(DeskArrangeCopy.settingsButton == "Arrange Desk…")
+    }
+}
+
+/// A window as Arrange mode's stash sees it, without a window server.
+@MainActor
+private final class FakeWindow: DeskArrangeHideable {
+    var isVisible: Bool
+    var ordersOut = 0
+    var bringsBack = 0
+
+    init(visible: Bool) { isVisible = visible }
+
+    func orderOut(_ sender: Any?) {
+        ordersOut += 1
+        isVisible = false
+    }
+
+    func makeKeyAndOrderFront(_ sender: Any?) {
+        bringsBack += 1
+        isVisible = true
+    }
+}
+
+@Suite("Arrange: Settings steps aside")
+@MainActor
+struct DeskArrangeStashTests {
+    @Test("an open Settings is put away while arranging and comes back after")
+    func settingsComesBack() {
+        let settings = FakeWindow(visible: true)
+        let stash = DeskArrangeStash()
+        stash.hide([settings])
+        #expect(!settings.isVisible)
+        #expect(settings.ordersOut == 1)
+        #expect(stash.hidden.count == 1)
+        stash.restore()
+        #expect(settings.isVisible)
+        #expect(settings.bringsBack == 1)
+        #expect(stash.hidden.isEmpty)
+        // Restoring again brings nothing back twice.
+        stash.restore()
+        #expect(settings.bringsBack == 1)
+    }
+
+    @Test("a closed or missing Settings stays closed")
+    func closedStaysClosed() {
+        let settings = FakeWindow(visible: false)
+        let stash = DeskArrangeStash()
+        stash.hide([settings, nil])
+        stash.restore()
+        #expect(!settings.isVisible)
+        #expect(settings.ordersOut == 0)
+        #expect(settings.bringsBack == 0)
+    }
+
+    @Test("hiding the same window twice remembers it once")
+    func once() {
+        let settings = FakeWindow(visible: true)
+        let stash = DeskArrangeStash()
+        stash.hide([settings])
+        settings.isVisible = true
+        stash.hide([settings])
+        #expect(stash.hidden.count == 1)
     }
 }
