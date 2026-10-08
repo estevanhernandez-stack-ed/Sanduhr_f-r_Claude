@@ -286,7 +286,8 @@ final class DeskArrangeBarController {
     /// Centers the open panel on `screen`'s visible frame (a display change while arranging).
     func place(on screen: NSScreen?) {
         guard let p = panel, let visible = (screen ?? NSScreen.main)?.visibleFrame else { return }
-        let size = p.contentView?.fittingSize ?? p.frame.size
+        p.contentView?.layoutSubtreeIfNeeded()
+        let size = DeskArrange.barSize(fitting: p.contentView?.fittingSize)
         p.setFrame(NSRect(origin: DeskArrange.barOrigin(size: size, in: visible), size: size), display: true)
     }
 
@@ -310,7 +311,7 @@ final class DeskArrangeBarController {
         p.backgroundColor = .clear
         p.hasShadow = true
         p.title = DeskArrangeCopy.barTitle
-        let host = FirstClickHostingView(rootView: DeskArrangeBar())
+        let host = FirstClickHostingView(rootView: DeskArrangeBar().fixedSize())
         p.contentView = host
         return p
     }
