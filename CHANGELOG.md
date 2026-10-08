@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+## v2.11.0-mac — 2026-10-08
+
 - Accounts: a green **Active** pill and a **Signed in**, **Session expired** or **Signed out** pill beside each account's name; a working account folds its sign-in tools under **Change Sign-In**, so the page no longer looks signed out. The Settings search field looks like one, and Command-F jumps into it.
 
 - A setup guide, docs/setup-guide.md.
