@@ -9,7 +9,9 @@ steps:
   - expect_state: { settings_section: message, settings_preview: message, message_editor.open: true, message_editor.mode: list, message_editor.unsaved: false }
   - do: message-editor
     arg: add
-  - expect_state: { message_editor.unsaved: true, message_editor.added: "Fri: {ink:#ff7e5f,#feb47b,#ffd86f} {font:script} {sweep} ship it." }
+  # Settings v2, slice 3: Add Line puts the line at the top of its day's lines and scrolls its open
+  # editor into view (the new-line anchor), wherever the list was scrolled.
+  - expect_state: { message_editor.unsaved: true, message_editor.added: "Fri: {ink:#ff7e5f,#feb47b,#ffd86f} {font:script} {sweep} ship it.", settings_anchor: new-line, settings_anchor_visible: true }
   - snap: message-editor
   - do: message-editor
     arg: revert

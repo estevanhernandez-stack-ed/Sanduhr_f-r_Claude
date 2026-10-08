@@ -27,36 +27,31 @@ struct MessageModePicker: View {
     }
 }
 
+/// The bar over Message's list (Settings v2, slice 3, F13): Add Line, List | Text, Save, Revert
+/// and whether anything is unsaved, always on screen. Add Line puts the new row at the top of its
+/// day's lines, opens its editor and scrolls it into view (SettingsWindowController.revealNewLine).
 struct MessageEditorBar: View {
     @Bindable var editor: MessageEditorModel
     let saved: () -> Void
-    @AppStorage("messageRotate", store: .desk) private var rotate = "daily"
-    @AppStorage(MessageEngine.mixKey, store: .desk) private var mix = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Picker("Change the line", selection: $rotate) {
-                    Text("Once a day").tag("daily")
-                    Text("Every hour").tag("hourly")
-                }
-                .pickerStyle(.segmented)
-                .fixedSize()
-                .help("How often the Desk picks another line from today's lines.")
-                Spacer()
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Button {
+                    editor.addLineAtTop()
+                    SettingsWindowController.shared.revealNewLine()
+                } label: { Label("Add Line", systemImage: "plus") }
+                    .help("A new line, every day, in the Desk's look, at the top of the list with its controls open.")
                 MessageModePicker(editor: editor)
-            }
-            Toggle("Mix every-day lines in on days with their own line", isOn: $mix)
-                .help("Off: on a day with its own lines (Fridays), only those show. On: they take turns with the every-day lines.")
-                .onChange(of: mix) { _, _ in saved() }
-            MessageSpecialDaysControl(changed: saved)
-            HStack {
+                Spacer()
                 Button("Save") { if editor.save() { saved() } }
                     .keyboardShortcut("s", modifiers: .command)
                     .disabled(!editor.unsaved)
                 Button("Revert") { editor.load() }
                     .disabled(!editor.unsaved)
                     .help("Drops your unsaved edits and shows messages.txt as it is.")
+            }
+            HStack {
                 Text(editor.unsaved ? "Unsaved changes" : Self.todayText(MessageEngine.today()))
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 Spacer()
@@ -74,6 +69,55 @@ struct MessageEditorBar: View {
     static func todayText(_ today: MessageEngine.Today) -> String {
         let lines = today.lines.map { MessageMarkup.parse($0).text }
         return "Today: " + (lines.isEmpty ? "nothing" : lines.joined(separator: " / "))
+    }
+}
+
+/// Rotation (slice 3): Change the line, Mix and On special days, folded to a one-line summary
+/// while all three are as shipped, open when one is not.
+struct MessageRotationGroup: View {
+    let changed: () -> Void
+    @AppStorage("messageRotate", store: .desk) private var rotate = "daily"
+    @AppStorage(MessageEngine.mixKey, store: .desk) private var mix = false
+    @AppStorage(MessageSpecialMode.key, store: .desk) private var special = MessageSpecialMode.stack
+    @State private var open: Bool?
+
+    var body: some View {
+        DisclosureGroup(isExpanded: Binding(
+            get: { open ?? !MessageRotationSummary.isStandard(rotate: rotate, mix: mix, special: special) },
+            set: { open = $0 })) {
+            VStack(alignment: .leading, spacing: 8) {
+                Picker("Change the line", selection: $rotate) {
+                    Text("Once a day").tag("daily")
+                    Text("Every hour").tag("hourly")
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+                .help("How often the Desk picks another line from today's lines.")
+                Toggle("Mix every-day lines in on days with their own line", isOn: $mix)
+                    .help("Off: on a day with its own lines (Fridays), only those show. On: they take turns with the every-day lines.")
+                    .onChange(of: mix) { _, _ in changed() }
+                MessageSpecialDaysControl(changed: changed)
+            }
+            .padding(.top, 6)
+        } label: {
+            HStack(spacing: 6) {
+                Text("Rotation").font(.headline)
+                Text(MessageRotationSummary.text(rotate: rotate, mix: mix, special: special))
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+        }
+    }
+}
+
+/// Rotation's folded line: "Once a day, Mix off, special days stack".
+enum MessageRotationSummary {
+    static func isStandard(rotate: String, mix: Bool, special: MessageSpecialMode) -> Bool {
+        rotate == "daily" && !mix && special == .stack
+    }
+
+    static func text(rotate: String, mix: Bool, special: MessageSpecialMode) -> String {
+        let change = rotate == "hourly" ? "Every hour" : "Once a day"
+        return "\(change), Mix \(mix ? "on" : "off"), special days: \(special.title.lowercased())"
     }
 }
 
@@ -121,15 +165,11 @@ struct MessageListEditor: View {
             }
             ForEach(rows) { row in
                 MessageRowView(editor: editor, row: row, pinned: $pinned, pinChanged: pinChanged)
+                    .modifier(NewLineAnchor(isNew: row.id == editor.justAdded))
             }
-            HStack {
-                Button { editor.addLine() } label: { Label("Add Line", systemImage: "plus") }
-                    .help("A new line, every day, in the Desk's look.")
-                Spacer()
-                if editor.document.noteCount > 0 {
-                    Text("Notes (#) and blank lines in the file stay where they are.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
+            if editor.document.noteCount > 0 {
+                Text("Notes (#) and blank lines in the file stay where they are.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
     }
@@ -145,6 +185,16 @@ struct MessageListEditor: View {
         .padding(8)
         .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.08)))
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// The row Add Line just put in carries the new-line anchor, so the page scrolls to it and
+/// `settings_anchor_visible` checks its editor is on screen.
+private struct NewLineAnchor: ViewModifier {
+    let isNew: Bool
+
+    func body(content: Content) -> some View {
+        if isNew { content.settingsAnchor(SettingsAnchor.newLine) } else { content }
     }
 }
 

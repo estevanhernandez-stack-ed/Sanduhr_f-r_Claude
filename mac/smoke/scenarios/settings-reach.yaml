@@ -1,0 +1,43 @@
+# docs/mac-smoke-test.md section 44: Settings v2, slice 3 (item 72), reach. A link to a section, the
+# smoke hook's anchor and the sidebar search each bring the section on screen on any window height
+# (628 pt included): state.yaml's settings_anchor_visible is the section's top line inside the
+# page's scrolling area. Margins sits under Desk's Advanced disclosure, which the search opens.
+# Reads only: nothing here changes a setting.
+name: Settings reaches every section without scrolling blind
+steps:
+  - do: settings
+    arg: notch glow
+  - expect_state: { settings_open: true, settings_section: notch, settings_anchor: glow, settings_anchor_visible: true }
+  - expect:
+      window: settings
+      contains: { text: Test Glow }
+  - snap: notch-glow
+  - do: settings
+    arg: watchers
+  # The Watchers page (was a section deep in Integrations) opens at its top.
+  - expect_state: { settings_section: watchers, settings_anchor: null, settings_anchor_visible: null }
+  - expect:
+      window: settings
+      contains: { text: Let agents show watchers }
+  - do: settings
+    arg: watchers above-prompt
+  - expect_state: { settings_section: watchers, settings_anchor: above-prompt, settings_anchor_visible: true }
+  - expect:
+      window: settings
+      contains: { text: Show watchers above the prompt }
+  - do: settings-search
+    arg: glow
+  - expect_state: { settings_section: notch, settings_anchor: glow, settings_anchor_visible: true }
+  - do: settings-search
+    arg: percent
+  - expect_state: { settings_section: general, settings_anchor: menu-bar-shows, settings_anchor_visible: true }
+  - expect:
+      window: settings
+      contains: { text: Menu Bar Shows }
+  - do: settings-search
+    arg: margins
+  - expect_state: { settings_section: deskLayout, settings_anchor: margins, settings_anchor_visible: true }
+  - expect:
+      window: settings
+      contains: { text: "Top (below the menu bar)" }
+  - snap: margins

@@ -14,7 +14,9 @@ module Smoke
                             welcome-tour, sheet)
       state                 snapshot and print state.yaml
       do <action> [arg]     run one hook action and wait for it: show-widget, hide-widget,
-                            settings [section], close-settings, refresh, test-alert,
+                            settings [section [anchor]] (notch glow: the page scrolled to a section),
+                            settings-search <words> (the sidebar search's best match, as Return),
+                            close-settings, refresh, test-alert,
                             pulse [tier], tool deep-work|pacing|snake, desk on|off, notch on|off,
                             camera-light on|off, glow [alert|meeting|camera], demo on|off,
                             account next (the next account, as the widget's chip),

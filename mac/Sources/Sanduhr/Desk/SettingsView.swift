@@ -20,27 +20,46 @@ struct DeskLayoutSection: View {
             Section {
                 Toggle(SettingsNames.deskSwitch, isOn: $deskOn)
                     .onChange(of: deskOn) { _, _ in DeskController.shared.apply() }
+                    .settingsAnchor(SettingsAnchor.desk)
                 DeskArrangeRow(deskOn: deskOn, arranging: arranging)
+                    .settingsAnchor(SettingsAnchor.arrange)
             }
             Section("Where each piece sits") {
                 ForEach(DeskLayout.widgets, id: \.key) { w in
                     DeskPlaceRow(widget: w.key, name: w.name, layout: $layout)
                         .disabled(arranging)
+                        .modifier(FirstPieceAnchor(widget: w.key))
                     DeskPieceExtra(widget: w.key)
                 }
                 Text(DeskLayout.placesCaption)
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Order") {
-                DeskOrderList(layout: $layout)
+                // One row, so the section's anchor marks the whole list.
+                VStack(alignment: .leading, spacing: 10) { DeskOrderList(layout: $layout) }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .disabled(arranging)
+                    .settingsAnchor(SettingsAnchor.order)
                 Text("Pieces in the same place stack top to bottom in this order. Drag a piece up or down to reorder it, or onto a piece in another place to move it there. The top, middle and bottom of a side share a column, and a side keeps clear of the centers, so places never overlap.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             DeskClicksSection()
-            DeskMarginsSection()
+            AdvancedSection(page: .deskLayout) { DeskMarginsRows() }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Where each piece sits: its first row carries the section's anchor.
+private struct FirstPieceAnchor: ViewModifier {
+    let widget: String
+
+    func body(content: Content) -> some View {
+        if widget == DeskLayout.widgets.first?.key {
+            content.settingsAnchor(SettingsAnchor.pieces)
+        } else {
+            content
+        }
     }
 }
 
@@ -51,26 +70,27 @@ private struct DeskClicksSection: View {
     var body: some View {
         Section("Clicks") {
             Toggle(DeskPieceClicks.title, isOn: $piecesTakeClicks)
+                .settingsAnchor(SettingsAnchor.clicks)
             Text(DeskPieceClicks.caption)
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
 }
 
-/// Desk, Margins. Slice 3 folds it under Advanced.
-private struct DeskMarginsSection: View {
+/// Desk, Advanced, Margins (slice 3: folded, the one expert control on the page).
+private struct DeskMarginsRows: View {
     @AppStorage("left", store: .desk) private var left = 52.0
     @AppStorage("right", store: .desk) private var right = 52.0
     @AppStorage("top", store: .desk) private var top = 40.0
     @AppStorage("bottom", store: .desk) private var bottom = 60.0
 
     var body: some View {
-        Section("Margins") {
-            slider("Left", $left, 0...300)
-            slider("Right", $right, 0...300)
-            slider("Top (below the menu bar)", $top, 0...300)
-            slider("Bottom", $bottom, 0...300)
-        }
+        Text("Margins").font(.callout.weight(.semibold))
+            .settingsAnchor(SettingsAnchor.margins)
+        slider("Left", $left, 0...300)
+        slider("Right", $right, 0...300)
+        slider("Top (below the menu bar)", $top, 0...300)
+        slider("Bottom", $bottom, 0...300)
     }
 }
 
@@ -93,17 +113,17 @@ private struct DeskPieceExtra: View {
         case NowPlayingPlacement.widget:
             link("Shows only while something plays.", .nowPlaying)
         case WatcherPlacement.widget:
-            link("Shows only while there is a watcher.", .watchers)
+            link("Shows only while there is a watcher.", .watchers, anchor: SettingsAnchor.whereTheyShow)
         default:
             EmptyView()
         }
     }
 
-    private func link(_ text: String, _ page: SettingsSection) -> some View {
+    private func link(_ text: String, _ page: SettingsSection, anchor: String? = nil) -> some View {
         HStack {
             Text(text).font(.caption).foregroundStyle(.secondary)
             Spacer()
-            SettingsLinkButton(page)
+            SettingsLinkButton(page, anchor: anchor)
         }
         .padding(.leading, 16)
     }
@@ -122,7 +142,7 @@ struct NeedsDeskRow: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 Spacer()
-                SettingsLinkButton(.deskLayout)
+                SettingsLinkButton(.deskLayout, anchor: SettingsAnchor.desk)
             }
         }
     }
@@ -335,6 +355,7 @@ struct DeskLookSection: View {
                     Divider()
                     ForEach(families, id: \.self) { Text($0).tag($0) }
                 }
+                .settingsAnchor(SettingsAnchor.fonts)
                 Picker("Message font", selection: $messageFont) {
                     Text("Same as Desk").tag("")
                     Divider()
@@ -343,14 +364,23 @@ struct DeskLookSection: View {
             }
             Section("Sizes") {
                 slider("Clock", $timeSize, 48...220)
+                    .settingsAnchor(SettingsAnchor.sizes)
                 slider("Message", $messageSize, 24...180)
             }
-            Section("Colors (one hex, or several with commas for a gradient)") {
-                ColorRow(title: "Message", value: $messageColor)
+            Section("Colors") {
+                ColorRow(title: "Message", value: $messageColor, showsHex: false)
+                    .settingsAnchor(SettingsAnchor.colors)
                 Toggle("Glow around the message", isOn: $messageGlow)
-                ColorRow(title: "Clock, date, meetings, Claude", value: $inkColor)
+                ColorRow(title: "Clock, date, meetings, Claude", value: $inkColor, showsHex: false)
                 Toggle("Drop shadow under the clock text", isOn: $inkShadow)
-                Text("Notch text color is on Notch; how the clock and the message take clicks is on Desk.")
+                Text("Pick a preset; Advanced, below, takes your own hex colors. Notch text color is on Notch; how the clock and the message take clicks is on Desk.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            AdvancedSection(page: .deskLook) {
+                HexRow(title: "Message", value: $messageColor)
+                    .settingsAnchor(SettingsAnchor.hex)
+                HexRow(title: "Clock, date, meetings, Claude", value: $inkColor)
+                Text("One hex color, or two to four with commas for a gradient, such as 8f5bd6,3a63e0,33fdff.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -362,15 +392,19 @@ struct DeskLookSection: View {
     }
 }
 
+/// A color: the preset picker, and either the hex field with its swatch or (Desk Look, whose hex
+/// fields fold under Advanced since slice 3) the swatch alone.
 struct ColorRow: View {
     let title: String
     @Binding var value: String
+    var showsHex = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(title)
                 Spacer()
+                if !showsHex { Swatch(value: value).frame(width: 60, height: 18) }
                 Picker("", selection: $value) {
                     ForEach(DeskLookSection.presets, id: \.value) { Text($0.name).tag($0.value) }
                     if !DeskLookSection.presets.contains(where: { $0.value == value }) {
@@ -379,12 +413,25 @@ struct ColorRow: View {
                 }
                 .labelsHidden()
                 .frame(width: 170)
+                .accessibilityLabel(title)
             }
-            HStack {
-                TextField("hex", text: $value)
-                    .font(.system(.body, design: .monospaced))
-                Swatch(value: value).frame(width: 90, height: 18)
-            }
+            if showsHex { HexRow(title: nil, value: $value) }
+        }
+    }
+}
+
+/// A hex field and its swatch: one hex color, or several with commas for a gradient.
+struct HexRow: View {
+    let title: String?
+    @Binding var value: String
+
+    var body: some View {
+        HStack {
+            if let title { Text(title) }
+            TextField("hex", text: $value)
+                .font(.system(.body, design: .monospaced))
+                .accessibilityLabel(title.map { "\($0) hex" } ?? "Hex")
+            Swatch(value: value).frame(width: 90, height: 18)
         }
     }
 }
@@ -507,8 +554,10 @@ struct DeskMessageSection: View {
     @State private var reviewing = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+        // Slice 3 (F13): Add Line, List | Text, Save and Revert sit in a bar that never scrolls
+        // away; the rotation, the lines and Ask Claude scroll under it.
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 8) {
                 if let proposal = handoff.pending {
                     MessageSuggestionBanner(proposal: proposal, canAdd: !editor.unsaved,
                                             review: { reviewing = true },
@@ -517,15 +566,26 @@ struct DeskMessageSection: View {
                 }
                 NeedsDeskRow()
                 MessageEditorBar(editor: editor, saved: refreshDesk)
-                if editor.mode == .list {
-                    MessageListEditor(editor: editor, pinChanged: refreshDesk)
-                } else {
-                    MessageTextEditorPane(editor: editor, pinChanged: refreshDesk)
-                }
-                Divider()
-                MessageAskClaude()
+                    .settingsAnchor(SettingsAnchor.editor)
             }
-            .padding(20)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    MessageRotationGroup(changed: refreshDesk)
+                        .settingsAnchor(SettingsAnchor.rotation)
+                    if editor.mode == .list {
+                        MessageListEditor(editor: editor, pinChanged: refreshDesk)
+                    } else {
+                        MessageTextEditorPane(editor: editor, pinChanged: refreshDesk)
+                    }
+                    Divider()
+                    MessageAskClaude()
+                        .settingsAnchor(SettingsAnchor.askClaude)
+                }
+                .padding(20)
+            }
         }
         .onAppear { editor.loadIfNeeded() }
         .onChange(of: rotate) { _, _ in refreshDesk() }
@@ -661,13 +721,6 @@ struct MessageSuggestionReview: View {
 
 struct DeskNotchSection: View {
     @AppStorage(DeskController.notchKey, store: .desk) private var enabled = false
-    @AppStorage("notchWings", store: .desk) private var wings = 36.0
-    @AppStorage("notchChin", store: .desk) private var chin = 26.0
-    @AppStorage("notchText", store: .desk) private var wingText = true
-    @AppStorage("notchChinText", store: .desk) private var chinText = false
-    @AppStorage(NotchContent.Place.left.key, store: .desk) private var left = NotchContent.Place.left.fallback
-    @AppStorage(NotchContent.Place.right.key, store: .desk) private var right = NotchContent.Place.right.fallback
-    @AppStorage(NotchContent.Place.strip.key, store: .desk) private var strip = NotchContent.Place.strip.fallback
     @AppStorage(CameraLightController.enabledKey, store: .desk) private var cameraLight = false
     @AppStorage(CameraLightController.brightnessKey, store: .desk) private var lightBrightness = CameraLightController.defaultBrightness
     @AppStorage(CameraLightController.sizeKey, store: .desk) private var lightSize = CameraLightController.defaultSize
@@ -676,33 +729,19 @@ struct DeskNotchSection: View {
         Form {
             Section {
                 Toggle(SettingsNames.notchSwitch, isOn: $enabled)
+                    .settingsAnchor(SettingsAnchor.notch)
                 NeedsDeskRow()
                 Text("Widens the notch into one black island while the Desk is on. Click it to open these settings. Screens without a notch are left alone.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section("Text") {
-                Toggle("Text beside the camera", isOn: $wingText)
-                contentPicker("Left wing", $left, .left).disabled(!wingText)
-                if left == .nowPlaying { NowPlayingIdleCaption(place: .left).disabled(!wingText) }
-                contentPicker("Right wing", $right, .right).disabled(!wingText)
-                if right == .nowPlaying { NowPlayingIdleCaption(place: .right).disabled(!wingText) }
-                Toggle("Text under the camera too (desktop only)", isOn: $chinText)
-                    .disabled(chin == 0)
-                contentPicker("Under the camera", $strip, .strip).disabled(!chinText || chin == 0)
-                if strip == .nowPlaying { NowPlayingIdleCaption(place: .strip).disabled(!chinText || chin == 0) }
-                Text("Nothing leaves that part plain black. A wing grows to fit its text. Watchers show the most urgent watcher while there is one (switched on in Watchers), else that place's default. Where the camera and mic indicators show is under Camera and mic, below.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            .disabled(!enabled)
-            Section("Size") {
-                slider("Extra width each side", $wings, 0...180)
-                slider("Extra height below (0 = none)", $chin, 0...56)
-            }
-            .disabled(!enabled)
-            NotchTextColorSection()
+            NotchTextSection()
+                .disabled(!enabled)
+            NotchGlowSection()
+            AVIndicatorSection()
             Section("Camera fill light") {
                 Toggle("Light up for the camera", isOn: $cameraLight)
                     .onChange(of: cameraLight) { _, _ in CameraLightController.shared.apply() }
+                    .settingsAnchor(SettingsAnchor.cameraLight)
                 HStack {
                     Text("Brightness")
                     Slider(value: $lightBrightness, in: CameraLightLayout.brightnessRange)
@@ -714,10 +753,49 @@ struct DeskNotchSection: View {
                 Text("While any app uses a camera, a soft white light around the notch lights your face, above every app. It ends when the camera stops, with or without Desk or the island. Tools, Camera Fill Light shows it by hand. Screens without a notch get it at the top center.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            AVIndicatorSection()
-            NotchGlowSection()
+            AdvancedSection(page: .notch) { NotchAdvancedRows(enabled: enabled) }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Notch, Text: the wings and the strip under the camera. Text under the camera turns on with a
+/// height (NotchChin): at 0 it sets Extra height below to 18 pt, so the island changes at once,
+/// and a hint under it names where the height lives (slice 3, F16).
+private struct NotchTextSection: View {
+    @AppStorage(NotchChin.key, store: .desk) private var chin = NotchChin.standard
+    @AppStorage("notchText", store: .desk) private var wingText = true
+    @AppStorage(NotchChin.textKey, store: .desk) private var chinText = false
+    @AppStorage(NotchContent.Place.left.key, store: .desk) private var left = NotchContent.Place.left.fallback
+    @AppStorage(NotchContent.Place.right.key, store: .desk) private var right = NotchContent.Place.right.fallback
+    @AppStorage(NotchContent.Place.strip.key, store: .desk) private var strip = NotchContent.Place.strip.fallback
+
+    var body: some View {
+        Section("Text") {
+            Toggle("Text beside the camera", isOn: $wingText)
+                .settingsAnchor(SettingsAnchor.text)
+            contentPicker("Left wing", $left, .left).disabled(!wingText)
+            if left == .nowPlaying { NowPlayingIdleCaption(place: .left).disabled(!wingText) }
+            contentPicker("Right wing", $right, .right).disabled(!wingText)
+            if right == .nowPlaying { NowPlayingIdleCaption(place: .right).disabled(!wingText) }
+            Toggle("Text under the camera too (desktop only)", isOn: chinTextBinding)
+            if chinText {
+                Text(NotchChin.hint(chin: chin))
+                    .font(.caption).foregroundStyle(chin == 0 ? .orange : .secondary)
+            }
+            contentPicker("Under the camera", $strip, .strip).disabled(!chinText || chin == 0)
+            if strip == .nowPlaying { NowPlayingIdleCaption(place: .strip).disabled(!chinText || chin == 0) }
+            Text("Nothing leaves that part plain black. A wing grows to fit its text. Watchers show the most urgent watcher while there is one (switched on in Watchers), else that place's default. Where the camera and mic indicators show is under Camera and mic, below.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    /// On with no height below the notch sets one, so the strip shows at once.
+    private var chinTextBinding: Binding<Bool> {
+        Binding(get: { chinText }, set: { on in
+            chin = NotchChin.height(turningTextOn: on, chin: chin)
+            chinText = on
+        })
     }
 
     /// A place's content. Camera and mic is no longer a choice here (Camera and mic, Where they
@@ -732,14 +810,46 @@ struct DeskNotchSection: View {
     }
 }
 
-/// Notch text color (moved from Desk Look in slice 2). Slice 3 folds it under Advanced with Size.
-private struct NotchTextColorSection: View {
+/// Notch, Advanced (slice 3): Size (moved from its own section) and Notch text color (moved from
+/// Desk Look in slice 2).
+private struct NotchAdvancedRows: View {
+    let enabled: Bool
+    @AppStorage("notchWings", store: .desk) private var wings = 36.0
+    @AppStorage(NotchChin.key, store: .desk) private var chin = NotchChin.standard
     @AppStorage("notchTextColor", store: .desk) private var notchTextColor = "ffffff"
 
     var body: some View {
-        Section("Notch text color") {
-            ColorRow(title: "Notch text", value: $notchTextColor)
-        }
+        Text("Size").font(.callout.weight(.semibold))
+            .settingsAnchor(SettingsAnchor.size)
+        slider("Extra width each side", $wings, 0...180)
+            .disabled(!enabled)
+        slider("Extra height below (0 = none)", $chin, 0...56)
+            .disabled(!enabled)
+        ColorRow(title: "Notch text color", value: $notchTextColor)
+            .settingsAnchor(SettingsAnchor.textColor)
+    }
+}
+
+/// Text under the camera and the height it needs (slice 3, F16): the toggle used to stay dim at
+/// a height of 0 with the reason further down the page.
+enum NotchChin {
+    static let key = "notchChin"
+    static let textKey = "notchChinText"
+    /// Extra height below as shipped.
+    static let standard = 26.0
+    /// What turning on Text under the camera sets when there is no height below the notch.
+    static let textHeight = 18.0
+
+    /// Extra height below after Text under the camera turns `on`: 18 pt when it was 0, else as it was.
+    static func height(turningTextOn on: Bool, chin: Double) -> Double {
+        on && chin <= 0 ? textHeight : chin
+    }
+
+    /// The one line under the switch.
+    static func hint(chin: Double) -> String {
+        chin <= 0
+            ? "Extra height below is 0, so nothing shows under the camera. Set it in Advanced, Size, below."
+            : "Height is Extra height below, in Advanced, Size, below."
     }
 }
 
@@ -766,6 +876,7 @@ private struct AVIndicatorSection: View {
             Picker("Show the red dot", selection: $dot) {
                 ForEach(AVCameraDotMode.allCases) { Text($0.label).tag($0) }
             }
+            .settingsAnchor(SettingsAnchor.cameraMic)
             Text("A MacBook's camera has its own green light; the dot is for cameras whose light you can't see: an external or Continuity camera, or the built-in one with the lid closed.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -792,7 +903,7 @@ private struct NowPlayingIdleCaption: View {
     var body: some View {
         HStack(spacing: 4) {
             Text(idle.caption(at: place))
-            Button("Change…") { SettingsWindowController.shared.show(.nowPlaying) }
+            Button("Change…") { SettingsWindowController.shared.show(.nowPlaying, anchor: SettingsAnchor.idle) }
                 .buttonStyle(.link)
         }
         .font(.caption)
@@ -821,6 +932,7 @@ private struct NotchGlowSection: View {
     /// Sanduhr's own events, and Test Glow.
     @ViewBuilder private var sanduhrRows: some View {
         Toggle("For Sanduhr alerts", isOn: $glowAlerts)
+            .settingsAnchor(SettingsAnchor.glow)
         Toggle("A minute before a meeting", isOn: $glowMeetings)
             .onChange(of: glowMeetings) { _, _ in NotchGlowController.shared.apply() }
         Toggle("When the camera fill light comes on", isOn: $glowCamera)
@@ -845,7 +957,7 @@ private struct NotchGlowSection: View {
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
-            SettingsLinkButton(.integrations)
+            SettingsLinkButton(.integrations, anchor: SettingsAnchor.folders)
         }
     }
 }
@@ -865,6 +977,7 @@ struct GeneralSection: View {
             SurfacesStatusSection()
             Section("Startup") {
                 Toggle("Open Sanduhr at login", isOn: $atLogin)
+                    .settingsAnchor(SettingsAnchor.startup)
                     .onChange(of: atLogin) { _, on in
                         do { if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() } }
                         catch { atLogin = SMAppService.mainApp.status == .enabled }
@@ -875,6 +988,7 @@ struct GeneralSection: View {
             Section {
                 HStack {
                     Button("Quit Sanduhr für Claude") { NSApp.terminate(nil) }
+                        .settingsAnchor(SettingsAnchor.quit)
                     Spacer()
                     Text("Sanduhr \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
                         .font(.caption).foregroundStyle(.secondary)
@@ -895,10 +1009,12 @@ struct GeneralSection: View {
             .onChange(of: menuBarMode) { _, _ in
                 (NSApp.delegate as? AppDelegate)?.menuBarModeDidChange()
             }
+            .settingsAnchor(SettingsAnchor.menuBarShows)
             Text("The percent beside the hourglass, also in every Sanduhr menu. Only the session and the weekly all-models limit show here; Rotate switches between them every 8 seconds (S for session, W for weekly). The meetings menu is a second menu bar item with today's meetings, Join and Settings.")
                 .font(.caption).foregroundStyle(.secondary)
             Toggle(SettingsNames.meetingsMenu, isOn: $menuIcon)
                 .onChange(of: menuIcon) { _, on in DeskController.shared.setMenuIcon(on) }
+                .settingsAnchor(SettingsAnchor.meetingsMenu)
         }
     }
 }
@@ -930,17 +1046,18 @@ private struct SurfacesStatusSection: View {
 
     var body: some View {
         Section("Surfaces") {
-            row(SurfaceStatus.desk(on: deskEnabled), .deskLayout)
-            row(SurfaceStatus.notch(on: notch, deskOn: deskEnabled), .notch)
-            row(SurfaceStatus.widget(widgetVisibility, shown: !panelHidden), .widgetLook)
+            row(SurfaceStatus.desk(on: deskEnabled), .deskLayout, SettingsAnchor.desk)
+                .settingsAnchor(SettingsAnchor.surfaces)
+            row(SurfaceStatus.notch(on: notch, deskOn: deskEnabled), .notch, SettingsAnchor.notch)
+            row(SurfaceStatus.widget(widgetVisibility, shown: !panelHidden), .widgetLook, SettingsAnchor.show)
             LabeledContent(SurfaceStatus.menuBar(menuBarMode)) { Text("Below").foregroundStyle(.secondary) }
             Text("Each surface is switched on its own page. Sanduhr keeps fetching and alerting with every surface off.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
 
-    private func row(_ status: String, _ page: SettingsSection) -> some View {
-        LabeledContent(status) { SettingsLinkButton(page) }
+    private func row(_ status: String, _ page: SettingsSection, _ anchor: String) -> some View {
+        LabeledContent(status) { SettingsLinkButton(page, anchor: anchor) }
     }
 }
 
@@ -954,6 +1071,7 @@ private struct ShortcutsSection: View {
         Section("Shortcuts") {
             Toggle(SanduhrHotKeys.Shortcut.settings.title, isOn: $settings)
                 .onChange(of: settings) { _, _ in DeskController.shared.applyHotKeys() }
+                .settingsAnchor(SettingsAnchor.shortcuts)
             Toggle(SanduhrHotKeys.Shortcut.join.title, isOn: $join)
                 .onChange(of: join) { _, _ in DeskController.shared.applyHotKeys() }
             Text(SanduhrHotKeys.caption)

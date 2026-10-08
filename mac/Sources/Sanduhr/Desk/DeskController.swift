@@ -704,10 +704,15 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     /// estedesk://join-next opens the next meeting's link (Option+J does the same, see applyHotKeys).
     /// estedesk://join-next, estedesk://settings (and the same on sanduhr://), forwarded by
-    /// the app delegate.
+    /// the app delegate. settings/<page>#<anchor> opens a page at a section (Settings v2, slice 3);
+    /// the host alone opens Settings where it was left.
     func handle(_ url: URL) {
         if url.host == "join-next" { joinNext() }
-        if url.host == "settings" || url.host == "desk" { showSettings() }
+        if url.host == "desk" { showSettings() }
+        if url.host == "settings" {
+            let target = SettingsLink.target(url)
+            MainActor.assumeIsolated { SettingsWindowController.shared.show(target.section, anchor: target.anchor) }
+        }
     }
 
     private func joinNext() {

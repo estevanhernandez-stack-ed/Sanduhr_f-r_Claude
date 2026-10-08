@@ -1394,6 +1394,51 @@ whenever Sanduhr runs, not only with the Desk (state.yaml `hot_keys`); Camera an
 become `avPlace` (above). `SettingsHomesTests` covers the pages, the aliases and each migration,
 including a 2.10 profile that reads the same after two runs.
 
+## Settings reach
+
+Settings v2, slice 3 (item 72): every section the guide names can be reached on a 628 pt window
+without scrolling blind.
+
+- **Anchors.** Every section of every page has a page-local anchor (`Models/SettingsIndex.swift`,
+  `SettingsAnchor.all`: `glow` on Notch, `margins` on Desk, `above-prompt` on Watchers, `data` on
+  Accounts…), marked in the views with `.settingsAnchor(_:)` (`Views/SettingsReach.swift`).
+  `SettingsWindowController.show(_:anchor:)` opens a page scrolled to one: one `ScrollViewReader`
+  around the page scrolls to it twice (just after the page appears and again 0.3 s later, for
+  rows a lazy form hadn't built yet). In-page links pass one: Needs the Desk opens Desk at its
+  switch, the Claude Code glow hook hints open Notch at Notch glow, the meters mod lines open Claude
+  Code at Folders, Now Playing's links open Notch at Text and Desk at Where each piece sits.
+- **Links.** `sanduhr://settings/<page>#<anchor>` (and `estedesk://`) open there, `<page>` a raw
+  value or an alias; an anchor the page lacks is dropped, and the host alone still opens Settings
+  where it was left (`SettingsLink.target`). The smoke hook's `settings` takes the same anchor:
+  `settings notch glow` or `settings notch#glow` (an unknown anchor is an error naming the page's).
+- **Search.** A field over the sidebar. The index (`SettingsSearch.index`) is every page, every
+  anchor and every name in `SettingsNames.table`, each with a few synonyms ("percent" and
+  "hourglass" for Menu Bar Shows, "corner" and "position" for Where each piece sits, "statusline"
+  and "prompt" for Claude Code). Prefix and word match only: each typed word starts a word of the
+  title or a synonym. Title matches rank before synonym matches, then sidebar order. Typing filters
+  the sidebar to the matching pages with the matching sections under each; choosing one opens it
+  scrolled to and lit for 1.5 s, Return opens the best match, Escape clears. Smoke:
+  `settings-search <words>`.
+- **Previews fold.** Below 720 pt of window height a page's preview is a 44 pt strip with its
+  title ("Notch preview") and an arrow; opening it pushes the controls down and is remembered per
+  page while the window lives. The window opens 680 pt tall where the screen allows (was 600), so on
+  the default window the previews start folded. Claude Code's strip says its card is sample input.
+- **Advanced.** A collapsed **Advanced** section on Desk (Margins), Desk Look (the hex fields; the
+  Colors section keeps the presets and a swatch) and Notch (Size and Notch text color). Search and
+  an anchor link open it.
+- **Message's bar.** Add Line, List | Text, Save and Revert sit above the list and never scroll
+  away, with "Unsaved changes" (or today's lines) under them; Rotation (Change the line, Mix, On
+  special days) folds to a summary line while all three are as shipped. Add Line puts the new line at
+  the top of its day's lines (`MessageDocument.insertAtTopOfGroup`: before the first line with the
+  same When, else before the first line, notes staying put), opens its editor and scrolls it into view.
+- **Text under the camera** turns on at any height: at 0 it sets Extra height below to 18 pt
+  (`NotchChin`), so the island changes at once, and a hint under it says where the height lives.
+
+state.yaml: `settings_anchor_visible` (the anchor's top line is inside the page's scrolling area,
+from frames the marked views report; null with no anchor) and `settings_preview_folded`.
+`SettingsReachTests` covers the index (every names-table entry indexed at its anchor, the synonyms),
+anchor and link parsing, Advanced, folding, Add Line's place and the chin height.
+
 ## Files
 
 - `sessionKey:{label}` + `cf_clearance:{label}` per account → the Keychain, service `com.626labs.sanduhr` (release builds), or `~/Library/Application Support/Sanduhr/credentials.json` (mode `0600`, dev builds); see First run and Accounts above

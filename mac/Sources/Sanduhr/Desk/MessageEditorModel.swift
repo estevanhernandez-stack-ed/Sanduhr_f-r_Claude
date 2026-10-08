@@ -17,6 +17,8 @@ final class MessageEditorModel {
     var text = ""
     /// The styled row whose controls show.
     var expanded: UUID?
+    /// The row Add Line put in last, until the file is read again (the new-line anchor).
+    private(set) var justAdded: UUID?
     /// messages.txt changed under unsaved edits (Claude's lines were added): offer to reload.
     var fileChanged = false
     private(set) var savedText = ""
@@ -48,6 +50,7 @@ final class MessageEditorModel {
         expanded = nil
         fileChanged = false
         debugAdded = nil
+        justAdded = nil
         loaded = true
     }
 
@@ -90,20 +93,29 @@ final class MessageEditorModel {
         mode = .list
     }
 
-    /// Add Line: a new row, its controls open.
+    /// A new row after the last one, its controls open.
     func addLine(_ line: MessageLine = MessageLine()) {
         expanded = document.add(line)
+        justAdded = expanded
     }
 
-    /// The acceptance line, added through the debug hooks for the smoke scenario; held unsaved.
-    func debugAdd() {
+    /// Add Line (Settings v2, slice 3): from either view, a new row at the top of its day's lines
+    /// (MessageDocument.insertAtTopOfGroup), its controls open; the page scrolls it into view.
+    func addLineAtTop(_ line: MessageLine = MessageLine()) {
         loadIfNeeded()
         if mode == .text { showList() }
+        expanded = document.insertAtTopOfGroup(line)
+        justAdded = expanded
+    }
+
+    /// The acceptance line, added through the debug hooks for the smoke scenario as Add Line adds
+    /// it; held unsaved.
+    func debugAdd() {
         var line = MessageLine(when: .weekday("Fri"), text: "ship it.")
         line.look.ink = MessagePalette.colors("sunset")
         line.look.font = .script
         line.look.setMotion(.sweep)
-        addLine(line)
+        addLineAtTop(line)
         debugAdded = line.written
     }
 

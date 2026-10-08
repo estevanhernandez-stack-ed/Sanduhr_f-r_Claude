@@ -358,6 +358,19 @@ struct MessageDocument: Equatable {
         return row.id
     }
 
+    /// Add Line (Settings v2, slice 3): a new line at the top of its day's lines, before the
+    /// first message row with the same When; with none, before the first message row; with no
+    /// message rows, after the last row. Notes and blank lines stay where they are. Its id.
+    @discardableResult
+    mutating func insertAtTopOfGroup(_ line: MessageLine = MessageLine()) -> UUID {
+        let row = MessageRow(content: .line(line), crlf: rows.last?.crlf ?? false)
+        let at = rows.firstIndex { $0.isMessage && Self.when(of: $0) == line.when }
+            ?? rows.firstIndex(where: \.isMessage)
+            ?? rows.count
+        rows.insert(row, at: at)
+        return row.id
+    }
+
     /// A copy right after the row, written as the row is; its id.
     @discardableResult
     mutating func duplicate(_ id: UUID) -> UUID? {

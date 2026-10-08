@@ -67,6 +67,7 @@ private struct WatcherSwitchesSection: View {
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Toggle("Let agents show watchers", isOn: $agents)
+                .settingsAnchor(SettingsAnchor.switches)
             Text("Agents use the MCP server's watch_start, watch_update and watch_end. Off, the server refuses them.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -76,7 +77,7 @@ private struct WatcherSwitchesSection: View {
                     Text("Needs the \(SettingsNames.claudeCodeGlowHook) in a Claude Code folder.")
                         .font(.caption).foregroundStyle(.orange)
                     Spacer()
-                    SettingsLinkButton(.integrations)
+                    SettingsLinkButton(.integrations, anchor: SettingsAnchor.folders)
                 }
             }
             Text("Background shells, monitors, subagents and workflows show as watchers on their own and end when they leave the session's list. Claude Code hands over each task's kind, status and short description, never a command or anything from the conversation; Sanduhr reads it and deletes it at once, and never logs it. Watchers from a work account's folder hide in demo mode.")
@@ -102,11 +103,12 @@ private struct WatcherPlacesSection: View {
             Picker(SettingsNames.watchersOnNotch, selection: notchSpot) {
                 ForEach(WatcherPlacement.NotchSpot.allCases) { Text($0.label).tag($0) }
             }
+            .settingsAnchor(SettingsAnchor.whereTheyShow)
             if let hint = WatcherPlacement.notchHint(in: UserDefaults.desk) {
                 HStack {
                     Text(hint).font(.caption).foregroundStyle(.orange)
                     Spacer()
-                    SettingsLinkButton(.notch)
+                    SettingsLinkButton(.notch, anchor: SettingsAnchor.text)
                 }
             }
             Picker(SettingsNames.watchersOnDesk, selection: deskPlace) {
@@ -144,6 +146,7 @@ private struct WatcherGlowSection: View {
         let _ = (notch, layout, left, right, strip)
         Section("Glow when a watcher waits on you") {
             Text(WatcherPlacement.glowRule)
+                .settingsAnchor(SettingsAnchor.glow)
             Text(WatcherPlacement.glowStatus(deskOn: deskOn, places: WatcherPlacement.places(in: UserDefaults.desk)))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -159,6 +162,7 @@ private struct WatcherBandSection: View {
     var body: some View {
         Section("Above the prompt") {
             Toggle("Show watchers above the prompt", isOn: $inBand)
+                .settingsAnchor(SettingsAnchor.abovePrompt)
             Text("Claude Code draws a row per watcher above its prompt, through the meters mod: the state, the title, the time so far and the progress. For the mod, Sanduhr keeps band.json in its folder, readable by you only: an agent's watcher's title, short title, state, progress and times, and for background work only its kind and state, never its description. Off deletes the watchers from it.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -172,7 +176,7 @@ private struct WatcherBandSection: View {
                 Text("\(SettingsNames.metersAbovePrompt) is switched per folder in Claude Code.")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                SettingsLinkButton(.integrations)
+                SettingsLinkButton(.integrations, anchor: SettingsAnchor.folders)
             }
         }
     }

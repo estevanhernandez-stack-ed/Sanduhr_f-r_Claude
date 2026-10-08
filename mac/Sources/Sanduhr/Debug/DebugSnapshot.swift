@@ -42,6 +42,10 @@ struct DebugStateInput {
     var settingsSection: SettingsSection?
     /// Where on the page Settings was opened (SettingsAnchor), nil for the top or closed.
     var settingsAnchor: String?
+    /// Slice 3: the anchor is on screen, inside the page's scrolling area; nil without one.
+    var settingsAnchorVisible: Bool?
+    /// Slice 3: the page's preview is folded to its strip (a window under 720 pt); nil without one.
+    var settingsPreviewFolded: Bool?
     /// The preview card the open Settings section shows (item 68), nil for none or closed.
     var settingsPreview: SettingsPreviewKind?
     /// The Claude Usage page (item 48) shows, and its tab. Never a label, project or number.
@@ -389,6 +393,7 @@ enum DebugState {
         let section: YAMLNode = s.settingsSection.map { .string($0.rawValue) } ?? .null
         pairs.append(("settings_section", section))
         pairs.append(("settings_anchor", s.settingsAnchor.map(YAMLNode.string) ?? .null))
+        pairs.append(("settings_anchor_visible", s.settingsAnchorVisible.map(YAMLNode.bool) ?? .null))
         pairs.append(("usage_page", usagePageYAML(open: s.usagePageOpen, tab: s.usageTab)))
         pairs.append(("meters", .list(meters)))
         let widgetWarnings: [YAMLNode] = s.widgetWarnings.map { .string($0.rawValue) }
@@ -443,6 +448,7 @@ enum DebugState {
         pairs.append(("av_indicators", avIndicatorsYAML(s.avIndicators)))
         // Item 68: which preview card the open Settings section shows (SettingsPreviewKind).
         pairs.append(("settings_preview", s.settingsPreview.map { .string($0.rawValue) } ?? .null))
+        pairs.append(("settings_preview_folded", s.settingsPreviewFolded.map(YAMLNode.bool) ?? .null))
         pairs.append(("mods_page", modsPageYAML(s.modsPage)))
         pairs.append(("message_editor", messageEditorYAML(s.messageEditor)))
         pairs.append(("hot_keys", hotKeysYAML(s.hotKeys)))

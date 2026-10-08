@@ -1,4 +1,4 @@
-# Sanduhr for Mac: setup guide
+| Every setting, in one window. The sidebar lists the pages in five groups: the first four pages, then Desktop, Claude Code, Widget and Help. Type in **Search**, above the sidebar, to find any setting by name: Return opens the best match, scrolled into view. |# Sanduhr for Mac: setup guide
 
 You just installed Sanduhr für Claude. Start with task 1, then pick the tasks you want.
 
@@ -15,7 +15,7 @@ Sanduhr is an independent tool. It is not made by or affiliated with Anthropic.
 | Settings | Settings… in any Sanduhr menu, the gear on the widget, or Option+S. | Every setting, in one window. The sidebar lists the pages in five groups: the first four pages, then Desktop, Claude Code, Widget and Help. |
 | The Sanduhr menu | The same menu everywhere: menu bar icon, widget, the Desk's pieces. | Show or hide the widget, Menu Bar Shows, Tools, Refresh, Settings…, Arrange Desk…, Check for Updates…, What's New…, Take the Tour…, Quit. |
 
-In this guide, "Settings, Accounts" means: open Settings, then click **Accounts** in the sidebar.
+In this guide, "Settings, Accounts" means: open Settings, then click **Accounts** in the sidebar. A setting the guide names is also one search away: type **glow**, **percent** or **margins** and press Return. On a short window, each page's preview folds to a strip at the top; click it to see the preview. A few expert settings sit under **Advanced**, folded, at the bottom of their page.
 
 ## 1. Install and sign in
 
@@ -84,9 +84,9 @@ The pieces are: **Message** (a line of your own, see task 5), **Clock and date**
 4. Drag a piece up or down its stack to reorder it. Drag its round handle to resize it.
 5. Press Return (or click **Done**) to keep it. Press Escape (or click **Cancel**) to put everything back.
 
-**Move pieces from Settings.** Settings, **Desk** has the same choices as menus. **Where each piece sits** picks a place (or **Hidden**) and a size for each piece; to keep your meters off the desktop, set both Claude meters pieces to **Hidden**. **Order** lists the stacks; drag to reorder. **Margins** keeps pieces away from the screen edges.
+**Move pieces from Settings.** Settings, **Desk** has the same choices as menus. **Where each piece sits** picks a place (or **Hidden**) and a size for each piece; to keep your meters off the desktop, set both Claude meters pieces to **Hidden**. **Order** lists the stacks; drag to reorder. **Margins**, under **Advanced** at the bottom, keeps pieces away from the screen edges.
 
-**Change the look.** Settings, **Desk Look** sets the **Desk font**, the **Message font**, the sizes of the clock and message, and the colors. EsteFont Pro, a handwriting font, is the Desk font on new installs.
+**Change the look.** Settings, **Desk Look** sets the **Desk font**, the **Message font**, the sizes of the clock and message, and the colors: pick a preset under **Colors**, or type your own hex colors under **Advanced** (one, or two to four with commas for a gradient). EsteFont Pro, a handwriting font, is the Desk font on new installs.
 
 **Clicks on the clock and message.** Click the clock once to open Desk Look. Click the message once to open its editor. Two-finger click either one for the Sanduhr menu, plus **Desk Look Settings…** or **Edit Messages…**.
 
@@ -103,11 +103,11 @@ You get a black island around the camera, with information on either side.
 The island has three places:
 
 - **Left wing** and **Right wing**, beside the camera. They need **Text beside the camera** on.
-- **Under the camera**, a strip below it. Turn on **Text under the camera too (desktop only)**. It needs **Extra height below** above 0.
+- **Under the camera**, a strip below it. Turn on **Text under the camera too (desktop only)**. With no height below the notch yet, this sets **Extra height below** to 18 pt, so the strip shows at once.
 
 Each place shows one thing: **Next meeting, or the time**, **Next meeting, or the Claude meters**, **Time**, **Claude meters**, **Message**, **Now playing**, **Watchers** or **Nothing**. With nothing to show, Watchers and Now playing give way to that place's usual content.
 
-**Size** sets **Extra width each side** and **Extra height below (0 = none)**. **Notch text color** sets the color of the island's text.
+Under **Advanced**, at the bottom of the page, **Size** sets **Extra width each side** and **Extra height below (0 = none)**, and **Notch text color** sets the color of the island's text.
 
 **Notch glow.** The notch's edge can glow softly for a few seconds. Under **Notch glow**, pick **For Sanduhr alerts**, **A minute before a meeting** or **When the camera fill light comes on**. Click **Test Glow** to see it. The two Claude Code rows in the same section are in task 7.
 
@@ -128,16 +128,15 @@ If it doesn't work: a screen without a notch is left alone. The camera and mic i
 You get a line of your own on the desktop, with its own colors and motion, and different lines on different days.
 
 1. Open Settings, **Message** (or click the message on the desktop).
-2. Click **Add Line**. A new row appears, drawn the way the Desk draws it.
-3. Click **Edit** on the row.
-4. **When**: **Every day**, a weekday, or **A date** (pick the month and day; it repeats every year).
-5. **Text**: what the Desk says.
-6. **Color**: **As the Desk**, **One color** or **Gradient**, or pick a **Palette**.
-7. **Glow**, **Size** and **Letters** set the rest of the line's look.
-8. **Motion**: **None**, **Write in** (draws itself once), **Shimmer** or **Sweep**.
-9. Click **Done**, then **Save**.
+2. Click **Add Line**, at the top of the page. A new row appears at the top of the list, drawn the way the Desk draws it, with its settings open.
+3. **When**: **Every day**, a weekday, or **A date** (pick the month and day; it repeats every year).
+4. **Text**: what the Desk says.
+5. **Color**: **As the Desk**, **One color** or **Gradient**, or pick a **Palette**.
+6. **Glow**, **Size** and **Letters** set the rest of the line's look.
+7. **Motion**: **None**, **Write in** (draws itself once), **Shimmer** or **Sweep**.
+8. Click **Done**, then **Save**.
 
-At the top of the page:
+**Add Line**, **List | Text**, **Save** and **Revert** stay at the top while the list scrolls. Under them, **Rotation** (folded to a one-line summary until you change it) holds:
 
 - **Change the line**: **Once a day** or **Every hour**.
 - **Mix every-day lines in on days with their own line**: off, a Friday line replaces the everyday lines on Fridays. On, they take turns.

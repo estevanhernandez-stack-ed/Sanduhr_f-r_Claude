@@ -233,9 +233,11 @@ struct IntegrationsSettings: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                IntegrationsPreview(model: model)
+                // Its preview draws only sample input, so its folded strip says so (slice 3).
+                PreviewFold(page: .integrations, note: PreviewSamples.statusline.label) { IntegrationsPreview(model: model) }
                 IntegrationsIntro()
                 PythonRow(model: model, reload: reload)
+                    .settingsAnchor(SettingsAnchor.python)
                 HStack {
                     Text("Folders").font(.headline)
                     Spacer()
@@ -244,6 +246,7 @@ struct IntegrationsSettings: View {
                         reload()
                     }
                 }
+                .settingsAnchor(SettingsAnchor.folders)
                 folderList
                 GlowHint()
                 if let note = model.note {
@@ -391,7 +394,7 @@ private struct GlowHint: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
-            SettingsLinkButton(.notch)
+            SettingsLinkButton(.notch, anchor: SettingsAnchor.glow)
         }
     }
 }
@@ -789,7 +792,7 @@ private struct HooksConsentBody: View {
                     .font(.caption)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
-                SettingsLinkButton(.notch, before: closeSheet)
+                SettingsLinkButton(.notch, anchor: SettingsAnchor.glow, before: closeSheet)
             }
         }
     }

@@ -11,6 +11,7 @@ struct UpdatesSection: View {
         Form {
             Section {
                 LabeledContent("Installed", value: info.versionAndBuild)
+                    .settingsAnchor(SettingsAnchor.check)
                 LabeledContent("Last checked", value: UpdateCheckText.lastChecked(updates.lastCheck))
                 HStack {
                     Button(SettingsNames.checkForUpdates) { updates.checkNow() }
@@ -24,6 +25,7 @@ struct UpdatesSection: View {
                 Toggle("Check for updates automatically", isOn: Binding(
                     get: { updates.checksAutomatically },
                     set: { updates.setChecksAutomatically($0) }))
+                    .settingsAnchor(SettingsAnchor.automatic)
                 Toggle("Download and install updates automatically", isOn: Binding(
                     get: { updates.downloadsAutomatically },
                     set: { updates.setDownloadsAutomatically($0) }))
@@ -57,6 +59,7 @@ struct AboutSection: View {
                     }
                 }
                 .padding(.vertical, 4)
+                .settingsAnchor(SettingsAnchor.about)
                 Text(AppInfo.independence)
                     .font(.callout).foregroundStyle(.secondary)
                 // Item 57: the release highlights, any time, whatever Don't show after updates says.
@@ -75,9 +78,11 @@ struct AboutSection: View {
                             .help(link.url.absoluteString)
                     }
                 }
+                .settingsAnchor(SettingsAnchor.links)
             }
             Section {
                 Link("Updates by Sparkle", destination: AboutLinks.sparkle)
+                    .settingsAnchor(SettingsAnchor.notices)
                 Link("Now playing uses mediaremote-adapter by Jonas van den Berg (BSD-3-Clause)",
                      destination: AboutLinks.mediaRemoteAdapter)
                 Text(AppInfo.fontCredit)

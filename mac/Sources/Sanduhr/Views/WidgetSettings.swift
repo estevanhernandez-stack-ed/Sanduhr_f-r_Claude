@@ -10,8 +10,6 @@ struct WidgetSettings: View {
     let section: SettingsSection
     /// Alerts' Each limit reads the Desk model's reported and temporary limits.
     var deskModel: DeskModel? = nil
-    /// Where the page was opened (SettingsAnchor), scrolled into view on arrival.
-    var anchor: String? = nil
 
     @AppStorage("remindSessionEnd") private var remindSessionEnd = false
     @AppStorage("alertsEnabled") private var alertsEnabled = false
@@ -74,11 +72,12 @@ struct WidgetSettings: View {
                     .font(.caption)
                     .foregroundStyle(t.textSecondary)
                 ThemeGalleryView(vm: vm)
+                    .settingsAnchor(SettingsAnchor.gallery)
                 Divider().padding(.vertical, 6)
                 Text("Your own themes")
                     .font(.headline)
-                themeTools(t: t)
-                claudeThemeSwitch(t: t)
+                themeTools(t: t).settingsAnchor(SettingsAnchor.ownThemes)
+                claudeThemeSwitch(t: t).settingsAnchor(SettingsAnchor.claudeThemes)
             }
             .padding(.trailing, 4)
         }
@@ -253,13 +252,14 @@ struct WidgetSettings: View {
 
     /// Widget: Show the widget (from General), the font and subtle mode, the pacing calculators.
     private func widgetPage(t: Theme.Palette) -> some View {
-        AnchoredScroll(anchor: anchor) {
+        // The window's scroll reader brings an anchor into view (SettingsRoot, slice 3).
+        ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                WidgetShowRows()
+                WidgetShowRows().settingsAnchor(SettingsAnchor.show)
                 Divider()
-                fontTab(t: t)
+                fontTab(t: t).settingsAnchor(SettingsAnchor.font)
                 Divider()
-                pacingTab(t: t).id(SettingsAnchor.pacing)
+                pacingTab(t: t).settingsAnchor(SettingsAnchor.pacing)
             }
         }
     }
@@ -313,12 +313,12 @@ struct WidgetSettings: View {
 
     /// Alerts: Notifications, then Each limit (was Desk, Meters).
     private func alertsPage(t: Theme.Palette) -> some View {
-        AnchoredScroll(anchor: anchor) {
+        ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                alertsTab(t: t)
+                alertsTab(t: t).settingsAnchor(SettingsAnchor.notifications)
                 if let deskModel {
                     Divider()
-                    EachLimitSection(model: deskModel).id(SettingsAnchor.eachLimit)
+                    EachLimitSection(model: deskModel).settingsAnchor(SettingsAnchor.eachLimit)
                 }
             }
         }
@@ -379,6 +379,7 @@ struct WidgetSettings: View {
                 }
 
                 Toggle("Quiet hours", isOn: $alertQuietEnabled)
+                    .settingsAnchor(SettingsAnchor.quietHours)
                 HStack {
                     DatePicker("From", selection: quietTime($alertQuietStart), displayedComponents: .hourAndMinute)
                     DatePicker("to", selection: quietTime($alertQuietEnd), displayedComponents: .hourAndMinute)
@@ -437,22 +438,6 @@ struct WidgetSettings: View {
     }
 }
 
-/// A page that scrolls, brought to `anchor` (a child's `.id`) when it appears.
-struct AnchoredScroll<Content: View>: View {
-    let anchor: String?
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView { content() }
-                .onAppear {
-                    guard let anchor else { return }
-                    // After the first layout, so the target has a frame to scroll to.
-                    DispatchQueue.main.async { proxy.scrollTo(anchor, anchor: .top) }
-                }
-        }
-    }
-}
 
 /// Widget, Show the widget (moved from General's Surfaces in slice 2): when it shows on its own,
 /// and showing or hiding it now. The switch mirrors panelHidden, which AppDelegate writes whenever

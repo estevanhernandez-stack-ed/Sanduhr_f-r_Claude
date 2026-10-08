@@ -1709,9 +1709,10 @@ desktop well away from every piece.
    Option+S types ß again; Option+J still joins. Put both back. `hot_keys` in state.yaml follows.
 4. Desk: the Desk switch at the top, Arrange Desk…, Where each piece sits (Meetings with **Read
    today's meetings** under it; Now playing and Watchers with their page links), Order, **Clicks**
-   (Clock and message take clicks) and Margins. Desk Look no longer has Clicks or Notch text.
+   (Clock and message take clicks) and Margins (under Advanced since slice 3). Desk Look no longer
+   has Clicks or Notch text.
 5. Notch: the notch switch at the top (with **Needs the Desk.** and Desk Settings… while the Desk is
-   off), **Notch text color** after Size. The wing pickers no longer offer Camera and mic; Camera and
+   off), **Notch text color** with Size (both under Advanced since slice 3). The wing pickers no longer offer Camera and mic; Camera and
    mic's **Where they show** offers Beside the camera, left and right, In the left or right wing and
    Under the camera. Set it to In the right wing and run `smoke/smoke do av-test "mic on"`: the right wing
    shows the mic; `smoke/smoke do av-test "mic off"`: the right wing shows its own text again.
@@ -1737,3 +1738,42 @@ desktop well away from every piece.
     off, both Claude meters pieces read Hidden on Desk), a wing that was Camera and mic now reads
     that place under Where they show, the shortcuts read as the old switch did, and Menu Bar Shows
     is unchanged. Quit and relaunch: nothing changes again.
+
+## 44. Settings v2, slice 3: reach (item 72)
+
+`docs/settings-v2-spec.md`, Slice 3. On a 13-inch screen, with the Settings window dragged down to
+628 pt tall (`smoke/smoke state` shows `settings_preview_folded: true` on a page with a preview).
+
+1. `smoke/smoke run smoke/scenarios/settings-reach.yaml` (from `mac/`) passes: `settings notch glow`,
+   `settings watchers above-prompt` and the searches `glow`, `percent` and `margins` each report
+   `settings_anchor_visible: true`; `settings watchers` opens the page at its top
+   (`settings_anchor: null`). `message-editor.yaml` passes with `settings_anchor: new-line` and
+   `settings_anchor_visible: true` after `message-editor add`.
+2. Search: type **glow** in the field over the sidebar. The sidebar shows Notch with **Notch glow**
+   under it, Watchers with **Glow when a watcher waits on you**, Claude Code with **Claude Code glow
+   hook**, then Desk Look (Colors, a synonym match). Press Return: Notch opens scrolled to Notch glow,
+   lit for about a second and a half. Type **percent**: General, **Menu Bar Shows**. Type
+   **margins**, click **Margins**: Desk opens with **Advanced** open and Margins on screen. Escape
+   clears the field and the sidebar shows every page again.
+3. Links: `open "sanduhr://settings/notch#glow"` opens Notch at Notch glow; `open
+   "estedesk://settings/watchers#above-prompt"` opens Watchers at Above the prompt; `open
+   "sanduhr://settings/deskMeters"` opens Alerts at Each limit; `open "sanduhr://settings"` opens
+   Settings where it was left. An anchor the page doesn't have (`notch#nope`) opens the page's top.
+4. Previews: at 628 pt each preview is a 44 pt strip ("Notch preview", an arrow, Show). Click it:
+   the card opens and pushes the controls down; go to another page and back, it stays open; close
+   and reopen the window, it is folded again. Drag the window taller than 720 pt: every card shows
+   in full. Claude Code's strip reads "Sample: statusline input".
+5. Advanced: Desk, Desk Look and Notch end with a folded **Advanced**. Desk's holds Margins; Desk
+   Look's the two hex fields (Colors above keeps the presets and a swatch; pick Custom in the hex
+   field and the preset reads Custom); Notch's Size (Extra width each side, Extra height below) and
+   Notch text color. Every value reads as before the update (`defaults read
+   com.626labs.sanduhr.desk left`, `notchChin`, `messageColor`, `notchTextColor` unchanged).
+6. Message: Add Line, List | Text, Save and Revert stay at the top while the list scrolls. Scroll
+   to the bottom of a long list and click **Add Line**: the new line appears at the top of the
+   every-day lines with its editor open, on screen. In Text, Add Line switches to List first.
+   Rotation reads "Once a day, Mix off, special days: stack" folded; set Every hour and it opens on
+   the next visit. Revert drops the new line.
+7. Notch, Text: with Extra height below at 0 (Advanced), switch **Text under the camera too** on:
+   the island grows a strip under the camera at once, Extra height below reads 18, and the hint
+   under the switch says where the height lives. Set it back to 0: the hint says nothing shows under
+   the camera. Put your values back.

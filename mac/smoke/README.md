@@ -71,9 +71,13 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   `strip` and `desk`; `source`, `adapter`, `fallback` or `off`; `state`, `playing`, `paused` or
   `none`; never a title, an artist or an app),
   `widget_visible`, `widget_visibility` (When the widget shows: `always`, `whileDeskOff` or
-  `onRequest`; `always` when unset), `settings_open`, `settings_section`, `settings_preview` (item 68: the
+  `onRequest`; `always` when unset), `settings_open`, `settings_section`, `settings_anchor` (item 72: the
+  section the page was opened at, such as `glow` on `notch`; null for the page's top), `settings_anchor_visible`
+  (item 72, slice 3: that section's top line is inside the page's scrolling area; null with no anchor),
+  `settings_preview` (item 68: the
   preview card the open section shows, `notch`, `layout`, `look`, `meters`, `message`, `nowPlaying`, `widget`,
-  `menuBar`, `integrations` or `mods`; null for none or with Settings closed), `mods_page` (item 64: `open`,
+  `menuBar`, `integrations` or `mods`; null for none or with Settings closed), `settings_preview_folded` (slice 3:
+  the card is folded to its 44 pt strip, as on a window under 720 pt; null for a page without one), `mods_page` (item 64: `open`,
   the Mods page shows; `loaded`, it has read the folders; `folders`, `mods`, `plugins`, `enabled` (on, or a
   session's dev mod) and `missing` counts across folders; `checked`, how many Checks have answered; `cli`,
   `claude` was found; never a mod's name, a path or a report), `message_editor` (item 69: `open`, Settings,
@@ -89,8 +93,11 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
 `step`, its step from 1, 0 when closed; `steps_shown`, how many steps this Mac shows; `done`, finished or
 skipped; `pending`, a fresh install's tour waiting for its first successful fetch). The Accounts submenu is not in `menu`: its items are labels.
 
-Actions: `show-widget`, `hide-widget`, `settings-link "<Page> Settings…"` (Settings at the page a button with that title opens, as the button opens it; three dots work for the ellipsis; a title that names no sidebar page is an error), `settings [section]` (a `SettingsSection` raw value such
-as `notch` or `deskLayout`), `close-settings`, `refresh` (waits for the fetch), `test-alert`,
+Actions: `show-widget`, `hide-widget`, `settings-link "<Page> Settings…"` (Settings at the page a button with that title opens, as the button opens it; three dots work for the ellipsis; a title that names no sidebar page is an error), `settings [section [anchor]]` (a `SettingsSection` raw value such
+as `notch` or `deskLayout`, or a retired one such as `deskMeters`; with an anchor, `notch glow` or `notch#glow`,
+the page scrolled to that section, opening its Advanced disclosure when it is under one; an anchor the page lacks is
+an error naming the ones it has), `settings-search <words>` (the sidebar search with the words typed and Return
+pressed: the best match opened, scrolled to and lit; words that find nothing are an error), `close-settings`, `refresh` (waits for the fetch), `test-alert`,
 `pulse [tier]` (`five_hour` by default; it glows the notch too), `tool deep-work|pacing|snake` (as the Tools menu: chosen
 again it closes), `desk on|off`, `notch on|off`, `camera-light on|off` (the light by hand, as Tools, Camera Fill Light;
 its window is kind `camera` in tree.yaml, one node labeled `Camera fill light`), `glow [alert|meeting|camera|claude-waiting|claude-done]`

@@ -23,6 +23,9 @@ enum DebugAction: Equatable {
     /// Settings at the page a "<Page> Settings…" button names (Settings v2, slice 1), opened the
     /// way SettingsLinkButton opens it. `settings-names.yaml` checks each button lands where it says.
     case settingsLink(SettingsSection)
+    /// Settings v2, slice 3: the sidebar search's Return, the best match for these words opened,
+    /// scrolled into view and lit, as a person typing them would get.
+    case settingsSearch(String)
     case closeSettings
     case refresh
     case testAlert
@@ -83,7 +86,7 @@ enum DebugAction: Equatable {
         case start, test, done, cancel
     }
 
-    static let names = ["show-widget", "hide-widget", "settings", "settings-link", "close-settings", "refresh",
+    static let names = ["show-widget", "hide-widget", "settings", "settings-link", "settings-search", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
                         "theme", "account", "usage", "whats-new", "close-whats-new",
                         "tour", "tour-step", "close-tour", "watch-test", "av-test", "message-editor",
@@ -148,11 +151,16 @@ enum DebugLink {
         case "hide-widget": return .success(.hideWidget)
         case "settings":
             guard let arg else { return .success(.settings(nil)) }
-            guard let page = page(arg) else {
-                let names = SettingsSection.allCases.map(\.rawValue) + SettingsSection.aliases.keys.sorted()
-                return bad("unknown settings section: \(arg) (one of \(names.joined(separator: ", ")))")
+            // "notch", "notch glow" or "notch#glow" (slice 3: an anchor on the page).
+            switch SettingsLink.parse(arg) {
+            case .success(let page): return .success(.settings(page.section, anchor: page.anchor))
+            case .failure(let e): return .failure(e)
             }
-            return .success(.settings(page.section, anchor: page.anchor))
+        case "settings-search":
+            guard let arg, !SettingsSearch.hits(arg).isEmpty else {
+                return bad("settings-search needs arg=<words> that find something in Settings")
+            }
+            return .success(.settingsSearch(arg))
         case "settings-link":
             // "Notch Settings…", or with three dots for a terminal.
             let title = (arg ?? "").replacingOccurrences(of: "...", with: "…")

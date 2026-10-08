@@ -15,13 +15,14 @@ struct AccountsSettings: View {
     @State private var scrollToData = false
 
     /// The Data section's scroll anchor.
-    static let dataAnchor = "account-data"
+    static let dataAnchor = SettingsAnchor.data
     @State private var adding = false
 
     var body: some View {
         Group {
             if vm.accountLabels.isEmpty {
                 FirstAccountForm(vm: vm)
+                    .settingsAnchor(SettingsAnchor.accounts)
             } else {
                 accounts
             }
@@ -36,6 +37,7 @@ struct AccountsSettings: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+                .settingsAnchor(SettingsAnchor.accounts)
             HStack(alignment: .top, spacing: 16) {
                 AccountList(vm: vm, selection: $selection, adding: $adding)
                     .frame(width: 190)
@@ -64,6 +66,11 @@ struct AccountsSettings: View {
         .onAppear {
             if let wanted = navigation?.accountToShow, vm.accountLabels.contains(wanted) {
                 selection = wanted
+                adding = false
+                scrollToData = true
+            } else if navigation?.anchor == SettingsAnchor.data {
+                // sanduhr://settings/credentials#data: the active account's Data.
+                selection = selection ?? vm.activeAccount
                 adding = false
                 scrollToData = true
             } else if selection == nil {
@@ -265,7 +272,7 @@ private struct AccountDetail: View {
             renameRow
             Divider()
             AccountDataSection(vm: vm, label: label)
-                .id(AccountsSettings.dataAnchor)
+                .settingsAnchor(AccountsSettings.dataAnchor)
             Divider()
             endRow
             if let note { FormNote(text: note, isError: noteIsError) }

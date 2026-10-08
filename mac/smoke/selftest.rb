@@ -57,15 +57,29 @@ class FakeApp
     when 'show-widget' then s['widget_visible'] = true
     when 'hide-widget' then s['widget_visible'] = false
     when 'settings'
+      # "notch glow" (slice 3): a page and an anchor, scrolled into view.
+      page, *anchor = arg.to_s.split(/[ #]/)
       s['settings_open'] = true
-      s['settings_section'] = arg if arg
-      s['settings_preview'] = arg if %w[message].include?(arg)
+      if page
+        s['settings_section'] = page
+        s['settings_anchor'] = anchor.empty? ? nil : anchor.join('-')
+        s['settings_anchor_visible'] = anchor.empty? ? nil : true
+      end
+      s['settings_preview'] = page if %w[message].include?(page)
       (s['message_editor'] ||= {})['open'] = (s['settings_section'] == 'message')
+    when 'settings-search'
+      # The sidebar search's best match, as SettingsSearch ranks it.
+      page, anchor = { 'glow' => %w[notch glow], 'percent' => %w[general menu-bar-shows],
+                       'margins' => %w[deskLayout margins] }.fetch(arg)
+      s.merge!('settings_open' => true, 'settings_section' => page, 'settings_anchor' => anchor,
+               'settings_anchor_visible' => true)
     when 'message-editor'
       e = (s['message_editor'] ||= {})
       if arg == 'add'
         s['settings_open'] = true
         s['settings_section'] = s['settings_preview'] = 'message'
+        s['settings_anchor'] = 'new-line'
+        s['settings_anchor_visible'] = true
         e.merge!('open' => true, 'rows' => e['rows'].to_i + 1, 'styled' => e['styled'].to_i + 1, 'unsaved' => true,
                  'added' => 'Fri: {ink:#ff7e5f,#feb47b,#ffd86f} {font:script} {sweep} ship it.')
       elsif arg == 'revert' && e['added']
@@ -360,6 +374,31 @@ eq('message editor scenario passes', [r['status'], r['reason']], ['pass', nil])
 eq('message editor scenario adds, reverts, then closes Settings', app_me.actions,
    ['settings message', 'message-editor add', 'message-editor revert', 'close-settings'])
 FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-me'))
+# Item 72, slice 3: anchors, the search and settings_anchor_visible.
+eq('settings anchor keys in the fixture', state.values_at('settings_anchor', 'settings_anchor_visible', 'settings_preview_folded'),
+   [nil, nil, nil])
+# The fixture tree holds no Settings page, so the run here keeps the state steps and drops the tree ones.
+reach_doc = YAML.safe_load(File.read(File.join(Smoke::SCENARIOS, 'settings-reach.yaml')))
+reach_doc['steps'].reject! { |s| s.key?('expect') }
+FileUtils.mkdir_p(File.join(Smoke::OUT, '.selftest-reach'))
+reach_file = File.join(Smoke::OUT, '.selftest-reach', 'settings-reach.yaml')
+File.write(reach_file, YAML.dump(reach_doc))
+app_reach = FakeApp.new('settings_open' => false, 'settings_section' => 'general')
+r = Runner.new(app_reach, MemoryDefaults.new, File.join(Smoke::OUT, '.selftest-reach', 'out'), io: StringIO.new, settle: 0, poll: 0.01, within: 0.05)
+    .run_file(reach_file)
+eq('settings reach scenario passes', [r['status'], r['reason']], ['pass', nil])
+eq('settings reach scenario opens anchors and searches, then closes Settings', app_reach.actions,
+   ['settings notch glow', 'settings watchers', 'settings watchers above-prompt', 'settings-search glow',
+    'settings-search percent', 'settings-search margins', 'close-settings'])
+app_hidden = FakeApp.new('settings_open' => false, 'settings_section' => 'general')
+def app_hidden.action(name, arg = nil)
+  super
+  @state_now['settings_anchor_visible'] = false if @state_now['settings_anchor']
+end
+r = Runner.new(app_hidden, MemoryDefaults.new, File.join(Smoke::OUT, '.selftest-reach', 'out'), io: StringIO.new, settle: 0, poll: 0.01, within: 0.05)
+    .run_file(reach_file)
+eq('settings reach fails when the section is off screen', r['status'], 'fail')
+FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-reach'))
 # Item 60: Arrange mode, flags and a layout string only; a scenario that leaves it on is cancelled.
 eq('desk arrange keys', state['desk_arrange'].keys, %w[active changed working click_through bar_visible])
 eq('desk arrange in the fixture: off, clicks only where drawn, no bar',
@@ -453,7 +492,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings settings-link close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange]
+    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end

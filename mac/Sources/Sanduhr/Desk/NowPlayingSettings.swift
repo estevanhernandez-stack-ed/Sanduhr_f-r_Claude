@@ -13,6 +13,7 @@ struct NowPlayingSection: View {
             NeedsDeskRow()
             Section {
                 NowPlayingSourceRow(deskEnabled: deskEnabled)
+                    .settingsAnchor(SettingsAnchor.source)
                 Text("Shows the song or video playing in any app, browsers included, wherever you place it: a notch wing or the strip under the camera (Notch), or a place on the Desk (Desk). Click it to play or pause; two-finger click for Previous and Next. Nothing leaves your Mac, and titles are never saved (only the songs of looks you save from Claude, below). Runs only while it is placed somewhere and Desk is on.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -50,8 +51,8 @@ private struct NowPlayingSourceRow: View {
 private struct NowPlayingArrangeRow: View {
     var body: some View {
         HStack {
-            SettingsLinkButton(.notch)
-            SettingsLinkButton(.deskLayout)
+            SettingsLinkButton(.notch, anchor: SettingsAnchor.text)
+            SettingsLinkButton(.deskLayout, anchor: SettingsAnchor.pieces)
             Spacer()
         }
     }
@@ -63,6 +64,7 @@ private struct NowPlayingShowSection: View {
     var body: some View {
         Section("Show") {
             Toggle("Hide while paused", isOn: $hidePaused)
+                .settingsAnchor(SettingsAnchor.show)
             Text("While paused, a wing shows a Next button at its outer edge (the strip at its end): click the title to play, the button to skip.")
                 .font(.caption).foregroundStyle(.secondary)
         }
@@ -79,6 +81,7 @@ private struct NowPlayingIdleSection: View {
             Picker("When nothing is playing", selection: $idle) {
                 ForEach(NowPlayingIdle.allCases) { Text($0.label).tag($0) }
             }
+            .settingsAnchor(SettingsAnchor.idle)
             Text("Applies to the notch wings and the strip under the camera: when nothing plays, while paused with Hide while paused on, or when the app playing is switched off below, that spot shows this instead, and now playing comes back with the next track. By default each spot shows what it shows when Now playing isn't picked there. The Desk line simply hides.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -93,7 +96,7 @@ private struct NowPlayingAppsSection: View {
 
     var body: some View {
         let rows = NowPlayingApps.rows(seen: NowPlayingController.shared.seenApps, excluded: excluded)
-        Section("Apps") {
+        Section {
             if rows.isEmpty {
                 Text("Apps show here once they play something.")
                     .foregroundStyle(.secondary)
@@ -108,6 +111,9 @@ private struct NowPlayingAppsSection: View {
             }
             Text("Switch an app off and its playback never shows. All apps show by default.")
                 .font(.caption).foregroundStyle(.secondary)
+        } header: {
+            // The rows come and go with the apps seen, so the heading carries the anchor.
+            Text("Apps").settingsAnchor(SettingsAnchor.apps)
         }
         .onAppear {
             excluded = Set(UserDefaults.desk.stringArray(forKey: NowPlayingPrefs.excludedKey) ?? [])
@@ -128,6 +134,7 @@ private struct NowPlayingAskSection: View {
     var body: some View {
         Section("When the system now playing is unavailable") {
             Toggle("Ask Music and Spotify directly", isOn: $askApps)
+                .settingsAnchor(SettingsAnchor.fallback)
             Text("If macOS stops sharing what plays, Sanduhr falls back to the notices Music and Spotify send on each change (no browsers, no permission needed). This switch also asks them for their track when the fallback starts, so it shows before the next change. macOS asks once per app whether Sanduhr may control Music or Spotify; Sanduhr only reads what's playing, and only from an app that is already open.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

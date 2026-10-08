@@ -202,6 +202,7 @@ struct ModsSettings: View {
                 }
                 // The heading sits right above the list it describes (Settings v2, slice 1).
                 ModsIntro()
+                    .settingsAnchor(SettingsAnchor.inventory)
                 folders
                 Button(model.loading ? "Reading…" : "Read Again") { Task { await model.load(linked: linked) } }
                     .disabled(model.loading)
@@ -355,7 +356,7 @@ private struct ModRowOwnership: View {
                     .font(.caption)
                     .foregroundStyle(Color.hex("a78bfa"))
                 Spacer(minLength: 8)
-                SettingsLinkButton(.integrations)
+                SettingsLinkButton(.integrations, anchor: SettingsAnchor.folders)
             }
         case .copyOfSanduhrs:
             Text("A copy of Sanduhr's mod outside Sanduhr's folder: read-only here.")

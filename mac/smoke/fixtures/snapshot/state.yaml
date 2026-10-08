@@ -41,6 +41,9 @@ widget_visibility: always
 menu_bar: higher
 settings_open: true
 settings_section: notch
+settings_anchor: null
+settings_anchor_visible: null
+settings_preview_folded: null
 usage_page:
   open: false
   tab: overview

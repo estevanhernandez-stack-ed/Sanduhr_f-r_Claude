@@ -97,6 +97,7 @@ enum DebugHooks {
         case .hideWidget: app.hidePanel()
         case .settings(let section, let anchor): SettingsWindowController.shared.show(section, anchor: anchor)
         case .settingsLink(let section): SettingsWindowController.shared.show(section)
+        case .settingsSearch(let query): SettingsWindowController.shared.search(query)
         case .closeSettings: SettingsWindowController.shared.close()
         case .refresh:
             Task { @MainActor in
@@ -130,6 +131,7 @@ enum DebugHooks {
         case .messageEditor(.add):
             SettingsWindowController.shared.show(.message)
             SettingsWindowController.shared.messageEditor.debugAdd()
+            SettingsWindowController.shared.revealNewLine()
         case .messageEditor(.revert): SettingsWindowController.shared.messageEditor.load()
         case .deskArrange(.start): DeskController.shared.arrangeDesk()
         case .deskArrange(.test): DeskController.shared.model.arrange.smokeEdit()
@@ -333,6 +335,8 @@ enum DebugHooks {
         s.settingsOpen = settings.isOpen
         s.settingsSection = settings.window == nil ? nil : settings.section
         s.settingsAnchor = settings.window == nil ? nil : settings.anchor
+        s.settingsAnchorVisible = settings.anchorVisible
+        s.settingsPreviewFolded = settings.previewFolded
         s.hotKeys = HotKeysDebug(join: SanduhrHotKeys.isOn(.join, in: UserDefaults.desk),
                                  settings: SanduhrHotKeys.isOn(.settings, in: UserDefaults.desk),
                                  registered: desk.hotKeysRegistered)
