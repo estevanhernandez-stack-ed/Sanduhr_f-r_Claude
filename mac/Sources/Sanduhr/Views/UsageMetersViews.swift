@@ -12,16 +12,23 @@ struct UsageMetersTab: View {
 
     @State private var exportNote: (text: String, isError: Bool)?
 
-    private var historyOff: Bool { !page.metersAll && vm.historyOffAccounts.contains(label) }
+    private var overlay: Bool { page.metersOverlay(vm) }
+
+    /// Readings to write, loaded for what the tab shows now (not the account it showed before).
+    private var exportable: Bool {
+        page.metersExportable && page.meterAccounts == (overlay ? vm.accountLabels : [label])
+    }
+
+    private var historyOff: Bool { !overlay && vm.historyOffAccounts.contains(label) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             toolbar
-            if page.metersAll, vm.accountLabels.count > 1 { legend }
+            if overlay { legend }
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     ForEach(page.meterRows) { row in
-                        MeterHistoryRowView(row: row, window: page.metersWindow, overlay: page.metersAll,
+                        MeterHistoryRowView(row: row, window: page.metersWindow, overlay: overlay,
                                             accounts: vm.accountLabels, accent: accent)
                     }
                     if page.metersLoaded && page.meterRows.isEmpty {
@@ -49,8 +56,8 @@ struct UsageMetersTab: View {
             }
             Spacer(minLength: 0)
             Button("Export CSV…") { export() }
-                .disabled(page.meterHistories.values.allSatisfy { $0.values.allSatisfy(\.isEmpty) })
-                .help(page.metersAll ? "Every reading kept for every account, with an account column."
+                .disabled(!exportable)
+                .help(overlay ? "Every reading kept for every account, with an account column."
                                      : "Every reading kept for \(label).")
         }
     }
@@ -86,7 +93,7 @@ struct UsageMetersTab: View {
 
     /// Export CSV: written only to the file the user picks.
     private func export() {
-        let account = page.metersAll ? nil : label
+        let account = overlay ? nil : label
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.commaSeparatedText]
         panel.nameFieldStringValue = MeterHistoryChart.exportName(account: account, day: Date())

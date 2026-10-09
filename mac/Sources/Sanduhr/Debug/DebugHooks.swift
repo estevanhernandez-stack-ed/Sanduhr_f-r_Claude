@@ -359,7 +359,7 @@ enum DebugHooks {
         s.usagePageOpen = settings.isOpen && settings.section == .usage
         s.usageTab = settings.usageTab
         let meters = settings.usagePage
-        s.meterHistory = MeterHistoryDebug(all: meters.metersAll, window: meters.metersWindow.rawValue,
+        s.meterHistory = MeterHistoryDebug(all: meters.metersAll && KeychainStore.accounts.labels.count > 1, window: meters.metersWindow.rawValue,
                                            rows: meters.meterRows.count, series: meters.meterRows.reduce(0) { $0 + $1.series.count })
         let mods = settings.modsPage
         s.modsPage = ModsPageDebug(open: settings.isOpen && settings.section == .mods, loaded: mods.loaded,

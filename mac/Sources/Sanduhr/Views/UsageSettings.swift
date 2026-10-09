@@ -28,8 +28,14 @@ final class UsagePageModel {
     private(set) var meterRows: [MeterHistoryChart.Row] = []
     private(set) var metersLoaded = false
     /// The files the charts came from, for Export CSV (every reading, not only the window's).
-    @ObservationIgnored private(set) var meterHistories: [String: HistoryStore.History] = [:]
-    @ObservationIgnored private(set) var meterAccounts: [String] = []
+    private(set) var meterHistories: [String: HistoryStore.History] = [:]
+    private(set) var meterAccounts: [String] = []
+
+    /// All accounts applies only while there are two or more; with one left it reads as off.
+    func metersOverlay(_ vm: UsageViewModel) -> Bool { metersAll && vm.accountLabels.count > 1 }
+
+    /// Whether Export CSV has a reading to write.
+    var metersExportable: Bool { meterHistories.values.contains { $0.values.contains { !$0.isEmpty } } }
 
     @ObservationIgnored private var reader: CCLogReader?
     @ObservationIgnored private var generations: [String: Int] = [:]
@@ -69,7 +75,7 @@ final class UsagePageModel {
 
     /// Meters: each shown account's history file, read after the writes queued before it.
     func loadMeters(_ vm: UsageViewModel, label: String) async {
-        let accounts = metersAll ? vm.accountLabels : [label]
+        let accounts = metersOverlay(vm) ? vm.accountLabels : [label]
         let window = metersWindow
         let hidden = Set(vm.hiddenTiers.map(\.rawValue))
         let g = begin("meters")
@@ -237,7 +243,7 @@ private struct UsageHeader: View {
                     .pickerStyle(.menu)
                     .fixedSize()
                     // Meters with All accounts draws every account: the pick doesn't apply.
-                    .disabled(navigation.usageTab == .meters && page.metersAll)
+                    .disabled(navigation.usageTab == .meters && page.metersOverlay(vm))
                 }
                 Spacer(minLength: 0)
                 Picker("Tab", selection: $navigation.usageTab) {
@@ -252,7 +258,7 @@ private struct UsageHeader: View {
     }
 
     private var metersLine: String {
-        page.metersAll ? "Every account's meter history, one color each." : "\(label)'s meter history."
+        page.metersOverlay(vm) ? "Every account's meter history, one color each." : "\(label)'s meter history."
     }
 
     private var sourceLine: String {
@@ -317,7 +323,7 @@ private struct UsageTabContent: View {
 
     /// The Meters tab's reload: the account, the accounts, the window, the overlay, hidden limits.
     private var metersKey: String {
-        [label, vm.accountLabels.joined(separator: ","), page.metersWindow.rawValue, String(page.metersAll),
+        [label, vm.accountLabels.joined(separator: ","), page.metersWindow.rawValue, String(page.metersOverlay(vm)),
          vm.hiddenTiers.map(\.rawValue).sorted().joined(separator: ",")].joined(separator: "|")
     }
 }

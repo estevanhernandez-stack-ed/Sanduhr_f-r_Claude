@@ -43,11 +43,15 @@ enum MeterHistoryChart {
         let keys = Set(accounts.flatMap { histories[$0]?.keys.map { $0 } ?? [] }).subtracting(hidden)
         return order(keys).compactMap { key in
             let series = accounts.compactMap { account -> Series? in
-                let points = (histories[account]?[key] ?? []).compactMap { p -> Reading? in
-                    guard let d = HistoryStore.date(p.t), d >= cutoff, d <= now else { return nil }
-                    return Reading(date: d, value: min(100, max(0, p.v)))
+                // Oldest first: walk back from the newest and stop at the window's start, so a
+                // week parses about a week of points. An unparsable timestamp is skipped.
+                var points: [Reading] = []
+                for p in (histories[account]?[key] ?? []).reversed() {
+                    guard let d = HistoryStore.date(p.t) else { continue }
+                    if d < cutoff { break }
+                    if d <= now { points.append(Reading(date: d, value: min(100, max(0, p.v)))) }
                 }
-                return points.isEmpty ? nil : Series(account: account, points: points)
+                return points.isEmpty ? nil : Series(account: account, points: points.reversed())
             }
             return series.isEmpty ? nil : Row(tier: key, title: title(key), series: series)
         }

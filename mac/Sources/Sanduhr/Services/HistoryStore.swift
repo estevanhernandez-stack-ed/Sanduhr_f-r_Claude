@@ -144,14 +144,19 @@ enum HistoryStore {
         return drop > 0 ? Array(series.dropFirst(drop)) : series
     }
 
-    /// The Mac's own timestamps (whole seconds, `Z`) and Windows' (`.ffffff+00:00`).
+    /// The Mac's own timestamps (whole seconds, `Z`) and Windows' (`.ffffff+00:00`). The two
+    /// formatters are made once: ISO8601DateFormatter is thread safe, and a chart parses
+    /// thousands of points.
     static func date(_ s: String) -> Date? {
-        let plain = ISO8601DateFormatter()
-        if let d = plain.date(from: s) { return d }
-        let fractional = ISO8601DateFormatter()
-        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return fractional.date(from: s)
+        plainFormatter.date(from: s) ?? fractionalFormatter.date(from: s)
     }
+
+    nonisolated(unsafe) private static let plainFormatter = ISO8601DateFormatter()
+    nonisolated(unsafe) private static let fractionalFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
 
     /// What the sparklines draw: each tier's last `sparklinePoints` points.
     static func sparklines(_ h: History) -> History {

@@ -53,6 +53,19 @@ struct MeterHistoryChartTests {
         #expect(MeterHistoryChart.rows(histories: [:], accounts: ["A"], window: .month, now: now).isEmpty)
     }
 
+    @Test func walksBackToTheWindowSkippingOddPoints() {
+        let h: [String: HistoryStore.History] = ["A": ["five_hour": [
+            p("2026-09-20T00:00:00Z", 1),          // before the week: the walk stops here
+            p("2026-10-04T00:00:00Z", 2),
+            p("not a time", 99),                   // skipped
+            p("2026-10-09T00:00:00Z", 3),
+            p("2026-10-11T00:00:00Z", 4),          // after now (a clock ahead): left out
+        ]]]
+        let rows = MeterHistoryChart.rows(histories: h, accounts: ["A"], window: .week, now: now)
+        #expect(rows[0].series[0].points.map(\.value) == [2, 3])
+        #expect(rows[0].series[0].points.map(\.date) == rows[0].series[0].points.map(\.date).sorted())
+    }
+
     @Test func colorsFollowTheRegistry() {
         let accounts = ["A", "B", "C", "D", "E", "F", "G"]
         #expect(MeterHistoryChart.color(for: "A", in: accounts) == MeterHistoryChart.palette[0])
