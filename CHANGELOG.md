@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **Shortcuts know macOS's own.** On General, Shortcuts, keys macOS already uses (⌘Space for Spotlight, ⌃↑ for Mission Control, ⇧⌘3 for a screenshot, any shortcut that's on in System Settings, Keyboard, Keyboard Shortcuts) are named and not saved: "macOS uses ⌃↑ for “Mission Control”, so it would get there first." **Use Anyway** saves them, and while they're on a grey note says macOS may get them first; it goes when you turn that shortcut off in System Settings. **Test It** listens for 10 seconds: press the keys once and it says whether they reached Sanduhr (testing ⌥S doesn't open Settings again). No permission is asked for, and no other keystroke is read.
+
 - **Fixed: a plain click on the Desk's clock or message no longer opens Settings.** Both now behave like the meters and the Claude line: a plain click does nothing. **Desk Look Settings…** and **Edit Messages…** are still on their two-finger menus.
 
 ## v2.11.0-mac — 2026-10-08

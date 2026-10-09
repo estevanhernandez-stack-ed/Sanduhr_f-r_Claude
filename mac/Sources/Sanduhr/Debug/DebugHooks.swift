@@ -56,7 +56,7 @@ enum DebugHooks {
             }
         case .action(.theme(let id), _) where ThemeRegistry.theme(id: id) == nil:
             finish(dir, error: "unknown theme: \(id) (one of \(ThemeRegistry.themes.map(\.id).joined(separator: ", ")))")
-        case .action(.hotKey(let s, let combo), _)
+        case .action(.hotKey(let s, let combo, _), _)
             where SanduhrHotKeys.check(combo ?? s.defaultCombo, for: s) != nil:
             finish(dir, error: "hot-key refused: \(SanduhrHotKeys.check(combo ?? s.defaultCombo, for: s)!.note)")
         case .action(let action, _):
@@ -140,7 +140,9 @@ enum DebugHooks {
         case .deskArrange(.test): DeskController.shared.model.arrange.smokeEdit()
         case .deskArrange(.done): DeskController.shared.endArrange(keep: true)
         case .deskArrange(.cancel): DeskController.shared.endArrange(keep: false)
-        case .hotKey(let s, let combo): ShortcutRecorderModel.shared.save(combo ?? s.defaultCombo, for: s)
+        case .hotKey(let s, let combo, let anyway):
+            // Refused because macOS uses the keys, the refusal shows in state.yaml (`hot_keys.<s>_refusal`).
+            if let combo { ShortcutRecorderModel.shared.save(combo, for: s, insist: anyway) } else { ShortcutRecorderModel.shared.reset(s) }
         }
         settle()
     }
@@ -341,13 +343,18 @@ enum DebugHooks {
         s.settingsAnchor = settings.window == nil ? nil : settings.anchor
         s.settingsAnchorVisible = settings.anchorVisible
         s.settingsPreviewFolded = settings.previewFolded
+        let recorder = ShortcutRecorderModel.shared
         s.hotKeys = HotKeysDebug(join: SanduhrHotKeys.isOn(.join, in: UserDefaults.desk),
                                  settings: SanduhrHotKeys.isOn(.settings, in: UserDefaults.desk),
                                  registered: desk.hotKeysRegistered,
                                  joinKeys: SanduhrHotKeys.combo(.join).display,
                                  settingsKeys: SanduhrHotKeys.combo(.settings).display,
                                  joinTaken: desk.takenShortcuts.contains(.join),
-                                 settingsTaken: desk.takenShortcuts.contains(.settings))
+                                 settingsTaken: desk.takenShortcuts.contains(.settings),
+                                 joinRefusal: recorder.refusals[.join]?.kind,
+                                 settingsRefusal: recorder.refusals[.settings]?.kind,
+                                 joinClash: recorder.clash(.join),
+                                 settingsClash: recorder.clash(.settings))
         s.settingsPreview = settings.isOpen ? SettingsPreviewKind.of(settings.section) : nil
         s.usagePageOpen = settings.isOpen && settings.section == .usage
         s.usageTab = settings.usageTab

@@ -1756,10 +1756,21 @@ desktop well away from every piece.
     types ß. Click the keys and press Escape: nothing changes. Press ⇧S: "Add ⌘, ⌃ or ⌥: Shift alone
     isn't enough.", nothing saved. Press ⌥J: "⌥J already joins the next meeting.", nothing saved.
     When macOS refuses to register the keys, the note under the switch says another app uses them
-    (`hot_keys.<name>_taken: true`). macOS does not refuse system shortcuts such as ⌘Space or keys
-    another app registered the same way, so those register and both fire: pick keys you know are free. The caption names ß and ∆ only while both keys are the defaults. **Reset
+    (`hot_keys.<name>_taken: true`). The caption names ß and ∆ only while both keys are the defaults. **Reset
     to ⌥S**: back to the default, and `defaults read com.626labs.sanduhr.desk` has no
     `hotKeySettingsKeyCode`. The menus, the tour and What's New name no keys.
+12. macOS's own shortcuts (item 73): the scenario's second half passes (`ctrl-↑` refused with
+    `hot_keys.settings_refusal: macos`, `anyway` saves it with `hot_keys.settings_clash: Mission Control`).
+    By hand: click the keys and press ⌃↑ (or any shortcut on in System Settings, Keyboard, Keyboard
+    Shortcuts; one macOS takes before Sanduhr sees it never arrives, so nothing happens): the note
+    reads "macOS uses ⌃↑ for “Mission Control”, so it would get there first." with **Use Anyway**,
+    nothing is saved, and the recorder keeps listening. **Use Anyway** saves it; the quiet grey note
+    "macOS also uses ⌃↑ for “Mission Control”, so it may not reach Sanduhr." stays while the switch is
+    on. Turn that shortcut off in System Settings and come back to Sanduhr: the note goes. No
+    Accessibility prompt at any point. **Test It** (beside the note line, while the switch is on):
+    "Press ⌥S now…"; press ⌥S: "⌥S reached Sanduhr." and Settings does not open again; a later ⌥S
+    opens Settings as usual. With keys macOS takes, press them within 10 seconds: "… didn't reach
+    Sanduhr in 10 seconds: macOS or another app takes it first. Pick other keys."
 
 ## 44. Settings v2, slice 3: reach (item 72)
 

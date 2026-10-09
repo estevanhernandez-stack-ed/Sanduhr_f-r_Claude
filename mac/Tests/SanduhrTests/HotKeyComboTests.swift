@@ -115,6 +115,8 @@ struct HotKeyComboTests {
     @Test func theSmokeActionParses() {
         #expect((try? DebugLink.action("hot-key", arg: "settings ctrl-opt-s").get()) == .hotKey(.settings, ctrlOptS))
         #expect((try? DebugLink.action("hot-key", arg: "join default").get()) == .hotKey(.join, nil))
+        #expect((try? DebugLink.action("hot-key", arg: "settings cmd-space anyway").get())
+                == .hotKey(.settings, HotKeyCombo(keyCode: UInt32(kVK_Space), modifiers: HotKeyCombo.command), anyway: true))
         #expect((try? DebugLink.action("hot-key", arg: "settings").get()) == nil)
         #expect((try? DebugLink.action("hot-key", arg: "settings nope-q").get()) == nil)
         #expect(DebugAction.names.contains("hot-key"))
