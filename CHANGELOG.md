@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **Your meter history as charts, for one account or all of them.** Settings, Claude Usage has a new **Meters** tab: a chart per limit from the readings behind the sparklines, over a **Week** or a **Month**, with "N% now". With two or more accounts, **All accounts** draws one line per account in its own color, with a legend. Limits you hid with their Show switch stay hidden. **Export CSV…** writes every reading kept (`timestamp,tier,util_pct`, or with an `account` column for all accounts), the same file Sanduhr for Windows exports. Everything stays on this Mac.
+
 ## v2.12.0-mac — 2026-10-09
 
 - **Shortcuts know macOS's own.** On General, Shortcuts, keys macOS already uses (⌘Space for Spotlight, ⌃↑ for Mission Control, ⇧⌘3 for a screenshot, any shortcut that's on in System Settings, Keyboard, Keyboard Shortcuts) are named and not saved: "macOS uses ⌃↑ for “Mission Control”, so it would get there first." **Use Anyway** saves them, and while they're on a grey note says macOS may get them first; it goes when you turn that shortcut off in System Settings. **Test It** listens for 10 seconds: press the keys once and it says whether they reached Sanduhr (testing ⌥S doesn't open Settings again). No permission is asked for, and no other keystroke is read.
