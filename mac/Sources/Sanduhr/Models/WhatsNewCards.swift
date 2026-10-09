@@ -7,8 +7,16 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2120: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.12.0", id: "shortcut-awareness",
+            title: "Shortcuts that check with macOS",
+            body: "Keys macOS already uses are named before they're saved, and Test It tells you whether your keys reach Sanduhr.",
+            art: .symbol("keyboard.badge.ellipsis"), destination: .general),
+    ]
 
     static let release2110: [WhatsNewCard] = [
         WhatsNewCard(
