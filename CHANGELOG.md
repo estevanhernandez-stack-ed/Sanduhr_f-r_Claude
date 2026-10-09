@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **Fixed: a plain click on the Desk's clock or message no longer opens Settings.** Both now behave like the meters and the Claude line: a plain click does nothing. **Desk Look Settings…** and **Edit Messages…** are still on their two-finger menus.
+
 ## v2.11.0-mac — 2026-10-08
 
 - Accounts: a green **Active** pill and a **Signed in**, **Session expired** or **Signed out** pill beside each account's name; a working account folds its sign-in tools under **Change Sign-In**, so the page no longer looks signed out. The Settings search field looks like one, and Command-F jumps into it.

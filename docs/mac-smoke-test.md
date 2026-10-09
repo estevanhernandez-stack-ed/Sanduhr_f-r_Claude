@@ -1636,9 +1636,8 @@ desktop well away from every piece.
    Background). The clock's menu starts with **Desk Look Settings…**, the message's with **Edit Messages…**;
    each opens Settings at that page. Two-finger click the claude line: the shared menu, no extra
    item. With two accounts, a plain click on the account name still switches accounts.
-3. Plain click the clock: Settings opens at Desk Look. Plain click the message: Settings, Desk,
-   Message. Plain click the claude line (not the account name): nothing happens, no Finder
-   selection box starts.
+3. Plain click the clock, the message and the claude line (not the account name): nothing
+   happens each time, Settings stays closed and no Finder selection box starts.
 4. The same with a special day's stack (`10-31: test` in messages.txt with the Mac's date on
    10-31, or a date line for today), and with On special days set to Take turns and to Scroll: a
    two-finger click anywhere on the stack or the line taking its turn opens the menu.

@@ -88,7 +88,7 @@ The pieces are: **Message** (a line of your own, see task 5), **Clock and date**
 
 **Change the look.** Settings, **Desk Look** sets the **Desk font**, the **Message font**, the sizes of the clock and message, and the colors: pick a preset under **Colors**, or type your own hex colors under **Advanced** (one, or two to four with commas for a gradient). EsteFont Pro, a handwriting font, is the Desk font on new installs.
 
-**Clicks on the clock and message.** Click the clock once to open Desk Look. Click the message once to open its editor. Two-finger click either one for the Sanduhr menu, plus **Desk Look Settings…** or **Edit Messages…**.
+**Clicks on the clock and message.** A plain click does nothing. Two-finger click either one for the Sanduhr menu, plus **Desk Look Settings…** or **Edit Messages…**.
 
 If it doesn't work: desktop icons right under the clock or message can't be clicked while those pieces take clicks. Turn off **Clock and message take clicks** in Settings, Desk, under Clicks.
 
@@ -127,7 +127,7 @@ If it doesn't work: a screen without a notch is left alone. The camera and mic i
 
 You get a line of your own on the desktop, with its own colors and motion, and different lines on different days.
 
-1. Open Settings, **Message** (or click the message on the desktop).
+1. Open Settings, **Message** (or two-finger click the message on the desktop and pick **Edit Messages…**).
 2. Click **Add Line**, at the top of the page. A new row appears at the top of the list, drawn the way the Desk draws it, with its settings open.
 3. **When**: **Every day**, a weekday, or **A date** (pick the month and day; it repeats every year).
 4. **Text**: what the Desk says.

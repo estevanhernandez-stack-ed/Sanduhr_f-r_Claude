@@ -1127,8 +1127,7 @@ special day's stack, or the line taking its turn with Take turns or Scroll) and 
 those areas (`DeskPieceClicks`; kinds `clock`, `message` and `claude_line`). A two-finger click on
 any of them opens the shared Sanduhr menu (Arrange Desk…, Settings… and the rest) instead of the
 Finder's desktop menu; the clock's adds **Desk Look Settings…** and the message's **Edit Messages…** at the
-top, and the shared Settings… reads All Settings… there. A plain click on the clock opens Settings, Desk Look, on the message Settings, Desk, Message;
-on the claude line it does nothing, like the meters (the account name inside the line still
+top, and the shared Settings… reads All Settings… there. A plain click on any of them does nothing, like the meters (the account name inside the line still
 switches accounts). The cost: a desktop icon right beneath one of them can't be clicked there while
 the switch is on. Off, nothing is drawn behind them and they are not click areas, exactly as before.
 
