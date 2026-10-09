@@ -260,8 +260,9 @@ New options keep today's behavior by default; the camera light and the glow star
   Acceptance: two accounts switch without a relaunch, each with its own history; signing out one leaves the other; an upgrade lands on Personal with nothing lost.
   Verify: swift-testing on fakes (registry, migration, switch, scoped sign-out, history paths, account_ref matching Windows); smoke state key for the active account (hashed, never the label); by hand with two keys.
 
-- [ ] **37. All-accounts chart and CSV export** (later; decided 2026-10-03)
-  Spec ref: `docs/mac-merge-plan.md` (Per-account history, All-accounts chart toggle, CSV export)
+- [x] **37. All-accounts chart and CSV export** (decided 2026-10-03; built 2026-10-09 for 2.13.0)
+  Spec ref: `docs/mac-merge-plan.md` (Per-account history, All-accounts chart toggle, CSV export); Windows 2.2's History tab (`HistoryTabViewModel`, `CsvExport`).
+  Built: Settings, Claude Usage, **Meters**: a chart per limit from the meter history, Week (7 days) or Month (30), for the picked account or **All accounts** (one line per account in registry-order colors, a legend; the account picker greys out), hidden limits left out; **Export CSV…** of every reading kept, Windows' columns (`timestamp,tier,util_pct`, or `timestamp,account,tier,util_pct` for all), order, quoting and file name. `MeterHistoryChart` is pure and tested; state.yaml `meter_history` (window, overlay, counts); `usage-page.yaml` covers the tab.
 
 - [x] **38. Menu bar limit choice, hide special limits, inline duplicate-name error**
   Spec ref: on-screen check of item 36 (2026-10-03): a used-up promo limit ("Weekly — Special", `iguana_necktie`) pinned the menu bar at 100% because it shows the highest of every limit; Add Account's duplicate-name error showed only after Add, while the label-rule error shows under the field as you type.

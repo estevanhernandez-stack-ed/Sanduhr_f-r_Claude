@@ -22,6 +22,14 @@ final class UsagePageModel {
     private(set) var records: [VaultRecordInfo] = []
     private(set) var recordsLoaded = false
     var note: (text: String, isError: Bool)?
+    /// Meters (item 37): the window, all accounts or the picked one, and the charts.
+    var metersWindow: MeterHistoryChart.Window = .week
+    var metersAll = false
+    private(set) var meterRows: [MeterHistoryChart.Row] = []
+    private(set) var metersLoaded = false
+    /// The files the charts came from, for Export CSV (every reading, not only the window's).
+    @ObservationIgnored private(set) var meterHistories: [String: HistoryStore.History] = [:]
+    @ObservationIgnored private(set) var meterAccounts: [String] = []
 
     @ObservationIgnored private var reader: CCLogReader?
     @ObservationIgnored private var generations: [String: Int] = [:]
@@ -58,6 +66,24 @@ final class UsagePageModel {
     private func current(_ key: String, _ g: Int) -> Bool { generations[key] == g && !Task.isCancelled }
 
     // MARK: Loads
+
+    /// Meters: each shown account's history file, read after the writes queued before it.
+    func loadMeters(_ vm: UsageViewModel, label: String) async {
+        let accounts = metersAll ? vm.accountLabels : [label]
+        let window = metersWindow
+        let hidden = Set(vm.hiddenTiers.map(\.rawValue))
+        let g = begin("meters")
+        let loaded = await Task.detached(priority: .userInitiated) {
+            let histories = Dictionary(uniqueKeysWithValues: accounts.map { ($0, HistoryStore.load(account: $0)) })
+            return (histories, MeterHistoryChart.rows(histories: histories, accounts: accounts, window: window,
+                                                      now: Date(), hidden: hidden))
+        }.value
+        guard current("meters", g) else { return }
+        meterHistories = loaded.0
+        meterAccounts = accounts
+        meterRows = loaded.1
+        metersLoaded = true
+    }
 
     func loadOverview(_ vm: UsageViewModel, label: String) async {
         let choices = vm.dataChoices(for: label)
@@ -158,7 +184,8 @@ final class UsagePageModel {
 }
 
 /// Settings, Claude Usage (item 48): an account's Claude Code activity as Sanduhr reads it live
-/// and keeps it in the record, with Overview, Trends and Sessions, and every record on this Mac
+/// and keeps it in the record, with Overview, Trends and Sessions, the meter history as Meters
+/// (item 37), and every record on this Mac
 /// with its erase button.
 ///
 /// **Why a Settings section.** Everything about an account's data already lives in Settings:
@@ -209,6 +236,8 @@ private struct UsageHeader: View {
                     }
                     .pickerStyle(.menu)
                     .fixedSize()
+                    // Meters with All accounts draws every account: the pick doesn't apply.
+                    .disabled(navigation.usageTab == .meters && page.metersAll)
                 }
                 Spacer(minLength: 0)
                 Picker("Tab", selection: $navigation.usageTab) {
@@ -218,8 +247,12 @@ private struct UsageHeader: View {
                 .labelsHidden()
                 .fixedSize()
             }
-            UsageCaption(sourceLine)
+            UsageCaption(navigation.usageTab == .meters ? metersLine : sourceLine)
         }
+    }
+
+    private var metersLine: String {
+        page.metersAll ? "Every account's meter history, one color each." : "\(label)'s meter history."
     }
 
     private var sourceLine: String {
@@ -269,7 +302,23 @@ private struct UsageTabContent: View {
         case .sessions:
             UsageSessionsTab(vm: vm, page: page, navigation: navigation, label: label, accent: accent)
                 .task(id: key) { await page.loadSessions(vm, label: label) }
+        case .meters:
+            // Meter history needs no Claude Code folder: it is the meters' own readings.
+            UsageMetersTab(vm: vm, page: page, label: label, accent: accent)
+                .task(id: metersKey) {
+                    // A fetch adds a reading every few minutes: read again while the tab shows.
+                    while !Task.isCancelled {
+                        await page.loadMeters(vm, label: label)
+                        try? await Task.sleep(for: .seconds(60))
+                    }
+                }
         }
+    }
+
+    /// The Meters tab's reload: the account, the accounts, the window, the overlay, hidden limits.
+    private var metersKey: String {
+        [label, vm.accountLabels.joined(separator: ","), page.metersWindow.rawValue, String(page.metersAll),
+         vm.hiddenTiers.map(\.rawValue).sorted().joined(separator: ",")].joined(separator: "|")
     }
 }
 

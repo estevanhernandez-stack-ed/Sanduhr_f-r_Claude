@@ -3,7 +3,7 @@ import Foundation
 /// The Claude Usage page's tabs (item 48). The raw values are state.yaml's `usage_page.tab` and
 /// the `usage` debug action's argument.
 enum UsageTab: String, CaseIterable, Identifiable, Sendable {
-    case overview, trends, sessions
+    case overview, trends, sessions, meters
 
     var id: String { rawValue }
 
@@ -12,6 +12,7 @@ enum UsageTab: String, CaseIterable, Identifiable, Sendable {
         case .overview: "Overview"
         case .trends: "Trends"
         case .sessions: "Sessions"
+        case .meters: "Meters"
         }
     }
 }

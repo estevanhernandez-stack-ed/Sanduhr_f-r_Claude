@@ -91,7 +91,7 @@ struct DebugLinkTests {
         #expect(parse("sanduhr://debug/action?name=desk").error == "desk needs arg=on or arg=off")
         #expect(parse("sanduhr://debug/action?name=camera-light").error == "camera-light needs arg=on or arg=off")
         #expect(parse("sanduhr://debug/action?name=glow&arg=sound").error == "glow needs arg=alert, meeting, camera, claude-waiting or claude-done")
-        #expect(parse("sanduhr://debug/action?name=usage&arg=ledger").error == "usage needs arg=overview, trends or sessions")
+        #expect(parse("sanduhr://debug/action?name=usage&arg=ledger").error == "usage needs arg=overview, trends, sessions or meters")
         #expect(parse("sanduhr://debug/action?name=theme").error == "theme needs arg=<theme id>")
         // Only cycling: no hook adds, renames, signs out or removes an account.
         #expect(parse("sanduhr://debug/action?name=account").error == "account needs arg=next")
@@ -110,7 +110,7 @@ struct UsagePageStateTests {
     @Test func stateYAMLSaysOpenAndTabOnly() {
         let yaml = YAMLEmitter.emit(.object([("usage_page", DebugState.usagePageYAML(open: true, tab: .sessions))]))
         #expect(yaml == "usage_page:\n  open: true\n  tab: sessions\n")
-        #expect(UsageTab.allCases.map(\.rawValue) == ["overview", "trends", "sessions"])
+        #expect(UsageTab.allCases.map(\.rawValue) == ["overview", "trends", "sessions", "meters"])
     }
 
     @Test func stateYAMLCountsIntegrationsWithoutPaths() {
@@ -283,7 +283,7 @@ struct DebugStateTests {
                          "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "desk_piece_clicks", "dock", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
                          "glow_camera", "glow_claude_waiting", "glow_claude_done", "theme", "menu", "menu_submenus", "credentials_store", "account_ref", "accounts_count", "history_days", "data",
-                         "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "version", "build", "whats_new", "tour", "watchers", "av_indicators", "settings_preview", "settings_preview_folded", "mods_page", "message_editor", "hot_keys"])
+                         "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "version", "build", "whats_new", "tour", "watchers", "av_indicators", "settings_preview", "settings_preview_folded", "mods_page", "message_editor", "hot_keys", "meter_history"])
         #expect(yaml.contains("settings_section: notch\nsettings_anchor: null\nsettings_anchor_visible: null\nusage_page:\n  open: false\n  tab: overview\nmeters:"))
         #expect(yaml.contains("hot_keys:\n  join: true\n  settings: true\n  registered: 0\n  join_keys: ⌥J\n  settings_keys: ⌥S\n  join_taken: false\n  settings_taken: false\n"))
         #expect(yaml.contains("  shown: none\n  place: besideRight\n"))

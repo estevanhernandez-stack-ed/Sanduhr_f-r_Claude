@@ -101,6 +101,8 @@ final class SettingsWindowController {
     var anchor: String? { navigation.anchor }
     /// The Claude Usage page's tab (state.yaml `usage_page.tab`).
     var usageTab: UsageTab { navigation.usageTab }
+    /// The Claude Usage page's state (state.yaml `meter_history`).
+    var usagePage: UsagePageModel { navigation.usagePage }
     /// The Mods page's state (state.yaml `mods_page`).
     var modsPage: ModsPageModel { navigation.modsPage }
     /// Settings, Message's editor (state.yaml `message_editor`, the debug hooks' `message-editor`).

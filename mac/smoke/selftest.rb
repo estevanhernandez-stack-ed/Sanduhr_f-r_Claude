@@ -191,6 +191,10 @@ eq('no integration installed by default', state['integrations'], { 'mcp_installe
 check('integrations block holds no path', !state['integrations'].to_s.include?('/'))
 # Item 48: the Claude Usage page, open and its tab only: never a label, a project or a number.
 eq('usage page closed on its first tab', state['usage_page'], { 'open' => false, 'tab' => 'overview' })
+# Item 37: Claude Usage, Meters: its choices and counts, never a label or a reading.
+eq('meter history keys', state['meter_history'].keys, %w[all window rows series])
+check('meter history holds only flags, a window and counts',
+      state['meter_history'].values.all? { |v| v == true || v == false || v.is_a?(Integer) || %w[week month].include?(v) })
 # Item 38: the menu bar choice, Whichever is higher until changed.
 eq('menu bar follows the higher limit by default', state['menu_bar'], 'higher')
 eq('no limit hidden by default', state['hidden_limits'], [])

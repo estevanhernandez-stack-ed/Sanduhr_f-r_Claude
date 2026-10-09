@@ -210,3 +210,8 @@ hot_keys:
   settings_keys: ⌥S
   join_taken: false
   settings_taken: false
+meter_history:
+  all: false
+  window: week
+  rows: 2
+  series: 2
