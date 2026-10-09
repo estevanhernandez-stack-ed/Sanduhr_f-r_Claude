@@ -26,10 +26,12 @@ struct DeskElement: Equatable {
         /// or a two-finger click opens their read-only menu.
         case avIndicators = "av_indicators"
         /// The clock, time and date. Only while "Clock and message take clicks" is on
-        /// (DeskPieceClicks): a click opens Settings, Desk, Look; a two-finger click the shared menu.
+        /// (DeskPieceClicks): a plain click does nothing, a two-finger click opens the shared menu
+        /// with Desk Look Settings….
         case clock
         /// The message piece as a whole: the usual line, a special day's stack, or the line taking
-        /// its turn. Only while the switch is on: a click opens Settings, Desk, Message.
+        /// its turn. Only while the switch is on: a plain click does nothing, a two-finger click
+        /// opens the shared menu with Edit Messages….
         case message
         /// The claude line, the account name inside it keeping its own click. Only while the
         /// switch is on: a plain click does nothing, a two-finger click opens the shared menu.
@@ -334,16 +336,6 @@ enum DeskPieceClicks {
 
     static func set(_ on: Bool, in store: DefaultsStore) {
         store.set(on, forKey: key)
-    }
-
-    /// Where a plain click on the piece goes: the clock to Settings, Desk, Look, the message to
-    /// Settings, Desk, Message. The claude line takes the click and does nothing, as the meters do.
-    static func plainClick(_ kind: DeskElement.Kind) -> SettingsSection? {
-        switch kind {
-        case .clock: return .deskLook
-        case .message: return .message
-        default: return nil
-        }
     }
 
     /// The item a piece's two-finger menu has above the shared items, and the Settings page it opens.

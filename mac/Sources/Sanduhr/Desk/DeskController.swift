@@ -563,16 +563,11 @@ final class DeskController: NSObject, NSMenuDelegate {
                 guard let self else { return }
                 self.popUpAtPointer(AVIndicatorMenu.menu(self.model.avIndicators))
             }
-        case .meters, .meterRow:
-            // The window holds the mouse over the meters so a two-finger click reaches the limit
-            // menu; a plain click is swallowed there, so nothing reacts to it.
+        case .meters, .meterRow, .clock, .message, .claudeLine:
+            // The window holds the mouse over these so a two-finger click reaches their menu
+            // (DeskPieceClicks for the clock, message and claude line); a plain click is
+            // swallowed there, so nothing reacts to it. Their settings are in that menu.
             break
-        case .clock, .message, .claudeLine:
-            // DeskPieceClicks: the clock opens Settings, Desk, Look, the message Settings, Desk,
-            // Message; the claude line, like the meters, takes the click and does nothing.
-            if let section = DeskPieceClicks.plainClick(hit.kind) {
-                DispatchQueue.main.async { [weak self] in self?.showSettings(section) }
-            }
         case .meetings:
             return false
         }

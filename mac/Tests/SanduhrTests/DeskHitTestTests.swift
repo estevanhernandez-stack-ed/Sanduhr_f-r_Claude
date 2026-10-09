@@ -328,10 +328,7 @@ struct DeskPieceClicksTests {
         #expect(DeskFrameCheck.problem([low, line], window: window) == "clock overlaps claude_line")
     }
 
-    @Test func plainClicksAndMenus() {
-        #expect(DeskPieceClicks.plainClick(.clock) == .deskLook)
-        #expect(DeskPieceClicks.plainClick(.message) == .message)
-        #expect(DeskPieceClicks.plainClick(.claudeLine) == nil)
+    @Test func menus() {
         #expect(DeskPieceClicks.menuItem(.clock)?.title == "Desk Look Settings…")
         #expect(DeskPieceClicks.menuItem(.clock)?.section == .deskLook)
         #expect(DeskPieceClicks.menuItem(.message)?.title == "Edit Messages…")

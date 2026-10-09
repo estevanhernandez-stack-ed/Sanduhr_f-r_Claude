@@ -52,7 +52,7 @@ extension WhatsNew {
         WhatsNewCard(
             version: "2.10.0", id: "desk-clicks",
             title: "The clock and message answer clicks",
-            body: "Two-finger click the clock or the message for Sanduhr's menu, or click once to open their settings. A switch on the Desk page lets clicks through instead.",
+            body: "Two-finger click the clock or the message for Sanduhr's menu and their settings. A switch on the Desk page lets clicks through instead.",
             art: .symbol("cursorarrow.click"), destination: .deskLayout),
         WhatsNewCard(
             version: "2.10.0", id: "mod-switches",
