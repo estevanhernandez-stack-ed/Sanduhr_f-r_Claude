@@ -119,9 +119,11 @@ unsaved edits. Neither saves, so `messages.txt` is never written; a run reverts 
 `desk-arrange start|test|done|cancel` (item 60: Arrange mode on the Desk, as Arrange Desk… enters it; test
 makes the smoke's own edit, the clock to Top right at 120%, in the working layout only; done ends it writing
 the layout once when it changed, cancel ends it writing nothing. A run that leaves it on cancels it),
-`hot-key settings|join <keys>|default` (General, Shortcuts: a shortcut's keys set as the recorder sets them,
+`hot-key settings|join <keys> [anyway]|default` (General, Shortcuts: a shortcut's keys set as the recorder sets them,
 written as `ctrl-opt-s` or `⌃⌥S`; refused with an error, nothing saved, without ⌘, ⌃ or ⌥ or when the other
-shortcut has them. It writes the desk keys `hotKey<Settings|Join>KeyCode` and `…Modifiers`; a run puts changed
+shortcut has them. Keys macOS also uses (item 73) are refused without an error, as the recorder refuses them:
+nothing saved and `hot_keys.<shortcut>_refusal: macos` in state.yaml; `anyway` saves them as Use Anyway does,
+and `hot_keys.<shortcut>_clash` then names the macOS shortcut. `default` is never refused for macOS's sake. It writes the desk keys `hotKey<Settings|Join>KeyCode` and `…Modifiers`; a run puts changed
 keys back).
 
 ## Scenarios

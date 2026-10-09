@@ -17,6 +17,18 @@ steps:
   - do: hot-key
     arg: settings default
   - expect_state: { hot_keys.settings_keys: ⌥S }
+  # Item 73: keys macOS uses (⌃↑, Mission Control, on by default) are refused with its name and
+  # nothing saved; anyway saves them as Use Anyway does, and the clash shows quietly.
+  - do: hot-key
+    arg: settings ctrl-↑
+  - expect_state: { hot_keys.settings_keys: ⌥S, hot_keys.settings_refusal: macos }
+  - do: hot-key
+    arg: settings ctrl-↑ anyway
+  - expect_state: { hot_keys.settings_keys: ⌃↑, hot_keys.settings_clash: Mission Control }
+  - snap: shortcut-clash
+  - do: hot-key
+    arg: settings default
+  - expect_state: { hot_keys.settings_keys: ⌥S }
   # Leave General at its top: the next open of the same page keeps its scroll.
   - do: settings
     arg: general surfaces

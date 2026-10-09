@@ -219,9 +219,15 @@ final class DeskController: NSObject, NSMenuDelegate {
             hotKeys.unregister()
         } else {
             let failed = hotKeys.register(wanted.map { r -> DeskHotKeys.Binding in
-                switch r.shortcut {
-                case .join: DeskHotKeys.Binding(keyCode: r.combo.keyCode, modifiers: r.combo.modifiers) { [weak self] in self?.joinNext() }
-                case .settings: DeskHotKeys.Binding(keyCode: r.combo.keyCode, modifiers: r.combo.modifiers) { [weak self] in self?.showSettings() }
+                let action: () -> Void = switch r.shortcut {
+                case .join: { [weak self] in self?.joinNext() }
+                case .settings: { [weak self] in self?.showSettings() }
+                }
+                // Test It (item 73) takes the keys while it waits for them, instead of the action.
+                return DeskHotKeys.Binding(keyCode: r.combo.keyCode, modifiers: r.combo.modifiers) {
+                    MainActor.assumeIsolated {
+                        if !ShortcutRecorderModel.shared.arrived(r.shortcut) { action() }
+                    }
                 }
             })
             taken = Set(failed.map { wanted[$0].shortcut })

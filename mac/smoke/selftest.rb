@@ -88,11 +88,21 @@ class FakeApp
     when 'close-settings' then s['settings_open'] = false
     when 'hot-key'
       which, keys = arg.split(' ', 2)
+      anyway = keys.end_with?(' anyway')
+      keys = keys.delete_suffix(' anyway')
       defaults = { 'settings' => '⌥S', 'join' => '⌥J' }
-      keys = { 'default' => defaults[which], 'ctrl-opt-s' => '⌃⌥S', 'ctrl-opt-j' => '⌃⌥J' }.fetch(keys, keys)
+      keys = { 'default' => defaults[which], 'ctrl-opt-s' => '⌃⌥S', 'ctrl-opt-j' => '⌃⌥J', 'ctrl-↑' => '⌃↑' }.fetch(keys, keys)
       other = which == 'settings' ? 'join' : 'settings'
       raise Smoke::Failure, 'hot-key refused: already in use' if s['hot_keys']["#{other}_keys"] == keys
-      s['hot_keys']["#{which}_keys"] = keys
+      # Item 73: keys macOS uses are refused in state, unless anyway; the default never is.
+      clash = { '⌃↑' => 'Mission Control' }[keys]
+      if clash && !anyway
+        s['hot_keys']["#{which}_refusal"] = 'macos'
+      else
+        s['hot_keys']["#{which}_keys"] = keys
+        s['hot_keys']["#{which}_refusal"] = nil
+        s['hot_keys']["#{which}_clash"] = clash
+      end
     when 'desk-arrange'
       a = (s['desk_arrange'] ||= {})
       case arg
@@ -397,7 +407,9 @@ r = Runner.new(app_hk, MemoryDefaults.new, File.join(Smoke::OUT, '.selftest-hk',
     .run_file(hk_file)
 eq('shortcut keys scenario passes', [r['status'], r['reason']], ['pass', nil])
 eq('shortcut keys scenario sets, resets, then closes Settings', app_hk.actions,
-   ['settings general shortcuts', 'hot-key settings ctrl-opt-s', 'hot-key settings default', 'settings general surfaces', 'close-settings'])
+   ['settings general shortcuts', 'hot-key settings ctrl-opt-s', 'hot-key settings default',
+    'hot-key settings ctrl-↑', 'hot-key settings ctrl-↑ anyway', 'hot-key settings default',
+    'settings general surfaces', 'close-settings'])
 FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-hk'))
 # Item 72, slice 3: anchors, the search and settings_anchor_visible.
 eq('settings anchor keys in the fixture', state.values_at('settings_anchor', 'settings_anchor_visible', 'settings_preview_folded'),

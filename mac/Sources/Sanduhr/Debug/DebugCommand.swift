@@ -88,8 +88,8 @@ enum DebugAction: Equatable {
 
     /// A shortcut's keys set as General's recorder sets them (2026-10-08), with its rules: nil is
     /// the default. Refused (an error, nothing saved) without ⌘, ⌃ or ⌥ or when the other
-    /// shortcut uses them. Writes the two desk keys; Restore puts the keys back after a run.
-    case hotKey(SanduhrHotKeys.Shortcut, HotKeyCombo?)
+    /// shortcut uses them; keys macOS uses are refused in state.yaml unless `anyway` (item 73). Writes the two desk keys; Restore puts the keys back after a run.
+    case hotKey(SanduhrHotKeys.Shortcut, HotKeyCombo?, anyway: Bool = false)
 
     static let names = ["show-widget", "hide-widget", "settings", "settings-link", "settings-search", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
@@ -240,15 +240,18 @@ enum DebugLink {
             }
             return .success(.deskArrange(step))
         case "hot-key":
-            // "settings ctrl-opt-s", "join ⌃⌥J", "settings default".
+            // "settings ctrl-opt-s", "join ⌃⌥J", "settings default"; "anyway" after the keys saves
+            // keys macOS also uses (Use Anyway, item 73).
             let parts = (arg ?? "").split(separator: " ", maxSplits: 1).map(String.init)
             let which: [String: SanduhrHotKeys.Shortcut] = ["settings": .settings, "join": .join]
             guard parts.count == 2, let s = which[parts[0].lowercased()] else {
-                return bad("hot-key needs arg=settings|join <keys> (ctrl-opt-s, ⌃⌥S) or default")
+                return bad("hot-key needs arg=settings|join <keys> [anyway] (ctrl-opt-s, ⌃⌥S) or default")
             }
             if parts[1].lowercased() == "default" { return .success(.hotKey(s, nil)) }
-            guard let combo = HotKeyCombo.parse(parts[1]) else { return bad("hot-key: unknown keys \(parts[1])") }
-            return .success(.hotKey(s, combo))
+            let anyway = parts[1].lowercased().hasSuffix(" anyway")
+            let keys = anyway ? String(parts[1].dropLast(" anyway".count)) : parts[1]
+            guard let combo = HotKeyCombo.parse(keys) else { return bad("hot-key: unknown keys \(keys)") }
+            return .success(.hotKey(s, combo, anyway: anyway))
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }

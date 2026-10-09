@@ -109,12 +109,35 @@ extension SanduhrHotKeys {
         case needsModifier
         /// The other Sanduhr shortcut already uses it.
         case taken(by: Shortcut)
+        /// macOS has its own shortcut on these keys (SystemShortcuts, item 73); Use Anyway saves it.
+        case macOS(name: String, combo: HotKeyCombo)
 
         var note: String {
             switch self {
             case .needsModifier: "Add ⌘, ⌃ or ⌥: Shift alone isn't enough."
             case .taken(let other): "\(SanduhrHotKeys.combo(other).display) already \(other.action)."
+            case .macOS(let name, let combo): "macOS uses \(combo.display) for \(Self.quoted(name)), so it would get there first."
             }
+        }
+
+        /// Only the macOS refusal can be overridden (Use Anyway).
+        var canInsist: Bool {
+            if case .macOS = self { return true }
+            return false
+        }
+
+        /// state.yaml's `hot_keys.<shortcut>_refusal`.
+        var kind: String {
+            switch self {
+            case .needsModifier: "modifier"
+            case .taken: "taken"
+            case .macOS: "macos"
+            }
+        }
+
+        /// "Show Spotlight search" in quotes; the generic "a macOS shortcut" as it is.
+        fileprivate static func quoted(_ name: String) -> String {
+            name == SystemShortcuts.unnamed ? "another of its shortcuts" : "“\(name)”"
         }
     }
 
@@ -123,30 +146,41 @@ extension SanduhrHotKeys {
         "Another app already uses \(combo.display). Pick another."
     }
 
+    /// The quiet note under a shortcut that is on while macOS has its own shortcut on the same
+    /// keys (saved with Use Anyway, or turned on in System Settings later).
+    static func clashNote(_ combo: HotKeyCombo, name: String) -> String {
+        "macOS also uses \(combo.display) for \(Refusal.quoted(name)), so it may not reach Sanduhr."
+    }
+
     /// The combo saved for a shortcut, or its default.
     static func combo(_ s: Shortcut, in d: DefaultsStore = UserDefaults.desk) -> HotKeyCombo {
         HotKeyCombo.load(prefix: s.key, from: d) ?? s.defaultCombo
     }
 
-    /// Whether `combo` may be saved for `s`: a ⌘, ⌃ or ⌥ in it, and not the other shortcut's.
-    static func check(_ combo: HotKeyCombo, for s: Shortcut, in d: DefaultsStore = UserDefaults.desk) -> Refusal? {
+    /// Whether `combo` may be saved for `s`: a ⌘, ⌃ or ⌥ in it, not the other shortcut's, and,
+    /// unless `insist`, not one of macOS's own shortcuts in `system`.
+    static func check(_ combo: HotKeyCombo, for s: Shortcut, in d: DefaultsStore = UserDefaults.desk,
+                      system: SystemShortcuts = .none, insist: Bool = false) -> Refusal? {
         guard combo.hasRequiredModifier else { return .needsModifier }
         if let other = Shortcut.allCases.first(where: { $0 != s && Self.combo($0, in: d) == combo }) {
             return .taken(by: other)
         }
+        if !insist, let name = system.collision(combo) { return .macOS(name: name, combo: combo) }
         return nil
     }
 
-    /// Saves `combo` for `s` when check(_:for:in:) allows it; the default is stored as no value.
-    /// Returns the refusal, nil when saved.
+    /// Saves `combo` for `s` when check(_:for:in:system:insist:) allows it; the default is stored
+    /// as no value. Returns the refusal, nil when saved.
     @discardableResult
-    static func setCombo(_ combo: HotKeyCombo, for s: Shortcut, in d: DefaultsStore = UserDefaults.desk) -> Refusal? {
-        if let refusal = check(combo, for: s, in: d) { return refusal }
+    static func setCombo(_ combo: HotKeyCombo, for s: Shortcut, in d: DefaultsStore = UserDefaults.desk,
+                         system: SystemShortcuts = .none, insist: Bool = false) -> Refusal? {
+        if let refusal = check(combo, for: s, in: d, system: system, insist: insist) { return refusal }
         HotKeyCombo.store(combo == s.defaultCombo ? nil : combo, prefix: s.key, in: d)
         return nil
     }
 
-    /// Back to the default (⌥S, ⌥J). Refused only when the other shortcut was moved onto it.
+    /// Back to the default (⌥S, ⌥J). Refused only when the other shortcut was moved onto it; the
+    /// default is never refused for macOS's sake.
     @discardableResult
     static func reset(_ s: Shortcut, in d: DefaultsStore = UserDefaults.desk) -> Refusal? {
         setCombo(s.defaultCombo, for: s, in: d)
@@ -160,5 +194,48 @@ extension SanduhrHotKeys {
             return lead + " While one is on, ⌥S no longer types ß, or ⌥J ∆."
         }
         return lead + " While one is on, its keys go to Sanduhr instead of the app in front."
+    }
+}
+
+/// Test It on General, Shortcuts (item 73): press the shortcut once and Sanduhr says whether it
+/// arrived. While a test waits, the shortcut's own action is held back, so testing ⌥S doesn't
+/// open Settings again. Only the shortcut's own registered keys are heard; no other keystroke is
+/// read.
+struct HotKeyProbe: Equatable {
+    typealias Shortcut = SanduhrHotKeys.Shortcut
+
+    enum Result: Equatable {
+        case waiting, arrived, missed
+    }
+
+    /// How long a test waits for the keys before saying they didn't arrive.
+    static let timeout: TimeInterval = 10
+
+    private(set) var results: [Shortcut: Result] = [:]
+
+    mutating func start(_ s: Shortcut) { results[s] = .waiting }
+
+    /// The shortcut's keys arrived. True when a test was waiting for them: the test takes them and
+    /// the shortcut's action is skipped.
+    mutating func arrive(_ s: Shortcut) -> Bool {
+        guard results[s] == .waiting else { return false }
+        results[s] = .arrived
+        return true
+    }
+
+    /// The wait ran out with nothing heard.
+    mutating func expire(_ s: Shortcut) {
+        if results[s] == .waiting { results[s] = .missed }
+    }
+
+    mutating func clear(_ s: Shortcut) { results[s] = nil }
+
+    /// The line under the shortcut for a result.
+    static func note(_ result: Result, combo: HotKeyCombo) -> String {
+        switch result {
+        case .waiting: "Press \(combo.display) now…"
+        case .arrived: "\(combo.display) reached Sanduhr."
+        case .missed: "\(combo.display) didn't reach Sanduhr in \(Int(timeout)) seconds: macOS or another app takes it first. Pick other keys."
+        }
     }
 }
