@@ -358,6 +358,9 @@ enum DebugHooks {
         s.settingsPreview = settings.isOpen ? SettingsPreviewKind.of(settings.section) : nil
         s.usagePageOpen = settings.isOpen && settings.section == .usage
         s.usageTab = settings.usageTab
+        let meters = settings.usagePage
+        s.meterHistory = MeterHistoryDebug(all: meters.metersAll && KeychainStore.accounts.labels.count > 1, window: meters.metersWindow.rawValue,
+                                           rows: meters.meterRows.count, series: meters.meterRows.reduce(0) { $0 + $1.series.count })
         let mods = settings.modsPage
         s.modsPage = ModsPageDebug(open: settings.isOpen && settings.section == .mods, loaded: mods.loaded,
                                    counts: mods.counts, checked: mods.checks.count, cli: mods.claude != nil)

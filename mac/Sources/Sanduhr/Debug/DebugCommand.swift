@@ -206,7 +206,7 @@ enum DebugLink {
         case "usage":
             guard let arg else { return .success(.usage(.overview)) }
             guard let tab = UsageTab(rawValue: arg.lowercased()) else {
-                return bad("usage needs arg=overview, trends or sessions")
+                return bad("usage needs arg=overview, trends, sessions or meters")
             }
             return .success(.usage(tab))
         case "whats-new": return .success(.whatsNew(true))

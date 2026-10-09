@@ -51,6 +51,8 @@ struct DebugStateInput {
     /// The Claude Usage page (item 48) shows, and its tab. Never a label, project or number.
     var usagePageOpen = false
     var usageTab = UsageTab.overview
+    /// Claude Usage, Meters (item 37): its choices and what it draws, counts only.
+    var meterHistory = MeterHistoryDebug()
     var meters: [DeskMeterRow] = []
     /// The widget's tiers drawing red with a glow (MeterWarning), in display order.
     var widgetWarnings: [Tier] = []
@@ -307,6 +309,13 @@ enum DebugState {
         .map([YAMLPair("open", .bool(open)), YAMLPair("tab", .string(tab.rawValue))])
     }
 
+    /// `meter_history:` (item 37): the Meters tab's window, whether it overlays every account, and
+    /// how many limit charts and lines it draws. Never a label or a reading.
+    static func meterHistoryYAML(_ m: MeterHistoryDebug) -> YAMLNode {
+        .map([YAMLPair("all", .bool(m.all)), YAMLPair("window", .string(m.window)),
+              YAMLPair("rows", .int(m.rows)), YAMLPair("series", .int(m.series))])
+    }
+
     /// `integrations:` (items 49 to 51): counts of folders, never a path.
     static func integrationsYAML(mcp: Int, statusline: Int, meters: Int = 0, hooks: Int = 0) -> YAMLNode {
         .map([YAMLPair("mcp_installed", .int(mcp)), YAMLPair("statusline_installed", .int(statusline)),
@@ -471,6 +480,7 @@ enum DebugState {
         pairs.append(("mods_page", modsPageYAML(s.modsPage)))
         pairs.append(("message_editor", messageEditorYAML(s.messageEditor)))
         pairs.append(("hot_keys", hotKeysYAML(s.hotKeys)))
+        pairs.append(("meter_history", meterHistoryYAML(s.meterHistory)))
         return .object(pairs)
     }
     
@@ -614,4 +624,12 @@ enum DebugTree {
         default: return nil
         }
     }
+}
+
+/// state.yaml's `meter_history:` (item 37).
+struct MeterHistoryDebug: Equatable {
+    var all = false
+    var window = MeterHistoryChart.Window.week.rawValue
+    var rows = 0
+    var series = 0
 }

@@ -242,7 +242,7 @@ enum SettingsSearch {
     static let pageSynonyms: [SettingsSection: [String]] = [
         .general: ["menu bar", "login"],
         .credentials: ["sign in", "account"],
-        .usage: ["history", "tokens", "records", "trends", "sessions"],
+        .usage: ["history", "tokens", "records", "trends", "sessions", "meter history", "chart", "csv", "export"],
         .alerts: ["notification", "warning"],
         .integrations: ["statusline", "prompt", "MCP", "Integrations"],
         .mods: ["mods", "plugins", "config"],

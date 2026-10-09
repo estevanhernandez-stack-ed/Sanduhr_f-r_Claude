@@ -519,6 +519,16 @@ cc_line_at "$(date -u -v-10d +%Y-%m-%dT10:00:00.000Z)" claude-opus-4-1 20000 0 w
   names it as not linked; Erase Record: the row and `vault/<id>/` are gone and stay gone after
   two refreshes. Link and record again, then Erase… on the linked row: the confirmation says the
   account switches to Live only first; after it, Data shows Live only and the folder is gone.
+- [ ] Meters (item 37): `smoke/smoke run usage-page` shows the tab (`usage_page.tab: meters`,
+  `meter_history: {all: false, window: week}` with `rows` and `series` counting what it draws).
+  By hand with Meter history on: one chart per limit with a line over the last 7 days and "N% now",
+  Month widens it to 30 days; a limit hidden with its Show switch has no chart. With two accounts,
+  All accounts draws one line per account in the legend's colors and greys out the account picker.
+  Meter history Off for the account and no readings: the tab says so and points to Accounts, Data.
+  Export CSV… offers `Sanduhr-usage-<account>-<date>.csv` (`…-all-accounts-…` with All accounts);
+  the file opens in Numbers with `timestamp,tier,util_pct` (or `timestamp,account,tier,util_pct`)
+  rows oldest first, CRLF line ends, the same columns as Windows' export, and the note reads "Wrote
+  N readings.". `meter_history` never holds a label or a reading.
 - [ ] Console (`log stream --predicate 'subsystem == "com.626labs.sanduhr"'`) shows no label,
   path, project or number from the page. Then `rm -rf ~/.claude-smoketest ~/Desktop/sanduhr-sessions-*.csv`
   and unlink it.
