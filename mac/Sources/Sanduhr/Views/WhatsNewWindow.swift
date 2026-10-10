@@ -14,13 +14,19 @@ final class WhatsNewWindowController {
 
     func close() { window?.close() }
 
-    /// Shows `cards`, the ones missed since `lastSeen`, or every card up to this version (What's
-    /// New… in About and the menus), under one header for the releases they cover.
+    /// Shows `cards`, the ones missed since `lastSeen`, under one header for the releases they
+    /// cover; or, from What's New… in About and the menus, WhatsNew.forMenu: this version's
+    /// Highlights on a fresh install, else every card up to this version.
     func show(_ cards: [WhatsNewCard]? = nil, lastSeen: String? = nil) {
         let current = AppInfo.current.version
-        let shown = cards ?? WhatsNew.all(current: current)
-        let range = WhatsNew.rangeLabel(shown, lastSeen: cards == nil ? nil : lastSeen, current: current)
-        let root = WhatsNewView(cards: shown, range: range ?? "Version \(current)",
+        let shown: [WhatsNewCard], header: String
+        if let cards {
+            shown = cards
+            header = WhatsNew.rangeLabel(cards, lastSeen: lastSeen, current: current) ?? "Version \(current)"
+        } else {
+            (shown, header) = WhatsNew.forMenu(current: current, installed: WhatsNew.installed())
+        }
+        let root = WhatsNewView(cards: shown, range: header,
                                 close: { [weak self] in self?.close() })
         if let window {
             window.contentView = NSHostingView(rootView: root)

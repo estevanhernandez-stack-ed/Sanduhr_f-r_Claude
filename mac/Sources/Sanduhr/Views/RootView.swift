@@ -149,8 +149,8 @@ struct RootView: View {
     private var statusLine: some View {
         let t = vm.theme.palette
         let color: Color = vm.status.isError ? .hex("f87171") : t.textDim
-        if vm.status == .signedOut {
-            // Signed out: the line is the way back, straight to Settings, Accounts.
+        if vm.status == .signedOut || vm.status == .notSignedIn {
+            // Signed out or never signed in: the line is the way in, straight to Settings, Accounts.
             Button { SettingsWindowController.shared.show(.credentials) } label: {
                 Text(vm.status.text)
                     .font(.app(size: 11))

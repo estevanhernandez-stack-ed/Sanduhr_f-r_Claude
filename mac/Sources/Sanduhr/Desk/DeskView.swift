@@ -310,7 +310,8 @@ struct DeskPiece: View {
     @ViewBuilder
     private var meters: some View {
         let noteHere = model.switchNote && !lineInLayout
-        if !model.meters.isEmpty || model.signInNeeded || noteHere {
+        let signInLine = model.signInNeeded && model.signInReminder
+        if !model.meters.isEmpty || signInLine || noteHere {
             let size = timeSize * 0.17
             VStack(alignment: alignment, spacing: size * 0.6) {
                 ForEach(model.meters) { row in
@@ -318,8 +319,8 @@ struct DeskPiece: View {
                         .onGlobalFrame { model.meterRowFrames[row.tier] = $0 }
                         .deskPulse(model.pulses[row.tier] ?? 0, ink: ink, size: size)
                 }
-                if model.signInNeeded {
-                    Text("sign in again in Sanduhr").opacity(0.75)
+                if signInLine {
+                    Text(DeskClaudeText.signInLine(first: model.firstSignIn)).opacity(0.75)
                 }
             }
             .font(.custom(font, size: size))

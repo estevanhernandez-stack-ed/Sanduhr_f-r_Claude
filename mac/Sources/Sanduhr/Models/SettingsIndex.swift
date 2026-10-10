@@ -34,6 +34,7 @@ enum SettingsAnchor {
     // Alerts
     static let notifications = "notifications"
     static let quietHours = "quiet-hours"
+    static let signInReminder = "sign-in-reminder"
     /// Alerts, Each limit (was the Meters page, raw value `deskMeters`).
     static let eachLimit = "each-limit"
     // Desk
@@ -125,6 +126,8 @@ enum SettingsAnchor {
         SettingsEntry(title: "Notifications", page: .alerts, anchor: notifications,
                       synonyms: ["alert", "banner", "threshold", "Where alerts show", "sound", "Send a Test"]),
         SettingsEntry(title: "Quiet hours", page: .alerts, anchor: quietHours, synonyms: ["do not disturb", "night"]),
+        SettingsEntry(title: "Sign-in reminders", page: .alerts, anchor: signInReminder,
+                      synonyms: [SignInReminder.title, "sign in", "signed out", "without Claude"]),
         SettingsEntry(title: "Each limit", page: .alerts, anchor: eachLimit,
                       synonyms: ["Warn when nearly full", "red", "temporary limit", "Show this limit", "hide limit", "meters"]),
     ]

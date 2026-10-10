@@ -8,8 +8,13 @@ struct DeskUsage {
     var usage: UsageResponse?
     /// When `usage` was fetched; nil before the first success.
     var fetchedAt: Date?
-    /// The session key or Cloudflare clearance was refused, so only a new sign-in helps.
+    /// The session key or Cloudflare clearance was refused, or there is none yet, so only a
+    /// (new) sign-in helps.
     var signInNeeded = false
+    /// There has never been a key (a fresh install): the line asks to sign in, not to sign in again.
+    var firstSignIn = false
+    /// SignInReminder: off, a needed sign-in writes no line (the last numbers, if any, show dimmed).
+    var signInReminder = true
     /// The active account as the claude line names it, with two or more accounts ("Work", or
     /// "Work (in use)" just after an automatic switch); nil with one. The notch never shows it.
     var account: String?
@@ -82,8 +87,11 @@ enum DeskClaudeText {
         var rest: String
     }
 
+    /// The Desk's sign-in line: "sign in to Sanduhr" before the first key, else "sign in again in Sanduhr".
+    static func signInLine(first: Bool) -> String { first ? compactSignIn : "sign in again in Sanduhr" }
+
     static func parts(_ input: DeskUsage) -> Parts? {
-        if input.signInNeeded { return Parts(account: input.account, rest: "sign in again in Sanduhr") }
+        if input.signInNeeded, input.signInReminder { return Parts(account: input.account, rest: signInLine(first: input.firstSignIn)) }
         guard let tiers = input.usage?.tiers else { return nil }
         var parts: [String] = []
         if let s = tiers[.fiveHour], let util = s.utilization {
@@ -105,11 +113,33 @@ enum DeskClaudeText {
     /// "5h 7%  wk 63%" for the notch, the short sign-in line when only a new sign-in helps,
     /// nil when stale, empty or veiled by a switch (the old account's numbers).
     static func compact(_ input: DeskUsage, now: Date = Date()) -> String? {
-        if input.signInNeeded { return compactSignIn }
+        if input.signInNeeded { return input.signInReminder ? compactSignIn : nil }
         guard !input.veiled, !input.isStale(now: now), let tiers = input.usage?.tiers else { return nil }
         let text = [tiers[.fiveHour]?.utilization.map { "5h \(Int($0))%" },
                     tiers[.sevenDay]?.utilization.map { "wk \(Int($0))%" }]
             .compactMap { $0 }.joined(separator: "  ")
         return text.isEmpty ? nil : text
+    }
+}
+
+/// Settings, Alerts, "Sign-in reminders on the Desk and notch" (2026-10-10): on, a needed sign-in
+/// shows as "sign in to Sanduhr" (never signed in) or "sign in again in Sanduhr" (an expired
+/// session) on the Desk's Claude line and in the notch's Claude meters; off, those places stay
+/// empty, for someone who uses the Desk without a Claude account. The widget's own status line
+/// ("Not signed in", "Signed out") always stays: it is where signing in starts.
+enum SignInReminder {
+    /// Desk suite key (com.626labs.sanduhr.desk).
+    static let key = "signInReminder"
+    static let defaultOn = true
+
+    static let title = "Sign-in reminders on the Desk and notch"
+    static let caption = "Shows “sign in to Sanduhr” where your Claude meters would be while you're signed out or your session has expired. The widget always says when you're not signed in."
+
+    static func isOn(in store: DefaultsStore) -> Bool {
+        store.object(forKey: key) as? Bool ?? defaultOn
+    }
+
+    static func set(_ on: Bool, in store: DefaultsStore) {
+        store.set(on, forKey: key)
     }
 }

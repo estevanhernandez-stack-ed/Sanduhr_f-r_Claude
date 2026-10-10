@@ -119,6 +119,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // line keeps the old account's name until those numbers have faded out.
             DeskController.shared.model.update(DeskUsage(
                 usage: vm.shownUsage, fetchedAt: vm.lastUpdated, signInNeeded: vm.status.needsSignIn,
+                firstSignIn: vm.status == .notSignedIn,
                 account: vm.shownAccountLabel, veiled: vm.switchVeil, switchNote: vm.switchNote))
         }
 
@@ -194,6 +195,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onboarding: !KeychainStore.exists(account: KeychainAccount.sessionKey), hidden: WhatsNew.hidden(),
             tour: tourPending)
         if decision.record { WhatsNew.record(current) }
+        if fresh { WhatsNew.recordInstalled(current) }
         guard !decision.show.isEmpty else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             MainActor.assumeIsolated { WhatsNewWindowController.shared.show(decision.show, lastSeen: lastSeen) }

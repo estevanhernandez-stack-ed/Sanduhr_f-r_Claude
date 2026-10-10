@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **A clearer first run.** Before you sign in, the widget says **Not signed in — sign in** (a click opens Accounts) instead of "Connecting…" forever, and the footer keeps **Use Sonnet** back until your numbers arrive. The Desk's Claude line and the notch's Claude meters wing say **sign in to Sanduhr** instead of staying blank. A new switch on Settings, Alerts, **Sign-in reminders on the Desk and notch**, turns those lines off (and the "sign in again" one after a session expires), for anyone using the Desk without a Claude account. The tour is now the **Sanduhr Tour**, so it no longer shares a name with the sign-in sheet, and taken before signing in its first step says to sign in, with a **Sign In** button. On a fresh install, **What's New…** shows the highlights of the version you installed instead of every release you never had.
+
 ## v2.13.0-mac — 2026-10-10
 
 - **Your meter history as charts, for one account or all of them.** Settings, Claude Usage has a new **Meters** tab: a chart per limit from the readings behind the sparklines, over a **Week** or a **Month**, with "N% now". With two or more accounts, **All accounts** draws one line per account in its own color, with a legend. Limits you hid with their Show switch stay hidden. **Export CSV…** writes every reading kept (`timestamp,tier,util_pct`, or with an `account` column for all accounts), the same file Sanduhr for Windows exports. Everything stays on this Mac.

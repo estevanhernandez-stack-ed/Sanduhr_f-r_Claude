@@ -64,7 +64,7 @@ Fresh-install and migration checks stay manual.
   to sign in again." Cancel changes nothing. Sign Out: the note says "Signed out." and the button greys out as
   "Signed Out" (no password prompt on reopening the page); the list marks the account "Signed out"; the widget's cards
   go and it reads "Signed out — sign in" (click it: Settings opens at Accounts; with "Hidden
-  while Desk is on" the widget shows itself); Desk's meters give way to "sign in again in Sanduhr",
+  while Desk is on" the widget shows itself); Desk's meters give way to "sign in again in Sanduhr", (on a fresh profile that never had a key, "sign in to Sanduhr")
   the notch's meters to "sign in to Sanduhr"; the hourglass loses its percent.
   `security find-generic-password -s com.626labs.sanduhr -a sessionKey:Personal` finds nothing and
   `credentials.json` is gone; `snapshot.json` has `"status":"error"`, `"error_kind":"session_expired"`,
@@ -81,6 +81,7 @@ Fresh-install and migration checks stay manual.
 - [ ] Sound: pick Glass, Preview plays it; Send a Test plays Glass with the banner. Pick None: Preview is off and Send a Test is silent. Back to Default.
 - [ ] Where alerts show, Desk pulse (Desk on, meters on the desktop, notch on): Send a Test posts no banner; the session meter glows three times over about three seconds and the notch glows once (the soft halo down the island's sides and along its bottom, no light along the screen edge). Banner and Desk pulse: both. Turn Desk off with Desk pulse chosen: Send a Test shows a banner.
 - [ ] Quiet hours on, from a minute ago to an hour from now, Banner: set the session line below the current percent, Refresh: no banner, no sound. With Banner and Desk pulse, the meter still pulses. Turn quiet hours off and Refresh: still no banner (that window's alert was recorded). Put everything back.
+- [ ] Sign-in reminders (2026-10-10): signed out (or on a fresh profile), the Desk's Claude line and the notch's Claude meters wing say "sign in to Sanduhr" ("sign in again in Sanduhr" on the Desk after a session expires). Settings, Alerts, **Sign-in reminders on the Desk and notch** off: both go at once, no relaunch; the widget still reads "Not signed in — sign in" or "Signed out — sign in". With an expired session the last numbers stay on the Desk, dimmed. Search "sign in" finds the switch. Turn it back on.
 
 ## 4. Desk
 
@@ -1064,6 +1065,14 @@ the build afterwards.
   "New in 2.4.0 – <this version>", and again
   from What's New… in the menu bar item's menu, the widget's two-finger menu and the Desk clock's
   menu (under Check for Updates…). Done (or Return) closes it.
+- [ ] Fresh install (2.14.0 on): on the version it was installed with, What's New… shows only that
+  version's cards under "Highlights in <this version>" (`defaults read com.626labs.sanduhr
+  whatsNewInstalledVersion` prints it); after an update it shows every card again. A Mac that
+  updated from before 2.14.0 has no `whatsNewInstalledVersion` and always shows every card.
+- [ ] Signed out (2.14.0 on): a fresh profile's widget reads "Not signed in — sign in" (never
+  "Connecting…"), a click opens Settings, Accounts, and the footer has no Use Sonnet until the
+  first numbers arrive. Take the Tour… before signing in: "Sanduhr Tour", step 1 says "Sign in to
+  see your meters here." and its button reads Sign In and opens Accounts.
 - [ ] Don't show after updates: tick it, quit, `defaults write com.626labs.sanduhr whatsNewLastSeen
   2.3.4`, open: no window, and `whatsNewLastSeen` is this version again; About's What's New… still
   opens it. Untick it.
@@ -1112,7 +1121,7 @@ before each `defaults` command.
    open the build. The welcome sheet shows; no tour, no What's New. `smoke/smoke state` shows
    `tour: { open: false, pending: true, done: false }`.
 2. Sign in (Sign In to Claude… or Paste a Key Instead). About a second after the widget fetches,
-   "Welcome to Sanduhr" opens with "1 of 5" under it and the card "Your limits, paced" showing your
+   "Sanduhr Tour" opens with "1 of 5" under it and the card "Your limits, paced" showing your
    own session and weekly bars with the pace tick and the same percents as the widget.
 3. Quit before signing in on a fresh start, open again: still no tour until the first fetch. Turn
    the network off and sign in: no tour while the fetch fails; it shows once a fetch succeeds.
