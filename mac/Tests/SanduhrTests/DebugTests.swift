@@ -286,6 +286,7 @@ struct DebugStateTests {
                          "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "version", "build", "whats_new", "tour", "watchers", "av_indicators", "settings_preview", "settings_preview_folded", "mods_page", "message_editor", "hot_keys", "meter_history"])
         #expect(yaml.contains("settings_section: notch\nsettings_anchor: null\nsettings_anchor_visible: null\nusage_page:\n  open: false\n  tab: overview\nmeters:"))
         #expect(yaml.contains("hot_keys:\n  join: true\n  settings: true\n  registered: 0\n  join_keys: ⌥J\n  settings_keys: ⌥S\n  join_taken: false\n  settings_taken: false\n"))
+        #expect(yaml.contains("  settings_clash: null\n  check_app_menus: false\n  app_menus_trusted: false\nmeter_history:"))
         #expect(yaml.contains("  shown: none\n  place: besideRight\n"))
         #expect(yaml.contains("settings_preview: notch"))
         #expect(yaml.contains("widget_visible: true\nwidget_visibility: whileDeskOff\nmenu_bar: rotate\nsettings_open: true\n"))

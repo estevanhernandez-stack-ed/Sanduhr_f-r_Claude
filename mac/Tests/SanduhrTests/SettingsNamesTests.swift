@@ -80,6 +80,8 @@ struct SettingsNamesTests {
         #expect(SettingsNames.unknownLinks(in: "Pacing & Focus Settings…") == ["Pacing & Focus Settings…"])
         #expect(SettingsNames.unknownLinks(in: "Mods & Config Settings… and Claude Code Settings…").isEmpty)
         #expect(SettingsNames.unknownLinks(in: "arg=<Page> Settings…").isEmpty)
+        // macOS's own app is not a Sanduhr page (item 73 b's Allow button).
+        #expect(SettingsNames.unknownLinks(in: "Allow in System Settings…").isEmpty)
     }
 }
 

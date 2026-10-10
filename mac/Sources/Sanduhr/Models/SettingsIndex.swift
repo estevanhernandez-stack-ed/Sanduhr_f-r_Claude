@@ -112,7 +112,8 @@ enum SettingsAnchor {
         SettingsEntry(title: SettingsNames.meetingsMenu, page: .general, anchor: meetingsMenu, synonyms: ["calendar", "join"]),
         SettingsEntry(title: "Startup", page: .general, anchor: startup, synonyms: ["Open Sanduhr at login", "login", "launch"]),
         SettingsEntry(title: "Shortcuts", page: .general, anchor: shortcuts,
-                      synonyms: ["Option+S", "Option+J", "⌥S", "⌥J", "hotkey", "keyboard", "shortcut", "record", "keys"]),
+                      synonyms: ["Option+S", "Option+J", "⌥S", "⌥J", "hotkey", "keyboard", "shortcut", "record", "keys",
+                                 "Accessibility", "app menus"]),
         SettingsEntry(title: "Quit Sanduhr für Claude", page: .general, anchor: quit, synonyms: ["quit", "exit"]),
     ]
 
@@ -229,6 +230,7 @@ extension SettingsNames {
         menuBarShows: SettingsAnchor.menuBarShows, meetingsMenu: SettingsAnchor.meetingsMenu,
         SanduhrHotKeys.Shortcut.settings.name: SettingsAnchor.shortcuts,
         SanduhrHotKeys.Shortcut.join.name: SettingsAnchor.shortcuts,
+        checkAppMenus: SettingsAnchor.shortcuts,
         deskSwitch: SettingsAnchor.desk, notchSwitch: SettingsAnchor.notch, notchGlow: SettingsAnchor.glow,
         cameraMicPlace: SettingsAnchor.cameraMic,
         claudeCodeGlowHook: SettingsAnchor.folders, metersAbovePrompt: SettingsAnchor.metersMod,

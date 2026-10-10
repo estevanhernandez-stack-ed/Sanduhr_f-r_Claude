@@ -1790,6 +1790,19 @@ desktop well away from every piece.
     "Press ⌥S now…"; press ⌥S: "⌥S reached Sanduhr." and Settings does not open again; a later ⌥S
     opens Settings as usual. With keys macOS takes, press them within 10 seconds: "… didn't reach
     Sanduhr in 10 seconds: macOS or another app takes it first. Pick other keys."
+13. Other apps' menus (item 73 b), by hand. Fresh profile (or `tccutil reset Accessibility
+    com.626labs.sanduhr`): launch, open General: no Accessibility prompt, **Also check other apps'
+    menus** is off, `hot_keys.check_app_menus: false` and `app_menus_trusted: false`; steps 11 and
+    12 still pass. Turn the switch on: still no prompt, an orange "isn't allowed … yet" line with
+    **Allow in System Settings…**; only that button brings macOS's prompt. Allow Sanduhr in Privacy &
+    Security, Accessibility and come back: the line goes (`app_menus_trusted: true`). With Finder
+    open, click the keys and press ⇧⌘N: "Finder uses ⇧⌘N for “New Folder”. While this shortcut
+    is on, Finder won't get those keys." with **Use Anyway** (`hot_keys.settings_refusal: app`);
+    ⌘Space still names Spotlight first. **Use Anyway** saves it and the grey note "Finder also uses
+    ⇧⌘N for “New Folder”; Sanduhr takes those keys first." stays (`settings_clash: "Finder: New
+    Folder"`), and ⇧⌘N in Finder opens Settings instead of making a folder. Turn the switch off: the
+    note goes and ⇧⌘N records without a word. At no point does anything but the recorded keys get
+    read: no Input Monitoring prompt, and Sanduhr is absent from Privacy & Security, Input Monitoring.
 
 ## 44. Settings v2, slice 3: reach (item 72)
 

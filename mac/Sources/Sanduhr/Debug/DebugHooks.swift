@@ -354,7 +354,9 @@ enum DebugHooks {
                                  joinRefusal: recorder.refusals[.join]?.kind,
                                  settingsRefusal: recorder.refusals[.settings]?.kind,
                                  joinClash: recorder.clash(.join),
-                                 settingsClash: recorder.clash(.settings))
+                                 settingsClash: recorder.clash(.settings),
+                                 checkAppMenus: AppMenuReader.isOn(),
+                                 appMenusTrusted: AppMenuReader.isTrusted)
         s.settingsPreview = settings.isOpen ? SettingsPreviewKind.of(settings.section) : nil
         s.usagePageOpen = settings.isOpen && settings.section == .usage
         s.usageTab = settings.usageTab

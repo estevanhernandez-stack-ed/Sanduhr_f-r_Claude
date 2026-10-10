@@ -398,6 +398,8 @@ FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-me'))
 # 2026-10-08: General's shortcut keys, shown as text; a run puts changed keys back.
 eq('hot keys in the fixture', state['hot_keys'].values_at('join_keys', 'settings_keys', 'join_taken', 'settings_taken'),
    ['⌥J', '⌥S', false, false])
+# Item 73 b: the app menu check is off by default and nothing has asked for Accessibility.
+eq('app menu check in the fixture', state['hot_keys'].values_at('check_app_menus', 'app_menus_trusted'), [false, false])
 eq('changed shortcut keys are put back',
    Restore.plan(base.merge('hot_keys' => { 'settings_keys' => '⌥S' }), base.merge('hot_keys' => { 'settings_keys' => '⌃⌥S' })), [['hot-key', 'settings ⌥S']])
 # The fixture tree holds no Settings page: the state steps run, the tree ones are dropped.

@@ -1063,10 +1063,12 @@ private struct SurfacesStatusSection: View {
 
 /// General, Shortcuts (slice 2): open Settings and join the next meeting, one switch each,
 /// registered whenever Sanduhr runs (SanduhrHotKeys), each with its keys beside it to change
-/// (ShortcutRecorderModel, 2026-10-08).
+/// (ShortcutRecorderModel, 2026-10-08). Below them, the opt-in check of other apps' menus
+/// (item 73 b): off by default, and the only place Sanduhr asks for Accessibility.
 private struct ShortcutsSection: View {
     @AppStorage(SanduhrHotKeys.Shortcut.settings.key, store: .desk) private var settings = true
     @AppStorage(SanduhrHotKeys.Shortcut.join.key, store: .desk) private var join = true
+    @AppStorage(AppMenuReader.switchKey, store: .desk) private var checkAppMenus = false
     @ObservedObject private var recorder = ShortcutRecorderModel.shared
 
     var body: some View {
@@ -1078,6 +1080,22 @@ private struct ShortcutsSection: View {
                 .onChange(of: join) { _, _ in DeskController.shared.applyHotKeys() }
             Text(SanduhrHotKeys.caption(settings: recorder.combo(.settings), join: recorder.combo(.join)))
                 .font(.caption).foregroundStyle(.secondary)
+            Toggle(SettingsNames.checkAppMenus, isOn: $checkAppMenus)
+                .onChange(of: checkAppMenus) { _, _ in recorder.refreshAppMenus(force: true) }
+            Text(SanduhrHotKeys.appMenusCaption)
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if checkAppMenus && !recorder.appMenusTrusted {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("Sanduhr isn't allowed to use Accessibility yet, so other apps' menus aren't checked.")
+                        .font(.caption).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    Button("Allow in System Settings…") { recorder.requestAppMenuAccess() }
+                        .controlSize(.small)
+                        .accessibilityLabel("Allow Accessibility in System Settings, to check other apps' menus")
+                }
+            }
         }
         .onAppear { recorder.reload() }
     }

@@ -111,19 +111,33 @@ extension SanduhrHotKeys {
         case taken(by: Shortcut)
         /// macOS has its own shortcut on these keys (SystemShortcuts, item 73); Use Anyway saves it.
         case macOS(name: String, combo: HotKeyCombo)
+        /// Another app's menu has an item on these keys (AppMenuShortcuts, item 73 b); Use Anyway
+        /// saves it.
+        case appMenu(app: String, item: String, combo: HotKeyCombo)
 
         var note: String {
             switch self {
             case .needsModifier: "Add ⌘, ⌃ or ⌥: Shift alone isn't enough."
             case .taken(let other): "\(SanduhrHotKeys.combo(other).display) already \(other.action)."
             case .macOS(let name, let combo): "macOS uses \(combo.display) for \(Self.quoted(name)), so it would get there first."
+            case .appMenu(let app, let item, let combo): SanduhrHotKeys.appNote(combo, app: app, item: item)
             }
         }
 
-        /// Only the macOS refusal can be overridden (Use Anyway).
+        /// Only the macOS and app menu refusals can be overridden (Use Anyway).
         var canInsist: Bool {
-            if case .macOS = self { return true }
-            return false
+            switch self {
+            case .macOS, .appMenu: true
+            case .needsModifier, .taken: false
+            }
+        }
+
+        /// The keys Use Anyway saves, nil when it isn't offered.
+        var insistCombo: HotKeyCombo? {
+            switch self {
+            case .macOS(_, let combo), .appMenu(_, _, let combo): combo
+            case .needsModifier, .taken: nil
+            }
         }
 
         /// state.yaml's `hot_keys.<shortcut>_refusal`.
@@ -132,6 +146,7 @@ extension SanduhrHotKeys {
             case .needsModifier: "modifier"
             case .taken: "taken"
             case .macOS: "macos"
+            case .appMenu: "app"
             }
         }
 
@@ -152,39 +167,60 @@ extension SanduhrHotKeys {
         "macOS also uses \(combo.display) for \(Refusal.quoted(name)), so it may not reach Sanduhr."
     }
 
+    /// The refusal's note for keys an app's menu uses (item 73 b): "Finder uses ⇧⌘N for “New
+    /// Folder”. While this shortcut is on, Finder won't get those keys." A registered shortcut
+    /// takes its keys before the app in front sees them, so the app is the one that loses them.
+    static func appNote(_ combo: HotKeyCombo, app: String, item: String) -> String {
+        "\(app) uses \(combo.display) for “\(item)”. While this shortcut is on, \(app) won't get those keys."
+    }
+
+    /// The quiet note under a shortcut that is on while an app's menu uses the same keys.
+    static func appClashNote(_ combo: HotKeyCombo, app: String, item: String) -> String {
+        "\(app) also uses \(combo.display) for “\(item)”; Sanduhr takes those keys first."
+    }
+
     /// The combo saved for a shortcut, or its default.
     static func combo(_ s: Shortcut, in d: DefaultsStore = UserDefaults.desk) -> HotKeyCombo {
         HotKeyCombo.load(prefix: s.key, from: d) ?? s.defaultCombo
     }
 
     /// Whether `combo` may be saved for `s`: a ⌘, ⌃ or ⌥ in it, not the other shortcut's, and,
-    /// unless `insist`, not one of macOS's own shortcuts in `system`.
+    /// unless `insist`, not one of macOS's own shortcuts in `system`, then not an item in another
+    /// app's menu in `appMenus` (empty unless the user turned that check on).
     static func check(_ combo: HotKeyCombo, for s: Shortcut, in d: DefaultsStore = UserDefaults.desk,
-                      system: SystemShortcuts = .none, insist: Bool = false) -> Refusal? {
+                      system: SystemShortcuts = .none, appMenus: AppMenuShortcuts = .none,
+                      insist: Bool = false) -> Refusal? {
         guard combo.hasRequiredModifier else { return .needsModifier }
         if let other = Shortcut.allCases.first(where: { $0 != s && Self.combo($0, in: d) == combo }) {
             return .taken(by: other)
         }
-        if !insist, let name = system.collision(combo) { return .macOS(name: name, combo: combo) }
+        if insist { return nil }
+        if let name = system.collision(combo) { return .macOS(name: name, combo: combo) }
+        if let hit = appMenus.collision(combo) { return .appMenu(app: hit.app, item: hit.item, combo: combo) }
         return nil
     }
 
-    /// Saves `combo` for `s` when check(_:for:in:system:insist:) allows it; the default is stored
-    /// as no value. Returns the refusal, nil when saved.
+    /// Saves `combo` for `s` when check(_:for:in:system:appMenus:insist:) allows it; the default
+    /// is stored as no value. Returns the refusal, nil when saved.
     @discardableResult
     static func setCombo(_ combo: HotKeyCombo, for s: Shortcut, in d: DefaultsStore = UserDefaults.desk,
-                         system: SystemShortcuts = .none, insist: Bool = false) -> Refusal? {
-        if let refusal = check(combo, for: s, in: d, system: system, insist: insist) { return refusal }
+                         system: SystemShortcuts = .none, appMenus: AppMenuShortcuts = .none,
+                         insist: Bool = false) -> Refusal? {
+        if let refusal = check(combo, for: s, in: d, system: system, appMenus: appMenus, insist: insist) { return refusal }
         HotKeyCombo.store(combo == s.defaultCombo ? nil : combo, prefix: s.key, in: d)
         return nil
     }
 
     /// Back to the default (⌥S, ⌥J). Refused only when the other shortcut was moved onto it; the
-    /// default is never refused for macOS's sake.
+    /// default is never refused for macOS's or another app's sake.
     @discardableResult
     static func reset(_ s: Shortcut, in d: DefaultsStore = UserDefaults.desk) -> Refusal? {
         setCombo(s.defaultCombo, for: s, in: d)
     }
+
+    /// The caption under "Also check other apps' menus" (item 73 b).
+    static let appMenusCaption = "Needs Accessibility, which Sanduhr asks for only when you click Allow. It then reads the "
+        + "names of the menu items in the apps you have open and their shortcuts, nothing else, and no keystroke."
 
     /// General, Shortcuts' caption, following the combos: with the defaults it says which
     /// characters they take; otherwise only that the keys go to Sanduhr.
