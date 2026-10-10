@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+## v2.14.0-mac — 2026-10-11
+
 - **A clearer first run.** Before you sign in, the widget says **Not signed in — sign in** (a click opens Accounts) instead of "Connecting…" forever, and the footer keeps **Use Sonnet** back until your numbers arrive. The Desk's Claude line and the notch's Claude meters wing say **sign in to Sanduhr** instead of staying blank. A new switch on Settings, Alerts, **Sign-in reminders on the Desk and notch**, turns those lines off (and the "sign in again" one after a session expires), for anyone using the Desk without a Claude account. The tour is now the **Sanduhr Tour**, so it no longer shares a name with the sign-in sheet, and taken before signing in its first step says to sign in, with a **Sign In** button. On a fresh install, **What's New…** shows the highlights of the version you installed instead of every release you never had.
 
 - **Shortcuts can check other apps' menus too.** On General, Shortcuts, turn on **Also check other apps' menus** and keys an open app's menu uses are named before they're saved: "Finder uses ⇧⌘N for “New Folder”. While this shortcut is on, Finder won't get those keys." **Use Anyway** saves them, and while they're on a grey note says Sanduhr takes those keys first. It's off by default and needs Accessibility, which Sanduhr asks for only when you click **Allow in System Settings…**, never at launch. It reads only menu item names and their shortcuts, and no keystroke.
