@@ -197,8 +197,11 @@ before the reset (`security unlock-keychain <path>`), then:
 8. **Accept:** on a Mac running 2.0.4, menu, Check for Updates offers 2.1.0, installs and
    relaunches; `lipo -archs /Applications/Sanduhr.app/Contents/MacOS/Sanduhr` prints
    `x86_64 arm64`.
-9. **Homebrew:** copy `docs/distribution/sanduhr.rb` to wherever the 2.0.4 cask went (tap or
-   homebrew-cask pull request).
+9. **Homebrew:** copy `docs/distribution/sanduhr.rb` to `Casks/sanduhr.rb` in
+   [estevanhernandez-stack-ed/homebrew-tap](https://github.com/estevanhernandez-stack-ed/homebrew-tap)
+   (the two files are the same apart from version and sha256, which the workflow sets), run
+   `brew style Casks/sanduhr.rb`, commit `sanduhr <version>` and push. Check with
+   `brew tap estevanhernandez-stack-ed/tap && brew fetch --cask estevanhernandez-stack-ed/tap/sanduhr`.
 10. **CHANGELOG:** rename "Unreleased (mac)" to `v2.1.0-mac — <date>` and start a new empty one.
 
 Order matters: merging the pull request before publishing the draft points users at a DMG URL
