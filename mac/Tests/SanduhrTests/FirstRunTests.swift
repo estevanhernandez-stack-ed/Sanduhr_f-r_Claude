@@ -91,3 +91,47 @@ struct FirstRunDeskTests {
         #expect(DeskClaudeText.compact(DeskUsage()) == nil)
     }
 }
+
+/// Alerts, "Sign-in reminders on the Desk and notch" (SignInReminder, 2026-10-10): off, neither
+/// "sign in to Sanduhr" nor "sign in again in Sanduhr" is written; the last numbers still show.
+@Suite("Sign-in reminder switch")
+struct SignInReminderTests {
+    @Test func onByDefaultAndRoundTrips() {
+        let d = MemoryDefaults()
+        #expect(SignInReminder.isOn(in: d))
+        SignInReminder.set(false, in: d)
+        #expect(!SignInReminder.isOn(in: d))
+        #expect(d.values[SignInReminder.key] as? Bool == false)
+    }
+
+    @Test func offWritesNoSignInLineEitherWay() {
+        for first in [true, false] {
+            var u = DeskUsage()
+            u.signInNeeded = true
+            u.firstSignIn = first
+            u.signInReminder = false
+            #expect(DeskClaudeText.line(u) == nil)
+            #expect(DeskClaudeText.compact(u) == nil)
+            #expect(NotchContent.meters.text(at: .right, meetings: [], meters: DeskClaudeText.compact(u),
+                                             message: nil, now: Date()) == nil)
+        }
+    }
+
+    @Test func offAnExpiredSessionKeepsItsLastNumbersDimmed() {
+        let now = Date()
+        var u = DeskUsage()
+        u.usage = UsageResponse(tiers: [.fiveHour: TierUsage(utilization: 42, resetsAt: nil)])
+        u.fetchedAt = now
+        u.signInNeeded = true
+        u.signInReminder = false
+        #expect(DeskClaudeText.line(u) == "claude   42% session")
+        #expect(u.isStale(now: now))                       // drawn dimmed, and the notch drops it
+        #expect(DeskClaudeText.compact(u, now: now) == nil)
+        u.signInReminder = true
+        #expect(DeskClaudeText.line(u) == "claude   sign in again in Sanduhr")
+    }
+
+    @Test func searchFindsIt() {
+        #expect(SettingsAnchor.entries(on: .alerts).contains { $0.title == "Sign-in reminders" })
+    }
+}

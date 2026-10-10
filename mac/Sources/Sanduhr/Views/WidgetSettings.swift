@@ -316,6 +316,8 @@ struct WidgetSettings: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 alertsTab(t: t).settingsAnchor(SettingsAnchor.notifications)
+                Divider()
+                SignInReminderSection(t: t).settingsAnchor(SettingsAnchor.signInReminder)
                 if let deskModel {
                     Divider()
                     EachLimitSection(model: deskModel).settingsAnchor(SettingsAnchor.eachLimit)
@@ -469,6 +471,24 @@ private struct WidgetShowRows: View {
             Text("The floating window with the tools. Showing or hiding it by hand lasts until the Desk turns on or off or Sanduhr starts again; then the choice above takes over.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// Alerts, Sign-in reminders (SignInReminder): the one switch for "sign in to Sanduhr" and "sign
+/// in again in Sanduhr" on the Desk and in the notch. Flipping it redraws the Desk at once.
+private struct SignInReminderSection: View {
+    let t: Theme.Palette
+    @AppStorage(SignInReminder.key, store: .desk) private var on = SignInReminder.defaultOn
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(SignInReminder.title, isOn: $on)
+                .onChange(of: on) { _, _ in DeskController.shared.model.refreshClaude() }
+            Text(SignInReminder.caption)
+                .font(.caption)
+                .foregroundStyle(t.textDim)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

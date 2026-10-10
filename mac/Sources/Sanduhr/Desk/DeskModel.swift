@@ -81,6 +81,8 @@ final class DeskModel {
     var signInNeeded = false
     /// DeskUsage.firstSignIn: the sign-in line asks to sign in, not to sign in again.
     var firstSignIn = false
+    /// SignInReminder: off, the meters block draws no sign-in line.
+    var signInReminder = true
     /// An account switch is under way (AccountSwitchFade): the meters and the line keep the old
     /// account's layout, drawn unseen, until the new numbers fade in.
     var veiled = false
@@ -455,6 +457,9 @@ final class DeskModel {
     /// Rebuilds the meters and the text lines from the last numbers the widget handed over.
     /// Runs on every update and once a minute, so pace ticks and staleness move with the clock.
     func refreshClaude(now: Date = Date()) {
+        // The sign-in reminder switch is read here, so flipping it shows at once (SignInReminder).
+        var usage = self.usage
+        usage.signInReminder = SignInReminder.isOn(in: UserDefaults.desk)
         meters = Self.meterRows(usage.usage, now: now)
         // Settings' list of limits waits for the new account's numbers.
         let reported = Tier.allCases.filter { usage.usage?.tiers[$0]?.utilization != nil }
@@ -463,6 +468,7 @@ final class DeskModel {
         if !usage.veiled, temporary != temporaryTiers { temporaryTiers = temporary }
         signInNeeded = usage.signInNeeded
         firstSignIn = usage.firstSignIn
+        if signInReminder != usage.signInReminder { signInReminder = usage.signInReminder }
         if veiled != usage.veiled { veiled = usage.veiled }
         if switchNote != usage.switchNote { switchNote = usage.switchNote }
         claudeLine = DeskClaudeText.line(usage)
@@ -512,7 +518,7 @@ final class DeskModel {
         input.placed = DeskLayout.placed(desk.string(forKey: "layout") ?? DeskLayout.standard,
                                          showMeetings: desk.object(forKey: "showMeetings") as? Bool ?? true)
         input.meterTiers = meters.map(\.tier)
-        input.signInNeeded = signInNeeded
+        input.signInNeeded = signInNeeded && signInReminder
         input.switchNote = switchNote
         input.hasAccount = claudeParts?.account != nil
         input.calendarNote = calendarNote != nil

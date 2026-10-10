@@ -51,7 +51,7 @@ You get every limit as a bar, with a mark that says whether you're ahead of pace
 - Under the bar, **Resets in** counts down to the reset. Beside it, the pace reads **On pace**, a percent **ahead** (orange) or a percent **under** (blue).
 - Hover a card to see **Cool down** (how long to wait to get back on pace) or **Surplus** (how much room you have).
 - When you're on track to run out early, a red line says **At current pace, expires in** and a time.
-- A bar that turns red with a glow is nearly full with the reset still far off. Settings, **Alerts**, under **Each limit**, sets that warning per limit (**Warn when nearly full**, **At**, **Only while the reset is more than**) and, for a limit that looks temporary, **Show this limit**. The same page holds the notifications.
+- A bar that turns red with a glow is nearly full with the reset still far off. Settings, **Alerts**, under **Each limit**, sets that warning per limit (**Warn when nearly full**, **At**, **Only while the reset is more than**) and, for a limit that looks temporary, **Show this limit**. The same page holds the notifications. **Sign-in reminders on the Desk and notch** (also on Alerts) turns off the "sign in to Sanduhr" line those show while you're signed out, if you use the Desk without a Claude account; the widget still says when you're not signed in.
 
 **In the menu bar**, the hourglass shows one percent. It turns orange at 75% and red at 90%.
 

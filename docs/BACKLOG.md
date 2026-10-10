@@ -120,3 +120,28 @@ Shape to spec:
 
 Open questions: whether the walkthrough also offers the MCP integrations (likely a last, optional
 step), and whether a demo mode (made-up numbers until real usage arrives) helps the first minute.
+
+## #4 — "Just the Desk": Sanduhr without a Claude account (raised)
+
+Raised 2026-10-10 by the owner: "The Desk portion of our app is strong enough that some folks who
+don't have Claude might like it." Today a first launch assumes a Claude subscription: the welcome
+sheet only offers sign-in, the widget shows "Not signed in", and the Claude pieces (meters, the
+Claude line, the notch's meters wing) sit empty or remind. 2.14.0 adds the first piece, a switch
+for the sign-in reminders on the Desk and notch (Settings, Alerts).
+
+Shape to spec:
+
+- The welcome sheet gets **Just the Desk** beside Sign In: it turns the sign-in reminders off,
+  hides the widget, and leaves the Desk with the clock, meetings, message, now playing and
+  watchers; the Claude pieces stay placed but hidden while there is no account.
+- Signing in later (Accounts) brings every Claude piece back without a relaunch; nothing a
+  Desk-only user set is lost.
+- The menu bar item has something to show without numbers (the time, or the hourglass alone).
+- Usage, Alerts' limit sections and the Claude Code page say plainly that they need an account,
+  instead of looking broken.
+- Store and landing copy: describe the Desk on its own, with the trademark disclaimer kept on any
+  surface naming Claude (the 10.1.4.4 bar).
+- Windows parity as its own item.
+
+Open questions: whether Just the Desk should also skip the Keychain prompt path entirely, and
+whether the tour gets a Desk-only variant.

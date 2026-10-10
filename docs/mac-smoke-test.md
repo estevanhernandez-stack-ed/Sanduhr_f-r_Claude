@@ -81,6 +81,7 @@ Fresh-install and migration checks stay manual.
 - [ ] Sound: pick Glass, Preview plays it; Send a Test plays Glass with the banner. Pick None: Preview is off and Send a Test is silent. Back to Default.
 - [ ] Where alerts show, Desk pulse (Desk on, meters on the desktop, notch on): Send a Test posts no banner; the session meter glows three times over about three seconds and the notch glows once (the soft halo down the island's sides and along its bottom, no light along the screen edge). Banner and Desk pulse: both. Turn Desk off with Desk pulse chosen: Send a Test shows a banner.
 - [ ] Quiet hours on, from a minute ago to an hour from now, Banner: set the session line below the current percent, Refresh: no banner, no sound. With Banner and Desk pulse, the meter still pulses. Turn quiet hours off and Refresh: still no banner (that window's alert was recorded). Put everything back.
+- [ ] Sign-in reminders (2026-10-10): signed out (or on a fresh profile), the Desk's Claude line and the notch's Claude meters wing say "sign in to Sanduhr" ("sign in again in Sanduhr" on the Desk after a session expires). Settings, Alerts, **Sign-in reminders on the Desk and notch** off: both go at once, no relaunch; the widget still reads "Not signed in — sign in" or "Signed out — sign in". With an expired session the last numbers stay on the Desk, dimmed. Search "sign in" finds the switch. Turn it back on.
 
 ## 4. Desk
 
