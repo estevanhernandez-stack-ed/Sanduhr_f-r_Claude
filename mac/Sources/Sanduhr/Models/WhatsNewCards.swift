@@ -7,8 +7,21 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2140: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.14.0", id: "shortcut-app-menus",
+            title: "Shortcuts that check your apps",
+            body: "Turn on Also check other apps' menus and General names the app and menu item a new shortcut would take keys from.",
+            art: .symbol("menubar.rectangle"), destination: .general),
+        WhatsNewCard(
+            version: "2.14.0", id: "sign-in-reminders",
+            title: "Quiet the sign-in reminder",
+            body: "Using the Desk without Claude? Alerts has a switch for the sign-in line on the Desk and notch.",
+            art: .symbol("person.crop.circle.badge.questionmark"), destination: .alerts),
+    ]
 
     static let release2130: [WhatsNewCard] = [
         WhatsNewCard(
