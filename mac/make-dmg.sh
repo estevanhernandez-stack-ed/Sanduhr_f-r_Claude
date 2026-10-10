@@ -47,13 +47,18 @@ cp -R "$APP" "$STAGE/"
 # equivalent to dropping the app into /Applications.
 ln -s /Applications "$STAGE/Applications"
 
-# Size the read-write image with plenty of headroom (app is ~1 MB; 32 MB is safe).
-echo "→ Creating read-write image..."
+# Size the read-write image from what it holds: the staged app plus half again and 16 MB for
+# HFS+ overhead and Finder's .DS_Store. A fixed size ran out once the universal app passed
+# 31 MB (2.13.0's first run: "No space left on device"). The UDZO convert below compresses
+# it back down, so the headroom costs nothing in the shipped DMG.
+STAGE_MB=$(du -sm "$STAGE" | awk '{print $1}')
+IMAGE_MB=$(( STAGE_MB + STAGE_MB / 2 + 16 ))
+echo "→ Creating read-write image (${IMAGE_MB} MB for ${STAGE_MB} MB of contents)..."
 retry hdiutil create -ov -volname "$VOL_NAME" \
     -srcfolder "$STAGE" \
     -fs HFS+ \
     -format UDRW \
-    -size 32m \
+    -size "${IMAGE_MB}m" \
     "$TMP_DMG" >/dev/null
 
 echo "→ Mounting to arrange icons..."
