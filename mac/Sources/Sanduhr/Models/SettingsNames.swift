@@ -10,6 +10,9 @@ enum SettingsNames {
     static let menuBarShows = "Menu Bar Shows"
     /// General, Menu bar: the Desk's meetings menu as its own menu bar item (desk key `menuIcon`).
     static let meetingsMenu = "Meetings menu in the menu bar"
+    /// General, Shortcuts: check recorded keys against other apps' menus through Accessibility
+    /// (item 73 b; desk key `hotKeyCheckAppMenus`, off by default).
+    static let checkAppMenus = "Also check other apps' menus"
     /// The Desk's switch, at the top of the Desk page (desk key `deskEnabled`).
     static let deskSwitch = "Desk: clock, meters, meetings and the message on the desktop"
     /// The notch island's switch, at the top of the Notch page (desk key `notch`).
@@ -43,6 +46,7 @@ enum SettingsNames {
     static let table: [(name: String, page: SettingsSection)] = [
         (menuBarShows, .general), (meetingsMenu, .general),
         (SanduhrHotKeys.Shortcut.settings.name, .general), (SanduhrHotKeys.Shortcut.join.name, .general),
+        (checkAppMenus, .general),
         (deskSwitch, .deskLayout),
         (notchSwitch, .notch), (notchGlow, .notch), (cameraMicPlace, .notch),
         (claudeCodeGlowHook, .integrations), (metersAbovePrompt, .mods),
@@ -97,7 +101,8 @@ enum SettingsNames {
 
     /// Every "<Page> Settings…" in `text` whose page is not a sidebar title, empty when each one
     /// names a real page. The page is the run of capitalized words (and "&") right before
-    /// " Settings…"; "Settings…" alone, "All Settings…" and a placeholder such as "<Page>" pass.
+    /// " Settings…"; "Settings…" alone, "All Settings…", macOS's "System Settings…" and a
+    /// placeholder such as "<Page>" pass.
     static func unknownLinks(in text: String) -> [String] {
         let suffix = " Settings…"
         var out: [String] = []
@@ -112,7 +117,7 @@ enum SettingsNames {
                 if core.count != word.count { break }
             }
             let title = words.joined(separator: " ") + suffix
-            if !words.isEmpty, words != ["All"], SettingsSection.linked(title) == nil { out.append(title) }
+            if !words.isEmpty, words != ["All"], words != ["System"], SettingsSection.linked(title) == nil { out.append(title) }
             rest = rest[r.upperBound...]
         }
         return out

@@ -212,12 +212,17 @@ struct HotKeysDebug: Equatable {
     /// Its keys are held by another app, so it did not register.
     var joinTaken = false
     var settingsTaken = false
-    /// Why the last keys pressed for it were refused ("modifier", "taken", "macos"; item 73).
+    /// Why the last keys pressed for it were refused ("modifier", "taken", "macos", "app"; item 73).
     var joinRefusal: String?
     var settingsRefusal: String?
-    /// The macOS shortcut on the same keys while it is on (SystemShortcuts), nil when none.
+    /// The macOS shortcut on the same keys while it is on (SystemShortcuts), else the app menu item
+    /// ("Finder: New Folder", AppMenuShortcuts), nil when none.
     var joinClash: String?
     var settingsClash: String?
+    /// "Also check other apps' menus" is on (item 73 b), and whether macOS trusts Sanduhr with
+    /// Accessibility (asked without a prompt).
+    var checkAppMenus = false
+    var appMenusTrusted = false
 }
 
 /// state.yaml's `mods_page:` (item 64): whether the page shows and has read the folders, the
@@ -357,7 +362,8 @@ enum DebugState {
     }
 
     /// `hot_keys:` (slice 2): two switches and a count, then each one's keys, whether another
-    /// app holds them, why its last keys were refused and the macOS shortcut on its keys (item 73).
+    /// app holds them, why its last keys were refused and the macOS shortcut (else the app menu
+    /// item) on its keys, then the app menu check's switch and whether it is allowed (item 73).
     static func hotKeysYAML(_ h: HotKeysDebug) -> YAMLNode {
         .map([YAMLPair("join", .bool(h.join)), YAMLPair("settings", .bool(h.settings)),
               YAMLPair("registered", .int(h.registered)),
@@ -366,7 +372,8 @@ enum DebugState {
               YAMLPair("join_refusal", h.joinRefusal.map(YAMLNode.string) ?? .null),
               YAMLPair("settings_refusal", h.settingsRefusal.map(YAMLNode.string) ?? .null),
               YAMLPair("join_clash", h.joinClash.map(YAMLNode.string) ?? .null),
-              YAMLPair("settings_clash", h.settingsClash.map(YAMLNode.string) ?? .null)])
+              YAMLPair("settings_clash", h.settingsClash.map(YAMLNode.string) ?? .null),
+              YAMLPair("check_app_menus", .bool(h.checkAppMenus)), YAMLPair("app_menus_trusted", .bool(h.appMenusTrusted))])
     }
 
     /// `message_editor:` (item 69): the view, row counts and flags; `added` is only the smoke's own

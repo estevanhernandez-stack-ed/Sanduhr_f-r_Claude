@@ -210,6 +210,8 @@ hot_keys:
   settings_keys: ⌥S
   join_taken: false
   settings_taken: false
+  check_app_menus: false
+  app_menus_trusted: false
 meter_history:
   all: false
   window: week

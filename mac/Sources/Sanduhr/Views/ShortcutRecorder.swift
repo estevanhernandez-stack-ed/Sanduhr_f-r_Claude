@@ -5,7 +5,8 @@ import SwiftUI
 /// General, Shortcuts' recorders (2026-10-08): click a shortcut's keys, press a new combination,
 /// it saves; Escape cancels. A combination needs ⌘, ⌃ or ⌥ and can't be the other shortcut's
 /// (SanduhrHotKeys.check). While one listens the shortcuts are unregistered, so pressing the
-/// current keys records them instead of opening Settings.
+/// current keys records them instead of opening Settings. With "Also check other apps' menus" on
+/// and Accessibility allowed, other apps' menu shortcuts are checked too (AppMenuReader, item 73 b).
 @MainActor
 final class ShortcutRecorderModel: ObservableObject {
     static let shared = ShortcutRecorderModel()
@@ -24,6 +25,10 @@ final class ShortcutRecorderModel: ObservableObject {
     @Published private(set) var system: SystemShortcuts = .none
     /// Test It's state per shortcut (item 73).
     @Published private(set) var probe = HotKeyProbe()
+    /// Other apps' menu shortcuts, last read while the check is on and allowed; empty otherwise.
+    @Published private(set) var appMenus: AppMenuShortcuts = .none
+    /// Whether macOS trusts Sanduhr with Accessibility, asked on reload (never with a prompt).
+    @Published private(set) var appMenusTrusted = false
 
     private var monitor: Any?
 
@@ -48,7 +53,8 @@ final class ShortcutRecorderModel: ObservableObject {
     }
 
     /// The line under a shortcut: a refused combination, keys another app holds, Test It's
-    /// answer, else a quiet note when it is on while macOS uses the same keys.
+    /// answer, else a quiet note when it is on while macOS, or else another app's menu, uses the
+    /// same keys.
     func note(_ s: Shortcut) -> Note? {
         if let refusal = refusals[s] { return Note(text: refusal.note, tone: .warning) }
         if taken.contains(s) { return Note(text: SanduhrHotKeys.takenNote(combo(s)), tone: .warning) }
@@ -60,13 +66,32 @@ final class ShortcutRecorderModel: ObservableObject {
             }
             return Note(text: HotKeyProbe.note(result, combo: combo(s)), tone: tone)
         }
-        if let name = clash(s) { return Note(text: SanduhrHotKeys.clashNote(combo(s), name: name), tone: .quiet) }
+        if let name = systemClash(s) { return Note(text: SanduhrHotKeys.clashNote(combo(s), name: name), tone: .quiet) }
+        if let hit = appClash(s) {
+            return Note(text: SanduhrHotKeys.appClashNote(combo(s), app: hit.app, item: hit.item), tone: .quiet)
+        }
         return nil
     }
 
-    /// The macOS shortcut on the same keys as `s` while `s` is on, nil otherwise.
+    /// What else uses the keys of `s` while `s` is on: the macOS shortcut's name first, else the
+    /// app menu item ("Finder: New Folder"); nil when nothing does or `s` is off.
     func clash(_ s: Shortcut) -> String? {
+        systemClash(s) ?? appClash(s)?.name
+    }
+
+    /// The macOS shortcut on the same keys as `s` while `s` is on.
+    private func systemClash(_ s: Shortcut) -> String? {
         SanduhrHotKeys.isOn(s, in: UserDefaults.desk) ? system.collision(combo(s)) : nil
+    }
+
+    /// The app menu item on the same keys as `s` while `s` is on and the check is active.
+    private func appClash(_ s: Shortcut) -> AppMenuShortcuts.Collision? {
+        SanduhrHotKeys.isOn(s, in: UserDefaults.desk) ? activeAppMenus.collision(combo(s)) : nil
+    }
+
+    /// The app menus to check against: none unless the switch is on and Sanduhr is allowed.
+    private var activeAppMenus: AppMenuShortcuts {
+        AppMenuReader.isOn() && appMenusTrusted ? appMenus : .none
     }
 
     /// Whether Test It is offered: the shortcut is on and registered, and nothing is recording.
@@ -78,6 +103,26 @@ final class ShortcutRecorderModel: ObservableObject {
         combos = Dictionary(uniqueKeysWithValues: Shortcut.allCases.map { ($0, SanduhrHotKeys.combo($0)) })
         taken = DeskController.shared.takenShortcuts
         system = SystemShortcuts.current()
+        refreshAppMenus()
+    }
+
+    /// Asks again whether Sanduhr is trusted (no prompt) and, when the check is on and allowed,
+    /// reads the menus if the last read is stale. Off, it forgets them.
+    func refreshAppMenus(force: Bool = false) {
+        appMenusTrusted = AppMenuReader.isTrusted
+        guard AppMenuReader.isOn(), appMenusTrusted else {
+            appMenus = .none
+            AppMenuReader.shared.refresh()
+            return
+        }
+        appMenus = AppMenuReader.shared.current
+        AppMenuReader.shared.refresh(force: force) { menus in ShortcutRecorderModel.shared.appMenus = menus }
+    }
+
+    /// "Allow in System Settings…": the one place Sanduhr asks for Accessibility.
+    func requestAppMenuAccess() {
+        AppMenuReader.requestAccess()
+        refreshAppMenus()
     }
 
     /// Saves `combo` for `s` and registers it; returns the refusal, nil when saved. `insist`
@@ -85,7 +130,7 @@ final class ShortcutRecorderModel: ObservableObject {
     @discardableResult
     func save(_ combo: HotKeyCombo, for s: Shortcut, insist: Bool = false) -> SanduhrHotKeys.Refusal? {
         system = SystemShortcuts.current()
-        let refusal = SanduhrHotKeys.setCombo(combo, for: s, system: system, insist: insist)
+        let refusal = SanduhrHotKeys.setCombo(combo, for: s, system: system, appMenus: activeAppMenus, insist: insist)
         refusals[s] = refusal
         if refusal == nil {
             probe.clear(s)
@@ -95,12 +140,13 @@ final class ShortcutRecorderModel: ObservableObject {
         return refusal
     }
 
-    /// Back to the default; macOS's shortcuts never refuse it.
+    /// Back to the default; macOS's shortcuts and other apps' menus never refuse it.
     func reset(_ s: Shortcut) { save(s.defaultCombo, for: s, insist: true) }
 
-    /// Saves the keys last refused because macOS uses them, and stops listening.
+    /// Saves the keys last refused because macOS or another app's menu uses them, and stops
+    /// listening.
     func useAnyway(_ s: Shortcut) {
-        guard case .macOS(_, let combo) = refusals[s] else { return }
+        guard let combo = refusals[s]?.insistCombo else { return }
         if save(combo, for: s, insist: true) == nil { stop() }
     }
 
@@ -135,6 +181,8 @@ final class ShortcutRecorderModel: ObservableObject {
         recording = s
         refusals[s] = nil
         probe.clear(s)
+        // A stale read of the menus is renewed while the keys are being chosen.
+        refreshAppMenus()
         DeskController.shared.hotKeysSuspended = true
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             MainActor.assumeIsolated { ShortcutRecorderModel.shared.handle(event) } ? nil : event
@@ -175,8 +223,9 @@ final class ShortcutRecorderModel: ObservableObject {
 }
 
 /// One shortcut on General: its label with the live keys, the recorder, Reset when changed, the
-/// switch, and a note: refused keys (Use Anyway when only macOS objects), keys another app holds,
-/// Test It's answer, or a quiet line when macOS uses the same keys.
+/// switch, and a note: refused keys (Use Anyway when only macOS or an app's menu objects), keys
+/// another app holds, Test It's answer, or a quiet line when macOS or an app's menu uses the same
+/// keys.
 struct ShortcutRow: View {
     let shortcut: SanduhrHotKeys.Shortcut
     @Binding var isOn: Bool
