@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+## v2.13.0-mac — 2026-10-10
+
 - **Your meter history as charts, for one account or all of them.** Settings, Claude Usage has a new **Meters** tab: a chart per limit from the readings behind the sparklines, over a **Week** or a **Month**, with "N% now". With two or more accounts, **All accounts** draws one line per account in its own color, with a legend. Limits you hid with their Show switch stay hidden. **Export CSV…** writes every reading kept (`timestamp,tier,util_pct`, or with an `account` column for all accounts), the same file Sanduhr for Windows exports. Everything stays on this Mac.
 
 ## v2.12.0-mac — 2026-10-09
