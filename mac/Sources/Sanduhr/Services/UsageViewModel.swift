@@ -234,6 +234,8 @@ final class UsageViewModel {
         case signedOut
         /// An account switch, until the new account's first fetch answers.
         case switching
+        /// No session key yet (a fresh install, or none saved): the welcome sheet or Accounts signs in.
+        case notSignedIn
 
         var text: String {
             switch self {
@@ -243,6 +245,7 @@ final class UsageViewModel {
             case .error(let m, _):      return m
             case .signedOut:            return "Signed out — sign in"
             case .switching:            return "Switching account…"
+            case .notSignedIn:          return "Not signed in — sign in"
             }
         }
         var isError: Bool {
@@ -252,7 +255,7 @@ final class UsageViewModel {
         /// Only a new sign-in helps: Desk and the notch show the sign-in line.
         var needsSignIn: Bool {
             switch self {
-            case .signedOut:            return true
+            case .signedOut, .notSignedIn: return true
             case .error(_, let isAuth): return isAuth
             default:                    return false
             }
@@ -318,14 +321,14 @@ final class UsageViewModel {
         // The access file as this launch's choices say, before any tool call can read it.
         reloadAccounts()
         guard KeychainStore.exists(account: KeychainAccount.sessionKey) else {
-            status = .connecting     // onboarding sheet will drive the next step
+            status = .notSignedIn    // onboarding sheet will drive the next step
             return
         }
         if connect() {
             Task { await refresh() }
             startTimers()
         } else {
-            status = .connecting
+            status = .notSignedIn
         }
     }
 

@@ -53,6 +53,9 @@ enum WhatsNew {
     /// Standard defaults: Don't show after updates. Off by default; only the automatic showing
     /// listens to it, never About or the menus.
     static let hideKey = "whatsNewHideAfterUpdates"
+    /// Standard defaults: the version a fresh install's first launch ran (forMenu). Absent on Macs
+    /// that updated from a build before 2.14.0.
+    static let installedKey = "whatsNewInstalledVersion"
     /// Most cards shown automatically after an update, newest first.
     static let cap = 8
 
@@ -97,6 +100,20 @@ enum WhatsNew {
     /// Every card up to `current`, newest first, for What's New… in About and the menus.
     static func all(current: String, table: [WhatsNewCard] = WhatsNew.table) -> [WhatsNewCard] {
         cards(lastSeen: nil, current: current, limit: nil, table: table)
+    }
+
+    /// What's New… in About and the menus: on the version this Mac was installed with, before any
+    /// update, that version's own cards as "Highlights in 2.14.0" (a fresh install never had the
+    /// older ones, Settings v2 F24); otherwise every card under the range it covers. A version
+    /// without cards of its own shows every card.
+    static func forMenu(current: String, installed: String?,
+                        table: [WhatsNewCard] = WhatsNew.table) -> (cards: [WhatsNewCard], header: String) {
+        if let installed, compare(installed, current) == .orderedSame {
+            let own = table.filter { $0.versions.contains { compare($0, current) == .orderedSame } }
+            if !own.isEmpty { return (own, "Highlights in \(current)") }
+        }
+        let every = all(current: current, table: table)
+        return (every, rangeLabel(every, lastSeen: nil, current: current) ?? "Version \(current)")
     }
 
     /// Dotted versions compared number by number ("2.10.0" after "2.9.1"); a missing part is 0
@@ -147,6 +164,14 @@ enum WhatsNew {
 
     static func record(_ version: String, in d: DefaultsStore = UserDefaults.standard) {
         d.set(version, forKey: lastSeenKey)
+    }
+
+    static func installed(in d: DefaultsStore = UserDefaults.standard) -> String? {
+        (d.object(forKey: installedKey) as? String).flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    static func recordInstalled(_ version: String, in d: DefaultsStore = UserDefaults.standard) {
+        d.set(version, forKey: installedKey)
     }
 
     static func hidden(in d: DefaultsStore = UserDefaults.standard) -> Bool {

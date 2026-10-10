@@ -7,7 +7,7 @@ steps:
   - expect_state: { tour.open: true, tour.step: 1, tour.steps_shown: 5 }
   - expect:
       window: welcome-tour
-      contains: { text: Welcome to Sanduhr }
+      contains: { text: Sanduhr Tour }
   - expect:
       window: welcome-tour
       contains: { text: "/^1 of 5$/" }

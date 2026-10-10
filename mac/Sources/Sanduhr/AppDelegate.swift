@@ -194,6 +194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onboarding: !KeychainStore.exists(account: KeychainAccount.sessionKey), hidden: WhatsNew.hidden(),
             tour: tourPending)
         if decision.record { WhatsNew.record(current) }
+        if fresh { WhatsNew.recordInstalled(current) }
         guard !decision.show.isEmpty else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             MainActor.assumeIsolated { WhatsNewWindowController.shared.show(decision.show, lastSeen: lastSeen) }

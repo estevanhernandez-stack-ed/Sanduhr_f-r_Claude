@@ -32,9 +32,10 @@ final class WelcomeTourWindowController: NSObject, NSWindowDelegate {
         NSScreen.screens.contains { $0.cameraNotch != nil } ? [.notch] : []
     }
 
-    /// Opens the tour at `step` (0-based, clamped), with the current settings.
+    /// Opens the tour at `step` (0-based, clamped), with the current settings and sign-in.
     func show(step: Int = 0) {
-        navigation.steps = WelcomeTour.steps(features: Self.features())
+        navigation.steps = WelcomeTour.steps(features: Self.features(),
+                                              signedIn: KeychainStore.exists(account: KeychainAccount.sessionKey))
         navigation.index = max(0, min(step, navigation.count - 1))
         if window == nil {
             let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 600),
@@ -94,7 +95,8 @@ final class WelcomeTourWindowController: NSObject, NSWindowDelegate {
 }
 
 struct WelcomeTourView: View {
-    static let title = "Welcome to Sanduhr"
+    /// Not "Welcome to Sanduhr": that is the sign-in sheet, which may be open at the same time (F24).
+    static let title = "Sanduhr Tour"
     static let skipTitle = "Skip the Tour"
 
     var nav: TourNavigation
@@ -190,7 +192,7 @@ struct TourCardView: View {
                 .fixedSize(horizontal: false, vertical: true)
             ForEach(card.choices, id: \.self) { TourChoiceView(choice: $0) }
             Spacer(minLength: 0)
-            Button("Show me", action: showMe)
+            Button(card.showMeTitle, action: showMe)
                 .help(Self.showMeHelp(card.showMe))
         }
         .padding(12)

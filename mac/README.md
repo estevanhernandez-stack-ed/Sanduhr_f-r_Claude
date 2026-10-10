@@ -1307,6 +1307,8 @@ preview and a Show me button that opens the right page of Settings. A
 fresh install never shows it (onboarding covers that), and while onboarding is up it waits for a
 later launch. Tick **Don't show after updates** in the window to stop the automatic showing;
 Settings, About has **What's New…** any time, as do the menu bar, widget and Desk clock menus.
+On the version a fresh install started with, it shows that version's cards as **Highlights in
+<version>** (`whatsNewInstalledVersion`); after any update, every card.
 The cards live in `Sources/Sanduhr/Models/WhatsNewCards.swift`, one array per release: a release
 adds its own array and nothing else changes. Related features share a card, which sits with the
 newest release it covers and lists every release it spans; it shows when any of them is new. The last version seen is the `whatsNewLastSeen`
@@ -1316,7 +1318,7 @@ default (`defaults write com.626labs.sanduhr whatsNewLastSeen 2.3.4` fakes an up
 
 A fresh install gets a short tour once, after its first sign-in, as soon as the first fetch
 succeeds, so its first card shows your own meters. It uses the What's New window's look, one step
-at a time ("Welcome to Sanduhr", "1 of 5"): your limits and the pace tick, the Desk (with Show the
+at a time ("Sanduhr Tour", "1 of 5"; taken before signing in, its first card says to sign in and its button opens Accounts): your limits and the pace tick, the Desk (with Show the
 Desk and Match Desk switches), the menu bar (with what it shows) and, on a Mac with a notch, the
 notch, more than one account, and Claude Code (the Usage page and Claude Code). Choices are
 the real settings, written as you make them; Show me opens the widget or the right Settings page

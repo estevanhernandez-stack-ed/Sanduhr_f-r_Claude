@@ -48,6 +48,8 @@ struct TourCard: Equatable, Identifiable {
     let showMe: TourDestination
     var choices: [TourChoice] = []
     var requires: TourFeature?
+    /// The button's title; "Sign In" on the first card while nobody is signed in.
+    var showMeTitle = "Show me"
 }
 
 /// The welcome tour (item 61): the steps, who sees it once, and the choices it writes. Pure
@@ -82,9 +84,10 @@ enum WelcomeTour {
     }
 
     /// The steps that have a card showing, in order, each with its cards.
-    static func steps(features: Set<TourFeature>, table: [TourCard] = WelcomeTour.table) -> [[TourCard]] {
+    static func steps(features: Set<TourFeature>, table: [TourCard] = WelcomeTour.table,
+                      signedIn: Bool = true) -> [[TourCard]] {
         var out: [[TourCard]] = []
-        for card in cards(features: features, table: table) {
+        for card in cards(features: features, table: table).map({ signedIn ? $0 : signedOut($0) }) {
             if let last = out.last?.first, last.step == card.step {
                 out[out.count - 1].append(card)
             } else {
@@ -92,6 +95,17 @@ enum WelcomeTour {
             }
         }
         return out
+    }
+
+    /// The tour taken before signing in (Take the Tour… is always there): the first card says
+    /// how the meters get there and its button opens Accounts (Settings v2, F24). Every other card
+    /// is as written.
+    static func signedOut(_ card: TourCard) -> TourCard {
+        guard card.step == 1 else { return card }
+        return TourCard(id: card.id, step: card.step, title: card.title,
+                        body: "Sign in to see your meters here. Each bar is one of your limits, with a tick where an even pace would put you.",
+                        art: card.art, showMe: .settings(.credentials), choices: card.choices,
+                        requires: card.requires, showMeTitle: "Sign In")
     }
 
     /// "1 of 5": `index` is 0-based.
