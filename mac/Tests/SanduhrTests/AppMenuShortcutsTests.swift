@@ -110,7 +110,7 @@ struct AppMenuShortcutsTests {
         ])
         let refusal = SanduhrHotKeys.setCombo(shiftCmdN, for: .settings, in: d, appMenus: menus)
         #expect(refusal == .appMenu(app: "Finder", item: "New Folder", combo: shiftCmdN))
-        #expect(refusal?.note == "Finder uses ⇧⌘N for “New Folder”, so it may not reach Sanduhr while Finder is in front.")
+        #expect(refusal?.note == "Finder uses ⇧⌘N for “New Folder”. While this shortcut is on, Finder won't get those keys.")
         #expect(refusal?.canInsist == true && refusal?.kind == "app" && refusal?.insistCombo == shiftCmdN)
         #expect(d.object(forKey: "hotKeySettingsKeyCode") == nil)
         // macOS is named first when both use the keys.
@@ -130,7 +130,7 @@ struct AppMenuShortcutsTests {
 
     @Test func notesNameTheAppAndItem() {
         #expect(SanduhrHotKeys.appClashNote(shiftCmdN, app: "Finder", item: "New Folder")
-                == "Finder also uses ⇧⌘N for “New Folder”, so it may not reach Sanduhr while Finder is in front.")
+                == "Finder also uses ⇧⌘N for “New Folder”; Sanduhr takes those keys first.")
         #expect(SanduhrHotKeys.appMenusCaption.contains("Accessibility"))
         #expect(SanduhrHotKeys.appMenusCaption.contains("nothing else"))
     }

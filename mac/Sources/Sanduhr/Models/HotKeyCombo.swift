@@ -168,14 +168,15 @@ extension SanduhrHotKeys {
     }
 
     /// The refusal's note for keys an app's menu uses (item 73 b): "Finder uses ⇧⌘N for “New
-    /// Folder”, so it may not reach Sanduhr while Finder is in front."
+    /// Folder”. While this shortcut is on, Finder won't get those keys." A registered shortcut
+    /// takes its keys before the app in front sees them, so the app is the one that loses them.
     static func appNote(_ combo: HotKeyCombo, app: String, item: String) -> String {
-        "\(app) uses \(combo.display) for “\(item)”, so it may not reach Sanduhr while \(app) is in front."
+        "\(app) uses \(combo.display) for “\(item)”. While this shortcut is on, \(app) won't get those keys."
     }
 
     /// The quiet note under a shortcut that is on while an app's menu uses the same keys.
     static func appClashNote(_ combo: HotKeyCombo, app: String, item: String) -> String {
-        "\(app) also uses \(combo.display) for “\(item)”, so it may not reach Sanduhr while \(app) is in front."
+        "\(app) also uses \(combo.display) for “\(item)”; Sanduhr takes those keys first."
     }
 
     /// The combo saved for a shortcut, or its default.

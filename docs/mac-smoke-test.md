@@ -1796,10 +1796,11 @@ desktop well away from every piece.
     12 still pass. Turn the switch on: still no prompt, an orange "isn't allowed … yet" line with
     **Allow in System Settings…**; only that button brings macOS's prompt. Allow Sanduhr in Privacy &
     Security, Accessibility and come back: the line goes (`app_menus_trusted: true`). With Finder
-    open, click the keys and press ⇧⌘N: "Finder uses ⇧⌘N for “New Folder”, so it may not reach
-    Sanduhr while Finder is in front." with **Use Anyway** (`hot_keys.settings_refusal: app`);
+    open, click the keys and press ⇧⌘N: "Finder uses ⇧⌘N for “New Folder”. While this shortcut
+    is on, Finder won't get those keys." with **Use Anyway** (`hot_keys.settings_refusal: app`);
     ⌘Space still names Spotlight first. **Use Anyway** saves it and the grey note "Finder also uses
-    ⇧⌘N for “New Folder”…" stays (`settings_clash: "Finder: New Folder"`). Turn the switch off: the
+    ⇧⌘N for “New Folder”; Sanduhr takes those keys first." stays (`settings_clash: "Finder: New
+    Folder"`), and ⇧⌘N in Finder opens Settings instead of making a folder. Turn the switch off: the
     note goes and ⇧⌘N records without a word. At no point does anything but the recorded keys get
     read: no Input Monitoring prompt, and Sanduhr is absent from Privacy & Security, Input Monitoring.
 
