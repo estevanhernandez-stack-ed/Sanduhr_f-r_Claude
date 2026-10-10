@@ -8,8 +8,11 @@ struct DeskUsage {
     var usage: UsageResponse?
     /// When `usage` was fetched; nil before the first success.
     var fetchedAt: Date?
-    /// The session key or Cloudflare clearance was refused, so only a new sign-in helps.
+    /// The session key or Cloudflare clearance was refused, or there is none yet, so only a
+    /// (new) sign-in helps.
     var signInNeeded = false
+    /// There has never been a key (a fresh install): the line asks to sign in, not to sign in again.
+    var firstSignIn = false
     /// The active account as the claude line names it, with two or more accounts ("Work", or
     /// "Work (in use)" just after an automatic switch); nil with one. The notch never shows it.
     var account: String?
@@ -82,8 +85,11 @@ enum DeskClaudeText {
         var rest: String
     }
 
+    /// The Desk's sign-in line: "sign in to Sanduhr" before the first key, else "sign in again in Sanduhr".
+    static func signInLine(first: Bool) -> String { first ? compactSignIn : "sign in again in Sanduhr" }
+
     static func parts(_ input: DeskUsage) -> Parts? {
-        if input.signInNeeded { return Parts(account: input.account, rest: "sign in again in Sanduhr") }
+        if input.signInNeeded { return Parts(account: input.account, rest: signInLine(first: input.firstSignIn)) }
         guard let tiers = input.usage?.tiers else { return nil }
         var parts: [String] = []
         if let s = tiers[.fiveHour], let util = s.utilization {

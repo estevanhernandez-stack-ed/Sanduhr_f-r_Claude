@@ -319,7 +319,7 @@ struct DeskPiece: View {
                         .deskPulse(model.pulses[row.tier] ?? 0, ink: ink, size: size)
                 }
                 if model.signInNeeded {
-                    Text("sign in again in Sanduhr").opacity(0.75)
+                    Text(DeskClaudeText.signInLine(first: model.firstSignIn)).opacity(0.75)
                 }
             }
             .font(.custom(font, size: size))

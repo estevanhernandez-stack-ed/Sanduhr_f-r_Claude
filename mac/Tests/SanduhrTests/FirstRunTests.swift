@@ -64,3 +64,30 @@ struct FirstRunTests {
         #expect(d.values[WhatsNew.installedKey] as? String == "2.14.0")
     }
 }
+
+/// Before the first key, the Desk asks to sign in, not to sign in again; the notch's meters wing
+/// shows its short sign-in line instead of an empty wing (Settings v2 F25).
+@Suite("First run on the Desk and notch")
+struct FirstRunDeskTests {
+    @Test func theDeskLineAsksToSignInNotAgain() {
+        var first = DeskUsage()
+        first.signInNeeded = true
+        first.firstSignIn = true
+        #expect(DeskClaudeText.line(first) == "claude   sign in to Sanduhr")
+        var expired = DeskUsage()
+        expired.signInNeeded = true
+        #expect(DeskClaudeText.line(expired) == "claude   sign in again in Sanduhr")
+        #expect(DeskClaudeText.signInLine(first: true) == DeskClaudeText.compactSignIn)
+    }
+
+    @Test func theMetersWingShowsTheSignInLine() {
+        var first = DeskUsage()
+        first.signInNeeded = true
+        first.firstSignIn = true
+        #expect(DeskClaudeText.compact(first) == "sign in to Sanduhr")
+        #expect(NotchContent.meters.text(at: .right, meetings: [], meters: DeskClaudeText.compact(first),
+                                         message: nil, now: Date()) == "sign in to Sanduhr")
+        // Before this release a fresh install was "Connecting…", which needed no sign-in: no line.
+        #expect(DeskClaudeText.compact(DeskUsage()) == nil)
+    }
+}

@@ -119,6 +119,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // line keeps the old account's name until those numbers have faded out.
             DeskController.shared.model.update(DeskUsage(
                 usage: vm.shownUsage, fetchedAt: vm.lastUpdated, signInNeeded: vm.status.needsSignIn,
+                firstSignIn: vm.status == .notSignedIn,
                 account: vm.shownAccountLabel, veiled: vm.switchVeil, switchNote: vm.switchNote))
         }
 

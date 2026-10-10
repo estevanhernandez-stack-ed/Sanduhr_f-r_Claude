@@ -79,6 +79,8 @@ final class DeskModel {
     var claudeLineIsStale = false
     /// The widget's session key or Cloudflare clearance was refused.
     var signInNeeded = false
+    /// DeskUsage.firstSignIn: the sign-in line asks to sign in, not to sign in again.
+    var firstSignIn = false
     /// An account switch is under way (AccountSwitchFade): the meters and the line keep the old
     /// account's layout, drawn unseen, until the new numbers fade in.
     var veiled = false
@@ -460,6 +462,7 @@ final class DeskModel {
         let temporary = MeterVisibility.temporary(usage.usage, now: now, store: UserDefaults.desk)
         if !usage.veiled, temporary != temporaryTiers { temporaryTiers = temporary }
         signInNeeded = usage.signInNeeded
+        firstSignIn = usage.firstSignIn
         if veiled != usage.veiled { veiled = usage.veiled }
         if switchNote != usage.switchNote { switchNote = usage.switchNote }
         claudeLine = DeskClaudeText.line(usage)

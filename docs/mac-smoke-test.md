@@ -64,7 +64,7 @@ Fresh-install and migration checks stay manual.
   to sign in again." Cancel changes nothing. Sign Out: the note says "Signed out." and the button greys out as
   "Signed Out" (no password prompt on reopening the page); the list marks the account "Signed out"; the widget's cards
   go and it reads "Signed out — sign in" (click it: Settings opens at Accounts; with "Hidden
-  while Desk is on" the widget shows itself); Desk's meters give way to "sign in again in Sanduhr",
+  while Desk is on" the widget shows itself); Desk's meters give way to "sign in again in Sanduhr", (on a fresh profile that never had a key, "sign in to Sanduhr")
   the notch's meters to "sign in to Sanduhr"; the hourglass loses its percent.
   `security find-generic-password -s com.626labs.sanduhr -a sessionKey:Personal` finds nothing and
   `credentials.json` is gone; `snapshot.json` has `"status":"error"`, `"error_kind":"session_expired"`,
