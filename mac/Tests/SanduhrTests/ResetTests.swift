@@ -272,6 +272,110 @@ struct ResetTests {
         #expect(steps.map(\.part) == [.accounts, .accounts, .accounts, .settings, .settings])
     }
 
+    /// Review M1: someone else's edit between install and reset stays; Sanduhr's entry and the
+    /// backup Install kept both go.
+    @Test func anEditSinceInstallStaysAndTheBackupGoes() throws {
+        let b = ResetBed()
+        defer { b.cleanUp() }
+        try b.rig.installer.install(.statusline, folder: b.work, python: b.rig.python)
+        let backup = b.rig.home.at(".claude-work/settings.json") + IntegrationInstaller.backupSuffix
+        #expect(FileManager.default.fileExists(atPath: backup))
+        let edited = try #require(b.rig.text(".claude-work/settings.json")).replacingOccurrences(of: "\"opus\"", with: "\"sonnet\"")
+        FileManager.default.createFile(atPath: b.rig.home.at(".claude-work/settings.json"), contents: Data(edited.utf8))
+
+        let results = Reset.perform(Reset.plan([.claudeCode], in: b.env), in: b.env)
+
+        #expect(results.filter { !$0.ok }.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: backup))
+        let root = b.rig.json(".claude-work/settings.json")
+        #expect(root["model"] as? String == "sonnet")
+        #expect(root["statusLine"] == nil)
+    }
+
+    /// Review M3: installs.json that doesn't read keeps integrations/, whatever else is checked.
+    @Test func unreadableReceiptsKeepTheIntegrationsFolder() throws {
+        let b = ResetBed()
+        defer { b.cleanUp() }
+        b.writeSanduhrFiles()
+        try b.installEverything()
+        let receipts = b.rig.installer.receiptsURL
+        try Data("[{\"folder\": 1, \"newer\": true}]".utf8).write(to: receipts)
+        #expect(Reset.receiptsUnreadable(b.env))
+
+        let steps = Reset.plan(Set(ResetPart.allCases), in: b.env)
+        #expect(!steps.contains { $0.part == .claudeCode })
+        #expect(Reset.perform(steps, in: b.env).filter { !$0.ok }.isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: b.supportDir.path) == [ResetEnvironment.integrationsName])
+        #expect(FileManager.default.fileExists(atPath: receipts.path))
+        // The sweep at quit keeps it too.
+        Reset.sweep(Set(ResetPart.allCases), in: b.env)
+        #expect(FileManager.default.fileExists(atPath: receipts.path))
+    }
+
+    /// Review low: an entry of Sanduhr's still there after Remove fails its step and keeps its
+    /// receipt, so it can still be removed later.
+    @Test func anEntryStillThereKeepsItsReceipt() throws {
+        let b = ResetBed()
+        defer { b.cleanUp() }
+        try b.rig.installer.install(.statusline, folder: b.other, python: b.rig.python)
+        // A receipt whose "previous" value is itself a Sanduhr statusline: Remove puts it back.
+        let ours = try #require(b.rig.json(".claude-other/settings.json")["statusLine"])
+        let text = String(decoding: try JSONSerialization.data(withJSONObject: ours, options: [.sortedKeys]), as: UTF8.self)
+        var receipts = b.rig.installer.loadReceipts()
+        receipts[0].previous = text
+        b.rig.installer.saveReceipts(receipts)
+
+        let results = Reset.perform(Reset.plan([.claudeCode], in: b.env), in: b.env)
+
+        #expect(results.count == 1)
+        #expect(results.first?.error?.contains("still there") == true)
+        #expect(b.rig.installer.loadReceipts().count == 1)
+    }
+
+    /// Review M2: a dev build (file store only) says its Keychain stays; a Keychain key that
+    /// can't be deleted says where it is.
+    @Test func keyStoresAreSaidInTheResults() throws {
+        let b = ResetBed()
+        defer { b.cleanUp() }
+        #expect(b.env.clearsKeychain)
+        let file = FakeBackend(["sessionKey:Work": "sk"])
+        let defaults = MemoryDefaults()
+        defaults.set(["Work"], forKey: AccountRegistry.listKey)
+        var dev = b.env
+        dev.accounts = AccountRegistry(backend: file, stores: [(kind: .file, backend: file)], defaults: defaults)
+        #expect(!dev.clearsKeychain)
+        let devResults = Reset.perform(Reset.plan([.accounts], in: dev), in: dev)
+        #expect(!devResults.isEmpty)
+        #expect(devResults.allSatisfy { $0.note == ResetEnvironment.devBuildKeysNote })
+
+        b.keys.keychain.failDelete = ["sessionKey:Work"]
+        let results = Reset.perform(Reset.plan([.accounts], in: b.env), in: b.env)
+        let work = try #require(results.first { $0.step.target == "Work" })
+        #expect(work.error?.contains("Keychain Access") == true)
+        #expect(work.error?.contains("Work") == false)
+        #expect(results.allSatisfy { $0.note == nil })
+    }
+
+    /// Review H1: the sweep at quit takes out what a stray write put back, only for the checked
+    /// parts, and running it again changes nothing.
+    @Test func theQuitSweepIsIdempotentAndFollowsTheParts() throws {
+        let b = ResetBed()
+        defer { b.cleanUp() }
+        b.writeSanduhrFiles()
+        var parts = Set(ResetPart.allCases)
+        parts.remove(.themes)
+        _ = Reset.perform(Reset.plan(parts, in: b.env), in: b.env)
+        // Stray writes after the run.
+        FileManager.default.createFile(atPath: b.supportDir.appendingPathComponent("snapshot.json").path, contents: Data("{}".utf8))
+        UserDefaults(suiteName: b.suites[0])!.set(true, forKey: "SUEnableAutomaticChecks")
+
+        Reset.sweep(parts, in: b.env)
+        Reset.sweep(parts, in: b.env)
+
+        #expect(try FileManager.default.contentsOfDirectory(atPath: b.supportDir.path) == [ResetEnvironment.themesName])
+        for s in b.suites { #expect(b.persisted(s).isEmpty) }
+    }
+
     @Test func theHookTakesOnlyTheDryRun() {
         func parse(_ arg: String?) -> DebugRequest {
             var c = URLComponents(string: "sanduhr://debug/action")!

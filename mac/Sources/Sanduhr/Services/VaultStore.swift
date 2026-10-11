@@ -214,6 +214,8 @@ final class VaultStore: @unchecked Sendable {
     }
 
     private func write<T: Encodable>(_ path: String, _ value: T, throwOnFailure: Bool) throws {
+        // Reset Sanduhr… ran: the folder it emptied stays empty.
+        guard !ResetGate.isOn else { return }
         let tmp = path + ".tmp"
         var last: Error?
         for _ in 0..<Self.writeRetries {
@@ -259,6 +261,7 @@ final class VaultWriterLock {
     deinit { release() }
 
     private static func open(_ path: String) -> Int32 {
+        guard !ResetGate.isOn else { return -1 }
         try? FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent,
                                                 withIntermediateDirectories: true)
         return Darwin.open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)

@@ -44,9 +44,9 @@ enum ResetPart: String, CaseIterable, Identifiable, Sendable {
     var detail: String {
         switch self {
         case .claudeCode: "Takes out what Sanduhr added to each folder, so its files are as they were before."
-        case .accounts: "Remove Account for each account, its key and Keychain items included."
+        case .accounts: "Remove Account for each account: its key and cf_clearance, its history and its settings."
         case .records: "The vault, usage history, snapshots, seats.json and the rest of Sanduhr's folder in Application Support."
-        case .deskMessages: "messages.txt, kept as messages.txt.previous beside it."
+        case .deskMessages: "messages.txt, kept as messages.txt.previous beside it (an older messages.txt.previous is replaced)."
         case .themes: "The themes you added or Claude made for you."
         case .settings: "Both preferences domains, com.626labs.sanduhr and com.626labs.sanduhr.desk."
         }
@@ -82,6 +82,12 @@ struct ResetEnvironment {
     /// `~/Library/Application Support/Desk/messages.txt`.
     var messagesFile: URL
     var domains: [ResetDomain]
+
+    /// Whether the accounts step clears the Keychain. A dev (ad-hoc) build clears only its own
+    /// credentials file: the release build's Keychain items on the same Mac stay.
+    var clearsKeychain: Bool { accounts.stores.contains { $0.kind == .keychain } }
+
+    static let devBuildKeysNote = "This dev build clears its own key file; the release build's Keychain items stay."
 
     static let themesName = "themes"
     static let integrationsName = "integrations"
@@ -136,6 +142,8 @@ struct ResetResult: Equatable, Identifiable {
     var step: ResetStep
     /// Nil when the step did what it said.
     var error: String?
+    /// Something worth knowing about a step that did what it said (a dev build's keys).
+    var note: String?
 
     var ok: Bool { error == nil }
     var id: String { step.id }
@@ -185,7 +193,7 @@ enum Reset {
             }
         }
         if parts.contains(.records) {
-            let n = supportEntries(env, keepThemes: true, keepIntegrations: false).count
+            let n = supportEntries(env, keepThemes: true, keepIntegrations: receiptsUnreadable(env)).count
             if n > 0 {
                 steps.append(ResetStep(part: .records, kind: .supportFiles, target: env.supportDir.lastPathComponent, count: n))
             }
@@ -203,6 +211,20 @@ enum Reset {
             }
         }
         return steps
+    }
+
+    /// `integrations/installs.json` is there but doesn't read as a list of receipts (a newer
+    /// format, or damaged): the entries it records can't be listed or undone here, so
+    /// `integrations/` stays whatever else is checked, and the sheet says so.
+    static func receiptsUnreadable(_ env: ResetEnvironment) -> Bool {
+        guard let data = try? Data(contentsOf: env.installer.receiptsURL) else { return false }
+        return (try? JSONDecoder().decode([IntegrationReceipt].self, from: data)) == nil
+    }
+
+    /// `integrations/` stays: a receipt is left (an unchecked or failed folder) or the receipts
+    /// can't be read.
+    static func keepsIntegrations(_ env: ResetEnvironment) -> Bool {
+        !env.installer.loadReceipts().isEmpty || receiptsUnreadable(env)
     }
 
     /// The top-level items of Sanduhr's folder the records step deletes: everything but the
@@ -264,9 +286,27 @@ enum Reset {
             } catch let e {
                 error = describe(e)
             }
-            results.append(ResetResult(step: step, error: error))
+            var note: String?
+            if step.part == .accounts, !env.clearsKeychain { note = ResetEnvironment.devBuildKeysNote }
+            results.append(ResetResult(step: step, error: error, note: note))
         }
         return results
+    }
+
+    /// The last sweep, at quit after a reset: the checked file and preferences parts once more,
+    /// for anything a stray write put back after the run. Safe to run any number of times.
+    static func sweep(_ parts: Set<ResetPart>, in env: ResetEnvironment) {
+        let fm = FileManager.default
+        if parts.contains(.records) {
+            for url in supportEntries(env, keepThemes: true, keepIntegrations: keepsIntegrations(env)) {
+                try? fm.removeItem(at: url)
+            }
+        }
+        if parts.contains(.themes) { try? fm.removeItem(at: env.themesDir) }
+        removeIfEmpty(env.supportDir)
+        if parts.contains(.settings) {
+            for d in env.domains { d.defaults.removePersistentDomain(forName: d.name) }
+        }
     }
 
     private static func run(_ step: ResetStep, in env: ResetEnvironment) throws {
@@ -274,10 +314,18 @@ enum Reset {
         switch step.kind {
         case .claudeCodeEntry:
             guard let folder = step.folder, let kind = step.integration else { return }
-            try env.installer.remove(kind, folder: folder)
-            // Remove leaves an entry that isn't Sanduhr's any more alone and still drops the
-            // receipt; anything else left is a failure.
-            if env.installer.status(kind, folder: folder).isOurs { throw StepFailure("Sanduhr's entry is still there") }
+            let installer = env.installer
+            let file = installer.configFile(kind, folder: folder)
+            let held = installer.loadReceipts().filter { $0.file == file && $0.kind == kind }
+            try installer.remove(kind, folder: folder)
+            // Remove leaves an entry that isn't Sanduhr's any more alone and drops the receipt.
+            // One of Sanduhr's still there is a failure, and its receipt goes back, so it can
+            // still be removed later.
+            if installer.status(kind, folder: folder).isOurs {
+                installer.saveReceipts(installer.loadReceipts() + held)
+                throw StepFailure("Sanduhr's entry is still there; kept to remove later")
+            }
+            dropBackup(file, folder: folder, in: env)
         case .account:
             let r = env.accounts.remove(step.target)
             if !r.succeeded { throw StepFailure(keyFailure(r)) }
@@ -285,8 +333,9 @@ enum Reset {
             let r = env.accounts.signOut(nil)
             if !r.succeeded { throw StepFailure(keyFailure(r)) }
         case .supportFiles:
-            // A receipt still here means a folder's entry is still in place: keep what removes it.
-            let keepIntegrations = !env.installer.loadReceipts().isEmpty
+            // A receipt still here means a folder's entry is still in place: keep what removes
+            // it. Receipts that can't be read are kept the same.
+            let keepIntegrations = keepsIntegrations(env)
             var failed = 0
             for url in supportEntries(env, keepThemes: true, keepIntegrations: keepIntegrations) {
                 do { try fm.removeItem(at: url) } catch { failed += 1 }
@@ -309,6 +358,18 @@ enum Reset {
         }
     }
 
+    /// Once no receipt names `file` and none of Sanduhr's entries is left in it, the copy
+    /// Install kept beside it has nothing more to offer: it goes, even when the file changed
+    /// since (an edit of someone else's between install and reset), so nothing of Sanduhr's stays
+    /// in the folder.
+    private static func dropBackup(_ file: String, folder: String, in env: ResetEnvironment) {
+        let installer = env.installer
+        guard !installer.loadReceipts().contains(where: { $0.file == file }) else { return }
+        let kinds = IntegrationKind.allCases.filter { installer.configFile($0, folder: folder) == file }
+        guard !kinds.contains(where: { installer.status($0, folder: folder).isOurs }) else { return }
+        try? FileManager.default.removeItem(atPath: file + IntegrationInstaller.backupSuffix)
+    }
+
     private static func removeIfEmpty(_ dir: URL) {
         let fm = FileManager.default
         if let left = try? fm.contentsOfDirectory(atPath: dir.path), left.isEmpty {
@@ -321,10 +382,15 @@ enum Reset {
         init(_ message: String) { self.message = message }
     }
 
-    /// Store and slot kind only, as Sign Out logs it: never a label or a value.
+    /// Store and slot kind only, as Sign Out logs it: never a label or a value. A key left in
+    /// the Keychain is said so, since the account it belonged to is gone from the list.
     private static func keyFailure(_ r: SignOutResult) -> String {
         let f = r.failures.map { "\(AccountRegistry.slotKind($0.account)) in the \($0.store.rawValue) store" }
-        return "could not remove " + f.joined(separator: ", ")
+        var text = "could not remove " + f.joined(separator: ", ")
+        if r.failures.contains(where: { $0.store == .keychain }) {
+            text += "; it stays in the Keychain: delete the \(KeychainBackend.service) items in Keychain Access"
+        }
+        return text
     }
 
     /// What the result list says for a failure.

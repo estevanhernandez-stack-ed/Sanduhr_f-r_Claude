@@ -1931,7 +1931,9 @@ keys of your own) and a made-up account.
    you left it; `~/Library/Application Support/Sanduhr/` holds only `integrations/`.
 5. Fix the file, launch: the welcome sheet shows. Sign in with the made-up account, open Settings,
    Claude Code: the scratch folder's entries are listed; Reset again with everything checked.
-   After Quit: both files compare byte-identical with the copies from step 2 (`cmp`), no
+   Leave the results up a minute: `~/Library/Application Support/Sanduhr/` and its `themes/` don't
+   come back, the widget and Desk are gone, and the menu bar icon offers only Quit Sanduhr. (On a
+   dev build the accounts caption and rows say the release build's Keychain items stay.) After Quit: both files compare byte-identical with the copies from step 2 (`cmp`), no
    `.sanduhr-backup` beside them, no `~/Library/Application Support/Sanduhr/`,
    `messages.txt.previous` beside where `messages.txt` was, `defaults read com.626labs.sanduhr`
    and `defaults read com.626labs.sanduhr.desk` find no domain, and Keychain Access has no

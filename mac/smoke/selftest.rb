@@ -591,7 +591,7 @@ check('no scenario touches accounts', Dir[File.join(Smoke::SCENARIOS, '*.yaml')]
 Dir[File.join(Smoke::SCENARIOS, '*.yaml')].each do |f|
   Array(YAML.safe_load(File.read(f))['steps']).each do |s|
     next unless s.is_a?(Hash) && s['do'] == 'reset'
-    check("#{File.basename(f)}: reset only as --dry-run", s['arg'] == '--dry-run')
+    check("#{File.basename(f)}: reset only as a dry run", %w[--dry-run dry-run].include?(s['arg']))
   end
 end
 check('scenarios exist',Dir[File.join(Smoke::SCENARIOS, '*.yaml')].length >= 8)

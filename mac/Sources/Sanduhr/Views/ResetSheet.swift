@@ -3,8 +3,10 @@ import SwiftUI
 
 /// About's Reset Sanduhr… (Settings v2, slice 5): what will be removed, each part a checkbox, all
 /// checked; the Claude Code folders listed with their entries, each folder its own checkbox.
-/// Reset and Quit runs the checked steps in order (Reset.swift) and lists how each went; Quit
-/// then ends Sanduhr, and the next launch starts fresh with the welcome sheet.
+/// Reset and Quit first stops everything that runs on its own (AppDelegate.shutDownForReset,
+/// with ResetGate turning the writers off), then runs the checked steps in order (Reset.swift)
+/// and lists how each went; Quit Sanduhr then ends it, sweeping once more, and the next launch
+/// starts fresh with the welcome sheet.
 ///
 /// This button is the only place a real reset starts. The smoke hook has only `reset --dry-run`,
 /// which reads the plan and touches nothing.
@@ -15,12 +17,28 @@ final class ResetSheetModel: ObservableObject {
     @Published var checkedFolders: Set<String> = []
     @Published var results: [ResetResult]?
 
+    /// The dev build note for the accounts part, nil on a build that clears the Keychain.
+    @Published var keysNote: String?
+    /// installs.json can't be read: its entries can't be listed or removed here.
+    @Published var receiptsUnreadable = false
+
     let home = NSHomeDirectory()
+    private var env: ResetEnvironment?
 
     func load() {
-        folders = Reset.claudeCodeFolders(.standard)
+        let env = ResetEnvironment.standard
+        self.env = env
+        folders = Reset.claudeCodeFolders(env)
         checkedFolders = Set(folders.map(\.folder))
+        keysNote = env.clearsKeychain ? nil : ResetEnvironment.devBuildKeysNote
+        receiptsUnreadable = Reset.receiptsUnreadable(env)
         results = nil
+    }
+
+    /// Nothing checked would remove anything: Reset and Quit is off.
+    var planIsEmpty: Bool {
+        guard let env else { return true }
+        return Reset.plan(parts, folders: checkedFolders, in: env).isEmpty
     }
 
     /// Some folder's entries will stay: the part is off, or a folder is unchecked.
@@ -45,9 +63,14 @@ final class ResetSheetModel: ObservableObject {
 
     /// The confirmed button: the real reset, in order, every step tried.
     func resetNow() {
-        let env = ResetEnvironment.standard
+        let env = env ?? .standard
+        let parts = parts
         let steps = Reset.plan(parts, folders: checkedFolders, in: env)
-        AppDelegate.resetting = true
+        // Writers off and everything that runs on its own stopped before anything is removed,
+        // so nothing writes back and no removed account's key stays in memory.
+        ResetGate.begin()
+        (NSApp.delegate as? AppDelegate)?.shutDownForReset()
+        AppDelegate.resetSweep = { Reset.sweep(parts, in: env) }
         results = Reset.perform(steps, in: env)
     }
 
@@ -84,7 +107,7 @@ private struct ResetChoices: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Checked items are removed, in this order. Sanduhr then quits, and the next launch starts fresh.")
+                Text("Checked items are removed in this order. The sheet then shows how each step went; Quit Sanduhr ends it, and the next launch starts fresh.")
                     .foregroundStyle(.secondary)
                 ForEach(ResetPart.allCases) { part in
                     VStack(alignment: .leading, spacing: 4) {
@@ -93,6 +116,10 @@ private struct ResetChoices: View {
                             .font(.body.bold())
                         Text(part.detail).font(.caption).foregroundStyle(.secondary)
                             .padding(.leading, 20)
+                        if part == .accounts, let note = model.keysNote {
+                            Text(note).font(.caption).foregroundStyle(.orange)
+                                .padding(.leading, 20)
+                        }
                         if part == .claudeCode {
                             ResetFolderList(model: model)
                         }
@@ -110,7 +137,12 @@ private struct ResetFolderList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if model.folders.isEmpty {
+            if model.receiptsUnreadable {
+                Label("Sanduhr's record of what it installed can't be read, so its Claude Code entries can't be listed or removed here. Its integrations folder stays; remove the entries in Settings, Claude Code, or by hand.",
+                      systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            } else if model.folders.isEmpty {
                 Text("No Claude Code folder holds anything of Sanduhr's.")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -126,7 +158,7 @@ private struct ResetFolderList: View {
                 .disabled(!model.parts.contains(.claudeCode))
             }
             if model.leavesClaudeCodeEntries {
-                Label("Sanduhr's entries stay in the unchecked folders, and its scripts stay with them so those folders keep working. Remove them later in Settings, Claude Code.",
+                Label("Unchecked folders keep Sanduhr's entries, and its scripts stay so they keep working, but they show no meters until you sign in to Sanduhr again. Remove them later in Settings, Claude Code.",
                       systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(.orange)
@@ -173,6 +205,9 @@ private struct ResetResultRow: View {
                 if let error = result.error {
                     Text(error).font(.caption).foregroundStyle(.secondary)
                 }
+                if let note = result.note {
+                    Text(note).font(.caption).foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -188,7 +223,7 @@ private struct ResetSheetButtons: View {
             if model.results == nil {
                 Button("Cancel", action: dismiss).keyboardShortcut(.cancelAction)
                 Button("Reset and Quit", role: .destructive) { model.resetNow() }
-                    .disabled(model.parts.isEmpty)
+                    .disabled(model.planIsEmpty)
             } else {
                 Button("Quit Sanduhr") { NSApp.terminate(nil) }
                     .keyboardShortcut(.defaultAction)

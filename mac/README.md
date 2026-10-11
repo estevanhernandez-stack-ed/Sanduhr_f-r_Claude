@@ -1530,15 +1530,20 @@ lists what it removes, each part a checkbox, all checked, and runs the checked s
 
 1. **Claude Code folders.** One step per receipt in `integrations/installs.json`, newest install
    first, through `IntegrationInstaller.remove` (the meters mod's `enabledPlugins` switch comes out
-   with it, `undoModSwitch`), so every `settings.json` and `.claude.json` ends byte for byte as it was
-   before Sanduhr and its `.sanduhr-backup` goes. First, because the receipts live in the folder step
+   with it, `undoModSwitch`): Sanduhr's entries come out and every other byte stays, so a file
+   nobody else changed ends byte for byte as it was. Once no receipt names a file and no Sanduhr
+   entry is left in it, its `.sanduhr-backup` goes too, even after someone else's edit. An entry
+   still there after Remove fails the step and its receipt is put back. First, because the receipts live in the folder step
    3 deletes (F20). The sheet lists each folder (`~`-relative) with its entries, each folder its own
    checkbox.
 2. **Accounts and keys.** `AccountRegistry.remove` for each account (key, cf_clearance, history file,
    per-account preferences), then Sign Out of the pre-accounts slots when anything is there. The
-   cleared stores are the registry's: both on a signed build, only the file on a dev build.
+   cleared stores are the registry's: both on a signed build, only the file on a dev build, which
+   the sheet's accounts caption and each accounts result row say. A Keychain key that can't be
+   deleted is named by slot kind in its row, pointing at Keychain Access.
 3. **History and records.** Every top-level item of `~/Library/Application Support/Sanduhr/` except
-   `themes/` (its own part) and, while any receipt is left, `integrations/`; then the folder if empty.
+   `themes/` (its own part) and, while any receipt is left or `installs.json` can't be decoded,
+   `integrations/`; then the folder if empty. Unreadable receipts list no folder, and the sheet warns.
 4. **Desk messages.** `messages.txt` renamed to `messages.txt.previous`, replacing an older one.
 5. **Your themes.** `themes/`, then Sanduhr's folder if that left it empty.
 6. **All settings.** `removePersistentDomain` for `com.626labs.sanduhr` and
@@ -1549,8 +1554,19 @@ and is no longer JSON Sanduhr can edit, say) leaves that file and its receipt as
 rest still run. An unchecked folder, or a failed one, keeps its receipt, so `integrations/` stays
 and its entries keep working and can be removed from Settings, Claude Code after the next launch;
 the sheet warns when a folder is unchecked. The sheet ends with every step's result and **Quit
-Sanduhr**; `AppDelegate.resetting` keeps quitting from writing `band.json` back. With no account and
-no preferences, the next launch shows the welcome sheet.
+Sanduhr**. With no account and no preferences, the next launch shows the welcome sheet.
+
+**Nothing writes back.** Reset and Quit first calls `ResetGate.begin()` and
+`AppDelegate.shutDownForReset()` (`Services/ResetShutdown.swift`): refresh and countdown timers
+and the API client (the active key in memory), the account follower and its clients, the per-seat
+reads, the vault, the theme watcher, the Desk (timers, now playing, both shortcuts), the hand-off
+watch, the band's heartbeat and Sparkle's scheduled checks stop, each reporting whether it did;
+the widget and every window but Settings go; the menu bar icon offers only Quit Sanduhr and every
+menu command is a no-op. While the gate is on, the writers that would put a file back
+(`HandoffFiles.writeOwnerOnly`, the theme watcher's re-arm, `UserThemes.load`, history, snapshots,
+seat files, `mcp-access.json`, the vault, `messages.txt`'s starter, themes and looks from Claude)
+do nothing. At quit `applicationWillTerminate` runs `Reset.sweep` for the checked parts: Sanduhr's
+folder again (keeping `integrations/` as above) and both domains, idempotent.
 
 `Reset.perform` has one caller, the sheet's confirmed button (`ResetTests` fails if another file
 calls it). The smoke hook `reset --dry-run` runs `Reset.dryRun`, which plans with every part checked
@@ -1558,7 +1574,10 @@ and touches nothing; any other arg is refused. state.yaml: `reset_dry_run`, null
 then `touched: false`, `folders` and `steps` (`part`, `kind`, `count` in run order), never a path or
 a label. `ResetTests` runs on a temp home with the real installer, a fake credential store and
 throwaway defaults suites: the order, everything checked leaving each folder byte-identical, a
-changed folder failing alone, the dry run, unchecked folders and the hook's refusal.
+changed folder failing alone, the dry run, unchecked folders, an edit between install and reset,
+unreadable receipts, an entry still there, the key-store notes, the quit sweep and the hook's
+refusal. `ResetShutdownTests` covers the gate (each writer a no-op inside
+`ResetGate.$testOverride`, which holds only in its scope) and each service's stop and stopped state.
 
 ## Files
 

@@ -45,7 +45,7 @@ enum MessageEngine {
     /// Creates the starter file the first time, so there is something to edit.
     static func ensureFile() {
         let url = fileURL
-        guard !FileManager.default.fileExists(atPath: url.path) else { return }
+        guard !ResetGate.isOn, !FileManager.default.fileExists(atPath: url.path) else { return }
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                  withIntermediateDirectories: true)
         try? (starter + "\n").write(to: url, atomically: true, encoding: .utf8)

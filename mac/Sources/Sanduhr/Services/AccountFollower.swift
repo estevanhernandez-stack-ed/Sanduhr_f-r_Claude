@@ -44,7 +44,7 @@ final class AccountFollower {
         timer = nil
         firstCheck?.cancel()
         firstCheck = nil
-        guard enabled else {
+        guard enabled, !stopped else {
             clients = [:]
             return
         }
@@ -60,6 +60,16 @@ final class AccountFollower {
             await self?.check()
         }
     }
+
+    /// Reset Sanduhr… (slice 5): the checks stop for good and every client (each holding an
+    /// account's key) goes.
+    func stop() {
+        stopped = true
+        apply(enabled: false)
+    }
+
+    private var stopped = false
+    var isStopped: Bool { stopped && timer == nil && firstCheck == nil && clients.isEmpty }
 
     // MARK: Inputs
 
@@ -105,7 +115,7 @@ final class AccountFollower {
 
     /// One round: a usage request per signed-in inactive account, then the decision.
     func check(now: () -> Date = Date.init) async {
-        guard !checking else { return }
+        guard !checking, !stopped else { return }
         let s = current()
         guard s.enabled, let active = s.active, !s.activeSignedOut, !s.switching,
               s.signedIn.count > 1 else { return }
