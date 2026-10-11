@@ -1746,7 +1746,7 @@
                             </Button>
                             <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
                                        Text="{Binding Shortcuts.Note}"
-                                       Foreground="{DynamicResource Sanduhr.Brush.Accent}"
+                                       Foreground="#ffcf4d"
                                        Visibility="{Binding Shortcuts.HasNote, Converter={StaticResource BoolVis}}" />
                             <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextDim}"

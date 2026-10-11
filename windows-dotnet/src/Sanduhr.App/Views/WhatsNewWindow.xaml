@@ -152,6 +152,7 @@
                             HorizontalAlignment="Left" Margin="0,10,0,0" Padding="12,5"
                             ToolTip="{Binding ShowMeToolTip}"
                             AutomationProperties.Name="{Binding ShowMeName}"
+                            AutomationProperties.HelpText="{Binding Body}"
                             Click="ShowMe_Click" />
 
                     <StackPanel>
