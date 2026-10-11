@@ -228,7 +228,7 @@ Ported from `mac/Tests/SanduhrTests/{WhatsNewTests, HotKeyComboTests, ClaudeCode
 - **Demo mode** (`DemoMode.swift`): a session-only switch that pauses fetches and feeds sample data to the cards, tray, tour and Settings previews; never writes history, snapshot or vault.
 
 ## Stage 3: Settings v2
-- Sidebar navigation (a `ListBox` with group headers) replaces the `TabControl`; pages per `docs/settings-v2-spec.md`, minus the Mac-only pages (Notch); the Desk pages appear with S5.
+- Sidebar navigation replaces the tab strip; pages per `docs/settings-v2-spec.md`, minus the Mac-only pages (Notch); the Desk pages appear with S5. As built: the `TabControl` re-templated as a grouped sidebar (each `TabItem` tagged with its `SettingsPage`), so every page, the router and the Claude Usage refresh stay as they were. The statusline and MCP installers stay on Claude Usage until S4 builds the Claude Code page (PRIVACY.md names their current page).
 - `SettingsNames.cs` (the names table) and `SettingsIndex.cs` (search entries and synonyms) in Core; a test checks the tray menu, card and tour strings against the names table.
 - `SettingsMigrations.cs`: one-time, idempotent moves of any key whose meaning changes.
 - About: version, What's New…, Take the Tour…, the trademark disclaimer, Third-Party Notices, where settings live (Show in Explorer).

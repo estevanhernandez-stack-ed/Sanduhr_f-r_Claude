@@ -10,11 +10,10 @@ using Sanduhr.Core;
 namespace Sanduhr.App.Views;
 
 /// <summary>
-/// Tabbed settings window (port of <c>settings_dialog.py</c>'s shell). Hosts the
-/// Accounts tab (multi-account management), the Themes tab (swatch grid +
-/// agent-assisted theme creation), the History tab (30-day chart + CSV export),
-/// the Claude Usage tab (WS-C: Overview / Trends / Sessions over the usage vault
-/// + live session-log reader), and a thin General tab.
+/// The Settings window (Settings v2): a grouped sidebar with search over General,
+/// Accounts, Alerts, History, Claude Usage, Publish usage, Themes and About. The
+/// sidebar is the TabControl re-templated; each TabItem's Tag is its
+/// <see cref="SettingsPage"/>, which <see cref="SelectPage"/> and the search use.
 /// Opened non-modally and kept single-instance by the App so a live account switch
 /// from here reflects in the widget immediately.
 ///

@@ -412,7 +412,7 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Open the tabbed Settings window (Accounts tab default) — single-instance and
+    /// Open the Settings window (on General, or on <paramref name="page"/>) — single-instance and
     /// non-modal so a live account switch from here reflects in the widget at once.
     /// Re-invoking focuses the existing window and refreshes its account list.
     /// </summary>

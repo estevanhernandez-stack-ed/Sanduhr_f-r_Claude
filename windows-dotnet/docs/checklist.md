@@ -69,10 +69,11 @@
   Acceptance: PRD S2 stories. Verify: tests for step visibility, shown-once, choices written; describe the windows.
   Built: `WelcomeTour.cs` (TourCard wraps WhatsNewCard; 4 Windows steps, the Desk step waits for S5), `DemoMode.cs`, the window's step mode with live previews, `tour_state` decided before What's New records, Take the Tour… in the tray and Settings, Not now on the first-run card, demo mode from `--demo`. Rendered off screen on an isolated `SANDUHR_DEV_PROFILE`: every tour step signed out and in demo, the demo widget, the Not signed in line, What's New unchanged.
 
-- [ ] **10. Stage 3: Settings v2**
+- [x] **10. Stage 3: Settings v2** (Reset Sanduhr… held for Este's wording)
   Spec ref: `spec.md > Stage 3`; `docs/settings-v2-spec.md`
   What to build: sidebar, names table, search, migrations, previews, About with the disclaimer, Reset (after Este rules on its wording).
   Acceptance: PRD S3 stories. Verify: names-table test, migrations idempotent, keyboard-only walk of every page.
+  Built: `SettingsNames.cs` (page titles, groups, one name per control, retired names, "<Page> settings…" links) and `SettingsIndex.cs` (anchors, synonyms, search) in Core; the TabControl re-templated as a grouped sidebar with search, pages keyed by a `SettingsPage` tag so Show me keeps working; `SelectPage(page, anchor)` scrolls to and outlines a section; General's live tray preview; About (version, What's New…, Take the tour…, the trademark notice, where settings live, third-party notices); menu labels from the names table in sentence case; demo mode's sample accounts in Settings, History and the account menus; `tools/Sanduhr.RenderHarness`. No key changed, so no migration; `SettingsKeysContractTests` pins the keys instead. Tests: names against cards, tour and the App's source; every anchor marked in its page; the search index; notices against the shipped packages. Rendered off screen in a dark and a light theme: every page, search, two anchors. Not done: Reset Sanduhr… (Este rules on its wording first); a by-hand keyboard walk (arrow keys and Tab order are template defaults, not exercised here).
 
 - [ ] **11. Stage 4: the Claude Code side**
   Spec ref: `spec.md > Stage 4`; `docs/mods-and-config-spec.md`
