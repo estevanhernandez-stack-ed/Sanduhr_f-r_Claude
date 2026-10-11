@@ -98,6 +98,7 @@ enum SettingsAnchor {
     static let about = "about"
     static let links = "links"
     static let notices = "notices"
+    static let reset = "reset"
     /// Every Advanced disclosure's own row.
     static let advanced = "advanced"
 
@@ -209,6 +210,8 @@ enum SettingsAnchor {
         SettingsEntry(title: "About", page: .about, anchor: about, synonyms: ["version", "What's New", "Take the Tour", "plans"]),
         SettingsEntry(title: "Links", page: .about, anchor: links, synonyms: ["GitHub", "website", "privacy policy"]),
         SettingsEntry(title: "Third-Party Notices", page: .about, anchor: notices, synonyms: ["license", "credits"]),
+        SettingsEntry(title: SettingsNames.resetSanduhr, page: .about, anchor: reset,
+                      synonyms: ["reset", "start over", "erase", "uninstall", "remove everything"]),
     ]
 
     /// The anchors of `page`, in page order.
@@ -241,6 +244,7 @@ extension SettingsNames {
         showWidget: SettingsAnchor.show, checkForUpdates: SettingsAnchor.check, saveAndApply: SettingsAnchor.ownThemes,
         listMode: SettingsAnchor.editor, textMode: SettingsAnchor.editor,
         linkFolder: SettingsAnchor.data,
+        resetSanduhr: SettingsAnchor.reset,
     ]
 }
 

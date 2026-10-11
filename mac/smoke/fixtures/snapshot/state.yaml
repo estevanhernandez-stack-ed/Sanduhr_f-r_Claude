@@ -220,3 +220,4 @@ meter_history:
   rows: 2
   series: 2
 just_the_desk: false
+reset_dry_run: null

@@ -6,6 +6,9 @@ import SwiftUI
 /// Runs headless (LSUIElement=YES in Info.plist) so there's no dock icon.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Reset Sanduhr… ran (Settings v2, slice 5): quitting writes nothing back into the folders
+    /// the reset just emptied.
+    static var resetting = false
 
     let viewModel = UsageViewModel()
     private var panel: FloatingPanel?
@@ -298,6 +301,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Now playing's adapter runs as a child process (item 53): it goes when Sanduhr quits.
     func applicationWillTerminate(_ notification: Notification) {
         NowPlayingController.shared.shutdown()
+        guard !Self.resetting else { return }
         // Watchers go with Sanduhr: the band shows none from now on.
         BandFileWriter.shared.refresh(quitting: true)
     }

@@ -265,7 +265,8 @@ needed. **Remove Account…** (its own confirmation) signs out, deletes the acco
 file and drops it from the list; removing the active account switches to the next one.
 Signing out only removes the key from this Mac; it does not end the session on claude.ai.
 
-Dragging Sanduhr to the Trash removes neither store: sign out first, or delete the
+Dragging Sanduhr to the Trash removes neither store: run Settings, About, Reset Sanduhr… (below)
+or sign out first, or delete the
 `com.626labs.sanduhr` items in Keychain Access (release builds) or
 `~/Library/Application Support/Sanduhr/credentials.json` (dev builds).
 
@@ -1520,6 +1521,44 @@ state.yaml: `settings_anchor_visible` (the anchor's top line is inside the page'
 from frames the marked views report; null with no anchor) and `settings_preview_folded`.
 `SettingsReachTests` covers the index (every names-table entry indexed at its anchor, the synonyms),
 anchor and link parsing, Advanced, folding, Add Line's place and the chin height.
+
+## Reset Sanduhr…
+
+Settings v2, slice 5 (item 72): About's last section opens a sheet (`Views/ResetSheet.swift`) that
+lists what it removes, each part a checkbox, all checked, and runs the checked steps in this order
+(`Services/Reset.swift`, `Reset.plan`):
+
+1. **Claude Code folders.** One step per receipt in `integrations/installs.json`, newest install
+   first, through `IntegrationInstaller.remove` (the meters mod's `enabledPlugins` switch comes out
+   with it, `undoModSwitch`), so every `settings.json` and `.claude.json` ends byte for byte as it was
+   before Sanduhr and its `.sanduhr-backup` goes. First, because the receipts live in the folder step
+   3 deletes (F20). The sheet lists each folder (`~`-relative) with its entries, each folder its own
+   checkbox.
+2. **Accounts and keys.** `AccountRegistry.remove` for each account (key, cf_clearance, history file,
+   per-account preferences), then Sign Out of the pre-accounts slots when anything is there. The
+   cleared stores are the registry's: both on a signed build, only the file on a dev build.
+3. **History and records.** Every top-level item of `~/Library/Application Support/Sanduhr/` except
+   `themes/` (its own part) and, while any receipt is left, `integrations/`; then the folder if empty.
+4. **Desk messages.** `messages.txt` renamed to `messages.txt.previous`, replacing an older one.
+5. **Your themes.** `themes/`, then Sanduhr's folder if that left it empty.
+6. **All settings.** `removePersistentDomain` for `com.626labs.sanduhr` and
+   `com.626labs.sanduhr.desk`, last: step 2 reads the account list from the first.
+
+Each step is tried on its own (`Reset.perform`) and reported; a failure (a folder whose file changed
+and is no longer JSON Sanduhr can edit, say) leaves that file and its receipt as they are and the
+rest still run. An unchecked folder, or a failed one, keeps its receipt, so `integrations/` stays
+and its entries keep working and can be removed from Settings, Claude Code after the next launch;
+the sheet warns when a folder is unchecked. The sheet ends with every step's result and **Quit
+Sanduhr**; `AppDelegate.resetting` keeps quitting from writing `band.json` back. With no account and
+no preferences, the next launch shows the welcome sheet.
+
+`Reset.perform` has one caller, the sheet's confirmed button (`ResetTests` fails if another file
+calls it). The smoke hook `reset --dry-run` runs `Reset.dryRun`, which plans with every part checked
+and touches nothing; any other arg is refused. state.yaml: `reset_dry_run`, null until a dry run,
+then `touched: false`, `folders` and `steps` (`part`, `kind`, `count` in run order), never a path or
+a label. `ResetTests` runs on a temp home with the real installer, a fake credential store and
+throwaway defaults suites: the order, everything checked leaving each folder byte-identical, a
+changed folder failing alone, the dry run, unchecked folders and the hook's refusal.
 
 ## Files
 
