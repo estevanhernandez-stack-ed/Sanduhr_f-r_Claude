@@ -20,7 +20,6 @@ internal sealed class DeskController : IDisposable
     private DeskFonts? _fonts;
     private DeskSettings _settings = DeskSettings.Default;
     private DeskUsage _usage = DeskUsage.Empty;
-    private readonly List<DeskView> _views = [];
     private bool _stopped;
 
     public DeskController(SettingsStore store, Func<IDeskHost> hostFactory)
@@ -56,8 +55,7 @@ internal sealed class DeskController : IDisposable
     public void SetUsage(DeskUsage usage)
     {
         _usage = usage;
-        var now = DateTimeOffset.Now;
-        foreach (var v in _views) v.Update(_usage, now);
+        Render();
     }
 
     /// <summary>Reset Sanduhr…: the Desk comes down and stays down until Sanduhr quits.</summary>
@@ -76,19 +74,28 @@ internal sealed class DeskController : IDisposable
     private void Rebuild()
     {
         if (_host is null || _stopped) return;
+        _screens = _host.Screens();
+        Render();
+        ScheduleMinute();
+    }
+
+    private IReadOnlyList<DeskScreen> _screens = [];
+
+    /// <summary>Lays each screen out afresh and hands the host its islands; the host keeps its windows
+    /// when the islands line up with the last ones.</summary>
+    private void Render()
+    {
+        if (_host is null || _stopped || _screens.Count == 0) return;
         _fonts ??= new DeskFonts();
-        _views.Clear();
         var now = DateTimeOffset.Now;
         var surfaces = new List<DeskSurface>();
-        foreach (var screen in _host.Screens())
+        foreach (var screen in _screens)
         {
             var view = new DeskView(screen, _settings, _fonts);
             view.Update(_usage, now);
-            _views.Add(view);
-            surfaces.Add(new DeskSurface(screen, view));
+            surfaces.Add(new DeskSurface(screen, view.TakeIslands()));
         }
         _host.Show(surfaces);
-        ScheduleMinute();
     }
 
     /// <summary>The clock shows h:mm, so it redraws once a minute, on the minute (no render loop).</summary>
@@ -104,15 +111,14 @@ internal sealed class DeskController : IDisposable
     {
         _minute.Stop();
         if (_host is null || _stopped) return;
-        var now = DateTimeOffset.Now;
-        foreach (var v in _views) v.Update(_usage, now);
+        Render();
         ScheduleMinute();
     }
 
     private void StopHost()
     {
         _minute.Stop();
-        _views.Clear();
+        _screens = [];
         if (_host is null) return;
         _host.ScreensChanged -= Rebuild;
         _host.Dispose();

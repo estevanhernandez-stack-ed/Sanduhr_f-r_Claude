@@ -11,10 +11,10 @@ using Sanduhr.Core;
 namespace Sanduhr.App.Desk;
 
 /// <summary>
-/// The Desk's windows on Este's ruled route (V3, spec 5.1), Rainmeter's "On desktop": one top-level,
-/// per-pixel-transparent tool window per monitor, owned by the shell window and kept at the bottom of
-/// the z-order, just above the desktop and below every normal window. Never activated, never in Alt+Tab
-/// or the taskbar.
+/// The Desk's windows on Este's ruled route (V3, spec 5.1), Rainmeter's "On desktop": top-level,
+/// per-pixel-transparent tool windows, one per island (a stack of pieces) on each monitor, owned by
+/// the shell window and kept at the bottom of the z-order, just above the desktop and below every
+/// normal window. Never activated, never in Alt+Tab or the taskbar.
 ///
 /// Show desktop (Win+D, the taskbar corner) raises the desktop icons host above the normal windows. As
 /// Rainmeter does, a hidden sentinel stays at the bottom; when the icons host sits above it, Show desktop
@@ -36,6 +36,8 @@ internal sealed class DesktopLayerHost : IDeskHost
     private static readonly TimeSpan FastFor = TimeSpan.FromSeconds(3);
 
     private readonly List<HwndSource> _windows = [];
+    /// <summary>The screen each window in <see cref="_windows"/> draws on.</summary>
+    private readonly List<DeskScreen> _screens = [];
     private readonly HwndSource _sentinel;
     private readonly uint _taskbarCreated;
     private readonly DispatcherTimer _coalesce;
@@ -110,9 +112,22 @@ internal sealed class DesktopLayerHost : IDeskHost
     public void Show(IReadOnlyList<DeskSurface> surfaces)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        CloseWindows();
-        foreach (var s in surfaces)
-            _windows.Add(Create(s));
+        var wanted = surfaces.SelectMany(s => s.Islands.Select(i => (s.Screen, Island: i))).ToList();
+        // The minute's redraw hands over the same islands on the same screens: keep the windows.
+        bool reuse = wanted.Count == _windows.Count
+            && wanted.Select(w => w.Screen).SequenceEqual(_screens);
+        if (!reuse)
+        {
+            CloseWindows();
+            foreach (var (screen, _) in wanted)
+            {
+                _windows.Add(Create(screen));
+                _screens.Add(screen);
+            }
+        }
+        for (int i = 0; i < wanted.Count; i++)
+            Place(_windows[i], wanted[i].Screen, wanted[i].Island, first: !reuse);
+        if (reuse) return;
         Reorder(() => DeskNative.SetWindowPos(_sentinel.Handle, DeskNative.HWND_BOTTOM, 0, 0, 0, 0,
             DeskNative.SWP_NOMOVE | DeskNative.SWP_NOSIZE | DeskNative.SWP_NOACTIVATE));
         // Showing happens from Settings or at launch, never during Show desktop: a sentinel already
@@ -143,11 +158,14 @@ internal sealed class DesktopLayerHost : IDeskHost
         _sentinel.Dispose();
     }
 
-    private HwndSource Create(DeskSurface s)
+    /// <summary>Room around an island for the ink's shadow, in DIPs.</summary>
+    private const double Pad = 16;
+
+    private HwndSource Create(DeskScreen screen)
     {
-        var b = s.Screen.Bounds;
+        var b = screen.Bounds;
         // Created per-monitor aware so each window draws crisply at its own monitor's DPI while the
-        // process stays system aware.
+        // process stays system aware. Born 1x1 on its monitor (for the DPI), sized by Place.
         var src = DeskNative.PerMonitor(() => new HwndSource(new HwndSourceParameters("SanduhrDesk")
         {
             WindowStyle = DeskNative.WS_POPUP,
@@ -156,29 +174,59 @@ internal sealed class DesktopLayerHost : IDeskHost
             UsesPerPixelTransparency = true,
             PositionX = b.X,
             PositionY = b.Y,
-            Width = b.Width,
-            Height = b.Height,
+            Width = 1,
+            Height = 1,
         }));
         src.AddHook(DeskHook);
+        if (OwnedByShell)
+            DeskNative.SetWindowLongPtr(src.Handle, DeskNative.GWLP_HWNDPARENT, DeskNative.GetShellWindow());
+        return src;
+    }
+
+    /// <summary>Puts an island in its window: the window just its size (plus the shadow's room), with
+    /// the island's aligned edge on its anchor point.</summary>
+    private void Place(HwndSource src, DeskScreen screen, DeskIsland island, bool first)
+    {
         // WPF draws in its own DPI for this window; scale the content so a DIP is the monitor's.
         double wpf = src.CompositionTarget?.TransformToDevice.M11 is > 0 and var t ? t : 1.0;
-        double k = s.Screen.Scale / wpf;
-        var size = s.Screen.SizeDips;
-        s.Content.Width = size.Width;
-        s.Content.Height = size.Height;
-        var root = new Border
+        double k = screen.Scale / wpf;
+        var content = island.Content;
+        content.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double cw = Math.Ceiling(content.DesiredSize.Width), ch = Math.Ceiling(content.DesiredSize.Height);
+        double left = island.Anchor.X - Pad - island.Horizontal switch
         {
-            Child = s.Content,
+            HorizontalAlignment.Right => cw,
+            HorizontalAlignment.Center => cw / 2,
+            _ => 0,
+        };
+        double top = island.Anchor.Y - Pad - island.Vertical switch
+        {
+            VerticalAlignment.Bottom => ch,
+            VerticalAlignment.Center => ch / 2,
+            _ => 0,
+        };
+        double w = cw + 2 * Pad, h = ch + 2 * Pad;
+        src.RootVisual = new Border
+        {
+            Child = content,
+            Padding = new Thickness(Pad),
+            Width = w,
+            Height = h,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
             IsHitTestVisible = !ClickThrough,
             LayoutTransform = Math.Abs(k - 1) < 0.001 ? Transform.Identity : new ScaleTransform(k, k),
         };
-        src.RootVisual = root;
-        var h = src.Handle;
-        if (OwnedByShell)
-            DeskNative.SetWindowLongPtr(h, DeskNative.GWLP_HWNDPARENT, DeskNative.GetShellWindow());
-        Reorder(() => DeskNative.SetWindowPos(h, DeskNative.HWND_BOTTOM, b.X, b.Y, b.Width, b.Height,
-            DeskNative.SWP_NOACTIVATE | DeskNative.SWP_SHOWWINDOW));
-        return src;
+        int x = screen.Bounds.X + (int)Math.Round(left * screen.Scale);
+        int y = screen.Bounds.Y + (int)Math.Round(top * screen.Scale);
+        int pw = (int)Math.Ceiling(w * screen.Scale), ph = (int)Math.Ceiling(h * screen.Scale);
+        var hwnd = src.Handle;
+        if (first)
+            Reorder(() => DeskNative.SetWindowPos(hwnd, DeskNative.HWND_BOTTOM, x, y, pw, ph,
+                DeskNative.SWP_NOACTIVATE | DeskNative.SWP_SHOWWINDOW));
+        else if (DeskNative.Rect(hwnd) != new PxRect(x, y, pw, ph))
+            DeskNative.SetWindowPos(hwnd, IntPtr.Zero, x, y, pw, ph,
+                DeskNative.SWP_NOACTIVATE | DeskNative.SWP_NOZORDER | DeskNative.SWP_NOOWNERZORDER);
     }
 
     private void CloseWindows()
@@ -189,6 +237,7 @@ internal sealed class DesktopLayerHost : IDeskHost
             foreach (var w in _windows)
                 w.Dispose();
             _windows.Clear();
+            _screens.Clear();
         }
         finally { _closing = false; }
     }

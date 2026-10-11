@@ -14,8 +14,13 @@ internal sealed record DeskScreen(string Device, PxRect Bounds, PxRect Work, dou
     public Size SizeDips => new(Bounds.Width / Scale, Bounds.Height / Scale);
 }
 
-/// <summary>What the Desk draws on one screen.</summary>
-internal sealed record DeskSurface(DeskScreen Screen, FrameworkElement Content);
+/// <summary>One stack of Desk pieces and where it hangs: <paramref name="Anchor"/> is a point in the
+/// screen's DIPs, and the alignments say which of the island's edges (or its middle) sits on it.</summary>
+internal sealed record DeskIsland(FrameworkElement Content, Point Anchor, HorizontalAlignment Horizontal, VerticalAlignment Vertical);
+
+/// <summary>What the Desk draws on one screen: its islands, each drawn in a window just its size, so
+/// a redraw repaints a few small surfaces rather than a full-screen one (spec 5.1, cost).</summary>
+internal sealed record DeskSurface(DeskScreen Screen, IReadOnlyList<DeskIsland> Islands);
 
 /// <summary>
 /// The seam between the Desk and the windows it draws in (spec 5.1). The host owns the HWNDs, their
@@ -32,7 +37,9 @@ internal interface IDeskHost : IDisposable
     /// hand the host new surfaces. Raised once per burst of changes.</summary>
     event Action? ScreensChanged;
 
-    /// <summary>Show these surfaces, one window each, replacing whatever was shown.</summary>
+    /// <summary>Show these surfaces, one window per island, replacing what was shown. Windows are
+    /// reused when the islands line up with the last call (the minute's redraw), so the steady state
+    /// creates no windows.</summary>
     void Show(IReadOnlyList<DeskSurface> surfaces);
 
     /// <summary>Close every Desk window. The host keeps listening until disposed.</summary>

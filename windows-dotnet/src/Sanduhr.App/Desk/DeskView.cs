@@ -50,9 +50,64 @@ internal sealed class DeskView : Grid
     private double TimeSize => _settings.TimeSize;
     private double Inset => TimeSize * 0.18;
 
+    private readonly List<(StackPanel Stack, DeskColumn Column, DeskRow Row)> _stacks = [];
+
+    /// <summary>
+    /// Lays the whole screen out once, then hands each stack of pieces out on its own, with the point
+    /// it hangs from (its column's edge or middle, its row's top, middle or bottom) in screen DIPs. The
+    /// host draws each in a window just its size, so a redraw repaints a few small surfaces instead of
+    /// the whole screen. The view is spent afterwards: build a new one for the next redraw.
+    /// </summary>
+    public IReadOnlyList<DeskIsland> TakeIslands()
+    {
+        var size = _screen.SizeDips;
+        Measure(size);
+        Arrange(new Rect(size));
+        UpdateLayout();
+        var islands = new List<DeskIsland>();
+        foreach (var (stack, column, row) in _stacks)
+        {
+            if (stack.Children.Count == 0 || stack.Parent is not Panel parent) continue;
+            var r = stack.TransformToAncestor(this).TransformBounds(new Rect(stack.RenderSize));
+            double x = column switch
+            {
+                DeskColumn.Left => r.Left,
+                DeskColumn.Right => r.Right,
+                _ => r.Left + r.Width / 2,
+            };
+            double y = row switch
+            {
+                DeskRow.Top => r.Top,
+                DeskRow.Bottom => r.Bottom,
+                _ => r.Top + r.Height / 2,
+            };
+            var h = column switch
+            {
+                DeskColumn.Left => HorizontalAlignment.Left,
+                DeskColumn.Right => HorizontalAlignment.Right,
+                _ => HorizontalAlignment.Center,
+            };
+            var v = row switch
+            {
+                DeskRow.Top => VerticalAlignment.Top,
+                DeskRow.Bottom => VerticalAlignment.Bottom,
+                _ => VerticalAlignment.Center,
+            };
+            double maxWidth = stack.Parent is FrameworkElement col && col.MaxWidth is > 0 and < double.PositiveInfinity
+                ? col.MaxWidth : (parent as FrameworkElement)?.ActualWidth ?? r.Width;
+            parent.Children.Remove(stack);
+            stack.MaxWidth = maxWidth;
+            islands.Add(new DeskIsland(stack, new Point(x, y), h, v));
+        }
+        Children.Clear();
+        _stacks.Clear();
+        return islands;
+    }
+
     private void Build()
     {
         Children.Clear();
+        _stacks.Clear();
         var arrangement = new DeskArrangement(_settings.Layout);
         var stacks = arrangement.Stacks();
         var m = _settings.Margins;
@@ -112,6 +167,9 @@ internal sealed class DeskView : Grid
             });
             if (rows[i].Spacer) continue;
             var stack = new StackPanel { HorizontalAlignment = align };
+            var row = rows.Count == 3 ? (i == 0 ? DeskRow.Top : DeskRow.Bottom)
+                : i == 0 ? DeskRow.Top : i == 2 ? DeskRow.Middle : DeskRow.Bottom;
+            _stacks.Add((stack, column, row));
             foreach (var p in rows[i].Pieces)
                 if (Piece(p, align) is { } piece)
                 {
