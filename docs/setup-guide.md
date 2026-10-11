@@ -36,6 +36,8 @@ You get your own claude.ai usage on your Mac, refreshed every 5 minutes.
 
 You can also click **Paste a Key Instead** right on the welcome sheet and do the same steps.
 
+**No Claude account?** Click **Just the Desk** at the bottom of the welcome sheet. You get the Desk on its own: a clock, today's meetings, your message, now playing and watchers on the desktop. Sanduhr asks for nothing, the widget stays out of the way (show it from the menu bar icon), and the Claude pieces stay blank. To add your Claude meters later, sign in from Settings, **Accounts**; they fill in with the first numbers.
+
 **Where the key is kept.** Sanduhr keeps only the session key, in your macOS Keychain. It sends it only to claude.ai, to read your usage.
 
 If it doesn't work: if the widget says "Cloudflare", copy the **cf_clearance** cookie the same way and paste it into the **cf_clearance (optional)** field in Settings, Accounts. Most people never need this.

@@ -1,13 +1,15 @@
 import SwiftUI
 
 /// First run, shown while no sessionKey is saved: sign in to Claude in Sanduhr's own window
-/// (item 62), or paste a key in Settings, Accounts.
+/// (item 62), paste a key in Settings, Accounts, or use Just the Desk without an account.
 struct OnboardingSheet: View {
     @Bindable var vm: UsageViewModel
     /// Sign In to Claude.
     var onSignIn: () -> Void
     /// Paste a key instead: Settings, Accounts.
     var onPaste: () -> Void
+    /// Just the Desk: no account, the Desk on its own (JustTheDesk).
+    var onJustTheDesk: () -> Void = {}
 
     var body: some View {
         let t = vm.theme.palette
@@ -31,6 +33,18 @@ struct OnboardingSheet: View {
                 Spacer()
                 Button("Sign In to Claude…", action: onSignIn)
                     .keyboardShortcut(.defaultAction)
+            }
+
+            Divider()
+
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(JustTheDesk.caption)
+                    .font(.system(size: 11))
+                    .foregroundStyle(t.textDim)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Button(JustTheDesk.buttonTitle, action: onJustTheDesk)
+                    .help("Use the Desk without a Claude account; nothing is asked for")
             }
         }
         .padding(22)

@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **Just the Desk: Sanduhr without a Claude account.** The welcome sheet has a new **Just the Desk** button for people who want the Desk (the clock, meetings, a message, now playing and watchers on the desktop) and have no Claude account. Sanduhr then asks for nothing: the sheet doesn't come back, the widget follows its When the widget shows choice instead of waiting for a sign-in, and the Desk and notch drop their sign-in line. Signing in later from Settings, Accounts fills in the Claude meters with the first numbers and turns the sign-in reminder back on.
+
 ## v2.14.0-mac — 2026-10-11
 
 - **A clearer first run.** Before you sign in, the widget says **Not signed in — sign in** (a click opens Accounts) instead of "Connecting…" forever, and the footer keeps **Use Sonnet** back until your numbers arrive. The Desk's Claude line and the notch's Claude meters wing say **sign in to Sanduhr** instead of staying blank. A new switch on Settings, Alerts, **Sign-in reminders on the Desk and notch**, turns those lines off (and the "sign in again" one after a session expires), for anyone using the Desk without a Claude account. The tour is now the **Sanduhr Tour**, so it no longer shares a name with the sign-in sheet, and taken before signing in its first step says to sign in, with a **Sign In** button. On a fresh install, **What's New…** shows the highlights of the version you installed instead of every release you never had.

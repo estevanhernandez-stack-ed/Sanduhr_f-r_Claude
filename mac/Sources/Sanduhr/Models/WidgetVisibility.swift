@@ -44,6 +44,9 @@ enum WidgetVisibilityEvent: Equatable {
     case signedOut
     /// The choice itself was changed in Settings.
     case choiceChanged
+    /// Just the Desk on the welcome sheet: no sign-in to wait for, so the widget follows the
+    /// choice as after a sign-in (an "Always shown" widget stays as it is).
+    case justTheDesk
 }
 
 /// Whether this Mac is still signing in: the widget shows for sign-in until the active
