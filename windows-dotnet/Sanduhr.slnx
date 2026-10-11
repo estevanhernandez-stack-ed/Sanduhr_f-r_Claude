@@ -3,6 +3,9 @@
     <Project Path="src/Sanduhr.App/Sanduhr.App.csproj" />
     <Project Path="src/Sanduhr.Mcp/Sanduhr.Mcp.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Sanduhr.RenderHarness/Sanduhr.RenderHarness.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Sanduhr.Tests/Sanduhr.Tests.csproj" />
     <Project Path="tests/Sanduhr.Mcp.Tests/Sanduhr.Mcp.Tests.csproj" />
