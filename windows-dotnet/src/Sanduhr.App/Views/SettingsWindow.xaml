@@ -1666,7 +1666,7 @@
                                                         <Button Grid.Column="1" Style="{StaticResource FlatButton}" Content="Forget folder" Margin="8,0,0,0"
                                                                 Padding="10,4" FontSize="11"
                                                                 AutomationProperties.Name="Forget this folder"
-                                                                Command="{Binding DataContext.ForgetFolderCommand, RelativeSource={RelativeSource AncestorType=TabItem}}"
+                                                                Command="{Binding ForgetCommand}"
                                                                 CommandParameter="{Binding}"
                                                                 Visibility="{Binding IsAdded, Converter={StaticResource BoolVis}}" />
                                                     </Grid>
@@ -1674,9 +1674,9 @@
                                                         <TextBlock Text="Linked account" FontSize="11.5" VerticalAlignment="Center" Margin="0,0,8,0"
                                                                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                                                         <ComboBox Style="{StaticResource ThemedComboBox}" Width="170"
-                                                                  ItemsSource="{Binding DataContext.AccountOptions, RelativeSource={RelativeSource AncestorType=TabItem}}"
+                                                                  ItemsSource="{Binding AccountOptions}"
                                                                   SelectedItem="{Binding LinkedAccount, Mode=TwoWay}"
-                                                                  IsEnabled="{Binding DataContext.LinkEnabled, RelativeSource={RelativeSource AncestorType=TabItem}}"
+                                                                  IsEnabled="{Binding LinkEnabled}"
                                                                   AutomationProperties.Name="Linked account for this folder" />
                                                     </StackPanel>
                                                     <TextBlock Text="The statusline in this folder shows that account's meters." FontSize="10.5"

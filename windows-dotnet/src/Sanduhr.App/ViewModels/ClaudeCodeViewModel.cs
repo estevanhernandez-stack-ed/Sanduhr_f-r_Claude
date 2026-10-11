@@ -56,6 +56,12 @@ public sealed partial class CcFolderRowViewModel : ObservableObject
     }
 
     public string AutomationName => $"Folder {Display}";
+
+    /// <summary>The account choices (the page's list), bound directly so the combo never depends on
+    /// a RelativeSource walk to the page.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<string> AccountOptions => _owner.AccountOptions;
+    public bool LinkEnabled => _owner.LinkEnabled;
+    public System.Windows.Input.ICommand ForgetCommand => _owner.ForgetFolderCommand;
 }
 
 /// <summary>One Sanduhr piece for the selected folder: what it is, where it stands, and its buttons.</summary>
