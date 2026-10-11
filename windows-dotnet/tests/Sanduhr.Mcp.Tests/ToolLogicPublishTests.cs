@@ -223,4 +223,33 @@ public class ToolLogicPublishTests
         var r = new ToolLogic(PublishConfig(tmp), () => Now).BuildPublish(null);
         Assert.Equal("disabled", (string?)r["status"]);
     }
+
+    [Fact]
+    public void Request_is_replaced_atomically_not_rewritten_in_place()
+    {
+        // The widget may be reading the request while a new one is queued. An in-place
+        // rewrite truncates under the reader (a torn, unparseable file); a temp sibling
+        // plus replace leaves the reader's handle on the old bytes.
+        using var tmp = new TempDir();
+        WriteSettings(tmp, enabled: true, tokenStored: true);
+        var cfg = PublishConfig(tmp);
+        string path = cfg.PublishRequestPath!;
+        byte[] oldBytes = System.Text.Encoding.UTF8.GetBytes("{\"id\":\"old\",\"date\":\"2026-01-01\",\"requested_at\":\"2026-01-02T00:00:00Z\"}");
+        File.WriteAllBytes(path, oldBytes);
+
+        using var held = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+
+        var r = new ToolLogic(cfg, () => Now).BuildPublish(null);
+        Assert.Equal("queued", (string?)r["status"]);
+
+        var buf = new byte[oldBytes.Length + 512];
+        int n = held.Read(buf, 0, buf.Length);
+        Assert.Equal(oldBytes, buf.AsSpan(0, n).ToArray());
+
+        var current = JsonNode.Parse(File.ReadAllText(path)) as JsonObject;
+        Assert.NotNull(current);
+        Assert.NotEqual("old", (string?)current!["id"]);
+        Assert.Equal((string?)r["request_id"], (string?)current["id"]);
+        Assert.False(File.Exists(path + ".tmp"), "the temp sibling must not linger");
+    }
 }
