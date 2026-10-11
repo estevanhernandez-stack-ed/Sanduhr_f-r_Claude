@@ -235,6 +235,7 @@ struct IntegrationsSettings: View {
             VStack(alignment: .leading, spacing: 14) {
                 // Its preview draws only sample input, so its folded strip says so (slice 3).
                 PreviewFold(page: .integrations, note: PreviewSamples.statusline.label) { IntegrationsPreview(model: model) }
+                NeedsAccountNote(vm: vm, text: NeedsAccountNote.claudeCode)
                 IntegrationsIntro()
                 PythonRow(model: model, reload: reload)
                     .settingsAnchor(SettingsAnchor.python)

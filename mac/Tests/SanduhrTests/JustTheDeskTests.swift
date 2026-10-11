@@ -79,3 +79,17 @@ struct JustTheDeskTests {
         #expect(JustTheDesk.caption.contains("Sign in any time from Settings, Accounts."))
     }
 }
+
+/// Alerts and Claude Code say plainly that they start once you sign in (BACKLOG #4).
+@Suite("Pages that need an account")
+struct NeedsAccountNoteTests {
+    @Test func showsOnlyWithoutASignIn() {
+        #expect(NeedsAccountNote.shows(.notSignedIn))
+        #expect(NeedsAccountNote.shows(.signedOut))
+        for s: UsageViewModel.StatusMessage in [.idle, .refreshing, .connecting, .noTiers, .switching,
+                                                .error("Session expired — sign in again", isAuth: true)] {
+            #expect(!NeedsAccountNote.shows(s))
+        }
+        #expect(SettingsSection.credentials.linkTitle == "Accounts Settings…")
+    }
+}

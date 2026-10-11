@@ -2,7 +2,7 @@
 
 ## Unreleased (mac)
 
-- **Just the Desk: Sanduhr without a Claude account.** The welcome sheet has a new **Just the Desk** button for people who want the Desk (the clock, meetings, a message, now playing and watchers on the desktop) and have no Claude account. Sanduhr then asks for nothing: the sheet doesn't come back, the widget follows its When the widget shows choice instead of waiting for a sign-in, and the Desk and notch drop their sign-in line. Signing in later from Settings, Accounts fills in the Claude meters with the first numbers and turns the sign-in reminder back on.
+- **Just the Desk: Sanduhr without a Claude account.** The welcome sheet has a new **Just the Desk** button for people who want the Desk (the clock, meetings, a message, now playing and watchers on the desktop) and have no Claude account. Sanduhr then asks for nothing: the sheet doesn't come back, the widget follows its When the widget shows choice instead of waiting for a sign-in, and the Desk and notch drop their sign-in line. Signing in later from Settings, Accounts fills in the Claude meters with the first numbers and turns the sign-in reminder back on. While no account is signed in, Settings, Alerts and Claude Code open with a line saying they start once you sign in, with **Accounts Settings…**.
 
 ## v2.14.0-mac — 2026-10-11
 

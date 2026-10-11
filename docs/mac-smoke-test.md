@@ -1858,6 +1858,8 @@ com.626labs.sanduhr.desk` on a throwaway profile with no Sanduhr Keychain item),
    line; the notch's Claude meters wing is empty. `smoke/smoke state` shows `just_the_desk: true`,
    `desk_enabled: true`, and Settings, Alerts has **Sign-in reminders on the Desk and notch** off.
    The menu bar item is the icon alone.
+   Settings, Alerts and Claude Code open with "…once you sign in" and **Accounts Settings…**, which
+   opens Accounts; the line is gone once signed in.
 2. Quit and open again: no welcome sheet, the widget stays hidden, the Desk comes back. Show
    Widget from the menu bar: it reads "Not signed in — sign in"; a click opens Accounts.
 3. After an update (`defaults write com.626labs.sanduhr whatsNewLastSeen 2.13.0`, relaunch):

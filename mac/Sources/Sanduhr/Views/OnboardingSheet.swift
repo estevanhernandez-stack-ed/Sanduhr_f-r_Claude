@@ -51,3 +51,37 @@ struct OnboardingSheet: View {
         .frame(width: 440)
     }
 }
+
+/// A page about Claude usage, shown with no account signed in (Just the Desk, BACKLOG #4, or
+/// signed out): one plain line saying it starts once you sign in, and the way to Accounts. Nothing
+/// on the page is disabled; its settings wait for the numbers.
+struct NeedsAccountNote: View {
+    var vm: UsageViewModel
+    let text: String
+
+    /// Not signed in yet, or signed out: no numbers will come until a sign-in.
+    static func shows(_ status: UsageViewModel.StatusMessage) -> Bool {
+        status == .notSignedIn || status == .signedOut
+    }
+
+    static let alerts = "Alerts are about your Claude limits, so they start once you sign in. You can set them up now."
+    static let claudeCode = "The statusline, the meters above the prompt and the MCP server report your Claude usage. They show numbers once you sign in."
+
+    var body: some View {
+        if Self.shows(vm.status) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Image(systemName: "person.crop.circle.badge.questionmark")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                Text(text)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Button(SettingsSection.credentials.linkTitle) { SettingsWindowController.shared.show(.credentials) }
+            }
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
+        }
+    }
+}

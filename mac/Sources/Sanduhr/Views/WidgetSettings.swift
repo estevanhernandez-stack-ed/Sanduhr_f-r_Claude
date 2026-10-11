@@ -315,6 +315,7 @@ struct WidgetSettings: View {
     private func alertsPage(t: Theme.Palette) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                NeedsAccountNote(vm: vm, text: NeedsAccountNote.alerts)
                 alertsTab(t: t).settingsAnchor(SettingsAnchor.notifications)
                 Divider()
                 SignInReminderSection(t: t).settingsAnchor(SettingsAnchor.signInReminder)
