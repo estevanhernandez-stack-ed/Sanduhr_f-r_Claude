@@ -94,10 +94,10 @@
   Acceptance: PRD S5 stories. Verify: spike notes; layout tests.
   - [x] 12.1 Deepening pass: `spec.md > Stage 5` (5.0 spike, 5.1 the Desk against the Mac, Rainmeter checks (a) to (h))
   - [x] 12.2 WorkerW spike on Dunder (26220, one 4K monitor at 100%): FAIL on (b) for the `WorkerW` child, (a) unproven, (c) and (d) pass as far as tested. Stopped and escalated with V2 (child of `Progman` above the icons view) and V3 (bottom-most window owned by `Progman`).
-  - [ ] 12.3 Este rules on the window route (blocked here)
-  - [ ] 12.4 Core: `DeskArrangement`, `DeskGeometry`, `TaskbarClearance`, `DeskMeters`, `DeskFont` with ported tests
-  - [ ] 12.5 App: `DeskWindowHost` on the ruled route, Desk page, EsteFont resources and notices, the layout map
-  - [ ] 12.6 The Desk window passes (a) to (h) with evidence; PR
+  - [x] 12.3 Este rules on the window route: V3, Rainmeter's way; EsteFont bundling approved
+  - [x] 12.4 Core: `DeskArrangement`, `DeskGeometry`, `TaskbarClearance`, `DeskMeters`, `DeskFont`, `DeskSettings`, font notices, with ported tests
+  - [x] 12.5 App: `IDeskHost` and `DesktopLayerHost` (V3, island windows, Show-desktop watcher), `DeskView`, `DeskController`, the Desk page and its map, EsteFont resources, harness scenarios; (g) measured
+  - [ ] 12.6 V3 live checks (a), (b), (e) on Este's clear desktop with `DeskRunner`; then merge
 
 - [ ] **13. Stage 6: Desk content** (deepening pass first)
   Spec ref: `spec.md > Stage 6`
