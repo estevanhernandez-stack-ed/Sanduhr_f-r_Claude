@@ -6,6 +6,13 @@ import SwiftUI
 /// Runs headless (LSUIElement=YES in Info.plist) so there's no dock icon.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Reset Sanduhr… ran (Settings v2, slice 5): quitting writes nothing back into the folders
+    /// the reset just emptied (ResetGate turns the writers off).
+    static var resetting: Bool { ResetGate.isOn }
+
+    /// The reset's last sweep, run at quit: whatever a stray write put back since the run, once
+    /// more, for the parts that were checked.
+    static var resetSweep: (() -> Void)?
 
     let viewModel = UsageViewModel()
     private var panel: FloatingPanel?
@@ -298,6 +305,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Now playing's adapter runs as a child process (item 53): it goes when Sanduhr quits.
     func applicationWillTerminate(_ notification: Notification) {
         NowPlayingController.shared.shutdown()
+        guard !Self.resetting else {
+            Self.resetSweep?()
+            return
+        }
         // Watchers go with Sanduhr: the band shows none from now on.
         BandFileWriter.shared.refresh(quitting: true)
     }
@@ -377,6 +388,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: Actions
 
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
+        // Reset Sanduhr… ran: the only thing left to do is quit.
+        if Self.resetting {
+            let menu = NSMenu()
+            menu.addItem(withTitle: "Quit Sanduhr", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+            statusItem?.menu = menu
+            sender.performClick(nil)
+            statusItem?.menu = nil
+            return
+        }
         let event = NSApp.currentEvent
         let rightClick = event?.type == .rightMouseUp
             || (event?.modifierFlags.contains(.control) ?? false)
@@ -578,6 +598,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// first. Chosen again while it shows on a visible widget, a tool turns off. Camera Light
     /// leaves the widget alone.
     func perform(_ command: MenuCommand) {
+        // Reset Sanduhr… ran: every menu command but Quit does nothing.
+        if Self.resetting && command != .quit { return }
         let visible = panel?.isVisible ?? false
         switch command {
         case .showHide: showOrHidePanel()
@@ -632,6 +654,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel.makeKeyAndOrderFront(nil)
             panel.orderFrontRegardless()
         }
+    }
+
+    /// Reset Sanduhr… (slice 5), before anything is removed: everything that runs on its own
+    /// stops, in this order, and every window but Settings (where the sheet shows the results)
+    /// goes. Returns the names of any service that didn't stop.
+    @discardableResult
+    func shutDownForReset() -> [String] {
+        let steps = viewModel.resetShutdownSteps + [
+            ResetShutdown.Step(name: "desk", stop: { DeskController.shared.stopForReset() },
+                               isStopped: { DeskController.shared.isStoppedForReset }),
+            ResetShutdown.Step(name: "handoff watch", stop: { HandoffWatch.shared.stop() },
+                               isStopped: { HandoffWatch.shared.isStopped }),
+            ResetShutdown.Step(name: "band", stop: { BandFileWriter.shared.stop() },
+                               isStopped: { BandFileWriter.shared.isStopped }),
+            ResetShutdown.Step(name: "updates", stop: { [weak self] in self?.updates.stopForReset() },
+                               isStopped: { [weak self] in self?.updates.isStoppedForReset ?? true }),
+        ]
+        let left = ResetShutdown(steps: steps).run()
+        if !left.isEmpty { NSLog("Sanduhr reset: still running: \(left.joined(separator: ", "))") }
+        // The widget and the other windows go without writing their hidden state.
+        panel?.orderOut(nil)
+        let settings = SettingsWindowController.shared.window
+        // The menu bar icon's own window stays: its menu now offers only Quit Sanduhr.
+        for w in NSApp.windows where w !== settings && w.sheetParent == nil && w.isVisible
+            && !String(describing: type(of: w)).contains("StatusBar") {
+            w.orderOut(nil)
+        }
+        return left
     }
 
     @objc func hidePanel() {

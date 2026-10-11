@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **Reset Sanduhr… on About.** One sheet removes what Sanduhr wrote, each part with a checkbox, all checked: Sanduhr's entries in each Claude Code folder (listed with what each holds), your accounts and their Keychain items, history and records, Desk messages (kept as `messages.txt.previous`), your themes, and both preferences domains. The Claude Code entries come out first, through the same records Remove uses: Sanduhr's entries and the backup it kept go, and everything else in the file stays as it is, so a file nobody else touched ends byte for byte as it was before Sanduhr. Preferences go last. Before anything is removed, Sanduhr stops fetching, following, recording and watching its folders, so nothing is written back and no removed key stays in memory. A step that fails, such as a folder whose file changed and isn't JSON Sanduhr can edit, is reported without stopping the rest, and the sheet ends with how each step went. Quit Sanduhr, and the next launch starts fresh with the welcome sheet. Uncheck a folder and its entries stay, with a warning; Sanduhr's scripts stay too, so they keep working (with no meters until you sign in again) and can be removed later. A development build clears only its own key file and says so; a release build's Keychain items stay. The setup guide's reset section is rewritten around it, with the Terminal steps kept for when Sanduhr won't open.
+
 ## v2.16.0-mac — 2026-10-11
 
 - **Fixed: Update on the meters mod no longer drops the band from a running Claude Code session.** The version the session loaded stays on disk until the next launch of Sanduhr, which deletes versions no settings file names any more.

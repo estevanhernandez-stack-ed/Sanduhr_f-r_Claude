@@ -1,0 +1,17 @@
+# docs/mac-smoke-test.md section 47: Reset Sanduhr… (Settings v2, slice 5). The hook has only the
+# dry run: it reads the plan the sheet would run, every part checked, and puts it in state.yaml as
+# step kinds and counts in run order, never a path, a folder or a label. Nothing is removed, so
+# the run is safe on a real profile; the real reset starts only from About's sheet.
+name: Reset's dry run lists the steps in order and touches nothing
+steps:
+  - do: settings
+    arg: about reset
+  - expect_state: { settings_section: about, settings_anchor: reset }
+  - do: reset
+    arg: --dry-run
+  - expect_state:
+      reset_dry_run.touched: false
+      reset_dry_run.folders: '/^\d+$/'
+      reset_dry_run.steps[kind=preferences].part: settings
+      reset_dry_run.steps[kind=preferences].count: 2
+  - snap: reset-about

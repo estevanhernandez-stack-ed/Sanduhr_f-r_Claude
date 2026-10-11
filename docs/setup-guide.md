@@ -270,14 +270,24 @@ If it doesn't work: Check needs Claude Code's command line (`claude`) installed.
 - **Check for Updates…** (any Sanduhr menu, or the same button in Settings, **Updates**) checks now. Updates also has the automatic update switches.
 - **Shortcuts.** Settings, **General**, under Shortcuts: **⌥S opens Settings** and **⌥J joins the next meeting**, one switch each. They work in every app whenever Sanduhr runs, with or without the Desk. While one is on, ⌥S no longer types ß (or ⌥J ∆). To change one, click its keys beside the switch and press the new combination; Escape cancels. It needs ⌘, ⌃ or ⌥ (Shift alone isn't enough) and can't be the other shortcut's keys; the label follows (**⌃⌥S opens Settings**). **Reset to ⌥S** (or ⌥J) appears once changed. If macOS refuses the keys, a note under the switch says another app uses them. If they are one of macOS's own shortcuts (⌃↑ for Mission Control, ⇧⌘3 for a screenshot, any that are on in System Settings, Keyboard, Keyboard Shortcuts), the note names it and nothing is saved unless you click **Use Anyway**; while such keys are on, a grey note says macOS may get them first. **Test It**, under the switch, listens for 10 seconds: press the keys once and it says whether they reached Sanduhr (testing ⌥S doesn't open Settings again). **Also check other apps' menus**, below the shortcuts and off by default, names an app menu item that uses the same keys ("Finder uses ⇧⌘N for “New Folder”. While this shortcut is on, Finder won't get those keys.", with **Use Anyway**; while such keys are on, a grey note says Sanduhr takes them first); it needs Accessibility, which Sanduhr asks for only when you click **Allow in System Settings…**, and it reads only menu item names and their shortcuts. After updating from 2.10 they start on only if the Desk was on, since that is the only time they worked before.
 - **Where settings live.** Your choices are in two preferences files, `com.626labs.sanduhr` and `com.626labs.sanduhr.desk`. History, themes and integration files are in `~/Library/Application Support/Sanduhr/`. Desk messages are in `~/Library/Application Support/Desk/messages.txt`. Your key is in the Keychain.
-- **How to reset.** In Settings, **Accounts**, select each account and click **Remove Account…**. Quit Sanduhr. Delete the folder `~/Library/Application Support/Sanduhr/`. Then, in Terminal, type:
+- **How to reset.** Settings, **About**, **Reset Sanduhr…** opens a sheet that lists what it removes, each part with a checkbox, all checked:
+  - **Claude Code folders**: each folder holding something of Sanduhr's, with what it holds (the MCP server, the statusline, Meters above the prompt and its switch, the Claude Code glow hook). Each is taken out the way Remove takes it out: Sanduhr's entries and the backup it kept go, and anything else in the folder's `settings.json` and `.claude.json` stays as it is, so a file nobody else edited ends exactly as it was before Sanduhr. This runs first, because what Sanduhr needs to undo them lives in its own folder, which a later step deletes.
+  - **Accounts and keys**: Remove Account for each account, its key and Keychain items included.
+  - **History and records**: the vault, usage history, snapshots, `seats.json` and the rest of `~/Library/Application Support/Sanduhr/`.
+  - **Desk messages**: `messages.txt`, kept as `messages.txt.previous` beside it.
+  - **Your themes**.
+  - **All settings**: both preferences domains, `com.626labs.sanduhr` and `com.626labs.sanduhr.desk`, last.
+
+  Uncheck a folder (or the whole Claude Code part) and its entries stay; the sheet warns you, and keeps Sanduhr's scripts so those entries still work (showing no meters until you sign in again) and can be removed later from Settings, **Claude Code**. Click **Reset and Quit**: Sanduhr first stops everything it runs in the background, then each checked step runs in that order, and one that fails (a folder whose file changed and isn't JSON Sanduhr can edit any more, say) is reported without stopping the rest. The sheet ends with a list of every step and how it went; click **Quit Sanduhr**. The next launch starts fresh with the welcome sheet.
+
+  If Sanduhr won't open, reset by hand instead. First, in each Claude Code folder you installed into, take Sanduhr's entries out of `settings.json` (`statusLine`, Sanduhr's path in `env.CLAUDE_CODE_PLUGIN_DIRS`, Sanduhr's entries under `hooks`) and `.claude.json` (`mcpServers.sanduhr`); for `~/.claude` the second file is `~/.claude.json`. A `settings.json.sanduhr-backup` beside a file is that file before Sanduhr's first change. Then delete the folder `~/Library/Application Support/Sanduhr/`, and in Terminal type:
 
 ```
 defaults delete com.626labs.sanduhr
 defaults delete com.626labs.sanduhr.desk
 ```
 
-Open Sanduhr again and it starts fresh. Dragging Sanduhr to the Trash doesn't remove your key, so remove your accounts (or sign out) first.
+Your keys stay in the Keychain that way: open Keychain Access and delete the items named `com.626labs.sanduhr`. Dragging Sanduhr to the Trash removes none of this, so reset first.
 
 ## Privacy in one paragraph
 

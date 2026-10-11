@@ -94,7 +94,33 @@ struct AboutSection: View {
                     Text(info.copyright).font(.caption).foregroundStyle(.secondary)
                 }
             }
+            ResetSection()
         }
         .formStyle(.grouped)
+    }
+}
+
+/// About's last section (Settings v2, slice 5): Reset Sanduhr… opens the sheet that says what it
+/// removes before anything is removed.
+private struct ResetSection: View {
+    @StateObject private var model = ResetSheetModel()
+    @State private var showing = false
+
+    var body: some View {
+        Section("Reset") {
+            HStack {
+                Text("Remove what Sanduhr added to Claude Code folders, your accounts and keys, history, messages, themes and settings, then quit.")
+                    .font(.callout).foregroundStyle(.secondary)
+                Spacer()
+                Button(SettingsNames.resetSanduhr) {
+                    model.load()
+                    showing = true
+                }
+            }
+            .settingsAnchor(SettingsAnchor.reset)
+        }
+        .sheet(isPresented: $showing) {
+            ResetSheet(model: model) { showing = false }
+        }
     }
 }

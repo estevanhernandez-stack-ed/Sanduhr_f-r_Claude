@@ -146,7 +146,7 @@ enum SeatSnapshots {
     /// A renamed account's seat file follows it: moved to the new ref, `account_ref` rewritten.
     static func rename(_ oldRef: String, to newRef: String, in files: Files) {
         let from = files.snapshot(oldRef), to = files.snapshot(newRef)
-        guard oldRef != newRef, var obj = json(from) else { return }
+        guard oldRef != newRef, !ResetGate.isOn, var obj = json(from) else { return }
         obj["account_ref"] = newRef
         guard let data = try? JSONSerialization.data(withJSONObject: obj, options: [.sortedKeys]) else { return }
         do {
@@ -189,6 +189,8 @@ enum SeatSnapshots {
     /// Written whole, a temporary sibling renamed over the file, so a reader never sees half;
     /// owner-only, put back to 0600 even when the bytes are unchanged.
     static func write(_ data: Data, to url: URL) {
+        // Reset Sanduhr… ran: seats.json and the seat files stay gone.
+        guard !ResetGate.isOn else { return }
         let fm = FileManager.default
         if let current = try? Data(contentsOf: url), current == data {
             try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)

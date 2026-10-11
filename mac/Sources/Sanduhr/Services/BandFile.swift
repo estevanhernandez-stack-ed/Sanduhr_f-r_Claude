@@ -133,6 +133,7 @@ final class BandFileWriter {
     /// Writes the file when what it says changed, or the heartbeat is due; deletes it when it
     /// would say nothing. `quitting` writes no watchers: Sanduhr drops them as it quits.
     func refresh(quitting: Bool = false) {
+        guard !stopped else { return }
         let styles = BandFile.styles(from: defaults.string(forKey: BandFile.stylesKey))
         let on = showsWatchers
         guard on || !styles.isEmpty else {
@@ -169,6 +170,21 @@ final class BandFileWriter {
         timer?.invalidate()
         timer = nil
     }
+
+    private(set) var stopped = false
+
+    /// Reset Sanduhr… (slice 5): no heartbeat, no change notices, no write from here on.
+    func stop() {
+        stopped = true
+        stopHeartbeat()
+        for o in observers {
+            NotificationCenter.default.removeObserver(o)
+            NSWorkspace.shared.notificationCenter.removeObserver(o)
+        }
+        observers = []
+    }
+
+    var isStopped: Bool { stopped && timer == nil && observers.isEmpty }
 
     /// The app's wiring: the switch and the looks (defaults), Reduce Motion, then a first write.
     func startForApp() {

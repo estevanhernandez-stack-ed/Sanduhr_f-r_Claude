@@ -14,8 +14,11 @@ import SwiftUI
 enum UserThemes {
     static func load() {
         let dir = appSupportThemesDir()
-        try? FileManager.default.createDirectory(
-            at: dir, withIntermediateDirectories: true)
+        // Reset Sanduhr… ran: read what is there, create nothing.
+        if !ResetGate.isOn {
+            try? FileManager.default.createDirectory(
+                at: dir, withIntermediateDirectories: true)
+        }
 
         guard let files = try? FileManager.default.contentsOfDirectory(
             at: dir, includingPropertiesForKeys: nil)
@@ -167,11 +170,26 @@ final class ThemeFolderWatcher {
         source?.cancel()
     }
 
-    /// Opens the folder for events only. False when it cannot be opened (missing).
+    /// Reset Sanduhr… (slice 5): the watch ends for good, so a deleted folder is not made again.
+    /// Call on `queue`.
+    func stop() {
+        stopped = true
+        pending?.cancel()
+        pending = nil
+        source?.cancel()
+        source = nil
+    }
+
+    private(set) var stopped = false
+    var isStopped: Bool { stopped && source == nil && pending == nil }
+
+    /// Opens the folder for events only. False when it cannot be opened (missing), stopped, or
+    /// while a reset runs (the folder is not made again).
     @discardableResult
     private func arm() -> Bool {
         source?.cancel()
         source = nil
+        guard !stopped, !ResetGate.isOn else { return false }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let fd = open(dir.path, O_EVTONLY)
         guard fd >= 0 else {
@@ -192,9 +210,10 @@ final class ThemeFolderWatcher {
 
     private func changed(folderGone: Bool) {
         if folderGone { source?.cancel(); source = nil }
+        guard !stopped else { return }
         pending?.cancel()
         let work = DispatchWorkItem { [weak self] in
-            guard let self else { return }
+            guard let self, !self.stopped else { return }
             self.onChange()
             if self.source == nil { self.arm() }
         }
