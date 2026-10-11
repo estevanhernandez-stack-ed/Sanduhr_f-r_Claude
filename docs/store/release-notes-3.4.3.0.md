@@ -14,6 +14,7 @@ Setup.exe installs change nothing in this release.
 ### Known issues
 
 - Signing in with a Google account inside the sign-in window still dead-ends (Google blocks embedded OAuth). Use **Continue with email** on the claude.ai page and enter the code Anthropic emails you; the manual session-key paste remains under Settings ▸ Accounts.
+- Store installs: if the update to 3.4.3 won't install (error 0x80073D02), restart Windows and try again. A WebView2 process left behind by the previous version can keep running after the widget quits, and Windows waits for it to close.
 - Setup.exe is not code-signed, so SmartScreen shows "Windows protected your PC" on first install: More info → Run anyway. The Microsoft Store package is the signed path.
 
 Full changelog: [CHANGELOG.md](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/blob/main/CHANGELOG.md#v343--2026-10-11)
