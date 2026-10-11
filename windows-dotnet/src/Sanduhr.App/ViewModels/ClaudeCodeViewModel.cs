@@ -390,9 +390,19 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         {
             var statusline = MakeStatusline();
             var integ = MakeIntegrations();
-            bool any = ClaudeCodeFolders.AnySnapshotConsumer(KnownFolders(),
-                p => statusline.IsRegistered(p),
-                p => integ.Status(IntegrationKind.Meters, p) is IntegrationStatus.Installed or IntegrationStatus.Outdated);
+            // An unreadable folder is unknown, not empty, and a receipt outlives a folder dropped from the
+            // list: only "nothing anywhere" turns the snapshot off and deletes the script.
+            var states = new List<ConsumerState>();
+            foreach (var f in KnownFolders())
+            {
+                states.Add(SnapshotConsumers.Of(statusline.Status(f.Path)));
+                states.Add(SnapshotConsumers.Of(integ.Status(IntegrationKind.Meters, f.Path)));
+            }
+            var (receipts, unknown) = SnapshotConsumers.ReadReceipts(integ.ReceiptsPath);
+            var decision = SnapshotConsumers.Decide(states, receipts.Select(r => r.Kind), unknown);
+            if (decision == SnapshotDecision.Keep)
+                return;
+            bool any = decision == SnapshotDecision.On;
             if (any != _widget.LoadStatuslineEnabled() || (any && forceWrite))
                 _widget.SaveStatuslineEnabled(any);
             if (!any)
@@ -518,7 +528,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
             var installer = MakeMcp();
             bool ok = installer.Deregister(row.Name);
             bool anyLeft = KnownFolders().Any(f => f.Discovered && installer.IsRegistered(f.Name));
-            if (!anyLeft)
+            if (!anyLeft && ok)
                 installer.RemoveIntegrationFiles();
             _widget.SaveMcpEnabled(anyLeft);
             Done(ok ? "MCP server removed."
@@ -652,11 +662,24 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         catch (Exception) { failures.Add("a Claude Code entry"); }
 
         var statusline = new StatuslineInstaller(profile, widget.StatuslineBinDir, null, sanduhrDir);
-        foreach (var f in folders)
+        // Known folders first, then any folder a receipt names that is no longer in the list, so Reset
+        // never leaves an orphan statusLine. Each folder once.
+        var statuslineFolders = folders.Select(f => f.Path).ToList();
+        try
+        {
+            var (receipts, _) = SnapshotConsumers.ReadReceipts(
+                Path.Combine(sanduhrDir, "integrations", "installs.json"));
+            foreach (var folder in SnapshotConsumers.StatuslineReceiptFolders(receipts))
+                if (!statuslineFolders.Any(p => ClaudeCodeFolders.Same(p, folder)))
+                    statuslineFolders.Add(folder);
+        }
+        catch (Exception) { failures.Add("a statusline entry"); }
+        foreach (var folder in statuslineFolders)
         {
             try
             {
-                if (statusline.IsRegistered(f.Path) && !statusline.Remove(f.Path))
+                // A rooted second argument to Path.Combine returns it, so a full folder path works as the home name.
+                if (statusline.IsRegistered(folder) && !statusline.Remove(folder))
                     failures.Add("a statusline entry");
             }
             catch (Exception) { failures.Add("a statusline entry"); }
@@ -669,10 +692,9 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
             var homes = folders.Where(f => f.Discovered).Select(f => f.Name)
                 .Concat(widget.LoadMcpCcHome() is { Length: > 0 } saved ? [saved] : [])
                 .Distinct(StringComparer.OrdinalIgnoreCase);
-            foreach (var home in homes)
-                if (!mcp.Deregister(home))
-                    failures.Add("an MCP server entry");
-            mcp.RemoveIntegrationFiles();
+            // A failed deregister keeps the launcher and server files, as the reset promises.
+            if (!mcp.UndoAll(homes))
+                failures.Add("an MCP server entry");
         }
         catch (Exception) { failures.Add("an MCP server entry"); }
 
