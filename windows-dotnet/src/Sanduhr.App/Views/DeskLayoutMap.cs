@@ -37,7 +37,8 @@ internal sealed class DeskLayoutMap : Canvas
         Focusable = false;
         AutomationProperties.SetName(this, AccessibleName);
         DataContextChanged += (_, _) => Attach(DataContext as DeskSettingsViewModel);
-        Loaded += (_, _) => Redraw();
+        // A tab switch unloads the page and Unloaded detaches; coming back re-attaches (PR #209 review, 7).
+        Loaded += (_, _) => { Attach(DataContext as DeskSettingsViewModel); Redraw(); };
         Unloaded += (_, _) => Attach(null);
     }
 
@@ -91,13 +92,11 @@ internal sealed class DeskLayoutMap : Canvas
         if (ReferenceEquals(vm, _vm)) return;
         if (_vm is not null)
         {
-            _vm.LayoutChanged -= Redraw;
             _vm.PropertyChanged -= OnVmChanged;
         }
         _vm = vm;
         if (_vm is not null)
         {
-            _vm.LayoutChanged += Redraw;
             _vm.PropertyChanged += OnVmChanged;
         }
         Redraw();
@@ -105,8 +104,8 @@ internal sealed class DeskLayoutMap : Canvas
 
     private void OnVmChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(DeskSettingsViewModel.Layout) or nameof(DeskSettingsViewModel.Settings)
-            or nameof(DeskSettingsViewModel.TimeSize))
+        // One redraw per saved change: Settings carries the layout, sizes and margins.
+        if (e.PropertyName is nameof(DeskSettingsViewModel.Settings))
             Redraw();
     }
 

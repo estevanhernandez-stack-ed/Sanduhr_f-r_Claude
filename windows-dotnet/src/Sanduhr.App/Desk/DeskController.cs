@@ -15,6 +15,7 @@ internal sealed class DeskController : IDisposable
 {
     private readonly SettingsStore _store;
     private readonly Func<IDeskHost> _hostFactory;
+    private readonly Func<DeskUsage> _usageSource;
     private readonly DispatcherTimer _minute;
     private IDeskHost? _host;
     private DeskFonts? _fonts;
@@ -22,10 +23,11 @@ internal sealed class DeskController : IDisposable
     private DeskUsage _usage = DeskUsage.Empty;
     private bool _stopped;
 
-    public DeskController(SettingsStore store, Func<IDeskHost> hostFactory)
+    public DeskController(SettingsStore store, Func<IDeskHost> hostFactory, Func<DeskUsage> usageSource)
     {
         _store = store;
         _hostFactory = hostFactory;
+        _usageSource = usageSource;
         _minute = new DispatcherTimer(DispatcherPriority.Background);
         _minute.Tick += (_, _) => OnMinute();
     }
@@ -51,10 +53,12 @@ internal sealed class DeskController : IDisposable
         Rebuild();
     }
 
-    /// <summary>The widget's latest numbers (after each render and sign-in change).</summary>
-    public void SetUsage(DeskUsage usage)
+    /// <summary>The widget has new numbers (after each render and sign-in change). Read only while the
+    /// Desk is on, so an off Desk costs nothing.</summary>
+    public void UsageChanged()
     {
-        _usage = usage;
+        if (_host is null || _stopped) return;
+        _usage = _usageSource();
         Render();
     }
 
@@ -75,6 +79,7 @@ internal sealed class DeskController : IDisposable
     {
         if (_host is null || _stopped) return;
         _screens = _host.Screens();
+        _usage = _usageSource();
         Render();
         ScheduleMinute();
     }
@@ -95,7 +100,17 @@ internal sealed class DeskController : IDisposable
             view.Update(_usage, now);
             surfaces.Add(new DeskSurface(screen, view.TakeIslands()));
         }
-        _host.Show(surfaces);
+        try
+        {
+            _host.Show(surfaces);
+        }
+        catch (Exception e) when (e is ObjectDisposedException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            // A window went away under us (Explorer restarting mid-redraw): start over with new ones
+            // on the next rebuild rather than let a timer tick take the app down.
+            System.Diagnostics.Debug.WriteLine($"[Sanduhr] Desk redraw failed: {e.GetType().Name}");
+            _host.Hide();
+        }
     }
 
     /// <summary>The clock shows h:mm, so it redraws once a minute, on the minute (no render loop).</summary>

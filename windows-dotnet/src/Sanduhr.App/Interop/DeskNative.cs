@@ -103,6 +103,8 @@ internal static class DeskNative
     [DllImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] public static extern bool IsWindow(IntPtr h);
     [DllImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetWindowRect(IntPtr h, out RECT r);
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] public static extern int GetWindowLong(IntPtr h, int index);
+    // SetWindowLongPtrW exists only in 64-bit user32 (32-bit exports SetWindowLongW alone); Sanduhr ships
+    // x64 only (win-x64 publish and Store package), so this binding is safe there and nowhere else.
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")] public static extern IntPtr SetWindowLongPtr(IntPtr h, int index, IntPtr value);
     [DllImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern uint RegisterWindowMessageW(string name);
@@ -157,6 +159,9 @@ internal static class DeskNative
             if (w == target) return true;
         return false;
     }
+
+    /// <summary>The window just above <paramref name="h"/> in the z-order, or zero at the top.</summary>
+    public static IntPtr Above(IntPtr h) => h == IntPtr.Zero ? IntPtr.Zero : GetWindow(h, GW_HWNDPREV);
 
     /// <summary>The topmost window nearest above <paramref name="from"/> (the "backmost" topmost one),
     /// or <see cref="HWND_TOPMOST"/> when there is none.</summary>

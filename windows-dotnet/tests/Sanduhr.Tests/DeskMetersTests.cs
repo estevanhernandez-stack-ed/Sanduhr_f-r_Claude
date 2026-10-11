@@ -137,4 +137,18 @@ public class DeskMetersTests
         Assert.True(fresh.IsStale(Now + DeskUsage.StaleAfter + TimeSpan.FromSeconds(1)));
         Assert.Equal(TimeSpan.FromMinutes(15), DeskUsage.StaleAfter);
     }
+
+    /// <summary>PR #209 review, finding 8: a hidden session card still feeds the Claude line, while the
+    /// meters draw only the visible tiers.</summary>
+    [Fact]
+    public void ClaudeLine_ReadsLineTiers_WhenTheCardsAreHidden()
+    {
+        var visible = new[] { new DeskTier("seven_day_sonnet", 50, null) };
+        var line = new[] { new DeskTier(TierModel.FiveHour, 7, null), new DeskTier(TierModel.SevenDay, 63, null) };
+        var u = new DeskUsage(visible, Now, false, false, null, line);
+        Assert.Equal("claude   7% session   63% week", DeskClaudeText.Line(u, TimeZoneInfo.Utc));
+        Assert.Equal(["seven_day_sonnet"], DeskMeters.Rows(u, Now, TimeZoneInfo.Utc).Select(r => r.Key));
+        // Without line tiers the visible ones feed the line, as before.
+        Assert.Null(DeskClaudeText.Line(u with { LineTiers = null }, TimeZoneInfo.Utc));
+    }
 }

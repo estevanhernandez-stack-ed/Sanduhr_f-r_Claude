@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Sanduhr.App.Services;
 using Sanduhr.Core;
@@ -98,8 +99,11 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     /// <summary>Called after every saved change (App re-applies the Desk).</summary>
     public Action? Changed { get; set; }
 
-    /// <summary>The layout changed (the map redraws).</summary>
-    public event Action? LayoutChanged;
+    /// <summary>Slider drags (clock size, margins) settle for this long before they save, so a drag
+    /// writes settings.json and rebuilds the Desk once, not on every tick (PR #209 review, 6).</summary>
+    public static readonly TimeSpan SettleFor = TimeSpan.FromMilliseconds(200);
+    private DispatcherTimer? _settle;
+    private DeskSettings? _pending;
 
     public ObservableCollection<DeskPieceRow> Pieces { get; }
     public IReadOnlyList<string> FontChoices { get; }
@@ -147,20 +151,19 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         _loading = true;
         foreach (var row in Pieces) row.Load(a.Placement(row.Widget));
         _loading = false;
-        LayoutChanged?.Invoke();
     }
 
     partial void OnEnabledChanged(bool value) { if (!_loading) Save(_saved with { Enabled = value }); }
 
     partial void OnFontChanged(string value)
     {
-        if (_loading) return;
+        if (_loading || value is null) return;
         // EsteFont Pro is the default: saved as absent, so a later default change follows it.
         string? saved = value == SystemFont ? "" : value == BundledFonts.Family ? null : value;
         Save(_saved with { Font = saved });
     }
 
-    partial void OnTimeSizeChanged(double value) { if (!_loading) Save(_saved with { TimeSize = value }); }
+    partial void OnTimeSizeChanged(double value) { if (!_loading) SaveSoon(Current with { TimeSize = value }); }
     partial void OnMarginLeftChanged(double value) => SaveMargins();
     partial void OnMarginRightChanged(double value) => SaveMargins();
     partial void OnMarginTopChanged(double value) => SaveMargins();
@@ -169,12 +172,44 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     private void SaveMargins()
     {
         if (_loading) return;
-        Save(_saved with { Margins = new DeskMarginSettings(MarginLeft, MarginRight, MarginTop, MarginBottom) });
-        LayoutChanged?.Invoke();
+        SaveSoon(Current with { Margins = new DeskMarginSettings(MarginLeft, MarginRight, MarginTop, MarginBottom) });
+    }
+
+    /// <summary>The settings as they stand, a pending slider change included.</summary>
+    private DeskSettings Current => _pending ?? _saved;
+
+    private void SaveSoon(DeskSettings next)
+    {
+        _pending = next;
+        if (_settle is null)
+        {
+            _settle = new DispatcherTimer(DispatcherPriority.Background) { Interval = SettleFor };
+            _settle.Tick += (_, _) => Flush();
+        }
+        _settle.Stop();
+        _settle.Start();
+    }
+
+    /// <summary>Saves a pending slider change now (the settle timer, or any other change first).</summary>
+    public void Flush()
+    {
+        _settle?.Stop();
+        if (_pending is { } p)
+        {
+            _pending = null;
+            Save(p);
+        }
     }
 
     private void Save(DeskSettings next)
     {
+        if (_pending is { } pending && !ReferenceEquals(next, pending))
+        {
+            // Another change arrives while a slider settles: keep the slider's value too.
+            next = next with { TimeSize = pending.TimeSize, Margins = pending.Margins };
+            _pending = null;
+            _settle?.Stop();
+        }
         _saved = next.Normalized();
         _store.SaveDesk(_saved);
         OnPropertyChanged(nameof(Layout));

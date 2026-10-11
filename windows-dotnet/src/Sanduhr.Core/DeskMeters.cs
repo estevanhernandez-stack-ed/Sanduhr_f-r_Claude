@@ -13,14 +13,17 @@ public sealed record DeskTier(string Key, double Utilization, string? ResetsAt);
 /// <paramref name="SignInNeeded"/> means only a (new) sign-in helps; <paramref name="FirstSignIn"/>
 /// means there has never been a key, so the line asks to sign in, not to sign in again;
 /// <paramref name="Account"/> is the active account as the Claude line names it with two or more
-/// accounts, else null.
+/// accounts, else null. <paramref name="LineTiers"/> feeds the Claude line: every tier with data,
+/// hidden or not (the line reads session and week whatever the cards show); null uses
+/// <paramref name="Tiers"/>.
 /// </summary>
 public sealed record DeskUsage(
     IReadOnlyList<DeskTier> Tiers,
     DateTimeOffset? FetchedAt,
     bool SignInNeeded,
     bool FirstSignIn,
-    string? Account)
+    string? Account,
+    IReadOnlyList<DeskTier>? LineTiers = null)
 {
     /// <summary>No tiers, never fetched, nothing needed.</summary>
     public static DeskUsage Empty { get; } = new([], null, false, false, null);
@@ -112,7 +115,8 @@ public static class DeskClaudeText
     {
         if (u.SignInNeeded) return new Parts(u.Account, SignInLine(u.FirstSignIn));
         var parts = new List<string>();
-        var session = u.Tiers.FirstOrDefault(t => t.Key == TierModel.FiveHour);
+        var tiers = u.LineTiers ?? u.Tiers;
+        var session = tiers.FirstOrDefault(t => t.Key == TierModel.FiveHour);
         if (session is not null)
         {
             var part = $"{(int)session.Utilization}% session";
@@ -123,7 +127,7 @@ public static class DeskClaudeText
             }
             parts.Add(part);
         }
-        var week = u.Tiers.FirstOrDefault(t => t.Key == TierModel.SevenDay);
+        var week = tiers.FirstOrDefault(t => t.Key == TierModel.SevenDay);
         if (week is not null) parts.Add($"{(int)week.Utilization}% week");
         return parts.Count == 0 ? null : new Parts(u.Account, string.Join("   ", parts));
     }

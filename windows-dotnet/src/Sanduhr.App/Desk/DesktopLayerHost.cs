@@ -17,15 +17,17 @@ namespace Sanduhr.App.Desk;
 /// normal window. Never activated, never in Alt+Tab or the taskbar.
 ///
 /// Show desktop (Win+D, the taskbar corner) raises the desktop icons host above the normal windows. As
-/// Rainmeter does, a hidden sentinel stays at the bottom; when the icons host sits above it, Show desktop
-/// is on and the Desk windows go just below the backmost topmost window, so they stay visible over the
-/// raised desktop; when it ends they go back to the bottom. Checked on the foreground hook (the shell
-/// becoming the foreground) and on a timer: 250 ms while Show desktop is on or just after a desktop
-/// foreground change, 2 s otherwise.
+/// Rainmeter does, a hidden sentinel marks where the icons host sits at rest: it is kept just above
+/// the host while an app is in front. When the host is found above the sentinel, the desktop is the
+/// foreground and no app is in front, Show desktop is on (<see cref="ShowDesktopRule"/>) and the Desk
+/// windows go just below the backmost topmost window, so they stay visible over the raised desktop;
+/// they go back to the bottom when it ends or as soon as any app window is in front. Checked on the
+/// foreground hook and on a timer: 250 ms while lifted or just after the desktop took the foreground,
+/// 2 s otherwise.
 ///
-/// The sentinel is also the window that hears <c>TaskbarCreated</c> (Explorer restarted, which takes the
-/// owned Desk windows with it), display changes and work-area changes; each raises
-/// <see cref="ScreensChanged"/> once per 500 ms burst and the controller rebuilds.
+/// The sentinel also hears <c>TaskbarCreated</c> (Explorer restarted, which destroys the owned Desk
+/// windows with their owner), display changes and work-area changes; each raises
+/// <see cref="ScreensChanged"/> once per 500 ms burst and the controller rebuilds into new windows.
 /// </summary>
 [SupportedOSPlatform("windows")]
 internal sealed class DesktopLayerHost : IDeskHost
@@ -34,6 +36,9 @@ internal sealed class DesktopLayerHost : IDeskHost
     private static readonly TimeSpan SlowWatch = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan FastWatch = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan FastFor = TimeSpan.FromSeconds(3);
+
+    /// <summary>Room around an island for the ink's shadow, in DIPs.</summary>
+    private const double Pad = 16;
 
     private readonly List<HwndSource> _windows = [];
     /// <summary>The screen each window in <see cref="_windows"/> draws on.</summary>
@@ -47,9 +52,12 @@ internal sealed class DesktopLayerHost : IDeskHost
     private bool _reordering;
     private bool _closing;
     private bool _disposed;
+    /// <summary>A Desk window died without being asked (Explorer restarted) or the shell window changed:
+    /// the next <see cref="Show"/> builds new windows instead of reusing these.</summary>
+    private bool _stale;
     private DateTime _fastUntil;
-    /// <summary>The sentinel sat below the icons host at rest, so z-order cannot tell Show desktop
-    /// apart; the lift is then never applied (the Desk stays at the bottom, owned by the shell).</summary>
+    /// <summary>The sentinel could not be put above the icons host, so z-order cannot tell Show desktop
+    /// apart from rest; the lift is never applied (the Desk stays at the bottom, owned by the shell).</summary>
     private bool _sentinelUnreliable;
 
     /// <summary>True while Show desktop is on and the Desk windows are lifted over the desktop.</summary>
@@ -72,7 +80,7 @@ internal sealed class DesktopLayerHost : IDeskHost
 
     public bool IsShowing => _windows.Count > 0;
 
-    /// <summary>The Desk windows' handles, in screen order (the runner queries them).</summary>
+    /// <summary>The Desk windows' handles, in island order (the runner queries them).</summary>
     public IReadOnlyList<IntPtr> Handles => [.. _windows.Select(w => w.Handle)];
 
     /// <summary>The sentinel's handle (the runner checks its z-order).</summary>
@@ -113,12 +121,16 @@ internal sealed class DesktopLayerHost : IDeskHost
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         var wanted = surfaces.SelectMany(s => s.Islands.Select(i => (s.Screen, Island: i))).ToList();
-        // The minute's redraw hands over the same islands on the same screens: keep the windows.
-        bool reuse = wanted.Count == _windows.Count
-            && wanted.Select(w => w.Screen).SequenceEqual(_screens);
+        // The minute's redraw hands over the same islands on the same screens: keep the windows, but
+        // only while every one is alive (Explorer restarting destroys them with their owner).
+        bool reuse = !_stale
+            && wanted.Count == _windows.Count
+            && wanted.Select(w => w.Screen).SequenceEqual(_screens)
+            && _windows.All(w => !w.IsDisposed && DeskNative.IsWindow(w.Handle));
         if (!reuse)
         {
             CloseWindows();
+            _stale = false;
             foreach (var (screen, _) in wanted)
             {
                 _windows.Add(Create(screen));
@@ -128,16 +140,8 @@ internal sealed class DesktopLayerHost : IDeskHost
         for (int i = 0; i < wanted.Count; i++)
             Place(_windows[i], wanted[i].Screen, wanted[i].Island, first: !reuse);
         if (reuse) return;
-        Reorder(() => DeskNative.SetWindowPos(_sentinel.Handle, DeskNative.HWND_BOTTOM, 0, 0, 0, 0,
-            DeskNative.SWP_NOMOVE | DeskNative.SWP_NOSIZE | DeskNative.SWP_NOACTIVATE));
-        // Showing happens from Settings or at launch, never during Show desktop: a sentinel already
-        // below the icons host here means z-order cannot tell the two apart on this machine.
-        var host = DeskNative.IconsHost();
-        _sentinelUnreliable = host != IntPtr.Zero && DeskNative.IsBelow(_sentinel.Handle, host)
-            && !IsDesktopForeground(DeskNative.GetForegroundWindow());
-        if (_sentinelUnreliable)
-            Log("sentinel sits below the icons host at rest; Show desktop lift disabled");
         ShowDesktopLifted = false;
+        SeatSentinel();
         StartWatching();
         Log($"showing {_windows.Count} window(s)");
     }
@@ -157,9 +161,6 @@ internal sealed class DesktopLayerHost : IDeskHost
         _disposed = true;
         _sentinel.Dispose();
     }
-
-    /// <summary>Room around an island for the ink's shadow, in DIPs.</summary>
-    private const double Pad = 16;
 
     private HwndSource Create(DeskScreen screen)
     {
@@ -206,7 +207,7 @@ internal sealed class DesktopLayerHost : IDeskHost
             _ => 0,
         };
         double w = cw + 2 * Pad, h = ch + 2 * Pad;
-        src.RootVisual = new Border
+        var root = new Border
         {
             Child = content,
             Padding = new Thickness(Pad),
@@ -215,18 +216,27 @@ internal sealed class DesktopLayerHost : IDeskHost
             HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Top,
             IsHitTestVisible = !ClickThrough,
+            UseLayoutRounding = true,
+            SnapsToDevicePixels = true,
             LayoutTransform = Math.Abs(k - 1) < 0.001 ? Transform.Identity : new ScaleTransform(k, k),
         };
+        TextOptions.SetTextFormattingMode(root, TextFormattingMode.Ideal);
+        src.RootVisual = root;
         int x = screen.Bounds.X + (int)Math.Round(left * screen.Scale);
         int y = screen.Bounds.Y + (int)Math.Round(top * screen.Scale);
         int pw = (int)Math.Ceiling(w * screen.Scale), ph = (int)Math.Ceiling(h * screen.Scale);
         var hwnd = src.Handle;
-        if (first)
-            Reorder(() => DeskNative.SetWindowPos(hwnd, DeskNative.HWND_BOTTOM, x, y, pw, ph,
-                DeskNative.SWP_NOACTIVATE | DeskNative.SWP_SHOWWINDOW));
-        else if (DeskNative.Rect(hwnd) != new PxRect(x, y, pw, ph))
-            DeskNative.SetWindowPos(hwnd, IntPtr.Zero, x, y, pw, ph,
-                DeskNative.SWP_NOACTIVATE | DeskNative.SWP_NOZORDER | DeskNative.SWP_NOOWNERZORDER);
+        // Physical pixels in, physical pixels out: the same per-monitor context the monitors were read in.
+        DeskNative.PerMonitor(() =>
+        {
+            if (first)
+                Reorder(() => DeskNative.SetWindowPos(hwnd, DeskNative.HWND_BOTTOM, x, y, pw, ph,
+                    DeskNative.SWP_NOACTIVATE | DeskNative.SWP_SHOWWINDOW));
+            else if (DeskNative.Rect(hwnd) != new PxRect(x, y, pw, ph))
+                DeskNative.SetWindowPos(hwnd, IntPtr.Zero, x, y, pw, ph,
+                    DeskNative.SWP_NOACTIVATE | DeskNative.SWP_NOZORDER | DeskNative.SWP_NOOWNERZORDER);
+            return true;
+        });
     }
 
     private void CloseWindows()
@@ -235,7 +245,7 @@ internal sealed class DesktopLayerHost : IDeskHost
         try
         {
             foreach (var w in _windows)
-                w.Dispose();
+                if (!w.IsDisposed) w.Dispose();
             _windows.Clear();
             _screens.Clear();
         }
@@ -251,19 +261,55 @@ internal sealed class DesktopLayerHost : IDeskHost
         finally { _reordering = false; }
     }
 
-    private static bool IsDesktopForeground(IntPtr fg)
+    private static bool IsDesktopWindow(IntPtr w)
     {
-        if (fg == IntPtr.Zero) return false;
+        if (w == IntPtr.Zero) return false;
         var shell = DeskNative.GetShellWindow();
-        return fg == shell || (DeskNative.ClassName(fg) == "WorkerW" && DeskNative.SameProcess(shell, fg));
+        return w == shell || (DeskNative.ClassName(w) == "WorkerW" && DeskNative.SameProcess(shell, w));
+    }
+
+    /// <summary>Some other visible, non-tool window is the foreground: any app, borderless and
+    /// full-screen ones and Sanduhr's own Settings included. Only the desktop and the Desk windows
+    /// themselves are not "an app in front".</summary>
+    private bool AppWindowInFront()
+    {
+        var fg = DeskNative.GetForegroundWindow();
+        if (fg == IntPtr.Zero || IsDesktopWindow(fg) || fg == _sentinel.Handle) return false;
+        foreach (var w in _windows)
+            if (w.Handle == fg) return false;
+        return DeskNative.IsWindowVisible(fg)
+            && (DeskNative.GetWindowLong(fg, DeskNative.GWL_EXSTYLE) & DeskNative.WS_EX_TOOLWINDOW) == 0;
+    }
+
+    /// <summary>Puts the sentinel just above the icons host (the window above the host becomes the
+    /// sentinel's insert-after), so at rest the host is never above it and only Show desktop, which
+    /// raises the host over the normal windows, puts it there.</summary>
+    private void SeatSentinel()
+    {
+        var host = DeskNative.IconsHost();
+        if (host == IntPtr.Zero) return;
+        var above = DeskNative.Above(host);
+        if (above == _sentinel.Handle) { _sentinelUnreliable = false; return; }
+        DeskNative.PerMonitor(() =>
+        {
+            Reorder(() => DeskNative.SetWindowPos(_sentinel.Handle, above == IntPtr.Zero ? IntPtr.Zero : above, 0, 0, 0, 0,
+                DeskNative.SWP_NOMOVE | DeskNative.SWP_NOSIZE | DeskNative.SWP_NOACTIVATE));
+            return true;
+        });
+        _sentinelUnreliable = DeskNative.IsBelow(_sentinel.Handle, host);
+        if (_sentinelUnreliable)
+            Log("the sentinel could not be put above the icons host; Show desktop lift disabled");
     }
 
     private void StartWatching()
     {
-        if (!WatchShowDesktop || _hook != IntPtr.Zero) { _watch.Start(); return; }
-        _proc = OnForeground;
-        _hook = DeskNative.SetWinEventHook(DeskNative.EVENT_SYSTEM_FOREGROUND, DeskNative.EVENT_SYSTEM_FOREGROUND,
-            IntPtr.Zero, _proc, 0, 0, DeskNative.WINEVENT_OUTOFCONTEXT | DeskNative.WINEVENT_SKIPOWNPROCESS);
+        if (!WatchShowDesktop) return;
+        if (_hook == IntPtr.Zero)
+        {
+            _proc = OnForeground;
+            _hook = DeskNative.SetWinEventHook(DeskNative.EVENT_SYSTEM_FOREGROUND, DeskNative.EVENT_SYSTEM_FOREGROUND,
+                IntPtr.Zero, _proc, 0, 0, DeskNative.WINEVENT_OUTOFCONTEXT | DeskNative.WINEVENT_SKIPOWNPROCESS);
+        }
         _watch.Interval = SlowWatch;
         _watch.Start();
     }
@@ -278,78 +324,80 @@ internal sealed class DesktopLayerHost : IDeskHost
 
     private void OnForeground(IntPtr hook, uint evt, IntPtr hwnd, int idObject, int idChild, uint thread, uint time)
     {
-        if (IsDesktopForeground(hwnd))
-        {
-            _fastUntil = DateTime.UtcNow + FastFor;
-            CheckShowDesktop("desktop became the foreground");
-        }
-        else if (ShowDesktopLifted)
-        {
-            CheckShowDesktop("foreground left the desktop");
-        }
+        if (IsDesktopWindow(hwnd)) _fastUntil = DateTime.UtcNow + FastFor;
+        CheckShowDesktop(IsDesktopWindow(hwnd) ? "desktop became the foreground" : "foreground changed");
     }
 
-    /// <summary>Compare the sentinel with the icons host and lift or drop the Desk windows.</summary>
+    /// <summary>Read the z-order and the foreground, ask <see cref="ShowDesktopRule"/>, and lift, drop
+    /// or keep the Desk windows; re-seat the sentinel while at rest.</summary>
     public void CheckShowDesktop(string why)
     {
-        if (_disposed || !IsShowing || !WatchShowDesktop || _sentinelUnreliable)
+        if (_disposed || !IsShowing)
         {
             _watch.Interval = SlowWatch;
             return;
         }
         var host = DeskNative.IconsHost();
-        bool raised = host != IntPtr.Zero && DeskNative.IsBelow(_sentinel.Handle, host);
-        if (raised && !ShowDesktopLifted)
+        bool desktopFg = IsDesktopWindow(DeskNative.GetForegroundWindow());
+        bool appInFront = AppWindowInFront();
+        if (!WatchShowDesktop)
         {
-            ShowDesktopLifted = true;
-            Lift(host);
-            Log($"Show desktop on ({why}): lifted over the desktop");
+            if (ShowDesktopLifted) { ShowDesktopLifted = false; Drop(); }
+            return;
         }
-        else if (ShowDesktopLifted && (!raised || AppWindowInFront()))
+        if (ShowDesktopRule.ShouldReseatSentinel(ShowDesktopLifted, desktopFg) && appInFront)
+            SeatSentinel();
+        bool raised = !_sentinelUnreliable && host != IntPtr.Zero && DeskNative.IsBelow(_sentinel.Handle, host);
+        switch (ShowDesktopRule.Decide(raised, desktopFg, appInFront, ShowDesktopLifted))
         {
-            ShowDesktopLifted = false;
-            Drop();
-            Log($"Show desktop off ({why}): back to the bottom");
+            case ShowDesktopAction.Lift:
+                ShowDesktopLifted = true;
+                Lift(host);
+                Log($"Show desktop on ({why}): lifted over the desktop");
+                break;
+            case ShowDesktopAction.Drop:
+                ShowDesktopLifted = false;
+                Drop();
+                Log($"Show desktop off ({why}): back to the bottom");
+                break;
         }
         _watch.Interval = ShowDesktopLifted || DateTime.UtcNow < _fastUntil ? FastWatch : SlowWatch;
-    }
-
-    /// <summary>A captioned window of another app is the foreground: whatever z-order says, the
-    /// Desk never stays lifted over an app the person is using.</summary>
-    private static bool AppWindowInFront()
-    {
-        var fg = DeskNative.GetForegroundWindow();
-        if (fg == IntPtr.Zero || IsDesktopForeground(fg)) return false;
-        DeskNative.GetWindowThreadProcessId(fg, out uint pid);
-        if (pid == (uint)Environment.ProcessId) return false;
-        return (DeskNative.GetWindowLong(fg, DeskNative.GWL_STYLE) & DeskNative.WS_CAPTION) == DeskNative.WS_CAPTION
-            && DeskNative.IsWindowVisible(fg);
     }
 
     private void Lift(IntPtr host)
     {
         var after = DeskNative.BackmostTopmostAbove(host);
-        foreach (var w in _windows)
+        DeskNative.PerMonitor(() =>
         {
-            var h = w.Handle;
-            Reorder(() => DeskNative.SetWindowPos(h, after, 0, 0, 0, 0,
-                DeskNative.SWP_NOMOVE | DeskNative.SWP_NOSIZE | DeskNative.SWP_NOACTIVATE));
-        }
+            foreach (var w in _windows)
+            {
+                if (w.IsDisposed) continue;
+                var h = w.Handle;
+                Reorder(() => DeskNative.SetWindowPos(h, after, 0, 0, 0, 0,
+                    DeskNative.SWP_NOMOVE | DeskNative.SWP_NOSIZE | DeskNative.SWP_NOACTIVATE));
+            }
+            return true;
+        });
     }
 
     private void Drop()
     {
-        foreach (var w in _windows)
+        DeskNative.PerMonitor(() =>
         {
-            var h = w.Handle;
-            Reorder(() =>
+            foreach (var w in _windows)
             {
-                DeskNative.SetWindowPos(h, DeskNative.HWND_NOTOPMOST, 0, 0, 0, 0,
-                    DeskNative.SWP_NOMOVE | DeskNative.SWP_NOSIZE | DeskNative.SWP_NOACTIVATE);
-                DeskNative.SetWindowPos(h, DeskNative.HWND_BOTTOM, 0, 0, 0, 0,
-                    DeskNative.SWP_NOMOVE | DeskNative.SWP_NOSIZE | DeskNative.SWP_NOACTIVATE);
-            });
-        }
+                if (w.IsDisposed) continue;
+                var h = w.Handle;
+                Reorder(() =>
+                {
+                    DeskNative.SetWindowPos(h, DeskNative.HWND_NOTOPMOST, 0, 0, 0, 0,
+                        DeskNative.SWP_NOMOVE | DeskNative.SWP_NOSIZE | DeskNative.SWP_NOACTIVATE);
+                    DeskNative.SetWindowPos(h, DeskNative.HWND_BOTTOM, 0, 0, 0, 0,
+                        DeskNative.SWP_NOMOVE | DeskNative.SWP_NOSIZE | DeskNative.SWP_NOACTIVATE);
+                });
+            }
+            return true;
+        });
     }
 
     // ---- messages ----
@@ -359,7 +407,7 @@ internal sealed class DesktopLayerHost : IDeskHost
         switch (msg)
         {
             case DeskNative.WM_WINDOWPOSCHANGING:
-                KeepZOrder(lParam);
+                KeepZOrder(lParam, desk: true);
                 break;
             case DeskNative.WM_MOUSEACTIVATE:
                 handled = true;
@@ -368,7 +416,11 @@ internal sealed class DesktopLayerHost : IDeskHost
                 Schedule("DPI changed");
                 break;
             case DeskNative.WM_DESTROY:
-                if (!_closing) Schedule("a Desk window was destroyed");
+                if (!_closing)
+                {
+                    _stale = true;
+                    Schedule("a Desk window was destroyed");
+                }
                 break;
         }
         return IntPtr.Zero;
@@ -377,9 +429,13 @@ internal sealed class DesktopLayerHost : IDeskHost
     private IntPtr SentinelHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg == DeskNative.WM_WINDOWPOSCHANGING)
-            KeepZOrder(lParam);
+            KeepZOrder(lParam, desk: false);
         else if ((uint)msg == _taskbarCreated && _taskbarCreated != 0)
+        {
+            // A new shell window: the old windows were owned by the old one. Build new windows.
+            _stale = true;
             Schedule("Explorer restarted (TaskbarCreated)");
+        }
         else if (msg == DeskNative.WM_DISPLAYCHANGE)
             Schedule("display changed");
         else if (msg == DeskNative.WM_SETTINGCHANGE && wParam.ToInt64() == DeskNative.SPI_SETWORKAREA)
@@ -387,13 +443,24 @@ internal sealed class DesktopLayerHost : IDeskHost
         return IntPtr.Zero;
     }
 
-    /// <summary>Anyone but the host asking to restack a Desk window or the sentinel is refused, so a
-    /// click or another app's reordering never raises it.</summary>
-    private void KeepZOrder(IntPtr lParam)
+    /// <summary>
+    /// Restacks the host did not ask for. A Desk window may move down toward the desktop (to the bottom,
+    /// or just above its owner) and may go wherever the system takes it while Show desktop has the
+    /// icons host raised (the owner carrying its owned windows up with it); any other move up, such as a
+    /// click or another app's reordering, is refused. The sentinel is never moved by anyone else.
+    /// </summary>
+    private void KeepZOrder(IntPtr lParam, bool desk)
     {
         if (_reordering || lParam == IntPtr.Zero) return;
         var pos = Marshal.PtrToStructure<DeskNative.WINDOWPOS>(lParam);
         if ((pos.flags & DeskNative.SWP_NOZORDER) != 0) return;
+        if (desk)
+        {
+            var after = pos.hwndInsertAfter;
+            if (after == DeskNative.HWND_BOTTOM || after == DeskNative.GetShellWindow()) return;
+            var host = DeskNative.IconsHost();
+            if (host != IntPtr.Zero && DeskNative.IsBelow(_sentinel.Handle, host)) return;
+        }
         pos.flags |= DeskNative.SWP_NOZORDER;
         Marshal.StructureToPtr(pos, lParam, false);
     }

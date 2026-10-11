@@ -391,9 +391,10 @@ public partial class App : Application
     private void StartDesk()
     {
         if (_vm is null) return;
-        _desk = new Desk.DeskController(new SettingsStore(new Sanduhr.Core.Paths()), () => new Desk.DesktopLayerHost());
-        _desk.SetUsage(_vm.CurrentDeskUsage);
-        _vm.DeskUsageChanged += _desk.SetUsage;
+        var vm = _vm;
+        _desk = new Desk.DeskController(new SettingsStore(new Sanduhr.Core.Paths()), () => new Desk.DesktopLayerHost(),
+            () => vm.CurrentDeskUsage);
+        _vm.DeskUsageChanged += _desk.UsageChanged;
         _desk.Reload();
     }
 
