@@ -203,34 +203,47 @@ is saved for it. The decision is `AccountFollow.decide`, pure and unit-tested.
 
 #### Per-seat meters (item 74)
 
-Each Claude Code folder linked to a signed-in account (Accounts, Data) shows that account's meters
-in its sessions, whichever account Sanduhr shows. `SeatSnapshots` (pure, on an injected folder):
+Each Claude Code folder linked to an account (Accounts, Data) shows that account's meters in its
+sessions, whichever account Sanduhr shows. `SeatSnapshots` (pure, on an injected folder) holds the
+files; `SeatMeters` (the view model's, with an injectable client, clock and wait) keeps them:
 
-- **Off until two signed-in accounts have a folder linked.** Then, beside `snapshot.json` (still
-  the active account's, unchanged), Sanduhr writes `snapshot.<account_ref>.json` per linked
-  account, the same schema (`SnapshotWriter`, atomic, `writer_version` stamped), and `seats.json`,
+- **On once any folder is linked.** Beside `snapshot.json` (still the active account's,
+  unchanged), Sanduhr writes `snapshot.<account_ref>.json` per linked account, the same schema
+  (`SnapshotWriter`, atomic, `writer_version` stamped), and `seats.json`,
   `{"schema_version": 1, "seats": [{"folder": "<real path>", "account_ref": "<8 hex>"}]}`: the
   folder with `~` expanded, symbolic links followed (`realpath(3)`) and no trailing slash. No label,
-  email or key. `seats.json` is rewritten only when its bytes change; every change to the accounts,
-  their sign-in or their links re-syncs it and deletes the file of an account that is no longer a
-  seat (Sign Out, Remove, unlink, rename, or back to one linked account, which deletes them all).
-- **Fetching.** The active account's fetch also writes its seat file. An inactive linked account is
-  fetched only while following sees it in use (`accountsInUse`), at the 5-minute cadence, one
-  account at a time, `SeatSnapshots.stagger` (5 s) after the active fetch, through its own client;
-  a failed fetch writes the error kind and keeps its last tiers, and a refused key skips it until a
-  new key is saved. Following's own 15-minute checks write their answers too (no extra request).
-  Otherwise it is not fetched and its file keeps the last reading, stamped `captured_at`, so
-  readers show its age. An account with no folder is never fetched for a seat.
+  email or key; owner-only (0600, put back even when the bytes are unchanged), rewritten only when
+  its bytes change. A signed-out linked account keeps its row and gets a signed-out file (no tiers),
+  so its sessions say "sign in again" rather than show the active account; signed in again, the
+  file goes until its next reading. Remove or unlink deletes the account's file and row, a rename
+  moves its file to the new ref with `account_ref` rewritten, and unlinking the last folder deletes
+  everything (back to `snapshot.json` alone).
+- **Fetching.** The active account's fetch also writes its seat file (rechecked to still be the
+  active account). After an active fetch that did not fail on the network, every inactive signed-in
+  linked account following sees in use (`accountsInUse`) is fetched, one round at a time, one
+  account after another, `SeatSnapshots.stagger` (5 s) apart, through its own client. An account
+  read within the refresh interval (less a tenth for timer jitter), by a round or by following's own
+  15-minute check (whose answers are written too, no extra request), is skipped, so a manual
+  Refresh never reads it again early. A failed fetch writes the error kind and keeps the last tiers;
+  a refused key skips the account until a new key is saved; an answer for an account switched to,
+  signed out, unlinked or renamed mid-request is dropped. Otherwise an account is not fetched and
+  its file keeps the last reading, stamped `captured_at`. An account with no folder is never fetched
+  for a seat.
 - **Readers.** The statusline, the meters mod and `get_usage` take `CLAUDE_CONFIG_DIR` (unset:
-  `~/.claude`), resolve it the same way and look it up in `seats.json`: a linked folder reads its
+  `~/.claude`; `~` expanded against HOME; relative reads as unlinked) and look it up in `seats.json`
+  (at most 64 KB, `schema_version` exactly 1, rows with `~` expanded): Python matches folders by file
+  identity (`st_dev`, `st_ino`), by the folded real path (NFC, lower case) when either can't be
+  stat'ed; the mod, whose stat has no file id, by the folded real path. A linked folder reads its
   account's file; any other folder, or no readable `seats.json`, reads `snapshot.json` as before. A
   linked folder never borrows another account's numbers: until its file exists the statusline
   falls back to Claude Code's own `rate_limits` (marked `*`), the mod draws nothing and `get_usage`
-  says `missing`. `get_usage` answers with `scope: seat_account` for a seat (Share with your agents
-  still decides), `active_account_only` otherwise. `SANDUHR_SNAPSHOT` still names one file and skips
-  the lookup. The Python helper is one block in both scripts, pinned identical by a test.
-- **Settings.** Each Claude Code folder box's Account row says "Meters here show Work" (or "the
-  active account" while the folder is no seat); Accounts, Data has **Link a Claude Code Folder…**
+  says `missing`. A seat file past the dead band shows its numbers "as of 23m" (`get_usage`: stale,
+  `seat_not_in_use`), never "start widget". `get_usage` answers with `scope: seat_account` for a
+  seat (Share with your agents still decides), `active_account_only` otherwise. `SANDUHR_SNAPSHOT`
+  still names one file and skips the lookup. The Python helper is one block in both scripts, pinned
+  identical by a test.
+- **Settings.** Each Claude Code folder box's Account row says "Meters here show Work" for a linked
+  folder, "the active account" otherwise; Accounts, Data has **Link a Claude Code Folder…**
   (`SettingsNames.linkFolder`) for an account with none, the folder picker of Choose….
 
 ### Signing out

@@ -30,13 +30,15 @@ import {
   WEEKLY,
   bandFor,
   bar,
+  SEATS_MAX_BYTES,
   configFolder,
+  expandFolder,
   parseSeats,
   parseSnapshot,
   remember,
+  seatKey,
   seatSnapshotName,
   sessionReset,
-  trimFolder,
   warningKeys,
   warningToast,
 } from './meters'
@@ -77,8 +79,11 @@ let sweeps: Record<string, number> = {}
 let drawn = false
 let frameKey: string | null = null
 let timers: (() => void)[] = []
-// This session's Claude Code folder, resolved once per session.start (null on Windows).
+// This session's Claude Code folder as a seat key, resolved once per session.start (null on
+// Windows or for a relative CLAUDE_CONFIG_DIR), and whether the snapshot read is a seat's own.
 let seatFolder: string | null = null
+let home = ''
+let isSeat = false
 let frameTimer: (() => void) | null = null
 
 function pick<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
@@ -211,31 +216,73 @@ async function readSnapshot($: EngineInterface): Promise<string | null> {
   const named = await $.env.get('SANDUHR_SNAPSHOT')
 
   if (named !== undefined && named !== '') {
+    isSeat = false
+
     return readFile($, 'snapshot.json', named)
   }
 
-  const seats = seatFolder === null ? null : parseSeats(await readFile($, 'seats.json', undefined))
+  const rows = seatFolder === null ? null : await seatRows($)
+  const name = seatSnapshotName(rows, seatFolder)
+  isSeat = name !== 'snapshot.json'
 
-  return readFile($, seatSnapshotName(seats, seatFolder), undefined)
+  return readFile($, name, undefined)
 }
 
-/** CLAUDE_CONFIG_DIR (unset: ~/.claude) as seats.json writes it: links followed, no trailing slash. macOS only. */
-async function resolveSeatFolder($: EngineInterface): Promise<string | null> {
-  const home = await $.env.get('HOME')
+/** seats.json's rows with each folder resolved to its key; null without a readable file of at most 64 KB. */
+async function seatRows($: EngineInterface): Promise<{ key: string; ref: string }[] | null> {
+  const path = await sanduhrFile($, 'seats.json', undefined)
 
-  if ((await $.env.get('OS')) === 'Windows_NT' || home === undefined || home === '') {
+  if (path === null) {
+    return null
+  }
+
+  try {
+    if ((await $.fs.stat(path, { resolve: false })).size > SEATS_MAX_BYTES) {
+      return null
+    }
+  } catch {
+    return null
+  }
+
+  const seats = parseSeats(await readFile($, 'seats.json', undefined))
+
+  if (seats === null) {
+    return null
+  }
+
+  const rows: { key: string; ref: string }[] = []
+
+  for (const s of seats) {
+    const folder = expandFolder(s.folder, home)
+
+    if (folder !== null) {
+      rows.push({ key: await resolvedKey($, folder), ref: s.ref })
+    }
+  }
+
+  return rows
+}
+
+/** A folder's seat key: links followed where the folder exists, its spelling otherwise. */
+async function resolvedKey($: EngineInterface, folder: string): Promise<string> {
+  try {
+    return seatKey((await $.fs.stat(folder, { resolve: true })).realPath ?? folder)
+  } catch {
+    return seatKey(folder)
+  }
+}
+
+/** CLAUDE_CONFIG_DIR (unset: ~/.claude) as a seat key. macOS only; null for a relative path. */
+async function resolveSeatFolder($: EngineInterface): Promise<string | null> {
+  home = (await $.env.get('HOME')) ?? ''
+
+  if ((await $.env.get('OS')) === 'Windows_NT' || home === '') {
     return null
   }
 
   const folder = configFolder(await $.env.get('CLAUDE_CONFIG_DIR'), home)
 
-  try {
-    const stat = await $.fs.stat(folder, { resolve: true })
-
-    return trimFolder(stat.realPath ?? folder)
-  } catch {
-    return trimFolder(folder)
-  }
+  return folder === null ? null : resolvedKey($, folder)
 }
 
 /** Reads band.json: the looks, Reduce Motion and the watchers. */
@@ -255,7 +302,7 @@ function motionAllowed(band: MetersBand | null): boolean {
 }
 
 function bandAt(snap: MetersSnapshot | null, now: number, s: Style): Band {
-  return bandFor(snap, now, { bars: opts.bars, style: s, tzOffsetMinutes: new Date(now).getTimezoneOffset() })
+  return bandFor(snap, now, { bars: opts.bars, style: s, tzOffsetMinutes: new Date(now).getTimezoneOffset(), seat: isSeat })
 }
 
 /** What may move now: sweeps, the pulses (a nearly full limit glows, one about to reset shimmers, waiting watchers), fades. */

@@ -51,6 +51,16 @@ enum SnapshotWriter {
         write(status: "error", errorKind: "session_expired", tiers: [], accountRef: accountRef, now: now, to: target)
     }
 
+    /// The error kind a failed fetch writes: `session_expired` and `cloudflare` ask for a new sign-in,
+    /// anything else is `network`.
+    static func errorKind(_ error: Error) -> String {
+        switch error as? ClaudeAPI.APIError {
+        case .unauthorized?: "session_expired"
+        case .cloudflareChallenge?: "cloudflare"
+        default: "network"
+        }
+    }
+
     /// An account switch removes the file at once, before anything else happens, so a reader
     /// never sees the new account's freshness on the old account's numbers (Windows WS-E). The
     /// next fetch writes it again with the new `account_ref`.

@@ -6,6 +6,7 @@ import {
   bar,
   configFolder,
   countdown,
+  expandFolder,
   freshness,
   isWarning,
   meterText,
@@ -15,6 +16,8 @@ import {
   parseTime,
   remember,
   resetWords,
+  seatAge,
+  seatKey,
   seatSnapshotName,
   sessionReset,
   trimFolder,
@@ -211,39 +214,40 @@ test('remembered keys stay unique and capped', () => {
 
 // -- Seats (item 74) --------------------------------------------------------------------------
 
-const SEATS = JSON.stringify({
-  schema_version: 1,
-  seats: [
-    { folder: '/Users/someone/.claude', account_ref: '1a2b3c4d' },
-    { folder: '/Users/someone/.claude-home/', account_ref: 'aabbccdd' },
-  ],
-})
-
-test('the session folder: CLAUDE_CONFIG_DIR with ~ expanded, unset or empty meaning ~/.claude', () => {
+test('the session folder: CLAUDE_CONFIG_DIR with ~ expanded, unset or empty meaning ~/.claude, relative unlinked', () => {
   expect(configFolder(undefined, '/Users/someone')).toBe('/Users/someone/.claude')
   expect(configFolder('', '/Users/someone')).toBe('/Users/someone/.claude')
   expect(configFolder('~/.claude-home', '/Users/someone')).toBe('/Users/someone/.claude-home')
   expect(configFolder('/Volumes/x/.claude', '/Users/someone')).toBe('/Volumes/x/.claude')
+  expect(configFolder('.claude-home', '/Users/someone')).toBeNull()
+  expect(expandFolder('~', '/Users/someone')).toBe('/Users/someone')
   expect(trimFolder('/Users/someone/.claude//')).toBe('/Users/someone/.claude')
   expect(trimFolder('/')).toBe('/')
 })
 
-test('a linked folder reads its account; any other reads snapshot.json', () => {
-  const seats = parseSeats(SEATS)
-  expect(seatSnapshotName(seats, '/Users/someone/.claude')).toBe('snapshot.1a2b3c4d.json')
-  expect(seatSnapshotName(seats, '/Users/someone/.claude-home')).toBe('snapshot.aabbccdd.json')
-  expect(seatSnapshotName(seats, '/Users/someone/.claude-home/')).toBe('snapshot.aabbccdd.json')
-  expect(seatSnapshotName(seats, '/Users/someone/.claude-other')).toBe('snapshot.json')
-  expect(seatSnapshotName(seats, null)).toBe('snapshot.json')
-  expect(seatSnapshotName(null, '/Users/someone/.claude')).toBe('snapshot.json')
+test('seat keys fold case, normalization and the trailing slash', () => {
+  expect(seatKey('/Users/someone/.CLAUDE-Home/')).toBe(seatKey('/Users/someone/.claude-home'))
+  expect(seatKey('/Users/someone/cafe\u0301')).toBe(seatKey('/Users/someone/caf\u00e9'))
 })
 
-test('a missing, malformed or newer seats.json, or a bad row, is not read', () => {
+test('a linked folder reads its account; any other reads snapshot.json', () => {
+  const rows = [{ key: seatKey('/Users/someone/.claude'), ref: '1a2b3c4d' }, { key: seatKey('/Users/someone/.claude-home'), ref: 'aabbccdd' }]
+  expect(seatSnapshotName(rows, seatKey('/Users/someone/.claude'))).toBe('snapshot.1a2b3c4d.json')
+  expect(seatSnapshotName(rows, seatKey('/Users/someone/.Claude-Home/'))).toBe('snapshot.aabbccdd.json')
+  expect(seatSnapshotName(rows, seatKey('/Users/someone/.claude-other'))).toBe('snapshot.json')
+  expect(seatSnapshotName(rows, null)).toBe('snapshot.json')
+  expect(seatSnapshotName(null, seatKey('/Users/someone/.claude'))).toBe('snapshot.json')
+})
+
+test('a missing, malformed or other-schema seats.json, or a bad row, is not read', () => {
   expect(parseSeats(null)).toBeNull()
   expect(parseSeats('{')).toBeNull()
   expect(parseSeats('[]')).toBeNull()
   expect(parseSeats('{"seats": []}')).toBeNull()
   expect(parseSeats('{"schema_version": 2, "seats": []}')).toBeNull()
+  expect(parseSeats('{"schema_version": "1", "seats": []}')).toBeNull()
+  expect(parseSeats('{"schema_version": true, "seats": []}')).toBeNull()
+  expect(parseSeats('{"schema_version": 1.0, "seats": []}')).toEqual([])
   expect(parseSeats('{"schema_version": 1, "seats": {}}')).toBeNull()
   const rows = parseSeats(JSON.stringify({
     schema_version: 1,
@@ -252,8 +256,17 @@ test('a missing, malformed or newer seats.json, or a bad row, is not read', () =
       { folder: '/a', account_ref: 'ABCDEF12' },
       { folder: '', account_ref: '1a2b3c4d' },
       'junk',
-      { folder: '/b', account_ref: '1a2b3c4d' },
+      { folder: '/b/', account_ref: '1a2b3c4d' },
     ],
   }))
-  expect(rows).toEqual([{ folder: '/b', ref: '1a2b3c4d' }])
+  expect(rows).toEqual([{ folder: '/b/', ref: '1a2b3c4d' }])
+})
+
+test('a seat reading past the dead band shows its numbers with their age', () => {
+  const old = snap({ tiers: [{ key: 'five_hour', resets_at: new Date(NOW + HOUR).toISOString(), utilization: 40 }], at: NOW - 23 * MIN })
+  const b = bandFor(old, NOW, { ...COMPACT, seat: true })
+  expect(b.kind === 'meters' && b.isDim && b.note).toBe('as of 23m')
+  expect(bandFor(old, NOW, COMPACT)).toEqual({ kind: 'line', text: 'Sanduhr: no update for 23m. Is the widget running?' })
+  expect(seatAge(3 * HOUR)).toBe('3h')
+  expect(seatAge(3 * 24 * HOUR)).toBe('3d')
 })

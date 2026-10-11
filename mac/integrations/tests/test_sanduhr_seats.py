@@ -143,6 +143,34 @@ class Resolution(Seats):
         self.seats(schema=2)                                                     # newer: not read
         self.assertEqual(self.resolve(self.work), default)
 
+    def test_the_same_folder_spelled_another_way_matches_by_identity(self):
+        self.seats()
+        # macOS volumes ignore case and normalization: the same folder, so the same seat.
+        self.assertEqual(self.resolve(self.home.replace(".claude-home", ".CLAUDE-Home"))[1], ref("Home"))
+        nfc = self.folder("café")
+        self.seats([{"folder": nfc, "account_ref": ref("Home")}])
+        self.assertEqual(self.resolve(os.path.join(self.dir, "café"))[1], ref("Home"))
+        # A folder that doesn't exist compares by spelling, folded the same way.
+        gone = os.path.join(self.dir, "Gone")
+        self.seats([{"folder": gone, "account_ref": ref("Home")}])
+        self.assertEqual(self.resolve(os.path.join(self.dir, "gone"))[1], ref("Home"))
+
+    def test_a_tilde_row_is_expanded_like_the_folder(self):
+        self.seats([{"folder": "~/.claude-home/", "account_ref": ref("Home")}])
+        self.assertEqual(self.resolve(self.home)[1], ref("Home"))
+
+    def test_a_relative_config_dir_reads_as_unlinked(self):
+        self.seats([{"folder": self.home, "account_ref": ref("Home")}])
+        self.assertEqual(self.resolve(".claude-home"), (os.path.join(self.support, "snapshot.json"), None))
+
+    def test_schema_version_must_be_the_number_one_and_the_file_small(self):
+        rows = [{"folder": self.work, "account_ref": ref("Work")}]
+        for version, found in (("1", False), (True, False), (2, False), (1.0, True), (1, True)):
+            self.write("seats.json", {"schema_version": version, "seats": rows})
+            self.assertEqual(self.resolve(self.work)[1] is not None, found, version)
+        self.write("seats.json", json.dumps({"schema_version": 1, "seats": rows}) + " " * (64 * 1024))
+        self.assertIsNone(self.resolve(self.work)[1])
+
     def test_a_ref_that_is_not_eight_hex_digits_is_skipped(self):
         self.seats([{"folder": self.work, "account_ref": "../../x"},
                     {"folder": self.work, "account_ref": "ABCDEF12"},
@@ -197,6 +225,17 @@ class Statusline(Seats):
         self.snapshot("Home", 12, captured=datetime.now(timezone.utc) - timedelta(minutes=10))
         self.assertIn("(10m ago)", self.run_line(self.home))
 
+    def test_an_old_seat_reading_says_its_age_not_start_widget(self):
+        self.seats()
+        self.snapshot("Home", 12, captured=datetime.now(timezone.utc) - timedelta(minutes=23))
+        line = self.run_line(self.home)
+        self.assertIn("5h 12%", line)
+        self.assertIn("(as of 23m)", line)
+        self.assertNotIn("start widget", line)
+        # snapshot.json past the dead band still says so.
+        self.snapshot("Work", 61, name="snapshot.json", captured=datetime.now(timezone.utc) - timedelta(minutes=23))
+        self.assertIn("start widget", self.run_line(self.other))
+
     def test_sanduhr_snapshot_still_names_one_file(self):
         self.seats()
         self.snapshot("Home", 12)
@@ -249,6 +288,14 @@ class GetUsage(Seats):
         r = self.usage(self.home)
         self.assertEqual((r["status"], r["reason"]), ("no_data", "not_shared"))
         self.assertNotIn("12", json.dumps(r.get("tiers")))
+
+    def test_an_old_seat_reading_is_not_a_stopped_widget(self):
+        self.seats()
+        self.access("Work", "Home")
+        self.snapshot("Home", 12, captured=datetime.now(timezone.utc) - timedelta(hours=3))
+        r = self.usage(self.home)
+        self.assertEqual((r["status"], r["reason"]), ("stale", "seat_not_in_use"))
+        self.assertIn("3h", r["remedy"])
 
     def test_a_seat_file_naming_another_account_is_refused(self):
         self.seats()

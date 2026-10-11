@@ -54,6 +54,7 @@ import os
 import re
 import sys
 import time
+import unicodedata
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -117,6 +118,10 @@ REMEDY_SEAT_MISSING = (
     "Sanduhr has no reading yet for the account this Claude Code folder is linked to. It fetches that "
     "account while it is the active account, or while following sees it in use (Settings > Accounts, "
     "Follow the account I'm using).")
+REMEDY_SEAT_OLD = (
+    "This is the reading as of %s ago of the account this Claude Code folder is linked to. Sanduhr "
+    "reads an account it doesn't show while following sees it in use (Settings > Accounts, Follow the "
+    "account I'm using), or when you make it the active account.")
 REMEDY_NO_ACTIVITY = (
     "No account shares Claude Code activity from a folder Sanduhr reads. In " + SETTINGS_PLACE +
     ": link the account's Claude Code folder, set Claude Code activity to Live only or Keep a "
@@ -702,6 +707,7 @@ def not_shared(status):
 
 SEATS_FILE = "seats.json"
 SEATS_SCHEMA_VERSION = 1
+SEATS_MAX_BYTES = 64 * 1024
 SEAT_REF = re.compile(r"\A[0-9a-f]{8}\Z")
 
 
@@ -712,39 +718,67 @@ def seat_home(path, env):
     return path
 
 
+def seat_key(path):
+    """A folder's spelling as two spellings compare when it can't be stat'ed: links followed, no
+    trailing slash, NFC, lower case (macOS volumes ignore case and normalization by default)."""
+    p = os.path.realpath(path).rstrip("/") or "/"
+    return unicodedata.normalize("NFC", p).lower()
+
+
+def seat_same(a, b):
+    """Whether a and b are one folder: by file identity, by spelling when either can't be stat'ed."""
+    try:
+        sa, sb = os.stat(a), os.stat(b)
+    except (OSError, ValueError):
+        return seat_key(a) == seat_key(b)
+    return (sa.st_dev, sa.st_ino) == (sb.st_dev, sb.st_ino)
+
+
 def seat_folder(env=None):
-    """This session's Claude Code folder as seats.json writes it: CLAUDE_CONFIG_DIR (unset or
-    empty: ~/.claude), ~ expanded, every symbolic link followed, no trailing slash."""
+    """This session's Claude Code folder: CLAUDE_CONFIG_DIR (unset or empty: ~/.claude), ~
+    expanded against HOME; None for a relative path, which reads as an unlinked folder."""
     env = os.environ if env is None else env
-    path = os.path.realpath(seat_home(env.get("CLAUDE_CONFIG_DIR") or "~/.claude", env))
-    return path.rstrip("/") or "/"
+    path = seat_home(env.get("CLAUDE_CONFIG_DIR") or "~/.claude", env)
+    return path if os.path.isabs(path) else None
 
 
 def seat_snapshot(support_dir, env=None):
     """(path, ref): the snapshot this session reads. A folder seats.json lists reads its account's
-    snapshot.<ref>.json (ref is that account's); any other folder, or no readable seats.json,
-    reads snapshot.json exactly as before (ref None). Reads two small files; never the network."""
-    default = os.path.join(support_dir, "snapshot.json")
-    try:
-        with open(os.path.join(support_dir, SEATS_FILE), encoding="utf-8") as f:
-            doc = json.load(f)
-        if int(doc.get("schema_version")) > SEATS_SCHEMA_VERSION:
-            return default, None
-        rows = doc.get("seats")
-    except (OSError, ValueError, TypeError, AttributeError):
-        return default, None
-    if not isinstance(rows, list):
-        return default, None
+    snapshot.<ref>.json (ref is that account's); any other folder, or no readable seats.json
+    (missing, over 64 KB, not JSON, schema_version not 1), reads snapshot.json exactly as before
+    (ref None). Reads small files only; never the network."""
     env = os.environ if env is None else env
+    default = os.path.join(support_dir, "snapshot.json")
     folder = seat_folder(env)
+    if folder is None:
+        return default, None
+    try:
+        with open(os.path.join(support_dir, SEATS_FILE), "rb") as f:
+            raw = f.read(SEATS_MAX_BYTES + 1)
+        if len(raw) > SEATS_MAX_BYTES:
+            return default, None
+        doc = json.loads(raw.decode("utf-8"))
+        version, rows = doc.get("schema_version"), doc.get("seats")
+    except (OSError, ValueError, AttributeError):
+        return default, None
+    if isinstance(version, bool) or not isinstance(version, (int, float)) or version != SEATS_SCHEMA_VERSION \
+            or not isinstance(rows, list):
+        return default, None
     for row in rows:
         f = row.get("folder") if isinstance(row, dict) else None
         ref = row.get("account_ref") if isinstance(row, dict) else None
-        if not isinstance(f, str) or not f or not isinstance(ref, str) or not SEAT_REF.match(ref):
+        if not isinstance(f, str) or not isinstance(ref, str) or not SEAT_REF.match(ref):
             continue
-        if folder in (f.rstrip("/") or "/", os.path.realpath(seat_home(f, env)).rstrip("/") or "/"):
+        f = seat_home(f, env)
+        if os.path.isabs(f) and seat_same(folder, f):
             return os.path.join(support_dir, "snapshot.%s.json" % ref), ref
     return default, None
+
+
+def seat_age(seconds):
+    """A seat reading's age, the way its readers say it: 23m, 3h, 2d."""
+    m = max(0, int(seconds)) // 60
+    return "%dm" % m if m < 60 else ("%dh" % (m // 60) if m < 48 * 60 else "%dd" % (m // 1440))
 
 # -- end seats --
 
@@ -1087,7 +1121,9 @@ def build_usage(now=None, paths=None, env=None):
     error_kind = snap.get("error_kind")
     status = "ok" if b == "fresh" and file_status != "error" else "stale"
     reason = remedy = None
-    if b == "dead":
+    if b == "dead" and seat_ref:
+        reason, remedy = "seat_not_in_use", REMEDY_SEAT_OLD % seat_age(age)
+    elif b == "dead":
         reason, remedy = "widget_not_polling", "Snapshot is %d minutes old. %s" % (age // 60, REMEDY_START)
     elif file_status == "error":
         remedy = REMEDY_ERROR.get(error_kind, REMEDY_NETWORK)

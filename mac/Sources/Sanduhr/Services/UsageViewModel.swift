@@ -197,14 +197,8 @@ final class UsageViewModel {
     /// For a minute after an automatic switch the chip and the Desk line read "Label (in use)".
     private(set) var followNote = false
     @ObservationIgnored private let follower = AccountFollower()
-    /// Per-seat meters (item 74): where the per-account files go, the seats last written, each
-    /// inactive seat account's client (its org id cached, like the follower's) and the accounts
-    /// skipped after an auth error until a different key is saved. Labels never leave memory.
-    @ObservationIgnored private let seatFiles = SeatSnapshots.Files.standard
-    @ObservationIgnored private var syncedSeats: [SeatSnapshots.Seat]?
-    @ObservationIgnored private var seatClients: [String: (credentials: AccountCredentials, api: ClaudeAPI)] = [:]
-    @ObservationIgnored private var seatAuthSkipped: [String: String] = [:]
-    @ObservationIgnored private var seatFetch: Task<Void, Never>?
+    /// Per-seat meters (item 74): the per-account files and the inactive linked accounts' fetches.
+    @ObservationIgnored private let seatMeters = SeatMeters()
     @ObservationIgnored private var followNoteTask: Task<Void, Never>?
     /// Bumped every 30s so countdown labels re-render without refetching.
     var countdownTick: Int = 0 {
@@ -315,7 +309,8 @@ final class UsageViewModel {
         follower.context = { [weak self] in self?.followContext() ?? AccountFollow.State() }
         follower.onSwitch = { [weak self] label in self?.switchAccount(to: label, automatic: true) }
         follower.onReadings = { [weak self] in self?.refreshInUse() }
-        follower.onResult = { [weak self] label, result in self?.recordSeat(label, result) }
+        follower.onResult = { [weak self] label, result in self?.seatMeters.followerAnswered(label, result) }
+        seatMeters.context = { [weak self] in self?.seatContext() ?? SeatMeters.Context() }
         follower.apply(enabled: followEnabled)
         vault.onCycleEnd = { [weak self] in
             Task { @MainActor in self?.vaultCycles += 1 }
@@ -410,6 +405,7 @@ final class UsageViewModel {
         try KeychainStore.accounts.rename(old, to: new)
         if apiAccount == old { apiAccount = new }
         follower.rename(old, to: new)
+        seatMeters.rename(old, to: new)
         reloadAccounts()
         refreshInUse()
         onUsageUpdate?()
@@ -609,95 +605,17 @@ final class UsageViewModel {
 
     // MARK: Per-seat meters (item 74)
 
-    /// The signed-in accounts with a linked folder, label to folder.
-    private var seatLinked: [String: String] {
-        SeatSnapshots.linked(choices: accountDataChoices, signedIn: signedInAccounts)
+    /// What SeatMeters reads of the accounts, at each step.
+    private func seatContext() -> SeatMeters.Context {
+        SeatMeters.Context(labels: accountLabels, choices: accountDataChoices, signedIn: signedInAccounts,
+                           active: activeAccount, inUse: accountsInUse)
     }
-
-    /// The accounts whose linked folders show their own meters, empty until two are linked: what
-    /// Settings' "Meters here show" says.
-    var seatAccounts: Set<String> { SeatSnapshots.seatAccounts(seatLinked) }
 
     /// seats.json and the per-account files follow every change to the accounts, their sign-in
-    /// and their links; a seat that went (signed out, removed, unlinked, renamed) loses its file.
+    /// and their links; the active account's seat starts from the numbers on screen.
     private func syncSeats() {
-        let seats = SeatSnapshots.seats(seatLinked)
-        guard seats != syncedSeats else { return }
-        syncedSeats = seats
-        let accounts = Set(seatLinked.keys)
-        seatClients = seatClients.filter { accounts.contains($0.key) }
-        seatAuthSkipped = seatAuthSkipped.filter { accounts.contains($0.key) }
-        SeatSnapshots.sync(seats, in: seatFiles)
-        // The active account's seat starts from the numbers on screen, stamped with their fetch
-        // time, rather than waiting up to 5 minutes for the next fetch.
-        if let u = usage, let at = lastUpdated, let target = seatTarget(apiAccount),
-           !FileManager.default.fileExists(atPath: target.path) {
-            SnapshotWriter.writeOk(u, accountRef: AccountRef.of(apiAccount), now: at, to: target)
-        }
-    }
-
-    /// The file a fetch of `label` also writes, nil when the account is not a seat.
-    private func seatTarget(_ label: String?) -> URL? {
-        guard let label, seatAccounts.contains(label), let ref = AccountRef.of(label) else { return nil }
-        return seatFiles.snapshot(ref)
-    }
-
-    /// A fetch of `label`'s usage that answered: kept in its seat file when it is a seat.
-    private func recordSeat(_ label: String, _ result: Result<UsageResponse, Error>) {
-        guard label != apiAccount, let target = seatTarget(label) else { return }
-        let ref = AccountRef.of(label)
-        switch result {
-        case .success(let u): SnapshotWriter.writeOk(u, accountRef: ref, to: target)
-        case .failure(let e): SnapshotWriter.writeError(Self.errorKind(e), accountRef: ref, to: target)
-        }
-    }
-
-    /// After the active fetch: each inactive linked account following sees in use is fetched in
-    /// turn, `SeatSnapshots.stagger` apart. One round at a time; the rest keep their last reading.
-    private func fetchSeats() {
-        guard seatFetch == nil else { return }
-        let due = SeatSnapshots.due(linked: seatLinked, active: apiAccount, inUse: accountsInUse)
-        guard !due.isEmpty else { return }
-        seatFetch = Task { [weak self] in
-            for label in due {
-                try? await Task.sleep(nanoseconds: UInt64(SeatSnapshots.stagger * 1_000_000_000))
-                guard let self else { return }
-                await self.fetchSeat(label)
-            }
-            self?.seatFetch = nil
-        }
-    }
-
-    private func fetchSeat(_ label: String) async {
-        guard SeatSnapshots.due(linked: seatLinked, active: apiAccount, inUse: accountsInUse).contains(label) else { return }
-        let creds = KeychainStore.accounts.credentials(for: label)
-        guard let key = creds.sessionKey, !key.isEmpty else { return }
-        if let failed = seatAuthSkipped[label] {
-            guard failed != key else { return }
-            seatAuthSkipped.removeValue(forKey: label)
-        }
-        let api: ClaudeAPI
-        if let c = seatClients[label], c.credentials == creds {
-            api = c.api
-        } else {
-            api = ClaudeAPI(sessionKey: key, cfClearance: creds.cfClearance)
-            seatClients[label] = (creds, api)
-        }
-        let result: Result<UsageResponse, Error>
-        do { result = .success(try await api.getUsage()) } catch { result = .failure(error) }
-        // Signed out, removed, unlinked or renamed while the request ran: the answer is no one's.
-        guard seatClients[label]?.api === api else { return }
-        if case .failure(let e) = result, Self.errorKind(e) != "network" { seatAuthSkipped[label] = key }
-        recordSeat(label, result)
-    }
-
-    /// snapshot.json's error kind for a failed fetch.
-    nonisolated static func errorKind(_ error: Error) -> String {
-        switch error as? ClaudeAPI.APIError {
-        case .unauthorized?: "session_expired"
-        case .cloudflareChallenge?: "cloudflare"
-        default: "network"
-        }
+        seatMeters.sync()
+        seatMeters.seed(usage, at: lastUpdated, label: apiAccount)
     }
 
     nonisolated private static func signedIn(_ accounts: AccountRegistry) -> Set<String> {
@@ -951,11 +869,8 @@ final class UsageViewModel {
             // Signed out, switched, or a new key saved while this fetch ran: its answer is stale.
             guard self.api === api else { return }
             showFailure(error, accountRef: ref)
-            if let target = seatTarget(account) {
-                SnapshotWriter.writeError(Self.errorKind(error), accountRef: ref, to: target)
-            }
+            if apiAccount == account { seatMeters.activeAnswered(account, .failure(error)) }
             endSwitchVeil()
-            fetchSeats()
             return
         }
         await waitOutSwitchFade()
@@ -971,7 +886,6 @@ final class UsageViewModel {
         vault.trigger()
         Notifier.shared.evaluate(u)
         SnapshotWriter.writeOk(u, accountRef: ref)
-        if let target = seatTarget(account) { SnapshotWriter.writeOk(u, accountRef: ref, to: target) }
         follower.recordActive(account, usage: u)
         // One write of the history file per fetch, off the main thread, skipped while the
         // account's Meter history is off (item 43). The sparklines gain the same points in memory.
@@ -983,7 +897,8 @@ final class UsageViewModel {
         self.status = u.tiers.isEmpty ? .noTiers : .idle
         // A switch's new numbers: they fade in.
         endSwitchVeil()
-        fetchSeats()
+        // The active account's seat file, then the round of inactive seats in use.
+        if apiAccount == account { seatMeters.activeAnswered(account, .success(u)) }
     }
 
     /// A failed fetch: the status line and snapshot.json's error kind.
@@ -994,7 +909,7 @@ final class UsageViewModel {
         case .http(let c)?: status = .error("HTTP \(c)", isAuth: false)
         default: status = .error(error.localizedDescription, isAuth: false)
         }
-        SnapshotWriter.writeError(Self.errorKind(error), accountRef: ref)
+        SnapshotWriter.writeError(SnapshotWriter.errorKind(error), accountRef: ref)
     }
 
     // MARK: Local Claude Code activity (item 45)

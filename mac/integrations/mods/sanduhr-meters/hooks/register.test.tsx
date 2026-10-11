@@ -59,7 +59,7 @@ function beneath(on: any, files: Record<string, string>, env: Record<string, str
   mock.env(on, env)
   // A made-up file system: every folder is there, a symbolic link resolves through `links`.
   on('fs.stat', (_$: unknown, e: { path: string; resolve: boolean }) =>
-    ({ value: { kind: 'dir', size: 0, mtimeMs: 0, isLink: e.path in links, realPath: e.resolve ? links[e.path] ?? e.path : undefined } }) as never)
+    ({ value: { kind: 'dir', size: world.files[e.path]?.length ?? 0, mtimeMs: 0, isLink: e.path in links, realPath: e.resolve ? links[e.path] ?? e.path : undefined } }) as never)
   on('session.start', (_$: unknown, e: { cwd: string }) => ({ cwd: e.cwd }))
   on('fs.read', (_$: unknown, e: { path: string }) => {
     world.reads.push(e.path)
@@ -182,6 +182,53 @@ test('a malformed seats.json reads snapshot.json', async ($, on) => {
   await $.session.start(START)
 
   expect((await (await $.ui.mount(band())).find({ key: 'sm-five_hour' }))?.text).toContain('61%')
+})
+
+test('the same folder spelled with other case or normalization is the same seat', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  const seats = JSON.stringify({ schema_version: 1, seats: [{ folder: `${HOME}/caf\u00e9`, account_ref: HOME_REF }] })
+  beneath(on, { [SEATS]: seats, [PATH]: seatSnapshot(61), [seatFile(HOME_REF)]: seatSnapshot(12) },
+    { HOME, CLAUDE_CONFIG_DIR: `${HOME}/CAFE\u0301` })
+  await $.session.start(START)
+
+  expect((await (await $.ui.mount(band())).find({ key: 'sm-five_hour' }))?.text).toContain('12%')
+})
+
+test('a seats.json row written with ~ and a trailing slash matches', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  const seats = JSON.stringify({ schema_version: 1, seats: [{ folder: '~/.claude-home/', account_ref: HOME_REF }] })
+  beneath(on, { [SEATS]: seats, [PATH]: seatSnapshot(61), [seatFile(HOME_REF)]: seatSnapshot(12) },
+    { HOME, CLAUDE_CONFIG_DIR: `${HOME}/.claude-home` })
+  await $.session.start(START)
+  expect((await (await $.ui.mount(band())).find({ key: 'sm-five_hour' }))?.text).toContain('12%')
+})
+
+test('a relative CLAUDE_CONFIG_DIR draws the active account', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  beneath(on, { [SEATS]: SEATS_JSON, [PATH]: seatSnapshot(61), [seatFile(HOME_REF)]: seatSnapshot(12) },
+    { HOME, CLAUDE_CONFIG_DIR: '.claude-home' })
+  await $.session.start(START)
+  expect((await (await $.ui.mount(band())).find({ key: 'sm-five_hour' }))?.text).toContain('61%')
+})
+
+test('a seats.json over 64 KB is not read', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  beneath(on, { [SEATS]: SEATS_JSON + ' '.repeat(64 * 1024), [PATH]: seatSnapshot(61), [seatFile(HOME_REF)]: seatSnapshot(12) },
+    { HOME, CLAUDE_CONFIG_DIR: `${HOME}/.claude-home` })
+  await $.session.start(START)
+  expect((await (await $.ui.mount(band())).find({ key: 'sm-five_hour' }))?.text).toContain('61%')
+})
+
+test('an old seat reading shows its numbers as of its age, not a stopped widget', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  const old = snapshot([{ key: 'five_hour', resets_at: new Date(NOW + 2 * HOUR).toISOString(), utilization: 12 }], { at: NOW - 23 * MIN })
+  beneath(on, { [SEATS]: SEATS_JSON, [seatFile(HOME_REF)]: old }, { HOME, CLAUDE_CONFIG_DIR: `${HOME}/.claude-home` })
+  await $.session.start(START)
+
+  const text = await textOf(await $.ui.mount(band()))
+  expect(text).toContain('12%')
+  expect(text).toContain('as of 23m')
+  expect(text).not.toContain('widget running')
 })
 
 test('SANDUHR_SNAPSHOT still names one file', async ($, on) => {

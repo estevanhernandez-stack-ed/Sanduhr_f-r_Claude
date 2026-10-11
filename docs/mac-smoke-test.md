@@ -1878,22 +1878,25 @@ com.626labs.sanduhr.desk` on a throwaway profile with no Sanduhr Keychain item),
 Two Claude Code folders and two signed-in accounts, both made up for the test (a scratch Claude
 Code folder such as `~/.claude-scratch` with a `projects` folder is enough for the second seat).
 
-1. With one account linked to a folder (or none): `smoke/smoke state` shows `snapshots: 0` and
-   `seats: 0`, and `~/Library/Application Support/Sanduhr` has no `seats.json` and no
-   `snapshot.<ref>.json`. Each Claude Code folder box's Account row says **Meters here show the
-   active account**.
-2. Settings, Accounts, select the account without a folder: under Claude Code folder, **Link a
-   Claude Code Folder…** opens the folder picker. Pick the second folder. `seats: 2`, and
-   `seats.json` lists both folders by their real paths with an 8-digit `account_ref` each, no label.
-   The folder boxes say **Meters here show Work** and **Meters here show Personal**. After the
-   next fetch, `snapshots` is 1 (the active account's) or 2.
+1. With no folder linked: `smoke/smoke state` shows `snapshots: 0` and `seats: 0`, and
+   `~/Library/Application Support/Sanduhr` has no `seats.json` and no `snapshot.<ref>.json`. Each
+   Claude Code folder box's Account row says **Meters here show the active account**.
+2. Link one account's folder (Settings, Accounts, select it, **Link a Claude Code Folder…**):
+   `seats: 1`, `seats.json` (mode 0600) lists the folder by its real path with an 8-digit
+   `account_ref`, no label, and that folder's box says **Meters here show Work**. Link the other
+   account to the second folder: `seats: 2`. After the next fetch, `snapshots` is 1 or 2.
 3. Turn on Follow the account I'm using. In a terminal, `CLAUDE_CONFIG_DIR=~/.claude-scratch claude`
    beside a session in `~/.claude`, and use the inactive account a while: once following marks it
    in use (the menu's "· in use"), its `snapshot.<ref>.json` is rewritten every 5 minutes, a few
-   seconds after the active fetch. Each session's statusline and meters band show its own
-   account's numbers at the same time; `get_usage` in each answers with `scope: seat_account` and
-   its own `account.ref`. Switch the active account: both sessions keep their own numbers.
+   seconds after the active fetch, and Refresh by hand doesn't read it again sooner. Each
+   session's statusline and meters band show its own account's numbers at the same time;
+   `get_usage` in each answers with `scope: seat_account` and its own `account.ref`. Switch the
+   active account: both sessions keep their own numbers. Stop using the inactive one for 20
+   minutes: its session shows its numbers "as of 20m", not "start widget".
 4. A session in a folder no account links (`CLAUDE_CONFIG_DIR=/tmp/x claude`, or an old statusline
-   copy): shows the active account, as before (`scope: active_account_only`).
-5. Unlink the second folder (or Sign Out or Remove its account): `seats: 0`, `snapshots: 0`,
-   `seats.json` and both per-account files are gone; `snapshot.json` is untouched.
+   copy): shows the active account, as before (`scope: active_account_only`). A different spelling
+   of a linked folder (`CLAUDE_CONFIG_DIR=~/.Claude-Scratch/`) is the same seat.
+5. Sign Out the second account: its row stays, its file says signed out, and its session says to
+   sign in again, never the other account's numbers. Rename the first account: its file moves to
+   the new `account_ref`. Unlink both folders: `seats: 0`, `snapshots: 0`, `seats.json` and every
+   per-account file are gone; `snapshot.json` is untouched.

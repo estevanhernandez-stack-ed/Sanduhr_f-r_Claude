@@ -290,8 +290,7 @@ struct IntegrationsSettings: View {
         }
         ForEach(model.folders) { f in
             IntegrationFolderBox(folder: f, model: model, owner: vm.account(linkedTo: f.path),
-                                 metersHere: SeatSnapshots.metersHere(owner: vm.account(linkedTo: f.path),
-                                                                      seatAccounts: vm.seatAccounts),
+                                 metersHere: SeatSnapshots.metersHere(owner: vm.account(linkedTo: f.path)),
                                  meters: MetersModStatus.text(mods.own.first { $0.folder == f.path }, fallback: f.meters),
                                  install: { kind in ask(kind, folder: f.path) },
                                  update: { kind in Task { await run(kind, folder: f.path, replace: false, combine: nil) } },

@@ -1,24 +1,24 @@
 import Darwin
 import Foundation
 
-/// Per-seat meters (item 74): each Claude Code folder linked to a signed-in account gets that
-/// account's numbers, so a session in a work seat and one in a personal seat each show their own
-/// meters at the same time, whichever account Sanduhr shows.
+/// Per-seat meters (item 74): each Claude Code folder linked to an account gets that account's
+/// numbers, so a session in a work seat and one in a personal seat each show their own meters at
+/// the same time, whichever account Sanduhr shows.
 ///
 /// Beside `snapshot.json` (still the active account's, for older scripts and the Desk) Sanduhr
-/// writes `snapshot.<account_ref>.json`, the same schema, one per linked signed-in account, and
-/// `seats.json`, `{"schema_version": 1, "seats": [{"folder": "<real path>", "account_ref": "…"}]}`.
-/// Neither ever holds a label, an email or a key. The statusline, the meters mod and the MCP
-/// server look their `CLAUDE_CONFIG_DIR` (unset: `~/.claude`) up in `seats.json`.
+/// writes `snapshot.<account_ref>.json`, the same schema, one per linked account, and `seats.json`,
+/// `{"schema_version": 1, "seats": [{"folder": "<real path>", "account_ref": "…"}]}`. Neither
+/// ever holds a label, an email or a key. The statusline, the meters mod and the MCP server look
+/// their `CLAUDE_CONFIG_DIR` (unset: `~/.claude`) up in `seats.json`.
 ///
-/// Off until two signed-in accounts have a folder linked: with one linked account or none, no file
-/// here is written and any left from before is deleted, so an existing install reads exactly as it
-/// did. Folder paths are written to `seats.json` only, never logged or put in state.yaml.
+/// On while any account has a folder linked, signed in or not: a linked folder never shows another
+/// account's numbers. A signed-out linked account keeps its row and gets a signed-out file (no
+/// tiers), so its sessions say "sign in again". With no folder linked, no file here exists (any
+/// left from before is deleted), so an install without links reads exactly as it did. Folder paths
+/// are written to `seats.json` only, never logged or put in state.yaml. `SeatMeters` keeps them.
 enum SeatSnapshots {
     static let schemaVersion = 1
     static let seatsName = "seats.json"
-    /// Per-seat files start with the second linked signed-in account.
-    static let minimumLinked = 2
     /// Seconds between the active fetch and each inactive linked account's fetch.
     static let stagger: TimeInterval = 5
 
@@ -47,43 +47,38 @@ enum SeatSnapshots {
 
     // MARK: Which accounts
 
-    /// The signed-in accounts with a folder linked, label to folder.
-    static func linked(choices: [String: AccountDataChoices], signedIn: Set<String>) -> [String: String] {
+    /// The listed accounts with a folder linked, label to folder, signed in or not.
+    static func linked(choices: [String: AccountDataChoices], labels: [String]) -> [String: String] {
         var out: [String: String] = [:]
-        for (label, c) in choices where signedIn.contains(label) {
-            if let folder = c.folder, !folder.isEmpty { out[label] = folder }
+        for label in labels {
+            if let folder = choices[label]?.folder, !folder.isEmpty { out[label] = folder }
         }
         return out
     }
 
-    /// Whether per-seat files are written at all.
-    static func isOn(_ linked: [String: String]) -> Bool { linked.count >= minimumLinked }
-
-    /// The accounts whose seats get their own meters: every linked one while on, none otherwise.
-    static func seatAccounts(_ linked: [String: String]) -> Set<String> {
-        isOn(linked) ? Set(linked.keys) : []
-    }
-
-    /// The seats `seats.json` lists, sorted by folder: none while off.
+    /// The seats `seats.json` lists, sorted by folder: one per linked account.
     static func seats(_ linked: [String: String], realPath: (String) -> String = realPath) -> [Seat] {
-        guard isOn(linked) else { return [] }
-        return linked.compactMap { label, folder in
+        linked.compactMap { label, folder in
             AccountRef.of(label).map { Seat(folder: realPath(folder), accountRef: $0) }
         }.sorted { ($0.folder, $0.accountRef) < ($1.folder, $1.accountRef) }
     }
 
-    /// The fetch rule: the inactive linked accounts to fetch after the active one this cycle,
-    /// only those following saw in use (`AccountFollow.othersInUse`), only while on. An account
-    /// with no folder is never fetched for a seat.
-    static func due(linked: [String: String], active: String?, inUse: Set<String>) -> [String] {
-        guard isOn(linked) else { return [] }
-        return linked.keys.filter { $0 != active && inUse.contains($0) }.sorted()
+    /// The fetch rule: the inactive signed-in linked accounts following saw in use
+    /// (`AccountFollow.othersInUse`). An account with no folder is never fetched for a seat.
+    static func due(linked: [String: String], signedIn: Set<String>, active: String?, inUse: Set<String>) -> [String] {
+        linked.keys.filter { fetchable($0, linked: linked, signedIn: signedIn, active: active) && inUse.contains($0) }.sorted()
+    }
+
+    /// Whether an answer for `label` may still be written to its seat file: linked, signed in and
+    /// not the active account (whose own fetch writes it).
+    static func fetchable(_ label: String, linked: [String: String], signedIn: Set<String>, active: String?) -> Bool {
+        linked[label] != nil && signedIn.contains(label) && label != active
     }
 
     /// Settings, Claude Code, a folder box's Account row: whose meters a session in the folder
-    /// shows. "Meters here show Work", or the active account's while the folder is no seat.
-    static func metersHere(owner: String?, seatAccounts: Set<String>) -> String {
-        guard let owner, seatAccounts.contains(owner) else { return "Meters here show the active account" }
+    /// shows. "Meters here show Work", or the active account's for a folder no account links.
+    static func metersHere(owner: String?) -> String {
+        guard let owner else { return "Meters here show the active account" }
         return "Meters here show \(owner)"
     }
 
@@ -125,12 +120,21 @@ enum SeatSnapshots {
     }
 
     /// Brings the folder in line with `seats`: `seats.json` rewritten when its bytes change (or
-    /// deleted when there are none), and every `snapshot.<ref>.json` whose account is no longer a
-    /// seat deleted (signed out, removed, unlinked, renamed, or per-seat turned off).
-    static func sync(_ seats: [Seat], in files: Files) {
+    /// deleted when there are none); every `snapshot.<ref>.json` whose account is no longer a seat
+    /// deleted (removed, unlinked); a signed-out seat's file written signed out (no tiers), and a
+    /// signed-out file left by an account signed in again deleted, until its next reading.
+    static func sync(_ seats: [Seat], signedOut: Set<String> = [], in files: Files, now: Date = Date()) {
         let keep = Set(seats.map(\.accountRef))
         for ref in files.snapshotRefs().subtracting(keep) {
             remove(files.snapshot(ref))
+        }
+        for ref in keep {
+            let url = files.snapshot(ref)
+            if signedOut.contains(ref) {
+                if !isSignedOut(url) { SnapshotWriter.writeSignedOut(accountRef: ref, now: now, to: url) }
+            } else if isSignedOut(url) {
+                remove(url)
+            }
         }
         if seats.isEmpty {
             remove(files.seats)
@@ -139,26 +143,54 @@ enum SeatSnapshots {
         }
     }
 
+    /// A renamed account's seat file follows it: moved to the new ref, `account_ref` rewritten.
+    static func rename(_ oldRef: String, to newRef: String, in files: Files) {
+        let from = files.snapshot(oldRef), to = files.snapshot(newRef)
+        guard oldRef != newRef, var obj = json(from) else { return }
+        obj["account_ref"] = newRef
+        guard let data = try? JSONSerialization.data(withJSONObject: obj, options: [.sortedKeys]) else { return }
+        do {
+            try data.write(to: to, options: .atomic)
+            remove(from)
+        } catch {
+            NSLog("Sanduhr seat file rename failed (\(type(of: error)))")
+        }
+    }
+
+    /// The file `writeSignedOut` writes: an auth error with no tiers.
+    static func isSignedOut(_ url: URL) -> Bool {
+        guard let obj = json(url) else { return false }
+        return obj["status"] as? String == "error" && obj["error_kind"] as? String == "session_expired"
+            && (obj["tiers"] as? [Any])?.isEmpty == true
+    }
+
     /// state.yaml's `snapshots` and `seats`: counts only, never a path or a ref.
     static func counts(in files: Files) -> (snapshots: Int, seats: Int) {
         let snapshots = files.snapshotRefs().count
-        guard let data = try? Data(contentsOf: files.seats),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let rows = obj["seats"] as? [Any] else { return (snapshots, 0) }
+        guard let rows = json(files.seats)?["seats"] as? [Any] else { return (snapshots, 0) }
         return (snapshots, rows.count)
     }
 
-    /// Written whole, a temporary sibling renamed over the file, so a reader never sees half.
-    private static func write(_ data: Data, to url: URL) {
-        if let current = try? Data(contentsOf: url), current == data { return }
+    private static func json(_ url: URL) -> [String: Any]? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    }
+
+    /// Written whole, a temporary sibling renamed over the file, so a reader never sees half;
+    /// owner-only, put back to 0600 even when the bytes are unchanged.
+    static func write(_ data: Data, to url: URL) {
         let fm = FileManager.default
+        if let current = try? Data(contentsOf: url), current == data {
+            try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+            return
+        }
         let tmp = url.deletingLastPathComponent().appendingPathComponent(".\(seatsName).\(UUID().uuidString).tmp")
         do {
             try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             guard fm.createFile(atPath: tmp.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
                 throw CocoaError(.fileWriteUnknown)
             }
-            guard rename(tmp.path, url.path) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            guard Darwin.rename(tmp.path, url.path) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         } catch {
             unlink(tmp.path)
             NSLog("Sanduhr seats write failed (\(type(of: error)))")
