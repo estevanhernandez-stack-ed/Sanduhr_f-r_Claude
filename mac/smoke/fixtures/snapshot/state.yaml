@@ -194,6 +194,15 @@ mods_page:
   missing: 0
   checked: 0
   cli: false
+mods_config:
+  tab: catalog
+  seats: 0
+  cards: 0
+  available: 0
+  needs_look: 0
+  duplicates: 0
+  work_only: 0
+  shown: 0
 message_editor:
   open: false
   mode: list
