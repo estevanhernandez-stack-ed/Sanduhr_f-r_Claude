@@ -33,6 +33,10 @@ using Sanduhr.Core;
 // never fetches, never adds, removes or renames accounts, never writes credentials. Settings,
 // history and themes go to SANDUHR_DEV_PROFILE (Paths honors it). Demo mode starts right after
 // the view model is built so no real account label reaches a PNG.
+//
+// Not everything is a sample: Claude Code homes are discovered from the real user profile, so the
+// Claude Usage and Publish usage pages can show real folder names, paths (with the Windows user
+// name) and project names. Check those PNGs before sharing them.
 public static class Program
 {
     const string LightThemeKey = "harness-light";

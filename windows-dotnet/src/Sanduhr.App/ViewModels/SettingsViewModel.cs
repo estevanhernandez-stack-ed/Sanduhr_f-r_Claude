@@ -67,7 +67,7 @@ public sealed class SettingsViewModel
     /// <summary>About, Where settings live: the roaming folder (settings, history, themes, logs).</summary>
     public string SettingsFolder { get; }
 
-    /// <summary>About, Where settings live: the local folder (the usage vault).</summary>
+    /// <summary>About, Where settings live: the usage vault (PRIVACY.md: <c>%LOCALAPPDATA%\Sanduhr\vault\</c>).</summary>
     public string LocalFolder { get; }
 
     /// <summary>Opens a folder from About in File Explorer.</summary>
@@ -105,8 +105,9 @@ public sealed class SettingsViewModel
         // The real folders this build uses (a dev build's SANDUHR_DEV_PROFILE included).
         var paths = new Paths();
         SettingsFolder = paths.AppDataDir;
-        LocalFolder = System.IO.Path.GetDirectoryName(paths.VaultDir) ?? paths.VaultDir;
-        ShowInExplorerCommand = new RelayCommand<string>(OpenFolder);
+        LocalFolder = paths.VaultDir;
+        ShowInExplorerCommand = new RelayCommand<string>(OpenFolder,
+            folder => !string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder));
         OpenLinkCommand = new RelayCommand<string>(OpenLink);
     }
 

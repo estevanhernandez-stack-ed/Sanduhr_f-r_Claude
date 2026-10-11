@@ -115,6 +115,11 @@ public sealed partial class LocalCcViewModel : ObservableObject
 
     public ThemePalette Palette => _widget.Palette;
 
+    private void OnThemeChanged(ThemePalette _) => Changed?.Invoke();
+
+    /// <summary>Stop following the widget's theme (Settings closed): the widget outlives the window.</summary>
+    public void Detach() => _widget.ThemeChanged -= OnThemeChanged;
+
     public LocalCcViewModel(WidgetViewModel widget, bool showBreakdowns, Action<bool> persistShowBreakdowns)
     {
         _widget = widget;
@@ -122,7 +127,7 @@ public sealed partial class LocalCcViewModel : ObservableObject
         _persistShowBreakdowns = persistShowBreakdowns;
         _statuslineInstalled = widget.LoadStatuslineEnabled();
         _mcpInstalled = widget.LoadMcpEnabled();
-        _widget.ThemeChanged += _ => Changed?.Invoke();
+        _widget.ThemeChanged += OnThemeChanged;
         RebuildRoots();
         RebuildMcpRoots();
     }

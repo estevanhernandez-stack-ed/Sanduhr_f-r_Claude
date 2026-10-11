@@ -686,6 +686,7 @@
                                                 </ListBox.ItemTemplate>
                                             </ListBox>
                                             <TextBlock Text="No setting by that name." FontSize="11" Margin="4,4,0,0"
+                                                       AutomationProperties.LiveSetting="Polite"
                                                        Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                                        Visibility="{Binding Search.HasNoResults, Converter={StaticResource BoolVis}}" />
                                         </Grid>
@@ -718,7 +719,6 @@
                                 <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
                                         BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1"
                                         Padding="10,8" Margin="0,0,0,10" HorizontalAlignment="Left"
-                                        AutomationProperties.Name="{Binding General.TrayPreviewText, StringFormat='Tray preview: {0}'}"
                                         ToolTip="What the tray icon shows now">
                                     <StackPanel Orientation="Horizontal">
                                         <Image Source="{Binding General.TrayPreviewImage}" Width="32" Height="32"

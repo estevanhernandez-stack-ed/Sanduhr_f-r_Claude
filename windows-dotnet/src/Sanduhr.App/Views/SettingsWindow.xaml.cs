@@ -75,6 +75,7 @@ internal partial class SettingsWindow : Window
             ViewModel.General.Detach();
             _localCcTimer.Stop();
             ViewModel.History.Changed -= RenderHistory;
+            ViewModel.History.Detach();
             ViewModel.ClaudeCode.Overview.Changed -= RenderLocalCc;
             ViewModel.ClaudeCode.Trends.Changed -= RenderTrends;
             CalendarStrip.DayClicked -= OnCalendarDayClicked;
@@ -198,34 +199,69 @@ internal partial class SettingsWindow : Window
         var tab = Tabs.Items.OfType<TabItem>().FirstOrDefault(t => PageOf(t) == page);
         if (tab is null)
             return;
-        Tabs.SelectedItem = tab;
-        if (SettingsIndex.Find(page, anchor) is not { } entry)
-            return;
+        // A link from outside (a card's Show me, a menu) shows the page list, not an old search.
+        ViewModel.Search.Clear();
+        var entry = SettingsIndex.Find(page, anchor);
 
-        if (page == SettingsPage.ClaudeUsage && entry.Subsection is { } view && ViewModel.ClaudeCode.Section != view)
+        // Claude Usage: pick the anchor's view first. Selecting the page then refreshes that view
+        // once; on the page already shown, the view's own command refreshes it.
+        if (page == SettingsPage.ClaudeUsage && entry?.Subsection is { } view && ViewModel.ClaudeCode.Section != view)
         {
-            var command = view switch
+            if (ReferenceEquals(Tabs.SelectedItem, tab))
             {
-                SettingsIndex.TrendsView => ViewModel.ClaudeCode.SetTrendsCommand,
-                SettingsIndex.SessionsView => ViewModel.ClaudeCode.SetSessionsCommand,
-                _ => ViewModel.ClaudeCode.SetOverviewCommand,
-            };
-            command.Execute(null);
+                var command = view switch
+                {
+                    SettingsIndex.TrendsView => ViewModel.ClaudeCode.SetTrendsCommand,
+                    SettingsIndex.SessionsView => ViewModel.ClaudeCode.SetSessionsCommand,
+                    _ => ViewModel.ClaudeCode.SetOverviewCommand,
+                };
+                command.Execute(null);
+            }
+            else
+            {
+                ViewModel.ClaudeCode.Section = view;
+            }
         }
+        // Themes: the paste box only exists in paste mode.
+        if (page == SettingsPage.Themes && anchor == SettingsIndex.Paste)
+            ViewModel.Themes.IsStudioMode = false;
+
+        Tabs.SelectedItem = tab;
+        if (entry is null)
+            return;
 
         // After layout: the page may have just been realized for the first time.
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
         {
             if (tab.Content is not DependencyObject content || SettingsAnchor.Find(content, entry.Anchor!) is not { } target
                 || !target.IsVisible)
+            {
+                tab.Focus();   // never leave keyboard focus nowhere
                 return;
+            }
             target.BringIntoView();
             if (TryFindResource("Sanduhr.Brush.Accent") is Brush accent)
                 AnchorHighlightAdorner.Flash(target, accent, TimeSpan.FromSeconds(1.5));
-            // Keyboard users land on the section: its first control that takes focus.
+            // Keyboard users land on the section: its first control that takes focus, else the
+            // next one after a heading, else the page's sidebar entry.
             if (FirstFocusable(target) is { } control)
                 control.Focus();
+            else if (target.PredictFocus(FocusNavigationDirection.Down) is UIElement { IsVisible: true } next
+                     && IsInside(next, content))
+                next.Focus();
+            else
+                tab.Focus();
         }));
+    }
+
+    private static bool IsInside(DependencyObject element, DependencyObject root)
+    {
+        for (var d = element; d is not null; d = VisualTreeHelper.GetParent(d) ?? LogicalTreeHelper.GetParent(d))
+        {
+            if (ReferenceEquals(d, root))
+                return true;
+        }
+        return false;
     }
 
     private static UIElement? FirstFocusable(DependencyObject root)
@@ -294,7 +330,6 @@ internal partial class SettingsWindow : Window
     /// <summary>A chosen result: the search closes and the page opens at the section.</summary>
     private void OpenSearchRow(SettingsSearchRow row)
     {
-        ViewModel.Search.Clear();
         SelectPage(row.Page, row.Anchor);
         if (row.Anchor is null)
             (Tabs.SelectedItem as TabItem)?.Focus();

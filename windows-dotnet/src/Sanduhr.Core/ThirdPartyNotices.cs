@@ -5,9 +5,9 @@ namespace Sanduhr.Core;
 public sealed record ThirdPartyPackage(string Name, string License, string Url);
 
 /// <summary>
-/// Settings, About, Third-party notices: every package the app ships, with the license its NuGet
-/// package declares. Build-only packages (PrivateAssets all, such as CsWin32) ship nothing and are not
-/// listed. <c>ThirdPartyNoticesTests</c> checks this list against the App's PackageReferences.
+/// Settings, About, Third-party notices: every package the App references directly, with the
+/// license its NuGet package declares. Build-only packages (PrivateAssets all, such as CsWin32) ship
+/// nothing and are not listed; the packages these depend on are not listed either. <c>ThirdPartyNoticesTests</c> checks this list against the App's PackageReferences.
 /// </summary>
 public static class ThirdPartyNotices
 {

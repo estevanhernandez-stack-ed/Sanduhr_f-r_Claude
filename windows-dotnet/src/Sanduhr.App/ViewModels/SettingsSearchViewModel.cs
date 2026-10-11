@@ -30,18 +30,32 @@ public sealed partial class SettingsSearchViewModel : ObservableObject
     partial void OnQueryChanged(string value)
     {
         Results.Clear();
-        foreach (var (page, entries) in SettingsIndex.Grouped(SettingsIndex.Search(value)))
+        var hits = SettingsIndex.Search(value);
+        var best = hits.Count > 0 ? hits[0].Entry : null;
+        _first = null;
+        foreach (var (page, entries) in SettingsIndex.Grouped(hits))
         {
-            Results.Add(new SettingsSearchRow(SettingsNames.PageTitle(page), page, null, IsPage: true));
+            var pageRow = new SettingsSearchRow(SettingsNames.PageTitle(page), page, null, IsPage: true);
+            Results.Add(pageRow);
+            if (best is not null && best.Page == page && best.Anchor is null)
+                _first ??= pageRow;
             foreach (var e in entries)
-                Results.Add(new SettingsSearchRow(e.Title, page, e.Anchor, IsPage: false));
+            {
+                var row = new SettingsSearchRow(e.Title, page, e.Anchor, IsPage: false);
+                Results.Add(row);
+                if (best is not null && best.Page == page && best.Anchor is not null && best.Title == e.Title)
+                    _first ??= row;
+            }
         }
         OnPropertyChanged(nameof(IsSearching));
         OnPropertyChanged(nameof(HasNoResults));
     }
 
-    /// <summary>The row Enter opens from the search box: the best hit's first section, else its page.</summary>
-    public SettingsSearchRow? First => Results.Count > 1 && !Results[1].IsPage ? Results[1] : Results.FirstOrDefault();
+    private SettingsSearchRow? _first;
+
+    /// <summary>The row Enter opens from the search box: the best hit, a page or a section
+    /// ("publish" opens Publish usage, "vault" opens History vault).</summary>
+    public SettingsSearchRow? First => _first ?? Results.FirstOrDefault();
 
     public void Clear() => Query = "";
 }

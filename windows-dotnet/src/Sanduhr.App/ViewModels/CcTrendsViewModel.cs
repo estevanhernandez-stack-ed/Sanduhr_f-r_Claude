@@ -30,10 +30,15 @@ public sealed partial class CcTrendsViewModel : ObservableObject
 
     public ThemePalette Palette => _widget.Palette;
 
+    private void OnThemeChanged(ThemePalette _) => Changed?.Invoke();
+
+    /// <summary>Stop following the widget's theme (Settings closed): the widget outlives the window.</summary>
+    public void Detach() => _widget.ThemeChanged -= OnThemeChanged;
+
     public CcTrendsViewModel(WidgetViewModel widget)
     {
         _widget = widget;
-        _widget.ThemeChanged += _ => Changed?.Invoke();
+        _widget.ThemeChanged += OnThemeChanged;
     }
 
     [RelayCommand]

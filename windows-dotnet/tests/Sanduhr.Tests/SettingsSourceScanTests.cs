@@ -123,4 +123,36 @@ public class SettingsSourceScanTests
         }
         Assert.True(missing.Count == 0, "Anchors not marked: " + string.Join(", ", missing));
     }
+
+    [Fact]
+    public void The_scan_sees_known_strings()
+    {
+        // A positive control: if either regex stops matching, the retired-name test would pass
+        // having scanned nothing.
+        var cs = CsStrings().ToList();
+        var xaml = XamlStrings().ToList();
+        Assert.Contains(cs, x => x.Where.StartsWith("App.xaml.cs", StringComparison.Ordinal) && x.Text == "Show");
+        Assert.Contains(xaml, x => x.Text == "Sanduhr — Settings");
+        Assert.True(cs.Count > 200 && xaml.Count > 100, $"scanned {cs.Count} C# and {xaml.Count} XAML strings");
+    }
+
+    [Fact]
+    public void The_sidebar_in_XAML_matches_the_names_table()
+    {
+        var xaml = File.ReadAllText(Path.Combine(AppDir(), "Views", "SettingsWindow.xaml"));
+        var tabs = Regex.Matches(xaml, @"<TabItem\b([^>]*)>").Select(m => m.Groups[1].Value).ToList();
+        string Attr(string tag, string name)
+        {
+            var m = Regex.Match(tag, @"(?<![\w.:])" + Regex.Escape(name) + "=\"([^\"]*)\"");
+            return m.Success ? m.Groups[1].Value : "";
+        }
+
+        Assert.Equal(SettingsNames.Pages.Select(p => p.ToString()), tabs.Select(t => Attr(t, "Tag")));
+        Assert.Equal(SettingsNames.Pages.Select(SettingsNames.PageTitle), tabs.Select(t => Attr(t, "Header")));
+        Assert.Equal(SettingsNames.Pages.Select(SettingsNames.PageTitle), tabs.Select(t => Attr(t, "AutomationProperties.Name")));
+        // A group's heading sits on its first page and nowhere else.
+        var expected = SettingsNames.Pages.Select(p =>
+            SettingsNames.Sidebar.FirstOrDefault(g => g.Pages[0] == p)?.Title ?? "");
+        Assert.Equal(expected, tabs.Select(t => Attr(t, "views:SettingsSidebar.GroupHeader")));
+    }
 }

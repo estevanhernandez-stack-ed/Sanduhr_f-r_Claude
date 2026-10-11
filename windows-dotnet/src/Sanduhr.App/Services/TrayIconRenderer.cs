@@ -21,12 +21,6 @@ public static class TrayIconRenderer
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool DestroyIcon(IntPtr handle);
 
-    /// <summary>
-    /// Build an icon showing <paramref name="percent"/> (clamped 0-100), tinted
-    /// by the usage ramp. <paramref name="percent"/> &lt; 0 renders a neutral
-    /// dot (no data yet). The returned <see cref="Icon"/> owns its handle and
-    /// must be disposed by the caller when it swaps in the next one.
-    /// </summary>
     /// <summary>The icon for <paramref name="percent"/> as a frozen WPF image, for the previews
     /// (Settings, General and the What's New and tour cards); null if it can't be drawn.</summary>
     public static System.Windows.Media.ImageSource? RenderImage(int percent)
@@ -45,6 +39,12 @@ public static class TrayIconRenderer
         }
     }
 
+    /// <summary>
+    /// Build an icon showing <paramref name="percent"/> (clamped 0-100), tinted
+    /// by the usage ramp. <paramref name="percent"/> &lt; 0 renders a neutral
+    /// dot (no data yet). The returned <see cref="Icon"/> owns its handle and
+    /// must be disposed by the caller when it swaps in the next one.
+    /// </summary>
     public static Icon Render(int percent)
     {
         const int size = 32;
