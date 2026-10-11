@@ -63,10 +63,11 @@
 
 ### Stages 2 to 7 (later runs; each starts from the latest main with its own branch and PR)
 
-- [ ] **9. Stage 2: welcome tour, signed-out first run, demo mode**
+- [x] **9. Stage 2: welcome tour, signed-out first run, demo mode**
   Spec ref: `spec.md > Stage 2`; `docs/welcome-tour-spec.md`
   What to build: `WelcomeTour.cs` on the card type, the window's step mode, `tour_state`, the What's New hand-off, the signed-out widget, demo mode.
   Acceptance: PRD S2 stories. Verify: tests for step visibility, shown-once, choices written; describe the windows.
+  Built: `WelcomeTour.cs` (TourCard wraps WhatsNewCard; 4 Windows steps, the Desk step waits for S5), `DemoMode.cs`, the window's step mode with live previews, `tour_state` decided before What's New records, Take the Tour… in the tray and Settings, Not now on the first-run card, demo mode from `--demo`. Rendered off screen on an isolated `SANDUHR_DEV_PROFILE`: every tour step signed out and in demo, the demo widget, the Not signed in line, What's New unchanged.
 
 - [ ] **10. Stage 3: Settings v2**
   Spec ref: `spec.md > Stage 3`; `docs/settings-v2-spec.md`

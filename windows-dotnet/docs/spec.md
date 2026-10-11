@@ -222,7 +222,7 @@ Ported from `mac/Tests/SanduhrTests/{WhatsNewTests, HotKeyComboTests, ClaudeCode
 ---
 
 ## Stage 2: welcome tour and a clearer first run
-- **Core `WelcomeTour.cs`**: steps as data (`Step`, `Requires`, `Choice`) reusing `WhatsNewCard`'s fields; `Visible(steps, features)`; `AtLaunch(fresh, finished, firstFetchOk)`; keys `tour_state` ("pending" | "finished" | "skipped"). Finishing or skipping records `whats_new_last_seen`, and `WhatsNew.AtLaunch(tour: pending)` yields to it. Mac reference: `WelcomeTour.swift`, `WelcomeTourSteps.swift`, `WelcomeTourWindow.swift`.
+- **Core `WelcomeTour.cs`**: steps as data (`Step`, `Requires`, `Choice`) reusing `WhatsNewCard`'s fields; `Visible(steps, features)`; `AtLaunch(fresh, finished, firstFetchOk)`; key `tour_state` ("pending" | "finished" | "skipped" | "not_offered", decided once at launch as the Mac does). Finishing or skipping records `whats_new_last_seen`, and `WhatsNew.AtLaunch(tour: pending)` yields to it. Mac reference: `WelcomeTour.swift`, `WelcomeTourSteps.swift`, `WelcomeTourWindow.swift`.
 - **Window**: the What's New window in step mode ("Welcome to Sanduhr · 1 of N", Back, Next, Skip the tour); keyboard Enter = Next, Escape = Skip.
 - **Signed-out widget**: "Not signed in" with Sign In, model controls hidden (`SignedOut.swift`).
 - **Demo mode** (`DemoMode.swift`): a session-only switch that pauses fetches and feeds sample data to the cards, tray, tour and Settings previews; never writes history, snapshot or vault.
@@ -267,7 +267,7 @@ All new state is keys in `settings.json`, defaults on absence:
 | `limits_hidden_until_reset` | `{tier: {resets_at, utilization}}` | S1 | {} |
 | `alert_muted_tiers` | `[tier]` | S1 | [] |
 | `tray_mode` | string | S1 | "highest" |
-| `tour_state` | string | S2 | fresh: "pending"; existing: absent = done |
+| `tour_state` | string | S2 | fresh: "pending"; otherwise "not_offered" |
 
 No new files outside `settings.json` in S1. Nothing new in Credential Manager, the vault or `snapshot.json`.
 

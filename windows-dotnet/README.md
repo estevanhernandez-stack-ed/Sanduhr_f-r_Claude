@@ -136,6 +136,17 @@ keys, each defaulting when absent: `whats_new_last_seen`, `whats_new_installed_v
 `limits_hidden_until_reset`, `alert_muted_tiers`. No new files, Credential Manager slots or
 manifest capabilities.
 
+### Since 3.4.3: Mac parity, Stage 2
+
+Stage 2 adds the welcome tour (`docs/welcome-tour-spec.md`): four steps in the What's New
+window's step mode, opened once after a fresh install's first successful fetch, reopenable from
+the tray and Settings, General ("Take the Tour…"). Its tray step writes `tray_mode` in place. The
+first-run sign-in card gains **Not now**, which leaves a "Not signed in · Sign in" line for that
+launch. Demo mode (`Sanduhr.exe --demo`, or `SANDUHR_DEMO=1`) shows two sample accounts with
+made-up numbers for screenshots, labelled on the widget, tray tooltip and tour. It writes nothing:
+no snapshot, history, alert or limit state. New `settings.json` key: `tour_state` (`pending`,
+`finished`, `skipped`, `not_offered`).
+
 ---
 
 ## Tech stack
