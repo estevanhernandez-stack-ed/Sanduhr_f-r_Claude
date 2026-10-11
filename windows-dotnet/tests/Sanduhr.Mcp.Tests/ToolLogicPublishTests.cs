@@ -169,11 +169,16 @@ public class ToolLogicPublishTests
         string resPath = cfg.PublishResultPath!;
 
         // Play the widget: wait for the request, answer it, clear it.
+        // The server writes the request in place, so the file can exist before
+        // its writer has closed it (an open fails with a sharing violation) or
+        // before its JSON is complete. Wait for a whole, readable request, the
+        // same condition the real widget waits on, instead of the file's mere
+        // existence.
         var widget = Task.Run(async () =>
         {
-            while (!File.Exists(reqPath))
+            JsonObject? req;
+            while ((req = TryReadRequest(reqPath)) is null)
                 await Task.Delay(10);
-            var req = (JsonObject)JsonNode.Parse(File.ReadAllText(reqPath))!;
             // A stale result for a DIFFERENT id must be ignored by the poller.
             File.WriteAllText(resPath, new JsonObject { ["id"] = "old", ["result"] = new JsonObject { ["status"] = "error" } }.ToJsonString());
             await Task.Delay(30);
@@ -192,6 +197,22 @@ public class ToolLogicPublishTests
         Assert.Equal(200, r["http_status"]!.GetValue<int>());
         Assert.Equal("2026-07-20", (string?)r["date"]);
         Assert.False(File.Exists(reqPath));
+    }
+
+    /// <summary>The request once its writer is done: null while the file is
+    /// missing, still open for writing, or not yet a complete JSON object.</summary>
+    private static JsonObject? TryReadRequest(string path)
+    {
+        try
+        {
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var sr = new StreamReader(fs);
+            return JsonNode.Parse(sr.ReadToEnd()) as JsonObject;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            return null;
+        }
     }
 
     [Fact]

@@ -10,6 +10,7 @@ namespace Sanduhr.Tests;
 /// assertions from test_tier_card.py / test_fetcher.py. Rendering is item 5
 /// and out of scope here.
 /// </summary>
+[Collection(TierRegistryCollection.Name)]
 public class TierModelTests : IDisposable
 {
     private static readonly DateTimeOffset Now = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);

@@ -12,6 +12,7 @@ namespace Sanduhr.Tests;
 /// the history append (isolated to a temp APPDATA in Python) becomes a recording
 /// fake <see cref="IUsageHistory"/>.
 /// </summary>
+[Collection(TierRegistryCollection.Name)]
 public class UsageFetcherTests : IDisposable
 {
     // TierModel's dynamic scoped-tier registry is process-global static state
