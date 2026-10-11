@@ -79,6 +79,12 @@
   Spec ref: `spec.md > Stage 4`; `docs/mods-and-config-spec.md`
   What to build: folder list, JSON splice and receipts, Mods & Config read-only then edits, meters mod, statusline combine, glow hooks, account follow, per-seat meters (after Este rules on the MCP root set).
   Acceptance: PRD S4 stories. Verify: byte-for-byte Remove tests on scratch folders only.
+  - [ ] 11.1 Rulings: MCP folder set behind consent, publish race, one trademark constant (spec 4.0)
+  - [ ] 11.2 JsonEdit, ConfigCommit, ReceiptLog, ConfigMask (spec 4.1)
+  - [ ] 11.3 AccountFollow rules and seat files in Core (spec 4.6)
+  - [ ] 11.4 ModInventory, meters mod and glow hook kinds, glow rules (spec 4.2, 4.3, 4.5)
+  - [ ] 11.5 Statusline on the splice engine, combine and segments, seat lookup (spec 4.4, 4.6)
+  - [ ] 11.6 Claude Code and Mods & Config pages, glow window, folder links, docs (spec 4.2 to 4.6)
 
 - [ ] **12. Stage 5: Desk foundation** (deepening pass first)
   Spec ref: `spec.md > Stage 5`
