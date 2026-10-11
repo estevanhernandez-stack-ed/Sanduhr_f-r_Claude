@@ -128,7 +128,24 @@ class FakeApp
         a.merge!('active' => false, 'changed' => false, 'working' => nil, 'click_through' => 'drawn',
                  'bar_visible' => false)
       end
+    when 'demo'
+      # Item 72, slice 4: sample meters on the widget and the Desk, two sample accounts; off puts
+      # the real state back.
+      if arg == 'on'
+        unless s['demo'] && s['demo']['active']
+          @before_demo = { 'meters' => s['meters'], 'demo' => s['demo'] }
+          s['meters'] = [{ 'tier' => 'five_hour', 'label' => 'Session (5hr)', 'percent' => 42, 'fill' => 0.42,
+                           'pace' => 0.6, 'reset' => 'Today 5:00 PM', 'warning' => false }] if Array(s['meters']).empty?
+        end
+        # usage_rows counts the Usage page's charts as drawn: 0 until the page opens.
+        s['demo'] = { 'active' => true, 'widget_tiers' => 3, 'desk_line' => true, 'notch_meters' => true,
+                      'accounts' => 2, 'usage_rows' => 0 }
+      elsif @before_demo
+        s.merge!(@before_demo)
+        @before_demo = nil
+      end
     when 'usage'
+      s['demo']['usage_rows'] = 3 if s['demo'].is_a?(Hash) && s['demo']['active']
       s['settings_open'] = true
       s['settings_section'] = 'usage'
       s['usage_page'] = { 'open' => true, 'tab' => arg || 'overview' }
@@ -454,6 +471,34 @@ r = Runner.new(app_hidden, MemoryDefaults.new, File.join(Smoke::OUT, '.selftest-
     .run_file(reach_file)
 eq('settings reach fails when the section is off screen', r['status'], 'fail')
 FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-reach'))
+# Item 72, slice 4: demo mode on a fresh profile (no account, no numbers) fills the widget and the
+# Desk and shows two sample accounts; off and the restore bring the fresh state back.
+eq('demo block in the fixture', state['demo'].keys, %w[active widget_tiers desk_line notch_meters accounts usage_rows])
+check('demo block holds only flags and counts', state['demo'].values.all? { |v| v == true || v == false || v.is_a?(Integer) })
+fresh = { 'meters' => [], 'accounts_count' => 0, 'settings_open' => false, 'last_fetch' => nil, 'widget_visible' => false,
+          'demo' => { 'active' => false, 'widget_tiers' => 0, 'desk_line' => false, 'notch_meters' => false,
+                      'accounts' => 0, 'usage_rows' => 0 } }
+demo_doc = YAML.safe_load(File.read(File.join(Smoke::SCENARIOS, 'demo-every-surface.yaml')))
+demo_doc['steps'].reject! { |s| s.key?('expect') }
+FileUtils.mkdir_p(File.join(Smoke::OUT, '.selftest-demo'))
+demo_file = File.join(Smoke::OUT, '.selftest-demo', 'demo-every-surface.yaml')
+File.write(demo_file, YAML.dump(demo_doc))
+app_demo = FakeApp.new(fresh)
+r = Runner.new(app_demo, MemoryDefaults.new, File.join(Smoke::OUT, '.selftest-demo', 'out'), io: StringIO.new, settle: 0, poll: 0.01, within: 0.05)
+    .run_file(demo_file)
+eq('demo scenario passes on a fresh profile', [r['status'], r['reason']], ['pass', nil])
+eq('demo scenario turns demo on and off, then puts the fresh profile back', app_demo.actions,
+   ['show-widget', 'demo on', 'usage meters', 'settings credentials', 'demo off', 'hide-widget', 'close-settings'])
+eq('fresh profile back: no meters, demo off', [app_demo.state_now['meters'], app_demo.state_now['demo']['active']], [[], false])
+# The restore turns demo mode off when a scenario leaves it on.
+app_left = FakeApp.new(fresh)
+app_left.action('demo', 'on')
+eq('demo fills the Desk meters on a fresh profile', app_left.state_now['meters'].length, 1)
+eq('demo left on goes off', Restore.plan(app_demo.state_now, app_left.state_now), [%w[demo off]])
+eq('demo off before and after: nothing to do', Restore.plan(fresh, fresh), [])
+# Demo mode never touches the real accounts: no step may add, remove or switch one.
+check('demo scenario touches no account', File.read(File.join(Smoke::SCENARIOS, 'demo-every-surface.yaml')) !~ /do:\s*account/)
+FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-demo'))
 # Item 60: Arrange mode, flags and a layout string only; a scenario that leaves it on is cancelled.
 eq('desk arrange keys', state['desk_arrange'].keys, %w[active changed working click_through bar_visible])
 eq('desk arrange in the fixture: off, clicks only where drawn, no bar',

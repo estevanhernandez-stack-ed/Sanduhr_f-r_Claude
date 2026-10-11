@@ -47,9 +47,11 @@ enum JustTheDesk {
         return true
     }
 
-    /// Whether the welcome sheet shows on its own: no session key, and Just the Desk not chosen.
-    static func showsWelcome(hasSessionKey: Bool, in store: DefaultsStore = UserDefaults.standard) -> Bool {
-        !hasSessionKey && !isOn(in: store)
+    /// Whether the welcome sheet shows on its own: no session key, Just the Desk not chosen, and
+    /// not put off for this launch with Not Now (WelcomeNotNow).
+    static func showsWelcome(hasSessionKey: Bool, notNow: Bool = false,
+                             in store: DefaultsStore = UserDefaults.standard) -> Bool {
+        !hasSessionKey && !notNow && !isOn(in: store)
     }
 
     /// The widget rule's "has a session key": with Just the Desk on and no key, the widget never

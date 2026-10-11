@@ -20,8 +20,12 @@ struct AccountsSettings: View {
 
     var body: some View {
         Group {
-            if vm.accountLabels.isEmpty {
-                FirstAccountForm(vm: vm)
+            if vm.demo {
+                // Demo mode (slice 4): the sample accounts, read-only, so nothing real can change.
+                DemoAccounts(vm: vm)
+                    .settingsAnchor(SettingsAnchor.accounts)
+            } else if vm.accountLabels.isEmpty {
+                FirstAccountForm(vm: vm, navigation: navigation)
                     .settingsAnchor(SettingsAnchor.accounts)
             } else {
                 accounts
@@ -229,11 +233,10 @@ private struct KeyFields: View {
             Text(hasKey ? "Or paste a sessionKey (replace)" : "Or paste a sessionKey")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text("claude.ai → DevTools (⌥⌘I) → Application → Cookies → sessionKey")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
             SecureField(hasKey ? "Leave blank to keep existing key" : "sessionKey", text: $sessionKey)
                 .textFieldStyle(.roundedBorder)
+            StoreCaption()
+            KeyHelp()
         }
         VStack(alignment: .leading, spacing: 6) {
             Text("cf_clearance (optional)")
@@ -509,46 +512,221 @@ private struct AddAccountForm: View {
 
 // MARK: - No accounts yet
 
-/// The first key, as Settings, Credentials took it before accounts: saving it creates Personal
-/// (KeychainStore.set), and the page turns into the list.
+/// The signed-out form (item 72, slice 4): a Label first, so the first account can be named Work
+/// (F17); Sign In to Claude… and Paste a Key Instead as on the welcome sheet; the key field with
+/// plain Chrome and Safari help (F19) and cf_clearance behind "Seeing a Cloudflare error?"; then
+/// the Data defaults the account will start with, read-only. Saving adds the account under the
+/// label, as Add Account does, and the page turns into the list.
 private struct FirstAccountForm: View {
     var vm: UsageViewModel
+    var navigation: SettingsNavigation?
+    @State private var label = SignedOut.defaultLabel
     @State private var sessionKey = ""
     @State private var cfClearance = ""
+    @State private var pasting = false
+    @State private var error: String?
+
+    /// The label rule, as you type (no other account exists to clash with).
+    private var labelProblem: String? {
+        AccountRegistry.labelProblem(label.trimmed, existing: vm.accountLabels).map(refusal)
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Sign in to the claude.ai account to watch, or paste its session key. It becomes your Personal account; you can add more here later.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            KeyFields(sessionKey: $sessionKey, cfClearance: $cfClearance, hasKey: false,
-                      onSignIn: signIn)
-            HStack {
-                Button("Save") { save() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(sessionKey.trimmed.isEmpty)
-                Spacer()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(SignedOut.intro)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                labelField
+                HStack {
+                    Button(SignedOut.pasteTitle) { pasting = true }
+                        .disabled(pasting)
+                    Button("Sign In to Claude…") { signIn() }
+                        .keyboardShortcut(pasting ? nil : .defaultAction)
+                        .disabled(labelProblem != nil)
+                    Spacer()
+                }
+                if pasting { FirstKeyFields(sessionKey: $sessionKey, cfClearance: $cfClearance) }
+                if pasting { saveRow }
+                if let error { FormNote(text: error, isError: true) }
+                Divider()
+                DataDefaultsPreview(label: label)
             }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .padding(.trailing, 12)
+        }
+        .onAppear { takePasteRequest() }
+        // Paste a Key Instead again while the page already shows.
+        .onChange(of: navigation?.pasteKey ?? false) { _, asked in if asked { takePasteRequest() } }
+    }
+
+    /// The welcome sheet's or the sign-in window's Paste a Key Instead: the key field shows.
+    private func takePasteRequest() {
+        guard navigation?.pasteKey == true else { return }
+        navigation?.pasteKey = false
+        pasting = true
+    }
+
+    private var labelField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Label").font(.caption).foregroundStyle(.secondary)
+            TextField(SignedOut.defaultLabel, text: $label)
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 220)
+            if let labelProblem { FormNote(text: labelProblem, isError: true) }
+        }
+    }
+
+    private var saveRow: some View {
+        HStack {
+            Button("Save") { save() }
+                .keyboardShortcut(.defaultAction)
+                .disabled(sessionKey.trimmed.isEmpty || labelProblem != nil)
             Spacer()
         }
     }
 
     private func signIn() {
         Task {
-            guard case .signedIn(let c) = await SignInWindowController.shared.run() else { return }
-            sessionKey = c.sessionKey
-            cfClearance = c.cfClearance ?? ""
-            save()
+            let l = label.trimmed
+            switch await SignInWindowController.shared.run(account: l.isEmpty ? nil : l) {
+            case .signedIn(let c):
+                sessionKey = c.sessionKey
+                cfClearance = c.cfClearance ?? ""
+                save()
+            case .pasteInstead:
+                pasting = true
+            case .cancelled:
+                break
+            }
         }
     }
 
     private func save() {
-        KeychainStore.set(sessionKey.trimmed, account: KeychainAccount.sessionKey)
         let cf = cfClearance.trimmed
-        if !cf.isEmpty { KeychainStore.set(cf, account: KeychainAccount.cfClearance) }
-        sessionKey = ""
-        cfClearance = ""
-        vm.credentialsChanged()
+        do {
+            try vm.addAccount(label.trimmed, sessionKey: sessionKey.trimmed, cfClearance: cf.isEmpty ? nil : cf,
+                              makeActive: true)
+            sessionKey = ""
+            cfClearance = ""
+        } catch {
+            self.error = refusal(error)
+            // A key captured by Sign In stays in the field beside the refusal, to fix and Save.
+            pasting = true
+        }
+    }
+}
+
+/// The first account's key field: the plain help, the dev-build caption and cf_clearance folded
+/// behind "Seeing a Cloudflare error?".
+private struct FirstKeyFields: View {
+    @Binding var sessionKey: String
+    @Binding var cfClearance: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("sessionKey").font(.caption).foregroundStyle(.secondary)
+            SecureField("Paste the sessionKey cookie's value", text: $sessionKey)
+                .textFieldStyle(.roundedBorder)
+            StoreCaption()
+            KeyHelp()
+            DisclosureGroup(SignedOut.cloudflareTitle) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(SignedOut.cloudflareCaption)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    SecureField("cf_clearance", text: $cfClearance)
+                        .textFieldStyle(.roundedBorder)
+                }
+                .padding(.top, 4)
+            }
+            .font(.caption)
+        }
+    }
+}
+
+/// "How do I find this?": the guide's plain steps for Chrome and Safari (F19), folded.
+private struct KeyHelp: View {
+    var body: some View {
+        DisclosureGroup(SignedOut.keyHelpTitle) {
+            VStack(alignment: .leading, spacing: 8) {
+                KeySteps(browser: "Chrome", steps: SignedOut.chromeSteps)
+                KeySteps(browser: "Safari", steps: SignedOut.safariSteps)
+            }
+            .padding(.top, 4)
+        }
+        .font(.caption)
+    }
+}
+
+private struct KeySteps: View {
+    let browser: String
+    let steps: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(browser).font(.caption.weight(.semibold))
+            ForEach(Array(steps.enumerated()), id: \.offset) { item in
+                Text("\(item.offset + 1). \(item.element)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+/// Under a key field on a dev build only (F29): dev builds keep keys in a file on purpose.
+private struct StoreCaption: View {
+    var body: some View {
+        if let text = SignedOut.storeCaption(KeychainStore.kind) {
+            Text(text)
+                .font(.caption2)
+                .foregroundStyle(Color.hex("fb923c"))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// The Data section before sign-in (F17), read-only: what the account will start with.
+private struct DataDefaultsPreview: View {
+    let label: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Data").font(.headline)
+            ForEach(SignedOut.dataPreview(label: label, in: KeychainStore.accounts.defaults), id: \.name) { row in
+                LabeledContent(row.name, value: row.value)
+            }
+            Text(SignedOut.dataCaption)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+// MARK: - Demo mode
+
+/// Demo mode (slice 4): the two sample accounts as the list shows them, and nothing to change.
+private struct DemoAccounts: View {
+    var vm: UsageViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Demo mode: sample accounts with made-up numbers. Your own accounts are back when demo mode is off; nothing here changes them.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(vm.accountLabels, id: \.self) { label in
+                    AccountRow(label: label, active: label == vm.activeAccount, signedIn: true)
+                }
+            }
+            .frame(width: 190, alignment: .leading)
+            Spacer(minLength: 0)
+        }
     }
 }

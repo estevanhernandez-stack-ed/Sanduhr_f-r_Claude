@@ -1938,3 +1938,34 @@ keys of your own) and a made-up account.
    `messages.txt.previous` beside where `messages.txt` was, `defaults read com.626labs.sanduhr`
    and `defaults read com.626labs.sanduhr.desk` find no domain, and Keychain Access has no
    `com.626labs.sanduhr` item. Launch: the welcome sheet shows.
+
+## 48. Settings v2, slice 4: signed out and demo mode (item 72)
+
+On a scratch macOS user (or a throwaway profile as in section 45), never on your own.
+
+1. Open Sanduhr: the welcome sheet is no wider than the widget. **Not Now** (or Escape) puts it
+   away; the widget reads "Not signed in — sign in". Quit and open again: the sheet is back.
+2. Settings, Accounts: **Label** reads Personal, **Paste a Key Instead** and **Sign In to Claude…**
+   sit under it, and **Data** lists Meter history 30 days, Claude Code activity Not tracked and
+   Share with your agents Off, with no controls. Click Paste a Key Instead: the sessionKey field
+   shows, with **How do I find this?** (Chrome and Safari steps, no DevTools shorthand) and
+   **Seeing a Cloudflare error?** folded. On a dev build the orange "Dev build: the key is kept in a
+   file, not the Keychain." sits under the field and `credentials_store: file`; a release build
+   shows no such line. The welcome sheet's Paste a Key Instead lands here with the field showing.
+3. Type Work as the Label and sign in: the account list shows Work, not Personal.
+4. Signed out, Settings, Usage: "Sign in to see your usage here…" and **Accounts Settings…**, no
+   charts.
+5. Notch on, Right wing on Claude meters, Alerts' **Sign-in reminders on the Desk and notch** off:
+   no black slab right of the camera; the island ends at the camera. Message in the left wing on a
+   day without a line: the same on the left. Sign in (or set a message): the wing comes back at
+   Extra width each side. Nothing in a wing keeps its black width. Signed in with two accounts,
+   click the widget's chip: the meters wing keeps its width through the switch, and after Save of a
+   new key it keeps it until the first numbers.
+6. `smoke/smoke run smoke/scenarios/demo-every-surface.yaml` (from `mac/`) on the fresh profile: passes; `smoke/smoke state` while
+   on, with Settings, Usage opened, shows `demo: {active: true, widget_tiers: 3, desk_line: true,
+   notch_meters: true, accounts: 2, usage_rows: 3}`. While on, the log shows no usage request
+   (Follow and per-seat rounds included), and a limit's two-finger menu has no Hide. By eye: the widget shows three cards and a Work chip (click: Personal,
+   other numbers), the Desk's Claude line starts with Work, the notch reads "5h 42%  wk 63%",
+   Settings, Usage shows charts for the samples, Settings, Accounts lists Work and Personal
+   read-only. Nothing names a real account, meeting or person. `demo off`: the profile is fresh again,
+   no `history.*.json` or `snapshot.*.json` appeared, and `accounts_count` never moved.

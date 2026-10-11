@@ -55,9 +55,9 @@ when it closes, and no key, cookie or page is logged.
   made with Google to Google even from Continue with email, so the window can't finish it. When
   it lands on Google's sign-in, a panel takes over with the steps: sign in in your browser, copy
   the `sessionKey` cookie, and paste it (**Open claude.ai in Browser**, **Paste a Key Instead**).
-- **Paste instead:** every sign-in window and the welcome sheet have **Paste a Key Instead**:
-  on claude.ai, open DevTools (⌥⌘I) → Application → Cookies → `claude.ai`, copy `sessionKey`,
-  and paste it in Settings → Accounts.
+- **Paste instead:** every sign-in window and the welcome sheet have **Paste a Key Instead**,
+  which opens Settings → Accounts with the key field showing; **How do I find this?** under it
+  has the plain Chrome and Safari steps for copying the `sessionKey` cookie.
 - The same window signs in a new account (**Add Account…**, **Sign In to Claude…**) and an
   account whose session expired (**Sign In Again…** on its page; a signed-in account shows a green Signed in pill and offers **Replace Sign-In…** under Change Sign-In instead; the widget says "Session
   expired — sign in again").
@@ -1382,6 +1382,45 @@ launch and What's New no longer waits for a key. Saving a key ends it at once, b
 (`JustTheDesk.endBySignIn`), turning the reminder back on only if Just the Desk had turned it off, so a
 key that then fails gets the usual sign-in flow (the widget up for it, the Desk's sign-in line).
 state.yaml: `just_the_desk`.
+
+## Signed out and demo mode
+
+Settings v2, slice 4 (item 72; `Models/SignedOut.swift`, `Models/DemoMode.swift`):
+
+- **Accounts before the first account.** A **Label** (Personal until changed) so the first account
+  can be named Work; **Paste a Key Instead** and **Sign In to Claude…** as on the welcome sheet; the
+  key field with **How do I find this?** (the guide's Chrome and Safari steps) and cf_clearance
+  folded under **Seeing a Cloudflare error?**; then **Data**, read-only: Meter history 30 days,
+  Claude Code activity Not tracked, Share with your agents Off, read from the defaults under the
+  label being typed (`SignedOut.dataPreview`). Saving adds the account under that label
+  (`addAccount`), and an upgrade's `history.json` follows it (`adoptLegacyHistory(into:)`).
+- **Dev builds** say so under every key field: "Dev build: the key is kept in a file, not the
+  Keychain." (`SignedOut.storeCaption`, when `KeychainStore.kind` is the file store); the welcome
+  sheet says the key is kept in a file. Release builds say nothing new.
+- **Usage signed out**: with no account, a line saying what will show and **Accounts Settings…**,
+  never empty charts (`SignedOut.usageState`).
+- **The welcome sheet** is 340 pt wide, the widget's narrowest, and has **Not Now** (Escape): the
+  sheet goes for this launch (`WelcomeNotNow`, in memory) and the widget's "Not signed in — sign in"
+  line stays the way in. Just the Desk stays the lasting choice.
+- **Empty notch wings collapse** (`NotchWingsView.collapses`): with Text beside the camera on, a
+  wing whose content has nothing to show is 0 wide, so no black slab and the island shrinks to the
+  camera on that side; Extra width each side comes back with the content. Nothing (a black wing
+  chosen on purpose) and Text beside the camera off keep their width, and a wing on the Claude
+  meters holds its width while they are empty only for a moment: an account switch's fade, or a
+  key's first fetch still out (`DeskModel.metersPending`).
+- **Demo mode** (`sanduhr://debug/action?name=demo&arg=on`, debug hooks on) now fills every
+  surface: `UsageViewModel.setDemo` puts two sample accounts, Work (active) and Personal, with
+  made-up numbers and history on the widget, its chip and the menu bar, and through
+  `DeskModel.update` on both Claude meters pieces and the notch; Settings, Usage draws the samples'
+  meter history and Settings, Accounts lists the sample accounts read-only. The real numbers,
+  accounts and history wait in memory (`DemoSession`), and every fetch pauses: the active account's
+  (an answer already on its way is dropped), Follow the account I'm using (off while demo is on)
+  and the per-seat rounds (`SeatMeters.paused`; seats.json and the seat files still follow the real
+  accounts). Nothing reaches snapshot.json, a seat file, history, SignInGate or the tour, Hide this
+  limit is off (the menus leave it out, Show this limit is disabled), and the Claude Code and Mods
+  pages keep listing the real accounts (`realAccountLabels`). Off restores everything exactly and
+  fetches. state.yaml: `demo` (`active`, `widget_tiers`, `desk_line`, `notch_meters`, `accounts`,
+  and `usage_rows`, the Usage page's charts as drawn); scenario `demo-every-surface.yaml`.
 
 ## Welcome tour
 

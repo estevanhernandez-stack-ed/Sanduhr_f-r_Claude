@@ -55,6 +55,8 @@ struct DebugStateInput {
     var meterHistory = MeterHistoryDebug()
     /// Just the Desk (BACKLOG #4): chosen on the welcome sheet and not yet ended by a sign-in.
     var justTheDesk = false
+    /// Demo mode (slice 4): on, and what each surface shows, counts and flags only.
+    var demo = DemoDebug()
     /// The last `reset --dry-run` (Settings v2, slice 5): the plan in run order, kinds and counts
     /// only, never a path, a folder, a label or a domain's contents. Nil until one ran.
     var resetDryRun: Reset.Report?
@@ -163,6 +165,19 @@ struct DockDebug: Equatable {
     var side = DockSide.bottom
     var autohide = false
     var inset = 0
+}
+
+/// state.yaml's `demo:` (item 72, slice 4): demo mode and what it fills. The widget's tier cards,
+/// whether the Desk's Claude line and the notch's Claude meters have text, how many accounts the
+/// widget and Accounts list, and the Usage page's chart rows as drawn (0 until it has shown under
+/// demo mode). Never a label.
+struct DemoDebug: Equatable {
+    var on = false
+    var widgetTiers = 0
+    var deskLine = false
+    var notchMeters = false
+    var accounts = 0
+    var usageRows = 0
 }
 
 /// state.yaml's `whats_new:`.
@@ -417,6 +432,13 @@ enum DebugState {
               YAMLPair("last_ingest_ok", .bool(v.lastIngestOK))])
     }
 
+    /// `demo:` (slice 4): whether demo mode is on and what it fills, never a label or a number.
+    static func demoYAML(_ d: DemoDebug) -> YAMLNode {
+        .map([YAMLPair("active", .bool(d.on)), YAMLPair("widget_tiers", .int(d.widgetTiers)),
+              YAMLPair("desk_line", .bool(d.deskLine)), YAMLPair("notch_meters", .bool(d.notchMeters)),
+              YAMLPair("accounts", .int(d.accounts)), YAMLPair("usage_rows", .int(d.usageRows))])
+    }
+
     static func yaml(_ s: DebugStateInput) -> YAMLNode {
         // Built in typed steps: one literal holding the whole map is more than Swift 6.0 and 6.1
         // will type-check in reasonable time.
@@ -509,6 +531,7 @@ enum DebugState {
         pairs.append(("hot_keys", hotKeysYAML(s.hotKeys)))
         pairs.append(("meter_history", meterHistoryYAML(s.meterHistory)))
         pairs.append(("just_the_desk", .bool(s.justTheDesk)))
+        pairs.append(("demo", demoYAML(s.demo)))
         pairs.append(("reset_dry_run", s.resetDryRun.map(resetDryRunYAML) ?? .null))
         return .object(pairs)
     }

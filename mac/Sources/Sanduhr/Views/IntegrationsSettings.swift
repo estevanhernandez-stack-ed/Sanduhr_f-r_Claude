@@ -226,7 +226,7 @@ struct IntegrationsSettings: View {
     @State private var consent: IntegrationConsent?
 
     /// The accounts' linked folders, listed even where discovery wouldn't find them.
-    private var linked: [String] { vm.accountLabels.compactMap { vm.dataChoices(for: $0).folder } }
+    private var linked: [String] { vm.realAccountLabels.compactMap { vm.dataChoices(for: $0).folder } }
     /// Mods & Config's model, kept by the window: each folder's meters mod state, read only here.
     private var mods: ModsPageModel { navigation.modsPage }
 
@@ -714,7 +714,7 @@ private struct MCPConsentBody: View {
             Text("Claude Code sessions using \(folder) can call Sanduhr's tools. What they read follows each account's Share with your agents choice, and answers become part of those conversations:")
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 3) {
-                ForEach(vm.accountLabels, id: \.self) { label in
+                ForEach(vm.realAccountLabels, id: \.self) { label in
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(label).font(.callout.weight(.medium))
                         Text(Self.shares(vm.dataChoices(for: label).share)).font(.callout).foregroundStyle(.secondary)
@@ -722,7 +722,7 @@ private struct MCPConsentBody: View {
                 }
             }
             .padding(.leading, 8)
-            if !vm.accountLabels.contains(where: { vm.dataChoices(for: $0).share != .off }) {
+            if !vm.realAccountLabels.contains(where: { vm.dataChoices(for: $0).share != .off }) {
                 Text("No account shares anything now, so the tools answer with nothing until you choose otherwise.")
                     .font(.caption)
                     .fixedSize(horizontal: false, vertical: true)
