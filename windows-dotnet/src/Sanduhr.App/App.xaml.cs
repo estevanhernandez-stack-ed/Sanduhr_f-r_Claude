@@ -138,6 +138,78 @@ public partial class App : Application
         // Best-effort GitHub/Velopack update probe — fire-and-forget so a slow or offline
         // network never delays the first paint. No-ops on the Store/MSIX install and in dev.
         _ = new UpdateChecker().CheckForUpdatesAsync();
+
+        ScheduleWhatsNewAtLaunch();
+    }
+
+    /// <summary>The app version as Major.Minor.Build, the same shape Settings shows.</summary>
+    private static string AppVersion
+    {
+        get
+        {
+            var v = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version;
+            return v is null ? "0.0.0" : $"{v.Major}.{v.Minor}.{v.Build}";
+        }
+    }
+
+    /// <summary>
+    /// What's New after an update: decide from the stored versions, record the version before
+    /// showing, and open the window two seconds later so the widget settles first.
+    /// </summary>
+    private void ScheduleWhatsNewAtLaunch()
+    {
+        if (_vm is null)
+            return;
+        try
+        {
+            var store = new SettingsStore(new Sanduhr.Core.Paths());
+            var current = AppVersion;
+            var lastSeen = store.LoadWhatsNewLastSeen();
+            // After Start(): it migrates legacy credentials, so the account list is settled.
+            var fresh = WhatsNew.IsFresh(lastSeen, store.LoadWhatsNewInstalledVersion(),
+                _vm.AccountStore.ListAccounts().Count);
+            var onboarding = _vm.ActiveAccount is null;
+            var decision = WhatsNew.AtLaunch(lastSeen, current, fresh, onboarding,
+                store.LoadWhatsNewHideAfterUpdates());
+
+            if (fresh)
+                store.SaveWhatsNewInstalledVersion(current);
+            if (decision.Record)
+                store.SaveWhatsNewLastSeen(current);
+            if (decision.Show.Count == 0)
+                return;
+
+            var cards = decision.Show;
+            var header = WhatsNew.RangeLabel(cards, lastSeen, current) ?? $"Version {current}";
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                OpenWhatsNew(cards, header);
+            };
+            timer.Start();
+        }
+        catch
+        {
+            // What's New is a courtesy: never let it stop the widget.
+        }
+    }
+
+    private void OpenWhatsNew(IReadOnlyList<WhatsNewCard> cards, string header) =>
+        WhatsNewWindow.Show(cards, header, new SettingsStore(new Sanduhr.Core.Paths()), page =>
+        {
+            if (page == SettingsPage.Widget)
+                ShowWindow();
+            else
+                _ = ShowSettingsAsync(page);
+        });
+
+    /// <summary>"What's New…" from the tray and Settings: the installed version's highlights, or every card.</summary>
+    private void ShowWhatsNewFromMenu()
+    {
+        var installed = new SettingsStore(new Sanduhr.Core.Paths()).LoadWhatsNewInstalledVersion();
+        var (cards, header) = WhatsNew.ForMenu(AppVersion, installed);
+        OpenWhatsNew(cards, header);
     }
 
     private void SetupTray()
@@ -157,6 +229,9 @@ public partial class App : Application
 
         var settings = new MenuItem { Header = "Settings…" };
         settings.Click += async (_, _) => await ShowSettingsAsync();
+
+        var whatsNew = new MenuItem { Header = "What's New…" };
+        whatsNew.Click += (_, _) => ShowWhatsNewFromMenu();
 
         var refresh = new MenuItem { Header = "Refresh" };
         refresh.Click += (_, _) => _vm?.RefreshCommand.Execute(null);
@@ -190,6 +265,7 @@ public partial class App : Application
 
         menu.Items.Add(show);
         menu.Items.Add(settings);
+        menu.Items.Add(whatsNew);
         menu.Items.Add(refresh);
         menu.Items.Add(BuildTrayShowsMenu());
         menu.Items.Add(new Separator());
@@ -250,7 +326,8 @@ public partial class App : Application
             return Task.CompletedTask;
         }
 
-        var svm = new SettingsViewModel(_vm, () => RunSignInAsync(embedded: true), RunUpdateSignInAsync, _hotKeys);
+        var svm = new SettingsViewModel(_vm, () => RunSignInAsync(embedded: true), RunUpdateSignInAsync, _hotKeys,
+            ShowWhatsNewFromMenu);
         try
         {
             _settingsWindow = new SettingsWindow(svm);

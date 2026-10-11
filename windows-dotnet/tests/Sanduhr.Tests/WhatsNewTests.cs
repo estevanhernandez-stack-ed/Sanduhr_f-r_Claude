@@ -17,6 +17,15 @@ public class WhatsNewTests
 
     private static string[] Ids(IEnumerable<WhatsNewCard> cards) => cards.Select(c => c.Id).ToArray();
 
+    [Theory]
+    [InlineData(null, null, 0, true)]
+    [InlineData("", "", 0, true)]
+    [InlineData("3.5.0", null, 0, false)]
+    [InlineData(null, "3.5.0", 0, false)]
+    [InlineData(null, null, 1, false)]
+    public void IsFresh_NeedsNoRecordAndNoAccount(string? lastSeen, string? installed, int accounts, bool expected) =>
+        Assert.Equal(expected, WhatsNew.IsFresh(lastSeen, installed, accounts));
+
     [Fact]
     public void Compare_NumbersNotStrings()
     {

@@ -596,6 +596,47 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>The newest version whose What's New was shown or skipped; empty reads as null.</summary>
+    public string? LoadWhatsNewLastSeen() => ReadString("whats_new_last_seen");
+
+    public void SaveWhatsNewLastSeen(string version) => WriteString("whats_new_last_seen", version);
+
+    /// <summary>The version a fresh install first ran; empty reads as null.</summary>
+    public string? LoadWhatsNewInstalledVersion() => ReadString("whats_new_installed_version");
+
+    public void SaveWhatsNewInstalledVersion(string version) => WriteString("whats_new_installed_version", version);
+
+    /// <summary>"Don't show after updates" (default false).</summary>
+    public bool LoadWhatsNewHideAfterUpdates()
+    {
+        try { return Read()["whats_new_hide_after_updates"]?.GetValue<bool>() ?? false; }
+        catch { return false; }
+    }
+
+    public void SaveWhatsNewHideAfterUpdates(bool hide)
+    {
+        var root = Read();
+        root["whats_new_hide_after_updates"] = hide;
+        Write(root);
+    }
+
+    private string? ReadString(string key)
+    {
+        try
+        {
+            var s = Read()[key]?.GetValue<string>();
+            return string.IsNullOrEmpty(s) ? null : s;
+        }
+        catch { return null; }
+    }
+
+    private void WriteString(string key, string value)
+    {
+        var root = Read();
+        root[key] = value;
+        Write(root);
+    }
+
     public void SavePublishEnabled(bool on) => MutatePublish(r => PublishSettingsJson.SetEnabled(r, on));
 
     public void SavePublishRoots(IReadOnlyDictionary<string, bool> roots)

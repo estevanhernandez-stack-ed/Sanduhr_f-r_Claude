@@ -136,6 +136,13 @@ public static class WhatsNew
         return (every, RangeLabel(every, null, current) ?? $"Version {current}");
     }
 
+    /// <summary>
+    /// A first-ever launch: nothing recorded as seen or installed, and no saved account. An
+    /// existing install updating to the first What's New build has accounts, so it is not fresh.
+    /// </summary>
+    public static bool IsFresh(string? lastSeen, string? installedVersion, int savedAccountCount) =>
+        string.IsNullOrEmpty(lastSeen) && string.IsNullOrEmpty(installedVersion) && savedAccountCount == 0;
+
     /// <summary>What a launch does: the cards to show and whether to record current as seen.</summary>
     public sealed record LaunchDecision(IReadOnlyList<WhatsNewCard> Show, bool Record);
 
