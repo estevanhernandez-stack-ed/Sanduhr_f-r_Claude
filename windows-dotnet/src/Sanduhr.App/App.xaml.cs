@@ -317,21 +317,25 @@ public partial class App : Application
         var items = new List<(TrayMode Mode, MenuItem Item)>();
         foreach (var mode in TrayReadout.All)
         {
-            var item = new MenuItem { Header = TrayReadout.Title(mode), IsCheckable = true };
+            // Not IsCheckable: a checkable item toggles itself on click, which would
+            // uncheck the current mode. The checks follow the setting instead.
+            var item = new MenuItem { Header = TrayReadout.Title(mode) };
             var captured = mode;
             item.Click += (_, _) =>
             {
                 if (_vm is not null)
                     _vm.TrayMode = captured;
+                SyncChecks();
             };
             items.Add((mode, item));
             parent.Items.Add(item);
         }
-        parent.SubmenuOpened += (_, _) =>
+        void SyncChecks()
         {
             foreach (var (mode, item) in items)
                 item.IsChecked = _vm?.TrayMode == mode;
-        };
+        }
+        parent.SubmenuOpened += (_, _) => SyncChecks();
         return parent;
     }
 
