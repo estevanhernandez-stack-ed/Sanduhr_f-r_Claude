@@ -91,6 +91,18 @@ final class UsagePageModel {
         metersLoaded = true
     }
 
+    /// Meters under demo mode (slice 4): the sample accounts' made-up history, never a file.
+    func loadDemoMeters(_ vm: UsageViewModel, label: String, now: Date = Date()) {
+        _ = begin("meters")    // a real read still running is dropped
+        let accounts = metersOverlay(vm) ? vm.accountLabels : [label]
+        let histories = DemoMode.histories(now: now).filter { accounts.contains($0.key) }
+        meterHistories = histories
+        meterAccounts = accounts
+        meterRows = MeterHistoryChart.rows(histories: histories, accounts: accounts, window: metersWindow,
+                                           now: now, hidden: Set(vm.hiddenTiers.map(\.rawValue)))
+        metersLoaded = true
+    }
+
     func loadOverview(_ vm: UsageViewModel, label: String) async {
         let choices = vm.dataChoices(for: label)
         let source = UsageSource.of(choices)
@@ -207,20 +219,59 @@ struct UsageSettings: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if let label = navigation.usagePage.label(vm) {
+            switch SignedOut.usageState(label: navigation.usagePage.label(vm), demo: vm.demo) {
+            case .account(let label):
                 UsageHeader(vm: vm, page: navigation.usagePage, navigation: navigation, label: label)
                 UsageTabContent(vm: vm, page: navigation.usagePage, navigation: navigation,
                                 label: label, accent: theme.accent)
-            } else {
-                Text("Add an account in Accounts first.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 0)
+            case .demo:
+                UsageDemo(vm: vm, page: navigation.usagePage, accent: theme.accent)
+            case .signedOut:
+                UsageSignedOut()
             }
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onDisappear { navigation.usagePage.dropReader() }
+    }
+}
+
+/// No account yet (slice 4): what will show here and the way to Accounts, never empty charts.
+private struct UsageSignedOut: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Image(systemName: "person.crop.circle.badge.questionmark")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                Text(SignedOut.usageLine)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Button(SettingsSection.credentials.linkTitle) { SettingsWindowController.shared.show(.credentials) }
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+/// Demo mode (slice 4): the Meters charts from the sample accounts' made-up history. The other
+/// tabs read Claude Code folders, which demo mode never shows.
+private struct UsageDemo: View {
+    var vm: UsageViewModel
+    @Bindable var page: UsagePageModel
+    let accent: Color
+
+    private var label: String { vm.activeAccount ?? DemoMode.active }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            UsageCaption("Demo mode: made-up meter history for the sample accounts. Your own usage is back when demo mode is off.")
+            UsageMetersTab(vm: vm, page: page, label: label, accent: accent)
+                .task(id: [label, page.metersWindow.rawValue, String(page.metersOverlay(vm))].joined(separator: "|")) {
+                    page.loadDemoMeters(vm, label: label)
+                }
+        }
     }
 }
 

@@ -44,6 +44,8 @@ enum SettingsNames {
     /// Message's two editing modes, a segmented control.
     static let listMode = "List"
     static let textMode = "Text"
+    /// About: the sheet that removes what Sanduhr wrote, Claude Code entries first (slice 5).
+    static let resetSanduhr = "Reset Sanduhr…"
 
     /// Every current name, with the page it lives on.
     static let table: [(name: String, page: SettingsSection)] = [
@@ -58,6 +60,7 @@ enum SettingsNames {
         (showWidget, .widgetLook), (checkForUpdates, .updates), (saveAndApply, .themes),
         (listMode, .message), (textMode, .message),
         (linkFolder, .credentials),
+        (resetSanduhr, .about),
     ]
 
     /// Names that are gone, each with the name that replaced it. None may appear in a menu, the

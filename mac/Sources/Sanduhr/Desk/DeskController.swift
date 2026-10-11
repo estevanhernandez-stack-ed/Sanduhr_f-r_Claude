@@ -56,6 +56,11 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// Called at launch and whenever the Desk switch flips. A flip after launch also lets the
     /// widget follow its When the widget shows choice (AppDelegate.deskDidChange).
     func apply() {
+        // Reset Sanduhr… (slice 5): the Desk stays down until Sanduhr quits.
+        if stoppedForReset {
+            if running { stop() }
+            return
+        }
         if enabled, !running { start() }
         if !enabled, running { stop() }
         // Now playing runs only while Desk does (and its own switch is on).
@@ -180,6 +185,21 @@ final class DeskController: NSObject, NSMenuDelegate {
     func recheckCalendar() {
         if running { model.recheckCalendar() }
     }
+
+    private(set) var stoppedForReset = false
+
+    /// Reset Sanduhr… (slice 5): the Desk, its timers, now playing and both shortcuts stop and
+    /// stay stopped until Sanduhr quits.
+    func stopForReset() {
+        stoppedForReset = true
+        hotKeysSuspended = true
+        if running { stop() }
+        NowPlayingController.shared.shutdown()
+        hotKeys.unregister()
+        registeredShortcuts = []
+    }
+
+    var isStoppedForReset: Bool { stoppedForReset && !running && wingsTimer == nil && approachTimer == nil }
 
     private func stop() {
         // Arrange mode ends with Desk; nothing was saved, so the layout stays as it was.

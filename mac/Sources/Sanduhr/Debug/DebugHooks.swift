@@ -64,6 +64,9 @@ enum DebugHooks {
         }
     }
 
+    /// The last `reset --dry-run` plan, for state.yaml's `reset_dry_run` (nil until one ran).
+    private static var resetDryRun: Reset.Report?
+
     private static var accessibilityPrimed = false
 
     /// SwiftUI hosting views expose no children until an assistive client says it is listening,
@@ -120,6 +123,8 @@ enum DebugHooks {
         case .glow: NotchGlowController.shared.fire()
         case .demo(let on):
             DeskController.shared.model.setDemo(on)
+            // The widget, the menu bar, both Claude meters pieces, Usage and Accounts (slice 4).
+            app.viewModel.setDemo(on)
             BandFileWriter.shared.refresh()
         case .theme(let id): app.viewModel.selectTheme(id: id)
         case .cycleAccount: app.viewModel.cycleAccount()
@@ -143,6 +148,9 @@ enum DebugHooks {
         case .hotKey(let s, let combo, let anyway):
             // Refused because macOS uses the keys, the refusal shows in state.yaml (`hot_keys.<s>_refusal`).
             if let combo { ShortcutRecorderModel.shared.save(combo, for: s, insist: anyway) } else { ShortcutRecorderModel.shared.reset(s) }
+        case .resetDryRun:
+            // Reads the plan only: no step runs (Reset.perform is the sheet's alone).
+            resetDryRun = Reset.dryRun(in: .standard)
         }
         settle()
     }
@@ -361,6 +369,10 @@ enum DebugHooks {
         s.usagePageOpen = settings.isOpen && settings.section == .usage
         s.usageTab = settings.usageTab
         s.justTheDesk = JustTheDesk.isOn()
+        s.demo = DemoDebug(on: vm.demo, widgetTiers: vm.visibleTiers().count, deskLine: desk.model.claudeLine != nil,
+                           notchMeters: desk.model.claudeCompact != nil, accounts: vm.accountLabels.count,
+                           usageRows: vm.demo ? settings.usagePage.meterRows.count : 0)
+        s.resetDryRun = resetDryRun
         let meters = settings.usagePage
         s.meterHistory = MeterHistoryDebug(all: meters.metersAll && KeychainStore.accounts.labels.count > 1, window: meters.metersWindow.rawValue,
                                            rows: meters.meterRows.count, series: meters.meterRows.reduce(0) { $0 + $1.series.count })
@@ -414,7 +426,7 @@ enum DebugHooks {
         s.localActivityEvents = vm.localBurn.events
         s.vault = vm.vault.state(for: s.accountData)
         let folders = ClaudeCodeFolders.discover(home: NSHomeDirectory(), environment: ProcessInfo.processInfo.environment).map(\.path)
-            + vm.accountLabels.compactMap { vm.dataChoices(for: $0).folder }
+            + vm.realAccountLabels.compactMap { vm.dataChoices(for: $0).folder }
         (s.mcpInstalled, s.statuslineInstalled, s.metersInstalled, s.hooksInstalled)
             = IntegrationInstaller.standard.installedCounts(folders: folders)
         s.pendingMessages = DeskMessageHandoff.shared.pending != nil

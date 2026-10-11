@@ -6,6 +6,13 @@ import SwiftUI
 /// Runs headless (LSUIElement=YES in Info.plist) so there's no dock icon.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// Reset Sanduhr… ran (Settings v2, slice 5): quitting writes nothing back into the folders
+    /// the reset just emptied (ResetGate turns the writers off).
+    static var resetting: Bool { ResetGate.isOn }
+
+    /// The reset's last sweep, run at quit: whatever a stray write put back since the run, once
+    /// more, for the parts that were checked.
+    static var resetSweep: (() -> Void)?
 
     let viewModel = UsageViewModel()
     private var panel: FloatingPanel?
@@ -98,30 +105,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Desk takes the numbers straight from the view model, so its meters move with
             // every refresh even while the widget is hidden (or Desk is off, ready for when it starts).
             guard let vm = self?.viewModel else { return }
-            let fetched = vm.usage != nil && (vm.status == .idle || vm.status == .noTiers)
-            // Remembered for the next launch: has the active account's key fetched (SignInGate)?
-            SignInGate.record(fetched: fetched, needsSignIn: vm.status.needsSignIn,
-                              account: KeychainStore.accounts.active, in: UserDefaults.standard)
-            // A fresh install's welcome tour, once the first fetch has the user's own numbers.
-            self?.offerTourIfPending(fetched: fetched)
-            // Just the Desk ends once a key is saved (a failed one included): the sign-in reminder it
-            // turned off comes back on, and the widget waits for that key like any other.
-            if KeychainStore.exists(account: KeychainAccount.sessionKey), JustTheDesk.endBySignIn() {
-                DeskController.shared.model.refreshClaude()
-                // Not fetched yet: the widget comes up for this key's sign-in, as for any other.
-                if !fetched { self?.applyWidgetVisibility(.justTheDesk) }
-            }
-            // The widget showed for sign-in; once the numbers arrive the choice takes over.
-            if self?.awaitingSignIn == true, fetched {
-                self?.awaitingSignIn = false
-                self?.applyWidgetVisibility(.signedIn)
-            }
-            // Signed out (Settings, Credentials): the widget shows for sign-in again, as at a
-            // launch without a key, until the next successful fetch.
-            if vm.status == .signedOut, self?.awaitingSignIn == false {
-                self?.awaitingSignIn = true
-                self?.applyWidgetVisibility(.signedOut)
-            }
+            // Demo mode's samples are no sign-in: nothing is recorded and nothing waits on them.
+            if !vm.demo { self?.afterUsageUpdate(vm) }
             // During a switch the Desk lays out the old account's meters unseen (veiled), as the
             // widget's cards do, and fades in the new ones with the view model's animation. The
             // line keeps the old account's name until those numbers have faded out.
@@ -174,6 +159,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // replace the last one's (a new stamped folder, the link swapped). No install, no write.
         Task.detached(priority: .utility) { IntegrationScripts.standard.refreshIfInstalled() }
         showWhatsNewIfUpdated(fresh: firstRun == .fresh, tourPending: tour == .pending)
+    }
+
+    /// What a refresh's answer means for sign-in: the launch gate, the tour, Just the Desk and the
+    /// widget waiting for numbers. Skipped under demo mode, whose samples are no sign-in.
+    private func afterUsageUpdate(_ vm: UsageViewModel) {
+        let fetched = vm.usage != nil && (vm.status == .idle || vm.status == .noTiers)
+        // Remembered for the next launch: has the active account's key fetched (SignInGate)?
+        SignInGate.record(fetched: fetched, needsSignIn: vm.status.needsSignIn,
+                          account: KeychainStore.accounts.active, in: UserDefaults.standard)
+        // A fresh install's welcome tour, once the first fetch has the user's own numbers.
+        offerTourIfPending(fetched: fetched)
+        // Just the Desk ends once a key is saved (a failed one included): the sign-in reminder it
+        // turned off comes back on, and the widget waits for that key like any other.
+        if KeychainStore.exists(account: KeychainAccount.sessionKey), JustTheDesk.endBySignIn() {
+            DeskController.shared.model.refreshClaude()
+            // Not fetched yet: the widget comes up for this key's sign-in, as for any other.
+            if !fetched { applyWidgetVisibility(.justTheDesk) }
+        }
+        // The widget showed for sign-in; once the numbers arrive the choice takes over.
+        if awaitingSignIn, fetched {
+            awaitingSignIn = false
+            applyWidgetVisibility(.signedIn)
+        }
+        // Signed out (Settings, Credentials): the widget shows for sign-in again, as at a
+        // launch without a key, until the next successful fetch.
+        if vm.status == .signedOut, !awaitingSignIn {
+            awaitingSignIn = true
+            applyWidgetVisibility(.signedOut)
+        }
     }
 
     /// The welcome tour has been offered in this launch.
@@ -298,6 +312,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Now playing's adapter runs as a child process (item 53): it goes when Sanduhr quits.
     func applicationWillTerminate(_ notification: Notification) {
         NowPlayingController.shared.shutdown()
+        guard !Self.resetting else {
+            Self.resetSweep?()
+            return
+        }
         // Watchers go with Sanduhr: the band shows none from now on.
         BandFileWriter.shared.refresh(quitting: true)
     }
@@ -377,6 +395,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: Actions
 
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
+        // Reset Sanduhr… ran: the only thing left to do is quit.
+        if Self.resetting {
+            let menu = NSMenu()
+            menu.addItem(withTitle: "Quit Sanduhr", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+            statusItem?.menu = menu
+            sender.performClick(nil)
+            statusItem?.menu = nil
+            return
+        }
         let event = NSApp.currentEvent
         let rightClick = event?.type == .rightMouseUp
             || (event?.modifierFlags.contains(.control) ?? false)
@@ -479,8 +506,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// warnings item for `tier`, Alerts Settings…, then the shared menu under a separator, less its
     /// own Show or Hide Widget. `tier` nil, a click beside the rows, leaves the limit's own items out.
     func addLimitMenuItems(to menu: NSMenu, tier: Tier?) {
+        // Demo mode's sample numbers never decide a hide: no Hide item while it is on (slice 4).
         let groups = LimitMenu.groups(tier: tier, accounts: currentAccountsMenu(), store: UserDefaults.desk,
-                                      usage: viewModel.usage, now: Date(), widgetVisible: widgetVisible)
+                                      usage: viewModel.demo ? nil : viewModel.usage, now: Date(),
+                                      widgetVisible: widgetVisible)
         for (i, group) in groups.enumerated() {
             if i > 0 { menu.addItem(.separator()) }
             for entry in group { menu.addItem(limitMenuItem(entry)) }
@@ -521,6 +550,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if visible { hidePanel() } else { DeskController.shared.showWidgetBesideMeters() }
         case .accounts, .hiddenLimits: break
         case .meterSettings: SettingsWindowController.shared.show(LimitMenu.meterSection, anchor: LimitMenu.meterAnchor)
+        case .hide where viewModel.demo: break
         case .hide, .show, .warnings: LimitMenu.apply(entry, to: UserDefaults.desk, usage: viewModel.usage)
         }
     }
@@ -578,6 +608,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// first. Chosen again while it shows on a visible widget, a tool turns off. Camera Light
     /// leaves the widget alone.
     func perform(_ command: MenuCommand) {
+        // Reset Sanduhr… ran: every menu command but Quit does nothing.
+        if Self.resetting && command != .quit { return }
         let visible = panel?.isVisible ?? false
         switch command {
         case .showHide: showOrHidePanel()
@@ -632,6 +664,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel.makeKeyAndOrderFront(nil)
             panel.orderFrontRegardless()
         }
+    }
+
+    /// Reset Sanduhr… (slice 5), before anything is removed: everything that runs on its own
+    /// stops, in this order, and every window but Settings (where the sheet shows the results)
+    /// goes. Returns the names of any service that didn't stop.
+    @discardableResult
+    func shutDownForReset() -> [String] {
+        let steps = viewModel.resetShutdownSteps + [
+            ResetShutdown.Step(name: "desk", stop: { DeskController.shared.stopForReset() },
+                               isStopped: { DeskController.shared.isStoppedForReset }),
+            ResetShutdown.Step(name: "handoff watch", stop: { HandoffWatch.shared.stop() },
+                               isStopped: { HandoffWatch.shared.isStopped }),
+            ResetShutdown.Step(name: "band", stop: { BandFileWriter.shared.stop() },
+                               isStopped: { BandFileWriter.shared.isStopped }),
+            ResetShutdown.Step(name: "updates", stop: { [weak self] in self?.updates.stopForReset() },
+                               isStopped: { [weak self] in self?.updates.isStoppedForReset ?? true }),
+        ]
+        let left = ResetShutdown(steps: steps).run()
+        if !left.isEmpty { NSLog("Sanduhr reset: still running: \(left.joined(separator: ", "))") }
+        // The widget and the other windows go without writing their hidden state.
+        panel?.orderOut(nil)
+        let settings = SettingsWindowController.shared.window
+        // The menu bar icon's own window stays: its menu now offers only Quit Sanduhr.
+        for w in NSApp.windows where w !== settings && w.sheetParent == nil && w.isVisible
+            && !String(describing: type(of: w)).contains("StatusBar") {
+            w.orderOut(nil)
+        }
+        return left
     }
 
     @objc func hidePanel() {

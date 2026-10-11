@@ -25,6 +25,8 @@ enum HandoffFiles {
 
     /// Atomic, readable by this user only.
     static func writeOwnerOnly(_ data: Data, to url: URL) {
+        // Reset Sanduhr… ran: nothing goes back into the folders it emptied.
+        guard !ResetGate.isOn else { return }
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         guard (try? data.write(to: url, options: .atomic)) != nil else { return }
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
@@ -50,8 +52,20 @@ final class HandoffWatch {
 
     init(dir: URL) { self.dir = dir }
 
+    /// Reset Sanduhr… (slice 5): no request is picked up any more, and the folder is not watched.
+    func stop() {
+        stopped = true
+        handlers = []
+        watcher?.stop()
+        watcher = nil
+    }
+
+    private var stopped = false
+    var isStopped: Bool { stopped && watcher == nil }
+
     /// Adds a subscriber; the watch starts with the first one.
     func add(_ handler: @escaping () -> Void) {
+        guard !stopped else { return }
         handlers.append(handler)
         guard watcher == nil else { return }
         watcher = ThemeFolderWatcher(dir: dir) { [weak self] in

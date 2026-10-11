@@ -504,6 +504,7 @@ private struct MeterWarningGroup: View {
                 // warning settings.
                 if temporary {
                     Toggle("Show this limit", isOn: showBinding)
+                        .disabled(model.demo)
                 }
                 warningControls
                     .disabled(!shown && temporary)

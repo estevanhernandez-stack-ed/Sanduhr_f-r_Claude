@@ -40,8 +40,10 @@ enum DebugAction: Equatable {
     case glow(NotchGlowEvent.Kind)
     /// The widget's theme by id, picked as the Theme menu and the gallery pick it.
     case theme(String)
-    /// Demo data on the Desk for screenshots: made-up meetings and a pinned message, held in
-    /// memory only (the calendar is never touched). Off puts the real ones back.
+    /// Demo data for screenshots (DemoMode): made-up meetings and a pinned message on the Desk,
+    /// and since slice 4 two sample accounts with made-up numbers on the widget, both Claude meters
+    /// pieces, the notch, Usage and Accounts. Held in memory only (the calendar, the Keychain and
+    /// every file are never touched). Off puts the real ones back.
     case demo(Bool)
     /// The next account, as the widget's chip cycles it. Safe: nothing is added, signed out or
     /// removed, and no hook can do those.
@@ -90,12 +92,16 @@ enum DebugAction: Equatable {
     /// the default. Refused (an error, nothing saved) without ⌘, ⌃ or ⌥ or when the other
     /// shortcut uses them; keys macOS uses are refused in state.yaml unless `anyway` (item 73). Writes the two desk keys; Restore puts the keys back after a run.
     case hotKey(SanduhrHotKeys.Shortcut, HotKeyCombo?, anyway: Bool = false)
+    /// Reset Sanduhr… (Settings v2, slice 5) as a dry run only: the ordered plan for every part,
+    /// kinds and counts into state.yaml, nothing touched. No hook resets for real; any other arg
+    /// is refused.
+    case resetDryRun
 
     static let names = ["show-widget", "hide-widget", "settings", "settings-link", "settings-search", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
                         "theme", "account", "usage", "whats-new", "close-whats-new",
                         "tour", "tour-step", "close-tour", "watch-test", "av-test", "message-editor",
-                        "desk-arrange", "hot-key"]
+                        "desk-arrange", "hot-key", "reset"]
 }
 
 enum DebugCommand: Equatable {
@@ -252,6 +258,11 @@ enum DebugLink {
             let keys = anyway ? String(parts[1].dropLast(" anyway".count)) : parts[1]
             guard let combo = HotKeyCombo.parse(keys) else { return bad("hot-key: unknown keys \(keys)") }
             return .success(.hotKey(s, combo, anyway: anyway))
+        case "reset":
+            guard let arg, ["--dry-run", "dry-run"].contains(arg.lowercased()) else {
+                return bad("reset needs arg=--dry-run; a real reset starts only from About's Reset Sanduhr… sheet")
+            }
+            return .success(.resetDryRun)
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }

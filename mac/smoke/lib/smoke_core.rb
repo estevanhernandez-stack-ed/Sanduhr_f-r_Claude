@@ -331,7 +331,13 @@ module Smoke
       if !arranging(before) && arranging(after)
         steps << ['desk-arrange', 'cancel']
       end
+      # Demo mode (item 72, slice 4) a scenario left on goes off: the real numbers come back.
+      steps << ['demo', 'off'] if !demo_on(before) && demo_on(after)
       steps
+    end
+
+    def demo_on(state)
+      state['demo'].is_a?(Hash) && state['demo']['active'] == true
     end
 
     def hot_keys(state, which)

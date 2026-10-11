@@ -54,6 +54,15 @@ final class UpdaterSettings {
         sync()
     }
 
+    /// Reset Sanduhr… (slice 5): no scheduled check from here on. Sparkle stores the switch in
+    /// the app's defaults; the reset's last sweep removes that domain again at quit.
+    func stopForReset() {
+        controller.updater.automaticallyChecksForUpdates = false
+        sync()
+    }
+
+    var isStoppedForReset: Bool { !controller.updater.automaticallyChecksForUpdates }
+
     func setChecksAutomatically(_ on: Bool) {
         controller.updater.automaticallyChecksForUpdates = on
         sync()

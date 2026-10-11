@@ -96,6 +96,8 @@ enum MCPAccess {
     /// of it. Failures are logged by error type only.
     @discardableResult
     static func write(_ data: Data, to url: URL = standardURL) -> WriteOutcome {
+        // Reset Sanduhr… ran: the access file stays gone (and with it, the MCP server shares nothing).
+        guard !ResetGate.isOn else { return .unchanged }
         if let current = try? Data(contentsOf: url), current == data { return .unchanged }
         let fm = FileManager.default
         let tmp = url.deletingLastPathComponent()

@@ -352,10 +352,11 @@ final class AccountRegistry: @unchecked Sendable {
     }
 
     /// The upgrade's one-time move of `history.json` to Personal's file (spec "Upgrade", step 2),
-    /// once Personal is listed; never over an existing file. Safe to call at every launch.
-    func adoptLegacyHistory() {
-        guard labels.contains(Self.defaultLabel) else { return }
-        history?.adoptLegacy(into: Self.defaultLabel)
+    /// once Personal is listed; never over an existing file. Safe to call at every launch. The
+    /// first account named on Settings, Accounts (slice 4) takes it under its own label.
+    func adoptLegacyHistory(into label: String = AccountRegistry.defaultLabel) {
+        guard labels.contains(label) else { return }
+        history?.adoptLegacy(into: label)
     }
 
     /// Deletes the legacy slots from the active store: a key saved with no accounts creates

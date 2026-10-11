@@ -128,7 +128,24 @@ class FakeApp
         a.merge!('active' => false, 'changed' => false, 'working' => nil, 'click_through' => 'drawn',
                  'bar_visible' => false)
       end
+    when 'demo'
+      # Item 72, slice 4: sample meters on the widget and the Desk, two sample accounts; off puts
+      # the real state back.
+      if arg == 'on'
+        unless s['demo'] && s['demo']['active']
+          @before_demo = { 'meters' => s['meters'], 'demo' => s['demo'] }
+          s['meters'] = [{ 'tier' => 'five_hour', 'label' => 'Session (5hr)', 'percent' => 42, 'fill' => 0.42,
+                           'pace' => 0.6, 'reset' => 'Today 5:00 PM', 'warning' => false }] if Array(s['meters']).empty?
+        end
+        # usage_rows counts the Usage page's charts as drawn: 0 until the page opens.
+        s['demo'] = { 'active' => true, 'widget_tiers' => 3, 'desk_line' => true, 'notch_meters' => true,
+                      'accounts' => 2, 'usage_rows' => 0 }
+      elsif @before_demo
+        s.merge!(@before_demo)
+        @before_demo = nil
+      end
     when 'usage'
+      s['demo']['usage_rows'] = 3 if s['demo'].is_a?(Hash) && s['demo']['active']
       s['settings_open'] = true
       s['settings_section'] = 'usage'
       s['usage_page'] = { 'open' => true, 'tab' => arg || 'overview' }
@@ -149,6 +166,17 @@ class FakeApp
       which, on = arg.to_s.split
       a = (s['av_indicators'] ||= { 'camera' => false, 'mic' => false, 'shown' => 'none' })
       a[which] = (on == 'on') if %w[camera mic].include?(which)
+    when 'reset'
+      # Slice 5: the dry run only, the plan as kinds and counts; the app refuses any other arg.
+      raise Smoke::Failure, 'reset needs arg=--dry-run' unless %w[--dry-run dry-run].include?(arg)
+      s['reset_dry_run'] = {
+        'touched' => false, 'folders' => 1,
+        'steps' => [{ 'part' => 'claude_code', 'kind' => 'claude_code_entry', 'count' => 2 },
+                    { 'part' => 'accounts', 'kind' => 'account', 'count' => 2 },
+                    { 'part' => 'records', 'kind' => 'support_files', 'count' => 9 },
+                    { 'part' => 'desk_messages', 'kind' => 'desk_messages', 'count' => 1 },
+                    { 'part' => 'settings', 'kind' => 'preferences', 'count' => 2 }]
+      }
     when 'watch-test'
       w = (s['watchers'] ||= { 'count' => 0, 'states' => [], 'placements' => [] })
       case arg
@@ -443,6 +471,34 @@ r = Runner.new(app_hidden, MemoryDefaults.new, File.join(Smoke::OUT, '.selftest-
     .run_file(reach_file)
 eq('settings reach fails when the section is off screen', r['status'], 'fail')
 FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-reach'))
+# Item 72, slice 4: demo mode on a fresh profile (no account, no numbers) fills the widget and the
+# Desk and shows two sample accounts; off and the restore bring the fresh state back.
+eq('demo block in the fixture', state['demo'].keys, %w[active widget_tiers desk_line notch_meters accounts usage_rows])
+check('demo block holds only flags and counts', state['demo'].values.all? { |v| v == true || v == false || v.is_a?(Integer) })
+fresh = { 'meters' => [], 'accounts_count' => 0, 'settings_open' => false, 'last_fetch' => nil, 'widget_visible' => false,
+          'demo' => { 'active' => false, 'widget_tiers' => 0, 'desk_line' => false, 'notch_meters' => false,
+                      'accounts' => 0, 'usage_rows' => 0 } }
+demo_doc = YAML.safe_load(File.read(File.join(Smoke::SCENARIOS, 'demo-every-surface.yaml')))
+demo_doc['steps'].reject! { |s| s.key?('expect') }
+FileUtils.mkdir_p(File.join(Smoke::OUT, '.selftest-demo'))
+demo_file = File.join(Smoke::OUT, '.selftest-demo', 'demo-every-surface.yaml')
+File.write(demo_file, YAML.dump(demo_doc))
+app_demo = FakeApp.new(fresh)
+r = Runner.new(app_demo, MemoryDefaults.new, File.join(Smoke::OUT, '.selftest-demo', 'out'), io: StringIO.new, settle: 0, poll: 0.01, within: 0.05)
+    .run_file(demo_file)
+eq('demo scenario passes on a fresh profile', [r['status'], r['reason']], ['pass', nil])
+eq('demo scenario turns demo on and off, then puts the fresh profile back', app_demo.actions,
+   ['show-widget', 'demo on', 'usage meters', 'settings credentials', 'demo off', 'hide-widget', 'close-settings'])
+eq('fresh profile back: no meters, demo off', [app_demo.state_now['meters'], app_demo.state_now['demo']['active']], [[], false])
+# The restore turns demo mode off when a scenario leaves it on.
+app_left = FakeApp.new(fresh)
+app_left.action('demo', 'on')
+eq('demo fills the Desk meters on a fresh profile', app_left.state_now['meters'].length, 1)
+eq('demo left on goes off', Restore.plan(app_demo.state_now, app_left.state_now), [%w[demo off]])
+eq('demo off before and after: nothing to do', Restore.plan(fresh, fresh), [])
+# Demo mode never touches the real accounts: no step may add, remove or switch one.
+check('demo scenario touches no account', File.read(File.join(Smoke::SCENARIOS, 'demo-every-surface.yaml')) !~ /do:\s*account/)
+FileUtils.rm_rf(File.join(Smoke::OUT, '.selftest-demo'))
 # Item 60: Arrange mode, flags and a layout string only; a scenario that leaves it on is cancelled.
 eq('desk arrange keys', state['desk_arrange'].keys, %w[active changed working click_through bar_visible])
 eq('desk arrange in the fixture: off, clicks only where drawn, no bar',
@@ -529,6 +585,26 @@ eq('per-seat counts pass with three seats', r['status'], 'pass')
 r = Runner.new(FakeApp.new('seats' => nil), mem, out, io: io, settle: 0, poll: 0.01, within: 0.05).run_file(seat)
 eq('per-seat counts fail without a count', r['status'], 'fail')
 
+# Settings v2, slice 5: reset's dry run puts the plan in state.yaml, kinds and counts only, and
+# the scenario runs it as a dry run and nothing else.
+eq('no dry run in the fixture', state['reset_dry_run'], nil)
+reset = File.join(Smoke::SCENARIOS, 'reset-dry-run.yaml')
+app_reset = FakeApp.new
+r = Runner.new(app_reset, mem, out, io: io, settle: 0, poll: 0.01, within: 0.05).run_file(reset)
+eq('reset dry run passes', r['status'], 'pass')
+eq('reset ran only as a dry run', app_reset.actions.grep(/\Areset/), ['reset --dry-run'])
+plan = app_reset.state_now['reset_dry_run']
+check('dry run holds no path or label', plan.to_s !~ %r{/|Personal|Work|\.claude})
+eq('dry run runs Claude Code first and settings last', [plan['steps'].first['part'], plan['steps'].last['part']],
+   %w[claude_code settings])
+refused = begin
+  FakeApp.new.action('reset', 'now')
+  false
+rescue Smoke::Failure
+  true
+end
+check('reset refuses anything but the dry run', refused)
+
 app3 = FakeApp.new('meters' => [])
 runner3 = Runner.new(app3, mem, out, io: io, settle: 0, poll: 0.01, within: 0.05)
 r = runner3.run_file(File.join(FIXTURES, 'scenarios', 'skip.yaml'))
@@ -547,7 +623,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key]
+    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end
@@ -556,7 +632,14 @@ check('no scenario signs out', Dir[File.join(Smoke::SCENARIOS, '*.yaml')].none? 
 # Item 36: a smoke run works on the real accounts, so no scenario adds, removes, renames, signs
 # out or even switches one.
 check('no scenario touches accounts', Dir[File.join(Smoke::SCENARIOS, '*.yaml')].none? { |f| File.read(f) =~ /do:\s*(account|add|remove|rename)/i })
-check('scenarios exist', Dir[File.join(Smoke::SCENARIOS, '*.yaml')].length >= 8)
+# Settings v2, slice 5: a smoke run never resets for real; every reset step is the dry run.
+Dir[File.join(Smoke::SCENARIOS, '*.yaml')].each do |f|
+  Array(YAML.safe_load(File.read(f))['steps']).each do |s|
+    next unless s.is_a?(Hash) && s['do'] == 'reset'
+    check("#{File.basename(f)}: reset only as a dry run", %w[--dry-run dry-run].include?(s['arg']))
+  end
+end
+check('scenarios exist',Dir[File.join(Smoke::SCENARIOS, '*.yaml')].length >= 8)
 
 # --- Gallery -----------------------------------------------------------------------------------
 

@@ -64,7 +64,7 @@ enum HistoryStore {
         }
 
         func save(_ h: History, account: String?) {
-            guard let data = try? JSONEncoder().encode(h) else { return }
+            guard !ResetGate.isOn, let data = try? JSONEncoder().encode(h) else { return }
             try? data.write(to: url(for: account), options: .atomic)
         }
 

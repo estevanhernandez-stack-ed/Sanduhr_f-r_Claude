@@ -126,6 +126,8 @@ final class ThemeProposalHandoff {
     }
 
     private func save(_ p: ThemeProposal, apply: Bool) {
+        // Reset Sanduhr… ran: no theme file is written again.
+        guard !ResetGate.isOn else { return }
         guard let place = placement(p) else {
             writeResult(id: p.id, .refusal("name_taken", "The themes folder has a different theme under '\(p.key)' and its next 98 keys; pass another save_as.", findings: p.findings))
             return

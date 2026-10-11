@@ -59,6 +59,24 @@ final class SeatMeters {
     private var knownFetchable: Set<String> = []
     /// Accounts waiting for that one fetch.
     private(set) var pending: Set<String> = []
+    /// Demo mode (slice 4): no round starts and no fetch goes out until it ends. The files and
+    /// seats.json still follow the real accounts (`sync`), so nothing reads as signed out.
+    var paused = false
+
+    /// Reset Sanduhr… stopped it (slice 5): no round, no client, no file from here on.
+    private(set) var stopped = false
+
+    /// Cancels a running round and drops every client (and with it the other accounts' keys).
+    func stop() {
+        stopped = true
+        round?.cancel()
+        round = nil
+        clients = [:]
+        pending = []
+        knownFetchable = []
+    }
+
+    var isStopped: Bool { stopped && round == nil && clients.isEmpty }
 
     init(files: SeatSnapshots.Files = .standard, interval: TimeInterval = 5 * 60) {
         self.files = files
@@ -76,6 +94,7 @@ final class SeatMeters {
     /// seats.json and the per-account files follow every change to the accounts, their sign-in
     /// and their links. Cheap when nothing changed.
     func sync() {
+        guard !stopped else { return }
         let c = context()
         let linked = c.linked
         let seats = SeatSnapshots.seats(linked)
@@ -138,7 +157,7 @@ final class SeatMeters {
     }
 
     private func write(_ label: String?, _ result: Result<UsageResponse, Error>) {
-        guard let target = target(label) else { return }
+        guard !stopped, let target = target(label) else { return }
         let ref = AccountRef.of(label)
         switch result {
         case .success(let u): SnapshotWriter.writeOk(u, accountRef: ref, now: now(), to: target)
@@ -159,7 +178,7 @@ final class SeatMeters {
     /// here off the main thread, with Claude Code activity in its folder.
     @discardableResult
     func startRound() -> Task<Void, Never>? {
-        guard round == nil else { return nil }
+        guard round == nil, !paused, !stopped else { return nil }
         let c = context()
         let candidates = c.linked.keys.filter {
             SeatSnapshots.fetchable($0, linked: c.linked, signedIn: c.signedIn, active: c.active) && !throttled($0)
@@ -178,6 +197,7 @@ final class SeatMeters {
                 await self.sleep(SeatSnapshots.stagger)
                 await self.fetch(label)
             }
+            guard !self.stopped else { return }
             self.round = nil
             // A seat that became new during the round gets its turn now.
             if !self.pending.isEmpty { self.startRound() }
@@ -187,6 +207,7 @@ final class SeatMeters {
     }
 
     private func fetch(_ label: String) async {
+        guard !paused else { return }
         let c = context()
         guard SeatSnapshots.fetchable(label, linked: c.linked, signedIn: c.signedIn, active: c.active),
               !throttled(label) else { return }

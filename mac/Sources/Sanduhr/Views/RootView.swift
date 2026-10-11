@@ -103,7 +103,9 @@ struct RootView: View {
             // `exists()` never prompts (no access control on the Keychain
             // items) — safe to call on every view appearance.
             // Not after Just the Desk: that person has no account to sign in to (JustTheDesk).
-            if JustTheDesk.showsWelcome(hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey)) {
+            // Nor after Not Now, for the rest of this launch (WelcomeNotNow).
+            if JustTheDesk.showsWelcome(hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey),
+                                        notNow: WelcomeNotNow.chosen) {
                 showOnboarding = true
             }
         }
@@ -120,17 +122,20 @@ struct RootView: View {
                     if let cf = c.cfClearance { KeychainStore.set(cf, account: KeychainAccount.cfClearance) }
                     vm.credentialsChanged()
                 case .pasteInstead:
-                    SettingsWindowController.shared.show(.credentials)
+                    SettingsWindowController.shared.showPasteKey()
                 case .cancelled:
                     if !KeychainStore.exists(account: KeychainAccount.sessionKey) { showOnboarding = true }
                 }
             }
         }, onPaste: {
             showOnboarding = false
-            SettingsWindowController.shared.show(.credentials)
+            SettingsWindowController.shared.showPasteKey()
         }, onJustTheDesk: {
             showOnboarding = false
             (NSApp.delegate as? AppDelegate)?.chooseJustTheDesk()
+        }, onNotNow: {
+            WelcomeNotNow.choose()
+            showOnboarding = false
         })
     }
 
@@ -296,7 +301,7 @@ struct LimitContextMenu: ViewModifier {
         content.contextMenu {
             if let app = NSApp.delegate as? AppDelegate {
                 let groups = LimitMenu.groups(tier: tier, accounts: app.currentAccountsMenu(),
-                                              hidden: vm.hiddenTiers, temporary: vm.temporaryTiers,
+                                              hidden: vm.hiddenTiers, temporary: vm.demo ? [] : vm.temporaryTiers,
                                               warningsOn: warningsOn)
                 ForEach(groups.indices, id: \.self) { i in
                     if i > 0 { Divider() }

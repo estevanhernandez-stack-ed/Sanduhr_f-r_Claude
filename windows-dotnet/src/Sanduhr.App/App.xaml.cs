@@ -30,6 +30,11 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Store installs only: bring data an older, virtualized Store build left in the
+        // package's LocalCache to the real AppData paths. Must run before anything below
+        // constructs Paths or reads settings. One-shot, never throws.
+        PackagedDataMigrationRunner.RunIfPackaged();
+
         _vm = new WidgetViewModel();
         // Apply the saved theme's palette to the Application resources before the
         // window is shown so the first paint is correct (no obsidian→saved flash).

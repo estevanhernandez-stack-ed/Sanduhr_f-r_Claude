@@ -274,7 +274,7 @@ struct ModsSettings: View {
     var model: ModsPageModel
     @State private var consent: MetersConsent?
 
-    private var linked: [String] { vm.accountLabels.compactMap { vm.dataChoices(for: $0).folder } }
+    private var linked: [String] { vm.realAccountLabels.compactMap { vm.dataChoices(for: $0).folder } }
 
     var body: some View {
         ScrollView {
