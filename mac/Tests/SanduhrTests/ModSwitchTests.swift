@@ -195,7 +195,11 @@ struct ModSwitchTests {
         #expect(v2 != v1)
         #expect(dirs(r, ".claude/settings.json") == r.scripts.pinnedModPath(v2))
         #expect(r.installer.ownModState(folder: folder).pinned == v2)
+        // A session running in the folder still loads v1: it stays until the next launch.
+        #expect(FileManager.default.fileExists(atPath: r.scripts.pinnedModPath(v1)))
+        r.scripts.refreshIfInstalled()
         #expect(!FileManager.default.fileExists(atPath: r.scripts.pinnedModPath(v1)))
+        #expect(FileManager.default.fileExists(atPath: r.scripts.pinnedModPath(v2)))
 
         // Version 3 changes a comment only: no question.
         r.ship(version: "3")

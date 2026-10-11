@@ -16,10 +16,13 @@ import Foundation
 /// new one, whole. The stamp follows the scripts' content, so an update that leaves them alone
 /// changes nothing on disk.
 ///
-/// The folder swapped out stays until the next refresh (a session that resolved the link a
-/// moment before the swap still finds it); every older stamped folder is deleted, except a
-/// version the Mods page pinned an entry to (item 64, slice 2), kept while a receipt names it. Python reads a
-/// script whole when it starts, so a running server or statusline never needs its folder again.
+/// Stamped folders are pruned only at launch (`refreshIfInstalled`): a Claude Code session loads
+/// the mod from the folder its settings named when it started, and keeps reading it, so a folder
+/// swapped out or unpinned while the app runs (Update on the Mods page) stays until the next
+/// launch. Then every stamped folder goes except the current one, the one that launch swapped
+/// out, a version a receipt pins (item 64, slice 2) and any a known settings.json still names
+/// (`…/integrations/<stamp>/`). Python reads a script whole when it starts, so a running server or
+/// statusline never needs its folder again.
 /// The flat copies `install.sh` makes beside them are never touched.
 ///
 /// The Claude Code mod (item 50) rides in the same stamped folder, under `mods/sanduhr-meters/`:
@@ -157,10 +160,16 @@ struct IntegrationScripts {
 
     // MARK: Refresh
 
-    /// Puts the app's scripts in their stamped folder, points `current` at it and deletes
-    /// stamped folders no longer in use. Returns the stamp.
+    /// Puts the app's scripts in their stamped folder and points `current` at it. Returns the
+    /// stamp. No stamped folder is deleted here (only leftovers of an interrupted refresh): a
+    /// running session may still load from one; `refreshIfInstalled` prunes at launch.
     @discardableResult
     func refresh() throws -> String {
+        try refresh(prune: nil)
+    }
+
+    /// `refresh()`, then, with `prune`, the launch prune over those settings files.
+    private func refresh(prune settingsFiles: [String]?) throws -> String {
         guard let source else { throw Failure.missingFromApp }
         let files = Self.files(in: source)
         guard let stamp = Self.stamp(of: source, files: files) else { throw Failure.missingFromApp }
@@ -192,7 +201,11 @@ struct IntegrationScripts {
                     throw Failure.writeFailed
                 }
             }
-            prune(keep: [stamp, replaced].compactMap { $0 } + pinnedStamps)
+            if let settingsFiles {
+                prune(keep: [stamp, replaced].compactMap { $0 } + pinnedStamps + Self.referencedStamps(in: settingsFiles))
+            } else {
+                pruneLeftovers()
+            }
             return stamp
         } catch let f as Failure {
             NSLog("Sanduhr integrations refresh failed (\(f))")
@@ -203,10 +216,43 @@ struct IntegrationScripts {
         }
     }
 
-    /// The launch refresh: only where an install exists. Failures are logged by type only.
-    func refreshIfInstalled() {
+    /// The launch refresh: only where an install exists, and the one place stamped folders are
+    /// pruned. `settingsFiles` are the settings a stamp may still be named in (the receipts' files
+    /// by default). Failures are logged by type only.
+    func refreshIfInstalled(settingsFiles: [String]? = nil) {
         guard isInstalled else { return }
-        _ = try? refresh()
+        _ = try? refresh(prune: settingsFiles ?? receiptFiles)
+    }
+
+    /// The config files the receipts name.
+    var receiptFiles: [String] {
+        guard let data = try? Data(contentsOf: dir.appendingPathComponent(IntegrationInstaller.receiptsName)),
+              let receipts = try? JSONDecoder().decode([IntegrationReceipt].self, from: data) else { return [] }
+        return Array(Set(receipts.map(\.file))).sorted()
+    }
+
+    /// The stamps named as `…/integrations/<stamp>/` in any of `files`.
+    static func referencedStamps(in files: [String]) -> [String] {
+        var out = Set<String>()
+        for file in files {
+            guard let text = try? String(contentsOfFile: file, encoding: .utf8) else { continue }
+            var rest = Substring(text)
+            while let r = rest.range(of: "integrations/") {
+                let stamp = String(rest[r.upperBound...].prefix(12))
+                if isStampName(stamp) { out.insert(stamp) }
+                rest = rest[r.upperBound...]
+            }
+        }
+        return out.sorted()
+    }
+
+    /// Deletes what an interrupted refresh left (never a stamped folder).
+    private func pruneLeftovers() {
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(atPath: dir.path) else { return }
+        for name in names where name.hasPrefix(".staging-") || name.hasPrefix(".current-") {
+            try? fm.removeItem(at: dir.appendingPathComponent(name))
+        }
     }
 
     /// Deletes stamped folders other than `keep`, and leftovers of an interrupted refresh.

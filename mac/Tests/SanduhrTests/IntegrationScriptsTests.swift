@@ -81,17 +81,30 @@ struct IntegrationScriptsTests {
         #expect(!s.isCurrent)
         let two = try s.refresh()
         #expect(two != one)
-        // The folder swapped out stays for one refresh, then goes.
+        // While the app runs nothing stamped is deleted: a session may load from it.
         #expect(FileManager.default.fileExists(atPath: r.support.appendingPathComponent(one).path))
         r.ship(version: "3")
         let three = try s.refresh()
-        let left = Set(try FileManager.default.contentsOfDirectory(atPath: r.support.path))
-        #expect(left == [three, two, "current", "sanduhr_mcp.py"])
-
+        #expect(Set(try FileManager.default.contentsOfDirectory(atPath: r.support.path))
+            == [three, two, one, "current", "sanduhr_mcp.py"])
+        // The next launch keeps the current one and the one it swapped out, and a version a known
+        // settings.json still names.
+        r.ship(version: "4")
+        let settings = r.support.deletingLastPathComponent().appendingPathComponent("settings-elsewhere.json")
+        try Data("{\"env\": {\"CLAUDE_CODE_PLUGIN_DIRS\": \"/x/integrations/\(one)/mods/sanduhr-meters\"}}".utf8).write(to: settings)
+        s.refreshIfInstalled(settingsFiles: [settings.path])
+        let four = try #require(s.installedStamp)
+        #expect(Set(try FileManager.default.contentsOfDirectory(atPath: r.support.path))
+            == [four, three, one, "current", "sanduhr_mcp.py"])
+        #expect(IntegrationScripts.referencedStamps(in: [settings.path]) == [one])
+        // Once nothing names it, the launch after deletes it.
+        s.refreshIfInstalled(settingsFiles: [])
+        #expect(Set(try FileManager.default.contentsOfDirectory(atPath: r.support.path))
+            == [four, "current", "sanduhr_mcp.py"])
         // An altered stamped folder is rebuilt.
-        try Data("tampered".utf8).write(to: r.support.appendingPathComponent("\(three)/sanduhr_mcp.py"))
-        #expect(try s.refresh() == three)
-        #expect(try String(contentsOfFile: s.installedPath(IntegrationScripts.mcpScript), encoding: .utf8) == "# sanduhr_mcp.py v3\n")
+        try Data("tampered".utf8).write(to: r.support.appendingPathComponent("\(four)/sanduhr_mcp.py"))
+        #expect(try s.refresh() == four)
+        #expect(try String(contentsOfFile: s.installedPath(IntegrationScripts.mcpScript), encoding: .utf8) == "# sanduhr_mcp.py v4\n")
 
         s.removeAll()
         #expect(Set(try FileManager.default.contentsOfDirectory(atPath: r.support.path)) == ["sanduhr_mcp.py"])
