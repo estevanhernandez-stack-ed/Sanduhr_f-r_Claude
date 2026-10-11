@@ -59,6 +59,7 @@ public sealed class SettingsViewModel
     public string TrademarkNotice => SettingsNames.TrademarkNotice;
     public string WhereSettingsLiveTitle => SettingsNames.WhereSettingsLive;
     public string ThirdPartyNoticesTitle => SettingsNames.ThirdPartyNotices;
+    public string ResetSanduhrTitle => SettingsNames.ResetSanduhr;
     public string AboutVersionLine => $"Sanduhr für Claude {Version}";
 
     /// <summary>About, Third-party notices: the packages the app ships with.</summary>
@@ -75,6 +76,12 @@ public sealed class SettingsViewModel
 
     /// <summary>Opens a third-party package's page in the browser.</summary>
     public ICommand OpenLinkCommand { get; }
+
+    /// <summary>About's "Reset Sanduhr…" button: asks the orchestrator to open the reset dialog.</summary>
+    public ICommand ResetSanduhrCommand { get; }
+
+    /// <summary>Connected by the orchestrator: opens the reset dialog. Null does nothing.</summary>
+    public Func<Task>? ResetRequested { get; set; }
 
     /// <summary>Backs the General tab's Shortcuts section (global shortcut + recorder).</summary>
     public ShortcutsViewModel Shortcuts { get; }
@@ -109,6 +116,11 @@ public sealed class SettingsViewModel
         ShowInExplorerCommand = new RelayCommand<string>(OpenFolder,
             folder => !string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder));
         OpenLinkCommand = new RelayCommand<string>(OpenLink);
+        ResetSanduhrCommand = new RelayCommand(async () =>
+        {
+            try { if (ResetRequested is { } reset) await reset(); }
+            catch (Exception) { /* the dialog reports its own failures */ }
+        });
     }
 
     private static void OpenFolder(string? folder)
