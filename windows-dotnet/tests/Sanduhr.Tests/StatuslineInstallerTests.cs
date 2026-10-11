@@ -22,13 +22,24 @@ public class StatuslineInstallerTests
     }
 
     [Fact]
-    public void DetectCcHomes_finds_both_known_homes_in_stable_order()
+    public void DetectCcHomes_finds_discovered_homes_in_stable_order()
+    {
+        // Discover requires projects/ (or the home's .claude.json) for a folder to count.
+        using var home = new TempDir();
+        using var bin = new TempDir();
+        Directory.CreateDirectory(Path.Combine(home.Path, ".claude-personal", "projects"));
+        Directory.CreateDirectory(Path.Combine(home.Path, ".claude", "projects"));
+        Assert.Equal(new[] { ".claude", ".claude-personal" }, Make(home, bin).DetectCcHomes());
+    }
+
+    [Fact]
+    public void DetectCcHomes_finds_a_third_home_and_skips_backup_copies()
     {
         using var home = new TempDir();
         using var bin = new TempDir();
-        Directory.CreateDirectory(Path.Combine(home.Path, ".claude-personal"));
-        Directory.CreateDirectory(Path.Combine(home.Path, ".claude"));
-        Assert.Equal(new[] { ".claude", ".claude-personal" }, Make(home, bin).DetectCcHomes());
+        foreach (var name in new[] { ".claude", ".claude-work", ".claude-backup-1", ".claude-work.config-backup-20261001" })
+            Directory.CreateDirectory(Path.Combine(home.Path, name, "projects"));
+        Assert.Equal(new[] { ".claude", ".claude-work" }, Make(home, bin).DetectCcHomes());
     }
 
     // -- script install -------------------------------------------------------

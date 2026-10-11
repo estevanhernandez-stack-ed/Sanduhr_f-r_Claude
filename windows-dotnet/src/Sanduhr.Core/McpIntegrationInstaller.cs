@@ -31,9 +31,6 @@ public readonly record struct McpRegisterResult(bool Ok, string? PriorCommand);
 /// </summary>
 public sealed class McpIntegrationInstaller
 {
-    private static readonly string[] KnownHomeNames = { ".claude", ".claude-personal" };
-    private const string DefaultHomeName = ".claude";
-
     private readonly string _homeDir;
     private readonly string _sanduhrDir;
     private readonly Action<string>? _logBestEffort;
@@ -50,33 +47,17 @@ public sealed class McpIntegrationInstaller
     public string VersionsDir => Path.Combine(_sanduhrDir, "mcp");
     public string LauncherPath => Path.Combine(_sanduhrDir, "bin", "sanduhr-mcp.cmd");
 
-    /// <summary>The .claude.json Claude Code reads for a home. Claude Code keeps
-    /// it INSIDE the home only when that home is selected through
-    /// <c>CLAUDE_CONFIG_DIR</c> (the only way a non-default home such as
-    /// <c>.claude-personal</c> is ever a home); for the default <c>.claude</c>
-    /// home it lives beside the home, at <c>%USERPROFILE%\.claude.json</c>.
-    /// An inner file that already exists wins for either name: its presence
-    /// means the config-dir layout is in use for that home.</summary>
+    /// <summary>The .claude.json Claude Code reads for a home: one placement rule,
+    /// <see cref="ClaudeCodeHomes.ConfigFile"/>. Any home but <c>.claude</c> keeps it
+    /// inside the home; for <c>.claude</c> the signed-in file wins, then the newer
+    /// inner one, else the one beside the home at <c>%USERPROFILE%\.claude.json</c>.</summary>
     public string ConfigPathFor(string ccHomeName)
-    {
-        string inner = Path.Combine(_homeDir, ccHomeName, ".claude.json");
-        if (ccHomeName != DefaultHomeName || File.Exists(inner))
-            return inner;
-        return Path.Combine(_homeDir, ".claude.json");
-    }
+        => ClaudeCodeHomes.ConfigFile(Path.Combine(_homeDir, ccHomeName), _homeDir);
 
-    /// <summary>CC homes that exist under the profile — same closed set as the
-    /// statusline installer; the consent dialog picks ONE.</summary>
+    /// <summary>CC homes under the profile, as <see cref="ClaudeCodeHomes.Discover"/>
+    /// finds them — same set as the statusline installer; the consent dialog picks ONE.</summary>
     public IReadOnlyList<string> DetectCcHomes()
-    {
-        var found = new List<string>();
-        foreach (var name in KnownHomeNames)
-        {
-            if (Directory.Exists(Path.Combine(_homeDir, name)))
-                found.Add(name);
-        }
-        return found;
-    }
+        => ClaudeCodeHomes.Discover(_homeDir, Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR"));
 
     /// <summary>Copy the server build from <paramref name="sourceDir"/> into a
     /// freshly stamped version dir. Returns the new dir, or null on failure.</summary>

@@ -21,11 +21,6 @@ namespace Sanduhr.Core;
 /// </summary>
 public sealed class StatuslineInstaller
 {
-    /// <summary>The Claude Code config homes Sanduhr knows how to detect —
-    /// mirrors CcLogReader's log roots (a CC home and its projects/ log root are
-    /// the same directory family).</summary>
-    private static readonly string[] KnownHomeNames = { ".claude", ".claude-personal" };
-
     private readonly string _homeDir;
     private readonly string _binDir;
     private readonly Action<string>? _logBestEffort;
@@ -46,18 +41,15 @@ public sealed class StatuslineInstaller
     /// <summary>The installed script path.</summary>
     public string ScriptPath => Path.Combine(_binDir, "sanduhr-statusline.ps1");
 
-    /// <summary>Claude Code homes that exist under the profile dir, in stable
-    /// order. More than one → the consent dialog MUST ask which one (a silent
+    /// <summary>Claude Code homes under the profile dir, as
+    /// <see cref="ClaudeCodeHomes.Discover"/> finds them (<c>.claude</c>, every
+    /// <c>.claude-*</c> home with <c>projects/</c> or a <c>.claude.json</c>, and the
+    /// <c>CLAUDE_CONFIG_DIR</c> folder when it is in the profile; never a backup
+    /// copy), in stable order. More than one → the consent dialog MUST ask which one (a silent
     /// default into an employer tenant is the breach the design review named).</summary>
     public IReadOnlyList<string> DetectCcHomes()
     {
-        var found = new List<string>();
-        foreach (var name in KnownHomeNames)
-        {
-            if (Directory.Exists(Path.Combine(_homeDir, name)))
-                found.Add(name);
-        }
-        return found;
+        return ClaudeCodeHomes.Discover(_homeDir, Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR"));
     }
 
     /// <summary>Write (or refresh) the script. Idempotent — called on every
