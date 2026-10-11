@@ -7,10 +7,15 @@ import Foundation
 /// `~/.claude-work`), the folder `CLAUDE_CONFIG_DIR` names, or any folder chosen by hand, as long
 /// as it looks like one: it holds `projects/` or its `.claude.json`.
 ///
-/// **Placement of `.claude.json`** (Windows `McpIntegrationInstaller.ConfigPathFor`): Claude Code
-/// keeps it inside the home when the home is selected through `CLAUDE_CONFIG_DIR`; for the
-/// default `~/.claude` it lives beside the home, at `~/.claude.json`. A file inside `~/.claude`
-/// that already exists wins.
+/// **Placement of `.claude.json`** (item 71, slice 0): Claude Code keeps it inside the home when
+/// the home is selected through `CLAUDE_CONFIG_DIR`, and beside the default `~/.claude`, at
+/// `~/.claude.json`, when the variable is unset. A launch with `CLAUDE_CONFIG_DIR` naming
+/// `~/.claude` itself uses `~/.claude/.claude.json` instead, and creates a fresh one (no sign-in)
+/// when it is missing: that is how a stub appears beside the live file (checked against Claude
+/// Code 2.1.296 in a scratch home; docs/mods-and-config-spec.md, open question 1). So for
+/// `~/.claude` with both files, the one signed in (`oauthAccount`) wins, then the newer one, and a
+/// tie goes to `~/.claude.json`, Claude Code's own default. Remove never uses this rule: it
+/// edits the file its receipt names.
 ///
 /// **What is read.** Only `oauthAccount.organizationUuid`, decoded into a type with that one
 /// field: the email, names and organization name beside it are never decoded or kept. The uuid
@@ -34,14 +39,88 @@ enum ClaudeCodeFolders {
         }
     }
 
-    /// The `.claude.json` Claude Code reads for the home at `dir`.
+    /// The `.claude.json` Claude Code reads for the home at `dir`, by the placement rule above.
     static func configFile(for dir: String, home: String,
                            fileManager fm: FileManager = .default) -> String {
+        let candidates = configCandidates(for: dir, home: home, fileManager: fm)
+        return candidates.first(where: \.inUse)?.path ?? candidates[0].path
+    }
+
+    /// One place a home's `.claude.json` can be. Facts only: whether it is signed in is the
+    /// presence of `oauthAccount`, never its contents.
+    struct ConfigCandidate: Equatable, Sendable {
+        let path: String
+        let exists: Bool
+        /// Holds an `oauthAccount` object.
+        let signedIn: Bool
+        let modified: Date?
+        /// The placement rule's answer.
+        let inUse: Bool
+
+        func with(inUse: Bool) -> ConfigCandidate {
+            ConfigCandidate(path: path, exists: exists, signedIn: signedIn, modified: modified, inUse: inUse)
+        }
+    }
+
+    /// Where the home at `dir` can keep its `.claude.json`: `~/.claude.json` then
+    /// `~/.claude/.claude.json` for the default home, the inner file alone for any other. Exactly
+    /// one is `inUse`. Settings shows both when both exist.
+    static func configCandidates(for dir: String, home: String,
+                                 fileManager fm: FileManager = .default) -> [ConfigCandidate] {
         let d = AccountData.normalized(dir)
+        let h = AccountData.normalized(home)
         let inner = (d as NSString).appendingPathComponent(configName)
-        let defaultHome = (AccountData.normalized(home) as NSString).appendingPathComponent(defaultName)
-        if d != defaultHome || fm.fileExists(atPath: inner) { return inner }
-        return (AccountData.normalized(home) as NSString).appendingPathComponent(configName)
+        guard d == (h as NSString).appendingPathComponent(defaultName) else {
+            return [candidate(inner, inUse: true, fm)]
+        }
+        let outer = (h as NSString).appendingPathComponent(configName)
+        let o = candidate(outer, inUse: false, fm), i = candidate(inner, inUse: false, fm)
+        let innerWins: Bool
+        switch (o.exists, i.exists) {
+        case (false, true): innerWins = true
+        case (true, true):
+            if o.signedIn != i.signedIn {
+                innerWins = i.signedIn
+            } else if let om = o.modified, let im = i.modified {
+                innerWins = im > om
+            } else {
+                innerWins = false
+            }
+        default: innerWins = false
+        }
+        return [o.with(inUse: !innerWins), i.with(inUse: innerWins)]
+    }
+
+    private static func candidate(_ path: String, inUse: Bool, _ fm: FileManager) -> ConfigCandidate {
+        var isDir: ObjCBool = false
+        let exists = fm.fileExists(atPath: path, isDirectory: &isDir) && !isDir.boolValue
+        let modified = exists ? (try? fm.attributesOfItem(atPath: path))?[.modificationDate] as? Date : nil
+        return ConfigCandidate(path: path, exists: exists, signedIn: exists && isSignedIn(path, fm), modified: modified, inUse: inUse)
+    }
+
+    /// The only part of `.claude.json` the placement rule decodes: whether `oauthAccount` is an
+    /// object. Nothing inside it is decoded.
+    private struct SignedIn: Decodable {
+        /// An object, whatever it holds; its members are never read.
+        struct Present: Decodable {
+            private struct NoKeys: CodingKey {
+                var stringValue: String
+                var intValue: Int? { nil }
+                init?(stringValue: String) { self.stringValue = stringValue }
+                init?(intValue: Int) { nil }
+            }
+
+            init(from decoder: Decoder) throws {
+                _ = try decoder.container(keyedBy: NoKeys.self)
+            }
+        }
+        let oauthAccount: Present?
+    }
+
+    private static func isSignedIn(_ path: String, _ fm: FileManager) -> Bool {
+        guard let data = fm.contents(atPath: path),
+              let decoded = try? JSONDecoder().decode(SignedIn.self, from: data) else { return false }
+        return decoded.oauthAccount != nil
     }
 
     /// Whether `dir` is a directory that looks like a Claude Code home: it holds a `projects`
@@ -58,14 +137,16 @@ enum ClaudeCodeFolders {
         return fm.fileExists(atPath: configFile(for: d, home: home, fileManager: fm))
     }
 
-    /// A copy a config tool left beside a home (`.claude-work.config-backup-20261001-174332`):
-    /// it looks like a home but nothing loads it, so discovery skips it.
+    /// A copy a config tool left beside a home (`.claude-work.config-backup-20261001-174332`, or
+    /// `.claude-backup-20261001` from a seat's migration): it looks like a home but nothing loads
+    /// it, so discovery skips it.
     static let backupMarker = ".config-backup-"
+    static let backupPrefix = ".claude-backup-"
 
-    static func isBackup(_ name: String) -> Bool { name.contains(backupMarker) }
+    static func isBackup(_ name: String) -> Bool { name.contains(backupMarker) || name.hasPrefix(backupPrefix) }
 
     /// The homes under `home`: `.claude` first, then the `.claude-*` folders by name (never a
-    /// `*.config-backup-*` copy), then the `CLAUDE_CONFIG_DIR` folder when it is somewhere else,
+    /// `*.config-backup-*` or `.claude-backup-*` copy), then the `CLAUDE_CONFIG_DIR` folder when it is somewhere else,
     /// even when its name looks like a backup (that is the one Claude Code uses). Only folders
     /// that look like homes.
     static func discover(home: String, environment: [String: String] = [:],

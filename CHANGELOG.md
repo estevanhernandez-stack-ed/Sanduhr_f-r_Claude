@@ -2,6 +2,10 @@
 
 ## Unreleased (mac)
 
+- **Fixed: Sanduhr reads the `.claude.json` Claude Code actually uses for `~/.claude`.** When both `~/.claude.json` and `~/.claude/.claude.json` exist, Sanduhr used to pick the inner file, which is often a near-empty stub left by a launch with `CLAUDE_CONFIG_DIR` set to `~/.claude`; the MCP server then showed as not installed and account suggestions missed. Now the signed-in file wins, then the newer one, and Mods & Config names both files in that folder's box. Remove always edits the file Sanduhr wrote to, so an entry written into the stub earlier comes out of the stub. Folders a seat migration leaves (`.claude-backup-*`) are no longer listed.
+- **Add Folder… on Mods & Config** keeps a Claude Code folder Sanduhr didn't find, and Claude Code's page lists it too. Sanduhr remembers it in its own settings and writes nothing into the folder; **Forget Folder** in its box stops listing it.
+- **One unreadable install record no longer hides the rest.** Sanduhr's install records are read one by one: a record it can't read is kept byte for byte, Mods & Config says so, and every other entry still removes cleanly. While such a record is there, Sanduhr deletes none of its script versions, and Remove of an entry only that record describes changes nothing and says why.
+
 ## v2.16.0-mac — 2026-10-11
 
 - **Fixed: Update on the meters mod no longer drops the band from a running Claude Code session.** The version the session loaded stays on disk until the next launch of Sanduhr, which deletes versions no settings file names any more.

@@ -105,8 +105,8 @@ with the label. The notch stays as it is. A switch never needs a relaunch: the m
   (`{label: {activity, names, share, folder}}`, missing means the default: nothing linked,
   tracked or shared, names). They follow Rename and go with Remove. Folders are found in the
   home folder (`.claude`, `.claude-*`, and `CLAUDE_CONFIG_DIR` when set) when they hold
-  `projects/` or their `.claude.json` (beside the home for `~/.claude`, inside it otherwise, as on
-  Windows); Choose… takes any folder that looks like one. One folder per account, one account
+  `projects/` or their `.claude.json` (inside it for any other folder; for `~/.claude`, the
+  placement rule below); Choose… takes any folder that looks like one. One folder per account, one account
   per folder; a folder linked elsewhere moves only after a confirmation. The suggestion compares
   `oauthAccount.organizationUuid` (the only field decoded) with the account's organization, in
   memory. Sharing goes to the MCP server through `mcp-access.json` (item 47, see Claude Code integrations).
@@ -289,7 +289,7 @@ CLI: `IntegrationInstaller` writes the entries itself, the way Windows' `McpInte
 and `StatuslineInstaller` do:
 
 ```jsonc
-// <folder>/.claude.json, or ~/.claude.json for ~/.claude (the placement rule)
+// <folder>/.claude.json, or for ~/.claude the placement rule's file (see Mods)
 "mcpServers": { "sanduhr": { "type": "stdio", "command": "/usr/bin/python3",
   "args": ["~/Library/Application Support/Sanduhr/integrations/current/sanduhr_mcp.py"] } }
 // <folder>/settings.json
@@ -834,6 +834,35 @@ folder loads, read-only. The folders are the ones Integrations lists: `~/.claude
 `~/.claude-*` folders and `CLAUDE_CONFIG_DIR`'s (`ClaudeCodeFolders.discover`, which now skips
 `*.config-backup-*` copies a config tool leaves beside a home, unless `CLAUDE_CONFIG_DIR` names
 one), the accounts' linked folders and the folders Sanduhr installed into.
+
+**The ground (item 71, slice 0).** `ClaudeCodeFolders.discover` also skips `.claude-backup-*`
+folders a seat migration leaves. **Add Folder…** under the folders keeps a folder discovery
+doesn't find, as a Sanduhr preference (defaults `seats`: `{labels, marks, added}`, absolute
+paths, never in a log or state.yaml; nothing is written into the folder), listed while it still
+looks like a Claude Code folder, with **Forget Folder** in its box; Claude Code's page lists
+those folders too. **The `.claude.json` placement rule:** Claude Code reads `~/.claude.json` for
+`~/.claude` when `CLAUDE_CONFIG_DIR` is unset, and `~/.claude/.claude.json` only when the
+variable names `~/.claude` (such a start creates a 423-byte stub there with no sign-in). With
+both files, the one holding `oauthAccount` wins (nothing in it is decoded), then the newer, and a
+tie goes to `~/.claude.json`; the folder's box on Mods & Config names both. Remove edits the
+file each receipt names, so an entry written into the stub under the old rule comes out of the
+stub; the rule's file is used only when no receipt names one, and when only an unreadable
+receipt does, Remove changes nothing and says so. **Receipts** (`installs.json`) decode record
+by record (`ReceiptLog`): a record that doesn't decode is reported on Mods & Config and kept byte
+for byte on the next save, an unchanged record is written back from its own bytes (fields a newer
+Sanduhr added survive), and the others still undo; a file that isn't a JSON array is moved aside
+to `installs.json.unreadable`. While any receipt is unreadable or set aside, the launch prune
+deletes no stamped folder and Remove keeps the scripts. **Foundations for slice 1:** `Seats`
+(each folder with its user-chosen label, defaulting to the folder's name and never read from the
+folder's files, and its mark: work when its linked account is marked work, else the per-seat
+toggle, else unmarked; a link never marks a seat personal), `SeatWall` (only a personal seat is a
+copy source), `ConfigMask` (by path: values under `env`, `headers`, `oauthAccount` or any key
+naming a token, key, secret, password, credential, auth, authorization, bearer or cookie; by
+value: URL userinfo, secret-named query parameters, the value of a secret-named flag or
+`NAME=value`, `Authorization:` and `Cookie:` headers, `Bearer …` and key-shaped strings inside
+commands, args and permission rules; names kept, never editable) and `ClaudeProcesses` (the seat
+of each running `claude` of this user, from `CLAUDE_CONFIG_DIR` in its launch environment through
+`KERN_PROCARGS2`; arguments and every other variable are dropped while parsing).
 
 **What a folder loads** (`ModInventory.scan`, files only, no CLI): the folders in its
 settings.json's `env.CLAUDE_CODE_PLUGIN_DIRS` (`@inline`; off when `enabledPlugins["<name>@inline"]`
