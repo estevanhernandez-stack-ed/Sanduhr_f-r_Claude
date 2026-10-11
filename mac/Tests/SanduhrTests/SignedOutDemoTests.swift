@@ -82,7 +82,9 @@ struct EmptyWingTests {
     /// Signed out with the sign-in reminder off: the meters have nothing to show and nothing coming.
     func signedOut() -> DeskModel {
         let model = DeskModel()
-        model.signInNeeded = true
+        model.update(DeskUsage(signInNeeded: true, keyPresent: false))
+        // The reminder's real setting is never read into the result: off, as the name says.
+        model.claudeCompact = nil
         return model
     }
 
@@ -160,12 +162,12 @@ struct EmptyWingTests {
     @Test func theMetersWingHoldsItsWidthBeforeTheFirstFetch() {
         // A key saved, its first fetch still out: no numbers, no sign-in needed.
         let model = DeskModel()
-        model.update(DeskUsage())
-        #expect(model.metersPending)
+        model.update(DeskUsage(keyPresent: true), now: now)
+        #expect(model.metersPending(now: now))
         #expect(layout(model, left: .time, right: .meters).right >= 36)
         // Signed out instead (only a sign-in helps): it folds.
-        model.signInNeeded = true
-        #expect(!model.metersPending)
+        model.update(DeskUsage(signInNeeded: true), now: now)
+        #expect(!model.metersPending(now: now))
         model.claudeCompact = nil
         #expect(layout(model, left: .time, right: .meters).right == 0)
         #expect(!NotchWingsView.collapses(nil, .meters, showText: true, metersPending: true))

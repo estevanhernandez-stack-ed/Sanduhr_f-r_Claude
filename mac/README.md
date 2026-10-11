@@ -1436,7 +1436,13 @@ Settings v2, slice 4 (item 72; `Models/SignedOut.swift`, `Models/DemoMode.swift`
   camera on that side; Extra width each side comes back with the content. Nothing (a black wing
   chosen on purpose) and Text beside the camera off keep their width, and a wing on the Claude
   meters holds its width while they are empty only for a moment: an account switch's fade, or a
-  key's first fetch still out (`DeskModel.metersPending`).
+  key's first fetch still out (`DeskModel.metersPending`). That wait needs a key a client fetches
+  with (`DeskUsage.keyPresent`, from `UsageViewModel.canFetch`, the credential store's answer, not
+  the account list) and ends after `DeskUsage.firstFetchWait` (90 s); with no key and no numbers
+  the meters read as signed out (`DeskUsage.settled`): the sign-in line, or folded with Sign-in
+  reminders off. A launch without a key tells the Desk at once (`bootstrap` calls
+  `onUsageUpdate`). Usage notes "Signed out on this Mac — showing saved history." for an account
+  without a usable key (`UsageViewModel.hasUsableKey`).
 - **Demo mode** (`sanduhr://debug/action?name=demo&arg=on`, debug hooks on) now fills every
   surface: `UsageViewModel.setDemo` puts two sample accounts, Work (active) and Personal, with
   made-up numbers and history on the widget, its chip and the menu bar, and through

@@ -275,6 +275,38 @@ private struct UsageDemo: View {
     }
 }
 
+/// The shown account has no usable key on this Mac (signed out, or a dev build's file store without
+/// it): what the page shows is saved, and Accounts is where to sign in again.
+private struct UsageNoKeyNote: View {
+    let label: String
+    let navigation: SettingsNavigation
+
+    var body: some View {
+        // A callout, not a caption (2026-10-11: the owner missed the line): an orange tint, an
+        // icon and the headline in bold, so a signed-out account never reads as live.
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "person.crop.circle.badge.exclamationmark")
+                .font(.title2)
+                .foregroundStyle(Color.hex("fb923c"))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(SignedOut.savedHistoryTitle).font(.headline)
+                Text(SignedOut.savedHistoryDetail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            SettingsLinkButton(.credentials) { navigation.accountToShow = label }
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.hex("fb923c").opacity(0.14)))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .strokeBorder(Color.hex("fb923c").opacity(0.5), lineWidth: 1))
+        .accessibilityElement(children: .combine)
+    }
+}
+
 /// The account picker (two or more accounts), the tabs and what the page reads for the account.
 private struct UsageHeader: View {
     var vm: UsageViewModel
@@ -305,6 +337,9 @@ private struct UsageHeader: View {
                 .fixedSize()
             }
             UsageCaption(navigation.usageTab == .meters ? metersLine : sourceLine)
+            if !vm.hasUsableKey(label) {
+                UsageNoKeyNote(label: label, navigation: navigation)
+            }
         }
     }
 

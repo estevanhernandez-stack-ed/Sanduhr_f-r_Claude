@@ -23,9 +23,36 @@ struct DeskUsage {
     var veiled = false
     /// The switch's fetch outlasts the fade: the faint "switching account…".
     var switchNote = false
+    /// The active account's key is in this launch's credential store and a client fetches with it
+    /// (UsageViewModel.canFetch); false when there is none to fetch with (a dev build's empty file
+    /// store, a missing or unreadable Keychain item); nil before the widget has said.
+    var keyPresent: Bool? = nil
 
     /// Numbers older than this are drawn dimmed, and the notch drops them.
     static let staleAfter: TimeInterval = 15 * 60
+    /// How long the meters may wait for a key's first fetch before an empty wing stops holding its
+    /// width: a first answer takes seconds, so this only ends a wait that will not end.
+    static let firstFetchWait: TimeInterval = 90
+
+    /// The same, with no key to fetch with and no numbers read as signed out (2026-10-11: two
+    /// listed accounts and an empty dev-build file store left the meters wing a blank slab): the
+    /// Claude line and the notch then say "sign in again in Sanduhr" (or "sign in to Sanduhr")
+    /// while Sign-in reminders are on, and stay empty, the wing folded, while they are off.
+    var settled: DeskUsage {
+        var u = self
+        if keyPresent == false, usage == nil, !veiled { u.signInNeeded = true }
+        return u
+    }
+
+    /// The meters are empty only for a moment, so a notch wing on them keeps its width: an account
+    /// switch's fade veils the old numbers, or a key that can fetch waits for its first answer, for
+    /// at most `firstFetchWait` from `waitingSince`. Never with no key, never once sign-in is needed.
+    func metersPending(waitingSince: Date?, now: Date) -> Bool {
+        if veiled { return true }
+        guard !signInNeeded, fetchedAt == nil, keyPresent != false else { return false }
+        guard let waitingSince else { return true }
+        return now.timeIntervalSince(waitingSince) < Self.firstFetchWait
+    }
 
     func isStale(now: Date) -> Bool {
         signInNeeded || fetchedAt.map { now.timeIntervalSince($0) > Self.staleAfter } ?? true

@@ -79,6 +79,12 @@ enum SignedOut {
 
     static let usageLine = "Sign in to see your usage here. Your meters, their history and your Claude Code activity show on this page once an account is signed in."
 
+    /// Usage, for an account with no usable key on this Mac: its numbers are saved ones.
+    static let savedHistoryLine = "Signed out on this Mac — showing saved history."
+    /// The same note as a callout: the headline in bold, the rest beneath it.
+    static let savedHistoryTitle = "Signed out on this Mac"
+    static let savedHistoryDetail = "The numbers below are saved history. Sign in again in Accounts to see live usage."
+
     static func usageState(label: String?, demo: Bool) -> UsageState {
         if demo { return .demo }
         guard let label else { return .signedOut }
