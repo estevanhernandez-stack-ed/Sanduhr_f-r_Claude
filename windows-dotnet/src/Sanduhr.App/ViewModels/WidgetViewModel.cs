@@ -116,8 +116,29 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// settings in the ctor; drives both the live card render and the toolbar glyph.</summary>
     [ObservableProperty] private SparklineStyle _sparklineStyle = SparklineStyle.Classic;
 
-    /// <summary>Visibility of the recovery card — any non-None reason shows it.</summary>
-    public bool ShowSignInPrompt => Reason != SignInReason.None;
+    /// <summary>Not now on the first-run card: put away for this launch only (in memory), so
+    /// the next launch without an account asks again. The "Not signed in" line stays the way in.</summary>
+    [ObservableProperty] private bool _signInPutOff;
+
+    /// <summary>Visibility of the recovery card: any non-None reason shows it, except a
+    /// first-run card put away with Not now.</summary>
+    public bool ShowSignInPrompt => Reason != SignInReason.None && !ShowNotSignedInLine;
+
+    /// <summary>The first-run card's Not now link (first run only; a recovery card stays).</summary>
+    public bool ShowNotNow => Reason == SignInReason.FirstRun;
+
+    /// <summary>The one-line "Not signed in" way in, shown after Not now.</summary>
+    public bool ShowNotSignedInLine => Reason == SignInReason.FirstRun && SignInPutOff;
+
+    partial void OnSignInPutOffChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowSignInPrompt));
+        OnPropertyChanged(nameof(ShowNotSignedInLine));
+    }
+
+    /// <summary>Not now: the first-run card goes for this launch; nothing is chosen or saved.</summary>
+    [RelayCommand]
+    private void NotNow() => SignInPutOff = true;
 
     /// <summary>The active account's credential origin — routes the recovery card.
     /// Embedded when signed out (FirstRun copy doesn't branch on origin anyway).</summary>
@@ -136,6 +157,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     partial void OnReasonChanged(SignInReason value)
     {
         OnPropertyChanged(nameof(ShowSignInPrompt));
+        OnPropertyChanged(nameof(ShowNotNow));
+        OnPropertyChanged(nameof(ShowNotSignedInLine));
         NotifyPromptCopy();
     }
 

@@ -390,6 +390,29 @@
                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" FontSize="12"
                                Visibility="{Binding StatusText, Converter={StaticResource StrVis}}" />
 
+                    <!-- Signed out, first-run card put away with Not now: one line is the way in. -->
+                    <Button Command="{Binding PrimaryAuthCommand}" Cursor="Hand"
+                            HorizontalAlignment="Left" Margin="2,4,2,8"
+                            Background="Transparent" BorderThickness="0" FontSize="12"
+                            Foreground="{DynamicResource Sanduhr.Brush.Accent}"
+                            ToolTip="Opens the sign-in window"
+                            AutomationProperties.Name="Not signed in. Sign in"
+                            Visibility="{Binding ShowNotSignedInLine, Converter={StaticResource BoolVis}, FallbackValue=Collapsed}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <TextBlock x:Name="text" TextDecorations="Underline"
+                                           Foreground="{TemplateBinding Foreground}">
+                                    <Run Text="Not signed in" /><Run Text=" · Sign in" />
+                                </TextBlock>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsKeyboardFocused" Value="True">
+                                        <Setter TargetName="text" Property="FontWeight" Value="SemiBold" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+
                     <!-- Empty-state: first-run "Sign in to Claude" prompt (item 6).
                          Shown when there's no active account; the headline feature's
                          front door. The 626 cyan->magenta pairing on the accent.
@@ -441,6 +464,22 @@
                                     <ControlTemplate TargetType="Button">
                                         <TextBlock Text="{TemplateBinding Content}"
                                                    TextDecorations="Underline"
+                                                   Foreground="{TemplateBinding Foreground}" />
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                            <!-- Not now (first run only): puts the card away for this launch. -->
+                            <Button Command="{Binding NotNowCommand}" Cursor="Hand"
+                                    Content="Not now"
+                                    HorizontalAlignment="Center" Margin="0,8,0,0"
+                                    Background="Transparent" BorderThickness="0" FontSize="11"
+                                    Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                    ToolTip="Put this away for now. The widget's Not signed in line signs in later."
+                                    AutomationProperties.Name="Not now"
+                                    Visibility="{Binding ShowNotNow, Converter={StaticResource BoolVis}, FallbackValue=Collapsed}">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <TextBlock Text="{TemplateBinding Content}"
                                                    Foreground="{TemplateBinding Foreground}" />
                                     </ControlTemplate>
                                 </Button.Template>
