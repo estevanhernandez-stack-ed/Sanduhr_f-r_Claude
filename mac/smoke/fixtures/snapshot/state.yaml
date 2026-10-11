@@ -203,6 +203,8 @@ mods_config:
   duplicates: 0
   work_only: 0
   shown: 0
+  selected: 0
+  by_seat: []
 message_editor:
   open: false
   mode: list

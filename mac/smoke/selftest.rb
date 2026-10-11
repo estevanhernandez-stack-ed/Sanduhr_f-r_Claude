@@ -410,10 +410,11 @@ check('mods page holds only flags and counts',
       state['mods_page'].values.all? { |v| v == true || v == false || v.is_a?(Integer) })
 # Item 71, slice 1: Mods & Config's tab and Catalog counts only: never a name, label, path or value.
 eq('mods config keys', state['mods_config'].keys,
-   %w[tab seats cards available needs_look duplicates work_only shown])
+   %w[tab seats cards available needs_look duplicates work_only shown selected by_seat])
 check('mods config holds a tab word and counts only',
       %w[catalog seat].include?(state['mods_config']['tab']) &&
-      state['mods_config'].reject { |k, _| k == 'tab' }.values.all? { |v| v.is_a?(Integer) })
+      state['mods_config'].reject { |k, _| %w[tab by_seat].include?(k) }.values.all? { |v| v.is_a?(Integer) } &&
+      state['mods_config']['by_seat'].is_a?(Array))
 # Item 69: Settings, Message's editor, counts and flags; `added` only ever the smoke's own line.
 eq('message editor keys', state['message_editor'].keys, %w[open mode rows styled raw notes unsaved today_special added])
 eq('message editor in the fixture: the starter file, nothing unsaved',
