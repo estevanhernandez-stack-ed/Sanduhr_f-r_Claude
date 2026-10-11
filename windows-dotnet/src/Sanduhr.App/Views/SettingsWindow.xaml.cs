@@ -67,8 +67,11 @@ internal partial class SettingsWindow : Window
         CalendarStrip.DayClicked += OnCalendarDayClicked;
 
         Loaded += (_, _) => RenderHistory();
+        PreviewKeyDown += OnRecorderPreviewKeyDown;
+        Deactivated += (_, _) => ViewModel.Shortcuts.CancelRecording();
         Closed += (_, _) =>
         {
+            ViewModel.Shortcuts.Detach();
             _localCcTimer.Stop();
             ViewModel.History.Changed -= RenderHistory;
             ViewModel.ClaudeCode.Overview.Changed -= RenderLocalCc;
@@ -141,6 +144,43 @@ internal partial class SettingsWindow : Window
                 RenderHistory();
         }
     }
+
+    /// <summary>While the shortcut recorder is listening, every key press is a candidate combo:
+    /// Escape cancels, a pure modifier is ignored, anything else goes to the view model.</summary>
+    private void OnRecorderPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        var shortcuts = ViewModel.Shortcuts;
+        if (!shortcuts.IsRecording)
+            return;
+
+        var key = e.Key switch
+        {
+            Key.System => e.SystemKey,
+            Key.ImeProcessed => e.ImeProcessedKey,
+            _ => e.Key,
+        };
+        e.Handled = true;
+        if (key == Key.Escape)
+        {
+            shortcuts.CancelRecording();
+            return;
+        }
+        if (key == Key.None)
+            return;
+
+        var mods = HotKeyModifiers.None;
+        var held = Keyboard.Modifiers;
+        if (held.HasFlag(ModifierKeys.Control)) mods |= HotKeyModifiers.Control;
+        if (held.HasFlag(ModifierKeys.Alt)) mods |= HotKeyModifiers.Alt;
+        if (held.HasFlag(ModifierKeys.Shift)) mods |= HotKeyModifiers.Shift;
+        if (held.HasFlag(ModifierKeys.Windows) || Keyboard.IsKeyDown(Key.LWin) || Keyboard.IsKeyDown(Key.RWin))
+            mods |= HotKeyModifiers.Win;
+
+        shortcuts.TryRecord(KeyInterop.VirtualKeyFromKey(key), mods);
+    }
+
+    private void ShortcutKeys_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        => ViewModel.Shortcuts.CancelRecording();
 
     /// <summary>Settings page to TabItem header: the one mapping the router uses.</summary>
     private static readonly Dictionary<SettingsPage, string> PageHeaders = new()

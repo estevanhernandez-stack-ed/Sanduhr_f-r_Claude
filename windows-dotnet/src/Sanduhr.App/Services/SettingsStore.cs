@@ -584,6 +584,18 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>The global shortcut's stored state (<c>hotkey_settings</c>: on, vk, mods).
+    /// Missing or odd reads as off with the default combo.</summary>
+    public HotKeySetting LoadHotKeySetting(HotKeyAction action)
+        => HotKeys.Decode(action, Read()["hotkey_settings"]);
+
+    public void SaveHotKeySetting(HotKeyAction action, HotKeySetting setting)
+    {
+        var root = Read();
+        root["hotkey_settings"] = HotKeys.Encode(action, setting);
+        Write(root);
+    }
+
     public void SavePublishEnabled(bool on) => MutatePublish(r => PublishSettingsJson.SetEnabled(r, on));
 
     public void SavePublishRoots(IReadOnlyDictionary<string, bool> roots)

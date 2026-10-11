@@ -27,6 +27,7 @@ public partial class App : Application
     private Icon? _trayIcon;
     private SettingsWindow? _settingsWindow;
     private DispatcherTimer? _trayRotateTimer;
+    private GlobalHotKeyService? _hotKeys;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -67,6 +68,7 @@ public partial class App : Application
 
         SetupTray();
         SyncTrayRotation();
+        SetupHotKeys();
 
         // Usage vault (WS-C): consent resolves BEFORE the service attaches —
         // attach order is the consent gate; Start()'s first fetch cycle then
@@ -201,6 +203,34 @@ public partial class App : Application
         _tray.ContextMenu = menu;
     }
 
+    /// <summary>The global shortcut: registers what <c>hotkey_settings</c> asks for (off until the user turns it on).</summary>
+    private void SetupHotKeys()
+    {
+        try
+        {
+            _hotKeys = new GlobalHotKeyService(action =>
+            {
+                if (action == HotKeyAction.Settings)
+                    _ = ShowSettingsAsync();
+            });
+            var store = new SettingsStore(new Sanduhr.Core.Paths());
+            _hotKeys.Apply(new Dictionary<HotKeyAction, HotKeySetting>
+            {
+                [HotKeyAction.Settings] = store.LoadHotKeySetting(HotKeyAction.Settings),
+            });
+        }
+        catch (Exception e)
+        {
+            // A shortcut that cannot register must never stop the widget from starting.
+            try
+            {
+                System.IO.File.AppendAllText(new Sanduhr.Core.Paths().LogFile,
+                    $"{DateTime.UtcNow:o} global shortcut failed to start ({e.GetType().Name}){Environment.NewLine}");
+            }
+            catch { }
+        }
+    }
+
     /// <summary>
     /// Open the tabbed Settings window (Accounts tab default) — single-instance and
     /// non-modal so a live account switch from here reflects in the widget at once.
@@ -220,7 +250,7 @@ public partial class App : Application
             return Task.CompletedTask;
         }
 
-        var svm = new SettingsViewModel(_vm, () => RunSignInAsync(embedded: true), RunUpdateSignInAsync);
+        var svm = new SettingsViewModel(_vm, () => RunSignInAsync(embedded: true), RunUpdateSignInAsync, _hotKeys);
         try
         {
             _settingsWindow = new SettingsWindow(svm);
@@ -387,6 +417,7 @@ public partial class App : Application
 
     private void QuitApp()
     {
+        _hotKeys?.Dispose();
         _tray?.Dispose();
         _trayIcon?.Dispose();
         _vm?.Dispose();
@@ -395,6 +426,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _hotKeys?.Dispose();
         _tray?.Dispose();
         _trayIcon?.Dispose();
         _vm?.Dispose();

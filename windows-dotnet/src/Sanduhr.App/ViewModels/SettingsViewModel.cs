@@ -1,4 +1,6 @@
 using System.Reflection;
+using Sanduhr.App.Services;
+using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
 
@@ -40,7 +42,11 @@ public sealed class SettingsViewModel
     /// <summary>Assembly version for the General tab footer (e.g. "3.0.0").</summary>
     public string Version { get; }
 
-    public SettingsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync, Func<string, Task> updateSignInAsync)
+    /// <summary>Backs the General tab's Shortcuts section (global shortcut + recorder).</summary>
+    public ShortcutsViewModel Shortcuts { get; }
+
+    public SettingsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync, Func<string, Task> updateSignInAsync,
+        GlobalHotKeyService? hotKeys = null)
     {
         Accounts = new AccountsViewModel(widget, addAccountAsync, updateSignInAsync);
         Themes = new ThemesViewModel(widget);
@@ -50,6 +56,7 @@ public sealed class SettingsViewModel
             new CcTrendsViewModel(widget),
             new CcLedgerViewModel(widget, widget.LoadLedgerGroupByProject(), widget.SaveLedgerGroupByProject));
         General = new GeneralViewModel(widget: widget);
+        Shortcuts = new ShortcutsViewModel(new SettingsStore(new Paths()), hotKeys);
         Alerts = new AlertsViewModel(widget, () =>
         {
             widget.AlertService?.DeliverTest();
