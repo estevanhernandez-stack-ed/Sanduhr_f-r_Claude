@@ -300,6 +300,7 @@ windows-dotnet/
 None new. `RegisterHotKey`/`UnregisterHotKey` (user32) by P/Invoke.
 
 ## Open Issues
+- From the Stage 1 review (PR #204): `limits_hidden_until_reset`, `limit_first_seen` and `alert_muted_tiers` are global, not per account, as on the Mac; switching accounts can return a hidden promo limit as a new window. A per-account shape is a later item for both apps. Discovery runs on every `SearchRoots()` call; cache it if a slow profile folder shows up.
 1. The MCP root set and installers on discovered homes (Este).
 2. The in-app trademark disclaimer on existing surfaces (Este; S3's About is the natural home).
 3. Card version numbers at release (Este).
