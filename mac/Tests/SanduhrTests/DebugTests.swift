@@ -283,7 +283,7 @@ struct DebugStateTests {
                          "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "desk_piece_clicks", "dock", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
                          "glow_camera", "glow_claude_waiting", "glow_claude_done", "theme", "menu", "menu_submenus", "credentials_store", "account_ref", "accounts_count", "history_days", "data",
-                         "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "version", "build", "whats_new", "tour", "watchers", "av_indicators", "settings_preview", "settings_preview_folded", "mods_page", "message_editor", "hot_keys", "meter_history", "just_the_desk"])
+                         "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "snapshots", "seats", "version", "build", "whats_new", "tour", "watchers", "av_indicators", "settings_preview", "settings_preview_folded", "mods_page", "message_editor", "hot_keys", "meter_history", "just_the_desk"])
         #expect(yaml.contains("settings_section: notch\nsettings_anchor: null\nsettings_anchor_visible: null\nusage_page:\n  open: false\n  tab: overview\nmeters:"))
         #expect(yaml.contains("hot_keys:\n  join: true\n  settings: true\n  registered: 0\n  join_keys: ⌥J\n  settings_keys: ⌥S\n  join_taken: false\n  settings_taken: false\n"))
         #expect(yaml.contains("  settings_clash: null\n  check_app_menus: false\n  app_menus_trusted: false\nmeter_history:"))
@@ -307,7 +307,7 @@ struct DebugStateTests {
         """))
         #expect(yaml.contains("    pace: null\n"))
         #expect(yaml.contains("last_fetch: \"1970-01-01T00:00:00Z\"\n"))
-        #expect(yaml.contains("credentials_store: file\naccount_ref: null\naccounts_count: 0\nhistory_days: 30\ndata:\n  activity: \"off\"\n  names: names\n  share: \"off\"\n  folder_linked: false\nlocal_activity:\n  reading: false\n  events: 0\nvault:\n  recording: false\n  months: 0\n  last_ingest_ok: false\nintegrations:\n  mcp_installed: 0\n  statusline_installed: 0\n  meters_installed: 0\n  hooks_installed: 0\npending_suggestions:\n  messages: false\n  theme: false\nfollow: false\nfollow_paused: false\nversion: \"2.1.0\"\n"))
+        #expect(yaml.contains("credentials_store: file\naccount_ref: null\naccounts_count: 0\nhistory_days: 30\ndata:\n  activity: \"off\"\n  names: names\n  share: \"off\"\n  folder_linked: false\nlocal_activity:\n  reading: false\n  events: 0\nvault:\n  recording: false\n  months: 0\n  last_ingest_ok: false\nintegrations:\n  mcp_installed: 0\n  statusline_installed: 0\n  meters_installed: 0\n  hooks_installed: 0\npending_suggestions:\n  messages: false\n  theme: false\nfollow: false\nfollow_paused: false\nsnapshots: 0\nseats: 0\nversion: \"2.1.0\"\n"))
         #expect(yaml.contains("version: \"2.1.0\"\nbuild: \"3\"\nwhats_new:\n  last_seen: null\n  pending: 0\n  open: false\n  hide_after_updates: false\n"))
         #expect(yaml.contains("tour:\n  open: false\n  step: 0\n  steps_shown: 0\n  done: false\n  pending: false\n"))
         #expect(yaml.contains("""

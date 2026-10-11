@@ -5,6 +5,7 @@ import CryptoKit
 /// rendezvous file the Windows widget writes (schema_version 1), so other tools on this Mac
 /// (a desktop clock, a Claude Code statusline) can show the meters without their own login.
 /// Raw facts only, no derived pace; readers work out age and countdowns at read time.
+/// Per-seat meters (item 74) write the same schema to `snapshot.<account_ref>.json` (SeatSnapshots).
 /// Never holds the session key or account labels: the account is named by `account_ref` only.
 enum SnapshotWriter {
     static let schemaVersion = 1
@@ -15,7 +16,7 @@ enum SnapshotWriter {
             .appendingPathComponent("snapshot.json")
     }
 
-    static func writeOk(_ usage: UsageResponse, accountRef: String?, now: Date = Date()) {
+    static func writeOk(_ usage: UsageResponse, accountRef: String?, now: Date = Date(), to target: URL = url) {
         var tiers: [[String: Any]] = []
         for tier in Tier.allCases {
             guard let t = usage.tiers[tier], let util = t.utilization else { continue }
@@ -27,19 +28,19 @@ enum SnapshotWriter {
                 "limit": NSNull(),
             ])
         }
-        write(status: "ok", errorKind: nil, tiers: tiers, accountRef: accountRef, now: now)
+        write(status: "ok", errorKind: nil, tiers: tiers, accountRef: accountRef, now: now, to: target)
     }
 
     /// On a failed fetch keep the last good tiers, so readers can say "sign in again"
     /// rather than "is the widget running?".
-    static func writeError(_ kind: String, accountRef: String?, now: Date = Date()) {
+    static func writeError(_ kind: String, accountRef: String?, now: Date = Date(), to target: URL = url) {
         var tiers: [[String: Any]] = []
-        if let data = try? Data(contentsOf: url),
+        if let data = try? Data(contentsOf: target),
            let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let last = obj["tiers"] as? [[String: Any]] {
             tiers = last
         }
-        write(status: "error", errorKind: kind, tiers: tiers, accountRef: accountRef, now: now)
+        write(status: "error", errorKind: kind, tiers: tiers, accountRef: accountRef, now: now, to: target)
     }
 
     /// After Sign Out: an auth error with no tiers, so readers say "sign in again" and drop the
@@ -48,6 +49,16 @@ enum SnapshotWriter {
     /// Settings, Credentials); the set is closed, so sign-out adds no kind of its own.
     static func writeSignedOut(accountRef: String?, now: Date = Date(), to target: URL = url) {
         write(status: "error", errorKind: "session_expired", tiers: [], accountRef: accountRef, now: now, to: target)
+    }
+
+    /// The error kind a failed fetch writes: `session_expired` and `cloudflare` ask for a new sign-in,
+    /// anything else is `network`.
+    static func errorKind(_ error: Error) -> String {
+        switch error as? ClaudeAPI.APIError {
+        case .unauthorized?: "session_expired"
+        case .cloudflareChallenge?: "cloudflare"
+        default: "network"
+        }
     }
 
     /// An account switch removes the file at once, before anything else happens, so a reader

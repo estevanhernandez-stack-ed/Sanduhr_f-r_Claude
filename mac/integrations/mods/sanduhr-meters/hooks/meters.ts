@@ -279,7 +279,8 @@ export type Band =
   | { kind: 'line'; text: string }
   | { kind: 'meters'; meters: Meter[]; isDim: boolean; note: string | null }
 
-export type BandOptions = { bars: Bars; style: Style; tzOffsetMinutes: number }
+// `seat`: the snapshot is a seat's own file (item 74), an account read only while it is in use.
+export type BandOptions = { bars: Bars; style: Style; tzOffsetMinutes: number; seat?: boolean }
 
 const ERROR_WORDS: Record<string, string> = { session_expired: 'sign in again', cloudflare: 'blocked, sign in again' }
 
@@ -299,7 +300,7 @@ export function bandFor(snap: Snapshot | null, now: number, opts: BandOptions): 
 
   const age = freshness(snap.capturedAt, now)
 
-  if (age === 'dead') {
+  if (age === 'dead' && opts.seat !== true) {
     const minutes = Math.floor((now - snap.capturedAt) / 60_000)
 
     return { kind: 'line', text: `Sanduhr: no update for ${minutes}m. Is the widget running?` }
@@ -341,6 +342,11 @@ export function bandFor(snap: Snapshot | null, now: number, opts: BandOptions): 
 
   if (meters.length === 0) {
     return { kind: 'none' }
+  }
+
+  // An old seat reading is not a stopped widget: its numbers, dimmed, with their age.
+  if (age === 'dead') {
+    return { kind: 'meters', meters, isDim: true, note: `as of ${seatAge(now - snap.capturedAt)}` }
   }
 
   if (age === 'stale') {
@@ -418,4 +424,97 @@ export const RESET_TOAST = 'Sanduhr: the session limit has reset.'
 /** The keys remembered as toasted, newest last, at most `cap`. */
 export function remember(seen: readonly string[], key: string, cap = 24): string[] {
   return [...seen.filter(k => k !== key), key].slice(-cap)
+}
+
+// -- Seats (item 74) --------------------------------------------------------------------------
+
+// seats.json beside snapshot.json maps each linked Claude Code folder (its real path) to an
+// account ref; that folder's sessions read snapshot.<ref>.json. Any other folder, or no readable
+// seats.json, reads snapshot.json as before. The statusline and sanduhr-mcp read it the same way.
+export const SEATS_SCHEMA_VERSION = 1
+export const SEATS_MAX_BYTES = 64 * 1024
+const SEAT_REF = /^[0-9a-f]{8}$/
+
+export type Seat = { folder: string; ref: string }
+
+/** A folder without its trailing slashes ("/" stays "/"). */
+export function trimFolder(path: string): string {
+  const t = path.replace(/\/+$/, '')
+
+  return t === '' && path.startsWith('/') ? '/' : t
+}
+
+/** `path` with a leading ~ expanded against `home`; null when the result is relative. */
+export function expandFolder(path: string, home: string): string | null {
+  const p = path === '~' || path.startsWith('~/') ? `${home}${path.slice(1)}` : path
+
+  return p.startsWith('/') ? p : null
+}
+
+/** The folder this session runs in: CLAUDE_CONFIG_DIR (unset or empty: ~/.claude); null when relative (unlinked). */
+export function configFolder(configDir: string | undefined, home: string): string | null {
+  return expandFolder(configDir === undefined || configDir === '' ? '~/.claude' : configDir, home)
+}
+
+/**
+ * A resolved folder as two spellings of it compare: no trailing slash, NFC, lower case. The
+ * engine's stat gives no file id, and macOS volumes ignore case and normalization by default.
+ */
+export function seatKey(realPath: string): string {
+  return trimFolder(realPath).normalize('NFC').toLowerCase()
+}
+
+/** seats.json's rows, or null for anything missing, malformed or not schema 1 (then snapshot.json is read). */
+export function parseSeats(text: string | null): Seat[] | null {
+  if (text === null) {
+    return null
+  }
+
+  let raw: unknown
+
+  try {
+    raw = JSON.parse(text)
+  } catch {
+    return null
+  }
+
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return null
+  }
+
+  const o = raw as Record<string, unknown>
+
+  if (o.schema_version !== SEATS_SCHEMA_VERSION || !Array.isArray(o.seats)) {
+    return null
+  }
+
+  const seats: Seat[] = []
+
+  for (const row of o.seats) {
+    if (typeof row !== 'object' || row === null) {
+      continue
+    }
+
+    const r = row as Record<string, unknown>
+
+    if (typeof r.folder === 'string' && r.folder !== '' && typeof r.account_ref === 'string' && SEAT_REF.test(r.account_ref)) {
+      seats.push({ folder: r.folder, ref: r.account_ref })
+    }
+  }
+
+  return seats
+}
+
+/** The snapshot file for a folder whose key is `folderKey`, given each row's key (`seatKey` of its resolved folder). */
+export function seatSnapshotName(rows: { key: string; ref: string }[] | null, folderKey: string | null): string {
+  const seat = folderKey === null ? undefined : rows?.find(r => r.key === folderKey)
+
+  return seat === undefined ? 'snapshot.json' : `snapshot.${seat.ref}.json`
+}
+
+/** A seat reading's age, the way its readers say it: 23m, 3h, 2d. */
+export function seatAge(ms: number): string {
+  const m = Math.floor(Math.max(0, ms) / 60_000)
+
+  return m < 60 ? `${m}m` : m < 48 * 60 ? `${Math.floor(m / 60)}h` : `${Math.floor(m / 1440)}d`
 }

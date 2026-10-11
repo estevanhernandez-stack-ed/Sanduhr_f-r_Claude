@@ -7,6 +7,17 @@ const HOUR = 60 * MIN
 const HOME = '/Users/someone'
 const PATH = `${HOME}/Library/Application Support/Sanduhr/snapshot.json`
 const BAND = `${HOME}/Library/Application Support/Sanduhr/band.json`
+const SEATS = `${HOME}/Library/Application Support/Sanduhr/seats.json`
+const WORK_REF = '1a2b3c4d'
+const HOME_REF = 'aabbccdd'
+const seatFile = (ref: string) => `${HOME}/Library/Application Support/Sanduhr/snapshot.${ref}.json`
+const SEATS_JSON = JSON.stringify({
+  schema_version: 1,
+  seats: [
+    { folder: `${HOME}/.claude`, account_ref: WORK_REF },
+    { folder: `${HOME}/.claude-home`, account_ref: HOME_REF },
+  ],
+})
 const START = { cwd: '/', surface: 'terminal', isInteractive: true } as const
 
 const band = (props: Record<string, unknown> = {}) =>
@@ -42,10 +53,13 @@ const HOT = snapshot([
 type World = { files: Record<string, string>; reads: string[]; toasts: string[]; store: Record<string, unknown>; redraws: number[] }
 
 /** The engine beneath the mod: a clock, a store, HOME, a file system holding `files`. */
-function beneath(on: any, files: Record<string, string>, env: Record<string, string> = { HOME }, store: Record<string, unknown> = {}, clock?: { now: () => number }): World {
+function beneath(on: any, files: Record<string, string>, env: Record<string, string> = { HOME }, store: Record<string, unknown> = {}, clock?: { now: () => number }, links: Record<string, string> = {}): World {
   const world: World = { files, reads: [], toasts: [], store, redraws: [] }
   mock.store(on, world.store)
   mock.env(on, env)
+  // A made-up file system: every folder is there, a symbolic link resolves through `links`.
+  on('fs.stat', (_$: unknown, e: { path: string; resolve: boolean }) =>
+    ({ value: { kind: 'dir', size: world.files[e.path]?.length ?? 0, mtimeMs: 0, isLink: e.path in links, realPath: e.resolve ? links[e.path] ?? e.path : undefined } }) as never)
   on('session.start', (_$: unknown, e: { cwd: string }) => ({ cwd: e.cwd }))
   on('fs.read', (_$: unknown, e: { path: string }) => {
     world.reads.push(e.path)
@@ -94,7 +108,7 @@ test('draws both meters above the band beneath, with the pace mark and countdown
   expect(await ui.find({ type: "Text", text: "beneath" })).toBeDefined()
 })
 
-test('nothing draws without a snapshot, and only the snapshot and band.json are read', async ($, on) => {
+test('nothing draws without a snapshot, and only the snapshot, seats.json and band.json are read', async ($, on) => {
   mock.clock(on, { now: NOW })
   const world = beneath(on, {})
   await $.session.start(START)
@@ -103,7 +117,128 @@ test('nothing draws without a snapshot, and only the snapshot and band.json are 
   expect(await ui.find({ key: 'sm-five_hour' })).toBeUndefined()
   expect(await ui.find({ type: "Text", text: /^Sanduhr:/ })).toBeUndefined()
   expect(await ui.find({ type: "Text", text: "beneath" })).toBeDefined()
-  expect(new Set(world.reads)).toEqual(new Set([PATH, BAND]))
+  expect(new Set(world.reads)).toEqual(new Set([PATH, SEATS, BAND]))
+})
+
+// -- Per-seat meters (item 74) ----------------------------------------------------------------
+
+const seatSnapshot = (five: number) =>
+  snapshot([{ key: 'five_hour', resets_at: new Date(NOW + 2 * HOUR).toISOString(), utilization: five }])
+
+test('each seat draws the account its folder is linked to', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  beneath(on, { [SEATS]: SEATS_JSON, [PATH]: seatSnapshot(61), [seatFile(WORK_REF)]: seatSnapshot(61), [seatFile(HOME_REF)]: seatSnapshot(12) },
+    { HOME, CLAUDE_CONFIG_DIR: `${HOME}/.claude-home/` })
+  await $.session.start(START)
+
+  expect((await (await $.ui.mount(band())).find({ key: 'sm-five_hour' }))?.text).toContain('12%')
+})
+
+test('CLAUDE_CONFIG_DIR unset is ~/.claude', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  const world = beneath(on, { [SEATS]: SEATS_JSON, [PATH]: seatSnapshot(12), [seatFile(WORK_REF)]: seatSnapshot(61) })
+  await $.session.start(START)
+
+  expect((await (await $.ui.mount(band())).find({ key: 'sm-five_hour' }))?.text).toContain('61%')
+  expect(world.reads).not.toContain(PATH)
+})
+
+test('a symlinked folder resolves to the folder seats.json names', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  beneath(on, { [SEATS]: SEATS_JSON, [PATH]: seatSnapshot(61), [seatFile(HOME_REF)]: seatSnapshot(12) },
+    { HOME, CLAUDE_CONFIG_DIR: '~/home-link' }, {}, undefined, { [`${HOME}/home-link`]: `${HOME}/.claude-home` })
+  await $.session.start(START)
+
+  expect((await (await $.ui.mount(band())).find({ key: 'sm-five_hour' }))?.text).toContain('12%')
+})
+
+test('an unlinked seat draws the active account as before', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  beneath(on, { [SEATS]: SEATS_JSON, [PATH]: seatSnapshot(61), [seatFile(HOME_REF)]: seatSnapshot(12) },
+    { HOME, CLAUDE_CONFIG_DIR: `${HOME}/.claude-other` })
+  await $.session.start(START)
+
+  expect((await (await $.ui.mount(band())).find({ key: 'sm-five_hour' }))?.text).toContain('61%')
+})
+
+test('a linked seat with no reading yet draws nothing, never another account', async ($, on) => {
+  const clock = mock.clock(on, { now: NOW })
+  const world = beneath(on, { [SEATS]: SEATS_JSON, [PATH]: seatSnapshot(61) }, { HOME, CLAUDE_CONFIG_DIR: `${HOME}/.claude-home` })
+  await $.session.start(START)
+
+  expect(await (await $.ui.mount(band())).find({ key: 'sm-five_hour' })).toBeUndefined()
+  expect(world.reads).not.toContain(PATH)
+
+  // Sanduhr fetches it: the next poll draws it.
+  world.files[seatFile(HOME_REF)] = seatSnapshot(12)
+  await clock.advance(30_000)
+  expect((await (await $.ui.mount(band())).find({ key: 'sm-five_hour' }))?.text).toContain('12%')
+})
+
+test('a malformed seats.json reads snapshot.json', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  beneath(on, { [SEATS]: '{', [PATH]: seatSnapshot(61), [seatFile(HOME_REF)]: seatSnapshot(12) },
+    { HOME, CLAUDE_CONFIG_DIR: `${HOME}/.claude-home` })
+  await $.session.start(START)
+
+  expect((await (await $.ui.mount(band())).find({ key: 'sm-five_hour' }))?.text).toContain('61%')
+})
+
+test('the same folder spelled with other case or normalization is the same seat', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  const seats = JSON.stringify({ schema_version: 1, seats: [{ folder: `${HOME}/caf\u00e9`, account_ref: HOME_REF }] })
+  beneath(on, { [SEATS]: seats, [PATH]: seatSnapshot(61), [seatFile(HOME_REF)]: seatSnapshot(12) },
+    { HOME, CLAUDE_CONFIG_DIR: `${HOME}/CAFE\u0301` })
+  await $.session.start(START)
+
+  expect((await (await $.ui.mount(band())).find({ key: 'sm-five_hour' }))?.text).toContain('12%')
+})
+
+test('a seats.json row written with ~ and a trailing slash matches', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  const seats = JSON.stringify({ schema_version: 1, seats: [{ folder: '~/.claude-home/', account_ref: HOME_REF }] })
+  beneath(on, { [SEATS]: seats, [PATH]: seatSnapshot(61), [seatFile(HOME_REF)]: seatSnapshot(12) },
+    { HOME, CLAUDE_CONFIG_DIR: `${HOME}/.claude-home` })
+  await $.session.start(START)
+  expect((await (await $.ui.mount(band())).find({ key: 'sm-five_hour' }))?.text).toContain('12%')
+})
+
+test('a relative CLAUDE_CONFIG_DIR draws the active account', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  beneath(on, { [SEATS]: SEATS_JSON, [PATH]: seatSnapshot(61), [seatFile(HOME_REF)]: seatSnapshot(12) },
+    { HOME, CLAUDE_CONFIG_DIR: '.claude-home' })
+  await $.session.start(START)
+  expect((await (await $.ui.mount(band())).find({ key: 'sm-five_hour' }))?.text).toContain('61%')
+})
+
+test('a seats.json over 64 KB is not read', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  beneath(on, { [SEATS]: SEATS_JSON + ' '.repeat(64 * 1024), [PATH]: seatSnapshot(61), [seatFile(HOME_REF)]: seatSnapshot(12) },
+    { HOME, CLAUDE_CONFIG_DIR: `${HOME}/.claude-home` })
+  await $.session.start(START)
+  expect((await (await $.ui.mount(band())).find({ key: 'sm-five_hour' }))?.text).toContain('61%')
+})
+
+test('an old seat reading shows its numbers as of its age, not a stopped widget', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  const old = snapshot([{ key: 'five_hour', resets_at: new Date(NOW + 2 * HOUR).toISOString(), utilization: 12 }], { at: NOW - 23 * MIN })
+  beneath(on, { [SEATS]: SEATS_JSON, [seatFile(HOME_REF)]: old }, { HOME, CLAUDE_CONFIG_DIR: `${HOME}/.claude-home` })
+  await $.session.start(START)
+
+  const text = await textOf(await $.ui.mount(band()))
+  expect(text).toContain('12%')
+  expect(text).toContain('as of 23m')
+  expect(text).not.toContain('widget running')
+})
+
+test('SANDUHR_SNAPSHOT still names one file', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  const world = beneath(on, { [SEATS]: SEATS_JSON, '/tmp/x/snap.json': seatSnapshot(44), [seatFile(WORK_REF)]: seatSnapshot(61) },
+    { HOME, SANDUHR_SNAPSHOT: '/tmp/x/snap.json' })
+  await $.session.start(START)
+
+  expect((await (await $.ui.mount(band())).find({ key: 'sm-five_hour' }))?.text).toContain('44%')
+  expect(world.reads).not.toContain(SEATS)
 })
 
 test('yields to a survey', async ($, on) => {

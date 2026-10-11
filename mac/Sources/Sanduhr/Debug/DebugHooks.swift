@@ -421,6 +421,7 @@ enum DebugHooks {
         s.pendingTheme = ThemeProposalHandoff.shared.pending != nil
         s.follow = vm.followEnabled
         s.followPaused = vm.followPaused
+        (s.seatSnapshots, s.seats) = SeatSnapshots.counts(in: .standard)
         s.version = info["CFBundleShortVersionString"] as? String ?? ""
         s.whatsNew = WhatsNewDebug(lastSeen: WhatsNew.lastSeen(), pending: WhatsNew.pending(current: s.version),
                                    open: WhatsNewWindowController.shared.isOpen, hidden: WhatsNew.hidden())

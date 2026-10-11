@@ -194,10 +194,13 @@ struct AccountDataSection: View {
             }
             .pickerStyle(.menu)
             .fixedSize()
+            if choices.folder == nil {
+                Button(SettingsNames.linkFolder) { pick(Self.chooseTag) }
+            }
             if choices.folder == nil, let suggestion {
                 SuggestionBox(folder: suggestion.display(home: home)) { pick(suggestion.path) }
             }
-            Caption("The Claude Code folder whose logs belong to this account, such as ~/.claude or a ~/.claude-name folder used with CLAUDE_CONFIG_DIR. A folder links to one account. Sanduhr suggests the folder signed in to this account's organization and never links one by itself.")
+            Caption("The Claude Code folder whose logs belong to this account, such as ~/.claude or a ~/.claude-name folder used with CLAUDE_CONFIG_DIR. A folder links to one account. Sanduhr suggests the folder signed in to this account's organization and never links one by itself. Claude Code sessions in the linked folder show this account's meters, whichever account Sanduhr shows.")
         }
     }
 

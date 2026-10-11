@@ -24,6 +24,9 @@ final class AccountFollower {
     var onSwitch: (String) -> Void = { _ in }
     /// New readings: the "in use" marks may have changed.
     var onReadings: () -> Void = {}
+    /// Each check's answer for an account (per-seat meters, item 74, keep its snapshot from it):
+    /// no request is made for that alone.
+    var onResult: (String, Result<UsageResponse, Error>) -> Void = { _, _ in }
 
     private var timer: Timer?
     private var firstCheck: Task<Void, Never>?
@@ -134,13 +137,18 @@ final class AccountFollower {
         do {
             let usage = try await api.getUsage()
             // Renamed, signed out or removed while the request ran: the answer belongs to no one.
-            guard clients[label]?.api === api,
-                  let util = usage.tiers[.fiveHour]?.utilization else { return }
+            guard clients[label]?.api === api else { return }
+            onResult(label, .success(usage))
+            guard let util = usage.tiers[.fiveHour]?.utilization else { return }
             state.record(label, utilization: util, at: now())
-        } catch ClaudeAPI.APIError.unauthorized, ClaudeAPI.APIError.cloudflareChallenge {
-            if clients[label]?.api === api { authSkipped[label] = key }
         } catch {
-            // Failed checks are silent.
+            // Failed checks are silent (a seat's snapshot keeps its last good tiers).
+            guard clients[label]?.api === api else { return }
+            onResult(label, .failure(error))
+            switch error as? ClaudeAPI.APIError {
+            case .unauthorized?, .cloudflareChallenge?: authSkipped[label] = key
+            default: break
+            }
         }
     }
 }

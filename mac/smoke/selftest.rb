@@ -518,6 +518,17 @@ app8 = FakeApp.new('desk_frames' => [])
 r = Runner.new(app8, mem, out, io: io, settle: 0, poll: 0.01, within: 0.05).run_file(geo)
 eq('desk geometry skips without the meters', r['status'], 'skip')
 
+# Item 74: the per-seat counts pass with no seat, a lone seat or several, and fail without the keys.
+seat = File.join(Smoke::SCENARIOS, 'per-seat-meters.yaml')
+r = Runner.new(FakeApp.new, mem, out, io: io, settle: 0, poll: 0.01, within: 0.05).run_file(seat)
+eq('per-seat counts pass with no seats', r['status'], 'pass')
+r = Runner.new(FakeApp.new('snapshots' => 1, 'seats' => 1), mem, out, io: io, settle: 0, poll: 0.01, within: 0.05).run_file(seat)
+eq('per-seat counts pass with a lone seat', r['status'], 'pass')
+r = Runner.new(FakeApp.new('snapshots' => 2, 'seats' => 3), mem, out, io: io, settle: 0, poll: 0.01, within: 0.05).run_file(seat)
+eq('per-seat counts pass with three seats', r['status'], 'pass')
+r = Runner.new(FakeApp.new('seats' => nil), mem, out, io: io, settle: 0, poll: 0.01, within: 0.05).run_file(seat)
+eq('per-seat counts fail without a count', r['status'], 'fail')
+
 app3 = FakeApp.new('meters' => [])
 runner3 = Runner.new(app3, mem, out, io: io, settle: 0, poll: 0.01, within: 0.05)
 r = runner3.run_file(File.join(FIXTURES, 'scenarios', 'skip.yaml'))

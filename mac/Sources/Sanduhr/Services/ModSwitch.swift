@@ -199,8 +199,8 @@ extension IntegrationInstaller {
         let more = added(scripts.pinnedModPath(old), scripts.pinnedModPath(new))
         if !more.isEmpty && !confirmed { return .needsConsent(added: more) }
         try install(.meters, folder: folder, python: "", pinned: new)
-        // The old version goes once no receipt pins it.
-        if let current = scripts.installedStamp { scripts.prune(keep: [current] + scripts.pinnedStamps) }
+        // The old version stays: a session running in this folder still loads from it. The launch
+        // prune deletes it once no receipt pins it and no known settings.json names it.
         return .updated
     }
 

@@ -1,8 +1,8 @@
 {
   "name": "sanduhr-meters",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": { "name": "626Labs LLC" },
-  "description": "Sanduhr's session and weekly meters above the prompt: bars with the pace mark, reset countdowns, your Style popover looks animated (sweep, shimmer, glow), Sanduhr's watchers as rows, and a toast when a limit nearly fills or the session resets. Reads only Sanduhr's snapshot.json and band.json on this machine.",
+  "description": "Sanduhr's session and weekly meters above the prompt: bars with the pace mark, reset countdowns, your Style popover looks animated (sweep, shimmer, glow), Sanduhr's watchers as rows, and a toast when a limit nearly fills or the session resets. Each Claude Code folder linked to an account in Sanduhr shows that account's meters. Reads only Sanduhr's snapshot files, seats.json and band.json on this machine.",
   "types": "./types/index.d.ts",
   "userConfig": {
     "bars": {

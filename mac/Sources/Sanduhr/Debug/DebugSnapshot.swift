@@ -114,6 +114,10 @@ struct DebugStateInput {
     /// Follow the account I'm using, and whether a manual switch is pausing it. Never labels.
     var follow = false
     var followPaused = false
+    /// Per-seat meters (item 74): the `snapshot.<ref>.json` files and the rows of seats.json.
+    /// Counts only, never a folder, a ref or a label.
+    var seatSnapshots = 0
+    var seats = 0
     /// Claude's suggestions waiting for the user (items 54, 55): flags only, never their content.
     var pendingMessages = false
     var pendingTheme = false
@@ -477,6 +481,8 @@ enum DebugState {
         pairs.append(("pending_suggestions", pendingSuggestionsYAML(messages: s.pendingMessages, theme: s.pendingTheme)))
         pairs.append(("follow", .bool(s.follow)))
         pairs.append(("follow_paused", .bool(s.followPaused)))
+        pairs.append(("snapshots", .int(s.seatSnapshots)))
+        pairs.append(("seats", .int(s.seats)))
         pairs.append(("version", .string(s.version)))
         pairs.append(("build", .string(s.build)))
         pairs.append(("whats_new", whatsNewYAML(s.whatsNew)))

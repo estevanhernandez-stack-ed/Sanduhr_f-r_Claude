@@ -197,6 +197,8 @@ final class UsageViewModel {
     /// For a minute after an automatic switch the chip and the Desk line read "Label (in use)".
     private(set) var followNote = false
     @ObservationIgnored private let follower = AccountFollower()
+    /// Per-seat meters (item 74): the per-account files and the inactive linked accounts' fetches.
+    @ObservationIgnored private let seatMeters = SeatMeters()
     @ObservationIgnored private var followNoteTask: Task<Void, Never>?
     /// Bumped every 30s so countdown labels re-render without refetching.
     var countdownTick: Int = 0 {
@@ -307,6 +309,8 @@ final class UsageViewModel {
         follower.context = { [weak self] in self?.followContext() ?? AccountFollow.State() }
         follower.onSwitch = { [weak self] label in self?.switchAccount(to: label, automatic: true) }
         follower.onReadings = { [weak self] in self?.refreshInUse() }
+        follower.onResult = { [weak self] label, result in self?.seatMeters.followerAnswered(label, result) }
+        seatMeters.context = { [weak self] in self?.seatContext() ?? SeatMeters.Context() }
         follower.apply(enabled: followEnabled)
         vault.onCycleEnd = { [weak self] in
             Task { @MainActor in self?.vaultCycles += 1 }
@@ -401,6 +405,7 @@ final class UsageViewModel {
         try KeychainStore.accounts.rename(old, to: new)
         if apiAccount == old { apiAccount = new }
         follower.rename(old, to: new)
+        seatMeters.rename(old, to: new)
         reloadAccounts()
         refreshInUse()
         onUsageUpdate?()
@@ -595,6 +600,22 @@ final class UsageViewModel {
         // What the MCP server may read follows every change to choices, links, the account list
         // and the active account (item 47). Rewritten only when its bytes change.
         MCPAccess.sync(labels: labels, active: active, choices: data)
+        syncSeats()
+    }
+
+    // MARK: Per-seat meters (item 74)
+
+    /// What SeatMeters reads of the accounts, at each step.
+    private func seatContext() -> SeatMeters.Context {
+        SeatMeters.Context(labels: accountLabels, choices: accountDataChoices, signedIn: signedInAccounts,
+                           active: activeAccount, inUse: accountsInUse)
+    }
+
+    /// seats.json and the per-account files follow every change to the accounts, their sign-in
+    /// and their links; the active account's seat starts from the numbers on screen.
+    private func syncSeats() {
+        seatMeters.sync()
+        seatMeters.seed(usage, at: lastUpdated, label: apiAccount)
     }
 
     nonisolated private static func signedIn(_ accounts: AccountRegistry) -> Set<String> {
@@ -848,6 +869,7 @@ final class UsageViewModel {
             // Signed out, switched, or a new key saved while this fetch ran: its answer is stale.
             guard self.api === api else { return }
             showFailure(error, accountRef: ref)
+            if apiAccount == account { seatMeters.activeAnswered(account, .failure(error)) }
             endSwitchVeil()
             return
         }
@@ -875,24 +897,19 @@ final class UsageViewModel {
         self.status = u.tiers.isEmpty ? .noTiers : .idle
         // A switch's new numbers: they fade in.
         endSwitchVeil()
+        // The active account's seat file, then the round of inactive seats in use.
+        if apiAccount == account { seatMeters.activeAnswered(account, .success(u)) }
     }
 
     /// A failed fetch: the status line and snapshot.json's error kind.
     private func showFailure(_ error: Error, accountRef ref: String?) {
         switch error as? ClaudeAPI.APIError {
-        case .unauthorized?:
-            status = .error("Session expired — sign in again", isAuth: true)
-            SnapshotWriter.writeError("session_expired", accountRef: ref)
-        case .cloudflareChallenge?:
-            status = .error("Cloudflare check — sign in again", isAuth: true)
-            SnapshotWriter.writeError("cloudflare", accountRef: ref)
-        case .http(let c)?:
-            status = .error("HTTP \(c)", isAuth: false)
-            SnapshotWriter.writeError("network", accountRef: ref)
-        default:
-            status = .error(error.localizedDescription, isAuth: false)
-            SnapshotWriter.writeError("network", accountRef: ref)
+        case .unauthorized?: status = .error("Session expired — sign in again", isAuth: true)
+        case .cloudflareChallenge?: status = .error("Cloudflare check — sign in again", isAuth: true)
+        case .http(let c)?: status = .error("HTTP \(c)", isAuth: false)
+        default: status = .error(error.localizedDescription, isAuth: false)
         }
+        SnapshotWriter.writeError(SnapshotWriter.errorKind(error), accountRef: ref)
     }
 
     // MARK: Local Claude Code activity (item 45)
