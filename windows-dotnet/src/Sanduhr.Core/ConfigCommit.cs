@@ -87,8 +87,14 @@ public sealed class ConfigCommit(string backupsFolder)
             {
                 // File.Replace, not Move(overwrite): Windows denies the move while Claude Code
                 // holds the file open, even with delete sharing (gotcha AwvJCwPCmizEVZKcFQ2l).
-                try { File.Replace(tmp, path, null); }
-                catch (FileNotFoundException) when (File.Exists(tmp)) { return false; }
+                // A scanner or indexer may hold the fresh files for a moment: a sharing
+                // violation is retried briefly; a vanished target is a conflict.
+                for (int n = 0; ; n++)
+                {
+                    try { File.Replace(tmp, path, null); break; }
+                    catch (FileNotFoundException) when (File.Exists(tmp)) { return false; }
+                    catch (IOException) when (n < 3 && File.Exists(tmp)) { Thread.Sleep(50 * (n + 1)); }
+                }
             }
             return true;
         }
