@@ -55,6 +55,9 @@ struct SeatMCPServer: Equatable, Sendable {
     var target: String
     var envNames: [String] = []
     var headerNames: [String] = []
+    /// An env or header value is written out rather than a `${VAR}` reference (the value itself is
+    /// never kept).
+    var literalValues = false
     /// The project folder (local and project scopes) or the plugin's name. Never shown across the wall.
     var owner: String?
 }
@@ -189,10 +192,57 @@ enum SeatScanner {
         do {
             let value = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
             guard let o = value as? [String: Any] else { return .unreadable("has no JSON object at its top level") }
+            if let problem = strictProblem(data) { return .unreadable(problem) }
             return .object(o)
         } catch {
             return .unreadable(parseError(error))
         }
+    }
+
+    /// What Foundation's parser lets through and Claude Code's strict JSON doesn't: a comment or a
+    /// trailing comma outside strings, with where it is ("isn't valid JSON (a trailing comma
+    /// around line 1, column 15)"). Nil for strict JSON.
+    static func strictProblem(_ data: Data) -> String? {
+        let b = Array(data)
+        var i = 0, line = 1, column = 1
+        var inString = false
+        var lastComma: (line: Int, column: Int)?
+        func at(_ l: Int, _ c: Int) -> String { "around line \(l), column \(c)" }
+        while i < b.count {
+            let c = b[i]
+            if inString {
+                if c == UInt8(ascii: "\\") {
+                    i += 2
+                    column += 2
+                    continue
+                }
+                if c == UInt8(ascii: "\"") { inString = false }
+            } else {
+                switch c {
+                case UInt8(ascii: "\""):
+                    inString = true
+                    lastComma = nil
+                case UInt8(ascii: "/") where i + 1 < b.count && (b[i + 1] == UInt8(ascii: "/") || b[i + 1] == UInt8(ascii: "*")):
+                    return "isn't valid JSON (a comment \(at(line, column)))"
+                case UInt8(ascii: ","):
+                    lastComma = (line, column)
+                case UInt8(ascii: "}"), UInt8(ascii: "]"):
+                    if let comma = lastComma { return "isn't valid JSON (a trailing comma \(at(comma.line, comma.column)))" }
+                case UInt8(ascii: " "), UInt8(ascii: "\t"), UInt8(ascii: "\r"), UInt8(ascii: "\n"):
+                    break
+                default:
+                    lastComma = nil
+                }
+            }
+            if c == UInt8(ascii: "\n") {
+                line += 1
+                column = 1
+            } else {
+                column += 1
+            }
+            i += 1
+        }
+        return nil
     }
 
     /// "isn't valid JSON (around line 3, column 5)": the position only. Foundation's message can
@@ -402,10 +452,13 @@ enum SeatScanner {
             let args = (ConfigMask.mask(entry["args"] as? [Any] ?? [], at: ["args"]) as? [Any] ?? []).compactMap { $0 as? String }
             target = ([ConfigMask.maskString(command)] + args).joined(separator: " ")
         }
-        return SeatMCPServer(name: name, scope: scope, transport: transport, target: target,
-                             envNames: (entry["env"] as? [String: Any] ?? [:]).keys.sorted(),
-                             headerNames: (entry["headers"] as? [String: Any] ?? [:]).keys.sorted(),
-                             owner: owner)
+        let values = Array((entry["env"] as? [String: Any] ?? [:]).values) + Array((entry["headers"] as? [String: Any] ?? [:]).values)
+        var s = SeatMCPServer(name: name, scope: scope, transport: transport, target: target,
+                              envNames: (entry["env"] as? [String: Any] ?? [:]).keys.sorted(),
+                              headerNames: (entry["headers"] as? [String: Any] ?? [:]).keys.sorted(),
+                              owner: owner)
+        s.literalValues = values.contains { ($0 as? String).map { !$0.contains("${") } ?? false }
+        return s
     }
 
     static func managedServers(_ folder: String, _ fm: FileManager) -> [SeatMCPServer] {
