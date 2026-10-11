@@ -4,7 +4,17 @@ namespace Sanduhr.Core;
 public enum SettingsPage { Accounts, Themes, Alerts, History, ClaudeUsage, Publish, General, Widget }
 
 /// <summary>The small live previews a card can ask for in place of a glyph.</summary>
-public enum WhatsNewPreview { None, Tray, Sparkline, Shortcut }
+public enum WhatsNewPreview
+{
+    None,
+    Tray,
+    Sparkline,
+    Shortcut,
+    /// <summary>The user's own meters.</summary>
+    Meters,
+    /// <summary>The account name chip.</summary>
+    AccountChip,
+}
 
 /// <summary>
 /// One highlight: what changed, in a sentence or two, and where "Show me" goes. A card may cover
