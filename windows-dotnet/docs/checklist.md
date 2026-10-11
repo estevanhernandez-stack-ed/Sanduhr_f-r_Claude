@@ -75,16 +75,18 @@
   Acceptance: PRD S3 stories. Verify: names-table test, migrations idempotent, keyboard-only walk of every page.
   Built: `SettingsNames.cs` (page titles, groups, one name per control, retired names, "<Page> settings…" links) and `SettingsIndex.cs` (anchors, synonyms, search) in Core; the TabControl re-templated as a grouped sidebar with search, pages keyed by a `SettingsPage` tag so Show me keeps working; `SelectPage(page, anchor)` scrolls to and outlines a section; General's live tray preview; About (version, What's New…, Take the tour…, the trademark notice, where settings live, third-party notices); menu labels from the names table in sentence case; demo mode's sample accounts in Settings, History and the account menus; `tools/Sanduhr.RenderHarness`. No key changed, so no migration; `SettingsKeysContractTests` pins the keys instead. Tests: names against cards, tour and the App's source; every anchor marked in its page; the search index; notices against the shipped packages. Rendered off screen in a dark and a light theme: every page, search, two anchors. Not done: Reset Sanduhr… (Este rules on its wording first); a by-hand keyboard walk (arrow keys and Tab order are template defaults, not exercised here).
 
-- [ ] **11. Stage 4: the Claude Code side**
+- [x] **11. Stage 4: the Claude Code side**
   Spec ref: `spec.md > Stage 4`; `docs/mods-and-config-spec.md`
   What to build: folder list, JSON splice and receipts, Mods & Config read-only then edits, meters mod, statusline combine, glow hooks, account follow, per-seat meters (after Este rules on the MCP root set).
   Acceptance: PRD S4 stories. Verify: byte-for-byte Remove tests on scratch folders only.
-  - [ ] 11.1 Rulings: MCP folder set behind consent, publish race, one trademark constant (spec 4.0)
-  - [ ] 11.2 JsonEdit, ConfigCommit, ReceiptLog, ConfigMask (spec 4.1)
-  - [ ] 11.3 AccountFollow rules and seat files in Core (spec 4.6)
-  - [ ] 11.4 ModInventory, meters mod and glow hook kinds, glow rules (spec 4.2, 4.3, 4.5)
-  - [ ] 11.5 Statusline on the splice engine, combine and segments, seat lookup (spec 4.4, 4.6)
-  - [ ] 11.6 Claude Code and Mods & Config pages, glow window, folder links, docs (spec 4.2 to 4.6)
+  - [x] 11.1 Rulings: MCP folder set behind consent, publish race, one trademark constant (spec 4.0)
+  - [x] 11.2 JsonEdit, ConfigCommit, ReceiptLog, ConfigMask (spec 4.1)
+  - [x] 11.3 AccountFollow rules and seat files in Core (spec 4.6)
+  - [x] 11.4 ModInventory, meters mod and glow hook kinds, glow rules (spec 4.2, 4.3, 4.5)
+  - [x] 11.5 Statusline on the splice engine, combine and segments, seat lookup (spec 4.4, 4.6)
+  - [x] 11.6 Claude Code and Mods & Config pages, glow window, folder links, docs (spec 4.2 to 4.6)
+  - [x] 11.7 Reset Sanduhr... (Este's option C, spec 4.7)
+  Built: Este's rulings (MCP folder set behind consent with ClaudeCodeHomes.cs on the allowlist, the publish race, one trademark source), the receipt engine, the Claude Code and Mods & Config pages, the meters mod, statusline combine with segments and the seat lookup, the glow at the top of the window in use with a success color per built-in theme, account follow and per-folder meters through per-account WebView2 profiles, and Reset. Rendered off screen from an invented profile in a dark and a light theme: both pages, the consent dialog, About, the glow over a maximized and a windowed target, Reset. Not exercised: anything needing the live app (the glow watcher, flash and click-through, the follow and seat timers, a live inactive-account read, Reset's real run, dialog clicks, OpenFolderDialog). Escalated: a success color in theme files (ThemeModel.cs is compiled into the MCP).
 
 - [ ] **12. Stage 5: Desk foundation** (deepening pass first)
   Spec ref: `spec.md > Stage 5`
