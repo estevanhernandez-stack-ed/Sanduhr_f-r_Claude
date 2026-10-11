@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The Mods page's state (item 64): every Claude Code folder's mods and plugins, the `claude`
@@ -32,16 +33,45 @@ final class ModsPageModel {
 
     var counts: ModCounts { ModCounts(inventory) }
 
-    /// The folders to list: found ones (never a `*.config-backup-*` copy), the accounts' linked
-    /// ones, and ones Sanduhr installed into.
-    nonisolated static func folders(home: String, environment: [String: String], linked: [String],
-                                    installed: [String]) -> [String] {
+    /// Per folder, the line naming both `.claude.json` files when the default folder has two
+    /// (item 71, slice 0).
+    private(set) var configNotes: [String: String] = [:]
+    /// Receipts Sanduhr couldn't read and set aside (item 71, slice 0): their entries can't be
+    /// undone from here, the others still can.
+    private(set) var receiptsSkipped = 0
+    var addNote: String?
+    /// The folders added by hand (Add Folder…), for their Forget button.
+    private(set) var addedFolders: [String] = []
+
+    /// Where Sanduhr keeps its seat preferences (Add Folder…, later labels and marks).
+    var store: DefaultsStore { KeychainStore.accounts.defaults }
+
+    /// The folders to list: found ones (never a `*.config-backup-*` or `.claude-backup-*` copy),
+    /// the ones added by hand, the accounts' linked ones, and ones Sanduhr installed into.
+    nonisolated static func folders(home: String, environment: [String: String], added: [String] = [],
+                                    linked: [String], installed: [String]) -> [String] {
         var paths = ClaudeCodeFolders.discover(home: home, environment: environment).map(\.path)
-        for p in linked + installed {
+        // A folder added by hand is listed while it still looks like a Claude Code folder.
+        let stillHomes = added.filter { ClaudeCodeFolders.looksLikeHome($0, home: home) }
+        for p in stillHomes + linked + installed {
             let n = AccountData.normalized(p)
             if !paths.contains(n) { paths.append(n) }
         }
         return paths
+    }
+
+    /// The line for a folder whose `.claude.json` sits in both places, nil otherwise: which one
+    /// Claude Code uses and when it reads the other. Whether each is signed in is all it says.
+    nonisolated static func configNote(_ candidates: [ClaudeCodeFolders.ConfigCandidate],
+                                       display: (String) -> String) -> String? {
+        let present = candidates.filter(\.exists)
+        guard present.count > 1, let used = present.first(where: \.inUse),
+              let other = present.first(where: { !$0.inUse }) else { return nil }
+        func state(_ c: ClaudeCodeFolders.ConfigCandidate) -> String { c.signedIn ? "signed in" : "not signed in" }
+        let when = other.path.hasSuffix("/\(ClaudeCodeFolders.defaultName)/\(ClaudeCodeFolders.configName)")
+            ? "only when CLAUDE_CONFIG_DIR names this folder" : "when CLAUDE_CONFIG_DIR is not set"
+        return "Two .claude.json files: \(display(used.path)) (\(state(used))) is the one Sanduhr reads and installs into. "
+            + "\(display(other.path)) (\(state(other))) is what Claude Code reads \(when). Remove always edits the file Sanduhr wrote to."
     }
 
     func load(linked: [String]) async {
@@ -50,22 +80,54 @@ final class ModsPageModel {
         defer { loading = false }
         let home = self.home
         let installer = self.installer
-        let result = await Task.detached(priority: .userInitiated) { () -> ([ModFolderInventory], String?, [OwnModRow], AppModVersion?) in
+        let added = SeatPreferences.added(in: store)
+        let result = await Task.detached(priority: .userInitiated) { () -> ([ModFolderInventory], String?, [OwnModRow], AppModVersion?, [String: String], Int) in
             let env = ProcessInfo.processInfo.environment
-            let paths = ModsPageModel.folders(home: home, environment: env, linked: linked,
+            let paths = ModsPageModel.folders(home: home, environment: env, added: added, linked: linked,
                                               installed: installer.installedFolders())
             let inventory = ModInventory.scan(folders: paths, home: home)
             let app = AppModVersion.read(installer.scripts)
             let own = inventory.map { OwnModRow.read(installer, folder: $0.folder, app: app) }
-            return (inventory, ModCheck.findClaude(environment: env, home: home), own, app)
+            var notes: [String: String] = [:]
+            for p in paths {
+                let display = { (s: String) in ClaudeCodeFolders.Folder(path: s).display(home: home) }
+                notes[p] = ModsPageModel.configNote(ClaudeCodeFolders.configCandidates(for: p, home: home), display: display)
+            }
+            return (inventory, ModCheck.findClaude(environment: env, home: home), own, app, notes,
+                    installer.readReceipts().skipped)
         }.value
         inventory = result.0
         claude = result.1
         own = result.2
         appMod = result.3
+        configNotes = result.4
+        addedFolders = added.map(AccountData.normalized)
+        receiptsSkipped = result.5
         let ids = Set(inventory.flatMap(\.items).map(\.id))
         checks = checks.filter { ids.contains($0.key) }
         loaded = true
+    }
+
+    /// Add Folder… (item 71, slice 0): a Claude Code folder discovery doesn't find (one outside
+    /// the home folder, or named otherwise), remembered as a Sanduhr preference. Nothing is
+    /// written into the folder.
+    func addFolder(linked: [String]) async {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.showsHiddenFiles = true
+        panel.directoryURL = URL(fileURLWithPath: home)
+        panel.prompt = "Add"
+        panel.message = "Choose a Claude Code folder (one with a projects folder or a .claude.json)."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard ClaudeCodeFolders.looksLikeHome(url.path, home: home) else {
+            addNote = "That folder doesn't look like a Claude Code folder: it has no projects folder and no .claude.json."
+            return
+        }
+        addNote = nil
+        SeatPreferences.add(url.path, in: store)
+        await load(linked: linked)
     }
 
     /// Runs `claude plugin validate --json` on the item's folder (never `plugin test`).
@@ -152,6 +214,18 @@ final class ModsPageModel {
         return note
     }
 
+    /// Forget Folder: Sanduhr stops listing a folder it was given with Add Folder…. The folder
+    /// itself is untouched; one discovery finds stays listed.
+    func forgetFolder(_ path: String, linked: [String]) async {
+        SeatPreferences.forget(path, in: store)
+        await load(linked: linked)
+    }
+
+    nonisolated static func receiptsSkippedText(_ n: Int) -> String {
+        let what = n == 1 ? "One of Sanduhr's install records" : "\(n) of Sanduhr's install records"
+        return "\(what) couldn't be read and \(n == 1 ? "was" : "were") set aside, kept as written. What \(n == 1 ? "it" : "they") recorded can't be undone from here; every other record still can."
+    }
+
     nonisolated static let takesEffect = "Takes effect in new Claude Code sessions (or after /reload-plugins)."
 
     static let cliMissing = "Check needs Claude Code's command line (claude), and it wasn't found on your PATH or in the usual install folders (~/.local/bin, /opt/homebrew/bin, /usr/local/bin)."
@@ -217,8 +291,22 @@ struct ModsSettings: View {
                 ModsIntro()
                     .settingsAnchor(SettingsAnchor.inventory)
                 folders
-                Button(model.loading ? "Reading…" : "Read Again") { Task { await model.load(linked: linked) } }
-                    .disabled(model.loading)
+                if model.receiptsSkipped > 0 {
+                    Text(ModsPageModel.receiptsSkippedText(model.receiptsSkipped))
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                HStack(spacing: 8) {
+                    Button(model.loading ? "Reading…" : "Read Again") { Task { await model.load(linked: linked) } }
+                        .disabled(model.loading)
+                    Button("Add Folder…") { Task { await model.addFolder(linked: linked) } }
+                        .disabled(model.loading)
+                        .help("Add a Claude Code folder Sanduhr didn't find. Sanduhr remembers it; nothing is written into the folder.")
+                }
+                if let note = model.addNote {
+                    Text(note).font(.caption).foregroundStyle(Color.hex("f87171"))
+                }
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .padding(20)
@@ -247,7 +335,7 @@ struct ModsSettings: View {
             Text("Reading your Claude Code folders…").font(.caption).foregroundStyle(.secondary)
         }
         ForEach(model.inventory) { f in
-            ModsFolderBox(folder: f, model: model)
+            ModsFolderBox(folder: f, model: model, linked: linked)
         }
     }
 }
@@ -268,10 +356,17 @@ private struct ModsIntro: View {
 private struct ModsFolderBox: View {
     let folder: ModFolderInventory
     var model: ModsPageModel
+    let linked: [String]
 
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 12) {
+                if let note = model.configNotes[folder.folder] {
+                    Text(note)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if folder.items.isEmpty {
                     Text("Loads no mods or plugins.").font(.caption).foregroundStyle(.secondary)
                 }
@@ -283,7 +378,14 @@ private struct ModsFolderBox: View {
             .padding(4)
             .frame(maxWidth: .infinity, alignment: .leading)
         } label: {
-            Text(model.display(folder.folder)).font(.body.monospaced())
+            HStack(spacing: 8) {
+                Text(model.display(folder.folder)).font(.body.monospaced())
+                if model.addedFolders.contains(folder.folder) {
+                    Button("Forget Folder") { Task { await model.forgetFolder(folder.folder, linked: linked) } }
+                        .controlSize(.small)
+                        .help("Stop listing this folder here. Nothing in the folder changes.")
+                }
+            }
         }
     }
 }

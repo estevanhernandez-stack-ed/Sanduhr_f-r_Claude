@@ -84,9 +84,24 @@ struct IntegrationScripts {
 
     /// The stamps receipts pin (`installs.json`'s `pinned`): refresh keeps them.
     var pinnedStamps: [String] {
-        guard let data = try? Data(contentsOf: dir.appendingPathComponent(IntegrationInstaller.receiptsName)),
-              let receipts = try? JSONDecoder().decode([IntegrationReceipt].self, from: data) else { return [] }
-        return receipts.compactMap(\.pinned).filter(Self.isStampName)
+        receipts.records.compactMap(\.pinned).filter(Self.isStampName)
+    }
+
+    /// `installs.json` read record by record (item 71, slice 0).
+    var receipts: ReceiptLog.Decoded<IntegrationReceipt> {
+        guard let data = try? Data(contentsOf: dir.appendingPathComponent(IntegrationInstaller.receiptsName)) else {
+            return ReceiptLog.Decoded()
+        }
+        return ReceiptLog.decode(IntegrationReceipt.self, from: data)
+    }
+
+    /// Every receipt is readable: none was skipped, the file parses, and no unreadable receipts
+    /// file was set aside beside it. While this is false, nothing that receipts might still name
+    /// (a stamped folder, the scripts) is deleted.
+    var receiptsAllReadable: Bool {
+        guard receipts.skipped == 0 else { return false }
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+        return !names.contains { $0.hasPrefix(IntegrationInstaller.receiptsName) && $0.hasSuffix(ReceiptLog.asideSuffix) }
     }
 
     /// The app carries the mod (its manifest is there).
@@ -201,7 +216,8 @@ struct IntegrationScripts {
                     throw Failure.writeFailed
                 }
             }
-            if let settingsFiles {
+            // A receipt Sanduhr can't read may pin a stamp or name a settings file: no prune then.
+            if let settingsFiles, receiptsAllReadable {
                 prune(keep: [stamp, replaced].compactMap { $0 } + pinnedStamps + Self.referencedStamps(in: settingsFiles))
             } else {
                 pruneLeftovers()
@@ -226,9 +242,7 @@ struct IntegrationScripts {
 
     /// The config files the receipts name.
     var receiptFiles: [String] {
-        guard let data = try? Data(contentsOf: dir.appendingPathComponent(IntegrationInstaller.receiptsName)),
-              let receipts = try? JSONDecoder().decode([IntegrationReceipt].self, from: data) else { return [] }
-        return Array(Set(receipts.map(\.file))).sorted()
+        Array(Set(receipts.records.map(\.file))).sorted()
     }
 
     /// The stamps named as `…/integrations/<stamp>/` in any of `files`.

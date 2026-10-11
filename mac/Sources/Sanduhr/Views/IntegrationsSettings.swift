@@ -10,6 +10,9 @@ struct IntegrationFolderState: Identifiable, Equatable {
     var hooks: IntegrationStatus = .notInstalled
     /// The statusline is Sanduhr's combined with the user's own (item 63).
     var statuslineCombined = false
+    /// The `.claude.json` the placement rule picks, worked out in the load (it may read a large
+    /// file), never in a view's body.
+    var mcpConfigFile: String?
     var id: String { path }
 
     func status(_ kind: IntegrationKind) -> IntegrationStatus {
@@ -41,7 +44,8 @@ final class IntegrationsModel {
     /// The folders to list: found ones, the accounts' linked ones, ones installed into, chosen.
     func load(linked: [String]) async {
         let home = self.home
-        let extra = chosen
+        // Folders added on Mods & Config (item 71, slice 0) list here too.
+        let extra = SeatPreferences.added(in: KeychainStore.accounts.defaults) + chosen
         let result = await Task.detached(priority: .userInitiated) { () -> ([IntegrationFolderState], PythonFinder.Result) in
             let installer = IntegrationInstaller.standard
             var paths = ClaudeCodeFolders.discover(home: home, environment: ProcessInfo.processInfo.environment).map(\.path)
@@ -54,7 +58,8 @@ final class IntegrationsModel {
                                        statusline: installer.status(.statusline, folder: $0),
                                        meters: installer.status(.meters, folder: $0),
                                        hooks: installer.status(.hooks, folder: $0),
-                                       statuslineCombined: installer.isCombined(folder: $0))
+                                       statuslineCombined: installer.isCombined(folder: $0),
+                                       mcpConfigFile: installer.configFile(.mcp, folder: $0))
             }
             return (states, PythonFinder.find())
         }.value
@@ -73,8 +78,12 @@ final class IntegrationsModel {
     /// A row's buttons work: nothing in progress, and python3 found where the kind runs on it.
     func canRun(_ kind: IntegrationKind) -> Bool { busy == nil && (pythonPath != nil || !kind.needsPython) }
 
+    /// The file `kind` is written to, from the load for `.claude.json`; settings.json is a path
+    /// join only.
     func configDisplay(_ kind: IntegrationKind, folder: String) -> String {
-        display(IntegrationInstaller.standard.configFile(kind, folder: folder))
+        if kind == .mcp, let file = folders.first(where: { $0.path == folder })?.mcpConfigFile { return display(file) }
+        if kind == .mcp { return display(folder) + "/.claude.json" }
+        return display(IntegrationInstaller.standard.configFile(kind, folder: folder))
     }
 
     /// The user's statusline run once against sample statusline JSON and split into segments,
@@ -202,6 +211,11 @@ final class IntegrationsModel {
             ?? ("\(kind.title) removed from \(display(folder)).", false)
     }
 
+    /// Remove refused: the record of what Sanduhr wrote there was set aside as unreadable.
+    nonisolated static func setAsideText(_ file: String) -> String {
+        "Sanduhr's record of what it wrote to \(file) couldn't be read and was set aside, so Remove can't undo it exactly. Nothing was changed. Edit the file by hand, or reinstall and then Remove."
+    }
+
     private func message(_ f: IntegrationInstaller.Failure) -> String {
         switch f {
         case .malformed(let file):
@@ -210,6 +224,8 @@ final class IntegrationsModel {
             return "This copy of Sanduhr doesn't contain the integration scripts. Nothing was changed."
         case .writeFailed(let file):
             return "Couldn't write \(display(file)). Nothing was changed."
+        case .receiptSetAside(let file):
+            return IntegrationsModel.setAsideText(display(file))
         }
     }
 }

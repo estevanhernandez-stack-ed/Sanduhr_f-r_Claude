@@ -194,6 +194,9 @@ struct IntegrationInstaller {
         case scriptsMissing
         /// Reading or writing failed, or the file kept changing while Sanduhr tried.
         case writeFailed(file: String)
+        /// Sanduhr wrote here, but the receipt saying what it wrote couldn't be read and was set
+        /// aside (item 71, slice 0): nothing was changed, since Remove couldn't undo it exactly.
+        case receiptSetAside(file: String)
     }
 
     /// Install's answer.
@@ -779,26 +782,64 @@ struct IntegrationInstaller {
     func remove(_ kind: IntegrationKind, folder: String) throws {
         // The meters mod's switch comes out first, so the folder is back to what it was.
         if kind == .meters { try undoModSwitch(folder: folder) }
-        let file = configFile(kind, folder: folder)
-        var receipts = loadReceipts()
-        let receipt = receipts.first { $0.file == file && $0.kind == kind }
-        var done = false
-        for _ in 0..<3 {
-            guard let original = try read(file) else { done = true; break }
-            guard let edit = try malformedNamed(file, { try planRemove(kind, bytes: original, receipt: receipt) }) else {
-                done = true
-                break
+        let ledger = readReceipts()
+        var receipts = ledger.records
+        // The files the receipts name, never the placement rule's answer today (item 71, slice
+        // 0): an entry written into `~/.claude/.claude.json` comes out of that file even when the
+        // rule now picks `~/.claude.json`. With no receipt, the rule's file, unless a receipt set
+        // aside as unreadable is about this folder and kind: then nothing is touched.
+        var files = Self.receiptFiles(receipts, kind: kind, folder: folder)
+        if files.isEmpty {
+            if let file = Self.setAsideFile(ledger.unreadable, kind: kind, folder: folder) {
+                throw Failure.receiptSetAside(file: file)
             }
-            let delete = receipt?.createdFile == true && (try? JSONEdit.topObject(edit))?.members.isEmpty == true
-            if try commit(file, original: original, bytes: delete ? nil : edit, backup: false) {
-                done = true
-                break
-            }
+            files = [configFile(kind, folder: folder)]
         }
-        guard done else { throw Failure.writeFailed(file: file) }
-        receipts.removeAll { $0.file == file && $0.kind == kind }
-        saveReceipts(receipts)
-        if receipts.isEmpty { scripts.removeAll() }
+        for file in files {
+            let receipt = receipts.first { $0.file == file && $0.kind == kind }
+            var done = false
+            for _ in 0..<3 {
+                guard let original = try read(file) else { done = true; break }
+                guard let edit = try malformedNamed(file, { try planRemove(kind, bytes: original, receipt: receipt) }) else {
+                    done = true
+                    break
+                }
+                let delete = receipt?.createdFile == true && (try? JSONEdit.topObject(edit))?.members.isEmpty == true
+                if try commit(file, original: original, bytes: delete ? nil : edit, backup: false) {
+                    done = true
+                    break
+                }
+            }
+            guard done else { throw Failure.writeFailed(file: file) }
+            receipts.removeAll { $0.file == file && $0.kind == kind }
+            saveReceipts(receipts)
+        }
+        // The scripts go only when every receipt was readable before this Remove and none was
+        // ever set aside: an unreadable one may still name them.
+        if receipts.isEmpty && ledger.skipped == 0 && scripts.receiptsAllReadable { scripts.removeAll() }
+    }
+
+    /// The file a set-aside receipt names for `kind` in `folder`, read from its raw JSON (folder,
+    /// kind and file only), nil when none matches.
+    static func setAsideFile(_ unreadable: [Data], kind: IntegrationKind, folder: String) -> String? {
+        let f = AccountData.normalized(folder)
+        for raw in unreadable {
+            guard let o = (try? JSONSerialization.jsonObject(with: raw)) as? [String: Any],
+                  o["kind"] as? String == kind.rawValue,
+                  let rf = o["folder"] as? String, AccountData.normalized(rf) == f else { continue }
+            return o["file"] as? String ?? folder
+        }
+        return nil
+    }
+
+    /// The files `receipts` record for `kind` in `folder`, in receipt order.
+    static func receiptFiles(_ receipts: [IntegrationReceipt], kind: IntegrationKind, folder: String) -> [String] {
+        let f = AccountData.normalized(folder)
+        var out: [String] = []
+        for r in receipts where r.kind == kind && AccountData.normalized(r.folder) == f && !out.contains(r.file) {
+            out.append(r.file)
+        }
+        return out
     }
 
     /// Remove's edit, or nil when there is nothing of Sanduhr's to take out.
@@ -1078,20 +1119,33 @@ struct IntegrationInstaller {
 
     var receiptsURL: URL { scripts.dir.appendingPathComponent(Self.receiptsName) }
 
-    func loadReceipts() -> [IntegrationReceipt] {
-        guard let data = try? Data(contentsOf: receiptsURL) else { return [] }
-        return (try? JSONDecoder().decode([IntegrationReceipt].self, from: data)) ?? []
+    /// The receipts that decode. One that doesn't is skipped, not fatal (item 71, slice 0).
+    func loadReceipts() -> [IntegrationReceipt] { readReceipts().records }
+
+    /// The receipts file record by record: the readable ones, and the ones set aside.
+    func readReceipts() -> ReceiptLog.Decoded<IntegrationReceipt> {
+        guard let data = try? Data(contentsOf: receiptsURL) else { return ReceiptLog.Decoded() }
+        return ReceiptLog.decode(IntegrationReceipt.self, from: data)
     }
 
+    /// Writes `receipts`, keeping every record of the file that didn't decode after them. A file
+    /// that isn't a JSON array at all is moved aside first, never written over.
     func saveReceipts(_ receipts: [IntegrationReceipt]) {
         let fm = FileManager.default
-        if receipts.isEmpty {
+        let current = readReceipts()
+        if current.fileUnreadable {
+            var aside = ReceiptLog.asideURL(receiptsURL)
+            if fm.fileExists(atPath: aside.path) {
+                aside = receiptsURL.deletingLastPathComponent()
+                    .appendingPathComponent("\(Self.receiptsName).\(Int(Date().timeIntervalSince1970)).unreadable")
+            }
+            try? fm.moveItem(at: receiptsURL, to: aside)
+        }
+        if receipts.isEmpty && current.unreadable.isEmpty {
             try? fm.removeItem(at: receiptsURL)
             return
         }
-        let enc = JSONEncoder()
-        enc.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
-        guard let data = try? enc.encode(receipts) else { return }
+        guard let data = ReceiptLog.encode(receipts, previous: current) else { return }
         try? fm.createDirectory(at: scripts.dir, withIntermediateDirectories: true)
         try? atomicWrite(data, to: receiptsURL.path, newFilePermissions: 0o600)
     }

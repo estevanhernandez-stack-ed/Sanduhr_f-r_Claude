@@ -77,6 +77,7 @@ struct OwnModNote: Equatable, Sendable {
         case .malformed: text = "settings.json isn't JSON Sanduhr can edit (or a key in it isn't the kind it should be), so nothing was changed."
         case .scriptsMissing: text = "This copy of Sanduhr doesn't carry the mod (a development build), so it can't add it."
         case .writeFailed: text = "Couldn't write settings.json: it kept changing, or the folder isn't writable. Nothing was changed."
+        case .receiptSetAside: text = IntegrationsModel.setAsideText("settings.json")
         case nil: text = "Something went wrong, so nothing was changed."
         }
     }
