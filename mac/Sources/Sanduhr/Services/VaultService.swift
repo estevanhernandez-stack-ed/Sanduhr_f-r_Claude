@@ -49,6 +49,8 @@ final class VaultService: @unchecked Sendable {
     private let eraseQueue = DispatchQueue(label: "com.626labs.sanduhr.vault-erase", qos: .userInitiated)
     private let lock = NSLock()
     private var running = false
+    /// Reset Sanduhr… (slice 5): no cycle starts from here on.
+    private var stopped = false
     private var lastOK: [String: Bool] = [:]
     private var _onCycleEnd: (@Sendable () -> Void)?
 
@@ -95,6 +97,7 @@ final class VaultService: @unchecked Sendable {
 
     /// Starts a cycle off the main thread unless one is running or nothing is recorded.
     func trigger() {
+        guard !isStopped, !ResetGate.isOn else { return }
         let d = defaults()
         let roots = Self.roots(in: d)
         guard !roots.isEmpty else { return }
@@ -116,6 +119,17 @@ final class VaultService: @unchecked Sendable {
             lock.unlock()
             done?()
         }
+    }
+
+    /// Reset Sanduhr… (slice 5): no new cycle starts; one already running writes nothing more
+    /// (VaultStore's writes check ResetGate).
+    func stop() {
+        lock.lock(); stopped = true; lock.unlock()
+    }
+
+    var isStopped: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return stopped
     }
 
     /// Called after each triggered cycle, on the vault's queue (the Claude Usage page reloads).

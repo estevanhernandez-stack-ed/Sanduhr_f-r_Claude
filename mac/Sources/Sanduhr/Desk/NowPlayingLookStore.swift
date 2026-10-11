@@ -128,6 +128,7 @@ final class NowPlayingLookStore {
 
     private func save(_ p: NowPlayingLookProposal) {
         loadIfNeeded()
+        guard !ResetGate.isOn else { return }
         let merged = NowPlayingLookProposal.merge(p.looks, into: saved)
         try? FileManager.default.createDirectory(at: paths.support, withIntermediateDirectories: true)
         HandoffFiles.writeOwnerOnly(NowPlayingLookProposal.looksJSON(merged), to: paths.looks)

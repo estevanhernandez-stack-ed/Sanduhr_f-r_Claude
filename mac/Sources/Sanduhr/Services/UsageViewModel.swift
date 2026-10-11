@@ -894,6 +894,23 @@ final class UsageViewModel {
 
     /// Stops the timers, drops the client (an answer still on its way is ignored) and the shown
     /// numbers.
+    /// Reset Sanduhr… (slice 5): what this model runs on its own, each a step of the shutdown.
+    /// Fetching stops and the client (holding the active key) goes; following and the per-seat
+    /// reads stop and drop their clients; the vault starts no cycle; the themes folder isn't
+    /// watched any more.
+    var resetShutdownSteps: [ResetShutdown.Step] {
+        [ResetShutdown.Step(name: "refresh", stop: { [weak self] in self?.stopFetching() },
+                            isStopped: { [weak self] in self.map { $0.api == nil && $0.refreshTimer == nil && $0.countdownTimer == nil } ?? true }),
+         ResetShutdown.Step(name: "account follower", stop: { [weak self] in self?.follower.stop() },
+                            isStopped: { [weak self] in self?.follower.isStopped ?? true }),
+         ResetShutdown.Step(name: "seat meters", stop: { [weak self] in self?.seatMeters.stop() },
+                            isStopped: { [weak self] in self?.seatMeters.isStopped ?? true }),
+         ResetShutdown.Step(name: "vault", stop: { [weak self] in self?.vault.stop() },
+                            isStopped: { [weak self] in self?.vault.isStopped ?? true }),
+         ResetShutdown.Step(name: "theme watcher", stop: { [weak self] in self?.themeWatcher?.stop() },
+                            isStopped: { [weak self] in self?.themeWatcher?.isStopped ?? true })]
+    }
+
     private func stopFetching() {
         refreshTimer?.invalidate()
         refreshTimer = nil

@@ -166,6 +166,17 @@ class FakeApp
       which, on = arg.to_s.split
       a = (s['av_indicators'] ||= { 'camera' => false, 'mic' => false, 'shown' => 'none' })
       a[which] = (on == 'on') if %w[camera mic].include?(which)
+    when 'reset'
+      # Slice 5: the dry run only, the plan as kinds and counts; the app refuses any other arg.
+      raise Smoke::Failure, 'reset needs arg=--dry-run' unless %w[--dry-run dry-run].include?(arg)
+      s['reset_dry_run'] = {
+        'touched' => false, 'folders' => 1,
+        'steps' => [{ 'part' => 'claude_code', 'kind' => 'claude_code_entry', 'count' => 2 },
+                    { 'part' => 'accounts', 'kind' => 'account', 'count' => 2 },
+                    { 'part' => 'records', 'kind' => 'support_files', 'count' => 9 },
+                    { 'part' => 'desk_messages', 'kind' => 'desk_messages', 'count' => 1 },
+                    { 'part' => 'settings', 'kind' => 'preferences', 'count' => 2 }]
+      }
     when 'watch-test'
       w = (s['watchers'] ||= { 'count' => 0, 'states' => [], 'placements' => [] })
       case arg
@@ -574,6 +585,26 @@ eq('per-seat counts pass with three seats', r['status'], 'pass')
 r = Runner.new(FakeApp.new('seats' => nil), mem, out, io: io, settle: 0, poll: 0.01, within: 0.05).run_file(seat)
 eq('per-seat counts fail without a count', r['status'], 'fail')
 
+# Settings v2, slice 5: reset's dry run puts the plan in state.yaml, kinds and counts only, and
+# the scenario runs it as a dry run and nothing else.
+eq('no dry run in the fixture', state['reset_dry_run'], nil)
+reset = File.join(Smoke::SCENARIOS, 'reset-dry-run.yaml')
+app_reset = FakeApp.new
+r = Runner.new(app_reset, mem, out, io: io, settle: 0, poll: 0.01, within: 0.05).run_file(reset)
+eq('reset dry run passes', r['status'], 'pass')
+eq('reset ran only as a dry run', app_reset.actions.grep(/\Areset/), ['reset --dry-run'])
+plan = app_reset.state_now['reset_dry_run']
+check('dry run holds no path or label', plan.to_s !~ %r{/|Personal|Work|\.claude})
+eq('dry run runs Claude Code first and settings last', [plan['steps'].first['part'], plan['steps'].last['part']],
+   %w[claude_code settings])
+refused = begin
+  FakeApp.new.action('reset', 'now')
+  false
+rescue Smoke::Failure
+  true
+end
+check('reset refuses anything but the dry run', refused)
+
 app3 = FakeApp.new('meters' => [])
 runner3 = Runner.new(app3, mem, out, io: io, settle: 0, poll: 0.01, within: 0.05)
 r = runner3.run_file(File.join(FIXTURES, 'scenarios', 'skip.yaml'))
@@ -592,7 +623,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key]
+    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end
@@ -601,7 +632,14 @@ check('no scenario signs out', Dir[File.join(Smoke::SCENARIOS, '*.yaml')].none? 
 # Item 36: a smoke run works on the real accounts, so no scenario adds, removes, renames, signs
 # out or even switches one.
 check('no scenario touches accounts', Dir[File.join(Smoke::SCENARIOS, '*.yaml')].none? { |f| File.read(f) =~ /do:\s*(account|add|remove|rename)/i })
-check('scenarios exist', Dir[File.join(Smoke::SCENARIOS, '*.yaml')].length >= 8)
+# Settings v2, slice 5: a smoke run never resets for real; every reset step is the dry run.
+Dir[File.join(Smoke::SCENARIOS, '*.yaml')].each do |f|
+  Array(YAML.safe_load(File.read(f))['steps']).each do |s|
+    next unless s.is_a?(Hash) && s['do'] == 'reset'
+    check("#{File.basename(f)}: reset only as a dry run", %w[--dry-run dry-run].include?(s['arg']))
+  end
+end
+check('scenarios exist',Dir[File.join(Smoke::SCENARIOS, '*.yaml')].length >= 8)
 
 # --- Gallery -----------------------------------------------------------------------------------
 

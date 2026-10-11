@@ -76,6 +76,8 @@ enum SnapshotWriter {
 
     private static func write(status: String, errorKind: String?, tiers: [[String: Any]], accountRef: String?,
                               now: Date, to target: URL = url) {
+        // Reset Sanduhr… ran: no snapshot comes back.
+        guard !ResetGate.isOn else { return }
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let root: [String: Any] = [

@@ -138,6 +138,8 @@ final class DeskMessageHandoff {
                         reasons: ["the list would pass \(MessageProposal.maxFileLines) lines"])
             return
         }
+        // Reset Sanduhr… ran: messages.txt is not written again.
+        guard !ResetGate.isOn else { return }
         do {
             try fm.createDirectory(at: paths.messages.deletingLastPathComponent(), withIntermediateDirectories: true)
             if had { try Data(existing.utf8).write(to: paths.backup, options: .atomic) }

@@ -124,7 +124,13 @@ written as `ctrl-opt-s` or `⌃⌥S`; refused with an error, nothing saved, with
 shortcut has them. Keys macOS also uses (item 73) are refused without an error, as the recorder refuses them:
 nothing saved and `hot_keys.<shortcut>_refusal: macos` in state.yaml; `anyway` saves them as Use Anyway does,
 and `hot_keys.<shortcut>_clash` then names the macOS shortcut. `default` is never refused for macOS's sake. It writes the desk keys `hotKey<Settings|Join>KeyCode` and `…Modifiers`; a run puts changed
-keys back).
+keys back),
+`reset --dry-run` (Settings v2, slice 5: the plan About's Reset Sanduhr… would run with every part checked,
+read and never run, into state.yaml as `reset_dry_run`: `touched` (always false), `folders` (how many Claude
+Code folders hold a Sanduhr entry) and `steps`, in run order, each a `part` (`claude_code`, `accounts`,
+`records`, `desk_messages`, `themes`, `settings`), a `kind` and a `count`; never a path, a folder, a label or a
+domain's contents. `reset_dry_run` is null until one ran. Any other arg is an error: no hook resets for real,
+and the selftest fails a scenario whose `reset` step is anything but `--dry-run`).
 
 ## Scenarios
 

@@ -57,6 +57,9 @@ struct DebugStateInput {
     var justTheDesk = false
     /// Demo mode (slice 4): on, and what each surface shows, counts and flags only.
     var demo = DemoDebug()
+    /// The last `reset --dry-run` (Settings v2, slice 5): the plan in run order, kinds and counts
+    /// only, never a path, a folder, a label or a domain's contents. Nil until one ran.
+    var resetDryRun: Reset.Report?
     var meters: [DeskMeterRow] = []
     /// The widget's tiers drawing red with a glow (MeterWarning), in display order.
     var widgetWarnings: [Tier] = []
@@ -414,6 +417,15 @@ enum DebugState {
               YAMLPair("cli", .bool(m.cli))])
     }
 
+    /// `reset_dry_run:` (slice 5): what Reset would remove, step kinds and counts in run order;
+    /// `touched` is always false, since the dry run runs no step.
+    static func resetDryRunYAML(_ r: Reset.Report) -> YAMLNode {
+        let steps: [YAMLNode] = r.rows.map { row in
+            .object([("part", .string(row.part)), ("kind", .string(row.kind)), ("count", .int(row.count))])
+        }
+        return .object([("touched", .bool(false)), ("folders", .int(r.folders)), ("steps", .list(steps))])
+    }
+
     /// `vault:` (item 46): flags and a count only.
     static func vaultYAML(_ v: VaultState) -> YAMLNode {
         .map([YAMLPair("recording", .bool(v.recording)), YAMLPair("months", .int(v.months)),
@@ -520,6 +532,7 @@ enum DebugState {
         pairs.append(("meter_history", meterHistoryYAML(s.meterHistory)))
         pairs.append(("just_the_desk", .bool(s.justTheDesk)))
         pairs.append(("demo", demoYAML(s.demo)))
+        pairs.append(("reset_dry_run", s.resetDryRun.map(resetDryRunYAML) ?? .null))
         return .object(pairs)
     }
     

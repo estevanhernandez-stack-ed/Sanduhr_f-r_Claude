@@ -1907,6 +1907,38 @@ Code folder such as `~/.claude-scratch` with a `projects` folder is enough for t
    the session's band stays and its transcript shows no "unloaded" line; the old
    `integrations/<stamp>/` folder is still there until Sanduhr's next launch, then goes.
 
+## 47. Reset Sanduhr… (item 72, Settings v2 slice 5)
+
+**Never on your own profile or a real Claude Code folder.** Use a scratch macOS user with a scratch
+Claude Code folder (`~/.claude-scratch` with a `projects` folder and a `settings.json` of a few
+keys of your own) and a made-up account.
+
+1. Smoke first, safe anywhere: `smoke/smoke run scenarios/reset-dry-run.yaml`. Settings opens at
+   About, Reset; `reset_dry_run` in `smoke/smoke state` has `touched: false`, `folders` and the
+   steps in run order (`claude_code` first, `settings` last, `preferences` count 2), kinds and
+   counts only. Nothing on disk, in the Keychain or in the preferences changed.
+   `smoke/smoke do reset now` is refused with an error.
+2. On the scratch user: copy `~/.claude-scratch/settings.json` and `~/.claude-scratch/.claude.json`
+   aside. Install the MCP server, the statusline (Combine with a line of your own), Meters above
+   the prompt (switched off once on Mods & Config) and the Claude Code glow hook into the scratch
+   folder. Search Settings for "start over": it opens About at **Reset Sanduhr…**.
+3. **Reset Sanduhr…**: every part is checked; the scratch folder is listed (`~/.claude-scratch`)
+   with its four entries. Uncheck the folder: an orange warning says its entries stay. Check it
+   again. Cancel closes the sheet and changes nothing.
+4. Make the scratch `settings.json` invalid by hand (delete its last brace), then **Reset and
+   Quit**. The result list shows the `settings.json` entries failed ("isn't JSON Sanduhr can
+   edit"), the `.claude.json` entry and every later step done. Quit Sanduhr. The broken file is as
+   you left it; `~/Library/Application Support/Sanduhr/` holds only `integrations/`.
+5. Fix the file, launch: the welcome sheet shows. Sign in with the made-up account, open Settings,
+   Claude Code: the scratch folder's entries are listed; Reset again with everything checked.
+   Leave the results up a minute: `~/Library/Application Support/Sanduhr/` and its `themes/` don't
+   come back, the widget and Desk are gone, and the menu bar icon offers only Quit Sanduhr. (On a
+   dev build the accounts caption and rows say the release build's Keychain items stay.) After Quit: both files compare byte-identical with the copies from step 2 (`cmp`), no
+   `.sanduhr-backup` beside them, no `~/Library/Application Support/Sanduhr/`,
+   `messages.txt.previous` beside where `messages.txt` was, `defaults read com.626labs.sanduhr`
+   and `defaults read com.626labs.sanduhr.desk` find no domain, and Keychain Access has no
+   `com.626labs.sanduhr` item. Launch: the welcome sheet shows.
+
 ## 48. Settings v2, slice 4: signed out and demo mode (item 72)
 
 On a scratch macOS user (or a throwaway profile as in section 45), never on your own.
