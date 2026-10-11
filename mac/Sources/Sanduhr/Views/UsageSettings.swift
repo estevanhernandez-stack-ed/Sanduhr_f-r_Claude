@@ -275,6 +275,24 @@ private struct UsageDemo: View {
     }
 }
 
+/// The shown account has no usable key on this Mac (signed out, or a dev build's file store without
+/// it): what the page shows is saved, and Accounts is where to sign in again.
+private struct UsageNoKeyNote: View {
+    let label: String
+    let navigation: SettingsNavigation
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(SignedOut.savedHistoryLine)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            SettingsLinkButton(.credentials) { navigation.accountToShow = label }
+                .controlSize(.small)
+        }
+    }
+}
+
 /// The account picker (two or more accounts), the tabs and what the page reads for the account.
 private struct UsageHeader: View {
     var vm: UsageViewModel
@@ -305,6 +323,9 @@ private struct UsageHeader: View {
                 .fixedSize()
             }
             UsageCaption(navigation.usageTab == .meters ? metersLine : sourceLine)
+            if !vm.hasUsableKey(label) {
+                UsageNoKeyNote(label: label, navigation: navigation)
+            }
         }
     }
 

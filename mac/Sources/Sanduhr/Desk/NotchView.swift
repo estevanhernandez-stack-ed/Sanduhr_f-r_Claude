@@ -487,7 +487,7 @@ struct NotchWingsView: View {
         }
         func wingWidth(_ text: String?, _ content: NotchContent, _ place: NotchContent.Place) -> CGFloat {
             // Nothing to show: no black slab, the island gives the room back (slice 4, F25).
-            if collapses(text, content, showText: showText, metersPending: model.metersPending) { return 0 }
+            if collapses(text, content, showText: showText, metersPending: model.metersPending(now: now)) { return 0 }
             // A paused now playing also makes room for its Next button (item 53b).
             // A watcher also makes room for its dot (item 66).
             // The camera and mic indicators are their own width (item 67).

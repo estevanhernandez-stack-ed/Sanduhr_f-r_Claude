@@ -447,18 +447,30 @@ final class DeskModel {
         calendarNote = nil
     }
 
-    /// The Claude meters are empty only for a moment: an account switch's fade veils the old numbers,
-    /// or a key is waiting for its first fetch (no numbers yet and no sign-in needed). A notch wing
-    /// on the meters keeps its width meanwhile (NotchWingsView.collapses, slice 4).
-    var metersPending: Bool {
-        veiled || (!signInNeeded && usage.fetchedAt == nil)
+    /// The Claude meters are empty only for a moment (DeskUsage.metersPending): an account switch's
+    /// fade, or a key with a client waiting for its first fetch, for a bounded time. A notch wing on
+    /// the meters keeps its width meanwhile (NotchWingsView.collapses, slice 4).
+    var metersPending: Bool { metersPending(now: Date()) }
+
+    func metersPending(now: Date) -> Bool {
+        usage.metersPending(waitingSince: waitingSince, now: now)
     }
 
+    /// When the current wait for a first fetch began, nil while there is no such wait.
+    @ObservationIgnored private var waitingSince: Date?
+
     /// Takes the widget's latest numbers. AppDelegate calls this after every refresh, whether
-    /// or not Desk or the widget is showing, so Desk has them the moment it starts.
-    func update(_ input: DeskUsage) {
-        usage = input
-        refreshClaude()
+    /// or not Desk or the widget is showing, so Desk has them the moment it starts. No key to fetch
+    /// with and no numbers reads as signed out (DeskUsage.settled).
+    func update(_ input: DeskUsage, now: Date = Date()) {
+        let settled = input.settled
+        usage = settled
+        if !settled.signInNeeded, settled.fetchedAt == nil, settled.keyPresent != false {
+            if waitingSince == nil { waitingSince = now }
+        } else {
+            waitingSince = nil
+        }
+        refreshClaude(now: now)
     }
 
     /// Rebuilds the meters and the text lines from the last numbers the widget handed over.

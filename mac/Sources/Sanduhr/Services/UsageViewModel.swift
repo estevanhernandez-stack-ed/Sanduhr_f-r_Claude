@@ -335,6 +335,9 @@ final class UsageViewModel {
         reloadAccounts()
         guard KeychainStore.exists(account: KeychainAccount.sessionKey) else {
             status = .notSignedIn    // onboarding sheet will drive the next step
+            // The Desk and the notch hear it too: without this they waited for a first fetch
+            // that could never come (2026-10-11, a blank meters wing).
+            onUsageUpdate?()
             return
         }
         if connect() {
@@ -342,7 +345,18 @@ final class UsageViewModel {
             startTimers()
         } else {
             status = .notSignedIn
+            onUsageUpdate?()
         }
+    }
+
+    /// The active account's key is in this launch's credential store and a client fetches with it.
+    /// The credential store's answer (`connect` read the key), not the account list's.
+    var canFetch: Bool { api != nil }
+
+    /// Whether `label` has a usable key on this Mac: the client's answer for the active account,
+    /// the credential store's (AccountRegistry.hasKey) for the others.
+    func hasUsableKey(_ label: String) -> Bool {
+        label == activeAccount ? canFetch : signedInAccounts.contains(label)
     }
 
     /// Called after the user saves new credentials: rebuilds the API client and refreshes.

@@ -113,7 +113,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DeskController.shared.model.update(DeskUsage(
                 usage: vm.shownUsage, fetchedAt: vm.lastUpdated, signInNeeded: vm.status.needsSignIn,
                 firstSignIn: vm.status == .notSignedIn,
-                account: vm.shownAccountLabel, veiled: vm.switchVeil, switchNote: vm.switchNote))
+                account: vm.shownAccountLabel, veiled: vm.switchVeil, switchNote: vm.switchNote,
+                keyPresent: vm.canFetch))
         }
 
         // When the user toggles compact mode, resize the panel to fit the
