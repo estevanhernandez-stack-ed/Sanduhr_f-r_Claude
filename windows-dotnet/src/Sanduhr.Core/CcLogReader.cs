@@ -80,16 +80,27 @@ public sealed class CcLogReader
     private DateTimeOffset _todayCacheComputedAt = DateTimeOffset.MinValue;
     private LocalCcAggregate? _todayCacheResult;
 
-    public CcLogReader(string? homeDir = null)
+    private readonly Func<IEnumerable<string>>? _rootNames;
+
+    public CcLogReader(string? homeDir = null) : this(homeDir, null)
+    {
+    }
+
+    /// <summary>Reader whose log roots come from <paramref name="rootNames"/> (folder
+    /// names directly under the home), re-evaluated on every <see cref="SearchRoots"/>
+    /// call so a home added later is picked up. A null provider uses the fixed
+    /// <c>.claude</c> and <c>.claude-personal</c> pair.</summary>
+    public CcLogReader(string? homeDir, Func<IEnumerable<string>>? rootNames)
     {
         _homeDir = homeDir ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        _rootNames = rootNames;
     }
 
     /// <summary>Candidate CC config roots in the user's home that actually exist.</summary>
     public IReadOnlyList<string> SearchRoots()
     {
         var outp = new List<string>();
-        foreach (var name in LogRootNames)
+        foreach (var name in _rootNames?.Invoke() ?? LogRootNames)
         {
             var p = Path.Combine(_homeDir, name);
             if (Directory.Exists(p))

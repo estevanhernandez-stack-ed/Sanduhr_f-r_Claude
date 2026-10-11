@@ -472,7 +472,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _credentials = new CredentialStore(_accounts, _paths);
         _history = new UsageHistory(_accounts, _paths);
         _settings = new SettingsStore(_paths);
-        _ccReader = new CcLogReader();
+        _ccReader = new CcLogReader(null, () => ClaudeCodeHomes.Discover(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR")));
 
         _alertConfig = _settings.LoadAlertConfig();
         AlertSettingsChanged += () => _alertConfig = _settings.LoadAlertConfig();
