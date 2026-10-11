@@ -83,6 +83,8 @@ public sealed class VaultService
     /// explicitly NOT the template here).</summary>
     public void TriggerIngest()
     {
+        if (ResetGuard.Done)
+            return;
         if (Interlocked.CompareExchange(ref _ingestRunning, 1, 0) != 0)
             return;   // previous run still going -> skip this cycle
 

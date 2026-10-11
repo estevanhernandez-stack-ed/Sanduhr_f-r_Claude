@@ -51,6 +51,7 @@ public class PublishHandoffTests
         var path = Path.Combine(tmp.Path, "publish-request.json");
 
         File.WriteAllText(path, "{ nope");
+        File.SetLastWriteTimeUtc(path, Now.UtcDateTime.AddSeconds(-11));
         Assert.Null(PublishHandoff.TryReadRequest(path, Now));
         Assert.False(File.Exists(path));
 
@@ -59,6 +60,42 @@ public class PublishHandoffTests
         Assert.False(File.Exists(path));
 
         File.WriteAllText(path, RequestJson("bad-date", "09/12/2026", Now));
+        Assert.Null(PublishHandoff.TryReadRequest(path, Now));
+        Assert.False(File.Exists(path));
+    }
+
+    [Fact]
+    public void Fresh_unparseable_request_is_left_for_the_next_look()
+    {
+        using var tmp = new TempDir();
+        var path = Path.Combine(tmp.Path, "publish-request.json");
+
+        // A writer may be mid-write: parse failure on a young file must not delete it.
+        File.WriteAllText(path, "{\"id\":\"abc\",");
+        File.SetLastWriteTimeUtc(path, Now.UtcDateTime.AddSeconds(-2));
+        Assert.Null(PublishHandoff.TryReadRequest(path, Now));
+        Assert.True(File.Exists(path));
+
+        // Same for a non-object root.
+        File.WriteAllText(path, "[1,2]");
+        File.SetLastWriteTimeUtc(path, Now.UtcDateTime.AddSeconds(-2));
+        Assert.Null(PublishHandoff.TryReadRequest(path, Now));
+        Assert.True(File.Exists(path));
+    }
+
+    [Fact]
+    public void Unparseable_request_older_than_ten_seconds_is_deleted()
+    {
+        using var tmp = new TempDir();
+        var path = Path.Combine(tmp.Path, "publish-request.json");
+
+        File.WriteAllText(path, "{\"id\":\"abc\",");
+        File.SetLastWriteTimeUtc(path, Now.UtcDateTime.AddSeconds(-11));
+        Assert.Null(PublishHandoff.TryReadRequest(path, Now));
+        Assert.False(File.Exists(path));
+
+        File.WriteAllText(path, "[1,2]");
+        File.SetLastWriteTimeUtc(path, Now.UtcDateTime.AddSeconds(-11));
         Assert.Null(PublishHandoff.TryReadRequest(path, Now));
         Assert.False(File.Exists(path));
     }

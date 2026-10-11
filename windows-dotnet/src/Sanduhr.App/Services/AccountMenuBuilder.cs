@@ -26,6 +26,7 @@ internal static class AccountMenuBuilder
         // picking one shows that sample.
         var active = vm.ShownActiveAccount;
         var accounts = vm.ShownAccounts;
+        var inUse = vm.OthersInUse;
         var switchCommand = vm.IsDemo ? vm.ShowSampleAccountCommand : (System.Windows.Input.ICommand)vm.SwitchAccountCommand;
 
         if (accounts.Count == 0)
@@ -37,9 +38,12 @@ internal static class AccountMenuBuilder
             foreach (var label in accounts)
             {
                 bool isActive = label == active;
+                // Follow saw this account in use in its latest check: the menu is rebuilt on every
+                // open, so the mark is as fresh as the follower's last reading.
+                var mark = !isActive && inUse.Contains(label) ? " · in use" : "";
                 items.Add(new MenuItem
                 {
-                    Header = isActive ? $"●  {label}" : $"     {label}",
+                    Header = (isActive ? $"●  {label}" : $"     {label}") + mark,
                     Command = switchCommand,
                     CommandParameter = label,
                     // The active account is the no-op target; dim it so the live one reads clearly.

@@ -97,12 +97,15 @@ public sealed class WebView2ApiClient : IClaudeApiClient, IDisposable
 
     /// <param name="sessionKey">The claude.ai <c>sessionKey</c> cookie value.</param>
     /// <param name="cfClearance">Optional <c>cf_clearance</c> cookie (injected too, though the live browser usually clears CF on its own).</param>
-    public WebView2ApiClient(string sessionKey, string? cfClearance = null)
+    /// <param name="profileDir">The WebView2 user-data folder. Null is the shared <c>webview2-fetch</c> profile
+    /// (the active account's); an inactive account's check passes its own <c>webview2-&lt;ref&gt;</c> folder, so the
+    /// cookie wipe in <see cref="InjectAuthCookies"/> only ever touches the profile this client owns.</param>
+    public WebView2ApiClient(string sessionKey, string? cfClearance = null, string? profileDir = null)
     {
         _sessionKey = sessionKey;
         _cfClearance = cfClearance;
         var paths = new Paths();
-        _profileDir = paths.WebView2FetchDir;
+        _profileDir = profileDir ?? paths.WebView2FetchDir;
         _logPath = Path.Combine(paths.AppDataDir, "fetch-debug.log");
         _dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
     }

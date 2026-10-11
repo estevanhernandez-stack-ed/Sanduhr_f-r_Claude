@@ -148,11 +148,36 @@ public class SettingsSourceScanTests
         }
 
         Assert.Equal(SettingsNames.Pages.Select(p => p.ToString()), tabs.Select(t => Attr(t, "Tag")));
-        Assert.Equal(SettingsNames.Pages.Select(SettingsNames.PageTitle), tabs.Select(t => Attr(t, "Header")));
-        Assert.Equal(SettingsNames.Pages.Select(SettingsNames.PageTitle), tabs.Select(t => Attr(t, "AutomationProperties.Name")));
+        Assert.Equal(SettingsNames.Pages.Select(SettingsNames.PageTitle), tabs.Select(t => WebUtility.HtmlDecode(Attr(t, "Header"))));
+        Assert.Equal(SettingsNames.Pages.Select(SettingsNames.PageTitle), tabs.Select(t => WebUtility.HtmlDecode(Attr(t, "AutomationProperties.Name"))));
         // A group's heading sits on its first page and nowhere else.
         var expected = SettingsNames.Pages.Select(p =>
             SettingsNames.Sidebar.FirstOrDefault(g => g.Pages[0] == p)?.Title ?? "");
         Assert.Equal(expected, tabs.Select(t => Attr(t, "views:SettingsSidebar.GroupHeader")));
+    }
+
+    [Fact]
+    public void The_trademark_notice_has_one_source_and_both_windows_bind_to_it()
+    {
+        const string phrase = "trademarks of Anthropic";
+        var appDir = AppDir();
+        var coreFile = Path.GetFullPath(Path.Combine(appDir, "..", "Sanduhr.Core", "SettingsNames.cs"));
+        Assert.Contains(phrase, File.ReadAllText(coreFile));
+
+        var offenders = Files("*.xaml").Concat(Files("*.cs"))
+            .Where(f => File.ReadAllText(f).Contains(phrase, StringComparison.Ordinal))
+            .Select(f => Path.GetRelativePath(appDir, f))
+            .ToList();
+        Assert.True(offenders.Count == 0,
+            "Hardcoded trademark text (bind SettingsNames.TrademarkNotice instead): " + string.Join(", ", offenders));
+
+        // The manifest keeps its own wording; it is the only other place the phrase may live.
+        Assert.Contains(phrase, File.ReadAllText(Path.Combine(appDir, "Package.appxmanifest")));
+
+        foreach (var window in new[] { "WhatsNewWindow.xaml", "SignInWindow.xaml" })
+        {
+            var xaml = File.ReadAllText(Path.Combine(appDir, "Views", window));
+            Assert.Contains("SettingsNames.TrademarkNotice", xaml);
+        }
     }
 }

@@ -113,6 +113,8 @@ public sealed class UsagePublishService
     /// schedule) runs on the pool, one tick at a time.</summary>
     public void Tick(DateTimeOffset nowLocal)
     {
+        if (ResetGuard.Done)
+            return;
         if (Interlocked.CompareExchange(ref _tickRunning, 1, 0) != 0)
             return;
         _ = Task.Run(async () =>

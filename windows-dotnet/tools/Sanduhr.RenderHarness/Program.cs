@@ -21,7 +21,7 @@ using Sanduhr.Core;
 //
 // Options:
 //   --out <dir>          where PNGs and log.txt go (default ./harness-out)
-//   --scenario <name>    widget | whatsnew | tour | settings | all; repeatable (default all)
+//   --scenario <name>    widget | whatsnew | tour | settings | glow | reset | all; repeatable (default all)
 //   --theme <key>        built-in theme key to apply (default obsidian)
 //   --light              write a LIGHT user theme into the dev profile's themes folder and apply
 //                        it, to check dialogs for legibility on a light surface
@@ -99,7 +99,7 @@ public static class Program
                     return 2;
             }
         }
-        string[] known = { "widget", "whatsnew", "tour", "settings" };
+        string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset" };
         if (scenarios.Count == 0 || scenarios.Contains("all"))
             scenarios = known.ToList();
         var bad = scenarios.Where(s => !known.Contains(s)).ToList();
@@ -266,6 +266,13 @@ public static class Program
         Log.Add($"windows app mode: {WindowsAppMode()}");
         Log.Add($"scenarios: {string.Join(",", scenarios)}");
 
+        // Claude Code folders come from an invented profile, never the real one, so no real path, project or
+        // account label reaches a picture. Set before the view model is built (its log reader discovers folders).
+        string fakeProfile = BuildFakeProfile();
+        Sanduhr.App.Services.ClaudeCodeProfile.ProfileOverride = fakeProfile;
+        Sanduhr.App.Services.ClaudeCodeProfile.ConfigDirOverride = "";
+        Log.Add("claude code profile: invented (temp folder)");
+
         // Reads the real Credential Manager accounts (constructor only). No Start().
         var vm = new WidgetViewModel();
         vm.ApplyThemeByKey(themeKey);
@@ -273,6 +280,9 @@ public static class Program
         // Before anything renders: sample accounts only ("Work", "Personal").
         vm.StartDemo();
         await Settle();
+        // One folder added by hand (its settings.json is deliberately unreadable), and a link from a sample account.
+        vm.SaveCcFoldersAdded([Path.Combine(fakeProfile, "elsewhere", "claude-home-extra")]);
+        vm.SetAccountFolder("Work", Path.Combine(fakeProfile, ".claude-work"));
 
         var asm = typeof(Sanduhr.App.App).Assembly;
         Sanduhr.App.MainWindow? main = null;
@@ -319,6 +329,11 @@ public static class Program
                 await Settle();
             }
 
+            if (scenarios.Contains("glow"))
+                await RenderGlow(light);
+            if (scenarios.Contains("reset"))
+                await RenderReset(asm);
+
             if (scenarios.Contains("settings"))
                 await RenderSettings(vm, asm);
         }
@@ -326,6 +341,134 @@ public static class Program
         {
             main?.Close();
             File.WriteAllLines(Path.Combine(Out, "log.txt"), Log);
+        }
+    }
+
+    /// <summary>
+    /// An invented user profile for the Claude Code pages: <c>.claude</c> (a foreign statusline, hooks, plugins,
+    /// an invented mod, MCP servers, CLAUDE.md, no retention setting) and <c>.claude-work</c> (Sanduhr's meters mod
+    /// installed, retention set), plus an added folder whose settings.json does not parse. Nothing here is a real
+    /// path, project or account.
+    /// </summary>
+    static string BuildFakeProfile()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "sanduhr-harness-profile-" + Guid.NewGuid().ToString("N")[..8]);
+        void Put(string rel, string text)
+        {
+            string path = Path.Combine(root, rel);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, text);
+        }
+
+        Directory.CreateDirectory(Path.Combine(root, ".claude", "projects", "demo-app"));
+        Directory.CreateDirectory(Path.Combine(root, ".claude-work", "projects", "demo-site"));
+        Put(Path.Combine(".claude", "settings.json"), """
+            {
+              "statusLine": { "type": "command", "command": "node statusline.js --api-key sk-ant-demo0000000000000000" },
+              "hooks": {
+                "PreToolUse": [ { "matcher": "Bash", "hooks": [ { "type": "command", "command": "echo checking" } ] } ],
+                "Stop": [ { "hooks": [ { "type": "command", "command": "echo done" } ] } ]
+              },
+              "enabledPlugins": { "docs-helper@acme-market": true, "lint-bot@acme-market": false },
+              "env": { "CLAUDE_CODE_PLUGIN_DIRS": "{PROFILE}\\mods\\band-clock" }
+            }
+            """.Replace("{PROFILE}", root.Replace("\\", "\\\\")));
+        Put(Path.Combine(".claude", "CLAUDE.md"), string.Join("\n", Enumerable.Range(1, 42).Select(i => "Line " + i)) + "\n");
+        Put(".claude.json", """
+            { "mcpServers": { "docs-search": { "command": "docs-search" }, "tickets": { "command": "tickets" } },
+              "projects": { "demo-app": { "mcpServers": { "local-db": { "command": "db" } } } } }
+            """);
+        Put(Path.Combine(".claude-work", "settings.json"), "{\n  \"cleanupPeriodDays\": 90,\n  \"model\": \"sonnet\"\n}\n");
+        Put(Path.Combine("mods", "band-clock", ".claude-plugin", "plugin.json"),
+            "{ \"name\": \"band-clock\", \"version\": \"1.2.0\", \"description\": \"Shows the time in a band above the prompt.\" }");
+        Put(Path.Combine("mods", "band-clock", "hooks", "hooks.json"), "{ \"modules\": [\"./src/index.ts\"] }");
+        Put(Path.Combine("mods", "band-clock", "src", "index.ts"), "slot: 'AbovePrompt'\nconst r = await $.fs.read(path)\n");
+        Put(Path.Combine("elsewhere", "claude-home-extra", "settings.json"), "{\n  \"model\": \"sonnet\",\n}\n");
+
+        try
+        {
+            // Sanduhr's meters mod in .claude-work, from the repo's copy of the mod.
+            string? source = null;
+            for (var d = new DirectoryInfo(AppContext.BaseDirectory); d is not null && source is null; d = d.Parent)
+            {
+                string c = Path.Combine(d.FullName, "mac", "integrations", "mods", "sanduhr-meters");
+                if (Directory.Exists(c)) source = c;
+            }
+            var integ = new ClaudeCodeIntegrations(root, new Paths().AppDataDir, source);
+            var res = integ.Install(IntegrationKind.Meters, Path.Combine(root, ".claude-work"));
+            Log.Add($"fake profile: meters mod install ok={res.Ok}");
+        }
+        catch (Exception e)
+        {
+            Log.Add($"fake profile: meters mod install failed ({e.GetType().Name})");
+        }
+        return root;
+    }
+
+    /// <summary>The consent dialog the Claude Code page opens, over an invented folder that has another statusline.</summary>
+    static async Task RenderConsent(Assembly asm)
+    {
+        var specType = asm.GetType("Sanduhr.App.Views.ConsentSpec")!;
+        var dlgType = asm.GetType("Sanduhr.App.Views.IntegrationConsentDialog")!;
+        var spec = Activator.CreateInstance(specType,
+            "Show usage under the Claude Code prompt?",
+            "Sanduhr adds a statusline with your live session and weekly meters, right where the tokens burn.",
+            "~\\.claude",
+            "What gets written: the render script, a statusLine entry in this folder's settings.json (a copy is saved first) and a usage snapshot. Remove brings back the statusline that was here before.",
+            "Install",
+            "node statusline.js --api-key " + ConfigMask.Masked,
+            true);
+        var dlg = (Window)Activator.CreateInstance(dlgType, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance,
+            null, [spec], null)!;
+        OffScreen(dlg);
+        dlg.Show();
+        dlg.Left = -20000;
+        dlg.Top = -20000;
+        await Settle();
+        Save((FrameworkElement)dlg.Content, "consent-statusline");
+        dlg.Close();
+        await Settle();
+    }
+
+    /// <summary>The Claude Code edge glow over a fake 1280x800 desktop: a maximized-style window and a
+    /// 900x600 windowed one, waiting and done, in the live theme. Never opens the real overlay window.</summary>
+    static async Task RenderGlow(bool light)
+    {
+        var screen = new PxRect(0, 0, 1280, 800);
+        var layouts = new (string Name, PxRect Frame)[]
+        {
+            ("maximized", new PxRect(0, 0, 1280, 800)),
+            ("windowed", new PxRect(190, 100, 900, 600)),
+        };
+        foreach (var (name, frame) in layouts)
+        foreach (var ev in new[] { ClaudeCodeEvent.Waiting, ClaudeCodeEvent.Done })
+        {
+            var canvas = new Canvas { Width = screen.Width, Height = screen.Height, Background = new SolidColorBrush(Color.FromRgb(0x58, 0x5c, 0x66)) };
+            Color body = light ? Color.FromRgb(0xf2, 0xf2, 0xf4) : Color.FromRgb(0x2b, 0x2b, 0x30);
+            Color bar = light ? Color.FromRgb(0xe0, 0xe0, 0xe4) : Color.FromRgb(0x1f, 0x1f, 0x23);
+            void Box(double x, double y, double w, double h, Color c)
+            {
+                var r = new System.Windows.Shapes.Rectangle { Width = w, Height = h, Fill = new SolidColorBrush(c) };
+                Canvas.SetLeft(r, x);
+                Canvas.SetTop(r, y);
+                canvas.Children.Add(r);
+            }
+            Box(frame.X, frame.Y, frame.Width, frame.Height, body);
+            Box(frame.X, frame.Y, frame.Width, 32, bar);
+
+            var target = new GlowTarget(frame, screen);
+            var placed = GlowPlacement.Compute(target, screen, 1.0);
+            var glow = new Sanduhr.App.Views.GlowOverlayContent { Width = placed.Width, Height = placed.Height };
+            glow.SetColor(Sanduhr.App.Views.GlowOverlayContent.ColorFor(ev));
+            Canvas.SetLeft(glow, placed.X);
+            Canvas.SetTop(glow, placed.Y);
+            canvas.Children.Add(glow);
+
+            canvas.Measure(new Size(screen.Width, screen.Height));
+            canvas.Arrange(new Rect(0, 0, screen.Width, screen.Height));
+            await Settle();
+            Save(canvas, $"glow-{name}-{ev.ToString().ToLowerInvariant()}");
+            Log.Add($"glow {name} {ev}: rect {placed}");
         }
     }
 
@@ -339,6 +482,34 @@ public static class Program
             .Concat(svm.History.Legend.Select(l => l.Label));
         if (shown.Any(label => !allowed.Contains(label)))
             throw new InvalidOperationException("A non-sample account label would render in Settings; stopping before any PNG.");
+    }
+
+    /// <summary>Reset Sanduhr: the choose state, then a results state with one failure. No ResetService is built,
+    /// so nothing can run; the window only shows what it is handed.</summary>
+    static async Task RenderReset(Assembly asm)
+    {
+        var rwType = asm.GetType("Sanduhr.App.Views.ResetWindow")!;
+        var rw = (Window)Activator.CreateInstance(rwType, new object?[] { null })!;
+        OffScreen(rw);
+        rw.Show();
+        rw.Left = -20000;
+        rw.Top = -20000;
+        await Settle();
+        Save((FrameworkElement)rw.Content, "reset-choose");
+
+        var results = new List<ResetStepResult>
+        {
+            ResetStepResult.Done(ResetPart.ClaudeCodeEntries),
+            ResetStepResult.Failed(ResetPart.Accounts, ["a sign-in profile folder"]),
+            ResetStepResult.Done(ResetPart.History),
+            ResetStepResult.Done(ResetPart.Themes),
+            ResetStepResult.Done(ResetPart.Settings),
+        };
+        rwType.GetMethod("ShowResults")!.Invoke(rw, [results]);
+        await Settle();
+        Save((FrameworkElement)rw.Content, "reset-results");
+        rw.Close();
+        await Settle();
     }
 
     static async Task RenderSettings(WidgetViewModel vm, Assembly asm)
@@ -367,6 +538,16 @@ public static class Program
             tabs.SelectedItem = item;
             await Settle();
             Save((FrameworkElement)sw.Content, $"settings-{index:00}-{Slug(header)}");
+            if (item.Tag is "ClaudeCode" or "Mods")
+            {
+                // These pages scroll: a second picture with the window tall enough to show all of it.
+                double h = sw.Height;
+                sw.Height = 1900;
+                await Settle();
+                Save((FrameworkElement)sw.Content, $"settings-{index:00}-{Slug(header)}-full");
+                sw.Height = h;
+                await Settle();
+            }
             index++;
         }
         File.WriteAllText(Path.Combine(Out, "settings-pages.txt"), pages.ToString());
@@ -387,5 +568,6 @@ public static class Program
         Save((FrameworkElement)sw.Content, "settings-anchor-claude-usage-sessions");
         sw.Close();
         await Settle();
+        await RenderConsent(asm);
     }
 }

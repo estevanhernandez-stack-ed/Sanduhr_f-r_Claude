@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Sanduhr.Core;
 
 namespace Sanduhr.Mcp;
 
@@ -10,7 +11,9 @@ namespace Sanduhr.Mcp;
 /// <c>SANDUHR_CC_ROOTS</c> (';'-separated directory list) replaces root
 /// discovery + consent. Without them the server reads the real
 /// <c>%APPDATA%\Sanduhr</c> paths and honors the <c>mcp_roots</c> consent map
-/// in settings.json — a root absent from the map (or the map absent entirely)
+/// in settings.json. Roots are the folders <c>ClaudeCodeHomes.Discover</c> finds
+/// (<c>~/.claude</c>, <c>~/.claude-*</c>, the <c>CLAUDE_CONFIG_DIR</c> folder when it
+/// sits in the profile); a root absent from the map (or the map absent entirely)
 /// is NOT consented; the burn surfaces return <c>no_data/disabled</c>.
 /// </summary>
 public sealed class McpConfig
@@ -23,7 +26,7 @@ public sealed class McpConfig
     public required string VaultDir { get; init; }
 
     /// <summary>Consented CC roots: name → full path. Order is stable
-    /// (.claude before .claude-personal). Empty = nothing consented.</summary>
+    /// (.claude first, then .claude-* in natural order). Empty = nothing consented.</summary>
     public required IReadOnlyList<(string Name, string Path)> ConsentedRoots { get; init; }
 
     /// <summary>All CC roots that exist on this machine (consented or not) —
@@ -62,35 +65,41 @@ public sealed class McpConfig
     public TimeSpan ThemeWaitTimeout { get; init; } = TimeSpan.FromSeconds(20);
     public TimeSpan ThemePollInterval { get; init; } = TimeSpan.FromMilliseconds(250);
 
-    private static readonly string[] KnownRootNames = { ".claude", ".claude-personal" };
-
     public static McpConfig Resolve()
     {
         string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        string sanduhrDir = Path.Combine(appData, "Sanduhr");
+        return Resolve(
+            home,
+            Path.Combine(appData, "Sanduhr"),
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            Environment.GetEnvironmentVariable);
+    }
 
-        string snapshotPath = Environment.GetEnvironmentVariable("SANDUHR_SNAPSHOT_PATH")
+    /// <summary>Testable core of <see cref="Resolve()"/>: every machine-specific input is a
+    /// parameter. <paramref name="env"/> reads <c>SANDUHR_SNAPSHOT_PATH</c>,
+    /// <c>SANDUHR_VAULT_DIR</c>, <c>SANDUHR_CC_ROOTS</c> and <c>CLAUDE_CONFIG_DIR</c>.
+    /// Public because the server assembly declares no InternalsVisibleTo.</summary>
+    public static McpConfig Resolve(string home, string sanduhrDir, string localAppData,
+        Func<string, string?> env)
+    {
+
+        string snapshotPath = env("SANDUHR_SNAPSHOT_PATH")
             is { Length: > 0 } envSnap
             ? envSnap
             : Path.Combine(sanduhrDir, "snapshot.json");
 
-        string vaultDir = Environment.GetEnvironmentVariable("SANDUHR_VAULT_DIR")
+        string vaultDir = env("SANDUHR_VAULT_DIR")
             is { Length: > 0 } envVault
             ? envVault
             : Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Sanduhr", "vault");
+                localAppData, "Sanduhr", "vault");
 
-        var found = new List<string>();
-        foreach (var name in KnownRootNames)
-        {
-            if (Directory.Exists(Path.Combine(home, name)))
-                found.Add(name);
-        }
+        // Discovery gives names only; a path is built solely from a discovered name.
+        var found = ClaudeCodeHomes.Discover(home, env("CLAUDE_CONFIG_DIR"));
 
         var consented = new List<(string, string)>();
-        if (Environment.GetEnvironmentVariable("SANDUHR_CC_ROOTS") is { Length: > 0 } envRoots)
+        if (env("SANDUHR_CC_ROOTS") is { Length: > 0 } envRoots)
         {
             // Dev-tier fixture redirection: each entry is a directory that plays
             // the role of a CC root; name = its basename.
@@ -102,14 +111,17 @@ public sealed class McpConfig
         }
         else
         {
-            // Production path: the closed root-name set gated by the consent map.
-            // No free-form paths, ever (design review: the file-oracle guard).
+            // Production path: discovered names under a fixed pattern (~/.claude and
+            // ~/.claude-*, the CLAUDE_CONFIG_DIR folder only when it is in the profile),
+            // consent required per name. Still never a free-form path: the consent map is
+            // only looked up BY a discovered name, so a key that is not one is ignored, and
+            // folders added by hand in the widget never reach this process (design review:
+            // the file-oracle guard; 2026-10-11 ruling).
             var consentMap = ReadMcpRootsConsent(Path.Combine(sanduhrDir, "settings.json"));
-            foreach (var name in KnownRootNames)
+            foreach (var name in found)
             {
-                string rootPath = Path.Combine(home, name);
-                if (consentMap.TryGetValue(name, out bool on) && on && Directory.Exists(rootPath))
-                    consented.Add((name, rootPath));
+                if (consentMap.TryGetValue(name, out bool on) && on)
+                    consented.Add((name, Path.Combine(home, name)));
             }
         }
 

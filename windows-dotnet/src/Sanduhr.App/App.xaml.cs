@@ -28,6 +28,7 @@ public partial class App : Application
     private SettingsWindow? _settingsWindow;
     private DispatcherTimer? _trayRotateTimer;
     private GlobalHotKeyService? _hotKeys;
+    private ClaudeCodeGlowService? _glow;
     private MenuItem? _endDemoItem;
 
     /// <summary>Where this install stands with the welcome tour, decided once at launch.</summary>
@@ -78,6 +79,7 @@ public partial class App : Application
         SetupTray();
         SyncTrayRotation();
         SetupHotKeys();
+        StartGlow();
 
         // Usage vault (WS-C): consent resolves BEFORE the service attaches —
         // attach order is the consent gate; Start()'s first fetch cycle then
@@ -383,6 +385,15 @@ public partial class App : Application
         _tray.ContextMenu = menu;
     }
 
+    /// <summary>Claude Code edge glow (Stage 4.5): watches the hook signal files; both switches start off.</summary>
+    private void StartGlow()
+    {
+        if (_window is null) return;
+        var paths = new Sanduhr.Core.Paths();
+        _glow = new ClaudeCodeGlowService(new SettingsStore(paths), paths, _window);
+        _glow.Start();
+    }
+
     /// <summary>The global shortcut: registers what <c>hotkey_settings</c> asks for (off until the user turns it on).</summary>
     private void SetupHotKeys()
     {
@@ -432,6 +443,14 @@ public partial class App : Application
 
         var svm = new SettingsViewModel(_vm, () => RunSignInAsync(embedded: true), RunUpdateSignInAsync, _hotKeys,
             ShowWhatsNewFromMenu, ShowTour);
+        // The Claude Code page re-reads the glow switches and plays "Try it" through the running glow service.
+        svm.ClaudeCodePage.GlowReload = () => _glow?.Reload();
+        svm.ClaudeCodePage.GlowPreview = e => _glow?.Preview(e);
+        svm.ResetRequested = () =>
+        {
+            ShowReset();
+            return Task.CompletedTask;
+        };
         try
         {
             _settingsWindow = new SettingsWindow(svm);
@@ -598,9 +617,39 @@ public partial class App : Application
         _window.Activate();
     }
 
+    /// <summary>
+    /// Settings, About, Reset Sanduhr…: opens the reset dialog over Settings. The dialog runs the checked
+    /// steps and quits. <c>stop</c> marks the reset (nothing writes settings, snapshot, history or the vault
+    /// again), stops follow, the seat meters, the timers, the fetch client and the glow watcher before any step
+    /// removes anything; <c>undo</c> takes Sanduhr's entries out of Claude Code folders and reports kinds of
+    /// failures only.
+    /// </summary>
+    private void ShowReset()
+    {
+        if (_vm is not { } vm)
+            return;
+        var paths = new Sanduhr.Core.Paths();
+        var service = new ResetService(
+            paths,
+            vm.AccountStore,
+            new PublishTokenStore(new WindowsCredentialManager(AccountStore.Service)),
+            () => Task.Run<IReadOnlyList<string>>(() => ClaudeCodeViewModel.UndoEverything(vm)),
+            () =>
+            {
+                ResetGuard.MarkDone();
+                vm.StopBackgroundWork();
+                _glow?.Stop();
+            },
+            vm.InactiveReader.DeleteAllProfilesAsync);
+        ResetWindow.ShowFor(_settingsWindow, service, QuitApp);
+    }
+
     private void QuitApp()
     {
+        // After a reset nothing may write settings.json, snapshot.json or history on the way out.
+        // (QuitApp is also the normal quit; the guard is a no-op until a reset has run.)
         WhatsNewWindow.Quitting = true;
+        _glow?.Dispose();
         _hotKeys?.Dispose();
         _tray?.Dispose();
         _trayIcon?.Dispose();
@@ -618,6 +667,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         WhatsNewWindow.Quitting = true;
+        _glow?.Dispose();
         _hotKeys?.Dispose();
         _tray?.Dispose();
         _trayIcon?.Dispose();

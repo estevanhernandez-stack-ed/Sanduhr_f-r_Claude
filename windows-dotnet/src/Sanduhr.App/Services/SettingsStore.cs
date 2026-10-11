@@ -48,6 +48,8 @@ public sealed class SettingsStore
 
     private void Write(JsonObject root)
     {
+        if (ResetGuard.Done)
+            return;   // Reset Sanduhr… has run: nothing writes settings.json again
         try
         {
             File.WriteAllText(_path, root.ToJsonString(new JsonSerializerOptions { WriteIndented = false }));
@@ -543,6 +545,91 @@ public sealed class SettingsStore
         foreach (var (name, on) in roots)
             map[name] = on;
         root["mcp_roots"] = map;
+        Write(root);
+    }
+
+    /// <summary>Claude Code folders the user added by hand (settings.json "cc_folders_added", a list of
+    /// full paths). They are installer targets on the Claude Code page and are never read by the MCP server.</summary>
+    public IReadOnlyList<string> LoadCcFoldersAdded() => LoadStringArray("cc_folders_added");
+
+    public void SaveCcFoldersAdded(IEnumerable<string> folders)
+    {
+        var root = Read();
+        var list = folders.Where(f => !string.IsNullOrWhiteSpace(f)).ToList();
+        if (list.Count == 0) root.Remove("cc_folders_added"); else root["cc_folders_added"] = ToArray(list);
+        Write(root);
+    }
+
+    /// <summary>"Follow the account I'm using" (settings.json "follow_account"), off by default.</summary>
+    public bool LoadFollowAccount()
+    {
+        var root = Read();
+        try { return root["follow_account"]?.GetValue<bool>() ?? false; } catch { return false; }
+    }
+
+    public void SaveFollowAccount(bool on)
+    {
+        var root = Read();
+        root["follow_account"] = on;
+        Write(root);
+    }
+
+    /// <summary>The Claude Code edge glow switches (settings.json "claude_code_glow"
+    /// {"waiting", "done", "skip_terminal"}). Off, off, and skip-terminal on until set.</summary>
+    public GlowSwitches LoadClaudeCodeGlow()
+    {
+        var o = Read()["claude_code_glow"] as JsonObject;
+        return new GlowSwitches(
+            Waiting: ReadBool(o, "waiting", false),
+            Done: ReadBool(o, "done", false),
+            SkipTerminal: ReadBool(o, "skip_terminal", true));
+    }
+
+    public void SaveClaudeCodeGlow(GlowSwitches switches)
+    {
+        var root = Read();
+        root["claude_code_glow"] = new JsonObject
+        {
+            ["waiting"] = switches.Waiting,
+            ["done"] = switches.Done,
+            ["skip_terminal"] = switches.SkipTerminal,
+        };
+        Write(root);
+    }
+
+    private static bool ReadBool(JsonObject? o, string key, bool fallback)
+    {
+        try { return o?[key]?.GetValue<bool>() ?? fallback; } catch { return fallback; }
+    }
+
+    /// <summary>Linked Claude Code folders by account label (settings.json "account_folders"
+    /// {label: folder path}). Blank paths are dropped.</summary>
+    public Dictionary<string, string> LoadAccountFolders()
+    {
+        var root = Read();
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (root["account_folders"] is JsonObject map)
+        {
+            foreach (var (label, node) in map)
+            {
+                try
+                {
+                    var path = node?.GetValue<string>();
+                    if (!string.IsNullOrWhiteSpace(path)) result[label] = path;
+                }
+                catch { /* a non-string entry reads as unlinked */ }
+            }
+        }
+        return result;
+    }
+
+    public void SaveAccountFolders(IReadOnlyDictionary<string, string> folders)
+    {
+        var root = Read();
+        var map = new JsonObject();
+        foreach (var (label, path) in folders)
+            if (!string.IsNullOrWhiteSpace(path)) map[label] = path;
+        if (map.Count == 0) root.Remove("account_folders"); else root["account_folders"] = map;
         Write(root);
     }
 

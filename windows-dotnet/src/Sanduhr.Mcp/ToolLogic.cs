@@ -657,6 +657,36 @@ public sealed class ToolLogic
 
     // -- publish_usage --------------------------------------------------------
 
+    /// <summary>Write a handoff request through a temp sibling and an atomic replace. The
+    /// widget watches or polls these files and must never read a half-written one, nor
+    /// have one truncated under an open handle. Over an existing file it uses
+    /// <c>File.Replace</c>: on Windows <c>File.Move(overwrite)</c> is denied while any
+    /// handle is open on the target, even one that shares delete, and the widget may be
+    /// mid-read. When the target vanishes first (the widget clears it), a plain move
+    /// lands the file.</summary>
+    private static void WriteRequestAtomically(string path, JsonObject request)
+    {
+        // A name per write: two sessions' servers may queue at the same moment.
+        string tmp = $"{path}.{Guid.NewGuid():N}.tmp";
+        File.WriteAllText(tmp, request.ToJsonString());
+        try
+        {
+            if (File.Exists(path))
+                File.Replace(tmp, path, null);
+            else
+                File.Move(tmp, path);
+        }
+        catch (FileNotFoundException) when (File.Exists(tmp))
+        {
+            File.Move(tmp, path, overwrite: true);
+        }
+        finally
+        {
+            // A failed write leaves no temp file behind.
+            try { if (File.Exists(tmp)) File.Delete(tmp); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
+    }
+
     /// <summary>Queue a publish request for the widget and wait (bounded) for its
     /// typed result. This server never touches the token or the network — the
     /// trust boundary (must-fix #11) holds structurally; the widget's tick loop
@@ -701,7 +731,7 @@ public sealed class ToolLogic
         };
         try
         {
-            File.WriteAllText(_config.PublishRequestPath, request.ToJsonString());
+            WriteRequestAtomically(_config.PublishRequestPath, request);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
@@ -770,10 +800,7 @@ public sealed class ToolLogic
         };
         try
         {
-            // Atomic: the widget watches this file and must never read a half-written one.
-            string tmp = _config.ThemeRequestPath + ".tmp";
-            File.WriteAllText(tmp, request.ToJsonString());
-            File.Move(tmp, _config.ThemeRequestPath, overwrite: true);
+            WriteRequestAtomically(_config.ThemeRequestPath, request);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
