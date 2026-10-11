@@ -140,6 +140,74 @@ public static class SeatFiles
             .WriteSignedOut(null, label, now ?? DateTimeOffset.UtcNow);
     }
 
+    /// <summary>A failed fetch of <paramref name="label"/>'s account: an error file keeping the last good tiers.</summary>
+    public static void WriteAccountError(string dir, string label, string errorKind, string? plan, DateTimeOffset now,
+        string? writerVersion = null, Action<string>? logBestEffort = null)
+    {
+        if (SnapshotContract.AccountRef(label) is not { } r) return;
+        Directory.CreateDirectory(dir);
+        new SnapshotWriter(SnapshotPath(dir, r), logBestEffort, writerVersion).WriteError(errorKind, plan, label, now);
+    }
+
+    /// <summary>When <paramref name="label"/>'s file says its reading was taken; null when missing or unreadable.</summary>
+    public static DateTimeOffset? CapturedAt(string dir, string label)
+    {
+        if (SnapshotContract.AccountRef(label) is not { } r) return null;
+        try
+        {
+            var obj = JsonNode.Parse(File.ReadAllText(SnapshotPath(dir, r))) as JsonObject;
+            return obj?["captured_at"] is JsonValue v && v.TryGetValue<string>(out var text)
+                && DateTimeOffset.TryParse(text, System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var at) ? at : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The file <see cref="WriteSignedOut"/> writes: an error with kind session_expired.</summary>
+    public static bool IsSignedOut(string dir, string label)
+    {
+        if (SnapshotContract.AccountRef(label) is not { } r) return false;
+        try
+        {
+            var obj = JsonNode.Parse(File.ReadAllText(SnapshotPath(dir, r))) as JsonObject;
+            return (string?)obj?["status"] == "error" && (string?)obj?["error_kind"] == SnapshotContract.ErrorSessionExpired;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Brings the folder in line with the links (port of the Mac's SeatSnapshots.sync): seats.json
+    /// rewritten (deleted with no seats), every per-account file whose account is no longer a seat
+    /// deleted, a signed-out seat's file written signed out, and a signed-out file left by an
+    /// account signed in again deleted until its next reading.
+    /// </summary>
+    public static void Sync(string dir, IReadOnlyDictionary<string, string> linked, IReadOnlySet<string> signedIn,
+        DateTimeOffset now, string? writerVersion = null, Action<string>? logBestEffort = null)
+    {
+        var seats = Seats(linked);
+        var keep = new HashSet<string>(seats.Select(s => s.AccountRef));
+        Prune(dir, keep);
+        foreach (var label in linked.Keys)
+        {
+            if (SnapshotContract.AccountRef(label) is null) continue;
+            if (!signedIn.Contains(label))
+            {
+                if (!IsSignedOut(dir, label)) WriteSignedOut(dir, label, now, writerVersion, logBestEffort);
+            }
+            else if (IsSignedOut(dir, label))
+            {
+                Delete(dir, label);
+            }
+        }
+        WriteSeats(dir, seats);
+    }
+
     /// <summary>Deletes <paramref name="label"/>'s per-account file.</summary>
     public static void Delete(string dir, string label)
     {

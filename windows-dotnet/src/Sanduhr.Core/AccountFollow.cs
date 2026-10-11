@@ -6,8 +6,8 @@ public readonly record struct SessionReading(DateTimeOffset At, double Utilizati
 /// <summary>
 /// Following the account in use (port of the Mac's AccountFollow.swift): with the setting on,
 /// switch to the account whose session meter is climbing. The decision is pure: readings, the
-/// last automatic switch, the manual pause and the clock go in, a decision comes out. Not wired
-/// on Windows yet (spec 4.6): following needs a usage check of each inactive account.
+/// last automatic switch, the manual pause and the clock go in, a decision comes out. The App's
+/// AccountFollower schedules the usage checks (spec 4.6).
 /// </summary>
 public static class AccountFollow
 {

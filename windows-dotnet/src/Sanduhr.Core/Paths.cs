@@ -98,6 +98,10 @@ public sealed class Paths
     /// remains (no future client init would ever wipe it otherwise).</summary>
     public string WebView2FetchDir => Path.Combine(AppDataDir, "webview2-fetch");
 
+    /// <summary>An inactive account's own transport profile (account follow and seat meters):
+    /// <c>webview2-&lt;account_ref&gt;</c> beside the shared one, deleted with the account.</summary>
+    public string WebView2ProfileDir(string accountRef) => Path.Combine(AppDataDir, "webview2-" + accountRef);
+
     public string LogFile => Path.Combine(AppDataDir, "sanduhr.log");
 
     public string LastErrorFile => Path.Combine(AppDataDir, "last_error.json");
