@@ -7,8 +7,16 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2160: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.16.0", id: "per-seat-meters",
+            title: "Each Claude Code folder, its own meters",
+            body: "Link an account to each Claude Code folder in Accounts, and sessions there show that account's meters, whichever one Sanduhr shows.",
+            art: .symbol("person.2"), destination: .credentials),
+    ]
 
     static let release2150: [WhatsNewCard] = [
         WhatsNewCard(
