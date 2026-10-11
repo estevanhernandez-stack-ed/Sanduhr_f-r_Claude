@@ -148,6 +148,9 @@ enum DebugHooks {
         case .hotKey(let s, let combo, let anyway):
             // Refused because macOS uses the keys, the refusal shows in state.yaml (`hot_keys.<s>_refusal`).
             if let combo { ShortcutRecorderModel.shared.save(combo, for: s, insist: anyway) } else { ShortcutRecorderModel.shared.reset(s) }
+        case .modsConfig(let tab, let seat):
+            SettingsWindowController.shared.show(.mods)
+            SettingsWindowController.shared.modsPage.showTab(tab, seat: seat)
         case .resetDryRun:
             // Reads the plan only: no step runs (Reset.perform is the sheet's alone).
             resetDryRun = Reset.dryRun(in: .standard)
@@ -379,6 +382,8 @@ enum DebugHooks {
         let mods = settings.modsPage
         s.modsPage = ModsPageDebug(open: settings.isOpen && settings.section == .mods, loaded: mods.loaded,
                                    counts: mods.counts, checked: mods.checks.count, cli: mods.claude != nil)
+        s.modsConfig = ModsConfigDebug(tab: mods.tab.debugName, seats: mods.seats.count,
+                                       counts: ConfigCatalog.counts(mods.catalog), shown: mods.shownCards(demo: vm.demo).count)
         s.messageEditor = settings.messageEditor.debugState(open: settings.isOpen && settings.section == .message)
         s.messageEditor.todaySpecial = desk.model.specialMessages.count
         // A `defaults write` from the smoke runner posts no change notice here: apply the saved

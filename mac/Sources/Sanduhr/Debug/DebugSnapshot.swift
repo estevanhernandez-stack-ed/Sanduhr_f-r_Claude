@@ -141,6 +141,7 @@ struct DebugStateInput {
     var avIndicators = AVIndicatorsDebug()
     /// The Mods page (item 64): open, read, and counts only, never a name or a path.
     var modsPage = ModsPageDebug()
+    var modsConfig = ModsConfigDebug()
     /// Settings, Message's editor (item 69): counts and flags, never a line of the user's.
     var messageEditor = MessageEditorDebug()
     /// The two shortcuts (slice 2): each switch, whether registered now, and its keys.
@@ -258,6 +259,16 @@ struct ModsPageDebug: Equatable {
     var counts = ModCounts()
     var checked = 0
     var cli = false
+}
+
+/// state.yaml's `mods_config:` (item 71, slice 1): the tab Mods & Config shows, how many seats
+/// it read and the Catalog's counts (cards, available, needing a look, duplicates, work-only,
+/// shown after the filters and demo mode). Never a name, a label, a path or a value.
+struct ModsConfigDebug: Equatable {
+    var tab = ModsTab.catalog.debugName
+    var seats = 0
+    var counts = ConfigCatalog.Counts()
+    var shown = 0
 }
 
 /// state.yaml's `notch_shows:`: each place's effective content, never its text.
@@ -417,6 +428,14 @@ enum DebugState {
               YAMLPair("cli", .bool(m.cli))])
     }
 
+    /// `mods_config:` (item 71, slice 1): the tab and counts only.
+    static func modsConfigYAML(_ m: ModsConfigDebug) -> YAMLNode {
+        .map([YAMLPair("tab", .string(m.tab)), YAMLPair("seats", .int(m.seats)),
+              YAMLPair("cards", .int(m.counts.cards)), YAMLPair("available", .int(m.counts.available)),
+              YAMLPair("needs_look", .int(m.counts.needsLook)), YAMLPair("duplicates", .int(m.counts.duplicates)),
+              YAMLPair("work_only", .int(m.counts.workOnly)), YAMLPair("shown", .int(m.shown))])
+    }
+
     /// `reset_dry_run:` (slice 5): what Reset would remove, step kinds and counts in run order;
     /// `touched` is always false, since the dry run runs no step.
     static func resetDryRunYAML(_ r: Reset.Report) -> YAMLNode {
@@ -527,6 +546,7 @@ enum DebugState {
         pairs.append(("settings_preview", s.settingsPreview.map { .string($0.rawValue) } ?? .null))
         pairs.append(("settings_preview_folded", s.settingsPreviewFolded.map(YAMLNode.bool) ?? .null))
         pairs.append(("mods_page", modsPageYAML(s.modsPage)))
+        pairs.append(("mods_config", modsConfigYAML(s.modsConfig)))
         pairs.append(("message_editor", messageEditorYAML(s.messageEditor)))
         pairs.append(("hot_keys", hotKeysYAML(s.hotKeys)))
         pairs.append(("meter_history", meterHistoryYAML(s.meterHistory)))

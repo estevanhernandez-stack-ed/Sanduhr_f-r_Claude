@@ -158,6 +158,14 @@ enum Seats {
     /// The seat at `path`, with its label, mark and placement facts.
     static func seat(_ path: String, origin: Seat.Origin, home: String, store: DefaultsStore,
                      fileManager fm: FileManager = .default) -> Seat {
+        seat(path, origin: origin, home: home, store: store,
+             config: ClaudeCodeFolders.configCandidates(for: path, home: home, fileManager: fm))
+    }
+
+    /// The seat at `path` with its placement facts already read (off the main thread), so only
+    /// the preferences are read here.
+    static func seat(_ path: String, origin: Seat.Origin, home: String, store: DefaultsStore,
+                     config: [ClaudeCodeFolders.ConfigCandidate]) -> Seat {
         let p = AccountData.normalized(path)
         let h = AccountData.normalized(home)
         let chosen = SeatPreferences.label(for: p, in: store)
@@ -165,8 +173,7 @@ enum Seats {
         return Seat(path: p, origin: origin,
                     isDefault: p == (h as NSString).appendingPathComponent(ClaudeCodeFolders.defaultName),
                     label: chosen ?? (p as NSString).lastPathComponent, labelChosen: chosen != nil,
-                    mark: mark, markSource: source,
-                    config: ClaudeCodeFolders.configCandidates(for: p, home: h, fileManager: fm))
+                    mark: mark, markSource: source, config: config)
     }
 
     /// A linked account marked work makes the seat work. A link never makes a seat personal (an
