@@ -53,6 +53,26 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private DateTimeOffset? _lastFetchAt;
     private bool _refreshing;
 
+    /// <summary>Demo mode's sample payload while it is on (never written anywhere).</summary>
+    private JsonObject? _demoData;
+    private string _demoAccount = DemoMode.Active;
+
+    /// <summary>Demo mode: sample numbers for screenshots. Session-only; while on, nothing is
+    /// fetched, and no snapshot, history, alert or limit state is written from the samples.</summary>
+    [ObservableProperty] private bool _isDemo;
+
+    /// <summary>The widget's demo banner.</summary>
+    public string DemoBanner => DemoMode.Banner;
+
+    /// <summary>The demo account showing (null when demo mode is off), for the tour's chip preview.</summary>
+    public string? DemoAccount => IsDemo ? _demoAccount : null;
+
+    /// <summary>What the cards show: the samples in demo mode, else the last fetch.</summary>
+    private JsonObject? ShownData => IsDemo ? _demoData : _lastData;
+
+    /// <summary>A successful real fetch rendered (the tour waits for the first one).</summary>
+    public event Action? FetchSucceeded;
+
     /// <summary>Bumped on every <see cref="RebuildFetcher"/> call (account switch,
     /// sign-in reload, sign-out). Guards the post-switch retry in
     /// <see cref="RetryOnceIfTransientAsync"/> — if another rebuild lands during the
@@ -420,7 +440,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// the integration is off; never throws into the fetch path.</summary>
     private void WriteSnapshotOk(JsonObject data)
     {
-        if (!_statuslineEnabled)
+        // Demo mode never reaches snapshot.json (the statusline and the MCP read it).
+        if (!_statuslineEnabled || IsDemo)
             return;
         try
         {
@@ -438,7 +459,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// statusline can say "reauth needed" instead of going silently stale.</summary>
     private void WriteSnapshotError(string errorKind)
     {
-        if (!_statuslineEnabled)
+        if (!_statuslineEnabled || IsDemo)
             return;
         try
         {
@@ -769,6 +790,65 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _fetcher = new UsageFetcher(_client, _history);
     }
 
+    // -- demo mode -------------------------------------------------------------
+
+    /// <summary>Demo mode on: pause fetches and show the Work sample account. The real
+    /// account, credentials and files are untouched; a fetch already in flight is dropped.</summary>
+    public void StartDemo()
+    {
+        if (IsDemo)
+            return;
+        IsDemo = true;
+        _refreshTimer.Stop();
+        _alertEngine.Reset();
+        Reason = SignInReason.None;
+        StatusText = "";
+        _demoAccount = DemoMode.Active;
+        ShowDemoAccount();
+    }
+
+    /// <summary>Demo mode off: the real state back, fetched afresh.</summary>
+    [RelayCommand]
+    public async Task EndDemoAsync()
+    {
+        if (!IsDemo)
+            return;
+        LeaveDemo();
+        RebuildFetcher();
+        RefreshAccountLabel();
+        var outcome = await RefreshCoreAsync().ConfigureAwait(true);
+        await RetryOnceIfTransientAsync(outcome).ConfigureAwait(true);
+    }
+
+    /// <summary>Drop the samples and restart the fetch timer; the caller refetches.</summary>
+    private void LeaveDemo()
+    {
+        IsDemo = false;
+        _demoData = null;
+        _lastData = null;
+        Tiers.Clear();
+        ClearTray();   // the sample percent never lingers on the tray unlabelled
+        FooterText = "";
+        OnPropertyChanged(nameof(DemoAccount));
+        _refreshTimer.Start();
+    }
+
+    /// <summary>Render the current sample account: cards, tray, chip and footer.</summary>
+    private void ShowDemoAccount()
+    {
+        var now = DateTimeOffset.UtcNow;
+        _demoData = DemoMode.Usage(_demoAccount, now);
+        Tiers.Clear();
+        RenderCards(_demoData, now);
+        HasPlanBadge = false;
+        PlanBadgeName = "";
+        PlanTooltip = "";
+        _riffTimer.Stop();
+        RefreshAccountLabel();
+        UpdateFooter();
+        OnPropertyChanged(nameof(DemoAccount));
+    }
+
     /// <summary>Rebuild the fetcher against the now-active account, refresh the
     /// account label, and kick an immediate fetch — called after a successful
     /// embedded or manual sign-in so the widget starts tracking at once.</summary>
@@ -778,6 +858,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // new account before this runs, so a stale _lastData from the PRIOR account would
         // make RetryOnceIfTransientAsync's "_lastData is not null" guard skip the retry —
         // the exact cold-transport/CF race this method exists to cover.
+        if (IsDemo)
+            LeaveDemo();   // a real sign-in ends demo mode
         _lastData = null;
         _snapshotWriter?.Delete();   // same no-bleed rule as SwitchAccount
         RebuildFetcher();
@@ -855,8 +937,10 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task SwitchAccount(string? label)
     {
-        if (string.IsNullOrEmpty(label) || label == _accounts.GetActive())
+        if (string.IsNullOrEmpty(label) || (label == _accounts.GetActive() && !IsDemo))
             return;
+        if (IsDemo)
+            LeaveDemo();   // picking a real account ends demo mode
 
         _accounts.SetActive(label);
         // Snapshot is deleted synchronously BEFORE the switch completes — no
@@ -886,6 +970,13 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task CycleAccount()
     {
+        if (IsDemo)
+        {
+            // Demo mode: the chip moves among the sample accounts only.
+            _demoAccount = DemoMode.Next(_demoAccount);
+            ShowDemoAccount();
+            return;
+        }
         var labels = _accounts.ListAccounts().ToList();
         if (labels.Count < 2)
             return;
@@ -921,6 +1012,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// </summary>
     public async Task SignOutAccountAsync(string label)
     {
+        if (IsDemo)
+            await EndDemoAsync();
         bool wasActive = _accounts.GetActive() == label;
         if (wasActive)
         {
@@ -1004,7 +1097,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // Local CC surfaces work without an account.
         _vault?.TriggerIngest();
 
-        if (_fetcher is null || _refreshing)
+        // Demo mode pauses fetches; a real answer must never replace the samples.
+        if (_fetcher is null || _refreshing || IsDemo)
             return RefreshOutcome.Other;
         _refreshing = true;
         try
@@ -1012,6 +1106,10 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             if (Tiers.Count == 0)
                 StatusText = "Refreshing…";
             var data = await _fetcher.FetchAsync().ConfigureAwait(true);
+            // Demo mode came on while this fetch was out: drop the answer (the Mac's
+            // DemoSession.answerApplies). Turning demo off fetches afresh.
+            if (IsDemo)
+                return RefreshOutcome.Other;
             _lastData = data;
             _lastFetchAt = DateTimeOffset.Now;
             ReconcileLimits(data, DateTimeOffset.UtcNow);
@@ -1028,7 +1126,14 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             Reason = SignInReason.None;
             UpdateFooter();
             WriteSnapshotOk(data);
+            FetchSucceeded?.Invoke();
             return RefreshOutcome.Ok;
+        }
+        catch (Exception) when (IsDemo)
+        {
+            // A failure that lands under demo mode must not wipe the samples or
+            // write an error snapshot; turning demo off fetches afresh.
+            return RefreshOutcome.Other;
         }
         catch (SessionExpiredException)
         {
@@ -1111,8 +1216,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private void ToggleCompact()
     {
         IsCompact = !IsCompact;
-        if (_lastData is not null)
-            RenderCards(_lastData, DateTimeOffset.UtcNow);
+        if (ShownData is { } shown)
+            RenderCards(shown, DateTimeOffset.UtcNow);
         CompactChanged?.Invoke(IsCompact);
     }
 
@@ -1205,12 +1310,14 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         // files, so the widget is what tells the person and offers to quit.
         _storeUpdate?.Tick(DateTimeOffset.Now);
 
-        if (_lastData is null)
+        if (ShownData is null)
             return;
         var now = DateTimeOffset.UtcNow;
         foreach (var vm in Tiers)
             vm.Tick(now);
-        _ = RefreshCcDerivedAsync();
+        // Demo cards carry no real Claude Code burn.
+        if (!IsDemo)
+            _ = RefreshCcDerivedAsync();
     }
 
     /// <summary>ONE shared TokensSince walk feeding BOTH the per-tier badges
@@ -1309,7 +1416,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             string? resetsAt = tier?["resets_at"]?.GetValue<string>();
             int? used = GetInt(tier, "used");
             int? limit = GetInt(tier, "limit");
-            var historyValues = _history.Load(key);
+            var historyValues = IsDemo ? DemoMode.History(_demoAccount, key, now) : _history.Load(key);
 
             vm.Update(util, resetsAt, used, limit, historyValues, _palette, SparklineStyle, now);
             if (util > highest) { highest = util; highestKey = key; }
@@ -1415,6 +1522,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     private void RefreshAccountLabel()
     {
+        if (IsDemo)
+        {
+            AccountSwitcherText = $"⇆ {DemoMode.ChipText(_demoAccount)}";
+            AccountSwitcherClickable = true;
+            return;
+        }
         var active = _accounts.GetActive();
         if (active is null)
         {
@@ -1429,6 +1542,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     private void UpdateFooter()
     {
+        if (IsDemo) { FooterText = "Demo  ·  sample numbers"; return; }
         if (_lastFetchAt is null) { FooterText = ""; return; }
         string ts = _lastFetchAt.Value.ToString("h:mm tt", CultureInfo.InvariantCulture);
         string mode = IsCompact ? "Compact" : (Pinned ? "Pinned" : "Float");
@@ -1492,7 +1606,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// <summary>True when the tier is believed temporary, so "Hide until it resets" applies.</summary>
     public bool CanHideUntilReset(string tierKey)
     {
-        if (_lastData is null || _limitState.HiddenUntilReset.ContainsKey(tierKey))
+        // Never in demo mode: the sample resets would be saved as limit state.
+        if (IsDemo || _lastData is null || _limitState.HiddenUntilReset.ContainsKey(tierKey))
             return false;
         DateTimeOffset? seen = _limitState.FirstSeen.TryGetValue(tierKey, out var s) ? s : null;
         return LimitLifetime.IsTemporary(tierKey, ResetsAtOf(_lastData, tierKey), DateTimeOffset.UtcNow, seen);
@@ -1501,7 +1616,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// <summary>Hide a temporary limit until its window renews or refills.</summary>
     public void HideUntilReset(string tierKey)
     {
-        if (_lastData is null)
+        if (IsDemo || _lastData is null)
             return;
         var next = LimitLifetime.Hide(
             _limitState, tierKey, ResetsAtOf(_lastData, tierKey), Util(_lastData, tierKey), DateTimeOffset.UtcNow);
@@ -1524,8 +1639,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             _limitState = LimitLifetime.Show(_limitState, tierKey);
             _settings.SaveLimitState(_limitState);
         }
-        if (_lastData is not null)
-            RenderCards(_lastData, DateTimeOffset.UtcNow);
+        if (ShownData is { } shown)
+            RenderCards(shown, DateTimeOffset.UtcNow);
     }
 
     /// <summary>Hidden limits (manual and until-reset), in canonical tier order.</summary>

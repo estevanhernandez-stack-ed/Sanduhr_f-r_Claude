@@ -16,11 +16,33 @@ public sealed class WhatsNewCardItem
     public WhatsNewCard Card { get; }
     public ImageSource? TrayImage { get; }
 
-    public WhatsNewCardItem(WhatsNewCard card, ImageSource? trayImage)
+    /// <summary>The Meters preview's rows (the user's own meters, or demo mode's samples).</summary>
+    public IReadOnlyList<MeterPreviewRow> Meters { get; }
+
+    /// <summary>The account chip preview's text.</summary>
+    public string ChipText { get; }
+
+    /// <summary>A tour card's in-place setting (the tray readout), empty otherwise.</summary>
+    public IReadOnlyList<TrayChoiceItem> Choices { get; }
+
+    /// <summary>The button's title: "Show me", or "Sign In" on the signed-out tour's first card.</summary>
+    public string ShowMeTitle { get; }
+
+    public WhatsNewCardItem(WhatsNewCard card, ImageSource? trayImage,
+        IReadOnlyList<MeterPreviewRow>? meters = null, string chipText = "",
+        IReadOnlyList<TrayChoiceItem>? choices = null, string showMeTitle = "Show me", bool isSample = false)
     {
         Card = card;
         TrayImage = trayImage;
+        Meters = meters ?? [];
+        ChipText = chipText;
+        Choices = choices ?? [];
+        ShowMeTitle = showMeTitle;
+        IsSample = isSample;
     }
+
+    /// <summary>The preview draws demo mode's made-up numbers, and says so.</summary>
+    public bool IsSample { get; }
 
     public string Title => Card.Title;
     public string Body => Card.Body;
@@ -30,12 +52,17 @@ public sealed class WhatsNewCardItem
     public bool IsTray => Card.Preview == WhatsNewPreview.Tray;
     public bool IsSparkline => Card.Preview == WhatsNewPreview.Sparkline;
     public bool IsShortcut => Card.Preview == WhatsNewPreview.Shortcut;
+    public bool IsMeters => Card.Preview == WhatsNewPreview.Meters && Meters.Count > 0;
+    /// <summary>The Meters preview with nothing to show yet: a line instead of empty bars.</summary>
+    public bool IsMetersEmpty => Card.Preview == WhatsNewPreview.Meters && Meters.Count == 0;
+    public bool IsAccountChip => Card.Preview == WhatsNewPreview.AccountChip;
+    public bool HasChoices => Choices.Count > 0;
 
     /// <summary>A steady series: the horizon sparkline draws it as a level line.</summary>
     public IReadOnlyList<int> SparkValues => SteadyValues;
 
     public string AutomationName => $"{Card.Title}. {Card.Body}";
-    public string ShowMeName => $"Show me: {Card.Title}";
+    public string ShowMeName => $"{ShowMeTitle}: {Card.Title}";
 
     public string ShowMeToolTip => Card.Destination == SettingsPage.Widget
         ? "Shows the widget"
@@ -59,6 +86,13 @@ public sealed class WhatsNewViewModel : ObservableObject
     public IReadOnlyList<WhatsNewCardItem> Items { get; }
     public bool IsEmpty => Items.Count == 0;
 
+    // The window's mode: What's New (cards, Don't show after updates, Done).
+    public string WindowTitle => "What's New in Sanduhr";
+    public string HeaderName => Header;
+    public bool IsTour => false;
+    public bool IsWhatsNew => true;
+    public int Columns => 2;
+
     public WhatsNewViewModel(IReadOnlyList<WhatsNewCard> cards, string header, SettingsStore store)
     {
         _store = store;
@@ -79,7 +113,7 @@ public sealed class WhatsNewViewModel : ObservableObject
     }
 
     /// <summary>The tray glyph at 12% as a WPF image, for the Tray preview.</summary>
-    private static ImageSource? RenderTray()
+    internal static ImageSource? RenderTray()
     {
         try
         {
