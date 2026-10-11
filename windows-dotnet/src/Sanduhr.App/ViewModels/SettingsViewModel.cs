@@ -49,7 +49,7 @@ public sealed class SettingsViewModel
             widget, widget.LoadLocalCcShowBreakdowns(), widget.SaveLocalCcShowBreakdowns),
             new CcTrendsViewModel(widget),
             new CcLedgerViewModel(widget, widget.LoadLedgerGroupByProject(), widget.SaveLedgerGroupByProject));
-        General = new GeneralViewModel();
+        General = new GeneralViewModel(widget: widget);
         Alerts = new AlertsViewModel(widget, () =>
         {
             widget.AlertService?.DeliverTest();

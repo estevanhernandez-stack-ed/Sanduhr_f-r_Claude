@@ -1676,6 +1676,24 @@
                             <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                        Text="Off by default. When on, Sanduhr launches hidden in the tray at sign-in." />
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                            <!-- Tray (W3) — which number the tray icon shows. -->
+                            <TextBlock Text="Tray" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Tray shows" VerticalAlignment="Center" FontSize="12"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,8,0" />
+                                <ComboBox Style="{StaticResource ThemedComboBox}" Width="230"
+                                          ItemsSource="{Binding General.TrayModeOptions}"
+                                          DisplayMemberPath="Title"
+                                          SelectedItem="{Binding General.SelectedTrayMode, Mode=TwoWay}"
+                                          AutomationProperties.Name="Tray shows" />
+                            </StackPanel>
+                            <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                       Text="The number on the tray icon. Rotate switches between session and weekly every 8 seconds." />
                         </StackPanel>
                     </Border>
                 </TabItem>

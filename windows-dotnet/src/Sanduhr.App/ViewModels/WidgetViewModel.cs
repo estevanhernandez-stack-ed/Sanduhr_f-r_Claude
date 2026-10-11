@@ -150,8 +150,51 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(PromptSecondaryLabel));
     }
 
-    /// <summary>Highest active-tier % for the tray glyph; -1 when no data.</summary>
-    public event Action<int>? TrayPercentChanged;
+    /// <summary>The tray reading (percent + tooltip label) under the chosen
+    /// <see cref="TrayMode"/>; null when there is no data ("--").</summary>
+    public event Action<TrayReading?>? TrayReadingChanged;
+
+    private TrayMode _trayMode;
+    private int _trayStep;
+    private double? _traySession;
+    private double? _trayWeekly;
+    private (string Label, double Util)? _trayHighest;
+
+    /// <summary>Which number the tray icon shows. Setting it persists, recomputes
+    /// the reading from the last inputs (no fetch) and raises
+    /// <see cref="TrayReadingChanged"/>.</summary>
+    public TrayMode TrayMode
+    {
+        get => _trayMode;
+        set
+        {
+            if (_trayMode == value) return;
+            _trayMode = value;
+            _settings.SaveTrayMode(value);
+            OnPropertyChanged();
+            RaiseTray();
+        }
+    }
+
+    /// <summary>Advance the Rotate step (session, weekly, session...) and re-raise.</summary>
+    public void AdvanceTrayRotation()
+    {
+        _trayStep++;
+        RaiseTray();
+    }
+
+    private void RaiseTray() =>
+        TrayReadingChanged?.Invoke(
+            TrayReadout.Reading(_trayMode, _traySession, _trayWeekly, _trayHighest, _trayStep));
+
+    /// <summary>No data: forget the inputs and tell the tray to show "--".</summary>
+    private void ClearTray()
+    {
+        _traySession = null;
+        _trayWeekly = null;
+        _trayHighest = null;
+        TrayReadingChanged?.Invoke(null);
+    }
 
     /// <summary>Raised when compact mode toggles — the window hides its toolbar and
     /// auto-sizes its height to the single remaining card.</summary>
@@ -486,6 +529,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _isThemesExpanded = _settings.LoadThemesExpanded();
         _savedOrder = _settings.LoadTierOrder().ToList();
         _hidden = new HashSet<string>(_settings.LoadHiddenTiers());
+        _trayMode = _settings.LoadTrayMode();
 
         _refreshTimer = new DispatcherTimer { Interval = RefreshInterval };
         _refreshTimer.Tick += async (_, _) => await RefreshAsync();
@@ -674,7 +718,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             Reason = SignInReason.FirstRun;
             StatusText = "";
             ClearSignedInChrome();
-            TrayPercentChanged?.Invoke(-1);
+            ClearTray();
             return;
         }
         Reason = SignInReason.None;
@@ -783,7 +827,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _alertEngine.Reset();
         _lastData = null;
         StatusText = "Switching account…";
-        TrayPercentChanged?.Invoke(-1);
+        ClearTray();
 
         RebuildFetcher();
         RefreshAccountLabel();
@@ -1068,7 +1112,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private void Fail(string message)
     {
         StatusText = message;
-        TrayPercentChanged?.Invoke(-1);
+        ClearTray();
     }
 
     /// <summary>Drop the widget into a clean recovery state: show the reason card and
@@ -1082,7 +1126,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         NotifyPromptCopy();
         StatusText = "";
         ClearSignedInChrome();
-        TrayPercentChanged?.Invoke(-1);
+        ClearTray();
     }
 
     /// <summary>Wipe the signed-in chrome — tier cards, plan badge, account label,
@@ -1199,6 +1243,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
         var existing = Tiers.ToDictionary(t => t.TierKey);
         int highest = -1;
+        string? highestKey = null;
 
         for (int i = 0; i < active.Count; i++)
         {
@@ -1224,10 +1269,14 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             var historyValues = _history.Load(key);
 
             vm.Update(util, resetsAt, used, limit, historyValues, _palette, SparklineStyle, now);
-            if (util > highest) highest = util;
+            if (util > highest) { highest = util; highestKey = key; }
         }
 
-        TrayPercentChanged?.Invoke(highest);
+        // Session and weekly read from the data whether or not their cards are hidden.
+        _traySession = Util(data, TierModel.FiveHour);
+        _trayWeekly = Util(data, TierModel.SevenDay);
+        _trayHighest = highestKey is null ? null : (TierModel.Label(highestKey), highest);
+        RaiseTray();
     }
 
     /// <summary>Map the fetch payload to alert snapshots — every known tier
@@ -1378,10 +1427,11 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     private void RecomputeHighestForTray()
     {
-        int highest = -1;
+        TierCardViewModel? top = null;
         foreach (var vm in Tiers)
-            if ((int)vm.Utilization > highest) highest = (int)vm.Utilization;
-        TrayPercentChanged?.Invoke(highest);
+            if (top is null || (int)vm.Utilization > (int)top.Utilization) top = vm;
+        _trayHighest = top is null ? null : (TierModel.Label(top.TierKey), (int)top.Utilization);
+        RaiseTray();
     }
 
     // -- json helpers ---------------------------------------------------------

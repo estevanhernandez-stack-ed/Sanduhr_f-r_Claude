@@ -240,6 +240,22 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>Which number the tray icon shows (settings.json "tray_mode"),
+    /// defaulting to the highest visible tier.</summary>
+    public TrayMode LoadTrayMode()
+    {
+        var root = Read();
+        try { return TrayReadout.Parse(root["tray_mode"]?.GetValue<string>()); }
+        catch { return TrayMode.Highest; }
+    }
+
+    public void SaveTrayMode(TrayMode mode)
+    {
+        var root = Read();
+        root["tray_mode"] = TrayReadout.Raw(mode);
+        Write(root);
+    }
+
     public IReadOnlyList<string> LoadTierOrder() => LoadStringArray("tier_order");
 
     public void SaveTierOrder(IEnumerable<string> order)

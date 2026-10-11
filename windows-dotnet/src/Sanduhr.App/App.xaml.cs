@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using Hardcodet.Wpf.TaskbarNotification;
 using Sanduhr.App.Services;
 using Sanduhr.App.Theming;
@@ -25,6 +26,7 @@ public partial class App : Application
     private MainWindow? _window;
     private Icon? _trayIcon;
     private SettingsWindow? _settingsWindow;
+    private DispatcherTimer? _trayRotateTimer;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -42,7 +44,12 @@ public partial class App : Application
         // A live theme switch (strip or Settings) raises ThemeChanged — the window
         // swaps its backdrop (Mica for glass themes, solid for a Matrix opt-out).
         _vm.ThemeChanged += p => _window?.ApplyBackdropForTheme(p);
-        _vm.TrayPercentChanged += OnTrayPercentChanged;
+        _vm.TrayReadingChanged += OnTrayReadingChanged;
+        _vm.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(WidgetViewModel.TrayMode))
+                SyncTrayRotation();
+        };
         _vm.SignInRequested += () => RunSignInAsync(embedded: true);
         _vm.ReauthRequested += RunReauthAsync;
         _vm.ManualReauthRequested += RunManualReauthAsync;
@@ -58,6 +65,7 @@ public partial class App : Application
         _vm.AttachAlertService(new AlertService(new Sanduhr.Core.Paths(), ShowWindow));
 
         SetupTray();
+        SyncTrayRotation();
 
         // Usage vault (WS-C): consent resolves BEFORE the service attaches —
         // attach order is the consent gate; Start()'s first fetch cycle then
@@ -180,6 +188,7 @@ public partial class App : Application
         menu.Items.Add(show);
         menu.Items.Add(settings);
         menu.Items.Add(refresh);
+        menu.Items.Add(BuildTrayShowsMenu());
         menu.Items.Add(new Separator());
         menu.Items.Add(accounts);
         menu.Items.Add(addAccount);
@@ -288,17 +297,65 @@ public partial class App : Application
             await _vm.ReloadAfterSignInAsync();
     }
 
-    private void OnTrayPercentChanged(int percent)
+    private void OnTrayReadingChanged(TrayReading? reading)
     {
         if (_tray is null)
             return;
-        var icon = TrayIconRenderer.Render(percent);
+        var icon = TrayIconRenderer.Render(reading?.Percent ?? -1);
         _tray.Icon = icon;
         _trayIcon?.Dispose();
         _trayIcon = icon;
-        _tray.ToolTipText = percent < 0
+        _tray.ToolTipText = reading is null
             ? "Sanduhr für Claude — no data yet"
-            : $"Sanduhr für Claude — ⏳ {percent}%";
+            : $"Sanduhr für Claude — {reading.Label} {reading.Percent}%";
+    }
+
+    /// <summary>"Tray Shows" submenu: one checkable item per mode, checks refreshed on open.</summary>
+    private MenuItem BuildTrayShowsMenu()
+    {
+        var parent = new MenuItem { Header = "Tray Shows" };
+        var items = new List<(TrayMode Mode, MenuItem Item)>();
+        foreach (var mode in TrayReadout.All)
+        {
+            var item = new MenuItem { Header = TrayReadout.Title(mode), IsCheckable = true };
+            var captured = mode;
+            item.Click += (_, _) =>
+            {
+                if (_vm is not null)
+                    _vm.TrayMode = captured;
+            };
+            items.Add((mode, item));
+            parent.Items.Add(item);
+        }
+        parent.SubmenuOpened += (_, _) =>
+        {
+            foreach (var (mode, item) in items)
+                item.IsChecked = _vm?.TrayMode == mode;
+        };
+        return parent;
+    }
+
+    /// <summary>The 8-second rotate timer runs only while the mode is Rotate.</summary>
+    private void SyncTrayRotation()
+    {
+        if (_vm is null)
+            return;
+        if (_vm.TrayMode == TrayMode.Rotate)
+        {
+            _trayRotateTimer ??= CreateRotateTimer();
+            _trayRotateTimer.Start();
+        }
+        else
+        {
+            _trayRotateTimer?.Stop();
+        }
+    }
+
+    private DispatcherTimer CreateRotateTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TrayReadout.RotateInterval };
+        timer.Tick += (_, _) => _vm?.AdvanceTrayRotation();
+        return timer;
     }
 
     private void ToggleWindow()

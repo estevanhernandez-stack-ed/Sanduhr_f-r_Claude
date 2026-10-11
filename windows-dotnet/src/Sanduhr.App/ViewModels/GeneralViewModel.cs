@@ -15,7 +15,27 @@ namespace Sanduhr.App.ViewModels;
 /// </summary>
 public sealed partial class GeneralViewModel : ObservableObject
 {
+    /// <summary>One entry in the "Tray shows" combo.</summary>
+    public sealed record TrayModeOption(TrayMode Mode, string Title);
+
     private readonly StartupManager _startup;
+    private readonly WidgetViewModel? _widget;
+
+    /// <summary>The five tray modes, titled as the tray menu titles them.</summary>
+    public IReadOnlyList<TrayModeOption> TrayModeOptions { get; } =
+        TrayReadout.All.Select(m => new TrayModeOption(m, TrayReadout.Title(m))).ToList();
+
+    /// <summary>The "Tray shows" combo selection. Reads and writes the widget's
+    /// <see cref="WidgetViewModel.TrayMode"/>, so the tray menu and this combo stay in sync.</summary>
+    public TrayModeOption? SelectedTrayMode
+    {
+        get => TrayModeOptions.FirstOrDefault(o => o.Mode == _widget?.TrayMode);
+        set
+        {
+            if (value is not null && _widget is not null)
+                _widget.TrayMode = value.Mode;
+        }
+    }
 
     /// <summary>True when this is an MSIX/Store install (toggle replaced by a
     /// deep-link button).</summary>
@@ -28,8 +48,17 @@ public sealed partial class GeneralViewModel : ObservableObject
     /// it writes/removes the Run entry via <see cref="OnAutoStartEnabledChanged"/>.</summary>
     [ObservableProperty] private bool _autoStartEnabled;
 
-    public GeneralViewModel(StartupManager? startup = null)
+    public GeneralViewModel(StartupManager? startup = null, WidgetViewModel? widget = null)
     {
+        _widget = widget;
+        if (_widget is not null)
+        {
+            _widget.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(WidgetViewModel.TrayMode))
+                    OnPropertyChanged(nameof(SelectedTrayMode));
+            };
+        }
         _startup = startup ?? StartupManager.CreateDefault();
         IsPackaged = _startup.IsPackaged();
         // Seed via the backing field so the initial read doesn't trigger a write.
