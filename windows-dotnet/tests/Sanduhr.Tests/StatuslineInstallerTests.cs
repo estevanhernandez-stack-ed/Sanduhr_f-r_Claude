@@ -191,3 +191,237 @@ public class StatuslineInstallerTests
         Assert.Contains("-NoProfile", installer.BuildCommand());
     }
 }
+
+/// <summary>Stage 4 (4.4): the installer on the splice engine, with receipts and exact undo.</summary>
+public class StatuslineInstallerSpliceTests
+{
+    private sealed class Rig : IDisposable
+    {
+        public TempDir Home { get; } = new();
+        public TempDir Bin { get; } = new();
+        public TempDir Data { get; } = new();
+        public StatuslineInstaller Installer { get; }
+        public List<string> Log { get; } = [];
+        public string Settings => Path.Combine(Home.Path, ".claude", "settings.json");
+        public string Receipts => Path.Combine(Data.Path, "integrations", "installs.json");
+
+        public Rig()
+        {
+            Directory.CreateDirectory(Path.Combine(Home.Path, ".claude"));
+            Installer = new StatuslineInstaller(Home.Path, Bin.Path, Log.Add, Data.Path);
+            Installer.InstallScript();
+        }
+
+        public void Write(string text) => File.WriteAllBytes(Settings, new System.Text.UTF8Encoding(false).GetBytes(text));
+        public byte[] Bytes() => File.ReadAllBytes(Settings);
+        public string Text() => System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(Settings));
+
+        public void Dispose() { Home.Dispose(); Bin.Dispose(); Data.Dispose(); }
+    }
+
+    private static string Settings(string eol, string statusLine)
+        => "{" + eol + "  \"model\": \"opus\"," + eol + "  \"statusLine\": " + statusLine + "," + eol
+           + "  \"env\": {" + eol + "    \"A\": \"1\"" + eol + "  }" + eol + "}" + eol;
+
+    private const string TheirsLf = "{\n    \"type\": \"command\",\n    \"command\": \"~/bin/mine.sh \\u00e9\",\n    \"padding\": 2\n  }";
+
+    [Theory]
+    [InlineData("\n", StatuslineMode.Replace)]
+    [InlineData("\r\n", StatuslineMode.Replace)]
+    [InlineData("\n", StatuslineMode.Combine)]
+    [InlineData("\r\n", StatuslineMode.Combine)]
+    public void Remove_restores_their_statusline_byte_for_byte(string eol, StatuslineMode mode)
+    {
+        using var rig = new Rig();
+        var theirs = TheirsLf.Replace("\n", eol);
+        var original = Settings(eol, theirs);
+        rig.Write(original);
+
+        Assert.True(rig.Installer.Install(".claude", mode, StatuslineInstaller.DefaultSegments, "line"), string.Join("; ", rig.Log));
+        Assert.NotEqual(original, rig.Text());
+        Assert.Equal(StatuslineStatus.Installed, rig.Installer.Status(".claude"));
+        Assert.Contains("\"model\": \"opus\"", rig.Text()); // everything else untouched
+
+        Assert.True(rig.Installer.Remove(".claude"));
+        Assert.Equal(original, rig.Text());
+        Assert.Equal(StatuslineStatus.Other, rig.Installer.Status(".claude"));
+        Assert.Equal("~/bin/mine.sh \u00e9", rig.Installer.TheirCommand(".claude"));
+    }
+
+    [Fact]
+    public void Combine_chains_their_command_as_base64_and_keeps_it_through_a_reinstall()
+    {
+        using var rig = new Rig();
+        rig.Write(Settings("\n", TheirsLf));
+        Assert.Equal("~/bin/mine.sh \u00e9", rig.Installer.TheirCommand(".claude"));
+
+        Assert.True(rig.Installer.Install(".claude", StatuslineMode.Combine, ["weekly", "session"], "same"));
+        var parsed = StatuslineInstaller.TryParseCommand(CommandIn(rig));
+        Assert.NotNull(parsed);
+        Assert.Equal("~/bin/mine.sh \u00e9", parsed!.Chain);
+        Assert.Equal("same", parsed.Join);
+        Assert.Equal(new[] { "session", "weekly" }, parsed.Segments);
+        Assert.Null(rig.Installer.TheirCommand(".claude")); // ours now
+
+        // An update of our own entry keeps what the first install recorded: a replace in between
+        // does not lose theirs, and combining again chains it back.
+        Assert.True(rig.Installer.Install(".claude", StatuslineMode.Replace, StatuslineInstaller.DefaultSegments, "line"));
+        Assert.Null(StatuslineInstaller.TryParseCommand(CommandIn(rig))!.Chain);
+        Assert.True(rig.Installer.Install(".claude", StatuslineMode.Combine, StatuslineInstaller.DefaultSegments, "line"));
+        Assert.Equal("~/bin/mine.sh \u00e9", StatuslineInstaller.TryParseCommand(CommandIn(rig))!.Chain);
+
+        Assert.True(rig.Installer.Remove(".claude"));
+        Assert.Equal(Settings("\n", TheirsLf), rig.Text());
+    }
+
+    [Fact]
+    public void Install_without_their_entry_then_Remove_returns_the_file()
+    {
+        using var rig = new Rig();
+        var original = "{\r\n  \"model\": \"opus\"\r\n}\r\n";
+        rig.Write(original);
+        Assert.True(rig.Installer.Install(".claude", StatuslineMode.Combine, StatuslineInstaller.DefaultSegments, "line"));
+        Assert.Contains("statusLine", rig.Text());
+        Assert.DoesNotContain("-Chain", rig.Text()); // nothing to combine with
+        Assert.True(rig.Installer.Remove(".claude"));
+        Assert.Equal(original, rig.Text());
+    }
+
+    [Fact]
+    public void A_file_Sanduhr_created_is_deleted_again()
+    {
+        using var rig = new Rig();
+        Assert.False(File.Exists(rig.Settings));
+        Assert.True(rig.Installer.Install(".claude", StatuslineMode.Replace, StatuslineInstaller.DefaultSegments, "line"));
+        Assert.True(File.Exists(rig.Settings));
+        Assert.True(rig.Installer.Remove(".claude"));
+        Assert.False(File.Exists(rig.Settings));
+        Assert.Equal(StatuslineStatus.NotInstalled, rig.Installer.Status(".claude"));
+    }
+
+    [Fact]
+    public void Remove_leaves_an_entry_the_user_changed_alone_and_drops_the_receipt()
+    {
+        using var rig = new Rig();
+        rig.Write(Settings("\n", TheirsLf));
+        Assert.True(rig.Installer.Install(".claude", StatuslineMode.Replace, StatuslineInstaller.DefaultSegments, "line"));
+        var changed = Settings("\n", "{\"type\":\"command\",\"command\":\"something-new.exe\"}");
+        rig.Write(changed);
+
+        Assert.True(rig.Installer.Remove(".claude"));
+        Assert.Equal(changed, rig.Text());
+        Assert.False(File.Exists(rig.Receipts)); // the stale receipt is gone
+    }
+
+    [Fact]
+    public void Install_writes_the_backup_and_receipt_in_the_sanduhr_folder_not_beside_the_file()
+    {
+        using var rig = new Rig();
+        rig.Write(Settings("\n", TheirsLf));
+        Assert.True(rig.Installer.Install(".claude", StatuslineMode.Combine, StatuslineInstaller.DefaultSegments, "line"));
+        Assert.Single(Directory.GetFiles(Path.Combine(rig.Data.Path, "backups")));
+        Assert.Equal(new[] { "settings.json" }, Directory.GetFiles(Path.GetDirectoryName(rig.Settings)!).Select(Path.GetFileName));
+        var receipts = File.ReadAllText(rig.Receipts).Replace(" ", "");
+        Assert.Contains("\"kind\":\"statusline\"", receipts);
+        Assert.Contains("\"mode\":\"combine\"", receipts);
+    }
+
+    [Fact]
+    public void A_malformed_settings_file_is_never_written()
+    {
+        using var rig = new Rig();
+        rig.Write("{ definitely not json");
+        Assert.Equal(StatuslineStatus.Unreadable, rig.Installer.Status(".claude"));
+        Assert.False(rig.Installer.Install(".claude", StatuslineMode.Replace, StatuslineInstaller.DefaultSegments, "line"));
+        Assert.Equal("{ definitely not json", rig.Text());
+        Assert.False(Directory.Exists(Path.Combine(rig.Data.Path, "backups")));
+    }
+
+    [Fact]
+    public void Status_tells_installed_from_outdated_from_other()
+    {
+        using var rig = new Rig();
+        Assert.Equal(StatuslineStatus.NotInstalled, rig.Installer.Status(".claude"));
+        rig.Write(Settings("\n", TheirsLf));
+        Assert.Equal(StatuslineStatus.Other, rig.Installer.Status(".claude"));
+        Assert.True(rig.Installer.Install(".claude", StatuslineMode.Replace, StatuslineInstaller.DefaultSegments, "line"));
+        Assert.Equal(StatuslineStatus.Installed, rig.Installer.Status(".claude"));
+        File.WriteAllText(rig.Installer.ScriptPath, "# an older script");
+        Assert.Equal(StatuslineStatus.Outdated, rig.Installer.Status(".claude"));
+        Assert.True(rig.Installer.IsRegistered(".claude"));
+    }
+
+    [Fact]
+    public void Register_and_Deregister_are_wrappers_over_Install_and_Remove()
+    {
+        using var rig = new Rig();
+        rig.Write(Settings("\r\n", TheirsLf.Replace("\n", "\r\n")));
+        var original = rig.Text();
+        Assert.True(rig.Installer.Register(".claude"));
+        Assert.True(rig.Installer.IsRegistered(".claude"));
+        Assert.Equal(rig.Installer.BuildCommand(), CommandIn(rig));
+        Assert.True(rig.Installer.Deregister(".claude"));
+        Assert.Equal(original, rig.Text());
+    }
+
+    // -- IsOurs parsing -------------------------------------------------------
+
+    [Fact]
+    public void Commands_round_trip_through_the_parser()
+    {
+        using var home = new TempDir();
+        using var bin = new TempDir();
+        var installer = new StatuslineInstaller(home.Path, bin.Path);
+        var cases = new (string? Chain, string Join, string[] Segments)[]
+        {
+            (null, "line", ["session", "weekly", "resets"]),
+            (null, "line", ["weekly"]),
+            ("bash ~/s.sh | head -1", "same", ["session", "resets"]),
+            ("echo \"h\u00e9llo\" ; date", "line", ["session", "weekly", "resets"]),
+        };
+        foreach (var (chain, join, segments) in cases)
+        {
+            var parsed = StatuslineInstaller.TryParseCommand(installer.BuildCommand(chain, join, segments));
+            Assert.NotNull(parsed);
+            Assert.Equal(chain, parsed!.Chain);
+            Assert.Equal(chain is null ? "line" : join, parsed.Join);
+            Assert.Equal(segments, parsed.Segments);
+            Assert.Equal(installer.ScriptPath, parsed.ScriptPath);
+        }
+        // Unknown names drop out, and what is left being the default writes no -Mine.
+        Assert.DoesNotContain("-Mine", installer.BuildCommand(null, "line", ["weekly", "resets", "session", "bogus"]));
+        Assert.Contains("-Mine weekly", installer.BuildCommand(null, "line", ["weekly"]));
+    }
+
+    [Theory]
+    [InlineData("powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\x\\sanduhr-statusline.ps1\" ; evil")]
+    [InlineData("powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\x\\sanduhr-statusline.ps1\" | tee out")]
+    [InlineData("powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\x\\sanduhr-statusline.ps1\" -Extra 1")]
+    [InlineData("powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\x\\sanduhr-statusline.ps1\" -Chain not-base64 -Join line")]
+    [InlineData("powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\x\\sanduhr-statusline.ps1\" -Mine weekly,session")]
+    [InlineData("powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\x\\sanduhr-statusline.ps1.bak\"")]
+    [InlineData("echo \"C:\\x\\sanduhr-statusline.ps1\"")]
+    [InlineData("my-wrapper.cmd C:\\x\\sanduhr-statusline.ps1")]
+    [InlineData("powershell -File \"C:\\x\\sanduhr-statusline.ps1\"")]
+    [InlineData("")]
+    public void A_lookalike_command_is_not_ours(string command)
+        => Assert.Null(StatuslineInstaller.TryParseCommand(command));
+
+    [Fact]
+    public void A_lookalike_in_settings_is_other_and_never_removed()
+    {
+        using var rig = new Rig();
+        var theirs = "{\"type\":\"command\",\"command\":\"powershell -NoProfile -ExecutionPolicy Bypass -File \\\"C:\\\\x\\\\sanduhr-statusline.ps1\\\" ; mine\"}";
+        var original = Settings("\n", theirs);
+        rig.Write(original);
+        Assert.Equal(StatuslineStatus.Other, rig.Installer.Status(".claude"));
+        Assert.True(rig.Installer.Remove(".claude"));
+        Assert.Equal(original, rig.Text());
+    }
+
+    private static string CommandIn(Rig rig)
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(rig.Bytes());
+        return doc.RootElement.GetProperty("statusLine").GetProperty("command").GetString()!;
+    }
+}
