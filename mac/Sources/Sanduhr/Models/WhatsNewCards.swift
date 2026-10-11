@@ -7,8 +7,26 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2170: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.17.0", id: "reset-sanduhr",
+            title: "Reset Sanduhr",
+            body: "About can now remove everything Sanduhr wrote, one checkbox per part. Claude Code folders go back to how they were before Sanduhr.",
+            art: .symbol("arrow.counterclockwise"), destination: .about),
+        WhatsNewCard(
+            version: "2.17.0", id: "signed-out-clarity",
+            title: "Clear when you're signed out",
+            body: "Accounts walks you through a first sign-in, Usage says when it shows saved history, and empty notch wings fold away.",
+            art: .symbol("person.crop.circle.badge.exclamationmark"), destination: .credentials),
+        WhatsNewCard(
+            version: "2.17.0", id: "mods-folders",
+            title: "Your Claude Code folders",
+            body: "Add Folder… on Mods & Config keeps a folder Sanduhr didn't find. Sanduhr now reads the settings file Claude Code actually uses.",
+            art: .symbol("folder.badge.plus"), destination: .mods),
+    ]
 
     static let release2160: [WhatsNewCard] = [
         WhatsNewCard(
