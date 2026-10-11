@@ -256,6 +256,34 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>First-seen dates and hidden-until-reset records for limits that come and go
+    /// ("limit_first_seen", "limits_hidden_until_reset"), via Core's JSON helpers.</summary>
+    public LimitState LoadLimitState()
+    {
+        var root = Read();
+        return new LimitState(
+            LimitLifetime.FirstSeenFromJson(root["limit_first_seen"]),
+            LimitLifetime.HiddenFromJson(root["limits_hidden_until_reset"]));
+    }
+
+    public void SaveLimitState(LimitState state)
+    {
+        var root = Read();
+        root["limit_first_seen"] = LimitLifetime.FirstSeenToJson(state.FirstSeen);
+        root["limits_hidden_until_reset"] = LimitLifetime.HiddenToJson(state.HiddenUntilReset);
+        Write(root);
+    }
+
+    /// <summary>Tiers whose warnings the user turned off ("alert_muted_tiers").</summary>
+    public IReadOnlyList<string> LoadAlertMutedTiers() => LoadStringArray("alert_muted_tiers");
+
+    public void SaveAlertMutedTiers(IEnumerable<string> tiers)
+    {
+        var root = Read();
+        root["alert_muted_tiers"] = ToArray(tiers);
+        Write(root);
+    }
+
     public IReadOnlyList<string> LoadTierOrder() => LoadStringArray("tier_order");
 
     public void SaveTierOrder(IEnumerable<string> order)

@@ -61,6 +61,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     private readonly List<string> _savedOrder;
     private readonly HashSet<string> _hidden;
+    private LimitState _limitState;
+    private readonly HashSet<string> _mutedTiers;
     private IReadOnlyList<string> _riffs = Array.Empty<string>();
     private int _riffIndex;
 
@@ -530,6 +532,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _savedOrder = _settings.LoadTierOrder().ToList();
         _hidden = new HashSet<string>(_settings.LoadHiddenTiers());
         _trayMode = _settings.LoadTrayMode();
+        _limitState = _settings.LoadLimitState();
+        _mutedTiers = new HashSet<string>(_settings.LoadAlertMutedTiers());
 
         _refreshTimer = new DispatcherTimer { Interval = RefreshInterval };
         _refreshTimer.Tick += async (_, _) => await RefreshAsync();
@@ -974,6 +978,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             var data = await _fetcher.FetchAsync().ConfigureAwait(true);
             _lastData = data;
             _lastFetchAt = DateTimeOffset.Now;
+            ReconcileLimits(data, DateTimeOffset.UtcNow);
             RenderCards(data, DateTimeOffset.UtcNow);
             EvaluateAlerts(data, DateTimeOffset.UtcNow);
             // Fresh fetch re-anchors the Local CC delta window: badges/footer
@@ -1220,7 +1225,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         foreach (var key in TierModel.EffectiveOrder)
             utilByKey[key] = Util(data, key);
 
-        var active = TierModel.ActiveTiers(utilByKey, _savedOrder, _hidden);
+        var hiddenKeys = new HashSet<string>(_hidden);
+        hiddenKeys.UnionWith(_limitState.HiddenUntilReset.Keys);
+        var active = TierModel.ActiveTiers(utilByKey, _savedOrder, hiddenKeys);
         if (IsCompact && active.Count > 0)
         {
             // Compact view: collapse to the single busiest tier (first-max, matching
@@ -1280,8 +1287,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Map the fetch payload to alert snapshots — every known tier
-    /// (canonical + dynamic scoped) with data participates, hidden or not (a
-    /// cap is real whether or not its card is shown).</summary>
+    /// (canonical + dynamic scoped) with data participates, manually hidden or not (a
+    /// cap is real whether or not its card is shown). Two opt-outs: a tier hidden
+    /// until its reset, and a tier whose warnings the user muted, stay silent.</summary>
     private List<TierAlertSnapshot> BuildAlertSnapshots(JsonObject data)
     {
         var snaps = new List<TierAlertSnapshot>();
@@ -1289,6 +1297,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         {
             var tier = data[key] as JsonObject;
             if (tier is null)
+                continue;
+            if (_limitState.HiddenUntilReset.ContainsKey(key) || _mutedTiers.Contains(key))
                 continue;
             double? util = Util(data, key);
             snaps.Add(new TierAlertSnapshot(
@@ -1415,6 +1425,86 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         var vm = Tiers.FirstOrDefault(t => t.TierKey == tierKey);
         if (vm is not null) Tiers.Remove(vm);
         RecomputeHighestForTray();
+    }
+
+    // -- limits that come and go (W2) ----------------------------------------
+
+    /// <summary>Record first sightings and bring back any hidden-until-reset limit
+    /// whose window renewed or refilled. Runs on each successful fetch, before cards render.</summary>
+    private void ReconcileLimits(JsonObject data, DateTimeOffset now)
+    {
+        var present = new Dictionary<string, (string? ResetsAt, double? Util)>();
+        foreach (var key in TierModel.EffectiveOrder)
+        {
+            if (data[key] is not JsonObject)
+                continue;
+            present[key] = (ResetsAtOf(data, key), Util(data, key));
+        }
+        var result = LimitLifetime.Reconcile(_limitState, present, now);
+        bool changed = result.State.FirstSeen.Count != _limitState.FirstSeen.Count || result.Returned.Count > 0;
+        _limitState = result.State;
+        if (changed)
+            _settings.SaveLimitState(_limitState);
+    }
+
+    private static string? ResetsAtOf(JsonObject data, string key)
+    {
+        try { return (data[key] as JsonObject)?["resets_at"]?.GetValue<string>(); }
+        catch { return null; }
+    }
+
+    /// <summary>True when the tier is believed temporary, so "Hide until it resets" applies.</summary>
+    public bool CanHideUntilReset(string tierKey)
+    {
+        if (_lastData is null || _limitState.HiddenUntilReset.ContainsKey(tierKey))
+            return false;
+        DateTimeOffset? seen = _limitState.FirstSeen.TryGetValue(tierKey, out var s) ? s : null;
+        return LimitLifetime.IsTemporary(tierKey, ResetsAtOf(_lastData, tierKey), DateTimeOffset.UtcNow, seen);
+    }
+
+    /// <summary>Hide a temporary limit until its window renews or refills.</summary>
+    public void HideUntilReset(string tierKey)
+    {
+        if (_lastData is null)
+            return;
+        var next = LimitLifetime.Hide(
+            _limitState, tierKey, ResetsAtOf(_lastData, tierKey), Util(_lastData, tierKey), DateTimeOffset.UtcNow);
+        if (ReferenceEquals(next, _limitState))
+            return;
+        _limitState = next;
+        _settings.SaveLimitState(_limitState);
+        var vm = Tiers.FirstOrDefault(t => t.TierKey == tierKey);
+        if (vm is not null) Tiers.Remove(vm);
+        RecomputeHighestForTray();
+    }
+
+    /// <summary>Show a hidden limit again, whichever way it was hidden.</summary>
+    public void ShowTier(string tierKey)
+    {
+        if (_hidden.Remove(tierKey))
+            _settings.SaveHiddenTiers(_hidden);
+        if (_limitState.HiddenUntilReset.ContainsKey(tierKey))
+        {
+            _limitState = LimitLifetime.Show(_limitState, tierKey);
+            _settings.SaveLimitState(_limitState);
+        }
+        if (_lastData is not null)
+            RenderCards(_lastData, DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>Hidden limits (manual and until-reset), in canonical tier order.</summary>
+    public IReadOnlyList<string> HiddenTierKeys =>
+        TierModel.EffectiveOrder
+            .Where(k => _hidden.Contains(k) || _limitState.HiddenUntilReset.ContainsKey(k))
+            .ToList();
+
+    public bool WarningsOn(string tierKey) => !_mutedTiers.Contains(tierKey);
+
+    public void SetWarnings(string tierKey, bool on)
+    {
+        bool changed = on ? _mutedTiers.Remove(tierKey) : _mutedTiers.Add(tierKey);
+        if (changed)
+            _settings.SaveAlertMutedTiers(_mutedTiers);
     }
 
     private void PersistOrder()
