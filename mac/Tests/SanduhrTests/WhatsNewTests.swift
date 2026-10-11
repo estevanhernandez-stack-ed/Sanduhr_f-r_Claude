@@ -156,9 +156,10 @@ struct WhatsNewTableTests {
     }
 
     @Test func releasesSinceTwoFour() {
-        let releases: Set<String> = ["2.4.0", "2.5.0", "2.6.0", "2.7.0", "2.8.0", "2.9.0", "2.10.0", "2.11.0", "2.12.0", "2.13.0", "2.14.0"]
+        let releases: Set<String> = ["2.4.0", "2.5.0", "2.6.0", "2.7.0", "2.8.0", "2.9.0", "2.10.0", "2.11.0", "2.12.0", "2.13.0", "2.14.0", "2.15.0"]
         #expect(Set(table.map(\.version)) == releases)
-        #expect(table.count == 31)
+        #expect(table.count == 32)
+        #expect(table.filter { $0.version == "2.15.0" }.map(\.id) == ["just-the-desk"])
         #expect(table.filter { $0.version == "2.14.0" }.map(\.id) == ["shortcut-app-menus", "sign-in-reminders"])
         #expect(table.filter { $0.version == "2.13.0" }.map(\.id) == ["meter-history"])
         #expect(table.filter { $0.version == "2.12.0" }.map(\.id) == ["shortcut-awareness"])
@@ -200,7 +201,7 @@ struct WhatsNewTableTests {
     @Test func showMeLandsOnTheRightPage() {
         let dest = Dictionary(uniqueKeysWithValues: table.map { ($0.id, $0.destination) })
         #expect(dest == [
-            "shortcut-app-menus": .general, "sign-in-reminders": .alerts,
+            "just-the-desk": .deskLayout, "shortcut-app-menus": .general, "sign-in-reminders": .alerts,
             "meter-history": .usage, "shortcut-awareness": .general,
             "settings-pages": .general, "settings-search": .general, "shortcut-keys": .general,
             "account-status": .credentials,
@@ -276,5 +277,11 @@ struct WhatsNewTableTests {
         let fromTwoThirteen = WhatsNew.cards(lastSeen: "2.13.0", current: "2.14.0")
         #expect(fromTwoThirteen.map(\.id) == ["shortcut-app-menus", "sign-in-reminders"])
         #expect(WhatsNew.rangeLabel(fromTwoThirteen, lastSeen: "2.13.0", current: "2.14.0") == "New in 2.14.0")
+    }
+
+    @Test func updatingToTwoFifteen() {
+        let fromTwoFourteen = WhatsNew.cards(lastSeen: "2.14.0", current: "2.15.0")
+        #expect(fromTwoFourteen.map(\.id) == ["just-the-desk"])
+        #expect(WhatsNew.rangeLabel(fromTwoFourteen, lastSeen: "2.14.0", current: "2.15.0") == "New in 2.15.0")
     }
 }
