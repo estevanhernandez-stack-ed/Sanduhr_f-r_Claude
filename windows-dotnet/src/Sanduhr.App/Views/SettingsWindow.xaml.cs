@@ -72,6 +72,7 @@ internal partial class SettingsWindow : Window
         Closed += (_, _) =>
         {
             ViewModel.Shortcuts.Detach();
+            ViewModel.General.Detach();
             _localCcTimer.Stop();
             ViewModel.History.Changed -= RenderHistory;
             ViewModel.ClaudeCode.Overview.Changed -= RenderLocalCc;

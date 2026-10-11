@@ -40,7 +40,9 @@ public sealed partial class ShortcutsViewModel : ObservableObject
     public string KeysToolTip => IsRecording ? "Press the new keys, or Escape to cancel." : "Click, then press new keys.";
 
     public string KeysAutomationName =>
-        $"{(IsRecording ? "Recording keys" : "Change keys")}, {HotKeys.Name(Action)}";
+        IsRecording
+            ? $"Recording keys, {HotKeys.Name(Action)}. Press the new keys, or Escape to cancel."
+            : $"Change keys, {HotKeys.Name(Action)}";
 
     public string SwitchAutomationName => HotKeys.Name(Action);
 

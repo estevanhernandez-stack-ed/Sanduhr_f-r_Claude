@@ -85,7 +85,7 @@
 
 - [ ] **13. Stage 6: Desk content** (deepening pass first)
   Spec ref: `spec.md > Stage 6`
-  What to build: messages and effects, editor, special days, now playing (widget then Desk), meetings, watchers, MCP tools (after Este rules).
+  What to build: messages and effects, editor, special days, now playing (widget then Desk), meetings, watchers, MCP tools (after Este rules). The Join shortcut arrives here: `hotkey_settings` is one flat object today, so move it to a per-action map with a one-time migration before adding Join (PR #204 review, finding 4).
   Acceptance: PRD S6 stories. Verify: parser tests ported from the Mac.
 
 - [ ] **14. Stage 7: Desk polish** (deepening pass first)

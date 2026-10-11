@@ -65,6 +65,20 @@ public sealed partial class GeneralViewModel : ObservableObject
         _autoStartEnabled = _startup.IsEnabled();
     }
 
+    private void OnWidgetPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(WidgetViewModel.TrayMode))
+            OnPropertyChanged(nameof(SelectedTrayMode));
+    }
+
+    /// <summary>Stop following the widget (Settings closed). The widget outlives every
+    /// Settings window, so a handler left on it would keep this view model alive.</summary>
+    public void Detach()
+    {
+        if (_widget is not null)
+            _widget.PropertyChanged -= OnWidgetPropertyChanged;
+    }
+
     partial void OnAutoStartEnabledChanged(bool value)
     {
         // Unpackaged: applies immediately (Run key). Packaged would deep-link to
