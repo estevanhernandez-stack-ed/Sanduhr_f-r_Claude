@@ -57,4 +57,13 @@ public class WhatsNewCardsTests
 
     [Fact]
     public void Glyphs_AreNotEmpty() => Assert.All(Table, c => Assert.False(string.IsNullOrEmpty(c.Glyph)));
+
+    /// <summary>A glyph is one Segoe Fluent Icons character (the font's codepoints sit in the
+    /// Private Use Area), never a codepoint spelled out as text.</summary>
+    [Fact]
+    public void Glyphs_AreOnePrivateUseCharacter() => Assert.All(Table, c =>
+    {
+        Assert.Equal(1, c.Glyph.Length);
+        Assert.InRange(c.Glyph[0], '', '');
+    });
 }
