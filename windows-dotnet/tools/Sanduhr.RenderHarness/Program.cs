@@ -21,7 +21,7 @@ using Sanduhr.Core;
 //
 // Options:
 //   --out <dir>          where PNGs and log.txt go (default ./harness-out)
-//   --scenario <name>    widget | whatsnew | tour | settings | all; repeatable (default all)
+//   --scenario <name>    widget | whatsnew | tour | settings | glow | all; repeatable (default all)
 //   --theme <key>        built-in theme key to apply (default obsidian)
 //   --light              write a LIGHT user theme into the dev profile's themes folder and apply
 //                        it, to check dialogs for legibility on a light surface
@@ -99,7 +99,7 @@ public static class Program
                     return 2;
             }
         }
-        string[] known = { "widget", "whatsnew", "tour", "settings" };
+        string[] known = { "widget", "whatsnew", "tour", "settings", "glow" };
         if (scenarios.Count == 0 || scenarios.Contains("all"))
             scenarios = known.ToList();
         var bad = scenarios.Where(s => !known.Contains(s)).ToList();
@@ -319,6 +319,9 @@ public static class Program
                 await Settle();
             }
 
+            if (scenarios.Contains("glow"))
+                await RenderGlow(light);
+
             if (scenarios.Contains("settings"))
                 await RenderSettings(vm, asm);
         }
@@ -326,6 +329,48 @@ public static class Program
         {
             main?.Close();
             File.WriteAllLines(Path.Combine(Out, "log.txt"), Log);
+        }
+    }
+
+    /// <summary>The Claude Code edge glow over a fake 1280x800 desktop: a maximized-style window and a
+    /// 900x600 windowed one, waiting and done, in the live theme. Never opens the real overlay window.</summary>
+    static async Task RenderGlow(bool light)
+    {
+        var screen = new PxRect(0, 0, 1280, 800);
+        var layouts = new (string Name, PxRect Frame)[]
+        {
+            ("maximized", new PxRect(0, 0, 1280, 800)),
+            ("windowed", new PxRect(190, 100, 900, 600)),
+        };
+        foreach (var (name, frame) in layouts)
+        foreach (var ev in new[] { ClaudeCodeEvent.Waiting, ClaudeCodeEvent.Done })
+        {
+            var canvas = new Canvas { Width = screen.Width, Height = screen.Height, Background = new SolidColorBrush(Color.FromRgb(0x58, 0x5c, 0x66)) };
+            Color body = light ? Color.FromRgb(0xf2, 0xf2, 0xf4) : Color.FromRgb(0x2b, 0x2b, 0x30);
+            Color bar = light ? Color.FromRgb(0xe0, 0xe0, 0xe4) : Color.FromRgb(0x1f, 0x1f, 0x23);
+            void Box(double x, double y, double w, double h, Color c)
+            {
+                var r = new System.Windows.Shapes.Rectangle { Width = w, Height = h, Fill = new SolidColorBrush(c) };
+                Canvas.SetLeft(r, x);
+                Canvas.SetTop(r, y);
+                canvas.Children.Add(r);
+            }
+            Box(frame.X, frame.Y, frame.Width, frame.Height, body);
+            Box(frame.X, frame.Y, frame.Width, 32, bar);
+
+            var target = new GlowTarget(frame, screen);
+            var placed = GlowPlacement.Compute(target, screen, 1.0);
+            var glow = new Sanduhr.App.Views.GlowOverlayContent { Width = placed.Width, Height = placed.Height };
+            glow.SetColor(Sanduhr.App.Views.GlowOverlayContent.ColorFor(ev));
+            Canvas.SetLeft(glow, placed.X);
+            Canvas.SetTop(glow, placed.Y);
+            canvas.Children.Add(glow);
+
+            canvas.Measure(new Size(screen.Width, screen.Height));
+            canvas.Arrange(new Rect(0, 0, screen.Width, screen.Height));
+            await Settle();
+            Save(canvas, $"glow-{name}-{ev.ToString().ToLowerInvariant()}");
+            Log.Add($"glow {name} {ev}: rect {placed}");
         }
     }
 
