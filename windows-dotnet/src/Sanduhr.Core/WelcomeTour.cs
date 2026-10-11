@@ -41,16 +41,16 @@ public static class WelcomeTour
     [
         new(1, new WhatsNewCard([], "paced", "Your limits, paced",
             "Each bar is one of your limits, filling as you use it. The tick marks where an even pace would put you right now.",
-            "", WhatsNewPreview.Meters, SettingsPage.Widget)),
+            "\uE9D2", WhatsNewPreview.Meters, SettingsPage.Widget)),
         new(3, new WhatsNewCard([], "tray", "At a glance",
             "The hourglass in the tray shows a percent: your session, your weekly limit, whichever is higher, both in turn, or the highest of any.",
-            "", WhatsNewPreview.Tray, SettingsPage.General), TourChoice.TrayMode),
+            "\uE7C4", WhatsNewPreview.Tray, SettingsPage.General), TourChoice.TrayMode),
         new(4, new WhatsNewCard([], "accounts", "More than one account",
             "Add each Claude account with its own sign-in and history, then switch from the name chip or the tray's Accounts menu.",
-            "", WhatsNewPreview.AccountChip, SettingsPage.Accounts)),
+            "\uE716", WhatsNewPreview.AccountChip, SettingsPage.Accounts)),
         new(5, new WhatsNewCard([], "claude-code", "Claude Code, connected",
             "The Claude Usage page shows your Claude Code tokens by day and project. It also adds the MCP tools and the statusline, each after you say yes.",
-            "", WhatsNewPreview.None, SettingsPage.ClaudeUsage)),
+            "\uEA86", WhatsNewPreview.None, SettingsPage.ClaudeUsage)),
     ];
 
     /// <summary>The cards this machine shows: features met, sorted by step, ties in table order.</summary>
