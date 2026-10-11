@@ -1867,5 +1867,8 @@ com.626labs.sanduhr.desk` on a throwaway profile with no Sanduhr Keychain item),
 4. Sign in from Settings, Accounts: the first numbers fill the Desk's meters and the notch wing;
    `just_the_desk: false`, and the sign-in reminder switch is on again. Had you turned that switch
    off yourself before choosing Just the Desk, it stays off.
+4b. Choose Just the Desk again on a fresh profile, then paste a made-up key in Settings, Accounts:
+   `just_the_desk: false` at once, the widget comes up reading the refusal, the Desk says "sign in
+   again in Sanduhr", and a relaunch keeps the widget up until a key works.
 5. Without Just the Desk (a fresh profile, sign in or close the sheet): the sheet comes back at each
    launch until a key is saved, as before.

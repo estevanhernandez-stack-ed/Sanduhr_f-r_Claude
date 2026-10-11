@@ -7,8 +7,10 @@ import Foundation
 /// their sign-in line (SignInReminder). The Claude pieces stay placed and draw nothing until there
 /// are numbers.
 ///
-/// Signing in later (Settings, Accounts) ends it at the first successful fetch: the Claude pieces
-/// fill in, and the sign-in reminder comes back on if Just the Desk was what turned it off.
+/// Saving a key later (Settings, Accounts, or the sheet) ends it at once, before any fetch: a key
+/// that then fails gets the usual sign-in flow (the widget up for it, the Desk's sign-in line), and
+/// one that works fills the Claude pieces in. The sign-in reminder comes back on if Just the Desk
+/// was what turned it off.
 enum JustTheDesk {
     /// Standard defaults: chosen and not yet ended by a sign-in.
     static let key = "justTheDesk"
@@ -34,8 +36,8 @@ enum JustTheDesk {
         desk.set(true, forKey: DeskController.enabledKey)
     }
 
-    /// The first successful fetch after signing in. Ends Just the Desk and turns the sign-in
-    /// reminder back on when Just the Desk had turned it off. True when it was on.
+    /// A session key exists now. Ends Just the Desk and turns the sign-in reminder back on when
+    /// Just the Desk had turned it off. True when it was on.
     @discardableResult
     static func endBySignIn(standard: DefaultsStore = UserDefaults.standard, desk: DefaultsStore = UserDefaults.desk) -> Bool {
         guard isOn(in: standard) else { return false }
@@ -50,9 +52,11 @@ enum JustTheDesk {
         !hasSessionKey && !isOn(in: store)
     }
 
-    /// The widget rule's "has a session key": with Just the Desk on, the widget never waits for a
-    /// sign-in and follows its choice as a signed-in Mac's would.
-    static func signInSettled(awaitingSignIn: Bool, in store: DefaultsStore = UserDefaults.standard) -> Bool {
-        !awaitingSignIn || isOn(in: store)
+    /// The widget rule's "has a session key": with Just the Desk on and no key, the widget never
+    /// waits for a sign-in and follows its choice as a signed-in Mac's would. Once a key exists it
+    /// waits for that key's first fetch like any other (SignInGate).
+    static func signInSettled(awaitingSignIn: Bool, hasSessionKey: Bool,
+                              in store: DefaultsStore = UserDefaults.standard) -> Bool {
+        !awaitingSignIn || (isOn(in: store) && !hasSessionKey)
     }
 }

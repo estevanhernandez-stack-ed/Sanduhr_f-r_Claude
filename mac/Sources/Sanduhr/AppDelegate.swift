@@ -80,7 +80,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let wasShowing = !UserDefaults.standard.bool(forKey: Self.panelHiddenKey)
         let show = WidgetVisibilityRule.resolve(
             showing: wasShowing, setting: .saved(), deskOn: DeskController.shared.enabled,
-            hasSessionKey: JustTheDesk.signInSettled(awaitingSignIn: awaitingSignIn), event: .launch)
+            hasSessionKey: JustTheDesk.signInSettled(awaitingSignIn: awaitingSignIn,
+                                                     hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey)), event: .launch)
         if show != wasShowing { UserDefaults.standard.set(!show, forKey: Self.panelHiddenKey) }
         if show {
             panel.makeKeyAndOrderFront(nil)
@@ -103,9 +104,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                               account: KeychainStore.accounts.active, in: UserDefaults.standard)
             // A fresh install's welcome tour, once the first fetch has the user's own numbers.
             self?.offerTourIfPending(fetched: fetched)
-            // Just the Desk ends at the first numbers: the Claude pieces fill in, and the sign-in
-            // reminder it turned off comes back on.
-            if fetched, JustTheDesk.endBySignIn() { DeskController.shared.model.refreshClaude() }
+            // Just the Desk ends once a key is saved (a failed one included): the sign-in reminder it
+            // turned off comes back on, and the widget waits for that key like any other.
+            if KeychainStore.exists(account: KeychainAccount.sessionKey), JustTheDesk.endBySignIn() {
+                DeskController.shared.model.refreshClaude()
+                // Not fetched yet: the widget comes up for this key's sign-in, as for any other.
+                if !fetched { self?.applyWidgetVisibility(.justTheDesk) }
+            }
             // The widget showed for sign-in; once the numbers arrive the choice takes over.
             if self?.awaitingSignIn == true, fetched {
                 self?.awaitingSignIn = false
@@ -254,7 +259,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func applyWidgetVisibility(_ event: WidgetVisibilityEvent) {
         guard let show = WidgetVisibilityRule.shouldShow(
             setting: .saved(), deskOn: DeskController.shared.enabled,
-            hasSessionKey: JustTheDesk.signInSettled(awaitingSignIn: awaitingSignIn), event: event) else { return }
+            hasSessionKey: JustTheDesk.signInSettled(awaitingSignIn: awaitingSignIn,
+                                                     hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey)), event: event) else { return }
         if !show { hidePanel(); return }
         guard let panel, !panel.isVisible else { return }
         // Comes back without taking focus from whatever flipped Desk (the Settings window).

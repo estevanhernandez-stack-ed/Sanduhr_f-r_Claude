@@ -11,8 +11,8 @@ struct JustTheDeskTests {
         #expect(!JustTheDesk.isOn(in: s))
         #expect(JustTheDesk.showsWelcome(hasSessionKey: false, in: s))
         #expect(!JustTheDesk.showsWelcome(hasSessionKey: true, in: s))
-        #expect(!JustTheDesk.signInSettled(awaitingSignIn: true, in: s))
-        #expect(JustTheDesk.signInSettled(awaitingSignIn: false, in: s))
+        #expect(!JustTheDesk.signInSettled(awaitingSignIn: true, hasSessionKey: false, in: s))
+        #expect(JustTheDesk.signInSettled(awaitingSignIn: false, hasSessionKey: true, in: s))
     }
 
     @Test func choosingTurnsTheDeskOnAndTheReminderOff() {
@@ -24,7 +24,18 @@ struct JustTheDeskTests {
         #expect(s.values[JustTheDesk.silencedKey] as? Bool == true)
         // No welcome sheet, and the widget no longer waits for a sign-in.
         #expect(!JustTheDesk.showsWelcome(hasSessionKey: false, in: s))
-        #expect(JustTheDesk.signInSettled(awaitingSignIn: true, in: s))
+        #expect(JustTheDesk.signInSettled(awaitingSignIn: true, hasSessionKey: false, in: s))
+    }
+
+    @Test func aSavedKeyThatHasntFetchedWaitsForSignInEvenBeforeItEnds() {
+        // Review 2026-10-11: a key saved after Just the Desk that never fetches must still get the
+        // sign-in flow, so the override holds only while there is no key.
+        let s = MemoryDefaults(), d = MemoryDefaults()
+        JustTheDesk.choose(standard: s, desk: d)
+        let settled = JustTheDesk.signInSettled(awaitingSignIn: true, hasSessionKey: true, in: s)
+        #expect(!settled)
+        #expect(WidgetVisibilityRule.shouldShow(setting: .whileDeskOff, deskOn: true, hasSessionKey: settled,
+                                                event: .launch) == true)
     }
 
     @Test func signingInEndsItAndBringsTheReminderBack() {
@@ -50,7 +61,7 @@ struct JustTheDeskTests {
 
     @Test func theWidgetFollowsItsChoiceInsteadOfWaitingForSignIn() {
         // A fresh install's choice is Hidden while Desk is on; Just the Desk turns the Desk on.
-        let settled = JustTheDesk.signInSettled(awaitingSignIn: true, in: {
+        let settled = JustTheDesk.signInSettled(awaitingSignIn: true, hasSessionKey: false, in: {
             let s = MemoryDefaults(); s.set(true, forKey: JustTheDesk.key); return s
         }())
         #expect(WidgetVisibilityRule.shouldShow(setting: .whileDeskOff, deskOn: true, hasSessionKey: settled,
