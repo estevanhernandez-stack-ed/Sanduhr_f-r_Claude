@@ -838,7 +838,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         var now = DateTimeOffset.UtcNow;
         _demoData = DemoMode.Usage(_demoAccount, now);
-        Tiers.Clear();
+        Tiers.Clear();   // fresh cards: no real Claude Code burn carried over
         RenderCards(_demoData, now);
         HasPlanBadge = false;
         PlanBadgeName = "";
@@ -1012,8 +1012,17 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// </summary>
     public async Task SignOutAccountAsync(string label)
     {
-        if (IsDemo)
-            await EndDemoAsync();
+        // Sign-out ends demo mode without fetching for the account about to go; the
+        // active-account path below rebuilds and refetches, the other path does it here.
+        bool leftDemo = IsDemo;
+        if (leftDemo)
+            LeaveDemo();
+        if (leftDemo && _accounts.GetActive() != label)
+        {
+            RebuildFetcher();
+            RefreshAccountLabel();
+            _ = RefreshAsync();
+        }
         bool wasActive = _accounts.GetActive() == label;
         if (wasActive)
         {
@@ -1101,14 +1110,15 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         if (_fetcher is null || _refreshing || IsDemo)
             return RefreshOutcome.Other;
         _refreshing = true;
+        int generation = _fetcherGeneration;
         try
         {
             if (Tiers.Count == 0)
                 StatusText = "Refreshing…";
             var data = await _fetcher.FetchAsync().ConfigureAwait(true);
-            // Demo mode came on while this fetch was out: drop the answer (the Mac's
-            // DemoSession.answerApplies). Turning demo off fetches afresh.
-            if (IsDemo)
+            // Demo mode came on, or the fetcher was rebuilt (demo ended, account switched),
+            // while this fetch was out: drop the answer. The rebuild's own fetch follows.
+            if (!DemoMode.AnswerApplies(generation == _fetcherGeneration, IsDemo))
                 return RefreshOutcome.Other;
             _lastData = data;
             _lastFetchAt = DateTimeOffset.Now;
@@ -1129,10 +1139,10 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             FetchSucceeded?.Invoke();
             return RefreshOutcome.Ok;
         }
-        catch (Exception) when (IsDemo)
+        catch (Exception) when (!DemoMode.AnswerApplies(generation == _fetcherGeneration, IsDemo))
         {
-            // A failure that lands under demo mode must not wipe the samples or
-            // write an error snapshot; turning demo off fetches afresh.
+            // A failure that lands under demo mode, or from a fetcher since rebuilt, must not
+            // wipe the samples or the new state, or write an error snapshot.
             return RefreshOutcome.Other;
         }
         catch (SessionExpiredException)
@@ -1170,6 +1180,10 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         finally
         {
             _refreshing = false;
+            // A rebuild's own fetch was turned away while this stale one was out
+            // (single-flight): fetch now for the current fetcher. Demo mode fetches nothing.
+            if (generation != _fetcherGeneration && !IsDemo && _fetcher is not null)
+                _ = RefreshCoreAsync();
         }
     }
 
@@ -1342,6 +1356,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             {
                 byModel = new Dictionary<string, long>();
             }
+            // Demo mode came on during the scan: real burn never lands on sample cards.
+            if (IsDemo)
+                return;
             long total = 0;
             var byTier = new Dictionary<string, long>();
             foreach (var (model, tokens) in byModel)

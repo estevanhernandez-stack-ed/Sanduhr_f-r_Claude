@@ -102,6 +102,13 @@ public sealed class WelcomeTourViewModel : ObservableObject
         return true;
     }
 
+    /// <summary>Jump to a step (clamped), for a tour refilled while open.</summary>
+    public void GoTo(int index)
+    {
+        _index = Math.Clamp(index, 0, Math.Max(0, Count - 1));
+        Build();
+    }
+
     public void Back()
     {
         if (_index == 0)

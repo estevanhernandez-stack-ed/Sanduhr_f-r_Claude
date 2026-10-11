@@ -185,7 +185,7 @@
                                 </Border>
                             </StackPanel>
                             <!-- Meters: the widget's own bars as they read now (demo mode's samples in demo). -->
-                            <ItemsControl ItemsSource="{Binding Meters}" Margin="16,8" VerticalAlignment="Center"
+                            <ItemsControl ItemsSource="{Binding Meters}" Margin="16,18,16,6" VerticalAlignment="Center"
                                           Focusable="False" IsTabStop="False"
                                           Visibility="{Binding IsMeters, Converter={StaticResource BoolVis}}">
                                 <ItemsControl.ItemTemplate>
@@ -250,11 +250,12 @@
                                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                         <!-- A tour card's in-place choice: the real setting, written when chosen. -->
                         <StackPanel Margin="0,10,0,0"
-                                    AutomationProperties.Name="The tray shows"
                                     Visibility="{Binding HasChoices, Converter={StaticResource BoolVis}}">
                             <TextBlock Text="The tray shows" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,4"
                                        Foreground="{DynamicResource Sanduhr.Brush.Text}" />
-                            <ItemsControl ItemsSource="{Binding Choices}" IsTabStop="False" Focusable="False">
+                            <!-- ItemsControl has an automation peer (a StackPanel does not): the group's name. -->
+                            <ItemsControl ItemsSource="{Binding Choices}" IsTabStop="False" Focusable="False"
+                                          AutomationProperties.Name="The tray shows">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <RadioButton Style="{StaticResource ThemedRadio}" GroupName="TourTrayShows"

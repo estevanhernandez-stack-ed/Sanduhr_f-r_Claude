@@ -99,6 +99,12 @@ public static class DemoMode
         return Accounts[0];
     }
 
+    /// <summary>
+    /// Whether a fetch's answer (or failure) may land: the fetcher it was made with is still the
+    /// current one, and demo mode is off. Port of the Mac's DemoSession.answerApplies.
+    /// </summary>
+    public static bool AnswerApplies(bool sameFetcher, bool demo) => sameFetcher && !demo;
+
     /// <summary>The widget's account chip text while demo mode is on.</summary>
     public static string ChipText(string account) => $"{account} (demo)";
 

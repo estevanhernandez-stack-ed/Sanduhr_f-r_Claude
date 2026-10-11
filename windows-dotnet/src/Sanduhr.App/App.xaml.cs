@@ -524,7 +524,7 @@ public partial class App : Application
         _tray.ToolTipText = reading is null
             ? "Sanduhr für Claude — no data yet"
             : _vm?.IsDemo == true
-                ? $"Sanduhr für Claude — {DemoMode.TrayLabel(reading.Label, reading.Percent)} (sample)"
+                ? $"Sanduhr für Claude — {DemoMode.TrayLabel(reading.Label, reading.Percent)}"
                 : $"Sanduhr für Claude — {reading.Label} {reading.Percent}%";
     }
 
@@ -600,6 +600,7 @@ public partial class App : Application
 
     private void QuitApp()
     {
+        WhatsNewWindow.Quitting = true;
         _hotKeys?.Dispose();
         _tray?.Dispose();
         _trayIcon?.Dispose();
@@ -607,8 +608,16 @@ public partial class App : Application
         Shutdown();
     }
 
+    /// <summary>Signing out of Windows closes every window: not a Skip of the tour.</summary>
+    protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+    {
+        WhatsNewWindow.Quitting = true;
+        base.OnSessionEnding(e);
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
+        WhatsNewWindow.Quitting = true;
         _hotKeys?.Dispose();
         _tray?.Dispose();
         _trayIcon?.Dispose();

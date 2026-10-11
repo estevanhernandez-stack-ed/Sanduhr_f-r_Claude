@@ -148,4 +148,12 @@ public class DemoModeTests
         Assert.Equal("--demo", DemoMode.Switch);
         Assert.Equal("SANDUHR_DEMO", DemoMode.EnvironmentVariable);
     }
+
+    [Theory]
+    [InlineData(true, false, true)]   // same fetcher, demo off: the answer lands
+    [InlineData(true, true, false)]   // demo came on while it was out: dropped
+    [InlineData(false, false, false)] // the fetcher was rebuilt (demo ended, account switched): dropped
+    [InlineData(false, true, false)]
+    public void AnswerApplies_OnlyFromTheCurrentFetcherOutsideDemo(bool sameFetcher, bool demo, bool expected) =>
+        Assert.Equal(expected, DemoMode.AnswerApplies(sameFetcher, demo));
 }

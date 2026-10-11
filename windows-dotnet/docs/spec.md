@@ -301,6 +301,11 @@ None new. `RegisterHotKey`/`UnregisterHotKey` (user32) by P/Invoke.
 
 ## Open Issues
 - From the Stage 1 review (PR #204): `limits_hidden_until_reset`, `limit_first_seen` and `alert_muted_tiers` are global, not per account, as on the Mac; switching accounts can return a hidden promo limit as a new window. A per-account shape is a later item for both apps. Discovery runs on every `SearchRoots()` call; cache it if a slow profile folder shows up.
+- From the Stage 2 review (PR #205), recorded rather than changed:
+  - **The tray's Accounts submenu and Settings show real account names in demo mode.** Only the widget, the tray tooltip and the tour use the samples. The Mac fills Settings too; that is a later item.
+  - **A tour opened from the tray while still pending records on Finish or Skip.** The Mac does the same (`WelcomeTour.end` records whenever the state is pending): the person took the tour.
+  - **Mixed casing ("Take the Tour…", "End Demo Mode", "Sign In" beside "Show me") follows the Mac's labels.** S3's names table settles casing for both apps.
+  - **No unit tests for `WidgetViewModel`'s demo guards or `WelcomeTourViewModel`.** These are WPF view models with no test seam. The answer-drop rule is in Core (`DemoMode.AnswerApplies`) and tested; the rest was checked with the off-screen render harness.
 1. The MCP root set and installers on discovered homes (Este).
 2. The in-app trademark disclaimer on existing surfaces (Este; S3's About is the natural home).
 3. Card version numbers at release (Este).

@@ -33,14 +33,17 @@ internal partial class WhatsNewWindow : Window
             if (ReferenceEquals(_tour, this))
             {
                 _tour = null;
-                // Closed any other way than Finish counts as Skip.
-                ReportEnd(false);
+                // Closed any other way than Finish counts as Skip, except when the app is
+                // quitting: then the tour simply offers again next launch.
+                if (!Quitting)
+                    ReportEnd(false);
             }
         };
     }
 
-    /// <summary>The welcome tour is up (the What's New launch waits for it).</summary>
-    public static bool TourOpen => _tour is not null;
+    /// <summary>Set by the app as it quits (Quit, a Store update, sign-out of Windows), so the
+    /// windows it closes are not read as the person skipping the tour.</summary>
+    public static bool Quitting { get; set; }
 
     /// <summary>
     /// Open the welcome tour (the window in step mode), or bring the open one forward. Show me
@@ -50,6 +53,11 @@ internal partial class WhatsNewWindow : Window
     {
         if (_tour is { } open)
         {
+            // Refill with the current steps (say, signed in since it opened) on the same step.
+            if (open.DataContext is WelcomeTourViewModel was)
+                model.GoTo(was.Index);
+            open.DataContext = model;
+            open._showMe = showMe;
             if (open.WindowState == WindowState.Minimized)
                 open.WindowState = WindowState.Normal;
             open.Activate();
