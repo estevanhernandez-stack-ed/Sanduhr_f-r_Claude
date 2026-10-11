@@ -865,6 +865,40 @@ commands, args and permission rules; names kept, never editable) and `ClaudeProc
 of each running `claude` of this user, from `CLAUDE_CONFIG_DIR` in its launch environment through
 `KERN_PROCARGS2`; arguments and every other variable are dropped while parsing).
 
+**Catalog | By Seat (item 71, slice 1a).** Under Sanduhr's own mod the page has two tabs,
+**Catalog** and **By Seat** (`ModsTabBar`, anchor `mods#inventory`), the choice kept by the
+page's model while the Settings window lives. Each seat is read once per load by
+`SeatScanner.scan` (`SeatScan.swift`), files only: no CLI, no network, no marketplace refresh,
+no mod or server started, nothing written. It reads the seat's `settings.json` (a file that
+doesn't parse is reported with its line and column, never as empty), the plugins
+`ModInventory.scan` finds plus plugin folders under `plugins/synced/` or `plugins/cache/synced/`
+(`name@synced`; where claude.ai keeps a synced plugin's files is unverified, so a seat without
+those folders lists none), the marketplaces in `plugins/known_marketplaces.json` and
+`extraKnownMarketplaces` with the plugins their cached `.claude-plugin/marketplace.json` lists,
+`agents/`, `commands/` (a subfolder's as `folder:name`), `output-styles/` and `skills/*/SKILL.md`
+(`skills/synced/` labelled as from claude.ai) with each file's frontmatter `name` and
+`description`, MCP servers from `.claude.json` (user scope, and each project's local entry),
+`managed-mcp.json` and each plugin's `.mcp.json` or manifest `mcpServers` (transport, the URL's
+host or the masked command, env and header names, never values), and for each project its
+`.claude.json` lists (at most 400) the project's `.claude/` agents, commands, output styles and
+skills, its `.mcp.json`, and the plugins its `.claude/settings.json` or `settings.local.json`
+turns on (with install records at project or local scope). `ConfigCatalog.build` makes one
+card per extension across every seat: plugins and mods by name (sources such as "Marketplace
+alpha", "Inline folder", "Skills folder", "claude.ai (synced)", "Sanduhr"; two sources is the
+**Duplicate** badge), the plugins every cached marketplace lists, Sanduhr's own `sanduhr-meters`
+(always, first), and agents, skills, commands, output styles and MCP servers grouped by name.
+A card shows its name, kind, version, description, sources, Check's risk line when Check ran,
+what needs a look (declared and not installed, a missing folder, on twice in one seat), and a
+chip per seat that holds it: the seat's label, its Work, Personal or Unmarked badge and **On**,
+**Off**, **Declared, not installed**, **In N projects** (never which) or **Its session only**. A
+card with no chip is **Available**. A chip opens By Seat at that seat with the extension lit.
+Filters: kind, seat, Everything, Installed somewhere, Available only, Needs a look (a duplicate,
+a problem or a Check that failed), and search over name, description and sources. Demo mode
+drops every card only work seats hold, and By Seat drops work seats. By Seat is the folder list
+below, each box now headed by the seat's label and badge with **Label** and a Work, Personal or
+Unmarked picker (Sanduhr preferences under `seats`; a seat whose linked account is marked work
+stays work). Nothing on the page writes to a seat except Sanduhr's own mod.
+
 **What a folder loads** (`ModInventory.scan`, files only, no CLI): the folders in its
 settings.json's `env.CLAUDE_CODE_PLUGIN_DIRS` (`@inline`; off when `enabledPlugins["<name>@inline"]`
 is false), every plugin in `plugins/installed_plugins.json` or keyed `<name>@<marketplace>` in

@@ -1969,3 +1969,36 @@ On a scratch macOS user (or a throwaway profile as in section 45), never on your
    Settings, Usage shows charts for the samples, Settings, Accounts lists Work and Personal
    read-only. Nothing names a real account, meeting or person. `demo off`: the profile is fresh again,
    no `history.*.json` or `snapshot.*.json` appeared, and `accounts_count` never moved.
+
+## 49. Mods & Config: the Catalog (item 71, slice 1a)
+
+On a Mac with two or more Claude Code folders. Nothing here changes a folder: before you start,
+note the modification times of each folder's `settings.json` and `.claude.json` (`stat -f '%m %N'`),
+and compare them at the end.
+
+1. Settings, **Mods & Config**: Meters above the prompt at the top, then the **Catalog | By Seat**
+   tabs on Catalog. Switch to By Seat, open another page and come back: still By Seat. Close and
+   reopen Settings: Catalog again.
+2. The Catalog's first card is sanduhr-meters (Mod, From Sanduhr), with a chip for each folder
+   it is installed in, or "Installed in no folder yet.". Below it, one card per plugin, skill,
+   agent, command, output style and MCP server, each with a chip per folder that has it: the
+   folder's label, a Work, Personal or Unmarked badge, and On, Off, Declared, not installed, In N
+   projects or Its session only. A chip never names a project.
+3. A plugin enabled from two marketplaces in any folder is one card with both "Marketplace …"
+   sources and an orange **Duplicate** badge, and "On twice in <label>". A plugin a marketplace
+   lists that no folder installed has no chips and a green **Available** badge.
+4. Filters: Kind, Agents shows only agents; Seat, one folder shows only cards with its chip;
+   Available only and Needs a look narrow the list; search for a marketplace's name finds its
+   plugins. The count line says "N of M shown.".
+5. On By Seat, give a folder a **Label** (press Return) and mark it **Work**: back on the Catalog
+   its chips carry the new label and an orange Work badge. A folder whose linked account is
+   marked work shows "Work from its account" and no picker. Nothing in the folder changes.
+6. Click a chip: By Seat opens scrolled to that folder, the item lit.
+7. Mark a folder Work, then `smoke/smoke do demo on` (debug hooks on): cards only that folder
+   holds disappear from the Catalog and its box from By Seat; `demo off` brings them back.
+8. Break a scratch folder's `settings.json` (add a `//` comment): Read Again. On By Seat its box
+   says "settings.json is unreadable: it isn't valid JSON (around line …, column …)", never that
+   it loads nothing.
+9. `smoke/smoke run smoke/scenarios/mods-config.yaml` (from `mac/`) passes; `smoke/smoke state`
+   shows `mods_config` with `tab`, `seats`, `cards`, `available`, `needs_look`, `duplicates`,
+   `work_only` and `shown`, numbers only. Compare the modification times from the start: unchanged.
