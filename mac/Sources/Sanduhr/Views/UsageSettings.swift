@@ -282,14 +282,28 @@ private struct UsageNoKeyNote: View {
     let navigation: SettingsNavigation
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(SignedOut.savedHistoryLine)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+        // A callout, not a caption (2026-10-11: the owner missed the line): an orange tint, an
+        // icon and the headline in bold, so a signed-out account never reads as live.
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "person.crop.circle.badge.exclamationmark")
+                .font(.title2)
+                .foregroundStyle(Color.hex("fb923c"))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(SignedOut.savedHistoryTitle).font(.headline)
+                Text(SignedOut.savedHistoryDetail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
             SettingsLinkButton(.credentials) { navigation.accountToShow = label }
-                .controlSize(.small)
         }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.hex("fb923c").opacity(0.14)))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .strokeBorder(Color.hex("fb923c").opacity(0.5), lineWidth: 1))
+        .accessibilityElement(children: .combine)
     }
 }
 
