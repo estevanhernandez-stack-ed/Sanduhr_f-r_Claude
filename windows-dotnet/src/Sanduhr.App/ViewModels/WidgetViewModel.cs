@@ -186,6 +186,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowNotNow));
         OnPropertyChanged(nameof(ShowNotSignedInLine));
         NotifyPromptCopy();
+        RaiseDesk();
     }
 
     /// <summary>Re-raise the recovery-card copy bindings. Needed beyond
@@ -1663,7 +1664,34 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _trayWeekly = Util(data, TierModel.SevenDay);
         _trayHighest = highestKey is null ? null : (TierModel.Label(highestKey), highest);
         RaiseTray();
+
+        // The Desk draws the same visible tiers, in the same order (spec 5.1).
+        _deskTiers = [.. active.Select(k => new DeskTier(k, utilByKey[k] ?? 0,
+            (data[k] as JsonObject)?["resets_at"]?.GetValue<string>()))];
+        RaiseDesk();
     }
+
+    private IReadOnlyList<DeskTier> _deskTiers = [];
+
+    /// <summary>What the Desk shows: the visible tiers, when they were fetched, whether a sign-in is
+    /// needed, and the account's name with two or more accounts. Demo mode feeds its samples.</summary>
+    public DeskUsage CurrentDeskUsage
+    {
+        get
+        {
+            bool signIn = !IsDemo && Reason != SignInReason.None;
+            string? account = IsDemo ? DemoMode.ChipText(_demoAccount)
+                : _accounts.ListAccounts().Count > 1 ? _accounts.GetActive() : null;
+            return new DeskUsage(signIn ? [] : _deskTiers,
+                IsDemo ? DateTimeOffset.Now : _lastFetchAt,
+                signIn, Reason == SignInReason.FirstRun, account);
+        }
+    }
+
+    /// <summary>Raised after each render and when the sign-in state changes (the Desk redraws).</summary>
+    public event Action<DeskUsage>? DeskUsageChanged;
+
+    private void RaiseDesk() => DeskUsageChanged?.Invoke(CurrentDeskUsage);
 
     /// <summary>Map the fetch payload to alert snapshots — every known tier
     /// (canonical + dynamic scoped) with data participates, manually hidden or not (a

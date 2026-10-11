@@ -29,6 +29,7 @@ public partial class App : Application
     private DispatcherTimer? _trayRotateTimer;
     private GlobalHotKeyService? _hotKeys;
     private ClaudeCodeGlowService? _glow;
+    private Desk.DeskController? _desk;
     private MenuItem? _endDemoItem;
 
     /// <summary>Where this install stands with the welcome tour, decided once at launch.</summary>
@@ -80,6 +81,7 @@ public partial class App : Application
         SyncTrayRotation();
         SetupHotKeys();
         StartGlow();
+        StartDesk();
 
         // Usage vault (WS-C): consent resolves BEFORE the service attaches —
         // attach order is the consent gate; Start()'s first fetch cycle then
@@ -385,6 +387,16 @@ public partial class App : Application
         _tray.ContextMenu = menu;
     }
 
+    /// <summary>The Desk (spec 5.1): off until switched on in Settings, Desk.</summary>
+    private void StartDesk()
+    {
+        if (_vm is null) return;
+        _desk = new Desk.DeskController(new SettingsStore(new Sanduhr.Core.Paths()), () => new Desk.DesktopLayerHost());
+        _desk.SetUsage(_vm.CurrentDeskUsage);
+        _vm.DeskUsageChanged += _desk.SetUsage;
+        _desk.Reload();
+    }
+
     /// <summary>Claude Code edge glow (Stage 4.5): watches the hook signal files; both switches start off.</summary>
     private void StartGlow()
     {
@@ -446,6 +458,7 @@ public partial class App : Application
         // The Claude Code page re-reads the glow switches and plays "Try it" through the running glow service.
         svm.ClaudeCodePage.GlowReload = () => _glow?.Reload();
         svm.ClaudeCodePage.GlowPreview = e => _glow?.Preview(e);
+        svm.Desk.Changed = () => _desk?.Reload();
         svm.ResetRequested = () =>
         {
             ShowReset();
@@ -639,6 +652,7 @@ public partial class App : Application
                 ResetGuard.MarkDone();
                 vm.StopBackgroundWork();
                 _glow?.Stop();
+                _desk?.StopForReset();
             },
             vm.InactiveReader.DeleteAllProfilesAsync);
         ResetWindow.ShowFor(_settingsWindow, service, QuitApp);
@@ -650,6 +664,7 @@ public partial class App : Application
         // (QuitApp is also the normal quit; the guard is a no-op until a reset has run.)
         WhatsNewWindow.Quitting = true;
         _glow?.Dispose();
+        _desk?.Dispose();
         _hotKeys?.Dispose();
         _tray?.Dispose();
         _trayIcon?.Dispose();
@@ -668,6 +683,7 @@ public partial class App : Application
     {
         WhatsNewWindow.Quitting = true;
         _glow?.Dispose();
+        _desk?.Dispose();
         _hotKeys?.Dispose();
         _tray?.Dispose();
         _trayIcon?.Dispose();

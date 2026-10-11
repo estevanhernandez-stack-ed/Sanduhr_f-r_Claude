@@ -112,6 +112,12 @@ public static class SettingsNames
     public const string FollowAccount = "Follow the account I'm using";
     /// <summary>Mods &amp; Config: re-reads the folder.</summary>
     public const string RefreshFolder = "Refresh";
+    /// <summary>Desk: the switch at the top of the page (settings.json "desk_enabled", off by default).</summary>
+    public const string DeskSwitch = "Desk: the clock and your Claude meters on the desktop";
+    /// <summary>Desk, Where each piece sits: the pieces, named as on the Mac.</summary>
+    public const string DeskClock = "Clock and date";
+    public const string DeskClaudeLine = "Claude meters (line)";
+    public const string DeskClaudeBars = "Claude meters (bars)";
 
     /// <summary>The trademark disclaimer, the standard text, word for word (About carries it).</summary>
     public const string TrademarkNotice =

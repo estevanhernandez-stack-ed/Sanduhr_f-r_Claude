@@ -34,6 +34,8 @@ public sealed class SettingsViewModel
 
     /// <summary>Backs the Mods &amp; Config page: a read-only look at one folder, plus the meters mod switch.</summary>
     public ModsConfigViewModel Mods { get; }
+    /// <summary>Settings, Desk (spec 5.1).</summary>
+    public DeskSettingsViewModel Desk { get; }
 
     /// <summary>Backs the General tab's auto-start control (item 10).</summary>
     public GeneralViewModel General { get; }
@@ -106,6 +108,7 @@ public sealed class SettingsViewModel
             new CcLedgerViewModel(widget, widget.LoadLedgerGroupByProject(), widget.SaveLedgerGroupByProject));
         ClaudeCodePage = new ClaudeCodeViewModel(widget);
         Mods = new ModsConfigViewModel(widget);
+        Desk = new DeskSettingsViewModel(new SettingsStore(new Paths()), new Sanduhr.App.Desk.DeskFonts().PickerFamilies());
         // The two pages share one folder list and one set of installed pieces.
         ClaudeCodePage.FoldersChanged += Mods.ReloadFolders;
         ClaudeCodePage.PiecesChanged += Mods.Refresh;

@@ -597,6 +597,53 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>The Desk (spec 5.1): "desk_enabled", "desk_layout", "desk_margins"
+    /// {"left", "right", "top", "bottom"}, "desk_font" and "desk_time_size". Absent or unreadable
+    /// keys read as <see cref="DeskSettings.Default"/>: off, "clock:bl claude:bl", 52/52/40/60,
+    /// EsteFont Pro, 112.</summary>
+    public DeskSettings LoadDesk()
+    {
+        var root = Read();
+        var d = DeskSettings.Default;
+        var m = root["desk_margins"] as JsonObject;
+        string? font = null;
+        try { font = root["desk_font"]?.GetValue<string>(); } catch { }
+        string layout = d.Layout;
+        try { layout = root["desk_layout"]?.GetValue<string>() ?? d.Layout; } catch { }
+        return new DeskSettings(
+            ReadBool(root, "desk_enabled", false),
+            layout,
+            new DeskMarginSettings(
+                ReadDouble(m, "left", d.Margins.Left), ReadDouble(m, "right", d.Margins.Right),
+                ReadDouble(m, "top", d.Margins.Top), ReadDouble(m, "bottom", d.Margins.Bottom)),
+            font,
+            ReadDouble(root, "desk_time_size", d.TimeSize)).Normalized();
+    }
+
+    public void SaveDesk(DeskSettings desk)
+    {
+        var d = desk.Normalized();
+        var root = Read();
+        root["desk_enabled"] = d.Enabled;
+        root["desk_layout"] = d.Layout;
+        root["desk_margins"] = new JsonObject
+        {
+            ["left"] = d.Margins.Left,
+            ["right"] = d.Margins.Right,
+            ["top"] = d.Margins.Top,
+            ["bottom"] = d.Margins.Bottom,
+        };
+        if (d.Font is null) root.Remove("desk_font");
+        else root["desk_font"] = d.Font;
+        root["desk_time_size"] = d.TimeSize;
+        Write(root);
+    }
+
+    private static double ReadDouble(JsonObject? o, string key, double fallback)
+    {
+        try { return o?[key]?.GetValue<double>() ?? fallback; } catch { return fallback; }
+    }
+
     private static bool ReadBool(JsonObject? o, string key, bool fallback)
     {
         try { return o?[key]?.GetValue<bool>() ?? fallback; } catch { return fallback; }
