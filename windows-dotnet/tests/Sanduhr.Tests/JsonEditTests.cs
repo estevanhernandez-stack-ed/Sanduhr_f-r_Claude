@@ -153,12 +153,15 @@ public class JsonEditTests
     }
 
     [Fact]
-    public void Decodes_escaped_keys_and_the_last_duplicate_wins()
+    public void Decodes_escaped_keys_and_the_scanner_alone_lets_the_last_duplicate_win()
     {
         var b = B("{\"k\\u0041\": 1, \"dup\": 1, \"dup\": 2}");
-        var top = JsonEdit.TopObject(b);
+        // The unvalidated scanner keeps the last; the validated entry points refuse duplicates outright.
+        var top = JsonEdit.Object(b, 0);
         Assert.Equal("kA", top.Members[0].Key);
         Assert.Equal("2", S(JsonEdit.Text(b, top.Member("dup")!.Value)));
+        Assert.False(JsonEdit.IsObject(b));
+        Assert.Equal(JsonEditFailure.Malformed, Assert.Throws<JsonEditException>(() => JsonEdit.TopObject(b)).Failure);
     }
 
     [Fact]

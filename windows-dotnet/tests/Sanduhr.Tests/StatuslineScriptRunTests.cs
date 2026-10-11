@@ -14,6 +14,17 @@ public sealed class PowerShellFactAttribute : FactAttribute
     }
 }
 
+/// <summary>A fact that is skipped, with a message, where Git for Windows' bash.exe cannot be found.</summary>
+public sealed class GitBashFactAttribute : FactAttribute
+{
+    public GitBashFactAttribute()
+    {
+        if (!OperatingSystem.IsWindows()) Skip = "Git Bash is only looked for on Windows.";
+        else if (StatuslineScriptRunTests.FindPowerShell() is null) Skip = "powershell.exe was not found; the statusline script run tests need it.";
+        else if (StatuslineScriptRunTests.FindGitBash() is null) Skip = "Git Bash was not found (no bin/bash.exe in git.exe's install root, where Claude Code and the script look); this test needs Git for Windows.";
+    }
+}
+
 /// <summary>
 /// Runs the embedded statusline script for real with powershell.exe (5.1, the shell Claude Code's
 /// command names) in a sandbox: APPDATA and USERPROFILE point at temp folders, so nothing of the
@@ -51,6 +62,27 @@ public class StatuslineScriptRunTests : IDisposable
             {
                 var candidate = Path.Combine(dir.Trim('"'), "powershell.exe");
                 if (File.Exists(candidate)) return candidate;
+            }
+            catch (ArgumentException) { }
+        }
+        return null;
+    }
+
+    /// <summary>bin\bash.exe in the git install root found from git.exe on PATH, as the script looks for it; never System32 (WSL).</summary>
+    internal static string? FindGitBash()
+    {
+        foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            try
+            {
+                var git = Path.Combine(dir.Trim('"'), "git.exe");
+                if (!File.Exists(git)) continue;
+                var up = Path.GetDirectoryName(git);
+                for (int i = 0; i < 3 && up is not null; i++, up = Path.GetDirectoryName(up))
+                {
+                    var candidate = Path.Combine(up, "bin", "bash.exe");
+                    if (File.Exists(candidate) && !candidate.Contains(@"\System32\", StringComparison.OrdinalIgnoreCase)) return candidate;
+                }
             }
             catch (ArgumentException) { }
         }
@@ -299,5 +331,56 @@ public class StatuslineScriptRunTests : IDisposable
         var run = RunScript(["-Chain", Chain(Theirs), "-Join", "line", "-Mine", "weekly"],
             env: new Dictionary<string, string?>(NoGitBash) { ["SANDUHR_CHAIN_DEPTH"] = "1" });
         Assert.Equal("wk 17%\n", run.Text);
+    }
+
+    // -- real Git Bash --------------------------------------------------------
+
+    [GitBashFact]
+    public void Under_real_git_bash_a_chain_with_quotes_backslash_and_dollar_round_trips_and_runs()
+    {
+        WriteSanduhr("snapshot.json", Snapshot(42, 17));
+        // Bash text:  printf '%s\n' "a\"b'c\\d\$e"   which prints   a"b'c\d$e
+        const string theirs = "printf '%s\\n' \"a\\\"b'c\\\\d\\$e\"";
+        const string expected = "a\"b'c\\d$e";
+        var installer = new StatuslineInstaller(_profile, Path.Combine(_root.Path, "bin"));
+        Assert.True(installer.InstallScript());
+        var command = installer.BuildCommand(theirs, "line", ["weekly"]);
+
+        // The installed command parses back to the same chain.
+        var parsed = StatuslineInstaller.TryParseCommand(command);
+        Assert.NotNull(parsed);
+        Assert.Equal(theirs, parsed!.Chain);
+
+        // Claude Code runs the whole statusLine command through Git Bash: do the same. The script then
+        // runs their chain through Git Bash again (CLAUDE_CODE_GIT_BASH_PATH unset, found via git.exe).
+        var psi = new ProcessStartInfo(FindGitBash()!)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardOutputEncoding = new UTF8Encoding(false),
+        };
+        psi.ArgumentList.Add("-c");
+        psi.ArgumentList.Add(command);
+        psi.Environment["APPDATA"] = _appData;
+        psi.Environment["USERPROFILE"] = _profile;
+        psi.Environment.Remove("CLAUDE_CONFIG_DIR");
+        psi.Environment.Remove("CLAUDE_CODE_GIT_BASH_PATH");
+        psi.Environment.Remove("SANDUHR_CHAIN_DEPTH");
+        psi.Environment["SANDUHR_CHAIN_MS"] = "15000";
+        using var p = Process.Start(psi)!;
+        var stdout = p.StandardOutput.ReadToEndAsync();
+        var stderr = p.StandardError.ReadToEndAsync();
+        p.StandardInput.Write("{}");
+        p.StandardInput.Close();
+        if (!p.WaitForExit(40_000))
+        {
+            p.Kill(entireProcessTree: true);
+            Assert.Fail("the statusLine command did not finish in 40 s under Git Bash");
+        }
+        Assert.True(p.ExitCode == 0, $"exit {p.ExitCode}; stderr: {stderr.Result}");
+        Assert.Equal(expected + "\nwk 17%\n", stdout.Result.Replace("\r\n", "\n"));
     }
 }

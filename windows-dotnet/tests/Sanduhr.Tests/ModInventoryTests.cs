@@ -71,6 +71,13 @@ public sealed class ModInventoryTests : IDisposable
     }
 
     [Fact]
+    public void DuplicateKeysMakeSettingsUnreadable()
+    {
+        Put("settings.json", "{\"env\": {}, \"env\": {}}");
+        Assert.Equal(SettingsKind.Unreadable, Read().Settings.Kind);
+    }
+
+    [Fact]
     public void CommentsMakeSettingsUnreadableNotEmpty()
     {
         Put("settings.json", "{\n  // hello\n  \"a\": 1\n}\n");

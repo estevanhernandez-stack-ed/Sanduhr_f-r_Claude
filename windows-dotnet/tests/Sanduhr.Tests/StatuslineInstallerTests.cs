@@ -326,6 +326,20 @@ public class StatuslineInstallerSpliceTests
         Assert.Contains("\"mode\":\"combine\"", receipts);
     }
 
+    [Theory]
+    [InlineData("{\"statusLine\": {}, \"statusLine\": {}}")]
+    [InlineData("{\"env\": {}, \"env\": {}}")]
+    public void A_settings_file_with_duplicate_keys_is_unreadable_and_never_written(string text)
+    {
+        using var rig = new Rig();
+        rig.Write(text);
+        Assert.Equal(StatuslineStatus.Unreadable, rig.Installer.Status(".claude"));
+        Assert.False(rig.Installer.Install(".claude", StatuslineMode.Replace, StatuslineInstaller.DefaultSegments, "line"));
+        Assert.False(rig.Installer.Install(".claude", StatuslineMode.Combine, StatuslineInstaller.DefaultSegments, "line"));
+        Assert.Equal(text, rig.Text());
+        Assert.False(Directory.Exists(Path.Combine(rig.Data.Path, "backups")));
+    }
+
     [Fact]
     public void A_malformed_settings_file_is_never_written()
     {

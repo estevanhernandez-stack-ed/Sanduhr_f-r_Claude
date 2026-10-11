@@ -516,7 +516,7 @@ public sealed class StatuslineInstaller
         {
             if (File.Exists(path))
             {
-                if (JsonNode.Parse(File.ReadAllText(path)) is not JsonObject parsed)
+                if (JsonNode.Parse(File.ReadAllText(path), documentOptions: JsonEdit.StrictOptions) is not JsonObject parsed)
                 {
                     _logBestEffort?.Invoke("statusline register aborted (settings.json not an object)");
                     return false;
@@ -549,7 +549,7 @@ public sealed class StatuslineInstaller
         {
             if (!File.Exists(path))
                 return true;
-            if (JsonNode.Parse(File.ReadAllText(path)) is not JsonObject root)
+            if (JsonNode.Parse(File.ReadAllText(path), documentOptions: JsonEdit.StrictOptions) is not JsonObject root)
                 return true; // nothing we can safely edit; nothing of ours provably present
             if (!LegacyIsOurs(root))
                 return true; // absent or foreign — leave it alone

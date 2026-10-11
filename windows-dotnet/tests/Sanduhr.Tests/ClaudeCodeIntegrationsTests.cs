@@ -572,6 +572,9 @@ public sealed class ClaudeCodeIntegrationsTests : IDisposable
     [InlineData("// comment\n{}")]
     [InlineData("{\"a\": 1,}")]
     [InlineData("")]
+    [InlineData("{\"env\": {}, \"env\": {}}")]
+    [InlineData("{\"hooks\": {\"Stop\": []}, \"hooks\": {}}")]
+    [InlineData("{\"env\": {\"A\": \"1\", \"A\": \"2\"}}")]
     public void An_unreadable_settings_file_is_never_written(string text)
     {
         var sut = Sut();
@@ -599,6 +602,40 @@ public sealed class ClaudeCodeIntegrationsTests : IDisposable
         Assert.False(File.Exists(Receipts));
         Assert.False(Directory.Exists(Path.Combine(SanduhrDir, "backups")));
         Assert.Equal(new[] { "settings.json" }, FolderFiles(folder));
+    }
+
+    [Fact]
+    public void Remove_claims_only_the_exact_shape_and_leaves_a_users_near_copies()
+    {
+        var sut = Sut();
+        var folder = Folder();
+        var ours = ClaudeCodeIntegrations.HookCommand("glow-waiting.signal");
+        var done = ClaudeCodeIntegrations.HookCommand("glow-done.signal");
+        string Hook(string cmd, string shell = "powershell") => "{\"type\":\"command\",\"shell\":" + Quote(shell) + ",\"command\":" + Quote(cmd) + "}";
+        var matcher = Quote(ClaudeCodeIntegrations.WaitingMatcher);
+        var nearCopies = new[]
+        {
+            // extra hook beside ours
+            "{\"matcher\":" + matcher + ",\"hooks\":[" + Hook(ours) + "," + Hook("echo hi") + "]}",
+            // a different matcher
+            "{\"matcher\":\"idle_prompt\",\"hooks\":[" + Hook(ours) + "]}",
+            // no matcher on Notification
+            "{\"hooks\":[" + Hook(ours) + "]}",
+            // a matcher on Stop
+            "{\"matcher\":\"x\",\"hooks\":[" + Hook(done) + "]}",
+            // an edited command
+            "{\"matcher\":" + matcher + ",\"hooks\":[" + Hook(ours + "; echo extra") + "]}",
+            // another shell
+            "{\"matcher\":" + matcher + ",\"hooks\":[" + Hook(ours, "bash") + "]}",
+        };
+        Put(folder, "{\"hooks\":{\"Notification\":[" + string.Join(",", nearCopies.Take(3)) + "],\"Stop\":[" + string.Join(",", nearCopies.Skip(3)) + "]}}");
+        foreach (var g in nearCopies) Assert.False(ClaudeCodeIntegrations.IsOurHookGroup(JsonNode.Parse(g)));
+        Ok(sut.Install(IntegrationKind.Hooks, folder));
+        Ok(sut.Remove(IntegrationKind.Hooks, folder));
+        var hooks = (JsonObject)Json(folder)["hooks"]!;
+        Assert.Equal(3, ((JsonArray)hooks["Notification"]!).Count);
+        Assert.Equal(3, ((JsonArray)hooks["Stop"]!).Count);
+        Assert.DoesNotContain(((JsonArray)hooks["Notification"]!), g => ClaudeCodeIntegrations.IsOurHookGroup(g));
     }
 
     [Fact]

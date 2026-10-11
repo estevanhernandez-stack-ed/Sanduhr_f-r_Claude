@@ -25,7 +25,7 @@ public enum CommitOutcome
 /// microseconds wide, and the two writers that matter replace the file whole.
 ///
 /// Rules: a file that isn't a JSON object is never written (and neither are bytes that aren't one);
-/// the first change keeps a copy of the ORIGINAL bytes in the backups folder
+/// every commit made with backup:true copies the ORIGINAL bytes into the backups folder
 /// (<c>&lt;12 hex of SHA-256 of the lowercased full path&gt;-&lt;yyyyMMddHHmmssfff&gt;.json</c>), never beside the file;
 /// the new bytes go to a hidden temp sibling that is moved over the target. A symlink at the target is
 /// not followed: the move replaces the link with a regular file.

@@ -35,7 +35,7 @@
 
   <!-- Trust boundary BY CONSTRUCTION (WS-E design review must-fix #11): this
        project deliberately has NO reference to Sanduhr.Core. It source-links
-       exactly the four files it needs, so CredentialStore /
+       an allowlisted slice of Core files (TrustBoundaryTests pins the list), so CredentialStore /
        WindowsCredentialManager / the WebView2 transport are not merely unused —
        they are not part of the compilation. The cert letter's "cannot touch
        credentials" claim is structural. A test pins this file's link list to

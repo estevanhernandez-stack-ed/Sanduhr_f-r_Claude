@@ -118,6 +118,13 @@ public static class JsonEdit
     // ---------------------------------------------------------------- checking and reading
 
     /// <summary>
+    /// Parse options for every settings read: depth 256 and NO duplicate property names. A file with two
+    /// <c>"env"</c> keys parses under the defaults but throws ArgumentException on first JsonObject
+    /// indexing; refusing it here makes it Malformed/Unreadable everywhere, and never written.
+    /// </summary>
+    public static readonly JsonDocumentOptions StrictOptions = new() { MaxDepth = 256, AllowDuplicateProperties = false };
+
+    /// <summary>
     /// The parsed top-level object, or <see cref="JsonEditFailure.Malformed"/>. Strict JSON, as Claude
     /// Code's own <c>JSON.parse</c> reads it: comments and trailing commas are refused, and nothing but
     /// whitespace may follow the object. The caller disposes the document.
@@ -126,7 +133,7 @@ public static class JsonEdit
     {
         JsonDocument doc;
         var body = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF ? bytes.AsMemory(3) : bytes.AsMemory();
-        try { doc = JsonDocument.Parse(body, new JsonDocumentOptions { MaxDepth = 256 }); }
+        try { doc = JsonDocument.Parse(body, StrictOptions); }
         catch (JsonException) { throw new JsonEditException(JsonEditFailure.Malformed); }
         if (doc.RootElement.ValueKind != JsonValueKind.Object)
         {

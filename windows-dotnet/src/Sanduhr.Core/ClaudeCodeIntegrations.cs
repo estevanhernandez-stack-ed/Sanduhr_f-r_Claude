@@ -343,6 +343,9 @@ public sealed class ClaudeCodeIntegrations
     public static string HookCommand(string signal)
         => "$d = Join-Path $env:APPDATA 'Sanduhr'; if (Test-Path -LiteralPath $d) { [IO.File]::WriteAllText((Join-Path $d '" + signal + "'), '') }";
 
+    // The per-hook "shell" ("bash" or "powershell") and "async" (true runs the hook in the background)
+    // fields and the timeout in seconds are from the Claude Code hooks docs:
+    // https://code.claude.com/docs/en/hooks . Not yet exercised against a live Claude Code session.
     /// <summary>Sanduhr's group for one event: a matcher group (Notification only) with one async PowerShell command hook.</summary>
     public static JsonEdit.Value HookGroup(string eventName)
     {
@@ -369,9 +372,25 @@ public sealed class ClaudeCodeIntegrations
             && cmd.Contains("Sanduhr", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>A group is Sanduhr's only when every hook in it is Sanduhr's command; a user's group that also runs Sanduhr's is theirs.</summary>
+    /// <summary>
+    /// A group is Sanduhr's only when it matches Sanduhr's exact shape: the Notification matcher (none for
+    /// Stop) and exactly one hook, type command, shell powershell, whose command equals
+    /// <see cref="HookCommand"/> for that event's signal byte for byte. A user's near-copy (an extra hook,
+    /// a different matcher or command) is theirs and is never claimed or removed. async and timeout are
+    /// not compared, so an older Sanduhr group still reads as ours (Outdated, not foreign).
+    /// </summary>
     public static bool IsOurHookGroup(JsonNode? group)
-        => group is JsonObject o && o["hooks"] is JsonArray hs && hs.Count > 0 && hs.All(IsOurHookCommand);
+    {
+        if (group is not JsonObject o || o["hooks"] is not JsonArray hs || hs.Count != 1 || hs[0] is not JsonObject hook) return false;
+        if (Str(hook["type"]) != "command" || Str(hook["shell"]) != "powershell" || Str(hook["command"]) is not { } cmd) return false;
+        foreach (var (name, signal) in HookEvents)
+        {
+            if (!string.Equals(cmd, HookCommand(signal), StringComparison.Ordinal)) continue;
+            var matcher = o["matcher"];
+            return name == "Notification" ? Str(matcher) == WaitingMatcher : matcher is null;
+        }
+        return false;
+    }
 
     // ------------------------------------------------------------------ status
 
@@ -583,7 +602,7 @@ public sealed class ClaudeCodeIntegrations
 
     private static JsonNode? ParseElement(byte[] b, JsonEdit.Element e)
     {
-        try { return JsonNode.Parse(b.AsMemory(e.Start, e.End - e.Start).Span); }
+        try { return JsonNode.Parse(b.AsMemory(e.Start, e.End - e.Start).Span, documentOptions: JsonEdit.StrictOptions); }
         catch (JsonException) { return null; }
     }
 
@@ -899,7 +918,7 @@ public sealed class ClaudeCodeIntegrations
         if (made.Previous is { } previous)
         {
             result = JsonEdit.Restore(b, obj, made.Key, Encoding.UTF8.GetBytes(previous));
-            try { expect = JsonNode.Parse(previous); } catch (JsonException) { }
+            try { expect = JsonNode.Parse(previous, documentOptions: JsonEdit.StrictOptions); } catch (JsonException) { }
         }
         else if (made.CreatedParent)
         {
@@ -1035,7 +1054,7 @@ public sealed class ClaudeCodeIntegrations
         var body = b.Length >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF ? b.AsSpan(3) : b.AsSpan();
         try
         {
-            if (JsonNode.Parse(body, documentOptions: new JsonDocumentOptions { MaxDepth = 256 }) is JsonObject o) return o;
+            if (JsonNode.Parse(body, documentOptions: JsonEdit.StrictOptions) is JsonObject o) return o;
         }
         catch (JsonException) { }
         throw new IntegrationException(IntegrationFailure.Malformed, "The text is not a JSON object.");

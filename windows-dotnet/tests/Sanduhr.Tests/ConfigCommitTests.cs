@@ -130,6 +130,9 @@ public sealed class ConfigCommitTests : IDisposable
     public void Bytes_that_arent_a_json_object_are_never_written()
     {
         File.WriteAllBytes(Config, B("{}"));
+        var dup = B("{\"env\": {}, \"env\": {}}");
+        Assert.Throws<JsonEditException>(() => Sut.Commit(Config, dup, B("{}"), backup: true));
+        Assert.Throws<JsonEditException>(() => Sut.Commit(Config, B("{}"), dup, backup: false));
         Assert.Throws<JsonEditException>(() => Sut.Commit(Config, B("{}"), B("[1]"), backup: false));
         Assert.Throws<JsonEditException>(() => Sut.Commit(Config, B("{}"), B("{"), backup: false));
         Assert.Equal(B("{}"), File.ReadAllBytes(Config));

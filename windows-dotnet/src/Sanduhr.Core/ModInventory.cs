@@ -152,7 +152,7 @@ public static class ModInventory
         try
         {
             // Strict on purpose: comments and trailing commas are errors, as for Claude Code.
-            using var doc = JsonDocument.Parse(bytes);
+            using var doc = JsonDocument.Parse(bytes, JsonEdit.StrictOptions);
             if (doc.RootElement.ValueKind != JsonValueKind.Object)
                 return (new SettingsState(SettingsKind.Unreadable, 1, 1, "The top level is not a JSON object."), null);
             return (SettingsState.Readable, doc.RootElement.Clone());
