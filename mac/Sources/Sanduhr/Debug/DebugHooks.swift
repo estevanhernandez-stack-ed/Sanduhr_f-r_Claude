@@ -365,7 +365,7 @@ enum DebugHooks {
         s.justTheDesk = JustTheDesk.isOn()
         s.demo = DemoDebug(on: vm.demo, widgetTiers: vm.visibleTiers().count, deskLine: desk.model.claudeLine != nil,
                            notchMeters: desk.model.claudeCompact != nil, accounts: vm.accountLabels.count,
-                           usageRows: vm.demo ? DemoMode.coverage()[.usage] ?? 0 : 0)
+                           usageRows: vm.demo ? settings.usagePage.meterRows.count : 0)
         let meters = settings.usagePage
         s.meterHistory = MeterHistoryDebug(all: meters.metersAll && KeychainStore.accounts.labels.count > 1, window: meters.metersWindow.rawValue,
                                            rows: meters.meterRows.count, series: meters.meterRows.reduce(0) { $0 + $1.series.count })
@@ -419,7 +419,7 @@ enum DebugHooks {
         s.localActivityEvents = vm.localBurn.events
         s.vault = vm.vault.state(for: s.accountData)
         let folders = ClaudeCodeFolders.discover(home: NSHomeDirectory(), environment: ProcessInfo.processInfo.environment).map(\.path)
-            + vm.accountLabels.compactMap { vm.dataChoices(for: $0).folder }
+            + vm.realAccountLabels.compactMap { vm.dataChoices(for: $0).folder }
         (s.mcpInstalled, s.statuslineInstalled, s.metersInstalled, s.hooksInstalled)
             = IntegrationInstaller.standard.installedCounts(folders: folders)
         s.pendingMessages = DeskMessageHandoff.shared.pending != nil

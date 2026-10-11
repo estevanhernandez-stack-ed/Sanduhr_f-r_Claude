@@ -447,6 +447,13 @@ final class DeskModel {
         calendarNote = nil
     }
 
+    /// The Claude meters are empty only for a moment: an account switch's fade veils the old numbers,
+    /// or a key is waiting for its first fetch (no numbers yet and no sign-in needed). A notch wing
+    /// on the meters keeps its width meanwhile (NotchWingsView.collapses, slice 4).
+    var metersPending: Bool {
+        veiled || (!signInNeeded && usage.fetchedAt == nil)
+    }
+
     /// Takes the widget's latest numbers. AppDelegate calls this after every refresh, whether
     /// or not Desk or the widget is showing, so Desk has them the moment it starts.
     func update(_ input: DeskUsage) {
@@ -481,6 +488,8 @@ final class DeskModel {
     /// Settings' "Show this limit" switch: hiding records what the limit reads now
     /// (MeterVisibility.hide), showing clears the hide.
     func setShown(_ tier: Tier, _ shown: Bool) {
+        // Demo mode's sample numbers never decide a hide (slice 4).
+        guard !demo else { return }
         if shown {
             MeterVisibility.show(tier, store: UserDefaults.desk)
         } else {

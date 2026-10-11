@@ -104,3 +104,78 @@ enum DemoMode {
         ]
     }
 }
+
+/// What demo mode swaps on the view model: the numbers, the status, the accounts and the
+/// sparklines. UsageViewModel captures and applies it; DemoSession decides it.
+struct DemoShown: Equatable {
+    var usage: UsageResponse?
+    var lastUpdated: Date?
+    var status: UsageViewModel.StatusMessage
+    var labels: [String]
+    var active: String?
+    var signedIn: Set<String>
+    var history: HistoryStore.History
+}
+
+/// Demo mode's state machine, pure so it is tested without the app: on keeps the real state and
+/// shows a sample account, a pick or the chip's cycle moves among the samples only, an account
+/// change made elsewhere while on updates the kept state, and off hands the kept state back
+/// exactly as it then stands.
+struct DemoSession {
+    /// The real state while demo mode is on, nil while off.
+    private(set) var real: DemoShown?
+
+    var isOn: Bool { real != nil }
+
+    /// A sample account as the surfaces show it.
+    static func sample(_ label: String, now: Date) -> DemoShown {
+        DemoShown(usage: DemoMode.usage(for: label, now: now), lastUpdated: now, status: .idle,
+                  labels: DemoMode.accounts, active: label, signedIn: Set(DemoMode.accounts),
+                  history: HistoryStore.sparklines(DemoMode.history(for: label, now: now)))
+    }
+
+    /// On: keeps `current` the first time (again on keeps what was kept) and shows Work, or the
+    /// sample account already showing.
+    mutating func start(_ current: DemoShown, now: Date) -> DemoShown {
+        if real == nil {
+            real = current
+            return Self.sample(DemoMode.active, now: now)
+        }
+        let label = current.active.flatMap { DemoMode.accounts.contains($0) ? $0 : nil } ?? DemoMode.active
+        return Self.sample(label, now: now)
+    }
+
+    /// A sample account picked by hand (Make Active, the Accounts submenu); nil when off or not a
+    /// sample, so a real label never shows.
+    func pick(_ label: String, now: Date) -> DemoShown? {
+        guard isOn, DemoMode.accounts.contains(label) else { return nil }
+        return Self.sample(label, now: now)
+    }
+
+    /// The widget chip's click: the next sample account, wrapping.
+    func next(after active: String?, now: Date) -> DemoShown? {
+        guard isOn else { return nil }
+        let i = DemoMode.accounts.firstIndex(of: active ?? "") ?? -1
+        return Self.sample(DemoMode.accounts[(i + 1) % DemoMode.accounts.count], now: now)
+    }
+
+    /// The registry changed while on (an account added, removed or signed out elsewhere): the
+    /// kept state follows, the samples stay.
+    mutating func accountsChanged(labels: [String], active: String?, signedIn: Set<String>) {
+        real?.labels = labels
+        real?.active = active
+        real?.signedIn = signedIn
+    }
+
+    /// Off: the kept state, then nothing kept. Nil when it wasn't on.
+    mutating func end() -> DemoShown? {
+        defer { real = nil }
+        return real
+    }
+
+    /// Whether a fetch's answer may land: the client it was made with is still the current one,
+    /// and demo mode is off (one that lands under demo mode is dropped; off fetches afresh).
+    static func answerApplies(sameClient: Bool, demo: Bool) -> Bool {
+        sameClient && !demo
+    }
+}

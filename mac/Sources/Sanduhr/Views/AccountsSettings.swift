@@ -556,11 +556,16 @@ private struct FirstAccountForm: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .padding(.trailing, 12)
         }
-        .onAppear {
-            guard navigation?.pasteKey == true else { return }
-            navigation?.pasteKey = false
-            pasting = true
-        }
+        .onAppear { takePasteRequest() }
+        // Paste a Key Instead again while the page already shows.
+        .onChange(of: navigation?.pasteKey ?? false) { _, asked in if asked { takePasteRequest() } }
+    }
+
+    /// The welcome sheet's or the sign-in window's Paste a Key Instead: the key field shows.
+    private func takePasteRequest() {
+        guard navigation?.pasteKey == true else { return }
+        navigation?.pasteKey = false
+        pasting = true
     }
 
     private var labelField: some View {
@@ -585,11 +590,16 @@ private struct FirstAccountForm: View {
     private func signIn() {
         Task {
             let l = label.trimmed
-            guard case .signedIn(let c) = await SignInWindowController.shared.run(account: l.isEmpty ? nil : l)
-            else { return }
-            sessionKey = c.sessionKey
-            cfClearance = c.cfClearance ?? ""
-            save()
+            switch await SignInWindowController.shared.run(account: l.isEmpty ? nil : l) {
+            case .signedIn(let c):
+                sessionKey = c.sessionKey
+                cfClearance = c.cfClearance ?? ""
+                save()
+            case .pasteInstead:
+                pasting = true
+            case .cancelled:
+                break
+            }
         }
     }
 
@@ -602,6 +612,8 @@ private struct FirstAccountForm: View {
             cfClearance = ""
         } catch {
             self.error = refusal(error)
+            // A key captured by Sign In stays in the field beside the refusal, to fix and Save.
+            pasting = true
         }
     }
 }

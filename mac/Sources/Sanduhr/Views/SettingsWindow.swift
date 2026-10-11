@@ -113,7 +113,10 @@ final class SettingsWindowController {
     /// Paste a Key Instead, from the welcome sheet or the sign-in window: Accounts, with the
     /// first-account form's key field already showing.
     func showPasteKey() {
-        navigation.pasteKey = true
+        // Only the first-account form has the field to open; with accounts (or demo mode) the page
+        // is the list, and a request left set would open a later first-account form unasked.
+        let vm = (NSApp.delegate as? AppDelegate)?.viewModel
+        navigation.pasteKey = vm.map { $0.accountLabels.isEmpty && !$0.demo } ?? false
         show(.credentials)
     }
 

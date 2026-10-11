@@ -301,7 +301,7 @@ struct LimitContextMenu: ViewModifier {
         content.contextMenu {
             if let app = NSApp.delegate as? AppDelegate {
                 let groups = LimitMenu.groups(tier: tier, accounts: app.currentAccountsMenu(),
-                                              hidden: vm.hiddenTiers, temporary: vm.temporaryTiers,
+                                              hidden: vm.hiddenTiers, temporary: vm.demo ? [] : vm.temporaryTiers,
                                               warningsOn: warningsOn)
                 ForEach(groups.indices, id: \.self) { i in
                     if i > 0 { Divider() }

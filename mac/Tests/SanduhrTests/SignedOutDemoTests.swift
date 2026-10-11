@@ -79,6 +79,13 @@ struct SignedOutTests {
 struct EmptyWingTests {
     let now = Date(timeIntervalSince1970: 1_000_000)
 
+    /// Signed out with the sign-in reminder off: the meters have nothing to show and nothing coming.
+    func signedOut() -> DeskModel {
+        let model = DeskModel()
+        model.signInNeeded = true
+        return model
+    }
+
     func layout(_ model: DeskModel, left: NotchContent, right: NotchContent, showText: Bool = true,
                 wings: Double = 36) -> NotchWingsView.Layout {
         NotchWingsView.layout(model: model, now: now, wings: wings, showText: showText,
@@ -87,7 +94,7 @@ struct EmptyWingTests {
 
     @Test func eachContentCollapsesOnlyWhenEmpty() {
         // Signed out with the reminder off, no meetings, no message, nothing playing, no watcher.
-        let model = DeskModel()
+        let model = signedOut()
         for content in NotchContent.choices {
             let w = layout(model, left: content, right: content)
             for (width, text, shown) in [(w.left, w.leftText, w.leftContent), (w.right, w.rightText, w.rightContent)] {
@@ -101,7 +108,7 @@ struct EmptyWingTests {
     }
 
     @Test func claudeMetersWithoutNumbersCollapseAndComeBack() {
-        let model = DeskModel()
+        let model = signedOut()
         #expect(layout(model, left: .time, right: .meters).right == 0)
         #expect(layout(model, left: .time, right: .meters).left >= 36)
         model.claudeCompact = "5h 42%  wk 63%"
@@ -120,7 +127,7 @@ struct EmptyWingTests {
     }
 
     @Test func meetingOrMetersWithNeitherCollapses() {
-        let model = DeskModel()
+        let model = signedOut()
         #expect(layout(model, left: .meetingOrMeters, right: .time).left == 0)
         model.meetings = DeskModel.demoMeetings(now: now)
         #expect(layout(model, left: .meetingOrMeters, right: .time).left >= 36)
@@ -128,13 +135,41 @@ struct EmptyWingTests {
 
     @Test func emptyWatchersAndNowPlayingFallBackThenCollapse() {
         // No watcher: the right wing shows its default, Claude meters, which has nothing either.
-        let model = DeskModel()
+        let model = signedOut()
         let w = layout(model, left: .watchers, right: .watchers)
         #expect(w.rightContent == .meters && w.right == 0)
         // The left default is the time, which always shows.
         #expect(w.leftContent == .meetingOrTime && w.left >= 36)
         let np = layout(model, left: .nowPlaying, right: .nowPlaying)
         #expect(np.right == 0 && np.left >= 36)
+    }
+
+    @Test func theMetersWingHoldsItsWidthThroughAnAccountSwitch() {
+        // Review 2026-10-11: the old numbers are veiled while a switch fades, so the short meters
+        // are briefly nil; the wing keeps its width instead of folding and growing back.
+        let model = DeskModel()
+        model.update(DeskUsage(usage: DemoMode.usage(for: "Work", now: now), fetchedAt: now, veiled: true))
+        model.claudeCompact = nil
+        #expect(model.metersPending)
+        #expect(layout(model, left: .meetingOrMeters, right: .meters).right >= 36)
+        #expect(layout(model, left: .meetingOrMeters, right: .meters).left >= 36)
+        // A Message wing still folds: it is empty by its content, not for a moment.
+        #expect(layout(model, left: .message, right: .meters).left == 0)
+    }
+
+    @Test func theMetersWingHoldsItsWidthBeforeTheFirstFetch() {
+        // A key saved, its first fetch still out: no numbers, no sign-in needed.
+        let model = DeskModel()
+        model.update(DeskUsage())
+        #expect(model.metersPending)
+        #expect(layout(model, left: .time, right: .meters).right >= 36)
+        // Signed out instead (only a sign-in helps): it folds.
+        model.signInNeeded = true
+        #expect(!model.metersPending)
+        model.claudeCompact = nil
+        #expect(layout(model, left: .time, right: .meters).right == 0)
+        #expect(!NotchWingsView.collapses(nil, .meters, showText: true, metersPending: true))
+        #expect(NotchWingsView.collapses(nil, .message, showText: true, metersPending: true))
     }
 
     @Test func nothingAndTextOffKeepTheChosenWidth() {
@@ -147,7 +182,7 @@ struct EmptyWingTests {
     }
 
     @Test func bothEmptyShrinksTheIslandToTheCamera() {
-        let w = layout(DeskModel(), left: .message, right: .meters)
+        let w = layout(signedOut(), left: .message, right: .meters)
         #expect(w.totalLeft == 0 && w.totalRight == 0)
         #expect(NotchWingsView.collapses(nil, .meters, showText: true))
         #expect(!NotchWingsView.collapses("", .avIndicators, showText: true))
@@ -201,6 +236,56 @@ struct DemoModeTests {
         let rows = MeterHistoryChart.rows(histories: DemoMode.histories(now: now), accounts: DemoMode.accounts,
                                           window: .month, now: now)
         #expect(rows.count == 3)
+    }
+
+    // MARK: DemoSession, the view model's on and off (review 2026-10-11)
+
+    /// A real state unlike the samples in every field.
+    var real: DemoShown {
+        DemoShown(usage: UsageResponse(tiers: [.fiveHour: TierUsage(utilization: 7, resetsAt: nil)]),
+                  lastUpdated: Date(timeIntervalSince1970: 1_700_000_000),
+                  status: .error("HTTP 500", isAuth: false), labels: ["Alpha", "Beta"], active: "Beta",
+                  signedIn: ["Beta"], history: ["five_hour": [HistoryStore.Point(t: "2026-10-01T00:00:00Z", v: 7)]])
+    }
+
+    @Test func onSwitchCycleOffRestoresTheRealStateExactly() {
+        var session = DemoSession()
+        let on = session.start(real, now: now)
+        #expect(session.isOn)
+        #expect(on.labels == ["Work", "Personal"] && on.active == "Work" && on.status == .idle)
+        #expect(on.signedIn == ["Work", "Personal"] && on.usage == DemoMode.usage(for: "Work", now: now))
+        // The chip cycles among the samples; a pick by hand too; a real name never shows.
+        let cycled = session.next(after: on.active, now: now)
+        #expect(cycled?.active == "Personal" && cycled?.usage == DemoMode.usage(for: "Personal", now: now))
+        #expect(session.next(after: "Personal", now: now)?.active == "Work")
+        #expect(session.pick("Work", now: now)?.active == "Work")
+        #expect(session.pick("Alpha", now: now) == nil)
+        // On again keeps the first kept state and the sample showing.
+        #expect(session.start(cycled!, now: now).active == "Personal")
+        #expect(session.end() == real)
+        #expect(!session.isOn && session.end() == nil)
+    }
+
+    @Test func anAccountChangeWhileOnLandsInTheKeptState() {
+        var session = DemoSession()
+        _ = session.start(real, now: now)
+        session.accountsChanged(labels: ["Alpha", "Beta", "Gamma"], active: "Gamma", signedIn: ["Beta", "Gamma"])
+        var expected = real
+        expected.labels = ["Alpha", "Beta", "Gamma"]
+        expected.active = "Gamma"
+        expected.signedIn = ["Beta", "Gamma"]
+        #expect(session.end() == expected)
+        // Off, there is nothing to keep.
+        var off = DemoSession()
+        off.accountsChanged(labels: ["X"], active: "X", signedIn: [])
+        #expect(off.end() == nil)
+        #expect(off.pick("Work", now: now) == nil && off.next(after: nil, now: now) == nil)
+    }
+
+    @Test func aFetchLandingDuringDemoIsDropped() {
+        #expect(DemoSession.answerApplies(sameClient: true, demo: false))
+        #expect(!DemoSession.answerApplies(sameClient: true, demo: true))
+        #expect(!DemoSession.answerApplies(sameClient: false, demo: false))
     }
 
     @Test func demoMeetingsAreMadeUp() {

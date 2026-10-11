@@ -59,6 +59,9 @@ final class SeatMeters {
     private var knownFetchable: Set<String> = []
     /// Accounts waiting for that one fetch.
     private(set) var pending: Set<String> = []
+    /// Demo mode (slice 4): no round starts and no fetch goes out until it ends. The files and
+    /// seats.json still follow the real accounts (`sync`), so nothing reads as signed out.
+    var paused = false
 
     init(files: SeatSnapshots.Files = .standard, interval: TimeInterval = 5 * 60) {
         self.files = files
@@ -159,7 +162,7 @@ final class SeatMeters {
     /// here off the main thread, with Claude Code activity in its folder.
     @discardableResult
     func startRound() -> Task<Void, Never>? {
-        guard round == nil else { return nil }
+        guard round == nil, !paused else { return nil }
         let c = context()
         let candidates = c.linked.keys.filter {
             SeatSnapshots.fetchable($0, linked: c.linked, signedIn: c.signedIn, active: c.active) && !throttled($0)
@@ -187,6 +190,7 @@ final class SeatMeters {
     }
 
     private func fetch(_ label: String) async {
+        guard !paused else { return }
         let c = context()
         guard SeatSnapshots.fetchable(label, linked: c.linked, signedIn: c.signedIn, active: c.active),
               !throttled(label) else { return }

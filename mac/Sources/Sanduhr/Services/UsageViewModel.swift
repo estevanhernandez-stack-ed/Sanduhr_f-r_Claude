@@ -184,19 +184,13 @@ final class UsageViewModel {
     private(set) var signedInAccounts: Set<String> = UsageViewModel.signedIn(KeychainStore.accounts)
 
     /// Demo mode (DemoMode, slice 4): the sample accounts and numbers stand in for the real ones
-    /// on every surface. In memory only; the real state waits in `demoStash` and comes back with off.
+    /// on every surface. In memory only; the real state waits in `demoSession` and comes back with off.
     private(set) var demo = false
-    /// What demo mode covers up, kept current while it is on (an account change elsewhere).
-    private struct DemoStash {
-        var usage: UsageResponse?
-        var lastUpdated: Date?
-        var status: StatusMessage
-        var labels: [String]
-        var active: String?
-        var signedIn: Set<String>
-        var history: HistoryStore.History
-    }
-    @ObservationIgnored private var demoStash: DemoStash?
+    @ObservationIgnored private var demoSession = DemoSession()
+
+    /// The real accounts, whatever demo mode shows: what the Claude Code folders, the Mods page and
+    /// state.yaml list (a sample name never stands for a real folder).
+    var realAccountLabels: [String] { demoSession.real?.labels ?? accountLabels }
 
     /// Settings, Accounts, Follow the account I'm using: off by default (AccountFollower).
     var followEnabled: Bool = UserDefaults.standard.bool(forKey: AccountFollower.enabledKey) {
@@ -601,9 +595,7 @@ final class UsageViewModel {
         let signedIn = Self.signedIn(accounts)
         if demo {
             // The sample accounts stay on screen; the real ones wait for demo mode's end.
-            demoStash?.labels = labels
-            demoStash?.active = active
-            demoStash?.signedIn = signedIn
+            demoSession.accountsChanged(labels: labels, active: active, signedIn: signedIn)
         } else {
             if labels != accountLabels { accountLabels = labels }
             if active != activeAccount { activeAccount = active }
@@ -630,7 +622,7 @@ final class UsageViewModel {
     /// What SeatMeters reads of the accounts, at each step.
     /// Always the real accounts: demo mode's samples never reach a seat file.
     private func seatContext() -> SeatMeters.Context {
-        if let s = demoStash {
+        if let s = demoSession.real {
             return SeatMeters.Context(labels: s.labels, choices: accountDataChoices, signedIn: s.signedIn,
                                       active: s.active, inUse: accountsInUse)
         }
@@ -643,7 +635,7 @@ final class UsageViewModel {
     /// ones under demo mode).
     private func syncSeats() {
         seatMeters.sync()
-        if let s = demoStash {
+        if let s = demoSession.real {
             seatMeters.seed(s.usage, at: s.lastUpdated, label: apiAccount)
             return
         }
@@ -689,7 +681,8 @@ final class UsageViewModel {
     private func followContext() -> AccountFollow.State {
         let accounts = KeychainStore.accounts
         var s = AccountFollow.State()
-        s.enabled = followEnabled
+        // Demo mode pauses following: no check, no fetch, no switch.
+        s.enabled = followEnabled && !demo
         s.active = accounts.active
         s.signedIn = Self.signedIn(accounts)
         s.activeSignedOut = status == .signedOut || api == nil
@@ -738,7 +731,7 @@ final class UsageViewModel {
     private func switchAccount(to label: String, automatic: Bool) {
         // Demo mode switches between the sample accounts only, and never by following.
         if demo {
-            if !automatic { showDemo(label) }
+            if !automatic, let shown = demoSession.pick(label, now: Date()) { apply(shown) }
             return
         }
         let accounts = KeychainStore.accounts
@@ -755,8 +748,7 @@ final class UsageViewModel {
     /// with fewer than two accounts.
     func cycleAccount() {
         if demo {
-            let i = accountLabels.firstIndex(of: activeAccount ?? "") ?? -1
-            showDemo(accountLabels[(i + 1) % accountLabels.count])
+            if let shown = demoSession.next(after: activeAccount, now: Date()) { apply(shown) }
             return
         }
         guard let next = KeychainStore.accounts.nextLabel else { return }
@@ -770,43 +762,39 @@ final class UsageViewModel {
     /// account change made meanwhile) and fetches at once. Writes nothing anywhere.
     func setDemo(_ on: Bool, now: Date = Date()) {
         if on {
-            if !demo {
-                demoStash = DemoStash(usage: usage, lastUpdated: lastUpdated, status: status, labels: accountLabels,
-                                      active: activeAccount, signedIn: signedInAccounts, history: history)
-                demo = true
-                activeAccount = DemoMode.active
-                accountLabels = DemoMode.accounts
-                signedInAccounts = Set(DemoMode.accounts)
-                refreshLocalBurn()
-            }
-            showDemo(DemoMode.accounts.contains(activeAccount ?? "") ? activeAccount ?? DemoMode.active : DemoMode.active,
-                     now: now)
+            // A switch's fade would hold the old account's name and numbers over the samples.
+            endSwitchVeil()
+            let shown = demoSession.start(shownState, now: now)
+            demo = true
+            seatMeters.paused = true
+            apply(shown)
+            refreshLocalBurn()
             return
         }
-        guard demo, let s = demoStash else { return }
+        guard let real = demoSession.end() else { return }
         demo = false
-        demoStash = nil
-        accountLabels = s.labels
-        activeAccount = s.active
-        signedInAccounts = s.signedIn
-        usage = s.usage
-        lastUpdated = s.lastUpdated
-        status = s.status
-        history = s.history
+        seatMeters.paused = false
+        apply(real)
         reloadAccounts()
         refreshLocalBurn()
-        onUsageUpdate?()
         if api != nil { Task { await refresh() } }
     }
 
-    /// One sample account on screen, as a switch would show it.
-    private func showDemo(_ label: String, now: Date = Date()) {
-        guard demo, DemoMode.accounts.contains(label) else { return }
-        activeAccount = label
-        usage = DemoMode.usage(for: label, now: now)
-        lastUpdated = now
-        status = .idle
-        history = HistoryStore.sparklines(DemoMode.history(for: label, now: now))
+    /// What demo mode swaps, as it stands now.
+    private var shownState: DemoShown {
+        DemoShown(usage: usage, lastUpdated: lastUpdated, status: status, labels: accountLabels,
+                  active: activeAccount, signedIn: signedInAccounts, history: history)
+    }
+
+    /// Puts a DemoShown on screen (samples, or the real state back) and tells the surfaces.
+    private func apply(_ shown: DemoShown) {
+        if accountLabels != shown.labels { accountLabels = shown.labels }
+        if activeAccount != shown.active { activeAccount = shown.active }
+        if signedInAccounts != shown.signedIn { signedInAccounts = shown.signedIn }
+        usage = shown.usage
+        lastUpdated = shown.lastUpdated
+        status = shown.status
+        history = shown.history
         onUsageUpdate?()
     }
 
@@ -958,14 +946,14 @@ final class UsageViewModel {
             await waitOutSwitchFade()
             // Signed out, switched, or a new key saved while this fetch ran: its answer is stale.
             // So is one that lands under demo mode.
-            guard self.api === api, !demo else { return }
+            guard DemoSession.answerApplies(sameClient: self.api === api, demo: demo) else { return }
             showFailure(error, accountRef: ref)
             if apiAccount == account { seatMeters.activeAnswered(account, .failure(error)) }
             endSwitchVeil()
             return
         }
         await waitOutSwitchFade()
-        guard self.api === api, !demo else { return }
+        guard DemoSession.answerApplies(sameClient: self.api === api, demo: demo) else { return }
         // Hidden limits that reset, refilled or are no longer temporary show again before the
         // numbers do (item 42).
         Self.reconcileHidden(u, now: Date())

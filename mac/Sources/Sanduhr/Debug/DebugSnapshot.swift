@@ -166,7 +166,8 @@ struct DockDebug: Equatable {
 
 /// state.yaml's `demo:` (item 72, slice 4): demo mode and what it fills. The widget's tier cards,
 /// whether the Desk's Claude line and the notch's Claude meters have text, how many accounts the
-/// widget and Accounts list, and the Usage page's chart rows from the samples. Never a label.
+/// widget and Accounts list, and the Usage page's chart rows as drawn (0 until it has shown under
+/// demo mode). Never a label.
 struct DemoDebug: Equatable {
     var on = false
     var widgetTiers = 0

@@ -4,7 +4,7 @@
 # and two sample accounts on the widget's chip and Settings, Accounts. Held in memory: nothing is
 # written, no account is added, and `demo off` (or the restore) brings the real state back. Also
 # safe on a signed-in profile, where demo mode covers the real numbers until off.
-# By hand: docs/mac-smoke-test.md, "Signed out and demo mode".
+# By hand: docs/mac-smoke-test.md, section 48, "Signed out and demo mode".
 name: Demo mode fills every surface
 needs: [desk]
 steps:
@@ -17,14 +17,13 @@ steps:
       demo.desk_line: true
       demo.notch_meters: true
       demo.accounts: 2
-      demo.usage_rows: '/^[1-9]\d*$/'
       meters.0.percent: '/^\d+$/'
   - expect:
       window: widget
       contains: { text: "/Work/" }
   - do: usage
     arg: meters
-  - expect_state: { usage_page.open: true, usage_page.tab: meters }
+  - expect_state: { usage_page.open: true, usage_page.tab: meters, demo.usage_rows: '/^[1-9]\d*$/' }
   - do: settings
     arg: credentials
   - expect:

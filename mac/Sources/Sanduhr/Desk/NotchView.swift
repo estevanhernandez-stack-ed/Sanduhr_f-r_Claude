@@ -450,8 +450,15 @@ struct NotchWingsView: View {
     /// chosen width (Extra width each side) comes back with the content. Two choices keep their
     /// width: Nothing, picked on purpose as a plain black wing, and Text beside the camera off,
     /// the island without text.
-    static func collapses(_ text: String?, _ content: NotchContent, showText: Bool) -> Bool {
-        showText && text == nil && content != .nothing
+    ///
+    /// A wing showing the Claude meters holds its width while their emptiness is only a moment:
+    /// during an account switch's fade (`metersPending`, the old numbers veiled) and before a key's
+    /// first fetch. Only a wing empty by its content folds.
+    static func collapses(_ text: String?, _ content: NotchContent, showText: Bool,
+                          metersPending: Bool = false) -> Bool {
+        guard showText, text == nil, content != .nothing else { return false }
+        if metersPending, content == .meters || content == .meetingOrMeters { return false }
+        return true
     }
 
     static func layout(model: DeskModel, now: Date, wings: Double, showText: Bool,
@@ -480,7 +487,7 @@ struct NotchWingsView: View {
         }
         func wingWidth(_ text: String?, _ content: NotchContent, _ place: NotchContent.Place) -> CGFloat {
             // Nothing to show: no black slab, the island gives the room back (slice 4, F25).
-            if collapses(text, content, showText: showText) { return 0 }
+            if collapses(text, content, showText: showText, metersPending: model.metersPending) { return 0 }
             // A paused now playing also makes room for its Next button (item 53b).
             // A watcher also makes room for its dot (item 66).
             // The camera and mic indicators are their own width (item 67).

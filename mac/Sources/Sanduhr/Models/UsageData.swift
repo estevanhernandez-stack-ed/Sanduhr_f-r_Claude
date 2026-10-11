@@ -3,7 +3,7 @@ import Foundation
 /// Decoded body of `GET /api/organizations/{id}/usage`.
 /// Keyed by `Tier` so we can iterate in display order without caring which
 /// fields the server included.
-struct UsageResponse {
+struct UsageResponse: Equatable {
     var tiers: [Tier: TierUsage] = [:]
     var extraUsage: ExtraUsage?
 }

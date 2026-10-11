@@ -137,13 +137,15 @@ class FakeApp
           s['meters'] = [{ 'tier' => 'five_hour', 'label' => 'Session (5hr)', 'percent' => 42, 'fill' => 0.42,
                            'pace' => 0.6, 'reset' => 'Today 5:00 PM', 'warning' => false }] if Array(s['meters']).empty?
         end
+        # usage_rows counts the Usage page's charts as drawn: 0 until the page opens.
         s['demo'] = { 'active' => true, 'widget_tiers' => 3, 'desk_line' => true, 'notch_meters' => true,
-                      'accounts' => 2, 'usage_rows' => 3 }
+                      'accounts' => 2, 'usage_rows' => 0 }
       elsif @before_demo
         s.merge!(@before_demo)
         @before_demo = nil
       end
     when 'usage'
+      s['demo']['usage_rows'] = 3 if s['demo'].is_a?(Hash) && s['demo']['active']
       s['settings_open'] = true
       s['settings_section'] = 'usage'
       s['usage_page'] = { 'open' => true, 'tab' => arg || 'overview' }

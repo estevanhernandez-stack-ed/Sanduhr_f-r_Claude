@@ -486,8 +486,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// warnings item for `tier`, Alerts Settings…, then the shared menu under a separator, less its
     /// own Show or Hide Widget. `tier` nil, a click beside the rows, leaves the limit's own items out.
     func addLimitMenuItems(to menu: NSMenu, tier: Tier?) {
+        // Demo mode's sample numbers never decide a hide: no Hide item while it is on (slice 4).
         let groups = LimitMenu.groups(tier: tier, accounts: currentAccountsMenu(), store: UserDefaults.desk,
-                                      usage: viewModel.usage, now: Date(), widgetVisible: widgetVisible)
+                                      usage: viewModel.demo ? nil : viewModel.usage, now: Date(),
+                                      widgetVisible: widgetVisible)
         for (i, group) in groups.enumerated() {
             if i > 0 { menu.addItem(.separator()) }
             for entry in group { menu.addItem(limitMenuItem(entry)) }
@@ -528,6 +530,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if visible { hidePanel() } else { DeskController.shared.showWidgetBesideMeters() }
         case .accounts, .hiddenLimits: break
         case .meterSettings: SettingsWindowController.shared.show(LimitMenu.meterSection, anchor: LimitMenu.meterAnchor)
+        case .hide where viewModel.demo: break
         case .hide, .show, .warnings: LimitMenu.apply(entry, to: UserDefaults.desk, usage: viewModel.usage)
         }
     }
