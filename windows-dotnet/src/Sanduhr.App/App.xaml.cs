@@ -54,7 +54,8 @@ public partial class App : Application
         _vm.ReauthRequested += RunReauthAsync;
         _vm.ManualReauthRequested += RunManualReauthAsync;
         _vm.PasteKeyRequested += () => RunSignInAsync(embedded: false);
-        _vm.SettingsRequested += ShowSettingsAsync;
+        _vm.SettingsRequested += () => ShowSettingsAsync();
+        _vm.SettingsPageRequested += page => ShowSettingsAsync(page);
         // Keep an open Settings window's account list in sync with quick-switches
         // made elsewhere (tray / widget chip / right-click).
         _vm.AccountsChanged += () => _settingsWindow?.ViewModel.Accounts.Reload();
@@ -205,7 +206,7 @@ public partial class App : Application
     /// non-modal so a live account switch from here reflects in the widget at once.
     /// Re-invoking focuses the existing window and refreshes its account list.
     /// </summary>
-    private Task ShowSettingsAsync()
+    private Task ShowSettingsAsync(SettingsPage? page = null)
     {
         if (_vm is null)
             return Task.CompletedTask;
@@ -213,6 +214,8 @@ public partial class App : Application
         if (_settingsWindow is not null)
         {
             _settingsWindow.ViewModel.Accounts.Reload();
+            if (page is { } p)
+                _settingsWindow.SelectPage(p);
             _settingsWindow.Activate();
             return Task.CompletedTask;
         }
@@ -238,6 +241,8 @@ public partial class App : Application
             _settingsWindow.Owner = _window;
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
+        if (page is { } first)
+            _settingsWindow.SelectPage(first);
         _settingsWindow.Activate();
         return Task.CompletedTask;
     }

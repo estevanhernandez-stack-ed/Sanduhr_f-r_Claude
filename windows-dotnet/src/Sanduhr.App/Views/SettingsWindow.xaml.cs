@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using Sanduhr.App.Interop;
 using Sanduhr.App.ViewModels;
+using Sanduhr.Core;
 
 namespace Sanduhr.App.Views;
 
@@ -138,6 +139,33 @@ internal partial class SettingsWindow : Window
             _localCcTimer.Stop();
             if (header == "History")
                 RenderHistory();
+        }
+    }
+
+    /// <summary>Settings page to TabItem header: the one mapping the router uses.</summary>
+    private static readonly Dictionary<SettingsPage, string> PageHeaders = new()
+    {
+        [SettingsPage.Accounts] = "Accounts",
+        [SettingsPage.Themes] = "Themes",
+        [SettingsPage.Alerts] = "Alerts",
+        [SettingsPage.History] = "History",
+        [SettingsPage.ClaudeUsage] = "Claude Usage",
+        [SettingsPage.Publish] = "Publish usage",
+        [SettingsPage.General] = "General",
+    };
+
+    /// <summary>Select the tab for <paramref name="page"/>. Widget is not a Settings page: ignored.</summary>
+    public void SelectPage(SettingsPage page)
+    {
+        if (!PageHeaders.TryGetValue(page, out var header))
+            return;
+        foreach (var item in Tabs.Items)
+        {
+            if (item is TabItem tab && tab.Header as string == header)
+            {
+                Tabs.SelectedItem = tab;
+                return;
+            }
         }
     }
 

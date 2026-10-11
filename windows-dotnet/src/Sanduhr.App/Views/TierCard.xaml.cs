@@ -86,7 +86,7 @@ public partial class TierCard : UserControl
             }
             menu.Items.Add(sub);
         }
-        menu.Items.Add(Item("Alerts Settings…", () => host.OpenSettingsCommand.Execute(null)));
+        menu.Items.Add(Item("Alerts Settings…", () => _ = host.OpenSettingsAtAsync(SettingsPage.Alerts)));
     }
 
     private static MenuItem Item(string header, Action onClick)

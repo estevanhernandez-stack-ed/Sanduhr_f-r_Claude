@@ -225,6 +225,19 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// tray) — App opens the <c>SettingsWindow</c> on the Accounts tab.</summary>
     public event Func<Task>? SettingsRequested;
 
+    /// <summary>Raised by <see cref="OpenSettingsAtAsync"/> — App opens (or focuses) Settings
+    /// and selects the named page.</summary>
+    public event Func<SettingsPage, Task>? SettingsPageRequested;
+
+    /// <summary>Open Settings on a named page (the tier card's "Alerts Settings…").</summary>
+    public async Task OpenSettingsAtAsync(SettingsPage page)
+    {
+        if (SettingsPageRequested is not null)
+            await SettingsPageRequested.Invoke(page);
+        else if (SettingsRequested is not null)
+            await SettingsRequested.Invoke();
+    }
+
     /// <summary>Raised after any account-registry mutation routed through this VM
     /// (switch / rename / sign-out). Open menus + the Settings accounts list re-read
     /// the registry so their checkmarks and rows stay in sync.</summary>
