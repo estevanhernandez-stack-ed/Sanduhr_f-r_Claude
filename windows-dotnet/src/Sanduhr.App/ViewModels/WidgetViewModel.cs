@@ -36,6 +36,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private readonly CredentialStore _credentials;
     private readonly UsageHistory _history;
     private readonly SettingsStore _settings;
+    private readonly InactiveUsageReader _inactiveReader;
+    private readonly AccountFollower _follower;
+    private readonly SeatMeters _seatMeters;
+    private readonly Dictionary<string, string> _accountFolders;
+    private bool _followAccount;
+    private bool _switchingAccount;
     private readonly CcLogReader _ccReader;
     private readonly AlertEngine _alertEngine = new();
     private AlertConfig _alertConfig = new(true, 80, 95, true, false);
@@ -608,6 +614,25 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _snapshotWriter = new SnapshotWriter(_paths.SnapshotFile, LogSnapshotFailure, AppVersion);
         _statuslineEnabled = _settings.LoadStatuslineEnabled();
 
+        // Account follow and per-seat meters (spec 4.6). Inactive accounts are read through their own
+        // WebView2 profiles, one at a time, and disposed after each read.
+        _followAccount = _settings.LoadFollowAccount();
+        _accountFolders = _settings.LoadAccountFolders();
+        _inactiveReader = new InactiveUsageReader(_paths, LogSnapshotFailure);
+        _follower = new AccountFollower(_inactiveReader, _accounts.LoadCredentials)
+        {
+            Context = FollowState,
+            OnSwitch = label => _ = SwitchAccountCoreAsync(label, automatic: true),
+            OnReadings = () => InUseChanged?.Invoke(),
+            OnResult = (label, reading) => _seatMeters!.FollowerAnswered(label, reading),
+        };
+        _seatMeters = new SeatMeters(_paths.AppDataDir, RefreshInterval, _inactiveReader, AppVersion, LogSnapshotFailure)
+        {
+            Context = SeatContextNow,
+            CredentialsOf = _accounts.LoadCredentials,
+        };
+        AccountsChanged += SyncSeats;
+
         _pinned = _settings.LoadPinned();
         _isThemesExpanded = _settings.LoadThemesExpanded();
         _savedOrder = _settings.LoadTierOrder().ToList();
@@ -655,6 +680,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
         RebuildFetcher();
         RefreshAccountLabel();
+        _follower.Apply(_followAccount);
+        SyncSeats();
         _tickTimer.Start();
         _refreshTimer.Start();
         await RefreshAsync();
@@ -787,6 +814,104 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     private static void Log(string message) => Debug.WriteLine($"[Sanduhr.Themes] {message}");
 
+    // -- account follow and per-seat meters (spec 4.6) -------------------------
+
+    /// <summary>Raised when the "in use" marks may have changed (a follower check, or following switched).</summary>
+    public event Action? InUseChanged;
+
+    /// <summary>"Follow the account I'm using": persisted, applies at once. While on, each signed-in
+    /// inactive account is checked every 15 minutes and the widget switches to the one in use.</summary>
+    public bool FollowAccount
+    {
+        get => _followAccount;
+        set
+        {
+            if (_followAccount == value) return;
+            _followAccount = value;
+            _settings.SaveFollowAccount(value);
+            _follower.Apply(value && !IsDemo);
+            OnPropertyChanged();
+            InUseChanged?.Invoke();
+        }
+    }
+
+    /// <summary>The other accounts following saw in use in their latest check (the account menu's
+    /// "in use" marks). Empty with following off, and in demo mode.</summary>
+    public IReadOnlySet<string> OthersInUse => IsDemo ? new HashSet<string>() : _follower.OthersInUse();
+
+    /// <summary>The Claude Code folder linked to <paramref name="label"/>, null when none.</summary>
+    public string? AccountFolder(string label) => _accountFolders.TryGetValue(label, out var p) ? p : null;
+
+    /// <summary>Links (or, with a null or blank path, unlinks) a Claude Code folder to an account.
+    /// seats.json and the seat files follow at once.</summary>
+    public void SetAccountFolder(string label, string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) _accountFolders.Remove(label);
+        else _accountFolders[label] = path.Trim();
+        _settings.SaveAccountFolders(_accountFolders);
+        SyncSeats();
+        if (!IsDemo && label == _accounts.GetActive() && _lastData is { } data)
+            _seatMeters.Seed(data, _lastFetchAt, label, HasPlanBadge ? PlanBadgeName : null);
+    }
+
+    private HashSet<string> SignedInLabels(IReadOnlyList<string> labels)
+        => labels.Where(l => !string.IsNullOrEmpty(_accounts.LoadCredentials(l).SessionKey)).ToHashSet();
+
+    private AccountFollow.State FollowState()
+    {
+        var labels = _accounts.ListAccounts();
+        return new AccountFollow.State
+        {
+            Enabled = _followAccount && !IsDemo,
+            Active = _accounts.GetActive(),
+            SignedIn = SignedInLabels(labels),
+            ActiveSignedOut = Reason != SignInReason.None,
+            Switching = _switchingAccount,
+        };
+    }
+
+    private SeatMeters.SeatContext SeatContextNow()
+    {
+        var labels = _accounts.ListAccounts();
+        return new SeatMeters.SeatContext
+        {
+            Linked = SeatFiles.Linked(_accountFolders, labels),
+            SignedIn = SignedInLabels(labels),
+            Active = _accounts.GetActive(),
+            InUse = _follower.OthersInUse(),
+        };
+    }
+
+    /// <summary>Keeps seats.json and the per-account files in line with the account list, the links
+    /// and the active account. Demo mode writes nothing.</summary>
+    private void SyncSeats()
+    {
+        if (IsDemo) return;
+        try { _seatMeters.Sync(); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { LogSnapshotFailure($"seat sync failed ({e.GetType().Name})"); }
+    }
+
+    /// <summary>A good active fetch: following records the session reading, and a linked account's seat
+    /// file gets the same numbers. Never throws into the fetch path.</summary>
+    private void OnActiveFetchGood(JsonObject data)
+    {
+        if (IsDemo) return;
+        try
+        {
+            var label = _accounts.GetActive();
+            _follower.RecordActive(label, data);
+            _seatMeters.ActiveAnswered(label, data, HasPlanBadge ? PlanBadgeName : null);
+        }
+        catch (Exception e) { LogSnapshotFailure($"seat write failed ({e.GetType().Name})"); }
+    }
+
+    private void OnActiveFetchFailed(string errorKind)
+    {
+        if (IsDemo) return;
+        try { _seatMeters.ActiveFailed(_accounts.GetActive(), errorKind, HasPlanBadge ? PlanBadgeName : null); }
+        catch (Exception e) { LogSnapshotFailure($"seat write failed ({e.GetType().Name})"); }
+    }
+
     private void RebuildFetcher()
     {
         _fetcherGeneration++;
@@ -823,6 +948,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         if (IsDemo)
             return;
         IsDemo = true;
+        _follower.Apply(false);
+        _seatMeters.Paused = true;
         _refreshTimer.Stop();
         _alertEngine.Reset();
         Reason = SignInReason.None;
@@ -848,6 +975,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private void LeaveDemo()
     {
         IsDemo = false;
+        _seatMeters.Paused = false;
+        _follower.Apply(_followAccount);
         _demoData = null;
         _lastData = null;
         Tiers.Clear();
@@ -961,13 +1090,33 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// <see cref="RetryOnceIfTransientAsync"/>), one delayed retry follows.
     /// </summary>
     [RelayCommand]
-    private async Task SwitchAccount(string? label)
+    private Task SwitchAccount(string? label) => SwitchAccountCoreAsync(label, automatic: false);
+
+    /// <summary>The switch itself. A manual one pauses account follow; the follower's own (automatic)
+    /// one starts its 30-minute spacing instead. Follow never switches in demo mode.</summary>
+    private async Task SwitchAccountCoreAsync(string? label, bool automatic)
     {
         if (string.IsNullOrEmpty(label) || (label == _accounts.GetActive() && !IsDemo))
+            return;
+        if (automatic && (IsDemo || _switchingAccount))
             return;
         if (IsDemo)
             LeaveDemo();   // picking a real account ends demo mode
 
+        if (automatic) _follower.AutomaticSwitch(); else _follower.ManualSwitch(label);
+        _switchingAccount = true;
+        try
+        {
+            await SwitchAccountBodyAsync(label).ConfigureAwait(true);
+        }
+        finally
+        {
+            _switchingAccount = false;
+        }
+    }
+
+    private async Task SwitchAccountBodyAsync(string label)
+    {
         _accounts.SetActive(label);
         // Snapshot is deleted synchronously BEFORE the switch completes — no
         // window where the new account's freshness wraps the old account's
@@ -1023,6 +1172,16 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     {
         _accounts.RenameAccount(oldLabel, newLabel);
         _history.Rename(oldLabel, newLabel);
+        // The folder link, the follower's readings, the seat file and the profile folder name all go by
+        // the label (the profile and the file by its ref). The old profile is a cache: delete it.
+        _follower.Rename(oldLabel, newLabel);
+        _seatMeters.Rename(oldLabel, newLabel);
+        if (_accountFolders.Remove(oldLabel, out var folder))
+        {
+            _accountFolders[newLabel] = folder;
+            _settings.SaveAccountFolders(_accountFolders);
+        }
+        _ = _inactiveReader.DeleteProfileAsync(oldLabel);
         RefreshAccountLabel();
         AccountsChanged?.Invoke();
     }
@@ -1059,6 +1218,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         }
         _history.Delete(label);
         _accounts.RemoveAccount(label);
+        // Its seat file, its folder link, its follower state and its own WebView2 profile go with it.
+        _follower.Forget(label);
+        _seatMeters.Forget(label);
+        if (_accountFolders.Remove(label))
+            _settings.SaveAccountFolders(_accountFolders);
+        _ = _inactiveReader.DeleteProfileAsync(label);
 
         if (wasActive)
         {
@@ -1162,6 +1327,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             Reason = SignInReason.None;
             UpdateFooter();
             WriteSnapshotOk(data);
+            OnActiveFetchGood(data);
             FetchSucceeded?.Invoke();
             return RefreshOutcome.Ok;
         }
@@ -1176,6 +1342,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             // Stored key rejected (non-empty, so RebuildFetcher's empty gate never fires):
             // show the actionable recovery card and wipe the now-stale signed-in chrome.
             WriteSnapshotError(SnapshotContract.ErrorSessionExpired);
+            OnActiveFetchFailed(SnapshotContract.ErrorSessionExpired);
             EnterRecoveryState(SignInReason.Expired);
             return RefreshOutcome.Auth;
         }
@@ -1183,18 +1350,21 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         {
             // Cloudflare challenge — re-auth re-captures a fresh cf_clearance silently.
             WriteSnapshotError(SnapshotContract.ErrorCloudflare);
+            OnActiveFetchFailed(SnapshotContract.ErrorCloudflare);
             EnterRecoveryState(SignInReason.Blocked);
             return RefreshOutcome.Auth;
         }
         catch (NetworkException)
         {
             WriteSnapshotError(SnapshotContract.ErrorNetwork);
+            OnActiveFetchFailed(SnapshotContract.ErrorNetwork);
             Fail("No connection — retrying…");
             return RefreshOutcome.Transient;
         }
         catch (HttpRequestException)
         {
             WriteSnapshotError(SnapshotContract.ErrorNetwork);
+            OnActiveFetchFailed(SnapshotContract.ErrorNetwork);
             Fail("No connection — retrying…");
             return RefreshOutcome.Transient;
         }
@@ -1749,6 +1919,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _riffTimer.Stop();
         _statusNoticeTimer?.Stop();
         _themeHandoff?.Dispose();
+        _follower.Stop();
+        _seatMeters.Stop();
         (_client as IDisposable)?.Dispose();
     }
 }

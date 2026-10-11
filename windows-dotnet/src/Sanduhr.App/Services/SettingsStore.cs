@@ -546,6 +546,51 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>"Follow the account I'm using" (settings.json "follow_account"), off by default.</summary>
+    public bool LoadFollowAccount()
+    {
+        var root = Read();
+        try { return root["follow_account"]?.GetValue<bool>() ?? false; } catch { return false; }
+    }
+
+    public void SaveFollowAccount(bool on)
+    {
+        var root = Read();
+        root["follow_account"] = on;
+        Write(root);
+    }
+
+    /// <summary>Linked Claude Code folders by account label (settings.json "account_folders"
+    /// {label: folder path}). Blank paths are dropped.</summary>
+    public Dictionary<string, string> LoadAccountFolders()
+    {
+        var root = Read();
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (root["account_folders"] is JsonObject map)
+        {
+            foreach (var (label, node) in map)
+            {
+                try
+                {
+                    var path = node?.GetValue<string>();
+                    if (!string.IsNullOrWhiteSpace(path)) result[label] = path;
+                }
+                catch { /* a non-string entry reads as unlinked */ }
+            }
+        }
+        return result;
+    }
+
+    public void SaveAccountFolders(IReadOnlyDictionary<string, string> folders)
+    {
+        var root = Read();
+        var map = new JsonObject();
+        foreach (var (label, path) in folders)
+            if (!string.IsNullOrWhiteSpace(path)) map[label] = path;
+        if (map.Count == 0) root.Remove("account_folders"); else root["account_folders"] = map;
+        Write(root);
+    }
+
     /// <summary>The Sessions Ledger's "stack by project" preference (settings.json
     /// "ledger_group_by_project"), defaulting to TRUE — the project stack is the
     /// new default; the flat per-session view is one click away.</summary>
