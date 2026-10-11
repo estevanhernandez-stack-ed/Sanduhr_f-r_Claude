@@ -639,7 +639,8 @@ public partial class App : Application
                 ResetGuard.MarkDone();
                 vm.StopBackgroundWork();
                 _glow?.Stop();
-            });
+            },
+            vm.InactiveReader.DeleteAllProfilesAsync);
         ResetWindow.ShowFor(_settingsWindow, service, QuitApp);
     }
 

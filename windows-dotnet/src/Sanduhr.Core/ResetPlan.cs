@@ -71,6 +71,26 @@ public static partial class ResetPlan
     [GeneratedRegex("^webview2-[0-9a-f]{8}$", RegexOptions.CultureInvariant)]
     private static partial Regex AccountProfileName();
 
+    /// <summary>True for a per-account profile folder name: <c>webview2-</c> and eight lowercase hex digits.
+    /// Not the shared <c>webview2-fetch</c> folder and not the sign-in <c>webview2</c> root.</summary>
+    public static bool IsAccountProfileName(string name) => AccountProfileName().IsMatch(name);
+
+    /// <summary>The per-account profile folders that exist right now, found by listing so accounts
+    /// already gone are covered too.</summary>
+    public static IReadOnlyList<string> AccountProfileDirs(Paths paths)
+    {
+        try
+        {
+            if (!Directory.Exists(paths.AppDataDir)) return [];
+            return [.. Directory.EnumerateDirectories(paths.AppDataDir)
+                .Where(d => IsAccountProfileName(Path.GetFileName(d)))];
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+    }
+
     /// <summary>The checked parts, in run order.</summary>
     public static IReadOnlyList<ResetPart> Steps(ResetChoices choices) =>
         [.. Enum.GetValues<ResetPart>().Where(choices.Includes)];

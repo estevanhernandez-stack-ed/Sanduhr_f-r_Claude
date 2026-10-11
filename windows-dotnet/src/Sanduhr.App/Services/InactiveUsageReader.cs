@@ -20,6 +20,7 @@ public sealed class InactiveUsageReader
     private readonly Paths _paths;
     private readonly Action<string>? _log;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private volatile bool _stopped;
 
     public InactiveUsageReader(Paths paths, Action<string>? log = null)
     {
@@ -34,10 +35,13 @@ public sealed class InactiveUsageReader
         if (accountRef is null || string.IsNullOrEmpty(creds.SessionKey))
             return new InactiveReading(null, null, new NetworkException("no account to read"));
 
+        // Reset is deleting the profiles: no new read may recreate one.
+        if (_stopped) throw new OperationCanceledException();
         await _gate.WaitAsync(ct).ConfigureAwait(true);
         WebView2ApiClient? client = null;
         try
         {
+            if (_stopped) throw new OperationCanceledException();
             client = new WebView2ApiClient(creds.SessionKey, creds.CfClearance, _paths.WebView2ProfileDir(accountRef));
             var data = await client.GetUsageAsync(ct).ConfigureAwait(true);
             var account = client.Account;
@@ -56,6 +60,45 @@ public sealed class InactiveUsageReader
         {
             try { client?.Dispose(); } catch { /* best-effort */ }
             _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Reset Sanduhr…: refuses every read from here on (a waiting or new <see cref="ReadAsync"/> throws
+    /// <see cref="OperationCanceledException"/>), waits for the read in flight to release the gate (up to
+    /// 15 s), then deletes every <c>webview2-&lt;8 hex&gt;</c> folder with retries, because WebView2's
+    /// browser processes release their file locks asynchronously. Returns how many folders stayed.
+    /// </summary>
+    public async Task<int> DeleteAllProfilesAsync()
+    {
+        _stopped = true;
+        bool held = await _gate.WaitAsync(TimeSpan.FromSeconds(15)).ConfigureAwait(true);
+        try
+        {
+            int stayed = 0;
+            foreach (var dir in ResetPlan.AccountProfileDirs(_paths))
+            {
+                bool gone = false;
+                for (int attempt = 0; attempt < 6 && !gone; attempt++)
+                {
+                    try
+                    {
+                        if (Directory.Exists(dir)) await Task.Run(() => Directory.Delete(dir, recursive: true)).ConfigureAwait(true);
+                        gone = true;
+                    }
+                    catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                    {
+                        await Task.Delay(400).ConfigureAwait(true);
+                    }
+                }
+                if (!gone) stayed++;
+            }
+            if (stayed > 0) _log?.Invoke("webview2 account profile purge failed");
+            return stayed;
+        }
+        finally
+        {
+            if (held) _gate.Release();
         }
     }
 

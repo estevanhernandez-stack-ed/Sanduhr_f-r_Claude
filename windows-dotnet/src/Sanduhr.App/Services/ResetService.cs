@@ -24,14 +24,17 @@ internal sealed class ResetService
     private readonly PublishTokenStore _publishToken;
     private readonly Func<Task<IReadOnlyList<string>>> _undoClaudeCodeEntries;
     private readonly Action _stopBackgroundWork;
+    private readonly Func<Task<int>>? _deleteAccountProfiles;
 
     public ResetService(
         Paths paths,
         AccountStore accounts,
         PublishTokenStore publishToken,
         Func<Task<IReadOnlyList<string>>> undoClaudeCodeEntries,
-        Action stopBackgroundWork)
+        Action stopBackgroundWork,
+        Func<Task<int>>? deleteAccountProfiles = null)
     {
+        _deleteAccountProfiles = deleteAccountProfiles;
         _paths = paths;
         _accounts = accounts;
         _publishToken = publishToken;
@@ -95,6 +98,17 @@ internal sealed class ResetService
 
         try { _publishToken.Clear(); }
         catch (Exception) { failures.Add("the publish token"); }
+
+        // The per-account profile folders go through the reader's gate, so a read in flight cannot hold
+        // or recreate one; the inventory delete below then finds them gone.
+        if (_deleteAccountProfiles is not null)
+        {
+            try
+            {
+                if (await _deleteAccountProfiles() > 0) failures.Add("a sign-in profile folder");
+            }
+            catch (Exception) { failures.Add("a sign-in profile folder"); }
+        }
 
         failures.AddRange(await DeleteItemsAsync(ResetPart.Accounts));
         return ResetStepResult.Failed(ResetPart.Accounts, Distinct(failures));
