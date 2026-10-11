@@ -21,7 +21,7 @@ using Sanduhr.Core;
 //
 // Options:
 //   --out <dir>          where PNGs and log.txt go (default ./harness-out)
-//   --scenario <name>    widget | whatsnew | tour | settings | glow | all; repeatable (default all)
+//   --scenario <name>    widget | whatsnew | tour | settings | glow | reset | all; repeatable (default all)
 //   --theme <key>        built-in theme key to apply (default obsidian)
 //   --light              write a LIGHT user theme into the dev profile's themes folder and apply
 //                        it, to check dialogs for legibility on a light surface
@@ -99,7 +99,7 @@ public static class Program
                     return 2;
             }
         }
-        string[] known = { "widget", "whatsnew", "tour", "settings", "glow" };
+        string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset" };
         if (scenarios.Count == 0 || scenarios.Contains("all"))
             scenarios = known.ToList();
         var bad = scenarios.Where(s => !known.Contains(s)).ToList();
@@ -321,6 +321,8 @@ public static class Program
 
             if (scenarios.Contains("glow"))
                 await RenderGlow(light);
+            if (scenarios.Contains("reset"))
+                await RenderReset(asm);
 
             if (scenarios.Contains("settings"))
                 await RenderSettings(vm, asm);
@@ -384,6 +386,34 @@ public static class Program
             .Concat(svm.History.Legend.Select(l => l.Label));
         if (shown.Any(label => !allowed.Contains(label)))
             throw new InvalidOperationException("A non-sample account label would render in Settings; stopping before any PNG.");
+    }
+
+    /// <summary>Reset Sanduhr: the choose state, then a results state with one failure. No ResetService is built,
+    /// so nothing can run; the window only shows what it is handed.</summary>
+    static async Task RenderReset(Assembly asm)
+    {
+        var rwType = asm.GetType("Sanduhr.App.Views.ResetWindow")!;
+        var rw = (Window)Activator.CreateInstance(rwType, new object?[] { null })!;
+        OffScreen(rw);
+        rw.Show();
+        rw.Left = -20000;
+        rw.Top = -20000;
+        await Settle();
+        Save((FrameworkElement)rw.Content, "reset-choose");
+
+        var results = new List<ResetStepResult>
+        {
+            ResetStepResult.Done(ResetPart.ClaudeCodeEntries),
+            ResetStepResult.Failed(ResetPart.Accounts, ["a sign-in profile folder"]),
+            ResetStepResult.Done(ResetPart.History),
+            ResetStepResult.Done(ResetPart.Themes),
+            ResetStepResult.Done(ResetPart.Settings),
+        };
+        rwType.GetMethod("ShowResults")!.Invoke(rw, [results]);
+        await Settle();
+        Save((FrameworkElement)rw.Content, "reset-results");
+        rw.Close();
+        await Settle();
     }
 
     static async Task RenderSettings(WidgetViewModel vm, Assembly asm)
