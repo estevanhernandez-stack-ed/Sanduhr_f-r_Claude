@@ -1662,6 +1662,10 @@
                                            VerticalAlignment="Center" />
                                 <Button Style="{StaticResource FlatButton}" Content="What's New…" Margin="14,0,0,0" Padding="10,3"
                                         Command="{Binding ShowWhatsNewCommand}" />
+                                <Button Style="{StaticResource FlatButton}" Content="Take the Tour…" Margin="8,0,0,0" Padding="10,3"
+                                        AutomationProperties.Name="Take the Tour"
+                                        ToolTip="Walks through what Sanduhr does, one step at a time"
+                                        Command="{Binding ShowTourCommand}" />
                             </StackPanel>
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />

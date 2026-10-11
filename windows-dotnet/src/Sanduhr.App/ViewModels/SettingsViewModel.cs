@@ -47,13 +47,17 @@ public sealed class SettingsViewModel
     /// <summary>General tab's "What's New…" button.</summary>
     public ICommand ShowWhatsNewCommand { get; }
 
+    /// <summary>General tab's "Take the Tour…" button.</summary>
+    public ICommand ShowTourCommand { get; }
+
     /// <summary>Backs the General tab's Shortcuts section (global shortcut + recorder).</summary>
     public ShortcutsViewModel Shortcuts { get; }
 
     public SettingsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync, Func<string, Task> updateSignInAsync,
-        GlobalHotKeyService? hotKeys = null, Action? showWhatsNew = null)
+        GlobalHotKeyService? hotKeys = null, Action? showWhatsNew = null, Action? showTour = null)
     {
         ShowWhatsNewCommand = new RelayCommand(() => showWhatsNew?.Invoke());
+        ShowTourCommand = new RelayCommand(() => showTour?.Invoke());
         Accounts = new AccountsViewModel(widget, addAccountAsync, updateSignInAsync);
         Themes = new ThemesViewModel(widget);
         History = new HistoryTabViewModel(widget);

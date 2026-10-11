@@ -4,7 +4,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:ctl="clr-namespace:Sanduhr.App.Controls"
-        Title="What's New in Sanduhr"
+        Title="{Binding WindowTitle}"
         Width="640" Height="620"
         MinWidth="520" MinHeight="420"
         WindowStartupLocation="CenterScreen"
@@ -55,6 +55,9 @@
                             <Trigger Property="IsKeyboardFocused" Value="True">
                                 <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
                             </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="bg" Property="Opacity" Value="0.4" />
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -89,6 +92,42 @@
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
                                 <Setter TargetName="box" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- The tour's choice: a themed radio, legible on the window's own surface in either Windows mode. -->
+        <Style x:Key="ThemedRadio" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <StackPanel Orientation="Horizontal" Background="Transparent">
+                            <Border x:Name="ring" Width="14" Height="14" CornerRadius="7" Margin="0,0,8,0"
+                                    VerticalAlignment="Center"
+                                    Background="{DynamicResource Sanduhr.Brush.Bg}"
+                                    BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
+                                <Ellipse x:Name="dot" Width="6" Height="6" Visibility="Collapsed"
+                                         Fill="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Border>
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="dot" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="ring" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ring" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="ring" Property="BorderThickness" Value="2" />
+                                <Setter TargetName="ring" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -145,10 +184,59 @@
                                     <TextBlock Text="S" FontSize="13" Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                                 </Border>
                             </StackPanel>
+                            <!-- Meters: the widget's own bars as they read now (demo mode's samples in demo). -->
+                            <ItemsControl ItemsSource="{Binding Meters}" Margin="16,18,16,6" VerticalAlignment="Center"
+                                          Focusable="False" IsTabStop="False"
+                                          Visibility="{Binding IsMeters, Converter={StaticResource BoolVis}}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,3">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="110" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="40" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Label}" FontSize="11" TextTrimming="CharacterEllipsis"
+                                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                            <Border Grid.Column="1" Height="6" CornerRadius="3" VerticalAlignment="Center"
+                                                    Background="{DynamicResource Sanduhr.Brush.Border}">
+                                                <Border CornerRadius="3" RenderTransformOrigin="0,0.5">
+                                                    <Border.RenderTransform>
+                                                        <ScaleTransform ScaleX="{Binding Fraction}" ScaleY="1" />
+                                                    </Border.RenderTransform>
+                                                    <Border.Background>
+                                                        <SolidColorBrush Color="{Binding BarColor}" />
+                                                    </Border.Background>
+                                                </Border>
+                                            </Border>
+                                            <TextBlock Grid.Column="2" Text="{Binding PercentText}" FontSize="11"
+                                                       HorizontalAlignment="Right"
+                                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="Your meters show here once you sign in." FontSize="12"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                       Visibility="{Binding IsMetersEmpty, Converter={StaticResource BoolVis}}" />
+                            <TextBlock Text="Demo: sample data" FontSize="10" FontWeight="SemiBold"
+                                       HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,10,0"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Accent}"
+                                       Visibility="{Binding IsSample, Converter={StaticResource BoolVis}}" />
+                            <!-- Account chip: the name the widget shows (a demo sample in demo mode). -->
+                            <Border HorizontalAlignment="Center" VerticalAlignment="Center" Padding="12,5" CornerRadius="12"
+                                    BorderThickness="1" BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
+                                    Background="{DynamicResource Sanduhr.Brush.Glass}"
+                                    Visibility="{Binding IsAccountChip, Converter={StaticResource BoolVis}}">
+                                <TextBlock FontSize="13" Foreground="{DynamicResource Sanduhr.Brush.Accent}">
+                                    <Run Text="⇆ " /><Run Text="{Binding ChipText, Mode=OneWay}" />
+                                </TextBlock>
+                            </Border>
                         </Grid>
                     </Border>
 
-                    <Button DockPanel.Dock="Bottom" Style="{StaticResource FlatButton}" Content="Show me"
+                    <Button DockPanel.Dock="Bottom" Style="{StaticResource FlatButton}" Content="{Binding ShowMeTitle}"
                             HorizontalAlignment="Left" Margin="0,10,0,0" Padding="12,5"
                             ToolTip="{Binding ShowMeToolTip}"
                             AutomationProperties.Name="{Binding ShowMeName}"
@@ -160,6 +248,24 @@
                                    Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                         <TextBlock Text="{Binding Body}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
                                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                        <!-- A tour card's in-place choice: the real setting, written when chosen. -->
+                        <StackPanel Margin="0,10,0,0"
+                                    Visibility="{Binding HasChoices, Converter={StaticResource BoolVis}}">
+                            <TextBlock Text="The tray shows" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,4"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                            <!-- ItemsControl has an automation peer (a StackPanel does not): the group's name. -->
+                            <ItemsControl ItemsSource="{Binding Choices}" IsTabStop="False" Focusable="False"
+                                          AutomationProperties.Name="The tray shows">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <RadioButton Style="{StaticResource ThemedRadio}" GroupName="TourTrayShows"
+                                                     Content="{Binding Title}" Margin="0,2"
+                                                     IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                                                     AutomationProperties.Name="{Binding Title}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </StackPanel>
                 </DockPanel>
             </Border>
@@ -188,9 +294,10 @@
                        Focusable="False" AutomationProperties.IsOffscreenBehavior="Offscreen"
                        RenderOptions.BitmapScalingMode="HighQuality" />
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="What's New in Sanduhr" FontSize="18" FontWeight="SemiBold"
+                    <TextBlock Text="{Binding WindowTitle}" FontSize="18" FontWeight="SemiBold"
                                Foreground="{DynamicResource Sanduhr.Brush.Text}" />
                     <TextBlock Text="{Binding Header}" FontSize="12" Margin="0,2,0,0"
+                               AutomationProperties.Name="{Binding HeaderName}"
                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
                 </StackPanel>
             </StackPanel>
@@ -200,15 +307,35 @@
                 <TextBlock FontSize="11" TextWrapping="Wrap"
                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                            Text="“Claude” and “claude.ai” are trademarks of Anthropic PBC, used nominatively; Sanduhr für Claude is an independent third-party tool." />
-                <DockPanel Margin="0,12,0,0" LastChildFill="False">
+                <DockPanel Margin="0,12,0,0" LastChildFill="False"
+                           Visibility="{Binding IsWhatsNew, Converter={StaticResource BoolVis}}">
                     <CheckBox DockPanel.Dock="Left" Style="{StaticResource ThemedCheckBox}"
                               Content="Don't show after updates"
                               IsChecked="{Binding HideAfterUpdates, Mode=TwoWay}"
                               ToolTip="What's New stays in the tray menu and Settings either way."
                               AutomationProperties.Name="Don't show after updates" />
                     <Button DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="Done"
-                            IsDefault="True" IsCancel="True" Padding="22,7"
+                            IsDefault="{Binding IsWhatsNew}" IsCancel="{Binding IsWhatsNew}" Padding="22,7"
                             AutomationProperties.Name="Done" Click="Done_Click" />
+                </DockPanel>
+
+                <!-- Step mode (the welcome tour): Skip always there, Back, Next / Finish. -->
+                <DockPanel Margin="0,12,0,0" LastChildFill="True"
+                           Visibility="{Binding IsTour, Converter={StaticResource BoolVis}}">
+                    <Button DockPanel.Dock="Left" Style="{StaticResource FlatButton}" Content="{Binding SkipTitle}"
+                            IsCancel="{Binding IsTour}" Padding="14,7"
+                            ToolTip="Close the tour; every setting stays as it is"
+                            AutomationProperties.Name="Skip the tour" Click="Skip_Click" />
+                    <Button DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="{Binding NextTitle}"
+                            IsDefault="{Binding IsTour}" Padding="22,7" Margin="8,0,0,0"
+                            AutomationProperties.Name="{Binding NextTitle}" Click="Next_Click" />
+                    <Button DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="Back"
+                            IsEnabled="{Binding CanGoBack}" Padding="14,7"
+                            AutomationProperties.Name="Back" Click="Back_Click" />
+                    <TextBlock Text="{Binding AgainLine}" FontSize="11" TextWrapping="Wrap" Margin="12,0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                               Visibility="{Binding IsLast, Converter={StaticResource BoolVis}}" />
                 </DockPanel>
             </StackPanel>
 
@@ -227,7 +354,8 @@
                                   Focusable="False" IsTabStop="False">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <UniformGrid Columns="2" />
+                                <UniformGrid VerticalAlignment="Top"
+                                             Columns="{Binding DataContext.Columns, RelativeSource={RelativeSource AncestorType=ItemsControl}}" />
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                     </ItemsControl>

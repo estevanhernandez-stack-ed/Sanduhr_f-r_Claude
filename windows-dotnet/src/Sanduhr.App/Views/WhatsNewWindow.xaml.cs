@@ -15,8 +15,13 @@ namespace Sanduhr.App.Views;
 internal partial class WhatsNewWindow : Window
 {
     private static WhatsNewWindow? _open;
+    private static WhatsNewWindow? _tour;
 
     private Action<SettingsPage> _showMe;
+
+    /// <summary>Step mode only: how the tour ended (true = Finish, false = Skip, Escape or Alt+F4).</summary>
+    private Action<bool>? _ended;
+    private bool _endReported;
 
     private WhatsNewWindow(Action<SettingsPage> showMe)
     {
@@ -25,7 +30,51 @@ internal partial class WhatsNewWindow : Window
         Closed += (_, _) =>
         {
             if (ReferenceEquals(_open, this)) _open = null;
+            if (ReferenceEquals(_tour, this))
+            {
+                _tour = null;
+                // Closed any other way than Finish counts as Skip, except when the app is
+                // quitting: then the tour simply offers again next launch.
+                if (!Quitting)
+                    ReportEnd(false);
+            }
         };
+    }
+
+    /// <summary>Set by the app as it quits (Quit, a Store update, sign-out of Windows), so the
+    /// windows it closes are not read as the person skipping the tour.</summary>
+    public static bool Quitting { get; set; }
+
+    /// <summary>
+    /// Open the welcome tour (the window in step mode), or bring the open one forward. Show me
+    /// leaves the tour open; <paramref name="ended"/> runs once, when it finishes or is skipped.
+    /// </summary>
+    public static void ShowTour(WelcomeTourViewModel model, Action<SettingsPage> showMe, Action<bool> ended)
+    {
+        if (_tour is { } open)
+        {
+            // Refill with the current steps (say, signed in since it opened) on the same step.
+            if (open.DataContext is WelcomeTourViewModel was)
+                model.GoTo(was.Index);
+            open.DataContext = model;
+            open._showMe = showMe;
+            if (open.WindowState == WindowState.Minimized)
+                open.WindowState = WindowState.Normal;
+            open.Activate();
+            return;
+        }
+        var window = new WhatsNewWindow(showMe) { DataContext = model, _ended = ended, Height = 560 };
+        _tour = window;
+        window.Show();
+        window.Activate();
+    }
+
+    private void ReportEnd(bool finished)
+    {
+        if (_endReported || _ended is null)
+            return;
+        _endReported = true;
+        _ended(finished);
     }
 
     /// <summary>Open the window with these cards, or refill and activate the one already open.
@@ -62,11 +111,31 @@ internal partial class WhatsNewWindow : Window
             return;
         var destination = item.Card.Destination;
         var callback = _showMe;
-        Close();
+        // The tour stays open behind the page it shows (as on the Mac); What's New closes.
+        if (DataContext is not WelcomeTourViewModel)
+            Close();
         callback(destination);
     }
 
     private void Done_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void Skip_Click(object sender, RoutedEventArgs e)
+    {
+        ReportEnd(false);
+        Close();
+    }
+
+    private void Next_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not WelcomeTourViewModel tour)
+            return;
+        if (tour.Next())
+            return;
+        ReportEnd(true);
+        Close();
+    }
+
+    private void Back_Click(object sender, RoutedEventArgs e) => (DataContext as WelcomeTourViewModel)?.Back();
 
     /// <summary>Drag by any background; buttons and the check box handle their own clicks.</summary>
     private void Background_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

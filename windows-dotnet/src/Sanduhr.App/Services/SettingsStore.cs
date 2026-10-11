@@ -620,6 +620,14 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>
+    /// Where this install stands with the welcome tour, as <c>WelcomeTour.Format</c> writes it
+    /// ("pending", "finished", "skipped", "not_offered"); empty reads as null (not yet decided).
+    /// </summary>
+    public string? LoadTourState() => ReadString(WelcomeTour.StateKey);
+
+    public void SaveTourState(string state) => WriteString(WelcomeTour.StateKey, state);
+
     private string? ReadString(string key)
     {
         try

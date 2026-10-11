@@ -28,6 +28,12 @@ public partial class App : Application
     private SettingsWindow? _settingsWindow;
     private DispatcherTimer? _trayRotateTimer;
     private GlobalHotKeyService? _hotKeys;
+    private MenuItem? _endDemoItem;
+
+    /// <summary>Where this install stands with the welcome tour, decided once at launch.</summary>
+    private TourState? _tourState;
+    /// <summary>The tour opens after a first successful fetch at most once a launch.</summary>
+    private bool _tourOfferedThisLaunch;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -50,7 +56,10 @@ public partial class App : Application
         {
             if (args.PropertyName == nameof(WidgetViewModel.TrayMode))
                 SyncTrayRotation();
+            if (args.PropertyName == nameof(WidgetViewModel.IsDemo) && _endDemoItem is not null)
+                _endDemoItem.Visibility = _vm.IsDemo ? Visibility.Visible : Visibility.Collapsed;
         };
+        _vm.FetchSucceeded += OnFetchSucceeded;
         _vm.SignInRequested += () => RunSignInAsync(embedded: true);
         _vm.ReauthRequested += RunReauthAsync;
         _vm.ManualReauthRequested += RunManualReauthAsync;
@@ -135,6 +144,12 @@ public partial class App : Application
         // Load the active account's stored credential + fetch real usage now.
         _vm.Start();
 
+        // Demo mode (screenshots): `--demo` or SANDUHR_DEMO=1. Session-only sample numbers,
+        // labelled as demo on the widget and the tray; nothing is fetched or written.
+        if (DemoMode.IsRequested(Environment.GetCommandLineArgs().Skip(1),
+                Environment.GetEnvironmentVariable(DemoMode.EnvironmentVariable)))
+            _vm.StartDemo();
+
         // Best-effort GitHub/Velopack update probe — fire-and-forget so a slow or offline
         // network never delays the first paint. No-ops on the Store/MSIX install and in dev.
         _ = new UpdateChecker().CheckForUpdatesAsync();
@@ -169,8 +184,17 @@ public partial class App : Application
             var fresh = WhatsNew.IsFresh(lastSeen, store.LoadWhatsNewInstalledVersion(),
                 _vm.AccountStore.ListAccounts().Count);
             var onboarding = _vm.ActiveAccount is null;
+
+            // The tour is decided before What's New records anything: pending only on a fresh
+            // install (no account, nothing seen). While it is pending, What's New waits for it.
+            var accounts = _vm.AccountStore.ListAccounts().Count;
+            var existingTour = WelcomeTour.Parse(store.LoadTourState());
+            _tourState = WelcomeTour.Decide(existingTour, fresh, accounts, lastSeen);
+            if (existingTour != _tourState)
+                store.SaveTourState(WelcomeTour.Format(_tourState.Value));
+
             var decision = WhatsNew.AtLaunch(lastSeen, current, fresh, onboarding,
-                store.LoadWhatsNewHideAfterUpdates());
+                store.LoadWhatsNewHideAfterUpdates(), tour: _tourState == TourState.Pending);
 
             if (fresh)
                 store.SaveWhatsNewInstalledVersion(current);
@@ -204,6 +228,69 @@ public partial class App : Application
                 _ = ShowSettingsAsync(page);
         });
 
+    /// <summary>
+    /// The first successful fetch on a fresh install opens the tour, once a launch, so its first
+    /// card shows the person's own meters. Posted, so the fetch finishes before the window opens.
+    /// </summary>
+    private void OnFetchSucceeded()
+    {
+        if (!WelcomeTour.ShowsAfterFetch(_tourState, fetched: true, _tourOfferedThisLaunch))
+            return;
+        _tourOfferedThisLaunch = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(ShowTour));
+    }
+
+    /// <summary>
+    /// The welcome tour: from the first fetch, the tray's "Take the Tour…" and Settings, General.
+    /// Reopening shows the same steps with the current settings and records nothing.
+    /// </summary>
+    private void ShowTour()
+    {
+        if (_vm is null)
+            return;
+        try
+        {
+            var signedIn = _vm.ActiveAccount is not null || _vm.IsDemo;
+            var steps = WelcomeTour.Steps(new HashSet<TourFeature>(), signedIn: signedIn);
+            WhatsNewWindow.ShowTour(new WelcomeTourViewModel(steps, _vm), page =>
+            {
+                if (page == SettingsPage.Widget)
+                    ShowWindow();
+                else
+                    _ = ShowSettingsAsync(page);
+            }, EndTour);
+        }
+        catch (Exception e)
+        {
+            // The tour is a courtesy: never let it stop the widget.
+            try
+            {
+                System.IO.File.AppendAllText(new Sanduhr.Core.Paths().LogFile,
+                    $"{DateTime.UtcNow:o} tour failed to open ({e.GetType().Name}){Environment.NewLine}");
+            }
+            catch { }
+        }
+    }
+
+    /// <summary>Finish or Skip: only a pending tour records anything, and then What's New's
+    /// last-seen becomes this version so no update cards follow the tour.</summary>
+    private void EndTour(bool finished)
+    {
+        try
+        {
+            var store = new SettingsStore(new Sanduhr.Core.Paths());
+            if (WelcomeTour.End(WelcomeTour.Parse(store.LoadTourState()), finished) is not { } ended)
+                return;
+            store.SaveTourState(WelcomeTour.Format(ended));
+            store.SaveWhatsNewLastSeen(AppVersion);
+            _tourState = ended;
+        }
+        catch
+        {
+            // Settings are best-effort here; the tour simply offers again next launch.
+        }
+    }
+
     /// <summary>"What's New…" from the tray and Settings: the installed version's highlights, or every card.</summary>
     private void ShowWhatsNewFromMenu()
     {
@@ -232,6 +319,21 @@ public partial class App : Application
 
         var whatsNew = new MenuItem { Header = "What's New…" };
         whatsNew.Click += (_, _) => ShowWhatsNewFromMenu();
+
+        var tour = new MenuItem { Header = "Take the Tour…" };
+        tour.Click += (_, _) => ShowTour();
+
+        // Only while demo mode is on: the way back to the real numbers, labelled as demo.
+        _endDemoItem = new MenuItem
+        {
+            Header = "End Demo Mode",
+            Visibility = _vm?.IsDemo == true ? Visibility.Visible : Visibility.Collapsed,
+        };
+        _endDemoItem.Click += async (_, _) =>
+        {
+            if (_vm is not null)
+                await _vm.EndDemoAsync();
+        };
 
         var refresh = new MenuItem { Header = "Refresh" };
         refresh.Click += (_, _) => _vm?.RefreshCommand.Execute(null);
@@ -263,9 +365,11 @@ public partial class App : Application
         var quit = new MenuItem { Header = "Quit Sanduhr" };
         quit.Click += (_, _) => QuitApp();
 
+        menu.Items.Add(_endDemoItem);
         menu.Items.Add(show);
         menu.Items.Add(settings);
         menu.Items.Add(whatsNew);
+        menu.Items.Add(tour);
         menu.Items.Add(refresh);
         menu.Items.Add(BuildTrayShowsMenu());
         menu.Items.Add(new Separator());
@@ -327,7 +431,7 @@ public partial class App : Application
         }
 
         var svm = new SettingsViewModel(_vm, () => RunSignInAsync(embedded: true), RunUpdateSignInAsync, _hotKeys,
-            ShowWhatsNewFromMenu);
+            ShowWhatsNewFromMenu, ShowTour);
         try
         {
             _settingsWindow = new SettingsWindow(svm);
@@ -419,7 +523,9 @@ public partial class App : Application
         _trayIcon = icon;
         _tray.ToolTipText = reading is null
             ? "Sanduhr für Claude — no data yet"
-            : $"Sanduhr für Claude — {reading.Label} {reading.Percent}%";
+            : _vm?.IsDemo == true
+                ? $"Sanduhr für Claude — {DemoMode.TrayLabel(reading.Label, reading.Percent)}"
+                : $"Sanduhr für Claude — {reading.Label} {reading.Percent}%";
     }
 
     /// <summary>"Tray Shows" submenu: one checkable item per mode, checks refreshed on open.</summary>
@@ -494,6 +600,7 @@ public partial class App : Application
 
     private void QuitApp()
     {
+        WhatsNewWindow.Quitting = true;
         _hotKeys?.Dispose();
         _tray?.Dispose();
         _trayIcon?.Dispose();
@@ -501,8 +608,16 @@ public partial class App : Application
         Shutdown();
     }
 
+    /// <summary>Signing out of Windows closes every window: not a Skip of the tour.</summary>
+    protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+    {
+        WhatsNewWindow.Quitting = true;
+        base.OnSessionEnding(e);
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
+        WhatsNewWindow.Quitting = true;
         _hotKeys?.Dispose();
         _tray?.Dispose();
         _trayIcon?.Dispose();
