@@ -53,10 +53,17 @@ public sealed class SparklineControl : FrameworkElement
         if (w < 10 || h < 4)
             return;
 
-        if (SparklineStyle == SparklineStyle.Horizon)
+        var doubles = new double[values.Count];
+        for (int i = 0; i < doubles.Length; i++) doubles[i] = values[i];
+
+        switch (SparklineSteady.Drawn(SparklineStyle, doubles))
         {
-            RenderHorizon(dc, values, w, h);
-            return;
+            case SparklineDraw.Level:
+                RenderLevel(dc, doubles, w, h);
+                return;
+            case SparklineDraw.Horizon:
+                RenderHorizon(dc, values, w, h);
+                return;
         }
 
         int mn = int.MaxValue, mx = int.MinValue;
@@ -86,6 +93,23 @@ public sealed class SparklineControl : FrameworkElement
         }
         geo.Freeze();
         dc.DrawGeometry(null, pen, geo);
+    }
+
+    /// <summary>Steady horizon data: a thin level line across the width with a soft wash beneath.</summary>
+    private void RenderLevel(DrawingContext dc, double[] values, double w, double h)
+    {
+        double y = SparklineSteady.LevelY(values, h);
+        var c = LineColor;
+
+        var wash = new SolidColorBrush(Color.FromArgb((byte)Math.Round(0.12 * 255), c.R, c.G, c.B));
+        wash.Freeze();
+        dc.DrawRectangle(wash, null, new Rect(0, y, w, h - y));
+
+        var line = new SolidColorBrush(Color.FromArgb((byte)Math.Round(0.85 * 255), c.R, c.G, c.B));
+        line.Freeze();
+        var pen = new Pen(line, 1.5) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+        pen.Freeze();
+        dc.DrawLine(pen, new Point(0, y), new Point(w, y));
     }
 
     /// <summary>Layered horizon mode — normalized, translucent bands (the geometry is
