@@ -72,6 +72,7 @@ public sealed class SettingsViewModel
 
     /// <summary>About, Third-party notices: the packages the app ships with.</summary>
     public IReadOnlyList<ThirdPartyPackage> Packages => ThirdPartyNotices.Packages;
+    public IReadOnlyList<ThirdPartyFont> Fonts => ThirdPartyNotices.Fonts;
 
     /// <summary>About, Where settings live: the roaming folder (settings, history, themes, logs).</summary>
     public string SettingsFolder { get; }

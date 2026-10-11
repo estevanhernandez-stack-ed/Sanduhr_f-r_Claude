@@ -19,7 +19,7 @@ public static class SettingsNames
 {
     // ---- Pages ----
 
-    /// <summary>The sidebar: five groups, each page once. Widget is not a page (Show me on a widget card
+    /// <summary>The sidebar: six groups, each page once. Widget is not a page (Show me on a widget card
     /// shows the widget itself).</summary>
     public static IReadOnlyList<SettingsGroup> Sidebar { get; } =
     [
@@ -27,6 +27,7 @@ public static class SettingsNames
         new("Usage", [SettingsPage.History, SettingsPage.ClaudeUsage, SettingsPage.Publish]),
         new("Claude Code", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
         new("Widget", [SettingsPage.Themes]),
+        new("Desk", [SettingsPage.Desk]),
         new("Help", [SettingsPage.About]),
     ];
 
@@ -45,6 +46,7 @@ public static class SettingsNames
         SettingsPage.ClaudeCode => "Claude Code",
         SettingsPage.Mods => "Mods & Config",
         SettingsPage.Themes => "Themes",
+        SettingsPage.Desk => "Desk",
         SettingsPage.About => "About",
         SettingsPage.Widget => "Widget",
         _ => page.ToString(),
@@ -141,6 +143,7 @@ public static class SettingsNames
         (ResetSanduhr, SettingsPage.About),
         (AddFolder, SettingsPage.ClaudeCode),
         (FollowAccount, SettingsPage.Accounts),
+        (DeskSwitch, SettingsPage.Desk),
     ];
 
     /// <summary>

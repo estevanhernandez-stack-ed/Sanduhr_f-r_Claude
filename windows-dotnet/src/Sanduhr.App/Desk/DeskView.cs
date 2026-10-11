@@ -195,7 +195,7 @@ internal sealed class DeskView : Grid
         if (piece is null) return null;
         piece.HorizontalAlignment = align;
         // The Desk ink: white at 0.92 with a soft dark shadow, readable on any wallpaper.
-        piece.Effect = new DropShadowEffect { Color = Colors.Black, Opacity = 0.45, BlurRadius = 10, ShadowDepth = 2, Direction = 270 };
+        piece.Effect = new DropShadowEffect { Color = Colors.Black, Opacity = 0.65, BlurRadius = 8, ShadowDepth = 1.5, Direction = 270 };
         return piece;
     }
 

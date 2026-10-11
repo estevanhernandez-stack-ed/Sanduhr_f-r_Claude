@@ -21,7 +21,7 @@ using Sanduhr.Core;
 //
 // Options:
 //   --out <dir>          where PNGs and log.txt go (default ./harness-out)
-//   --scenario <name>    widget | whatsnew | tour | settings | glow | reset | all; repeatable (default all)
+//   --scenario <name>    widget | whatsnew | tour | settings | glow | reset | desk | all; repeatable (default all)
 //   --theme <key>        built-in theme key to apply (default obsidian)
 //   --light              write a LIGHT user theme into the dev profile's themes folder and apply
 //                        it, to check dialogs for legibility on a light surface
@@ -99,7 +99,7 @@ public static class Program
                     return 2;
             }
         }
-        string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset" };
+        string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset", "desk" };
         if (scenarios.Count == 0 || scenarios.Contains("all"))
             scenarios = known.ToList();
         var bad = scenarios.Where(s => !known.Contains(s)).ToList();
@@ -333,6 +333,8 @@ public static class Program
                 await RenderGlow(light);
             if (scenarios.Contains("reset"))
                 await RenderReset(asm);
+            if (scenarios.Contains("desk"))
+                await RenderDesk(light);
 
             if (scenarios.Contains("settings"))
                 await RenderSettings(vm, asm);
@@ -472,6 +474,87 @@ public static class Program
         }
     }
 
+    /// <summary>
+    /// The Desk's content over a wallpaper stand-in (dark #1e2430 and light #d8dde6) with a 48 DIP taskbar
+    /// strip along the bottom, at 100% and 150%: the standard layout, the standard layout with the meters
+    /// (one tier past 90%), pieces at tc/ml/mr/bc/br/tl at sizes 0.6 and 1.6, and the signed-out lines.
+    /// The layout is the same in DIPs at both scales; 150% only renders sharper (2880x1620). Never opens a Desk window.
+    /// </summary>
+    static async Task RenderDesk(bool light)
+    {
+        var now = new DateTimeOffset(2026, 10, 11, 10, 9, 0, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 10, 11, 10, 9, 0)));
+        string Iso(TimeSpan span) => now.Add(span).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fffK", System.Globalization.CultureInfo.InvariantCulture);
+        var usage = new DeskUsage(
+            [new DeskTier(TierModel.FiveHour, 42, Iso(TimeSpan.FromHours(2))),
+             new DeskTier(TierModel.SevenDay, 63, Iso(TimeSpan.FromDays(4))),
+             new DeskTier(TierModel.SevenDaySonnet, 91, Iso(TimeSpan.FromDays(4)))],
+            now.AddMinutes(-1), false, false, null);
+        var signedOut = new DeskUsage([], null, true, true, null);
+
+        var fonts = new Sanduhr.App.Desk.DeskFonts();
+        var (family, bold) = fonts.Families(null);
+        foreach (var (label, f, weight) in new[] { ("regular", family, FontWeights.Normal), ("bold", bold, FontWeights.Bold) })
+        {
+            bool ok = new Typeface(f, FontStyles.Normal, weight, FontStretches.Normal).TryGetGlyphTypeface(out var gt);
+            string names = ok ? string.Join("/", gt!.Win32FamilyNames.Values) + " | " + gt.FaceNames.Values.FirstOrDefault() : "no glyph typeface";
+            Log.Add($"desk font {label}: source={f.Source} resolved={ok} {names}");
+        }
+
+        var variants = new (string Name, string Layout, DeskUsage Usage)[]
+        {
+            ("standard", DeskArrangement.Standard, usage),
+            ("meters", "clock:bl claude:bl meters:tr", usage),
+            ("anchors-a", "clock:tc:1.6 claude:ml:0.6 meters:mr:1.6", usage),
+            ("anchors-b", "clock:br:0.6 claude:bc:1.6 meters:tl:0.6", usage),
+            ("signed-out", "clock:bl meters:tr", signedOut),
+        };
+        var grounds = new (string Name, Color Color)[]
+        {
+            ("dark", Color.FromRgb(0x1e, 0x24, 0x30)),
+            ("light", Color.FromRgb(0xd8, 0xdd, 0xe6)),
+        };
+        foreach (double scale in new[] { 1.0, 1.5 })
+        {
+            var bounds = new PxRect(0, 0, (int)(1920 * scale), (int)(1080 * scale));
+            int bar = (int)Math.Round(48 * scale);
+            var work = new PxRect(0, 0, bounds.Width, bounds.Height - bar);
+            var screen = new Sanduhr.App.Desk.DeskScreen("DISPLAY1", bounds, work, scale, true,
+                TaskbarClearance.Insets(bounds, work, [], scale));
+            foreach (var (gname, gcolor) in grounds)
+            foreach (var (name, layout, u) in variants)
+            {
+                var settings = (DeskSettings.Default with { Enabled = true, Layout = layout }).Normalized();
+                var view = new Sanduhr.App.Desk.DeskView(screen, settings, fonts);
+                view.Update(u, now);
+                var root = new Grid { Width = 1920, Height = 1080, Background = new SolidColorBrush(gcolor) };
+                root.Children.Add(new System.Windows.Shapes.Rectangle
+                {
+                    Height = 48, VerticalAlignment = VerticalAlignment.Bottom,
+                    Fill = new SolidColorBrush(Color.FromArgb(0x66, 0, 0, 0)),
+                });
+                root.Children.Add(view);
+                root.Measure(new Size(1920, 1080));
+                root.Arrange(new Rect(0, 0, 1920, 1080));
+                await Settle();
+                SaveScaled(root, $"desk-{name}-{gname}-{scale:0.0}x".Replace('.', '_'), scale);
+            }
+        }
+    }
+
+    /// <summary>Like <see cref="Save"/>, rendered at <paramref name="scale"/> times 96 dpi.</summary>
+    static void SaveScaled(FrameworkElement el, string name, double scale)
+    {
+        el.UpdateLayout();
+        int w = (int)Math.Ceiling(el.ActualWidth * scale), h = (int)Math.Ceiling(el.ActualHeight * scale);
+        var rtb = new RenderTargetBitmap(Math.Max(1, w), Math.Max(1, h), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
+        rtb.Render(el);
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(rtb));
+        using (var f = File.Create(Path.Combine(Out, name + ".png")))
+            enc.Save(f);
+        Log.Add($"png {name}.png {w}x{h}");
+    }
+
     /// <summary>Demo mode fills Settings with the sample accounts (Stage 3). Fail before anything
     /// renders if a label that is not a sample would reach a PNG.</summary>
     static void AssertOnlySampleAccounts(SettingsViewModel svm)
@@ -538,7 +621,7 @@ public static class Program
             tabs.SelectedItem = item;
             await Settle();
             Save((FrameworkElement)sw.Content, $"settings-{index:00}-{Slug(header)}");
-            if (item.Tag is "ClaudeCode" or "Mods")
+            if (item.Tag is "ClaudeCode" or "Mods" or "Desk")
             {
                 // These pages scroll: a second picture with the window tall enough to show all of it.
                 double h = sw.Height;

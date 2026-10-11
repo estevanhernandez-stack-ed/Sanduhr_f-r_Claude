@@ -11,7 +11,9 @@ namespace Sanduhr.App.Desk;
 /// </summary>
 internal sealed class DeskFonts
 {
-    private static readonly Uri PackBase = new("pack://application:,,,/");
+    // The component form names this assembly, so it resolves the same in the app and in the off-screen
+    // harness (where "pack://application:,,,/Fonts/" did not resolve: the glyph typeface came back empty).
+    private static readonly Uri PackBase = new($"pack://application:,,,/{typeof(DeskFonts).Assembly.GetName().Name};component/");
     private readonly HashSet<string> _installed;
 
     public DeskFonts(IEnumerable<string>? installed = null) =>

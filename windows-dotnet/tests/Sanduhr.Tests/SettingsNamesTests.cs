@@ -43,6 +43,7 @@ public class SettingsNamesTests
     [InlineData(SettingsPage.ClaudeUsage, "Claude Usage")]
     [InlineData(SettingsPage.Publish, "Publish usage")]
     [InlineData(SettingsPage.Themes, "Themes")]
+    [InlineData(SettingsPage.Desk, "Desk")]
     [InlineData(SettingsPage.About, "About")]
     public void PageTitle_is_pinned(SettingsPage page, string title) =>
         Assert.Equal(title, SettingsNames.PageTitle(page));
