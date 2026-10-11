@@ -140,7 +140,7 @@ internal static class GlowNative
         return 1.0;
     }
 
-    /// <summary>Flash the taskbar button until the window comes to the front, up to three times.</summary>
+    /// <summary>Flash the taskbar button three times (bounded; no flash-until-foreground).</summary>
     public static void FlashTray(IntPtr hWnd)
     {
         if (hWnd == IntPtr.Zero) return;
@@ -148,7 +148,7 @@ internal static class GlowNative
         {
             cbSize = (uint)Marshal.SizeOf<FLASHWINFO>(),
             hwnd = hWnd,
-            dwFlags = FLASHW_TRAY | FLASHW_TIMERNOFG,
+            dwFlags = FLASHW_TRAY,
             uCount = 3,
             dwTimeout = 0,
         };
