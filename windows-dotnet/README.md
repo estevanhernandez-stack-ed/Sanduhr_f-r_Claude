@@ -124,6 +124,18 @@ Windows Credential Manager slots as the shipped Python build. An existing user w
 updates keeps their accounts, history, and settings untouched — schemas match the
 Python app byte-for-byte (verified by the data-compat tests in the suite).
 
+### Since 3.4.3: Mac parity, Stage 1
+
+The Windows app is catching up to the Mac in stages (`docs/scope.md`, `docs/spec.md`). Stage 1
+adds What's New after an update, a global shortcut to open Settings (off until turned on,
+Ctrl+Alt+S, with a recorder), every `~/.claude*` Claude Code home on the read paths (burn, model
+usage; new homes appear unconsented in the vault and publish lists), limits that hide until they
+reset, five tray readouts, and a level line for steady horizon sparklines. New `settings.json`
+keys, each defaulting when absent: `whats_new_last_seen`, `whats_new_installed_version`,
+`whats_new_hide_after_updates`, `hotkey_settings`, `tray_mode`, `limit_first_seen`,
+`limits_hidden_until_reset`, `alert_muted_tiers`. No new files, Credential Manager slots or
+manifest capabilities.
+
 ---
 
 ## Tech stack

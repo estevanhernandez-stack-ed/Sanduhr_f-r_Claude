@@ -61,6 +61,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     private readonly List<string> _savedOrder;
     private readonly HashSet<string> _hidden;
+    private LimitState _limitState;
+    private readonly HashSet<string> _mutedTiers;
     private IReadOnlyList<string> _riffs = Array.Empty<string>();
     private int _riffIndex;
 
@@ -150,8 +152,51 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(PromptSecondaryLabel));
     }
 
-    /// <summary>Highest active-tier % for the tray glyph; -1 when no data.</summary>
-    public event Action<int>? TrayPercentChanged;
+    /// <summary>The tray reading (percent + tooltip label) under the chosen
+    /// <see cref="TrayMode"/>; null when there is no data ("--").</summary>
+    public event Action<TrayReading?>? TrayReadingChanged;
+
+    private TrayMode _trayMode;
+    private int _trayStep;
+    private double? _traySession;
+    private double? _trayWeekly;
+    private (string Label, double Util)? _trayHighest;
+
+    /// <summary>Which number the tray icon shows. Setting it persists, recomputes
+    /// the reading from the last inputs (no fetch) and raises
+    /// <see cref="TrayReadingChanged"/>.</summary>
+    public TrayMode TrayMode
+    {
+        get => _trayMode;
+        set
+        {
+            if (_trayMode == value) return;
+            _trayMode = value;
+            _settings.SaveTrayMode(value);
+            OnPropertyChanged();
+            RaiseTray();
+        }
+    }
+
+    /// <summary>Advance the Rotate step (session, weekly, session...) and re-raise.</summary>
+    public void AdvanceTrayRotation()
+    {
+        _trayStep++;
+        RaiseTray();
+    }
+
+    private void RaiseTray() =>
+        TrayReadingChanged?.Invoke(
+            TrayReadout.Reading(_trayMode, _traySession, _trayWeekly, _trayHighest, _trayStep));
+
+    /// <summary>No data: forget the inputs and tell the tray to show "--".</summary>
+    private void ClearTray()
+    {
+        _traySession = null;
+        _trayWeekly = null;
+        _trayHighest = null;
+        TrayReadingChanged?.Invoke(null);
+    }
 
     /// <summary>Raised when compact mode toggles — the window hides its toolbar and
     /// auto-sizes its height to the single remaining card.</summary>
@@ -179,6 +224,19 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// <summary>Raised by the "Settings…" command (title-bar chip, widget right-click,
     /// tray) — App opens the <c>SettingsWindow</c> on the Accounts tab.</summary>
     public event Func<Task>? SettingsRequested;
+
+    /// <summary>Raised by <see cref="OpenSettingsAtAsync"/> — App opens (or focuses) Settings
+    /// and selects the named page.</summary>
+    public event Func<SettingsPage, Task>? SettingsPageRequested;
+
+    /// <summary>Open Settings on a named page (the tier card's "Alerts Settings…").</summary>
+    public async Task OpenSettingsAtAsync(SettingsPage page)
+    {
+        if (SettingsPageRequested is not null)
+            await SettingsPageRequested.Invoke(page);
+        else if (SettingsRequested is not null)
+            await SettingsRequested.Invoke();
+    }
 
     /// <summary>Raised after any account-registry mutation routed through this VM
     /// (switch / rename / sign-out). Open menus + the Settings accounts list re-read
@@ -472,7 +530,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _credentials = new CredentialStore(_accounts, _paths);
         _history = new UsageHistory(_accounts, _paths);
         _settings = new SettingsStore(_paths);
-        _ccReader = new CcLogReader();
+        _ccReader = new CcLogReader(null, () => ClaudeCodeHomes.Discover(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR")));
 
         _alertConfig = _settings.LoadAlertConfig();
         AlertSettingsChanged += () => _alertConfig = _settings.LoadAlertConfig();
@@ -484,6 +544,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _isThemesExpanded = _settings.LoadThemesExpanded();
         _savedOrder = _settings.LoadTierOrder().ToList();
         _hidden = new HashSet<string>(_settings.LoadHiddenTiers());
+        _trayMode = _settings.LoadTrayMode();
+        _limitState = _settings.LoadLimitState();
+        _mutedTiers = new HashSet<string>(_settings.LoadAlertMutedTiers());
 
         _refreshTimer = new DispatcherTimer { Interval = RefreshInterval };
         _refreshTimer.Tick += async (_, _) => await RefreshAsync();
@@ -672,7 +735,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             Reason = SignInReason.FirstRun;
             StatusText = "";
             ClearSignedInChrome();
-            TrayPercentChanged?.Invoke(-1);
+            ClearTray();
             return;
         }
         Reason = SignInReason.None;
@@ -781,7 +844,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _alertEngine.Reset();
         _lastData = null;
         StatusText = "Switching account…";
-        TrayPercentChanged?.Invoke(-1);
+        ClearTray();
 
         RebuildFetcher();
         RefreshAccountLabel();
@@ -928,6 +991,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             var data = await _fetcher.FetchAsync().ConfigureAwait(true);
             _lastData = data;
             _lastFetchAt = DateTimeOffset.Now;
+            ReconcileLimits(data, DateTimeOffset.UtcNow);
             RenderCards(data, DateTimeOffset.UtcNow);
             EvaluateAlerts(data, DateTimeOffset.UtcNow);
             // Fresh fetch re-anchors the Local CC delta window: badges/footer
@@ -1066,7 +1130,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private void Fail(string message)
     {
         StatusText = message;
-        TrayPercentChanged?.Invoke(-1);
+        ClearTray();
     }
 
     /// <summary>Drop the widget into a clean recovery state: show the reason card and
@@ -1080,7 +1144,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         NotifyPromptCopy();
         StatusText = "";
         ClearSignedInChrome();
-        TrayPercentChanged?.Invoke(-1);
+        ClearTray();
     }
 
     /// <summary>Wipe the signed-in chrome — tier cards, plan badge, account label,
@@ -1174,7 +1238,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         foreach (var key in TierModel.EffectiveOrder)
             utilByKey[key] = Util(data, key);
 
-        var active = TierModel.ActiveTiers(utilByKey, _savedOrder, _hidden);
+        var hiddenKeys = new HashSet<string>(_hidden);
+        hiddenKeys.UnionWith(_limitState.HiddenUntilReset.Keys);
+        var active = TierModel.ActiveTiers(utilByKey, _savedOrder, hiddenKeys);
         if (IsCompact && active.Count > 0)
         {
             // Compact view: collapse to the single busiest tier (first-max, matching
@@ -1197,6 +1263,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
         var existing = Tiers.ToDictionary(t => t.TierKey);
         int highest = -1;
+        string? highestKey = null;
 
         for (int i = 0; i < active.Count; i++)
         {
@@ -1222,15 +1289,20 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             var historyValues = _history.Load(key);
 
             vm.Update(util, resetsAt, used, limit, historyValues, _palette, SparklineStyle, now);
-            if (util > highest) highest = util;
+            if (util > highest) { highest = util; highestKey = key; }
         }
 
-        TrayPercentChanged?.Invoke(highest);
+        // Session and weekly read from the data whether or not their cards are hidden.
+        _traySession = Util(data, TierModel.FiveHour);
+        _trayWeekly = Util(data, TierModel.SevenDay);
+        _trayHighest = highestKey is null ? null : (TierModel.Label(highestKey), highest);
+        RaiseTray();
     }
 
     /// <summary>Map the fetch payload to alert snapshots — every known tier
-    /// (canonical + dynamic scoped) with data participates, hidden or not (a
-    /// cap is real whether or not its card is shown).</summary>
+    /// (canonical + dynamic scoped) with data participates, manually hidden or not (a
+    /// cap is real whether or not its card is shown). Two opt-outs: a tier hidden
+    /// until its reset, and a tier whose warnings the user muted, stay silent.</summary>
     private List<TierAlertSnapshot> BuildAlertSnapshots(JsonObject data)
     {
         var snaps = new List<TierAlertSnapshot>();
@@ -1238,6 +1310,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         {
             var tier = data[key] as JsonObject;
             if (tier is null)
+                continue;
+            if (_limitState.HiddenUntilReset.ContainsKey(key) || _mutedTiers.Contains(key))
                 continue;
             double? util = Util(data, key);
             snaps.Add(new TierAlertSnapshot(
@@ -1366,6 +1440,86 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         RecomputeHighestForTray();
     }
 
+    // -- limits that come and go (W2) ----------------------------------------
+
+    /// <summary>Record first sightings and bring back any hidden-until-reset limit
+    /// whose window renewed or refilled. Runs on each successful fetch, before cards render.</summary>
+    private void ReconcileLimits(JsonObject data, DateTimeOffset now)
+    {
+        var present = new Dictionary<string, (string? ResetsAt, double? Util)>();
+        foreach (var key in TierModel.EffectiveOrder)
+        {
+            if (data[key] is not JsonObject)
+                continue;
+            present[key] = (ResetsAtOf(data, key), Util(data, key));
+        }
+        var result = LimitLifetime.Reconcile(_limitState, present, now);
+        bool changed = result.State.FirstSeen.Count != _limitState.FirstSeen.Count || result.Returned.Count > 0;
+        _limitState = result.State;
+        if (changed)
+            _settings.SaveLimitState(_limitState);
+    }
+
+    private static string? ResetsAtOf(JsonObject data, string key)
+    {
+        try { return (data[key] as JsonObject)?["resets_at"]?.GetValue<string>(); }
+        catch { return null; }
+    }
+
+    /// <summary>True when the tier is believed temporary, so "Hide until it resets" applies.</summary>
+    public bool CanHideUntilReset(string tierKey)
+    {
+        if (_lastData is null || _limitState.HiddenUntilReset.ContainsKey(tierKey))
+            return false;
+        DateTimeOffset? seen = _limitState.FirstSeen.TryGetValue(tierKey, out var s) ? s : null;
+        return LimitLifetime.IsTemporary(tierKey, ResetsAtOf(_lastData, tierKey), DateTimeOffset.UtcNow, seen);
+    }
+
+    /// <summary>Hide a temporary limit until its window renews or refills.</summary>
+    public void HideUntilReset(string tierKey)
+    {
+        if (_lastData is null)
+            return;
+        var next = LimitLifetime.Hide(
+            _limitState, tierKey, ResetsAtOf(_lastData, tierKey), Util(_lastData, tierKey), DateTimeOffset.UtcNow);
+        if (ReferenceEquals(next, _limitState))
+            return;
+        _limitState = next;
+        _settings.SaveLimitState(_limitState);
+        var vm = Tiers.FirstOrDefault(t => t.TierKey == tierKey);
+        if (vm is not null) Tiers.Remove(vm);
+        RecomputeHighestForTray();
+    }
+
+    /// <summary>Show a hidden limit again, whichever way it was hidden.</summary>
+    public void ShowTier(string tierKey)
+    {
+        if (_hidden.Remove(tierKey))
+            _settings.SaveHiddenTiers(_hidden);
+        if (_limitState.HiddenUntilReset.ContainsKey(tierKey))
+        {
+            _limitState = LimitLifetime.Show(_limitState, tierKey);
+            _settings.SaveLimitState(_limitState);
+        }
+        if (_lastData is not null)
+            RenderCards(_lastData, DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>Hidden limits (manual and until-reset), in canonical tier order.</summary>
+    public IReadOnlyList<string> HiddenTierKeys =>
+        TierModel.EffectiveOrder
+            .Where(k => _hidden.Contains(k) || _limitState.HiddenUntilReset.ContainsKey(k))
+            .ToList();
+
+    public bool WarningsOn(string tierKey) => !_mutedTiers.Contains(tierKey);
+
+    public void SetWarnings(string tierKey, bool on)
+    {
+        bool changed = on ? _mutedTiers.Remove(tierKey) : _mutedTiers.Add(tierKey);
+        if (changed)
+            _settings.SaveAlertMutedTiers(_mutedTiers);
+    }
+
     private void PersistOrder()
     {
         var order = Tiers.Select(t => t.TierKey).ToList();
@@ -1376,10 +1530,11 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     private void RecomputeHighestForTray()
     {
-        int highest = -1;
+        TierCardViewModel? top = null;
         foreach (var vm in Tiers)
-            if ((int)vm.Utilization > highest) highest = (int)vm.Utilization;
-        TrayPercentChanged?.Invoke(highest);
+            if (top is null || (int)vm.Utilization > (int)top.Utilization) top = vm;
+        _trayHighest = top is null ? null : (TierModel.Label(top.TierKey), (int)top.Utilization);
+        RaiseTray();
     }
 
     // -- json helpers ---------------------------------------------------------

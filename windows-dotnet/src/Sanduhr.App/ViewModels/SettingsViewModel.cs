@@ -1,4 +1,8 @@
 using System.Reflection;
+using System.Windows.Input;
+using CommunityToolkit.Mvvm.Input;
+using Sanduhr.App.Services;
+using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
 
@@ -40,8 +44,16 @@ public sealed class SettingsViewModel
     /// <summary>Assembly version for the General tab footer (e.g. "3.0.0").</summary>
     public string Version { get; }
 
-    public SettingsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync, Func<string, Task> updateSignInAsync)
+    /// <summary>General tab's "What's New…" button.</summary>
+    public ICommand ShowWhatsNewCommand { get; }
+
+    /// <summary>Backs the General tab's Shortcuts section (global shortcut + recorder).</summary>
+    public ShortcutsViewModel Shortcuts { get; }
+
+    public SettingsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync, Func<string, Task> updateSignInAsync,
+        GlobalHotKeyService? hotKeys = null, Action? showWhatsNew = null)
     {
+        ShowWhatsNewCommand = new RelayCommand(() => showWhatsNew?.Invoke());
         Accounts = new AccountsViewModel(widget, addAccountAsync, updateSignInAsync);
         Themes = new ThemesViewModel(widget);
         History = new HistoryTabViewModel(widget);
@@ -49,7 +61,8 @@ public sealed class SettingsViewModel
             widget, widget.LoadLocalCcShowBreakdowns(), widget.SaveLocalCcShowBreakdowns),
             new CcTrendsViewModel(widget),
             new CcLedgerViewModel(widget, widget.LoadLedgerGroupByProject(), widget.SaveLedgerGroupByProject));
-        General = new GeneralViewModel();
+        General = new GeneralViewModel(widget: widget);
+        Shortcuts = new ShortcutsViewModel(new SettingsStore(new Paths()), hotKeys);
         Alerts = new AlertsViewModel(widget, () =>
         {
             widget.AlertService?.DeliverTest();

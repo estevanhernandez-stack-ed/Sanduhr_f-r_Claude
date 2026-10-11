@@ -1,0 +1,310 @@
+# Sanduhr for Windows: Mac parity — Technical Spec
+
+## Stack
+The existing app, unchanged: .NET 10, WPF (`Sanduhr.App`, `net10.0-windows10.0.19041.0`), pure logic in `Sanduhr.Core` (`net10.0`), xUnit in `tests/Sanduhr.Tests`, the network-free `Sanduhr.Mcp` with its own tests. CommunityToolkit.Mvvm for view models, Hardcodet `TaskbarIcon` for the tray, Win32 through P/Invoke (`Interop/`). No new packages in S1.
+
+## Runtime & Deployment
+Store MSIX and Velopack, both cut by Este (`docs/release-runbook.md`). Nothing in this cycle bumps a version, edits `Package.appxmanifest` or touches Partner Center. The app version at runtime is `Assembly.GetEntryAssembly().GetName().Version` formatted Major.Minor.Build (as `SettingsViewModel` and `WidgetViewModel` already do); Core's own assembly version is 1.0.0 and is never used for this.
+
+## Deployment — Identity & Signing
+Unchanged and out of scope: Store identity and the frozen Velopack packId `626Labs.Sanduhr`. Every stage's PR states "no manifest, packId, vault-location or Credential Manager change" or names the escalation it waits on.
+
+## Architecture Overview
+Each Mac feature splits the same way the Windows app already does: the rules (which cards, which homes, is this limit temporary, what does the tray read, is this series steady, is this combo valid) go into a Core class with tests ported from the Mac's tests; the WPF shell binds to it. Settings persist as keys in `%APPDATA%\Sanduhr\settings.json` through `SettingsStore` (a loose `JsonObject`, missing key = default, unknown keys survive), so an existing install reads unchanged.
+
+Two seams are shared across stages and built in S1:
+- **The card table and Show me router** (`WhatsNew`, `WhatsNewCard`, `SettingsPage`): S2's tour reuses the card type, the window chrome and the router; S3's names table checks card text.
+- **Claude Code home discovery** (`ClaudeCodeHomes`): S4's folder list, the meters mod, the glow hooks and per-seat meters all start from it.
+
+The MCP trust boundary is held: `Sanduhr.Mcp` source-links ten Core files, pinned by `TrustBoundaryTests`. New Core files are never referenced from a linked file. `CcLogReader.cs` is linked, so S1 changes it only by adding a constructor parameter of a BCL type (`Func<IEnumerable<string>>`), with the MCP's own code path unchanged.
+
+---
+
+## Stage 1 (full)
+
+### 1.1 What's New (W1)
+
+**Core: `Sanduhr.Core/WhatsNew.cs`** (port of `mac/Sources/Sanduhr/Models/WhatsNew.swift`).
+
+```csharp
+public enum SettingsPage { Accounts, Themes, Alerts, History, ClaudeUsage, Publish, General, Widget }
+public enum WhatsNewPreview { None, Tray, Sparkline, Shortcut }
+public sealed record WhatsNewCard(IReadOnlyList<string> Versions, string Id, string Title, string Body,
+    string Glyph, WhatsNewPreview Preview, SettingsPage Destination)
+{   // Versions sorted newest first by the constructor helper; Version = Versions[0]
+}
+public static class WhatsNew
+{
+    public const int Cap = 8;
+    public static int Compare(string a, string b);                 // trim, split '.', leading digits, missing = 0
+    public static IReadOnlyList<string> Shown(WhatsNewCard c, string? lastSeen, string current);
+    public static IReadOnlyList<WhatsNewCard> Cards(string? lastSeen, string current, int? limit = Cap, IReadOnlyList<WhatsNewCard>? table = null);
+    public static string? RangeLabel(IReadOnlyList<WhatsNewCard> cards, string? lastSeen, string current);
+    public static IReadOnlyList<WhatsNewCard> All(string current, IReadOnlyList<WhatsNewCard>? table = null);
+    public static (IReadOnlyList<WhatsNewCard> Cards, string Header) ForMenu(string current, string? installed, IReadOnlyList<WhatsNewCard>? table = null);
+    public sealed record LaunchDecision(IReadOnlyList<WhatsNewCard> Show, bool Record);
+    public static LaunchDecision AtLaunch(string? lastSeen, string current, bool fresh, bool onboarding, bool hidden, bool tour = false, IReadOnlyList<WhatsNewCard>? table = null);
+}
+```
+
+Rules, exactly as the Mac:
+- `Compare`: trim whitespace, split on `.`, each part's leading digits (none = 0), missing parts 0. "3.10.0" > "3.9.1"; "3.5" == "3.5.0"; "3.5.0-beta" == "3.5.0".
+- `Shown`: the card's versions `<= current` and (`lastSeen` null or `> lastSeen`), newest first.
+- `Cards`: cards with a non-empty `Shown`, sorted by their newest shown version descending, ties in table order (stable sort), first `limit` (null = all). Downgrade or same version shows nothing.
+- `RangeLabel`: oldest version shown across the cards; equal to current gives "New in {current}", else "New in {oldest} – {current}" (U+2013 with spaces); null with no cards. The window falls back to "Version {current}".
+- `ForMenu`: when `installed == current` and some card covers `current`, those cards in table order with "Highlights in {current}"; otherwise `All` with its range label, falling back to "Version {current}".
+- `AtLaunch`, in order: `fresh` gives (no cards, record); `onboarding || tour` gives (no cards, no record); otherwise show `hidden ? none : Cards(...)`, record when `lastSeen != current`.
+
+**Core: `Sanduhr.Core/WhatsNewCards.cs`**: the Windows table, newest first. S1's cards, all version "3.5.0" (Open Question 4):
+
+| Id | Title | Glyph / preview | Destination |
+|---|---|---|---|
+| `shortcut-keys` | Open Settings from any app | preview Shortcut | General |
+| `tray-shows` | Pick what the tray shows | preview Tray | General |
+| `limits-come-and-go` | Limits that come and go | glyph | Widget |
+| `every-folder` | Every Claude Code folder counts | glyph | ClaudeUsage |
+| `steady-sparklines` | Steady meters read steady | preview Sparkline | Widget |
+| `whats-new` | What's new, after every update | glyph | General |
+
+Bodies: second person, plain, at most two sentences and 200 characters, no "Claude" without need (a card naming Claude Code is fine; the window carries the disclaimer). Tests pin unique ids, the length and sentence limits, and that every destination is a real page.
+
+**Settings keys** (`SettingsStore`): `whats_new_last_seen` (string), `whats_new_installed_version` (string), `whats_new_hide_after_updates` (bool, default false). Load/Save pairs in the existing style; empty string reads as null.
+
+**Launch wiring** (`App.xaml.cs`, after `_vm.Start()`):
+- `fresh` = no `whats_new_last_seen`, no `whats_new_installed_version`, and no saved account (`AccountStore` empty after the legacy-credential migration `Start()` runs). A fresh launch also records `whats_new_installed_version`.
+- `onboarding` = no active account.
+- Record `current` immediately when the decision says so (before showing), then show the window two seconds later on the dispatcher when there are cards.
+
+**App: `Views/WhatsNewWindow.xaml(.cs)`**: borderless themed window like `ThemedDialog` (DynamicResource brushes `Sanduhr.Brush.*`, rounded glass border, draggable by its background), 640×620, min 520×420, resizable, centered, `ShowInTaskbar` true, single instance (reopening replaces the content and activates).
+- Header: the hourglass glyph, "What's New in Sanduhr" (title), the range label below in secondary text.
+- Body: `ScrollViewer` over an `ItemsControl` with a two-column `UniformGrid`, 14 px gaps. Empty: "Nothing new to show for this version."
+- Card: art box 96 px high (a Segoe Fluent Icons glyph at 40 px in the accent colour, or a preview: Tray = the rendered tray icon beside "Session 12%"; Sparkline = a `SparklineControl` drawing a level line at 96; Shortcut = "Ctrl+Alt+S" keycaps), title (SemiBold 14), body (12, secondary, wrapping), **Show me** button with tooltip "Opens Settings, {page}" (or "Shows the widget").
+- Footer: the trademark line "“Claude” and “claude.ai” are trademarks of Anthropic PBC, used nominatively; Sanduhr für Claude is an independent third-party tool." (the manifest's wording), then a row: checkbox **Don't show after updates** (tooltip "What's New stays in the tray menu and Settings either way."), spacer, **Done** (`IsDefault`, `IsCancel` so Escape closes too).
+- Accessibility: `AutomationProperties.Name` on each card container ("{title}. {body}"), each Show me ("Show me: {title}"), the checkbox and Done; art is `AutomationProperties.IsOffscreen`/not a control. Tab order: cards' Show me in reading order, checkbox, Done.
+- Show me: close, then `App.ShowSettingsAsync(page)` or, for `Widget`, `ShowWindow()`.
+
+**Router**: `ShowSettingsAsync(SettingsPage? page = null)`; `SettingsWindow.SelectPage(SettingsPage)` selects the `TabItem` whose header matches (`Accounts`, `Themes`, `Alerts`, `History`, `Claude Usage`, `Publish usage`, `General`). One mapping table in `SettingsWindow` with a unit-free assertion at startup in DEBUG.
+
+**Entry points**: tray menu "What's New…" (after Settings…); Settings, General: a **What's New…** button beside the version line. Both use `ForMenu`.
+
+### 1.2 Global shortcut with a recorder
+
+**Core: `Sanduhr.Core/HotKeyCombo.cs`** (semantics of `mac/.../Models/HotKeyCombo.swift`, keys in Win32 terms).
+
+```csharp
+[Flags] public enum HotKeyModifiers { None = 0, Alt = 1, Control = 2, Shift = 4, Win = 8 }  // = MOD_* values
+public readonly record struct HotKeyCombo(int VirtualKey, HotKeyModifiers Modifiers)
+{
+    public bool HasRequiredModifier => (Modifiers & (Alt | Control | Win)) != 0;
+    public string Display { get; }          // "Ctrl+Alt+S": order Ctrl, Alt, Shift, Win, then key name
+    public static HotKeyCombo? Parse(string text);   // case-insensitive "ctrl+alt+s", "Win+Shift+F5"
+}
+public enum HotKeyAction { Settings }       // Join arrives with meetings (S6)
+public static class HotKeys
+{
+    public static HotKeyCombo Default(HotKeyAction a);           // Settings: Ctrl+Alt+S (VK 0x53, Control|Alt)
+    public static string Label(HotKeyAction a, HotKeyCombo c);   // "{c.Display} opens Settings"
+    public static HotKeyRefusal? Check(HotKeyCombo c, HotKeyAction a, IReadOnlyDictionary<HotKeyAction, HotKeyCombo> current);
+    public static string Caption(IReadOnlyDictionary<HotKeyAction, HotKeyCombo> current);
+}
+public sealed record HotKeyRefusal(string Kind, string Note);   // Kind: "modifier" | "taken" | "os"
+```
+
+- Key names: A to Z, 0 to 9, F1 to F24, Space, Enter, Tab, Backspace, Delete, Insert, Home, End, PageUp, PageDown, arrows ("Left", "Right", "Up", "Down"), OEM keys by their US glyph (`- = [ ] ; ' , . / \ \``), numpad as "Num 0" to "Num 9"; anything else "Key 0x{vk:X2}".
+- `Check` order: no Ctrl/Alt/Win gives `modifier`, "Add Ctrl, Alt or Win: Shift alone isn't enough."; another action holding the same combo gives `taken`, "{combo} already {other label tail}." (no other action exists in S1, but the rule is in place for Join). Pure modifier virtual keys (Shift, Ctrl, Alt, Win, both sides) are never a combo.
+- Registration failure is not a Core concern: the App turns `ERROR_HOTKEY_ALREADY_REGISTERED` (1409) into `HotKeyRefusal("os", "Another app already uses {combo}. Pick another.")`.
+- Caption: "Works in every app whenever Sanduhr runs. While it's on, {combo} goes to Sanduhr instead of the app in front."
+
+**Settings key**: `hotkey_settings` = `{"on": bool, "vk": int, "mods": int}`. Missing, a half-written entry, a `vk` outside 1..0xFE or `mods` without a required modifier reads as the default combo; `on` missing reads as false. Storing the default combo omits `vk` and `mods`.
+
+**App: `Services/GlobalHotKeyService.cs`**: owns a message-only `HwndSource` (parent `HWND_MESSAGE`), `RegisterHotKey(hwnd, id, mods | MOD_NOREPEAT, vk)` per enabled action, `WM_HOTKEY` (0x0312) dispatch to the action (`Settings` → `ShowSettingsAsync()`), `Suspend()`/`Resume()` for the recorder, `Apply(settings)` re-registers only on change, unregisters on exit. P/Invoke in `Interop/HotKeyNative.cs`. Reports the last registration failure per action so the row can show it.
+
+**App: Settings, General, "Shortcuts" section** (new `ShortcutsViewModel` on `SettingsViewModel`): one row, "{combo} opens Settings": a keys button (min width 96) and a switch (`ThemedCheckBox`), a **Reset to Ctrl+Alt+S** link shown only when the combo differs from the default, and a note line (refusal or registration failure, orange; otherwise empty). Recording: click the keys button; it reads "Type keys…", tooltip "Press the new keys, or Escape to cancel."; the service is suspended; `PreviewKeyDown` (using `e.SystemKey` when `e.Key == Key.System`) ignores pure modifier keys, Escape cancels, anything else is checked and saved (a refusal keeps recording and shows its note). Accessible names: "Change keys, Shortcut to open Settings" / "Recording keys, Shortcut to open Settings"; the switch "Shortcut to open Settings".
+
+### 1.3 Claude Code home discovery (W7)
+
+**Core: `Sanduhr.Core/ClaudeCodeHomes.cs`** (port of the discovery half of `mac/.../Services/ClaudeCodeFolders.swift`).
+
+```csharp
+public static class ClaudeCodeHomes
+{
+    public const string DefaultName = ".claude";
+    public static bool IsCandidateName(string name);   // ".claude" or ".claude-" + at least one char
+    public static bool IsBackup(string name);          // contains ".config-backup-" or starts ".claude-backup-"
+    public static bool LooksLikeHome(string dir, string profileDir);  // dir exists; dir/projects is a directory, or ConfigFile exists
+    public static string ConfigFile(string dir, string profileDir);   // placement rule below
+    public static IReadOnlyList<string> Discover(string profileDir, string? claudeConfigDir);  // basenames
+}
+```
+
+- `Discover`: names directly in the profile that pass `IsCandidateName`, drop `IsBackup`, `.claude` first then the rest in natural order (digit runs compared as numbers, case-insensitive), keep `LooksLikeHome`. Then `CLAUDE_CONFIG_DIR` when non-empty, expanded (`~`, environment variables), full-path-normalized, its parent equal to the profile directory, not already listed, looking like a home: appended last by its basename. A folder outside the profile is skipped (roots are keyed by basename today; PRD "with more time").
+- `ConfigFile`: for any name but `.claude`, `dir/.claude.json`. For `.claude`: outer `profile/.claude.json`, inner `profile/.claude/.claude.json`; only inner exists gives inner; both exist: the signed-in one wins when exactly one parses as JSON with an object `oauthAccount`, else the strictly newer write time wins for inner, ties and unknowns go to outer; otherwise outer. Nothing inside `oauthAccount` is read.
+- Every IO failure reads as "not a home"; `Discover` never throws.
+
+**CcLogReader** (linked into the MCP): add `public CcLogReader(string? homeDir, Func<IEnumerable<string>>? rootNames)`; `SearchRoots()` uses `rootNames?.Invoke() ?? LogRootNames`. The existing one-argument constructor is unchanged, and the MCP never passes a provider.
+
+**Callers moved to discovery**: the App constructs one reader (`WidgetViewModel.cs:475`, `_ccReader = new CcLogReader()`), shared as `WidgetViewModel.CcReader` with `VaultService` and `UsagePublishService`; it becomes `new CcLogReader(null,` `() => ClaudeCodeHomes.Discover(profile, Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR"))`. Vault and publish consent are unchanged: a root absent from `vault_roots` or the publish map is off, and the existing per-root toggles list it.
+
+**Unchanged on purpose (escalated)**: `Sanduhr.Mcp/McpConfig.cs` `KnownRootNames`, `StatuslineInstaller.KnownHomeNames`, `McpIntegrationInstaller.KnownHomeNames`.
+
+### 1.4 Limits that come and go (W2)
+
+**Core: `Sanduhr.Core/LimitLifetime.cs`** (port of `LimitLifetime.swift` and the rules of `MeterVisibility.swift`).
+
+```csharp
+public sealed record HiddenLimitRecord(string? ResetsAt, double? Utilization);
+public static class LimitLifetime
+{
+    public static readonly TimeSpan LongReset = TimeSpan.FromDays(8), NewWindow = TimeSpan.FromDays(14), NewResetSlack = TimeSpan.FromHours(1);
+    public const double RefillPoints = 10;
+    public static bool IsPermanent(string tier);      // five_hour, seven_day
+    public static bool IsKnown(string tier);          // permanent + sonnet, opus, fable, cowork, omelette, oauth_apps, extra_usage, routines
+    public static bool IsTemporary(string tier, string? resetsAt, DateTimeOffset now, DateTimeOffset? firstSeen);
+    public static string? ShouldReturn(HiddenLimitRecord rec, string? resetsAt, double? util);  // "new_window" | "refill" | null
+    public static ReconcileResult Reconcile(LimitState state, IReadOnlyDictionary<string, (string? ResetsAt, double? Util)> present, DateTimeOffset now);
+}
+public sealed record LimitState(IReadOnlyDictionary<string, DateTimeOffset> FirstSeen,
+    IReadOnlyDictionary<string, HiddenLimitRecord> HiddenUntilReset);
+public sealed record ReconcileResult(LimitState State, IReadOnlyDictionary<string, string> Returned);
+```
+
+- `IsTemporary` in order: permanent gives false; `iguana_necktie` gives true; `resetsAt` parses and is more than 8 days after now gives true (exactly 8 days false); `firstSeen` set, `now - firstSeen < 14 days` and not known gives true; else false.
+- `ShouldReturn`: `new_window` when both resets parse and the new one is more than 1 hour after the recorded one (strictly); `refill` when both utilizations exist and `recorded - now >= 10`; else null.
+- `Reconcile`: record first sightings (never overwrite); for each hidden-until-reset tier present in this usage: not temporary any more gives `not_temporary`, else `ShouldReturn`; returned tiers leave the map; absent tiers stay hidden.
+- Hide: allowed only when `IsTemporary`; stores the current reset and utilization.
+
+**Settings keys**: `limit_first_seen` `{tier: ISO-8601}`, `limits_hidden_until_reset` `{tier: {"resets_at": string?, "utilization": number?}}`, `alert_muted_tiers` `[tier]`. Existing `hidden_tiers` keeps its meaning (manual hide).
+
+**WidgetViewModel**: on each successful fetch, `Reconcile` before `RenderCards` and persist; `RenderCards` passes `manualHidden ∪ hiddenUntilReset` to `TierModel.ActiveTiers`; `BuildAlertSnapshots` drops `hiddenUntilReset` and `alert_muted_tiers` tiers (manual hidden still alert, as today). New commands: `HideUntilReset(tier)`, `ShowTier(tier)` (removes from both hidden sets), `SetWarnings(tier, on)`, and `HiddenTiers` for the menu.
+
+**TierCard context menu** (built on open from the card's view model): "Hide until it resets" (only when temporary and not hidden), "Hide this tier" (as today), "Stop warnings for this limit" / "Warn again for this limit", a separator, a "Hidden limits" submenu listing every hidden tier by label (click shows it again; absent when none), "Alerts Settings…". `TierCardViewModel` carries `IsTemporary` and `WarningsOn`.
+
+### 1.5 What the tray shows (W3)
+
+**Core: `Sanduhr.Core/TrayReadout.cs`** (port of `MenuBarMode.swift`'s reading rules plus Windows' existing mode).
+
+```csharp
+public enum TrayMode { Highest, Session, Weekly, Higher, Rotate }   // settings value: "highest", "session", "weekly", "higher", "rotate"
+public sealed record TrayReading(int Percent, string Label);         // Label: "Session", "Weekly", or the tier label for Highest
+public static class TrayReadout
+{
+    public static readonly TimeSpan RotateInterval = TimeSpan.FromSeconds(8);
+    public static string Title(TrayMode m);   // "Highest of any limit", "Session", "Weekly", "Whichever is higher", "Rotate (session and weekly)"
+    public static TrayMode Parse(string? raw); // unknown or missing: Highest
+    public static TrayReading? Reading(TrayMode mode, double? session, double? weekly, (string Label, double Util)? highestVisible, int step);
+}
+```
+
+- Session: session, else weekly, else null. Weekly: weekly, else session. Higher: weekly only when strictly greater; one present uses it. Rotate: even step prefers session, odd weekly, falling back to the other. Highest: the highest visible tier (today's behavior). Percent is truncated (`(int)util`). Null means "--".
+- Session and weekly are read from the fetch data whether or not their cards are hidden.
+
+**Wiring**: `WidgetViewModel` raises `TrayReadingChanged(TrayReading?)` in place of `TrayPercentChanged(int)` (all call sites, including the -1 resets, become null). `App` keeps the last inputs, a `DispatcherTimer` ticking every 8 s only while Rotate is chosen, renders `TrayIconRenderer.Render(percent)` and the tooltip "Sanduhr für Claude — {Label} {n}%" (or "— no data yet"). Settings key `tray_mode`. Tray menu: a "Tray Shows" submenu with the five titles as checkable items; Settings, General: a "Tray shows" combo with the same titles and the caption "The number on the tray icon. Rotate switches between session and weekly every 8 seconds."
+
+### 1.6 Steady sparklines (W5)
+
+**Core: `Sanduhr.Core/SparklineSteady.cs`**.
+
+```csharp
+public enum SparklineDraw { Classic, Horizon, Level }
+public static class SparklineSteady
+{
+    public const double SteadySpread = 2;
+    public static SparklineDraw Drawn(SparklineStyle style, IReadOnlyList<double> values);  // Horizon and non-empty and max-min < 2 gives Level
+    public static double LevelY(IReadOnlyList<double> values, double height);              // level = clamp(mean, 0, 100); y = h - level/100*(h-2) - 1
+}
+```
+
+**SparklineControl**: `OnRender` asks `Drawn`; Level paints a wash rectangle from `y` to the bottom at 12% of the line colour and a 1.5 px round-capped line across the width at 85%. Classic and Horizon are unchanged.
+
+### 1.7 Tests for S1
+Ported from `mac/Tests/SanduhrTests/{WhatsNewTests, HotKeyComboTests, ClaudeCodeFoldersTests, LimitLifetimeTests, MeterVisibilityTests, MenuBarTextTests, SparklineModeTests}.swift`, retargeted to Windows values. New files under `tests/Sanduhr.Tests/`: `WhatsNewTests.cs`, `WhatsNewCardsTests.cs`, `HotKeyComboTests.cs`, `ClaudeCodeHomesTests.cs` (temp-directory fixtures), `LimitLifetimeTests.cs`, `TrayReadoutTests.cs`, `SparklineSteadyTests.cs`, plus `SettingsStore` round-trips where the store is testable, and a `CcLogReader` test that the provider overload is honored and the one-argument constructor is unchanged. `TrustBoundaryTests` must pass untouched.
+
+---
+
+## Stage 2: welcome tour and a clearer first run
+- **Core `WelcomeTour.cs`**: steps as data (`Step`, `Requires`, `Choice`) reusing `WhatsNewCard`'s fields; `Visible(steps, features)`; `AtLaunch(fresh, finished, firstFetchOk)`; keys `tour_state` ("pending" | "finished" | "skipped"). Finishing or skipping records `whats_new_last_seen`, and `WhatsNew.AtLaunch(tour: pending)` yields to it. Mac reference: `WelcomeTour.swift`, `WelcomeTourSteps.swift`, `WelcomeTourWindow.swift`.
+- **Window**: the What's New window in step mode ("Welcome to Sanduhr · 1 of N", Back, Next, Skip the tour); keyboard Enter = Next, Escape = Skip.
+- **Signed-out widget**: "Not signed in" with Sign In, model controls hidden (`SignedOut.swift`).
+- **Demo mode** (`DemoMode.swift`): a session-only switch that pauses fetches and feeds sample data to the cards, tray, tour and Settings previews; never writes history, snapshot or vault.
+
+## Stage 3: Settings v2
+- Sidebar navigation (a `ListBox` with group headers) replaces the `TabControl`; pages per `docs/settings-v2-spec.md`, minus the Mac-only pages (Notch); the Desk pages appear with S5.
+- `SettingsNames.cs` (the names table) and `SettingsIndex.cs` (search entries and synonyms) in Core; a test checks the tray menu, card and tour strings against the names table.
+- `SettingsMigrations.cs`: one-time, idempotent moves of any key whose meaning changes.
+- About: version, What's New…, Take the Tour…, the trademark disclaimer, Third-Party Notices, where settings live (Show in Explorer).
+- Reset Sanduhr… (escalated): ordered steps, Claude Code receipts first, a dry-run report testable without deleting.
+
+## Stage 4: the Claude Code side
+- **Folder list** from `ClaudeCodeHomes` plus manual Add Folder (stored as paths in `cc_folders_added`), with the MCP and installer root sets per Este's ruling.
+- **Receipts**: a Core JSON splice (port of `JSONEdit.swift`) that edits one member and keeps every other byte, compare-and-swap writes, receipts and backups under `%APPDATA%\Sanduhr`, byte-for-byte Remove.
+- **Mods & Config**: read-only inventory first (`ModInventory`, `ConfigMask`: secrets never shown), then the meters mod switch (`ModSwitch`), then CLI-routed edits.
+- **Statusline combine**: the combine runner wraps the person's own statusline; segments, looks and the band file (`BandFile.swift`) follow the Mac's script so both apps share one definition (a shared script under `integrations/` is the target).
+- **Glow hooks**: hook installer for `Notification` and `Stop`, a request file the widget watches, a top-center glow window plus `FlashWindowEx`, rate-limited.
+- **Account follow and per-seat meters**: `AccountFollow.swift`, `Seats.swift`, `SeatMeters.swift`; a seat snapshot the MCP would read is escalated.
+
+## Stage 5: Desk foundation (deepening pass before build)
+- Spike first: a borderless layered window parented into the desktop's `WorkerW` (send `0x052C` to `Progman`, find the `WorkerW` behind `SHELLDLL_DefView`), per-monitor, re-parented on `TaskbarCreated`; prove click-through outside drawn pieces (`WM_NCHITTEST` returning `HTTRANSPARENT`), behavior on Windows 11 24H2, and mixed DPI.
+- Then: `DeskModel`, `DeskLayout` (eight places, order, size), taskbar clearance from `SPI_GETWORKAREA` and `SHAppBarMessage`, EsteFont as an app-private font (`Fonts/` resources, license in Third-Party Notices).
+
+## Stage 6: Desk content (deepening pass before build)
+- `DeskMessage` grammar and effects (port of `Message.swift`, `MessageEffects.swift`), the editor, special days; Desk-message and watcher MCP tools through the existing handoff-file pattern (escalated: tool surface).
+- Now playing: `GlobalSystemMediaTransportControlsSessionManager` with the Mac's tracker rules (`NowPlaying.swift`), in the widget first, then on the Desk; titles never persisted or logged.
+- Meetings: `Windows.ApplicationModel.Appointments` (escalated: manifest capability).
+
+## Stage 7: Desk polish (deepening pass before build)
+- Arrange by dragging (always endable), Desk clicks, sign-in reminders and Just the Desk (`SignedOut.swift`, `JustTheDesk.swift`), a camera and mic indicator spike with a written verdict.
+
+## Data Model
+All new state is keys in `settings.json`, defaults on absence:
+
+| Key | Type | Stage | Default |
+|---|---|---|---|
+| `whats_new_last_seen` | string | S1 | none |
+| `whats_new_installed_version` | string | S1 | none |
+| `whats_new_hide_after_updates` | bool | S1 | false |
+| `hotkey_settings` | `{on, vk, mods}` | S1 | off, Ctrl+Alt+S |
+| `limit_first_seen` | `{tier: ISO}` | S1 | {} |
+| `limits_hidden_until_reset` | `{tier: {resets_at, utilization}}` | S1 | {} |
+| `alert_muted_tiers` | `[tier]` | S1 | [] |
+| `tray_mode` | string | S1 | "highest" |
+| `tour_state` | string | S2 | fresh: "pending"; existing: absent = done |
+
+No new files outside `settings.json` in S1. Nothing new in Credential Manager, the vault or `snapshot.json`.
+
+## File Structure (S1)
+```
+windows-dotnet/
+  src/Sanduhr.Core/
+    WhatsNew.cs, WhatsNewCards.cs, HotKeyCombo.cs, ClaudeCodeHomes.cs,
+    LimitLifetime.cs, TrayReadout.cs, SparklineSteady.cs        (new)
+    CcLogReader.cs                                               (provider overload)
+  src/Sanduhr.App/
+    Views/WhatsNewWindow.xaml(.cs)                               (new)
+    Services/GlobalHotKeyService.cs, Interop/HotKeyNative.cs     (new)
+    ViewModels/ShortcutsViewModel.cs                             (new)
+    App.xaml.cs, ViewModels/WidgetViewModel.cs, ViewModels/SettingsViewModel.cs,
+    ViewModels/TierCardViewModel.cs, Views/TierCard.xaml(.cs), Views/SettingsWindow.xaml(.cs),
+    Services/SettingsStore.cs, Services/VaultService.cs, Services/UsagePublishService.cs,
+    Controls/SparklineControl.cs                                 (edited)
+  tests/Sanduhr.Tests/  one test file per new Core file
+```
+
+## Key Technical Decisions
+1. **Windows behavior kept where 1:1 would regress it** (tray "Highest of any limit" default, manual hide beside hide-until-reset, manually hidden tiers keep alerting). Logged.
+2. **Discovery outside the MCP**: new Core file, not linked; `CcLogReader` gains a BCL-typed provider. The allowlist and the MCP's root set are untouched. Logged, escalated.
+3. **Shortcut opt-in on Ctrl+Alt+S**, only a registration-failure conflict check, no Test It. Logged.
+4. **What's New on the Mac's timing** (two seconds after launch with an account), versions tagged 3.5.0.
+5. **No new packages, no manifest change, no new storage location** in S1.
+
+## Dependencies & External Services
+None new. `RegisterHotKey`/`UnregisterHotKey` (user32) by P/Invoke.
+
+## Open Issues
+- From the Stage 1 review (PR #204): `limits_hidden_until_reset`, `limit_first_seen` and `alert_muted_tiers` are global, not per account, as on the Mac; switching accounts can return a hidden promo limit as a new window. A per-account shape is a later item for both apps. Discovery runs on every `SearchRoots()` call; cache it if a slow profile folder shows up.
+1. The MCP root set and installers on discovered homes (Este).
+2. The in-app trademark disclaimer on existing surfaces (Este; S3's About is the natural home).
+3. Card version numbers at release (Este).
+4. Self-review findings, answered in-line for the autonomous run:
+   - *Does the tray's Rotate timer belong in Core?* No: the timer is UI; Core takes `step`. Tested by step parity.
+   - *Is `ClaudeCodeHomes.Discover` cheap enough to run on every `SearchRoots()` call?* One directory listing of the profile plus a few `Directory.Exists` per candidate; `CcLogReader` already walks every project file each scan, so it is noise. No cache.
+   - *Does `snapshot.json` keep hidden tiers?* It is written from the fetch payload, not the visible cards (`WriteSnapshotOk`); the build re-verifies.

@@ -337,6 +337,17 @@
             </Setter>
         </Style>
 
+        <!-- Shortcut keys button: FlatButton whose border turns accent while recording. -->
+        <Style x:Key="ShortcutKeysButton" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Setter Property="MinWidth" Value="96" />
+            <Setter Property="Margin" Value="12,0,12,0" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Shortcuts.IsRecording}" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- Window-range pill (History Week / Month): FlatButton that fills with
              accent when active (the bound DataTrigger sets Button.Background, which
              the FlatButton template surfaces via TemplateBinding). -->
@@ -1647,7 +1658,10 @@
 
                             <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                                 <TextBlock Text="Version: " FontSize="12" Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                <TextBlock Text="{Binding Version}" FontSize="12" Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                <TextBlock Text="{Binding Version}" FontSize="12" Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                                           VerticalAlignment="Center" />
+                                <Button Style="{StaticResource FlatButton}" Content="What's New…" Margin="14,0,0,0" Padding="10,3"
+                                        Command="{Binding ShowWhatsNewCommand}" />
                             </StackPanel>
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
@@ -1676,6 +1690,67 @@
                             <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                        Text="Off by default. When on, Sanduhr launches hidden in the tray at sign-in." />
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                            <!-- Tray (W3) — which number the tray icon shows. -->
+                            <TextBlock Text="Tray" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Tray shows" VerticalAlignment="Center" FontSize="12"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,8,0" />
+                                <ComboBox Style="{StaticResource ThemedComboBox}" Width="230"
+                                          ItemsSource="{Binding General.TrayModeOptions}"
+                                          DisplayMemberPath="Title"
+                                          SelectedItem="{Binding General.SelectedTrayMode, Mode=TwoWay}"
+                                          AutomationProperties.Name="Tray shows" />
+                            </StackPanel>
+                            <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                       Text="The number on the tray icon. Rotate switches between session and weekly every 8 seconds." />
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                            <!-- Shortcuts (S1) — the global "open Settings" key. -->
+                            <TextBlock Text="Shortcuts" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding Shortcuts.Label}" VerticalAlignment="Center" FontSize="12"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                <Button x:Name="ShortcutKeysButton" Style="{StaticResource ShortcutKeysButton}"
+                                        Content="{Binding Shortcuts.KeysText}"
+                                        Command="{Binding Shortcuts.StartRecordingCommand}"
+                                        ToolTip="{Binding Shortcuts.KeysToolTip}"
+                                        AutomationProperties.Name="{Binding Shortcuts.KeysAutomationName}"
+                                        LostKeyboardFocus="ShortcutKeys_LostKeyboardFocus" />
+                                <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                          IsChecked="{Binding Shortcuts.IsOn, Mode=TwoWay}"
+                                          AutomationProperties.Name="{Binding Shortcuts.SwitchAutomationName}" />
+                            </StackPanel>
+                            <Button HorizontalAlignment="Left" Margin="0,6,0,0" Cursor="Hand"
+                                    Content="{Binding Shortcuts.ResetText}"
+                                    Command="{Binding Shortcuts.ResetCommand}"
+                                    AutomationProperties.Name="{Binding Shortcuts.ResetAutomationName}"
+                                    Visibility="{Binding Shortcuts.ShowReset, Converter={StaticResource BoolVis}}">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <TextBlock x:Name="t" Text="{TemplateBinding Content}" FontSize="11"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="t" Property="TextDecorations" Value="Underline" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                            <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
+                                       Text="{Binding Shortcuts.Note}"
+                                       Foreground="#ffcf4d"
+                                       Visibility="{Binding Shortcuts.HasNote, Converter={StaticResource BoolVis}}" />
+                            <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                       Text="{Binding Shortcuts.Caption}" />
                         </StackPanel>
                     </Border>
                 </TabItem>

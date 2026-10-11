@@ -9,16 +9,16 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              d:DataContext="{d:DesignInstance vm:TierCardViewModel}"
              AllowDrop="True"
+             ContextMenuOpening="OnContextMenuOpening"
              Cursor="SizeAll">
     <UserControl.Resources>
         <conv:StringToVisibilityConverter x:Key="StrVis" />
         <conv:ColorToBrushConverter x:Key="ColorBrush" />
         <BooleanToVisibilityConverter x:Key="BoolVis" />
     </UserControl.Resources>
+    <!-- Items are built on open (TierCard.xaml.cs) so they reflect current state. -->
     <UserControl.ContextMenu>
-        <ContextMenu>
-            <MenuItem Header="Hide this tier" Click="OnHideClick" />
-        </ContextMenu>
+        <ContextMenu />
     </UserControl.ContextMenu>
 
     <Border Background="{DynamicResource Sanduhr.Brush.CardGlass}"

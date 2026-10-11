@@ -240,6 +240,50 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>Which number the tray icon shows (settings.json "tray_mode"),
+    /// defaulting to the highest visible tier.</summary>
+    public TrayMode LoadTrayMode()
+    {
+        var root = Read();
+        try { return TrayReadout.Parse(root["tray_mode"]?.GetValue<string>()); }
+        catch { return TrayMode.Highest; }
+    }
+
+    public void SaveTrayMode(TrayMode mode)
+    {
+        var root = Read();
+        root["tray_mode"] = TrayReadout.Raw(mode);
+        Write(root);
+    }
+
+    /// <summary>First-seen dates and hidden-until-reset records for limits that come and go
+    /// ("limit_first_seen", "limits_hidden_until_reset"), via Core's JSON helpers.</summary>
+    public LimitState LoadLimitState()
+    {
+        var root = Read();
+        return new LimitState(
+            LimitLifetime.FirstSeenFromJson(root["limit_first_seen"]),
+            LimitLifetime.HiddenFromJson(root["limits_hidden_until_reset"]));
+    }
+
+    public void SaveLimitState(LimitState state)
+    {
+        var root = Read();
+        root["limit_first_seen"] = LimitLifetime.FirstSeenToJson(state.FirstSeen);
+        root["limits_hidden_until_reset"] = LimitLifetime.HiddenToJson(state.HiddenUntilReset);
+        Write(root);
+    }
+
+    /// <summary>Tiers whose warnings the user turned off ("alert_muted_tiers").</summary>
+    public IReadOnlyList<string> LoadAlertMutedTiers() => LoadStringArray("alert_muted_tiers");
+
+    public void SaveAlertMutedTiers(IEnumerable<string> tiers)
+    {
+        var root = Read();
+        root["alert_muted_tiers"] = ToArray(tiers);
+        Write(root);
+    }
+
     public IReadOnlyList<string> LoadTierOrder() => LoadStringArray("tier_order");
 
     public void SaveTierOrder(IEnumerable<string> order)
@@ -537,6 +581,59 @@ public sealed class SettingsStore
         var root = Read();
         PublishSettingsJson.Migrate(root);   // never write a fresh group beside a stale legacy one
         mutate(root);
+        Write(root);
+    }
+
+    /// <summary>The global shortcut's stored state (<c>hotkey_settings</c>: on, vk, mods).
+    /// Missing or odd reads as off with the default combo.</summary>
+    public HotKeySetting LoadHotKeySetting(HotKeyAction action)
+        => HotKeys.Decode(action, Read()["hotkey_settings"]);
+
+    public void SaveHotKeySetting(HotKeyAction action, HotKeySetting setting)
+    {
+        var root = Read();
+        root["hotkey_settings"] = HotKeys.Encode(action, setting);
+        Write(root);
+    }
+
+    /// <summary>The newest version whose What's New was shown or skipped; empty reads as null.</summary>
+    public string? LoadWhatsNewLastSeen() => ReadString("whats_new_last_seen");
+
+    public void SaveWhatsNewLastSeen(string version) => WriteString("whats_new_last_seen", version);
+
+    /// <summary>The version a fresh install first ran; empty reads as null.</summary>
+    public string? LoadWhatsNewInstalledVersion() => ReadString("whats_new_installed_version");
+
+    public void SaveWhatsNewInstalledVersion(string version) => WriteString("whats_new_installed_version", version);
+
+    /// <summary>"Don't show after updates" (default false).</summary>
+    public bool LoadWhatsNewHideAfterUpdates()
+    {
+        try { return Read()["whats_new_hide_after_updates"]?.GetValue<bool>() ?? false; }
+        catch { return false; }
+    }
+
+    public void SaveWhatsNewHideAfterUpdates(bool hide)
+    {
+        var root = Read();
+        root["whats_new_hide_after_updates"] = hide;
+        Write(root);
+    }
+
+    private string? ReadString(string key)
+    {
+        try
+        {
+            var s = Read()[key]?.GetValue<string>();
+            return string.IsNullOrEmpty(s) ? null : s;
+        }
+        catch { return null; }
+    }
+
+    private void WriteString(string key, string value)
+    {
+        var root = Read();
+        root[key] = value;
         Write(root);
     }
 

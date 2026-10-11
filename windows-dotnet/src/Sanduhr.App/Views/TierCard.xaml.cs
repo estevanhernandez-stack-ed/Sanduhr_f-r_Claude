@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Sanduhr.App.ViewModels;
+using Sanduhr.Core;
 
 namespace Sanduhr.App.Views;
 
@@ -52,12 +53,46 @@ public partial class TierCard : UserControl
         base.OnPreviewMouseLeftButtonUp(e);
     }
 
-    private void OnHideClick(object sender, RoutedEventArgs e)
+    /// <summary>Rebuild the menu each time it opens so it reflects current state.</summary>
+    private void OnContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
-        if (DataContext is TierCardViewModel vm
-            && Window.GetWindow(this)?.DataContext is WidgetViewModel host)
+        if (ContextMenu is not { } menu)
+            return;
+        menu.Items.Clear();
+        if (DataContext is not TierCardViewModel vm
+            || Window.GetWindow(this)?.DataContext is not WidgetViewModel host)
         {
-            host.HideTier(vm.TierKey);
+            e.Handled = true;   // nothing to offer, so no empty menu
+            return;
         }
+        string key = vm.TierKey;
+
+        if (host.CanHideUntilReset(key))
+            menu.Items.Add(Item("Hide until it resets", () => host.HideUntilReset(key)));
+        menu.Items.Add(Item("Hide this tier", () => host.HideTier(key)));
+        menu.Items.Add(host.WarningsOn(key)
+            ? Item("Stop warnings for this limit", () => host.SetWarnings(key, false))
+            : Item("Warn again for this limit", () => host.SetWarnings(key, true)));
+        menu.Items.Add(new Separator());
+
+        var hidden = host.HiddenTierKeys;
+        if (hidden.Count > 0)
+        {
+            var sub = new MenuItem { Header = "Hidden limits" };
+            foreach (var hiddenKey in hidden)
+            {
+                var k = hiddenKey;
+                sub.Items.Add(Item(TierModel.Label(k), () => host.ShowTier(k)));
+            }
+            menu.Items.Add(sub);
+        }
+        menu.Items.Add(Item("Alerts Settings…", () => _ = host.OpenSettingsAtAsync(SettingsPage.Alerts)));
+    }
+
+    private static MenuItem Item(string header, Action onClick)
+    {
+        var item = new MenuItem { Header = header };
+        item.Click += (_, _) => onClick();
+        return item;
     }
 }

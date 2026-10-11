@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using Sanduhr.App.Interop;
 using Sanduhr.App.ViewModels;
+using Sanduhr.Core;
 
 namespace Sanduhr.App.Views;
 
@@ -66,8 +67,12 @@ internal partial class SettingsWindow : Window
         CalendarStrip.DayClicked += OnCalendarDayClicked;
 
         Loaded += (_, _) => RenderHistory();
+        PreviewKeyDown += OnRecorderPreviewKeyDown;
+        Deactivated += (_, _) => ViewModel.Shortcuts.CancelRecording();
         Closed += (_, _) =>
         {
+            ViewModel.Shortcuts.Detach();
+            ViewModel.General.Detach();
             _localCcTimer.Stop();
             ViewModel.History.Changed -= RenderHistory;
             ViewModel.ClaudeCode.Overview.Changed -= RenderLocalCc;
@@ -138,6 +143,70 @@ internal partial class SettingsWindow : Window
             _localCcTimer.Stop();
             if (header == "History")
                 RenderHistory();
+        }
+    }
+
+    /// <summary>While the shortcut recorder is listening, every key press is a candidate combo:
+    /// Escape cancels, a pure modifier is ignored, anything else goes to the view model.</summary>
+    private void OnRecorderPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        var shortcuts = ViewModel.Shortcuts;
+        if (!shortcuts.IsRecording)
+            return;
+
+        var key = e.Key switch
+        {
+            Key.System => e.SystemKey,
+            Key.ImeProcessed => e.ImeProcessedKey,
+            _ => e.Key,
+        };
+        e.Handled = true;
+        if (key == Key.Escape)
+        {
+            shortcuts.CancelRecording();
+            return;
+        }
+        if (key == Key.None)
+            return;
+
+        var mods = HotKeyModifiers.None;
+        var held = Keyboard.Modifiers;
+        if (held.HasFlag(ModifierKeys.Control)) mods |= HotKeyModifiers.Control;
+        if (held.HasFlag(ModifierKeys.Alt)) mods |= HotKeyModifiers.Alt;
+        if (held.HasFlag(ModifierKeys.Shift)) mods |= HotKeyModifiers.Shift;
+        if (held.HasFlag(ModifierKeys.Windows) || Keyboard.IsKeyDown(Key.LWin) || Keyboard.IsKeyDown(Key.RWin))
+            mods |= HotKeyModifiers.Win;
+
+        shortcuts.TryRecord(KeyInterop.VirtualKeyFromKey(key), mods);
+    }
+
+    private void ShortcutKeys_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        => ViewModel.Shortcuts.CancelRecording();
+
+    /// <summary>Settings page to TabItem header: the one mapping the router uses.</summary>
+    private static readonly Dictionary<SettingsPage, string> PageHeaders = new()
+    {
+        [SettingsPage.Accounts] = "Accounts",
+        [SettingsPage.Themes] = "Themes",
+        [SettingsPage.Alerts] = "Alerts",
+        [SettingsPage.History] = "History",
+        [SettingsPage.ClaudeUsage] = "Claude Usage",
+        [SettingsPage.Publish] = "Publish usage",
+        [SettingsPage.General] = "General",
+    };
+
+    /// <summary>Select the tab for <paramref name="page"/>. Widget is not a Settings page: ignored.</summary>
+    public void SelectPage(SettingsPage page)
+    {
+        if (!PageHeaders.TryGetValue(page, out var header))
+            return;
+        foreach (var item in Tabs.Items)
+        {
+            if (item is TabItem tab && tab.Header as string == header)
+            {
+                Tabs.SelectedItem = tab;
+                return;
+            }
         }
     }
 

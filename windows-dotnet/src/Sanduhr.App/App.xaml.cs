@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using Hardcodet.Wpf.TaskbarNotification;
 using Sanduhr.App.Services;
 using Sanduhr.App.Theming;
@@ -25,6 +26,8 @@ public partial class App : Application
     private MainWindow? _window;
     private Icon? _trayIcon;
     private SettingsWindow? _settingsWindow;
+    private DispatcherTimer? _trayRotateTimer;
+    private GlobalHotKeyService? _hotKeys;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -42,12 +45,18 @@ public partial class App : Application
         // A live theme switch (strip or Settings) raises ThemeChanged — the window
         // swaps its backdrop (Mica for glass themes, solid for a Matrix opt-out).
         _vm.ThemeChanged += p => _window?.ApplyBackdropForTheme(p);
-        _vm.TrayPercentChanged += OnTrayPercentChanged;
+        _vm.TrayReadingChanged += OnTrayReadingChanged;
+        _vm.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(WidgetViewModel.TrayMode))
+                SyncTrayRotation();
+        };
         _vm.SignInRequested += () => RunSignInAsync(embedded: true);
         _vm.ReauthRequested += RunReauthAsync;
         _vm.ManualReauthRequested += RunManualReauthAsync;
         _vm.PasteKeyRequested += () => RunSignInAsync(embedded: false);
-        _vm.SettingsRequested += ShowSettingsAsync;
+        _vm.SettingsRequested += () => ShowSettingsAsync();
+        _vm.SettingsPageRequested += page => ShowSettingsAsync(page);
         // Keep an open Settings window's account list in sync with quick-switches
         // made elsewhere (tray / widget chip / right-click).
         _vm.AccountsChanged += () => _settingsWindow?.ViewModel.Accounts.Reload();
@@ -58,6 +67,8 @@ public partial class App : Application
         _vm.AttachAlertService(new AlertService(new Sanduhr.Core.Paths(), ShowWindow));
 
         SetupTray();
+        SyncTrayRotation();
+        SetupHotKeys();
 
         // Usage vault (WS-C): consent resolves BEFORE the service attaches —
         // attach order is the consent gate; Start()'s first fetch cycle then
@@ -127,6 +138,78 @@ public partial class App : Application
         // Best-effort GitHub/Velopack update probe — fire-and-forget so a slow or offline
         // network never delays the first paint. No-ops on the Store/MSIX install and in dev.
         _ = new UpdateChecker().CheckForUpdatesAsync();
+
+        ScheduleWhatsNewAtLaunch();
+    }
+
+    /// <summary>The app version as Major.Minor.Build, the same shape Settings shows.</summary>
+    private static string AppVersion
+    {
+        get
+        {
+            var v = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version;
+            return v is null ? "0.0.0" : $"{v.Major}.{v.Minor}.{v.Build}";
+        }
+    }
+
+    /// <summary>
+    /// What's New after an update: decide from the stored versions, record the version before
+    /// showing, and open the window two seconds later so the widget settles first.
+    /// </summary>
+    private void ScheduleWhatsNewAtLaunch()
+    {
+        if (_vm is null)
+            return;
+        try
+        {
+            var store = new SettingsStore(new Sanduhr.Core.Paths());
+            var current = AppVersion;
+            var lastSeen = store.LoadWhatsNewLastSeen();
+            // After Start(): it migrates legacy credentials, so the account list is settled.
+            var fresh = WhatsNew.IsFresh(lastSeen, store.LoadWhatsNewInstalledVersion(),
+                _vm.AccountStore.ListAccounts().Count);
+            var onboarding = _vm.ActiveAccount is null;
+            var decision = WhatsNew.AtLaunch(lastSeen, current, fresh, onboarding,
+                store.LoadWhatsNewHideAfterUpdates());
+
+            if (fresh)
+                store.SaveWhatsNewInstalledVersion(current);
+            if (decision.Record)
+                store.SaveWhatsNewLastSeen(current);
+            if (decision.Show.Count == 0)
+                return;
+
+            var cards = decision.Show;
+            var header = WhatsNew.RangeLabel(cards, lastSeen, current) ?? $"Version {current}";
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                OpenWhatsNew(cards, header);
+            };
+            timer.Start();
+        }
+        catch
+        {
+            // What's New is a courtesy: never let it stop the widget.
+        }
+    }
+
+    private void OpenWhatsNew(IReadOnlyList<WhatsNewCard> cards, string header) =>
+        WhatsNewWindow.Show(cards, header, new SettingsStore(new Sanduhr.Core.Paths()), page =>
+        {
+            if (page == SettingsPage.Widget)
+                ShowWindow();
+            else
+                _ = ShowSettingsAsync(page);
+        });
+
+    /// <summary>"What's New…" from the tray and Settings: the installed version's highlights, or every card.</summary>
+    private void ShowWhatsNewFromMenu()
+    {
+        var installed = new SettingsStore(new Sanduhr.Core.Paths()).LoadWhatsNewInstalledVersion();
+        var (cards, header) = WhatsNew.ForMenu(AppVersion, installed);
+        OpenWhatsNew(cards, header);
     }
 
     private void SetupTray()
@@ -146,6 +229,9 @@ public partial class App : Application
 
         var settings = new MenuItem { Header = "Settings…" };
         settings.Click += async (_, _) => await ShowSettingsAsync();
+
+        var whatsNew = new MenuItem { Header = "What's New…" };
+        whatsNew.Click += (_, _) => ShowWhatsNewFromMenu();
 
         var refresh = new MenuItem { Header = "Refresh" };
         refresh.Click += (_, _) => _vm?.RefreshCommand.Execute(null);
@@ -179,7 +265,9 @@ public partial class App : Application
 
         menu.Items.Add(show);
         menu.Items.Add(settings);
+        menu.Items.Add(whatsNew);
         menu.Items.Add(refresh);
+        menu.Items.Add(BuildTrayShowsMenu());
         menu.Items.Add(new Separator());
         menu.Items.Add(accounts);
         menu.Items.Add(addAccount);
@@ -191,12 +279,40 @@ public partial class App : Application
         _tray.ContextMenu = menu;
     }
 
+    /// <summary>The global shortcut: registers what <c>hotkey_settings</c> asks for (off until the user turns it on).</summary>
+    private void SetupHotKeys()
+    {
+        try
+        {
+            _hotKeys = new GlobalHotKeyService(action =>
+            {
+                if (action == HotKeyAction.Settings)
+                    _ = ShowSettingsAsync();
+            });
+            var store = new SettingsStore(new Sanduhr.Core.Paths());
+            _hotKeys.Apply(new Dictionary<HotKeyAction, HotKeySetting>
+            {
+                [HotKeyAction.Settings] = store.LoadHotKeySetting(HotKeyAction.Settings),
+            });
+        }
+        catch (Exception e)
+        {
+            // A shortcut that cannot register must never stop the widget from starting.
+            try
+            {
+                System.IO.File.AppendAllText(new Sanduhr.Core.Paths().LogFile,
+                    $"{DateTime.UtcNow:o} global shortcut failed to start ({e.GetType().Name}){Environment.NewLine}");
+            }
+            catch { }
+        }
+    }
+
     /// <summary>
     /// Open the tabbed Settings window (Accounts tab default) — single-instance and
     /// non-modal so a live account switch from here reflects in the widget at once.
     /// Re-invoking focuses the existing window and refreshes its account list.
     /// </summary>
-    private Task ShowSettingsAsync()
+    private Task ShowSettingsAsync(SettingsPage? page = null)
     {
         if (_vm is null)
             return Task.CompletedTask;
@@ -204,11 +320,14 @@ public partial class App : Application
         if (_settingsWindow is not null)
         {
             _settingsWindow.ViewModel.Accounts.Reload();
+            if (page is { } p)
+                _settingsWindow.SelectPage(p);
             _settingsWindow.Activate();
             return Task.CompletedTask;
         }
 
-        var svm = new SettingsViewModel(_vm, () => RunSignInAsync(embedded: true), RunUpdateSignInAsync);
+        var svm = new SettingsViewModel(_vm, () => RunSignInAsync(embedded: true), RunUpdateSignInAsync, _hotKeys,
+            ShowWhatsNewFromMenu);
         try
         {
             _settingsWindow = new SettingsWindow(svm);
@@ -229,6 +348,8 @@ public partial class App : Application
             _settingsWindow.Owner = _window;
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
+        if (page is { } first)
+            _settingsWindow.SelectPage(first);
         _settingsWindow.Activate();
         return Task.CompletedTask;
     }
@@ -288,17 +409,69 @@ public partial class App : Application
             await _vm.ReloadAfterSignInAsync();
     }
 
-    private void OnTrayPercentChanged(int percent)
+    private void OnTrayReadingChanged(TrayReading? reading)
     {
         if (_tray is null)
             return;
-        var icon = TrayIconRenderer.Render(percent);
+        var icon = TrayIconRenderer.Render(reading?.Percent ?? -1);
         _tray.Icon = icon;
         _trayIcon?.Dispose();
         _trayIcon = icon;
-        _tray.ToolTipText = percent < 0
+        _tray.ToolTipText = reading is null
             ? "Sanduhr für Claude — no data yet"
-            : $"Sanduhr für Claude — ⏳ {percent}%";
+            : $"Sanduhr für Claude — {reading.Label} {reading.Percent}%";
+    }
+
+    /// <summary>"Tray Shows" submenu: one checkable item per mode, checks refreshed on open.</summary>
+    private MenuItem BuildTrayShowsMenu()
+    {
+        var parent = new MenuItem { Header = "Tray Shows" };
+        var items = new List<(TrayMode Mode, MenuItem Item)>();
+        foreach (var mode in TrayReadout.All)
+        {
+            // Not IsCheckable: a checkable item toggles itself on click, which would
+            // uncheck the current mode. The checks follow the setting instead.
+            var item = new MenuItem { Header = TrayReadout.Title(mode) };
+            var captured = mode;
+            item.Click += (_, _) =>
+            {
+                if (_vm is not null)
+                    _vm.TrayMode = captured;
+                SyncChecks();
+            };
+            items.Add((mode, item));
+            parent.Items.Add(item);
+        }
+        void SyncChecks()
+        {
+            foreach (var (mode, item) in items)
+                item.IsChecked = _vm?.TrayMode == mode;
+        }
+        parent.SubmenuOpened += (_, _) => SyncChecks();
+        return parent;
+    }
+
+    /// <summary>The 8-second rotate timer runs only while the mode is Rotate.</summary>
+    private void SyncTrayRotation()
+    {
+        if (_vm is null)
+            return;
+        if (_vm.TrayMode == TrayMode.Rotate)
+        {
+            _trayRotateTimer ??= CreateRotateTimer();
+            _trayRotateTimer.Start();
+        }
+        else
+        {
+            _trayRotateTimer?.Stop();
+        }
+    }
+
+    private DispatcherTimer CreateRotateTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TrayReadout.RotateInterval };
+        timer.Tick += (_, _) => _vm?.AdvanceTrayRotation();
+        return timer;
     }
 
     private void ToggleWindow()
@@ -321,6 +494,7 @@ public partial class App : Application
 
     private void QuitApp()
     {
+        _hotKeys?.Dispose();
         _tray?.Dispose();
         _trayIcon?.Dispose();
         _vm?.Dispose();
@@ -329,6 +503,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _hotKeys?.Dispose();
         _tray?.Dispose();
         _trayIcon?.Dispose();
         _vm?.Dispose();
