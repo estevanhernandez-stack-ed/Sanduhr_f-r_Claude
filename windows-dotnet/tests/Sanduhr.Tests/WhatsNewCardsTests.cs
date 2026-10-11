@@ -64,6 +64,6 @@ public class WhatsNewCardsTests
     public void Glyphs_AreOnePrivateUseCharacter() => Assert.All(Table, c =>
     {
         Assert.Equal(1, c.Glyph.Length);
-        Assert.InRange(c.Glyph[0], '', '');
+        Assert.InRange((int)c.Glyph[0], 0xE000, 0xF8FF);
     });
 }
