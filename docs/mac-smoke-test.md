@@ -1990,15 +1990,53 @@ and compare them at the end.
 4. Filters: Kind, Agents shows only agents; Seat, one folder shows only cards with its chip;
    Available only and Needs a look narrow the list; search for a marketplace's name finds its
    plugins. The count line says "N of M shown.".
-5. On By Seat, give a folder a **Label** (press Return) and mark it **Work**: back on the Catalog
+5. On By Seat, pick a folder and give it a **Label** in its header (press Return) and mark it **Work**: back on the Catalog
    its chips carry the new label and an orange Work badge. A folder whose linked account is
    marked work shows "Work from its account" and no picker. Nothing in the folder changes.
-6. Click a chip: By Seat opens scrolled to that folder, the item lit.
+6. Click a chip: By Seat opens on that folder with Extensions (or MCP servers) open and the item lit.
 7. Mark a folder Work, then `smoke/smoke do demo on` (debug hooks on): cards only that folder
-   holds disappear from the Catalog and its box from By Seat; `demo off` brings them back.
-8. Break a scratch folder's `settings.json` (add a `//` comment): Read Again. On By Seat its box
-   says "settings.json is unreadable: it isn't valid JSON (around line …, column …)", never that
-   it loads nothing.
+   holds disappear from the Catalog and its chip from By Seat's picker; `demo off` brings them back.
+8. Break a scratch folder's `settings.json` (add a `//` comment): Read Again. On By Seat its Settings
+   summary says "settings.json is unreadable: it isn't valid JSON (a comment around line …, column …)",
+   never that it loads nothing.
 9. `smoke/smoke run smoke/scenarios/mods-config.yaml` (from `mac/`) passes; `smoke/smoke state`
    shows `mods_config` with `tab`, `seats`, `cards`, `available`, `needs_look`, `duplicates`,
    `work_only` and `shown`, numbers only. Compare the modification times from the start: unchanged.
+
+## 50. Mods & Config: By Seat (item 71, slice 1b)
+
+On a Mac with two or more Claude Code folders, one marked Work and one Personal (section 49, step
+5). Note each folder's modification times first (`stat -f '%m %N'` on `settings.json`,
+`.claude.json` and `history.jsonl`) and compare at the end: nothing may change.
+
+1. By Seat: a chip per folder with its label and badge; start `claude` in a terminal with
+   `CLAUDE_CONFIG_DIR` set to one folder, Read Again: that chip shows a green dot. Quit it, Read
+   Again: the dot goes.
+2. The header names the folder (`~/…`), its account or "No account linked", the install model
+   (Git clone, Copy-installed or Plain folder), the Claude Code version on PATH for a native
+   install, and "Claude Code's default folder" for `~/.claude`.
+3. Eight sections, each collapsed to one line: Settings, Instructions, Extensions, MCP servers,
+   History, Housekeeping, Seat, Drift between seats. Open and close one, switch tabs and back: it
+   stays as left.
+4. Settings: "Computed by Sanduhr" at the top; each key with its value, "From User (~/…/settings.json)"
+   or Managed, "honored: …", "this machine only" for keys in `.seat/local-keys.json`, and "also set
+   in N projects" without naming one. Env values and anything secret-named show as ••••••.
+   Put `"pluginConfigs": {}` in a project's `.claude/settings.json`: the row warns it is ignored there.
+5. Instructions: the seat's CLAUDE.md with its `@` imports indented, line and byte counts; an
+   import that doesn't exist says "doesn't resolve". On a non-default seat with `~/.claude/CLAUDE.md`
+   present and no exclude, the leak warning shows.
+6. Extensions: agents, skills, commands and output styles; plugins with enabled, installed and
+   declared marks; a plugin enabled from two marketplaces is listed under the checks; hooks
+   read-only; then the Mods list with Check, as before.
+7. MCP servers: each server with its scope, transport, host or command (secrets masked), env and
+   header names only, and the recommended route.
+8. History: without `cleanupPeriodDays`, orange "Transcripts older than 30 days are deleted at the
+   next start"; with it, "Kept N days".
+9. Housekeeping lists any `*.sanduhr-backup` first; Seat shows the branch for a git clone, "Sync
+   is switched off" when `.seat/disabled` exists, and the never-list buckets from `.gitignore`.
+10. Drift on the Personal seat against the Work one: key names and "differs" only, no values;
+    between two Personal seats the values show (masked). A work seat's sections never name its
+    projects ("a project", "Project 1").
+11. `smoke/smoke run smoke/scenarios/mods-config.yaml` (from `mac/`) passes; `smoke/smoke state`
+    shows `mods_config.selected` and one `by_seat` entry per folder, numbers and flags only. Compare
+    the modification times from the start: unchanged.

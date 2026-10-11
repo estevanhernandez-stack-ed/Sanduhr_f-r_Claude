@@ -894,10 +894,54 @@ chip per seat that holds it: the seat's label, its Work, Personal or Unmarked ba
 card with no chip is **Available**. A chip opens By Seat at that seat with the extension lit.
 Filters: kind, seat, Everything, Installed somewhere, Available only, Needs a look (a duplicate,
 a problem or a Check that failed), and search over name, description and sources. Demo mode
-drops every card only work seats hold, and By Seat drops work seats. By Seat is the folder list
-below, each box now headed by the seat's label and badge with **Label** and a Work, Personal or
-Unmarked picker (Sanduhr preferences under `seats`; a seat whose linked account is marked work
-stays work). Nothing on the page writes to a seat except Sanduhr's own mod.
+drops every card only work seats hold, and By Seat drops work seats. Nothing on the page writes
+to a seat except Sanduhr's own mod.
+
+**By Seat (item 71, slice 1b).** A seat picker (one chip per seat: label, Work, Personal or
+Unmarked badge, and a green dot while a `claude` of this user runs in it, from `ClaudeProcesses`),
+then the seat's header (its folder, linked account, install model, the Claude Code version read
+from a native install's `versions/<v>` path, never by running `claude`, whether Sanduhr's own
+`CLAUDE_CONFIG_DIR` names it, **Label** and the mark picker, Forget Folder for a folder added by
+hand) and eight sections, each a disclosure with a one-line summary that shows collapsed
+(`SeatSectionID`, `SeatSummary`). `SeatReports.build` reads every seat in one background pass
+(files only: no CLI, no git, no network, nothing written; every value through `ConfigMask`):
+**Settings** (`SettingsPrecedence.walk`, labelled "computed by Sanduhr": managed
+`managed-settings.json` and `managed-settings.d/*.json`, then project local, project shared,
+user; arrays merge except `fallbackModel`, `modelPicker`, `availableModels`, `modelSettings`;
+`enabledPlugins`, `env`, `permissions` and `hooks` resolve per member; the strict keys
+`disableClaudeAiConnectors`, `maxEffortLevel`, `permissions.blockReadsOutsideWorkingDirectories`,
+`enableArtifact`, `isolatePeerMachines`, `syncClaudeAiSkills`, `syncClaudeAiPlugins` take the
+strictest value; a value where it is ignored is left out with a warning. The seat view walks
+managed and user and counts the projects that set each key too, never naming them. Each row has
+its source and file, the honored badge, "this machine only" from `.seat/local-keys.json`, and the
+lints: `Write(path)` allow rules, a `settings.local.json` in the seat folder, Windows paths,
+`permissions`/`hooks`/`env` in `.claude.json`, a statusline command not on this Mac. A
+`settings.json` with a comment or a trailing comma is unreadable, with the line and column,
+because Claude Code's strict JSON refuses it even where Foundation's parser doesn't);
+**Instructions** (`SeatInstructions`: the managed CLAUDE.md or `claudeMd` key, the seat's
+CLAUDE.md, `rules/**/*.md` with their `paths` gates, `@` imports outside code resolved up to four
+hops and marked outside the seat or unresolved, `claudeMdExcludes` with how many CLAUDE.md files
+each matches, the warning when `~/.claude/CLAUDE.md` would load into a non-default seat, and each
+project's `MEMORY.md` against 200 lines and 25 KB with links to missing files);
+**Extensions** (`SeatExtensionsCheck`: agents, skills, commands and output styles with scope and
+shadowing notes, `skillOverrides`, plugins enabled, installed and declared side by side, the
+parity checks, every hook from settings and loaded plugins read-only, then item 64's Mods list
+with Check); **MCP servers** (`SeatMCPView`: managed, local, project, user, plugin, with
+shadowing by name, the same endpoint under two names, `.mcp.json` approval and the recommended
+route); **History** (`cleanupPeriodDays` or the 30-day warning, `desktopSessionCleanupPeriodDays`,
+transcript size, the last 30 days, the oldest session, `history.jsonl`, subagent folders that
+outlived their session); **Housekeeping** (`SeatHousekeeping`: Sanduhr's backups first, temp
+files, stray backups, copies beside the seat, a stub `.claude.json`, `bridge-spawn/`, project
+keys and folders that differ only in case; read-only); **Seat** (`SeatRepo`: git clone,
+copy-installed or plain folder, the branch from `.git/HEAD`, whether the origin in `.git/config`
+matches `.seat/seat.json`'s remote (the match only, never the remote or the file's name),
+`.seat/state.json` read in either spelling or "unknown schema", the kill switch, and the
+never-list in three buckets from the seat's own `.gitignore`); **Drift** (`SeatDriftCheck`: keys
+that differ, with masked values only between two personal seats and "differs" across the wall,
+extensions one seat holds and the other doesn't, and routing from each project's
+`.vscode/settings.json`, flagging a work seat's project that routes to a non-work seat). A work
+seat's view never draws its project names. `SeatMtimes` snapshots modification dates, and the
+tests use it to prove building every report changes nothing.
 
 **What a folder loads** (`ModInventory.scan`, files only, no CLI): the folders in its
 settings.json's `env.CLAUDE_CODE_PLUGIN_DIRS` (`@inline`; off when `enabledPlugins["<name>@inline"]`
