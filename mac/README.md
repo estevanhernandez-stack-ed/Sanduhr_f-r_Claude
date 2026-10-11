@@ -1404,16 +1404,22 @@ Settings v2, slice 4 (item 72; `Models/SignedOut.swift`, `Models/DemoMode.swift`
 - **Empty notch wings collapse** (`NotchWingsView.collapses`): with Text beside the camera on, a
   wing whose content has nothing to show is 0 wide, so no black slab and the island shrinks to the
   camera on that side; Extra width each side comes back with the content. Nothing (a black wing
-  chosen on purpose) and Text beside the camera off keep their width.
+  chosen on purpose) and Text beside the camera off keep their width, and a wing on the Claude
+  meters holds its width while they are empty only for a moment: an account switch's fade, or a
+  key's first fetch still out (`DeskModel.metersPending`).
 - **Demo mode** (`sanduhr://debug/action?name=demo&arg=on`, debug hooks on) now fills every
   surface: `UsageViewModel.setDemo` puts two sample accounts, Work (active) and Personal, with
   made-up numbers and history on the widget, its chip and the menu bar, and through
   `DeskModel.update` on both Claude meters pieces and the notch; Settings, Usage draws the samples'
   meter history and Settings, Accounts lists the sample accounts read-only. The real numbers,
-  accounts and history wait in memory, fetches pause, and nothing reaches snapshot.json, a seat
-  file, history, SignInGate or the tour; off restores them and fetches. state.yaml: `demo`
-  (`active`, `widget_tiers`, `desk_line`, `notch_meters`, `accounts`, `usage_rows`); scenario
-  `demo-every-surface.yaml`.
+  accounts and history wait in memory (`DemoSession`), and every fetch pauses: the active account's
+  (an answer already on its way is dropped), Follow the account I'm using (off while demo is on)
+  and the per-seat rounds (`SeatMeters.paused`; seats.json and the seat files still follow the real
+  accounts). Nothing reaches snapshot.json, a seat file, history, SignInGate or the tour, Hide this
+  limit is off (the menus leave it out, Show this limit is disabled), and the Claude Code and Mods
+  pages keep listing the real accounts (`realAccountLabels`). Off restores everything exactly and
+  fetches. state.yaml: `demo` (`active`, `widget_tiers`, `desk_line`, `notch_meters`, `accounts`,
+  and `usage_rows`, the Usage page's charts as drawn); scenario `demo-every-surface.yaml`.
 
 ## Welcome tour
 

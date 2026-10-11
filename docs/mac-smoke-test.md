@@ -1907,7 +1907,7 @@ Code folder such as `~/.claude-scratch` with a `projects` folder is enough for t
    the session's band stays and its transcript shows no "unloaded" line; the old
    `integrations/<stamp>/` folder is still there until Sanduhr's next launch, then goes.
 
-## 47. Settings v2, slice 4: signed out and demo mode (item 72)
+## 48. Settings v2, slice 4: signed out and demo mode (item 72)
 
 On a scratch macOS user (or a throwaway profile as in section 45), never on your own.
 
@@ -1926,10 +1926,13 @@ On a scratch macOS user (or a throwaway profile as in section 45), never on your
 5. Notch on, Right wing on Claude meters, Alerts' **Sign-in reminders on the Desk and notch** off:
    no black slab right of the camera; the island ends at the camera. Message in the left wing on a
    day without a line: the same on the left. Sign in (or set a message): the wing comes back at
-   Extra width each side. Nothing in a wing keeps its black width.
+   Extra width each side. Nothing in a wing keeps its black width. Signed in with two accounts,
+   click the widget's chip: the meters wing keeps its width through the switch, and after Save of a
+   new key it keeps it until the first numbers.
 6. `smoke/smoke run smoke/scenarios/demo-every-surface.yaml` (from `mac/`) on the fresh profile: passes; `smoke/smoke state` while
-   on shows `demo: {active: true, widget_tiers: 3, desk_line: true, notch_meters: true,
-   accounts: 2, usage_rows: 3}`. By eye: the widget shows three cards and a Work chip (click: Personal,
+   on, with Settings, Usage opened, shows `demo: {active: true, widget_tiers: 3, desk_line: true,
+   notch_meters: true, accounts: 2, usage_rows: 3}`. While on, the log shows no usage request
+   (Follow and per-seat rounds included), and a limit's two-finger menu has no Hide. By eye: the widget shows three cards and a Work chip (click: Personal,
    other numbers), the Desk's Claude line starts with Work, the notch reads "5h 42%  wk 63%",
    Settings, Usage shows charts for the samples, Settings, Accounts lists Work and Personal
    read-only. Nothing names a real account, meeting or person. `demo off`: the profile is fresh again,
