@@ -37,6 +37,18 @@ public sealed partial class GeneralViewModel : ObservableObject
         }
     }
 
+    /// <summary>General's live tray preview: the icon as the tray draws it now.</summary>
+    [ObservableProperty] private System.Windows.Media.ImageSource? _trayPreviewImage;
+
+    /// <summary>The preview's caption: what the number is, as the tray's tooltip names it.</summary>
+    [ObservableProperty] private string _trayPreviewText = "";
+
+    private void OnTrayReadingChanged(TrayReading? reading)
+    {
+        TrayPreviewImage = TrayIconRenderer.RenderImage(reading?.Percent ?? -1);
+        TrayPreviewText = reading is null ? "No numbers yet: the tray shows --" : $"{reading.Label} {reading.Percent}%";
+    }
+
     /// <summary>True when this is an MSIX/Store install (toggle replaced by a
     /// deep-link button).</summary>
     public bool IsPackaged { get; }
@@ -53,11 +65,10 @@ public sealed partial class GeneralViewModel : ObservableObject
         _widget = widget;
         if (_widget is not null)
         {
-            _widget.PropertyChanged += (_, e) =>
-            {
-                if (e.PropertyName == nameof(WidgetViewModel.TrayMode))
-                    OnPropertyChanged(nameof(SelectedTrayMode));
-            };
+            // Named handlers, so Detach can take them off the app-lifetime widget again.
+            _widget.PropertyChanged += OnWidgetPropertyChanged;
+            _widget.TrayReadingChanged += OnTrayReadingChanged;
+            OnTrayReadingChanged(_widget.CurrentTrayReading);
         }
         _startup = startup ?? StartupManager.CreateDefault();
         IsPackaged = _startup.IsPackaged();
@@ -76,7 +87,10 @@ public sealed partial class GeneralViewModel : ObservableObject
     public void Detach()
     {
         if (_widget is not null)
+        {
             _widget.PropertyChanged -= OnWidgetPropertyChanged;
+            _widget.TrayReadingChanged -= OnTrayReadingChanged;
+        }
     }
 
     partial void OnAutoStartEnabledChanged(bool value)

@@ -325,36 +325,22 @@ public static class Program
         }
     }
 
-    /// <summary>Demo mode swaps the widget's labels, but the Settings tabs list the real registry
-    /// (Accounts list, General summary, History account picker). Replace every one with the demo
-    /// labels before the window exists, so no real label reaches a PNG.</summary>
-    static void MaskAccountLabels(SettingsViewModel svm)
+    /// <summary>Demo mode fills Settings with the sample accounts (Stage 3). Fail before anything
+    /// renders if a label that is not a sample would reach a PNG.</summary>
+    static void AssertOnlySampleAccounts(SettingsViewModel svm)
     {
-        var accounts = svm.Accounts;
-        accounts.Accounts.Clear();
-        accounts.Accounts.Add(new AccountItemViewModel("Work", true));
-        accounts.Accounts.Add(new AccountItemViewModel("Personal", false));
-        accounts.HasNoAccounts = false;
-        accounts.ActiveLabel = "Work";
-        accounts.SelectedAccount = accounts.Accounts[0];
-
-        var history = svm.History;
-        history.SelectedOption = history.AccountOptions[0];
-        history.AccountOptions.Clear();
-        history.AccountOptions.Add(new AccountOption("All accounts", null));
-        history.AccountOptions.Add(new AccountOption("Work", "Work"));
-        history.AccountOptions.Add(new AccountOption("Personal", "Personal"));
-        history.SelectedOption = history.AccountOptions[0];
-        history.Legend.Clear();
-        history.Legend.Add(new LegendItem("Work", Brushes.SteelBlue));
-        history.Legend.Add(new LegendItem("Personal", Brushes.IndianRed));
-        history.ShowLegend = true;
+        var allowed = new HashSet<string>(DemoMode.Accounts) { "All accounts" };
+        var shown = svm.Accounts.Accounts.Select(a => a.Label)
+            .Concat(svm.History.AccountOptions.Select(o => o.Display))
+            .Concat(svm.History.Legend.Select(l => l.Label));
+        if (shown.Any(label => !allowed.Contains(label)))
+            throw new InvalidOperationException("A non-sample account label would render in Settings; stopping before any PNG.");
     }
 
     static async Task RenderSettings(WidgetViewModel vm, Assembly asm)
     {
         var svm = new SettingsViewModel(vm, () => Task.CompletedTask, _ => Task.CompletedTask);
-        MaskAccountLabels(svm);
+        AssertOnlySampleAccounts(svm);
         var swType = asm.GetType("Sanduhr.App.Views.SettingsWindow")!;
         var sw = (Window)Activator.CreateInstance(swType, svm)!;
         OffScreen(sw);
@@ -381,6 +367,20 @@ public static class Program
         }
         File.WriteAllText(Path.Combine(Out, "settings-pages.txt"), pages.ToString());
         Log.Add($"txt settings-pages.txt {index} pages");
+
+        // Search: the results list in place of the pages, then a result opened at its section.
+        svm.Search.Query = "vault";
+        await Settle();
+        Save((FrameworkElement)sw.Content, "settings-search-vault");
+        Log.Add($"search 'vault': {string.Join(" | ", svm.Search.Results.Select(r => r.Title))}");
+        svm.Search.Query = "";
+        var select = swType.GetMethod("SelectPage")!;
+        select.Invoke(sw, [SettingsPage.About, SettingsIndex.Where]);
+        await Settle();
+        Save((FrameworkElement)sw.Content, "settings-anchor-about-where");
+        select.Invoke(sw, [SettingsPage.ClaudeUsage, SettingsIndex.Sessions]);
+        await Settle();
+        Save((FrameworkElement)sw.Content, "settings-anchor-claude-usage-sessions");
         sw.Close();
         await Settle();
     }

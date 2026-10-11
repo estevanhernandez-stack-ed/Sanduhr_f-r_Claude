@@ -49,8 +49,16 @@ public sealed partial class AccountsViewModel : ObservableObject
 
     [ObservableProperty] private bool _hasNoAccounts;
 
-    /// <summary>Active account label for the General tab summary, or "None".</summary>
+    /// <summary>Active account label, or "None".</summary>
     [ObservableProperty] private string _activeLabel = "None";
+
+    /// <summary>Demo mode: the list shows the sample accounts and their actions are off.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SwitchToCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RenameCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SignOutCommand))]
+    [NotifyCanExecuteChangedFor(nameof(UpdateSignInCommand))]
+    private bool _isDemo;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SwitchToCommand))]
@@ -77,8 +85,9 @@ public sealed partial class AccountsViewModel : ObservableObject
     {
         var prev = SelectedAccount?.Label;
         Accounts.Clear();
-        var active = _widget.ActiveAccount;
-        foreach (var label in _widget.ListAccounts())
+        IsDemo = _widget.IsDemo;
+        var active = _widget.ShownActiveAccount;
+        foreach (var label in _widget.ShownAccounts)
             Accounts.Add(new AccountItemViewModel(label, label == active));
         HasNoAccounts = Accounts.Count == 0;
         ActiveLabel = active ?? "None";
@@ -87,7 +96,8 @@ public sealed partial class AccountsViewModel : ObservableObject
                           ?? Accounts.FirstOrDefault();
     }
 
-    private bool HasSelection => SelectedAccount is not null;
+    // Demo mode's samples are not real accounts: nothing to switch, rename, update or remove.
+    private bool HasSelection => SelectedAccount is not null && !IsDemo;
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
     private async Task SwitchTo()

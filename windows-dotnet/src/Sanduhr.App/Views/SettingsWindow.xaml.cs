@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Sanduhr.App.Interop;
 using Sanduhr.App.ViewModels;
@@ -131,9 +132,9 @@ internal partial class SettingsWindow : Window
         if (!ReferenceEquals(e.OriginalSource, Tabs))
             return; // ignore bubbled selection changes from inner controls (combo, lists)
 
-        var header = (Tabs.SelectedItem as TabItem)?.Header as string;
-        ViewModel.ClaudeCode.IsTabActive = header == "Claude Usage";
-        if (header == "Claude Usage")
+        var page = PageOf(Tabs.SelectedItem as TabItem);
+        ViewModel.ClaudeCode.IsTabActive = page == SettingsPage.ClaudeUsage;
+        if (page == SettingsPage.ClaudeUsage)
         {
             await ViewModel.ClaudeCode.RefreshActiveAsync();
             _localCcTimer.Start();
@@ -141,10 +142,14 @@ internal partial class SettingsWindow : Window
         else
         {
             _localCcTimer.Stop();
-            if (header == "History")
+            if (page == SettingsPage.History)
                 RenderHistory();
         }
     }
+
+    /// <summary>The page a sidebar entry stands for: its Tag names the <see cref="SettingsPage"/>.</summary>
+    private static SettingsPage? PageOf(TabItem? tab) =>
+        tab?.Tag is string tag && Enum.TryParse<SettingsPage>(tag, out var page) ? page : null;
 
     /// <summary>While the shortcut recorder is listening, every key press is a candidate combo:
     /// Escape cancels, a pure modifier is ignored, anything else goes to the view model.</summary>
@@ -183,31 +188,117 @@ internal partial class SettingsWindow : Window
     private void ShortcutKeys_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
         => ViewModel.Shortcuts.CancelRecording();
 
-    /// <summary>Settings page to TabItem header: the one mapping the router uses.</summary>
-    private static readonly Dictionary<SettingsPage, string> PageHeaders = new()
+    /// <summary>
+    /// Open <paramref name="page"/> and, with an <paramref name="anchor"/> from
+    /// <see cref="SettingsIndex"/>, scroll to that section and outline it for 1.5 s. On Claude Usage
+    /// the anchor's view (Overview, Trends, Sessions) is selected first. Widget is not a Settings
+    /// page and is ignored; an anchor the page doesn't have opens the page's top.
+    /// </summary>
+    public void SelectPage(SettingsPage page, string? anchor = null)
     {
-        [SettingsPage.Accounts] = "Accounts",
-        [SettingsPage.Themes] = "Themes",
-        [SettingsPage.Alerts] = "Alerts",
-        [SettingsPage.History] = "History",
-        [SettingsPage.ClaudeUsage] = "Claude Usage",
-        [SettingsPage.Publish] = "Publish usage",
-        [SettingsPage.General] = "General",
-    };
-
-    /// <summary>Select the tab for <paramref name="page"/>. Widget is not a Settings page: ignored.</summary>
-    public void SelectPage(SettingsPage page)
-    {
-        if (!PageHeaders.TryGetValue(page, out var header))
+        var tab = Tabs.Items.OfType<TabItem>().FirstOrDefault(t => PageOf(t) == page);
+        if (tab is null)
             return;
-        foreach (var item in Tabs.Items)
+        Tabs.SelectedItem = tab;
+        if (SettingsIndex.Find(page, anchor) is not { } entry)
+            return;
+
+        if (page == SettingsPage.ClaudeUsage && entry.Subsection is { } view && ViewModel.ClaudeCode.Section != view)
         {
-            if (item is TabItem tab && tab.Header as string == header)
+            var command = view switch
             {
-                Tabs.SelectedItem = tab;
-                return;
-            }
+                SettingsIndex.TrendsView => ViewModel.ClaudeCode.SetTrendsCommand,
+                SettingsIndex.SessionsView => ViewModel.ClaudeCode.SetSessionsCommand,
+                _ => ViewModel.ClaudeCode.SetOverviewCommand,
+            };
+            command.Execute(null);
         }
+
+        // After layout: the page may have just been realized for the first time.
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        {
+            if (tab.Content is not DependencyObject content || SettingsAnchor.Find(content, entry.Anchor!) is not { } target
+                || !target.IsVisible)
+                return;
+            target.BringIntoView();
+            if (TryFindResource("Sanduhr.Brush.Accent") is Brush accent)
+                AnchorHighlightAdorner.Flash(target, accent, TimeSpan.FromSeconds(1.5));
+            // Keyboard users land on the section: its first control that takes focus.
+            if (FirstFocusable(target) is { } control)
+                control.Focus();
+        }));
+    }
+
+    private static UIElement? FirstFocusable(DependencyObject root)
+    {
+        if (root is UIElement { Focusable: true, IsVisible: true, IsEnabled: true } el
+            && root is Control)
+            return el;
+        int n = VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < n; i++)
+        {
+            if (FirstFocusable(VisualTreeHelper.GetChild(root, i)) is { } found)
+                return found;
+        }
+        return null;
+    }
+
+    // ---- sidebar search ----
+
+    private ListBox? SearchResultsList => Tabs.Template?.FindName("SearchResults", Tabs) as ListBox;
+
+    /// <summary>Enter opens the best hit, Down moves into the results, Escape clears the search.</summary>
+    private void SearchBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        var search = ViewModel.Search;
+        switch (e.Key)
+        {
+            case Key.Enter when search.First is { } first:
+                e.Handled = true;
+                OpenSearchRow(first);
+                break;
+            case Key.Down when search.Results.Count > 0 && SearchResultsList is { } list:
+                e.Handled = true;
+                list.SelectedIndex = 0;
+                list.UpdateLayout();
+                (list.ItemContainerGenerator.ContainerFromIndex(0) as ListBoxItem)?.Focus();
+                break;
+            case Key.Escape when search.IsSearching:
+                e.Handled = true;
+                search.Clear();
+                break;
+        }
+    }
+
+    /// <summary>Enter opens the selected result; Escape goes back to the search box.</summary>
+    private void SearchResults_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && SearchResultsList?.SelectedItem is SettingsSearchRow row)
+        {
+            e.Handled = true;
+            OpenSearchRow(row);
+        }
+        else if (e.Key == Key.Escape)
+        {
+            e.Handled = true;
+            (Tabs.Template?.FindName("SearchBox", Tabs) as TextBox)?.Focus();
+        }
+    }
+
+    private void SearchResults_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject source
+            && ItemsControl.ContainerFromElement(SearchResultsList, source) is ListBoxItem { DataContext: SettingsSearchRow row })
+            OpenSearchRow(row);
+    }
+
+    /// <summary>A chosen result: the search closes and the page opens at the section.</summary>
+    private void OpenSearchRow(SettingsSearchRow row)
+    {
+        ViewModel.Search.Clear();
+        SelectPage(row.Page, row.Anchor);
+        if (row.Anchor is null)
+            (Tabs.SelectedItem as TabItem)?.Focus();
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

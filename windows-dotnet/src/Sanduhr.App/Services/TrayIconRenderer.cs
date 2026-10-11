@@ -27,6 +27,24 @@ public static class TrayIconRenderer
     /// dot (no data yet). The returned <see cref="Icon"/> owns its handle and
     /// must be disposed by the caller when it swaps in the next one.
     /// </summary>
+    /// <summary>The icon for <paramref name="percent"/> as a frozen WPF image, for the previews
+    /// (Settings, General and the What's New and tour cards); null if it can't be drawn.</summary>
+    public static System.Windows.Media.ImageSource? RenderImage(int percent)
+    {
+        try
+        {
+            using var icon = Render(percent);
+            var source = System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(icon.Handle,
+                System.Windows.Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+            source.Freeze();
+            return source;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public static Icon Render(int percent)
     {
         const int size = 32;

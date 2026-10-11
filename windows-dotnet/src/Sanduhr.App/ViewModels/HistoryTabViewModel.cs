@@ -73,7 +73,7 @@ public sealed partial class HistoryTabViewModel : ObservableObject
         var prev = SelectedOption?.Account;
         AccountOptions.Clear();
         AccountOptions.Add(new AccountOption("All accounts", null));
-        foreach (var label in _widget.ListAccounts())
+        foreach (var label in _widget.ShownAccounts)
             AccountOptions.Add(new AccountOption(label, label));
         SelectedOption = AccountOptions.FirstOrDefault(o => o.Account == prev) ?? AccountOptions[0];
     }
@@ -94,7 +94,7 @@ public sealed partial class HistoryTabViewModel : ObservableObject
             ShowLegend = false;
             return;
         }
-        var accounts = _widget.ListAccounts();
+        var accounts = _widget.ShownAccounts;
         if (accounts.Count == 0)
         {
             ShowLegend = false;
@@ -113,8 +113,11 @@ public sealed partial class HistoryTabViewModel : ObservableObject
     /// </summary>
     public IReadOnlyList<ChartRow> BuildRows()
     {
+        // Demo mode charts nothing: a sample label could match a real account's history file.
+        if (_widget.IsDemo)
+            return [];
         int days = WeekMode ? 7 : 30;
-        var accounts = _widget.ListAccounts();
+        var accounts = _widget.ShownAccounts;
         string? selected = SelectedOption?.Account;
         var rows = new List<ChartRow>();
 

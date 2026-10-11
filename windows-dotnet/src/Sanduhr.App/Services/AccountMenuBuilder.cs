@@ -1,5 +1,6 @@
 using System.Windows.Controls;
 using Sanduhr.App.ViewModels;
+using Sanduhr.Core;
 
 namespace Sanduhr.App.Services;
 
@@ -21,8 +22,11 @@ internal static class AccountMenuBuilder
     {
         items.Clear();
 
-        var active = vm.ActiveAccount;
-        var accounts = vm.ListAccounts();
+        // Demo mode lists the sample accounts, so a screenshot of the menu names no real one;
+        // picking one shows that sample.
+        var active = vm.ShownActiveAccount;
+        var accounts = vm.ShownAccounts;
+        var switchCommand = vm.IsDemo ? vm.ShowSampleAccountCommand : (System.Windows.Input.ICommand)vm.SwitchAccountCommand;
 
         if (accounts.Count == 0)
         {
@@ -36,7 +40,7 @@ internal static class AccountMenuBuilder
                 items.Add(new MenuItem
                 {
                     Header = isActive ? $"●  {label}" : $"     {label}",
-                    Command = vm.SwitchAccountCommand,
+                    Command = switchCommand,
                     CommandParameter = label,
                     // The active account is the no-op target; dim it so the live one reads clearly.
                     IsEnabled = !isActive,
@@ -48,9 +52,9 @@ internal static class AccountMenuBuilder
             items.Add(new Separator());
 
         if (includeAdd)
-            items.Add(new MenuItem { Header = "Add account…", Command = vm.SignInCommand });
+            items.Add(new MenuItem { Header = SettingsNames.AddAccount, Command = vm.SignInCommand });
 
         if (includeManage)
-            items.Add(new MenuItem { Header = "Manage accounts…", Command = vm.OpenSettingsCommand });
+            items.Add(new MenuItem { Header = SettingsNames.LinkTitle(SettingsPage.Accounts), Command = vm.OpenSettingsPageCommand, CommandParameter = SettingsPage.Accounts });
     }
 }
