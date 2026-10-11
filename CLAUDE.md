@@ -17,9 +17,12 @@ conventional commits.
 
 ## Gotchas
 
-- `windows-dotnet/Sanduhr.slnx` does not include the MCP projects. `dotnet build windows-dotnet` and
-  `dotnet test windows-dotnet` cover App + Core + `Sanduhr.Tests` only. Test the MCP server by path:
-  `dotnet test windows-dotnet/tests/Sanduhr.Mcp.Tests/Sanduhr.Mcp.Tests.csproj`.
+- `runFullTrust` does not stop MSIX AppData write virtualization. The Store manifest opts out with
+  `desktop6:FileSystemWriteVirtualization` (18362+) and `virtualization:ExcludedDirectories` scoped
+  to the two Sanduhr folders (20348+), both behind `rescap:unvirtualizedResources`;
+  `PackageManifestTests` pins them. Drop them and Claude Code, `sanduhr-mcp` and the statusline lose
+  sight of the widget's files. Store data written before 3.4.3 sits in the package LocalCache until
+  `PackagedDataMigration` copies it out on first launch.
 - The MCP process is network-free by contract. `Sanduhr.Mcp.csproj` has no ProjectReference or
   PackageReference; it source-links four Core files, and `TrustBoundaryTests` pins that allowlist.
   `publish_usage` hands the upload to the widget through request/result files under

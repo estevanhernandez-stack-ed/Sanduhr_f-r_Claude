@@ -1,6 +1,6 @@
 # Privacy Policy — Sanduhr für Claude
 
-**Last updated:** 2026-10-03
+**Last updated:** 2026-10-11
 **Publisher:** 626Labs LLC
 **Contact:** [GitHub Issues](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/issues)
 
@@ -94,7 +94,7 @@ Nothing about your usage comes back to us. The short-version promise above ("doe
 - **Clear credentials manually:** Windows Start → Credential Manager → delete entries under service `com.626labs.sanduhr`.
 - **Clear local storage:** delete `%APPDATA%\Sanduhr\` and `%LOCALAPPDATA%\Sanduhr\`.
 - **Uninstall does not wipe credentials.** Start → Apps & features → Sanduhr für Claude → Uninstall removes the installed app files only. It does **not** delete your Windows Credential Manager entries under `com.626labs.sanduhr`, on either the GitHub (.exe) or Microsoft Store install — sign out first, or delete the entries yourself afterward.
-- **Note for Microsoft Store installs:** uninstalling from Apps & features also does **not** remove `%LOCALAPPDATA%\Sanduhr` (Windows leaves per-user app data behind). If you want the usage vault gone after uninstall, delete that folder manually.
+- **Note for Microsoft Store installs:** uninstalling from Apps & features does **not** remove `%APPDATA%\Sanduhr` or `%LOCALAPPDATA%\Sanduhr`. From 3.4.3 the Store build writes those two folders at their real paths, so Claude Code, `sanduhr-mcp` and the statusline (which run outside the app package) can read them, and Windows leaves them behind on uninstall like any desktop app's data. To remove them, quit Sanduhr, uninstall it, then delete both folders (paste `%APPDATA%\Sanduhr` and then `%LOCALAPPDATA%\Sanduhr` into File Explorer's address bar). The one-time 3.4.3 upgrade copied older Store data out of the app package; the originals inside the package are removed with the app.
 - **On the Mac, Sign Out:** Sanduhr → Settings → Accounts → select the account → Sign Out, then confirm. This deletes that account's `sessionKey` and `cf_clearance` from both the Keychain and the credentials file; signing out the active account also stops fetching and marks `snapshot.json` signed out with no usage figures in it. The account stays in the list, and its usage history (`history.{Account}.json`) and your settings stay.
 - **On the Mac, Remove Account:** Settings → Accounts → select the account → Remove Account…, then confirm. This signs it out as above, deletes its history file, and drops it from the list. To remove everything, remove every account (or sign out), delete the folder `~/Library/Application Support/Sanduhr/` and run `defaults delete com.626labs.sanduhr` and `defaults delete com.626labs.sanduhr.desk`.
 - **On the Mac, by hand:** delete the `com.626labs.sanduhr` items in Keychain Access (release builds) or the folder `~/Library/Application Support/Sanduhr/` (development builds). Moving the app to the Trash removes neither, so sign out first.

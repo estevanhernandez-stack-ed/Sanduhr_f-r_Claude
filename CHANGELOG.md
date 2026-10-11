@@ -205,6 +205,22 @@ Also:
 - **Alerts.** Settings ▸ Alerts turns on macOS notifications: the session (5 hr) and weekly meters each warn at a threshold you set (50 to 95%, default 80), optionally again at 100% of the session and when the session resets. Each alert fires once per tier per reset window. Includes a test button and a shortcut to System Settings, Notifications. The old "Show reminder at 100% of session" toggle, which saved a setting nothing read, now drives the 100% alert.
 - **snapshot.json on the Mac.** After every fetch the widget writes `~/Library/Application Support/Sanduhr/snapshot.json` in the Windows schema (version 1: status, error_kind, captured_at, tiers with key, utilization and resets_at), atomically, keeping the last good tiers on a failed fetch. Other tools on the Mac can show the meters from it without a login of their own. It never holds the session key.
 
+## v3.4.3 — 2026-10-11
+
+**Platform:** Windows (.NET 10 / WPF). Store (MSIX) build only; the Setup.exe build is unchanged.
+
+### Fixed
+
+- **The Store build writes its files where Claude Code can read them.** `runFullTrust` does not turn off MSIX AppData write virtualization, so files and folders the packaged app created under `%APPDATA%\Sanduhr` and `%LOCALAPPDATA%\Sanduhr` landed in `%LOCALAPPDATA%\Packages\626LabsLLC.SanduhrfrClaude_wz1chhb2h2v4a\LocalCache`, invisible outside the package. Folders that already existed were written in place, which split the MCP install: `bin\sanduhr-mcp.cmd` at the real path pointed at an `mcp\v…\sanduhr-mcp.exe` that had been redirected, so Claude Code could not start the server, and `sanduhr-mcp` and the statusline could not see `snapshot.json`, history or settings. The manifest now declares `rescap:unvirtualizedResources` with `desktop6:FileSystemWriteVirtualization` = `disabled` (Windows 10 1903 and up) and `virtualization:ExcludedDirectories` limited to the two Sanduhr folders (build 20348 and up, where it takes precedence). Registry virtualization stays on. `TargetDeviceFamily MinVersion` rises from 10.0.17763.0 to 10.0.18362.0, the first build that honors the opt-out. `PackageManifestTests` pins all of it.
+
+### Added
+
+- **One-time move of Store data out of the package.** On first start, a Store install copies what earlier versions left in the package LocalCache to the real folders (`PackagedDataMigration`, Core): per file, only where the real copy is missing or older, timestamps kept; `bin\` and `mcp\` skipped because the widget regenerates them at start; WebView2 profiles copied whole through a staging folder only when no real profile exists, and skipped with a log line otherwise. The originals stay in LocalCache as a rollback. A marker (`%APPDATA%\Sanduhr\.packaged-migration`) makes it one-shot; a run with failures retries for up to three launches. It never blocks startup and logs counts and exception types only.
+
+### Docs
+
+- `PRIVACY.md`: uninstalling the Store build leaves `%APPDATA%\Sanduhr` and `%LOCALAPPDATA%\Sanduhr` behind; how to remove them.
+
 ## v3.4.2 — 2026-09-14
 
 **Platform:** Windows (.NET 10 / WPF).
