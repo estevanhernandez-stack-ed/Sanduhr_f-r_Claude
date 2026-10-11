@@ -266,6 +266,13 @@ public static class Program
         Log.Add($"windows app mode: {WindowsAppMode()}");
         Log.Add($"scenarios: {string.Join(",", scenarios)}");
 
+        // Claude Code folders come from an invented profile, never the real one, so no real path, project or
+        // account label reaches a picture. Set before the view model is built (its log reader discovers folders).
+        string fakeProfile = BuildFakeProfile();
+        Sanduhr.App.Services.ClaudeCodeProfile.ProfileOverride = fakeProfile;
+        Sanduhr.App.Services.ClaudeCodeProfile.ConfigDirOverride = "";
+        Log.Add("claude code profile: invented (temp folder)");
+
         // Reads the real Credential Manager accounts (constructor only). No Start().
         var vm = new WidgetViewModel();
         vm.ApplyThemeByKey(themeKey);
@@ -273,6 +280,9 @@ public static class Program
         // Before anything renders: sample accounts only ("Work", "Personal").
         vm.StartDemo();
         await Settle();
+        // One folder added by hand (its settings.json is deliberately unreadable), and a link from a sample account.
+        vm.SaveCcFoldersAdded([Path.Combine(fakeProfile, "elsewhere", "claude-home-extra")]);
+        vm.SetAccountFolder("Work", Path.Combine(fakeProfile, ".claude-work"));
 
         var asm = typeof(Sanduhr.App.App).Assembly;
         Sanduhr.App.MainWindow? main = null;
@@ -332,6 +342,92 @@ public static class Program
             main?.Close();
             File.WriteAllLines(Path.Combine(Out, "log.txt"), Log);
         }
+    }
+
+    /// <summary>
+    /// An invented user profile for the Claude Code pages: <c>.claude</c> (a foreign statusline, hooks, plugins,
+    /// an invented mod, MCP servers, CLAUDE.md, no retention setting) and <c>.claude-work</c> (Sanduhr's meters mod
+    /// installed, retention set), plus an added folder whose settings.json does not parse. Nothing here is a real
+    /// path, project or account.
+    /// </summary>
+    static string BuildFakeProfile()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "sanduhr-harness-profile-" + Guid.NewGuid().ToString("N")[..8]);
+        void Put(string rel, string text)
+        {
+            string path = Path.Combine(root, rel);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, text);
+        }
+
+        Directory.CreateDirectory(Path.Combine(root, ".claude", "projects", "demo-app"));
+        Directory.CreateDirectory(Path.Combine(root, ".claude-work", "projects", "demo-site"));
+        Put(Path.Combine(".claude", "settings.json"), """
+            {
+              "statusLine": { "type": "command", "command": "node statusline.js --api-key sk-ant-demo0000000000000000" },
+              "hooks": {
+                "PreToolUse": [ { "matcher": "Bash", "hooks": [ { "type": "command", "command": "echo checking" } ] } ],
+                "Stop": [ { "hooks": [ { "type": "command", "command": "echo done" } ] } ]
+              },
+              "enabledPlugins": { "docs-helper@acme-market": true, "lint-bot@acme-market": false },
+              "env": { "CLAUDE_CODE_PLUGIN_DIRS": "{PROFILE}\\mods\\band-clock" }
+            }
+            """.Replace("{PROFILE}", root.Replace("\\", "\\\\")));
+        Put(Path.Combine(".claude", "CLAUDE.md"), string.Join("\n", Enumerable.Range(1, 42).Select(i => "Line " + i)) + "\n");
+        Put(".claude.json", """
+            { "mcpServers": { "docs-search": { "command": "docs-search" }, "tickets": { "command": "tickets" } },
+              "projects": { "demo-app": { "mcpServers": { "local-db": { "command": "db" } } } } }
+            """);
+        Put(Path.Combine(".claude-work", "settings.json"), "{\n  \"cleanupPeriodDays\": 90,\n  \"model\": \"sonnet\"\n}\n");
+        Put(Path.Combine("mods", "band-clock", ".claude-plugin", "plugin.json"),
+            "{ \"name\": \"band-clock\", \"version\": \"1.2.0\", \"description\": \"Shows the time in a band above the prompt.\" }");
+        Put(Path.Combine("mods", "band-clock", "hooks", "hooks.json"), "{ \"modules\": [\"./src/index.ts\"] }");
+        Put(Path.Combine("mods", "band-clock", "src", "index.ts"), "slot: 'AbovePrompt'\nconst r = await $.fs.read(path)\n");
+        Put(Path.Combine("elsewhere", "claude-home-extra", "settings.json"), "{\n  \"model\": \"sonnet\",\n}\n");
+
+        try
+        {
+            // Sanduhr's meters mod in .claude-work, from the repo's copy of the mod.
+            string? source = null;
+            for (var d = new DirectoryInfo(AppContext.BaseDirectory); d is not null && source is null; d = d.Parent)
+            {
+                string c = Path.Combine(d.FullName, "mac", "integrations", "mods", "sanduhr-meters");
+                if (Directory.Exists(c)) source = c;
+            }
+            var integ = new ClaudeCodeIntegrations(root, new Paths().AppDataDir, source);
+            var res = integ.Install(IntegrationKind.Meters, Path.Combine(root, ".claude-work"));
+            Log.Add($"fake profile: meters mod install ok={res.Ok}");
+        }
+        catch (Exception e)
+        {
+            Log.Add($"fake profile: meters mod install failed ({e.GetType().Name})");
+        }
+        return root;
+    }
+
+    /// <summary>The consent dialog the Claude Code page opens, over an invented folder that has another statusline.</summary>
+    static async Task RenderConsent(Assembly asm)
+    {
+        var specType = asm.GetType("Sanduhr.App.Views.ConsentSpec")!;
+        var dlgType = asm.GetType("Sanduhr.App.Views.IntegrationConsentDialog")!;
+        var spec = Activator.CreateInstance(specType,
+            "Show usage under the Claude Code prompt?",
+            "Sanduhr adds a statusline with your live session and weekly meters, right where the tokens burn.",
+            "~\\.claude",
+            "What gets written: the render script, a statusLine entry in this folder's settings.json (a copy is saved first) and a usage snapshot. Remove brings back the statusline that was here before.",
+            "Install",
+            "node statusline.js --api-key " + ConfigMask.Masked,
+            true);
+        var dlg = (Window)Activator.CreateInstance(dlgType, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance,
+            null, [spec], null)!;
+        OffScreen(dlg);
+        dlg.Show();
+        dlg.Left = -20000;
+        dlg.Top = -20000;
+        await Settle();
+        Save((FrameworkElement)dlg.Content, "consent-statusline");
+        dlg.Close();
+        await Settle();
     }
 
     /// <summary>The Claude Code edge glow over a fake 1280x800 desktop: a maximized-style window and a
@@ -442,6 +538,16 @@ public static class Program
             tabs.SelectedItem = item;
             await Settle();
             Save((FrameworkElement)sw.Content, $"settings-{index:00}-{Slug(header)}");
+            if (item.Tag is "ClaudeCode" or "Mods")
+            {
+                // These pages scroll: a second picture with the window tall enough to show all of it.
+                double h = sw.Height;
+                sw.Height = 1900;
+                await Settle();
+                Save((FrameworkElement)sw.Content, $"settings-{index:00}-{Slug(header)}-full");
+                sw.Height = h;
+                await Settle();
+            }
             index++;
         }
         File.WriteAllText(Path.Combine(Out, "settings-pages.txt"), pages.ToString());
@@ -462,5 +568,6 @@ public static class Program
         Save((FrameworkElement)sw.Content, "settings-anchor-claude-usage-sessions");
         sw.Close();
         await Settle();
+        await RenderConsent(asm);
     }
 }
