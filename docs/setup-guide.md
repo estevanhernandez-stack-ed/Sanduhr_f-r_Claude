@@ -31,10 +31,14 @@ You get your own claude.ai usage on your Mac, refreshed every 5 minutes.
 1. Click **Open claude.ai in Browser** and sign in there with Google.
 2. Open the browser's developer tools. In Chrome press Option+Command+I, then click **Application**. In Safari choose Develop, Show Web Inspector, then **Storage**.
 3. Under Cookies, then claude.ai, find **sessionKey** and copy its value.
-4. Click **Paste a Key Instead**. Settings opens at Accounts.
+4. Click **Paste a Key Instead**. Settings opens at Accounts, with the **sessionKey** field showing.
 5. Paste the value into the **sessionKey** field and click **Save**.
 
-You can also click **Paste a Key Instead** right on the welcome sheet and do the same steps.
+You can also click **Paste a Key Instead** right on the welcome sheet and do the same steps. Under the field, **How do I find this?** shows the Chrome and Safari steps again.
+
+**Name it first.** Settings, **Accounts** has a **Label** above the buttons, Personal until you change it. Type Work there before signing in and your first account is called Work. Below, **Data** shows what the account starts with, Meter history 30 days, Claude Code activity Not tracked and Share with your agents Off; change them once you're signed in.
+
+**Not now?** **Not Now**, at the bottom of the welcome sheet, puts it away until you next open Sanduhr. The widget says **Not signed in — sign in**; click that line when you're ready. Settings, **Usage** says the same until you sign in.
 
 **No Claude account?** Click **Just the Desk** at the bottom of the welcome sheet. You get the Desk on its own: a clock, today's meetings, your message, now playing and watchers on the desktop. Sanduhr asks for nothing, the widget stays out of the way (show it from the menu bar icon), and the Claude pieces stay blank. To add your Claude meters later, sign in from Settings, **Accounts**; they fill in with the first numbers.
 
@@ -107,7 +111,7 @@ The island has three places:
 - **Left wing** and **Right wing**, beside the camera. They need **Text beside the camera** on.
 - **Under the camera**, a strip below it. Turn on **Text under the camera too (desktop only)**. With no height below the notch yet, this sets **Extra height below** to 18 pt, so the strip shows at once.
 
-Each place shows one thing: **Next meeting, or the time**, **Next meeting, or the Claude meters**, **Time**, **Claude meters**, **Message**, **Now playing**, **Watchers** or **Nothing**. With nothing to show, Watchers and Now playing give way to that place's usual content.
+Each place shows one thing: **Next meeting, or the time**, **Next meeting, or the Claude meters**, **Time**, **Claude meters**, **Message**, **Now playing**, **Watchers** or **Nothing**. With nothing to show, Watchers and Now playing give way to that place's usual content. A wing that still has nothing to show, such as Claude meters before you sign in with the sign-in reminder off, or Message on a day without a line, folds away, and the island shrinks back to the camera on that side. It comes back at its full width with the next thing to show. **Nothing** keeps its width: it's a plain black wing on purpose.
 
 Under **Advanced**, at the bottom of the page, **Size** sets **Extra width each side** and **Extra height below (0 = none)**, and **Notch text color** sets the color of the island's text.
 
@@ -269,6 +273,7 @@ If it doesn't work: Check needs Claude Code's command line (`claude`) installed.
 - **Take the Tour…** (same places) opens the **Sanduhr Tour** with your own numbers; before you sign in, its first step has a **Sign In** button.
 - **Check for Updates…** (any Sanduhr menu, or the same button in Settings, **Updates**) checks now. Updates also has the automatic update switches.
 - **Shortcuts.** Settings, **General**, under Shortcuts: **⌥S opens Settings** and **⌥J joins the next meeting**, one switch each. They work in every app whenever Sanduhr runs, with or without the Desk. While one is on, ⌥S no longer types ß (or ⌥J ∆). To change one, click its keys beside the switch and press the new combination; Escape cancels. It needs ⌘, ⌃ or ⌥ (Shift alone isn't enough) and can't be the other shortcut's keys; the label follows (**⌃⌥S opens Settings**). **Reset to ⌥S** (or ⌥J) appears once changed. If macOS refuses the keys, a note under the switch says another app uses them. If they are one of macOS's own shortcuts (⌃↑ for Mission Control, ⇧⌘3 for a screenshot, any that are on in System Settings, Keyboard, Keyboard Shortcuts), the note names it and nothing is saved unless you click **Use Anyway**; while such keys are on, a grey note says macOS may get them first. **Test It**, under the switch, listens for 10 seconds: press the keys once and it says whether they reached Sanduhr (testing ⌥S doesn't open Settings again). **Also check other apps' menus**, below the shortcuts and off by default, names an app menu item that uses the same keys ("Finder uses ⇧⌘N for “New Folder”. While this shortcut is on, Finder won't get those keys.", with **Use Anyway**; while such keys are on, a grey note says Sanduhr takes them first); it needs Accessibility, which Sanduhr asks for only when you click **Allow in System Settings…**, and it reads only menu item names and their shortcuts. After updating from 2.10 they start on only if the Desk was on, since that is the only time they worked before.
+- **Screenshots without your numbers.** Demo mode fills the widget, the menu bar, the Desk's Claude meters and Claude line, the notch, Settings, **Usage** and Settings, **Accounts** with made-up numbers for two sample accounts, Work and Personal, and the Desk with sample meetings and a sample message. It shows nothing of yours and changes nothing. In Terminal, type `defaults write com.626labs.sanduhr debugHooks -bool true`, then `open "sanduhr://debug/action?name=demo&arg=on"`. To end it, `open "sanduhr://debug/action?name=demo&arg=off"` and `defaults delete com.626labs.sanduhr debugHooks`. Quitting Sanduhr ends it too.
 - **Where settings live.** Your choices are in two preferences files, `com.626labs.sanduhr` and `com.626labs.sanduhr.desk`. History, themes and integration files are in `~/Library/Application Support/Sanduhr/`. Desk messages are in `~/Library/Application Support/Desk/messages.txt`. Your key is in the Keychain.
 - **How to reset.** In Settings, **Accounts**, select each account and click **Remove Account…**. Quit Sanduhr. Delete the folder `~/Library/Application Support/Sanduhr/`. Then, in Terminal, type:
 
