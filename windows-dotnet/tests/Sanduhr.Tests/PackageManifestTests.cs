@@ -14,7 +14,8 @@ public class PackageManifestTests
 {
     private static readonly XNamespace Foundation = "http://schemas.microsoft.com/appx/manifest/foundation/windows10";
     private static readonly XNamespace Desktop6 = "http://schemas.microsoft.com/appx/manifest/desktop/windows10/6";
-    private static readonly XNamespace Rescap = "http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities";
+    private static readonly XNamespace Virtualization = "http://schemas.microsoft.com/appx/manifest/virtualization/windows10";
+    private static readonly XNamespace Rescap ="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities";
 
     private static XDocument LoadManifest()
     {
@@ -48,13 +49,44 @@ public class PackageManifestTests
         Assert.Contains("runFullTrust", names);
     }
 
-    [Fact]
-    public void Desktop6_namespace_is_ignorable()
+    [Theory]
+    [InlineData("desktop6", "http://schemas.microsoft.com/appx/manifest/desktop/windows10/6")]
+    [InlineData("virtualization", "http://schemas.microsoft.com/appx/manifest/virtualization/windows10")]
+    public void Virtualization_namespaces_are_bound_and_ignorable(string prefix, string uri)
     {
         var root = LoadManifest().Root!;
-        var prefix = root.GetPrefixOfNamespace(Desktop6);
-        Assert.Equal("desktop6", prefix);
+        Assert.Equal(prefix, root.GetPrefixOfNamespace(uri));
         var ignorable = ((string?)root.Attribute("IgnorableNamespaces") ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        Assert.Contains("desktop6", ignorable);
+        Assert.Contains(prefix, ignorable);
+    }
+
+    [Fact]
+    public void Newer_Windows_unvirtualizes_only_the_two_Sanduhr_folders()
+    {
+        // Build 20348+ honors this list instead of the blanket desktop6 property, so the
+        // opt-out stays scoped to the folders external readers need.
+        var dirs = LoadManifest().Root!
+            .Element(Foundation + "Properties")!
+            .Element(Virtualization + "FileSystemWriteVirtualization")?
+            .Element(Virtualization + "ExcludedDirectories")?
+            .Elements(Virtualization + "ExcludedDirectory")
+            .Select(e => e.Value.Trim())
+            .OrderBy(v => v, StringComparer.Ordinal)
+            .ToArray();
+        Assert.NotNull(dirs);
+        Assert.Equal(
+            new[] { @"$(KnownFolder:LocalAppData)\Sanduhr", @"$(KnownFolder:RoamingAppData)\Sanduhr" },
+            dirs);
+    }
+
+    [Fact]
+    public void Floor_is_the_first_build_that_honors_the_opt_out()
+    {
+        // desktop6:FileSystemWriteVirtualization is honored from Windows 10 1903 (18362).
+        // Below that the Store build would run virtualized and the external readers break.
+        var tdf = LoadManifest().Root!
+            .Element(Foundation + "Dependencies")!
+            .Element(Foundation + "TargetDeviceFamily")!;
+        Assert.Equal("10.0.18362.0", (string?)tdf.Attribute("MinVersion"));
     }
 }
