@@ -1846,3 +1846,29 @@ the default 680 pt window shows full previews, `settings_preview_folded: false`)
    the island grows a strip under the camera at once, Extra height below reads 18, and the hint
    under the switch says where the height lives. Set it back to 0: the hint says nothing shows under
    the camera. Put your values back.
+
+## 45. Just the Desk (BACKLOG #4)
+
+On a scratch macOS user (or `defaults delete com.626labs.sanduhr; defaults delete
+com.626labs.sanduhr.desk` on a throwaway profile with no Sanduhr Keychain item), never on your own.
+
+1. Open Sanduhr: the welcome sheet has **Just the Desk** at the bottom with its caption. Click it:
+   the sheet goes, the widget hides (When the widget shows is "Hidden while Desk is on" on a fresh
+   install), and the Desk shows the clock, the message and meetings with no "sign in to Sanduhr"
+   line; the notch's Claude meters wing is empty. `smoke/smoke state` shows `just_the_desk: true`,
+   `desk_enabled: true`, and Settings, Alerts has **Sign-in reminders on the Desk and notch** off.
+   The menu bar item is the icon alone.
+   Settings, Alerts and Claude Code open with "…once you sign in" and **Accounts Settings…**, which
+   opens Accounts; the line is gone once signed in.
+2. Quit and open again: no welcome sheet, the widget stays hidden, the Desk comes back. Show
+   Widget from the menu bar: it reads "Not signed in — sign in"; a click opens Accounts.
+3. After an update (`defaults write com.626labs.sanduhr whatsNewLastSeen 2.13.0`, relaunch):
+   What's New shows, though there is no key.
+4. Sign in from Settings, Accounts: the first numbers fill the Desk's meters and the notch wing;
+   `just_the_desk: false`, and the sign-in reminder switch is on again. Had you turned that switch
+   off yourself before choosing Just the Desk, it stays off.
+4b. Choose Just the Desk again on a fresh profile, then paste a made-up key in Settings, Accounts:
+   `just_the_desk: false` at once, the widget comes up reading the refusal, the Desk says "sign in
+   again in Sanduhr", and a relaunch keeps the widget up until a key works.
+5. Without Just the Desk (a fresh profile, sign in or close the sheet): the sheet comes back at each
+   launch until a key is saved, as before.

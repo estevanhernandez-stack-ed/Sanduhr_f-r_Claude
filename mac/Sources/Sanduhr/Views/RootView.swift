@@ -102,7 +102,8 @@ struct RootView: View {
         .onAppear {
             // `exists()` never prompts (no access control on the Keychain
             // items) — safe to call on every view appearance.
-            if !KeychainStore.exists(account: KeychainAccount.sessionKey) {
+            // Not after Just the Desk: that person has no account to sign in to (JustTheDesk).
+            if JustTheDesk.showsWelcome(hasSessionKey: KeychainStore.exists(account: KeychainAccount.sessionKey)) {
                 showOnboarding = true
             }
         }
@@ -127,6 +128,9 @@ struct RootView: View {
         }, onPaste: {
             showOnboarding = false
             SettingsWindowController.shared.show(.credentials)
+        }, onJustTheDesk: {
+            showOnboarding = false
+            (NSApp.delegate as? AppDelegate)?.chooseJustTheDesk()
         })
     }
 

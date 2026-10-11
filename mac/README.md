@@ -1314,6 +1314,17 @@ adds its own array and nothing else changes. Related features share a card, whic
 newest release it covers and lists every release it spans; it shows when any of them is new. The last version seen is the `whatsNewLastSeen`
 default (`defaults write com.626labs.sanduhr whatsNewLastSeen 2.3.4` fakes an update).
 
+## Just the Desk
+
+The welcome sheet's **Just the Desk** (`Models/JustTheDesk.swift`, BACKLOG #4) is for someone without a
+Claude account. It sets `justTheDesk` (standard defaults), turns the Desk on and the sign-in reminder
+off (`justTheDeskSilencedReminder` remembers that it did), and lets the widget follow When the widget
+shows instead of staying up for sign-in (`JustTheDesk.signInSettled`). The sheet stops showing at
+launch and What's New no longer waits for a key. Saving a key ends it at once, before any fetch
+(`JustTheDesk.endBySignIn`), turning the reminder back on only if Just the Desk had turned it off, so a
+key that then fails gets the usual sign-in flow (the widget up for it, the Desk's sign-in line).
+state.yaml: `just_the_desk`.
+
 ## Welcome tour
 
 A fresh install gets a short tour once, after its first sign-in, as soon as the first fetch

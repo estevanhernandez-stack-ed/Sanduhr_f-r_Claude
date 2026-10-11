@@ -53,6 +53,8 @@ struct DebugStateInput {
     var usageTab = UsageTab.overview
     /// Claude Usage, Meters (item 37): its choices and what it draws, counts only.
     var meterHistory = MeterHistoryDebug()
+    /// Just the Desk (BACKLOG #4): chosen on the welcome sheet and not yet ended by a sign-in.
+    var justTheDesk = false
     var meters: [DeskMeterRow] = []
     /// The widget's tiers drawing red with a glow (MeterWarning), in display order.
     var widgetWarnings: [Tier] = []
@@ -488,6 +490,7 @@ enum DebugState {
         pairs.append(("message_editor", messageEditorYAML(s.messageEditor)))
         pairs.append(("hot_keys", hotKeysYAML(s.hotKeys)))
         pairs.append(("meter_history", meterHistoryYAML(s.meterHistory)))
+        pairs.append(("just_the_desk", .bool(s.justTheDesk)))
         return .object(pairs)
     }
     

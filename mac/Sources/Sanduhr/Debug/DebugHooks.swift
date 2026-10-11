@@ -360,6 +360,7 @@ enum DebugHooks {
         s.settingsPreview = settings.isOpen ? SettingsPreviewKind.of(settings.section) : nil
         s.usagePageOpen = settings.isOpen && settings.section == .usage
         s.usageTab = settings.usageTab
+        s.justTheDesk = JustTheDesk.isOn()
         let meters = settings.usagePage
         s.meterHistory = MeterHistoryDebug(all: meters.metersAll && KeychainStore.accounts.labels.count > 1, window: meters.metersWindow.rawValue,
                                            rows: meters.meterRows.count, series: meters.meterRows.reduce(0) { $0 + $1.series.count })
