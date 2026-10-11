@@ -48,6 +48,8 @@ public sealed class SettingsStore
 
     private void Write(JsonObject root)
     {
+        if (ResetGuard.Done)
+            return;   // Reset Sanduhr… has run: nothing writes settings.json again
         try
         {
             File.WriteAllText(_path, root.ToJsonString(new JsonSerializerOptions { WriteIndented = false }));
@@ -543,6 +545,18 @@ public sealed class SettingsStore
         foreach (var (name, on) in roots)
             map[name] = on;
         root["mcp_roots"] = map;
+        Write(root);
+    }
+
+    /// <summary>Claude Code folders the user added by hand (settings.json "cc_folders_added", a list of
+    /// full paths). They are installer targets on the Claude Code page and are never read by the MCP server.</summary>
+    public IReadOnlyList<string> LoadCcFoldersAdded() => LoadStringArray("cc_folders_added");
+
+    public void SaveCcFoldersAdded(IEnumerable<string> folders)
+    {
+        var root = Read();
+        var list = folders.Where(f => !string.IsNullOrWhiteSpace(f)).ToList();
+        if (list.Count == 0) root.Remove("cc_folders_added"); else root["cc_folders_added"] = ToArray(list);
         Write(root);
     }
 

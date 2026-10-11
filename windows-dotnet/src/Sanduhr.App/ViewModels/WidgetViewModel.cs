@@ -466,12 +466,22 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     public IReadOnlyDictionary<string, bool> LoadMcpRoots() => _settings.LoadMcpRoots();
     public void SaveMcpRoots(IReadOnlyDictionary<string, bool> roots) => _settings.SaveMcpRoots(roots);
 
+    // -- Claude Code page (spec 4.2, 4.5) ----------------------------------------
+
+    /// <summary>Folders the user added by hand (<c>cc_folders_added</c>).</summary>
+    public IReadOnlyList<string> LoadCcFoldersAdded() => _settings.LoadCcFoldersAdded();
+    public void SaveCcFoldersAdded(IEnumerable<string> folders) => _settings.SaveCcFoldersAdded(folders);
+
+    /// <summary>The glow switches (<c>claude_code_glow</c>).</summary>
+    public GlowSwitches LoadClaudeCodeGlow() => _settings.LoadClaudeCodeGlow();
+    public void SaveClaudeCodeGlow(GlowSwitches switches) => _settings.SaveClaudeCodeGlow(switches);
+
     /// <summary>Write a status=ok snapshot from a successful fetch. No-op while
     /// the integration is off; never throws into the fetch path.</summary>
     private void WriteSnapshotOk(JsonObject data)
     {
         // Demo mode never reaches snapshot.json (the statusline and the MCP read it).
-        if (!_statuslineEnabled || IsDemo)
+        if (!_statuslineEnabled || IsDemo || ResetGuard.Done)
             return;
         try
         {
@@ -489,7 +499,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// statusline can say "reauth needed" instead of going silently stale.</summary>
     private void WriteSnapshotError(string errorKind)
     {
-        if (!_statuslineEnabled || IsDemo)
+        if (!_statuslineEnabled || IsDemo || ResetGuard.Done)
             return;
         try
         {
@@ -605,8 +615,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _history = new UsageHistory(_accounts, _paths);
         _settings = new SettingsStore(_paths);
         _ccReader = new CcLogReader(null, () => ClaudeCodeHomes.Discover(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR")));
+            ClaudeCodeProfile.Dir,
+            ClaudeCodeProfile.ConfigDir));
 
         _alertConfig = _settings.LoadAlertConfig();
         AlertSettingsChanged += () => _alertConfig = _settings.LoadAlertConfig();
@@ -1282,7 +1292,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     private enum RefreshOutcome { Ok, Transient, Auth, Other }
 
     [RelayCommand]
-    private async Task RefreshAsync() => await RefreshCoreAsync().ConfigureAwait(true);
+    private async Task RefreshAsync()
+    {
+        if (ResetGuard.Done)
+            return;   // Reset ran: no fetch, no history, no snapshot on the way out
+        await RefreshCoreAsync().ConfigureAwait(true);
+    }
 
     /// <summary>The actual fetch-and-render cycle, factored out of the public
     /// <see cref="RefreshAsync"/> command so callers that need to know HOW it ended
@@ -1911,6 +1926,22 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     }
 
     private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max];
+
+    /// <summary>
+    /// Stops everything that fetches or writes on its own: the refresh, tick and riff timers, account follow,
+    /// the seat meters and the active fetch client. Reset Sanduhr… calls it before removing anything. The
+    /// widget does not fetch again in this process.
+    /// </summary>
+    public void StopBackgroundWork()
+    {
+        _refreshTimer.Stop();
+        _tickTimer.Stop();
+        _riffTimer.Stop();
+        _statusNoticeTimer?.Stop();
+        _follower.Stop();
+        _seatMeters.Stop();
+        (_client as IDisposable)?.Dispose();
+    }
 
     public void Dispose()
     {

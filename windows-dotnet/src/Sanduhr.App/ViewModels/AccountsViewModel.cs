@@ -75,6 +75,18 @@ public sealed partial class AccountsViewModel : ObservableObject
         Reload();
     }
 
+    /// <summary>"Follow the account I'm using": the widget owns the setting and the 15-minute check.</summary>
+    public bool FollowAccount
+    {
+        get => _widget.FollowAccount;
+        set
+        {
+            if (_widget.FollowAccount == value) return;
+            _widget.FollowAccount = value;
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>Owner window for modal dialogs (rename prompt, confirm boxes).
     /// Set by the hosting <c>SettingsWindow</c> once it exists.</summary>
     public void AttachOwner(Window owner) => _owner = owner;
@@ -90,6 +102,7 @@ public sealed partial class AccountsViewModel : ObservableObject
         foreach (var label in _widget.ShownAccounts)
             Accounts.Add(new AccountItemViewModel(label, label == active));
         HasNoAccounts = Accounts.Count == 0;
+        OnPropertyChanged(nameof(FollowAccount));
         ActiveLabel = active ?? "None";
         SelectedAccount = Accounts.FirstOrDefault(a => a.Label == prev)
                           ?? Accounts.FirstOrDefault(a => a.IsActive)

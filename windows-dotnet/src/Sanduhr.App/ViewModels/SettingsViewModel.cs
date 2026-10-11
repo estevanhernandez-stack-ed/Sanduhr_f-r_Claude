@@ -29,6 +29,12 @@ public sealed class SettingsViewModel
     /// over the usage vault + live reader.</summary>
     public ClaudeCodeTabViewModel ClaudeCode { get; }
 
+    /// <summary>Backs the Claude Code page: folders, accounts linked to them, Sanduhr's pieces and the glow.</summary>
+    public ClaudeCodeViewModel ClaudeCodePage { get; }
+
+    /// <summary>Backs the Mods &amp; Config page: a read-only look at one folder, plus the meters mod switch.</summary>
+    public ModsConfigViewModel Mods { get; }
+
     /// <summary>Backs the General tab's auto-start control (item 10).</summary>
     public GeneralViewModel General { get; }
 
@@ -98,6 +104,12 @@ public sealed class SettingsViewModel
             widget, widget.LoadLocalCcShowBreakdowns(), widget.SaveLocalCcShowBreakdowns),
             new CcTrendsViewModel(widget),
             new CcLedgerViewModel(widget, widget.LoadLedgerGroupByProject(), widget.SaveLedgerGroupByProject));
+        ClaudeCodePage = new ClaudeCodeViewModel(widget);
+        Mods = new ModsConfigViewModel(widget);
+        // The two pages share one folder list and one set of installed pieces.
+        ClaudeCodePage.FoldersChanged += Mods.ReloadFolders;
+        ClaudeCodePage.PiecesChanged += Mods.Refresh;
+        Mods.OwnModChanged += ClaudeCodePage.Reload;
         General = new GeneralViewModel(widget: widget);
         Shortcuts = new ShortcutsViewModel(new SettingsStore(new Paths()), hotKeys);
         Alerts = new AlertsViewModel(widget, () =>
