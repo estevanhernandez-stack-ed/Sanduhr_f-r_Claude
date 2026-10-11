@@ -385,7 +385,6 @@ public partial class App : Application
         _tray.ContextMenu = menu;
     }
 
-    /// <summary>The global shortcut: registers what <c>hotkey_settings</c> asks for (off until the user turns it on).</summary>
     /// <summary>Claude Code edge glow (Stage 4.5): watches the hook signal files; both switches start off.</summary>
     private void StartGlow()
     {
@@ -395,6 +394,7 @@ public partial class App : Application
         _glow.Start();
     }
 
+    /// <summary>The global shortcut: registers what <c>hotkey_settings</c> asks for (off until the user turns it on).</summary>
     private void SetupHotKeys()
     {
         try

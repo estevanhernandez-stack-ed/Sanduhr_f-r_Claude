@@ -38,6 +38,11 @@ public sealed class ThemePalette
     public Color TextDim { get; }
     public Color TextMuted { get; }
     public Color Accent { get; }
+    /// <summary>The theme's "done" color (the Claude Code glow's finished light). Built-ins carry
+    /// a hue picked for each; any other theme falls back to the healthy-bar green, darkened on a
+    /// light background. Kept in the App: a theme-file field would widen <c>ThemeModel.cs</c>,
+    /// which the MCP compiles for <c>propose_theme</c>.</summary>
+    public Color Success { get; }
     public Color BarBg { get; }
     public Color FooterBg { get; }
     public Color PaceMarker { get; }
@@ -79,6 +84,7 @@ public sealed class ThemePalette
         TextDim = Hex(def.TextDim);
         TextMuted = Hex(def.TextMuted);
         Accent = Hex(def.Accent);
+        Success = SuccessFor(key, Hex(def.Bg));
         BarBg = Hex(def.BarBg);
         FooterBg = Hex(def.FooterBg);
         PaceMarker = Hex(def.PaceMarker);
@@ -98,6 +104,26 @@ public sealed class ThemePalette
     /// Delegates to Core so the ramp has a single source of truth.
     /// </summary>
     public static Color UsageColor(int pct) => Hex(ThemeCatalog.UsageColor(pct));
+
+    /// <summary>Each built-in theme's success hue, chosen to sit beside its accent.</summary>
+    private static readonly IReadOnlyDictionary<string, string> BuiltInSuccess = new Dictionary<string, string>
+    {
+        ["obsidian"] = "#4ade80",
+        ["aurora"] = "#2dd4bf",
+        ["ember"] = "#a3e635",
+        ["mint"] = "#bef264",
+        ["matrix"] = "#c6ff7a",
+        ["blueprint"] = "#bef264",
+    };
+
+    /// <summary>The success color for theme <paramref name="key"/>: its built-in hue, else the
+    /// healthy-bar green (<c>#4ade80</c>), or <c>#16a34a</c> on a light background.</summary>
+    public static Color SuccessFor(string key, Color bg)
+    {
+        if (BuiltInSuccess.TryGetValue(key, out var hex)) return Hex(hex);
+        double luma = (0.2126 * bg.R + 0.7152 * bg.G + 0.0722 * bg.B) / 255.0;
+        return luma > 0.6 ? Color.FromRgb(0x16, 0xa3, 0x4a) : UsageColor(0);
+    }
 
     /// <summary>
     /// Register this palette into a resource dictionary under stable
@@ -131,6 +157,7 @@ public sealed class ThemePalette
         SetBrush(res, "Sanduhr.Brush.TextDim", TextDim);
         SetBrush(res, "Sanduhr.Brush.TextMuted", TextMuted);
         SetBrush(res, "Sanduhr.Brush.Accent", Accent);
+        SetBrush(res, "Sanduhr.Brush.Success", Success);
         SetBrush(res, "Sanduhr.Brush.PaceMarker", PaceMarker);
 
         // 1-px top-edge light catch (inner_highlight); Transparent when the theme

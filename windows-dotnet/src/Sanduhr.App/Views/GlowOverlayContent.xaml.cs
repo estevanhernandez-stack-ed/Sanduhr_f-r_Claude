@@ -17,22 +17,19 @@ public partial class GlowOverlayContent : UserControl
 
     /// <summary>
     /// The glow color for <paramref name="e"/>, read from the live resources at call time so theme
-    /// switches apply. Waiting is the theme accent (<c>Sanduhr.Brush.Accent</c>). Done is the green the
-    /// tier cards use for a healthy bar (<c>ThemePalette.UsageColor(0)</c>), darkened on light themes
-    /// (judged from <c>Sanduhr.Brush.Bg</c>) so it stays visible.
+    /// switches apply. Waiting is the theme accent (<c>Sanduhr.Brush.Accent</c>), done the theme's
+    /// success color (<c>Sanduhr.Brush.Success</c>, see <see cref="ThemePalette.SuccessFor"/>); without
+    /// those resources the healthy-bar green, darkened on a light background.
     /// </summary>
     public static Color ColorFor(ClaudeCodeEvent e)
     {
         var res = Application.Current?.Resources;
         if (e == ClaudeCodeEvent.Waiting)
             return res?["Sanduhr.Brush.Accent"] is SolidColorBrush a ? a.Color : Color.FromRgb(0x4d, 0xa3, 0xff);
-        var green = ThemePalette.UsageColor(0);
-        if (res?["Sanduhr.Brush.Bg"] is SolidColorBrush bg && Luma(bg.Color) > 0.6)
-            return Color.FromRgb(0x16, 0xa3, 0x4a);
-        return green;
+        if (res?["Sanduhr.Brush.Success"] is SolidColorBrush s) return s.Color;
+        var bg = res?["Sanduhr.Brush.Bg"] is SolidColorBrush b ? b.Color : Colors.Black;
+        return ThemePalette.SuccessFor("", bg);
     }
-
-    private static double Luma(Color c) => (0.2126 * c.R + 0.7152 * c.G + 0.0722 * c.B) / 255.0;
 
     public GlowOverlayContent() => InitializeComponent();
 
