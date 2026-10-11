@@ -4,6 +4,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:ctl="clr-namespace:Sanduhr.App.Controls"
+        xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
         Title="{Binding WindowTitle}"
         Width="640" Height="620"
         MinWidth="520" MinHeight="420"
@@ -306,7 +307,8 @@
             <StackPanel DockPanel.Dock="Bottom" Margin="20,10,20,16">
                 <TextBlock FontSize="11" TextWrapping="Wrap"
                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                           Text="“Claude” and “claude.ai” are trademarks of Anthropic PBC, used nominatively; Sanduhr für Claude is an independent third-party tool." />
+                           AutomationProperties.Name="{x:Static core:SettingsNames.TrademarkNotice}"
+                           Text="{x:Static core:SettingsNames.TrademarkNotice}" />
                 <DockPanel Margin="0,12,0,0" LastChildFill="False"
                            Visibility="{Binding IsWhatsNew, Converter={StaticResource BoolVis}}">
                     <CheckBox DockPanel.Dock="Left" Style="{StaticResource ThemedCheckBox}"
