@@ -49,8 +49,8 @@ public static class WelcomeTour
             "Add each Claude account with its own sign-in and history, then switch from the name chip or the tray's Accounts menu.",
             "\uE716", WhatsNewPreview.AccountChip, SettingsPage.Accounts)),
         new(5, new WhatsNewCard([], "claude-code", "Claude Code, connected",
-            "The Claude Usage page shows your Claude Code tokens by day and project. It also adds the MCP tools and the statusline, each after you say yes.",
-            "\uEA86", WhatsNewPreview.None, SettingsPage.ClaudeUsage)),
+            "The Claude Usage page shows your Claude Code tokens by day and project. The Claude Code page adds the MCP tools and the statusline, each after you say yes.",
+            "\uEA86", WhatsNewPreview.None, SettingsPage.ClaudeCode)),
     ];
 
     /// <summary>The cards this machine shows: features met, sorted by step, ties in table order.</summary>

@@ -28,6 +28,7 @@ public static class SettingsIndex
     public const string Shortcuts = "shortcuts";
     // Accounts
     public const string AccountList = "accounts";
+    public const string Follow = "follow";
     // Alerts
     public const string Notifications = "notifications";
     public const string Thresholds = "thresholds";
@@ -39,10 +40,20 @@ public static class SettingsIndex
     // Claude Usage
     public const string Overview = "overview";
     public const string Vault = "vault";
-    public const string Statusline = "statusline";
-    public const string Mcp = "mcp";
     public const string Trends = "trends";
     public const string Sessions = "sessions";
+    // Claude Code
+    public const string Folders = "folders";
+    public const string Statusline = "statusline";
+    public const string Mcp = "mcp";
+    public const string Meters = "meters";
+    public const string Glow = "glow";
+    // Mods & Config
+    public const string ConfigFiles = "config";
+    public const string ModList = "mods";
+    public const string McpServers = "mcpservers";
+    public const string ClaudeMd = "claudemd";
+    public const string Retention = "retention";
     // Publish usage
     public const string Destination = "destination";
     public const string Token = "token";
@@ -81,6 +92,8 @@ public static class SettingsIndex
         E("Accounts", SettingsPage.Accounts, AccountList,
             ["sign in", "sign out", "add account", "rename", "update sign-in", "remove account", "switch",
              "active account", "sessionKey", "session key", "cookie", "cf_clearance"]),
+        E(SettingsNames.FollowAccount, SettingsPage.Accounts, Follow,
+            ["follow", "auto switch", "in use", "switch automatically", "every 15 minutes"]),
 
         E("Alerts", SettingsPage.Alerts, Notifications,
             ["notification", "toast", "enable alerts", "projection", "pace", "reset notifications", "Focus Assist"]),
@@ -96,13 +109,29 @@ public static class SettingsIndex
             ["Claude Code tokens", "today", "last 30 days", "calendar", "projects", "skills", "breakdown"], OverviewView),
         E("History vault", SettingsPage.ClaudeUsage, Vault,
             ["vault", "archive", "erase archive", "open vault folder", "homes", ".claude"], OverviewView),
-        E("Claude Code statusline", SettingsPage.ClaudeUsage, Statusline,
-            ["statusline", "status line", "prompt", "install statusline", "remove statusline"], OverviewView),
-        E("Claude quota tools (MCP)", SettingsPage.ClaudeUsage, Mcp,
-            ["MCP", "MCP server", "sanduhr-mcp", "agents", "tools", "burn attribution"], OverviewView),
         E(TrendsView, SettingsPage.ClaudeUsage, Trends, ["weeks", "4 weeks", "12 weeks", "26 weeks", "trend"], TrendsView),
         E(SessionsView, SettingsPage.ClaudeUsage, Sessions,
             ["ledger", "sessions", "models", "yesterday", "7 days", "stack by project", "csv"], SessionsView),
+
+        E("Folders", SettingsPage.ClaudeCode, Folders,
+            ["folder", "seat", "home", ".claude", "add folder", "forget folder", "linked account", "account folder", "CLAUDE_CONFIG_DIR"]),
+        E("Statusline", SettingsPage.ClaudeCode, Statusline,
+            ["status line", "prompt", "install statusline", "remove statusline", "segments", "combine", "replace", "meters"]),
+        E("MCP server", SettingsPage.ClaudeCode, Mcp,
+            ["MCP", "sanduhr-mcp", "agents", "tools", "burn attribution", "project totals", "quota tools"]),
+        E("Meters above the prompt", SettingsPage.ClaudeCode, Meters,
+            ["mod", "plugin", "meters", "band", "sanduhr-meters", "CLAUDE_CODE_PLUGIN_DIRS"]),
+        E("Glow when Claude needs you", SettingsPage.ClaudeCode, Glow,
+            ["glow", "hooks", "notification", "waiting", "finishes", "edge light", "terminal", "try it"]),
+
+        E("Settings and statusline", SettingsPage.Mods, ConfigFiles,
+            ["settings.json", "folder", "hooks", "statusline", "readable", "unreadable", "refresh", "inventory"]),
+        E("Mods", SettingsPage.Mods, ModList,
+            ["mod", "plugin", "plugins", "enabledPlugins", "sanduhr-meters", "switch", "on", "off", "update", "remove"]),
+        E("MCP servers", SettingsPage.Mods, McpServers, ["MCP", "servers", "mcpServers", "tools"]),
+        E("CLAUDE.md", SettingsPage.Mods, ClaudeMd, ["memory", "instructions", "lines", "size"]),
+        E("History kept", SettingsPage.Mods, Retention,
+            ["retention", "cleanupPeriodDays", "transcripts", "30 days", "delete", "keep"]),
 
         E("Destination", SettingsPage.Publish, Destination,
             ["endpoint", "URL", "preset", "626 Labs", "dashboard", "auth", "header"]),
@@ -132,6 +161,8 @@ public static class SettingsIndex
         [SettingsNames.TrayShows] = Tray,
         [SettingsNames.ShortcutToOpenSettings] = Shortcuts,
         [SettingsNames.AddAccount] = AccountList,
+        [SettingsNames.AddFolder] = Folders,
+        [SettingsNames.FollowAccount] = Follow,
         [SettingsNames.SendTestAlert] = TestAlert,
         [SettingsNames.ExportCsv] = HistoryExport,
         [SettingsNames.SaveAndApply] = Paste,
@@ -149,7 +180,9 @@ public static class SettingsIndex
         [SettingsPage.Accounts] = ["sign in", "account"],
         [SettingsPage.Alerts] = ["notification", "warning"],
         [SettingsPage.History] = ["meter history", "chart"],
-        [SettingsPage.ClaudeUsage] = ["Claude Code", "tokens", "usage", "vault", "statusline", "MCP"],
+        [SettingsPage.ClaudeUsage] = ["Claude Code", "tokens", "usage", "vault"],
+        [SettingsPage.ClaudeCode] = ["statusline", "MCP", "meters", "mod", "plugin", "hooks", "glow", "folder", "seat"],
+        [SettingsPage.Mods] = ["mod", "plugin", "hooks", "statusline", "MCP", "CLAUDE.md", "retention", "config", "settings.json"],
         [SettingsPage.Publish] = ["publish", "upload", "endpoint", "share"],
         [SettingsPage.Themes] = ["theme", "colors", "look"],
         [SettingsPage.About] = ["help", "version", "trademark", "privacy"],

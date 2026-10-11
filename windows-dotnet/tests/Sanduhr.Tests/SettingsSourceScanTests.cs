@@ -148,8 +148,8 @@ public class SettingsSourceScanTests
         }
 
         Assert.Equal(SettingsNames.Pages.Select(p => p.ToString()), tabs.Select(t => Attr(t, "Tag")));
-        Assert.Equal(SettingsNames.Pages.Select(SettingsNames.PageTitle), tabs.Select(t => Attr(t, "Header")));
-        Assert.Equal(SettingsNames.Pages.Select(SettingsNames.PageTitle), tabs.Select(t => Attr(t, "AutomationProperties.Name")));
+        Assert.Equal(SettingsNames.Pages.Select(SettingsNames.PageTitle), tabs.Select(t => WebUtility.HtmlDecode(Attr(t, "Header"))));
+        Assert.Equal(SettingsNames.Pages.Select(SettingsNames.PageTitle), tabs.Select(t => WebUtility.HtmlDecode(Attr(t, "AutomationProperties.Name"))));
         // A group's heading sits on its first page and nowhere else.
         var expected = SettingsNames.Pages.Select(p =>
             SettingsNames.Sidebar.FirstOrDefault(g => g.Pages[0] == p)?.Title ?? "");

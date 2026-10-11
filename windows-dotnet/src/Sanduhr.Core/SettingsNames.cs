@@ -19,12 +19,13 @@ public static class SettingsNames
 {
     // ---- Pages ----
 
-    /// <summary>The sidebar: four groups, each page once. Widget is not a page (Show me on a widget card
+    /// <summary>The sidebar: five groups, each page once. Widget is not a page (Show me on a widget card
     /// shows the widget itself).</summary>
     public static IReadOnlyList<SettingsGroup> Sidebar { get; } =
     [
         new(null, [SettingsPage.General, SettingsPage.Accounts, SettingsPage.Alerts]),
         new("Usage", [SettingsPage.History, SettingsPage.ClaudeUsage, SettingsPage.Publish]),
+        new("Claude Code", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
         new("Widget", [SettingsPage.Themes]),
         new("Help", [SettingsPage.About]),
     ];
@@ -41,6 +42,8 @@ public static class SettingsNames
         SettingsPage.History => "History",
         SettingsPage.ClaudeUsage => "Claude Usage",
         SettingsPage.Publish => "Publish usage",
+        SettingsPage.ClaudeCode => "Claude Code",
+        SettingsPage.Mods => "Mods & Config",
         SettingsPage.Themes => "Themes",
         SettingsPage.About => "About",
         SettingsPage.Widget => "Widget",
@@ -101,6 +104,14 @@ public static class SettingsNames
     public const string ThirdPartyNotices = "Third-party notices";
     /// <summary>About: removes what Sanduhr keeps on this PC (spec 4.7).</summary>
     public const string ResetSanduhr = "Reset Sanduhr…";
+    /// <summary>Claude Code: picks a folder Sanduhr did not find.</summary>
+    public const string AddFolder = "Add folder…";
+    /// <summary>Claude Code: drops a folder that was added by hand.</summary>
+    public const string ForgetFolder = "Forget folder";
+    /// <summary>Accounts: the follow switch, and the tray's account list marks the account in use.</summary>
+    public const string FollowAccount = "Follow the account I'm using";
+    /// <summary>Mods &amp; Config: re-reads the folder.</summary>
+    public const string RefreshFolder = "Refresh";
 
     /// <summary>The trademark disclaimer, the standard text, word for word (About carries it).</summary>
     public const string TrademarkNotice =
@@ -122,6 +133,8 @@ public static class SettingsNames
         (WhereSettingsLive, SettingsPage.About),
         (ThirdPartyNotices, SettingsPage.About),
         (ResetSanduhr, SettingsPage.About),
+        (AddFolder, SettingsPage.ClaudeCode),
+        (FollowAccount, SettingsPage.Accounts),
     ];
 
     /// <summary>
