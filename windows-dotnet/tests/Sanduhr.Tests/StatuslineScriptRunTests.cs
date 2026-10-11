@@ -30,6 +30,7 @@ public sealed class GitBashFactAttribute : FactAttribute
 /// command names) in a sandbox: APPDATA and USERPROFILE point at temp folders, so nothing of the
 /// machine's own Sanduhr data is read.
 /// </summary>
+[Collection(StatuslineScriptRunCollection.Name)]
 public class StatuslineScriptRunTests : IDisposable
 {
     private readonly TempDir _root = new();
@@ -303,7 +304,9 @@ public class StatuslineScriptRunTests : IDisposable
         var env = new Dictionary<string, string?>(NoGitBash) { ["SANDUHR_CHAIN_MS"] = null };
         var run = RunScript(["-Chain", Chain(slow), "-Join", "line", "-Mine", "session,weekly"], env: env);
         Assert.Equal("5h 42% | wk 17%\n", run.Text);
-        Assert.True(run.Elapsed < TimeSpan.FromSeconds(9), $"took {run.Elapsed.TotalSeconds:0.0} s");
+        // Well under the 20 s sleep: the kill worked. Not tighter, because two PowerShell start-ups count
+        // against it and a loaded CI machine slows them (this once failed at 9 s under a parallel run).
+        Assert.True(run.Elapsed < TimeSpan.FromSeconds(15), $"took {run.Elapsed.TotalSeconds:0.0} s");
     }
 
     [PowerShellFact]
@@ -383,4 +386,12 @@ public class StatuslineScriptRunTests : IDisposable
         Assert.True(p.ExitCode == 0, $"exit {p.ExitCode}; stderr: {stderr.Result}");
         Assert.Equal(expected + "\nwk 17%\n", stdout.Result.Replace("\r\n", "\n"));
     }
+}
+
+/// <summary>The script tests start real PowerShell processes with timing bounds: they run alone, never
+/// beside the rest of the suite, so CPU contention cannot make them random.</summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class StatuslineScriptRunCollection
+{
+    public const string Name = "Statusline script runs";
 }

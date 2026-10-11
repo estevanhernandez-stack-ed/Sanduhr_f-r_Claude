@@ -248,9 +248,15 @@ public sealed class McpIntegrationInstaller
                     prior = CommandOf(JsonEdit.Text(original, existing));
                 result = JsonEdit.Set(original, servers, "sanduhr", OurEntry()).Bytes;
             }
+            else if (top.Member("mcpServers") is not null)
+            {
+                // An mcpServers that isn't an object is someone else's value: never replace it.
+                refuse = true;
+                return null;
+            }
             else
             {
-                // No mcpServers (or one that is not an object, which Claude Code would not use anyway).
+                // No mcpServers yet.
                 result = JsonEdit.Set(original, top, "mcpServers",
                     JsonEdit.Value.Obj(new JsonEdit.Pair("sanduhr", OurEntry()))).Bytes;
             }

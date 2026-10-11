@@ -453,4 +453,42 @@ public class McpIntegrationInstallerTests
         Assert.Equal(ClaudeCodeHomes.ConfigFile(Path.Combine(home.Path, ".claude"), home.Path),
             installer.ConfigPathFor(".claude"));
     }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void A_config_with_a_byte_order_mark_round_trips_through_register_and_deregister(string eol)
+    {
+        using var home = new TempDir();
+        using var sanduhr = new TempDir();
+        Directory.CreateDirectory(Path.Combine(home.Path, ".claude-work", "projects"));
+        string path = CcConfig(home, ".claude-work");
+        string text = "{" + eol + "  \"numStartups\": 3," + eol + "  \"mcpServers\": {" + eol
+                      + "    \"other\": {" + eol + "      \"command\": \"x\"" + eol + "    }" + eol + "  }" + eol + "}" + eol;
+        byte[] original = [0xEF, 0xBB, 0xBF, .. System.Text.Encoding.UTF8.GetBytes(text)];
+        File.WriteAllBytes(path, original);
+        var installer = Make(home, sanduhr);
+
+        Assert.True(installer.Register(".claude-work").Ok);
+        byte[] registered = File.ReadAllBytes(path);
+        Assert.Equal(original[..3], registered[..3]);   // the BOM stays
+        Assert.True(installer.IsRegistered(".claude-work"));
+
+        Assert.True(installer.Deregister(".claude-work"));
+        Assert.Equal(original, File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public void An_mcpServers_that_is_not_an_object_is_never_replaced()
+    {
+        using var home = new TempDir();
+        using var sanduhr = new TempDir();
+        Directory.CreateDirectory(Path.Combine(home.Path, ".claude-work", "projects"));
+        string path = CcConfig(home, ".claude-work");
+        File.WriteAllText(path, "{\"mcpServers\": [\"theirs\"]}");
+        byte[] before = File.ReadAllBytes(path);
+
+        Assert.False(Make(home, sanduhr).Register(".claude-work").Ok);
+        Assert.Equal(before, File.ReadAllBytes(path));
+    }
 }
