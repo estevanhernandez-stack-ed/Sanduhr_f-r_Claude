@@ -54,6 +54,10 @@ public sealed class SeatMeters
     private readonly HashSet<string> _pending = new();
     private Task? _round;
     private bool _stopped;
+    private readonly CancellationTokenSource _cts = new();
+
+    /// <summary>Whether a seat file may be written now: not stopped, Reset not run, not cancelled.</summary>
+    private bool MayWrite => WritePolicy.MayWrite(_stopped, ResetGuard.Done, _cts.IsCancellationRequested);
 
     public SeatMeters(string appDataDir, TimeSpan interval, InactiveUsageReader reader,
         string? writerVersion = null, Action<string>? log = null, Func<DateTimeOffset>? now = null)
@@ -70,6 +74,7 @@ public sealed class SeatMeters
     public void Stop()
     {
         _stopped = true;
+        try { _cts.Cancel(); } catch (ObjectDisposedException) { /* already gone */ }
         _pending.Clear();
         _knownFetchable = new();
     }
@@ -87,7 +92,7 @@ public sealed class SeatMeters
     /// one, is fetched once soon.</summary>
     public void Sync()
     {
-        if (_stopped || Paused) return;
+        if (!MayWrite || Paused) return;
         var c = Context();
         var seats = SeatFiles.Seats(c.Linked);
         var signedOut = c.Linked.Keys.Where(l => !c.SignedIn.Contains(l)).OrderBy(l => l, StringComparer.Ordinal);
@@ -115,7 +120,7 @@ public sealed class SeatMeters
     /// time, rather than waiting for the next fetch.</summary>
     public void Seed(JsonObject? usage, DateTimeOffset? at, string? label, string? plan)
     {
-        if (usage is null || at is null || label is null || _stopped || Paused) return;
+        if (usage is null || at is null || label is null || !MayWrite || Paused) return;
         if (!IsLinked(label, out _) || SeatFiles.CapturedAt(_dir, label) is not null) return;
         Write(() => SeatFiles.WriteAccount(_dir, label, usage, plan, at.Value, _writerVersion, _log));
     }
@@ -148,7 +153,7 @@ public sealed class SeatMeters
     /// <summary>The active account's good fetch: its seat file gets the same, then a round runs.</summary>
     public void ActiveAnswered(string? label, JsonObject usage, string? plan)
     {
-        if (_stopped || Paused) return;
+        if (!MayWrite || Paused) return;
         if (IsLinked(label, out _))
             Write(() => SeatFiles.WriteAccount(_dir, label!, usage, plan, _now(), _writerVersion, _log));
         StartRound();
@@ -159,7 +164,7 @@ public sealed class SeatMeters
     /// more is asked).</summary>
     public void ActiveFailed(string? label, string errorKind, string? plan)
     {
-        if (_stopped || Paused) return;
+        if (!MayWrite || Paused) return;
         if (IsLinked(label, out _))
             Write(() => SeatFiles.WriteAccountError(_dir, label!, errorKind, plan, _now(), _writerVersion, _log));
         if (errorKind != SnapshotContract.ErrorNetwork) StartRound();
@@ -168,7 +173,7 @@ public sealed class SeatMeters
     /// <summary>Following's own check of an inactive account answered (no request made for this).</summary>
     public void FollowerAnswered(string label, InactiveReading reading)
     {
-        if (_stopped || Paused) return;
+        if (!MayWrite || Paused) return;
         var c = Context();
         if (!SeatRules.Fetchable(label, c.Linked, c.SignedIn, c.Active)) return;
         _lastFetch[label] = _now();
@@ -185,6 +190,7 @@ public sealed class SeatMeters
 
     private void Write(Action write)
     {
+        if (!MayWrite) return;
         try { write(); }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { _log?.Invoke($"seat write failed ({e.GetType().Name})"); }
     }
@@ -196,7 +202,7 @@ public sealed class SeatMeters
     /// here, off the UI thread) with Claude Code activity in its folder.</summary>
     public void StartRound()
     {
-        if (_round is not null || Paused || _stopped) return;
+        if (_round is not null || Paused || !MayWrite) return;
         var c = Context();
         var candidates = c.Linked.Keys
             .Where(l => SeatRules.Fetchable(l, c.Linked, c.SignedIn, c.Active)
@@ -218,15 +224,21 @@ public sealed class SeatMeters
                 var active = await Task.Run(() => rest.Where(r => check(r.Folder)).Select(r => r.Label).ToList()).ConfigureAwait(true);
                 due.AddRange(active);
             }
+            if (!MayWrite) return;
             _pending.ExceptWith(due);
             foreach (var label in due.OrderBy(l => l, StringComparer.Ordinal))
             {
-                if (_stopped) return;
+                if (!MayWrite) return;
                 await Sleep(SeatRules.Stagger).ConfigureAwait(true);
+                if (!MayWrite) return;
                 await FetchAsync(label).ConfigureAwait(true);
             }
         }
-        catch (Exception e) when (e is not OperationCanceledException)
+        catch (OperationCanceledException)
+        {
+            // Stopped (Reset) while a read was out: nothing is written.
+        }
+        catch (Exception e)
         {
             _log?.Invoke($"seat round failed ({e.GetType().Name})");
         }
@@ -235,12 +247,12 @@ public sealed class SeatMeters
             _round = null;
         }
         // A seat that became new during the round gets its turn now.
-        if (!_stopped && _pending.Count > 0) StartRound();
+        if (MayWrite && _pending.Count > 0) StartRound();
     }
 
     private async Task FetchAsync(string label)
     {
-        if (Paused || _stopped) return;
+        if (Paused || !MayWrite) return;
         var c = Context();
         if (!SeatRules.Fetchable(label, c.Linked, c.SignedIn, c.Active)
             || SeatRules.Throttled(_lastFetch.TryGetValue(label, out var last) ? last : null, _now(), _interval))
@@ -255,7 +267,11 @@ public sealed class SeatMeters
         }
         _lastFetch[label] = _now();
         int epoch = _epoch.GetValueOrDefault(label);
-        var reading = await _reader.ReadAsync(label, creds).ConfigureAwait(true);
+        InactiveReading reading;
+        try { reading = await _reader.ReadAsync(label, creds, _cts.Token).ConfigureAwait(true); }
+        catch (OperationCanceledException) { return; }
+        // Reset or stop while the request ran: write nothing.
+        if (!MayWrite) return;
         // Switched to, signed out, removed, unlinked or renamed while the request ran: no one's.
         var after = Context();
         if (_epoch.GetValueOrDefault(label) != epoch

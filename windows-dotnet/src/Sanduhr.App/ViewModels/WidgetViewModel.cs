@@ -1313,7 +1313,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _vault?.TriggerIngest();
 
         // Demo mode pauses fetches; a real answer must never replace the samples.
-        if (_fetcher is null || _refreshing || IsDemo)
+        if (_fetcher is null || _refreshing || IsDemo || ResetGuard.Done)
             return RefreshOutcome.Other;
         _refreshing = true;
         int generation = _fetcherGeneration;
@@ -1322,6 +1322,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             if (Tiers.Count == 0)
                 StatusText = "Refreshing…";
             var data = await _fetcher.FetchAsync().ConfigureAwait(true);
+            // Reset ran while the fetch was out: no history, snapshot or seat write.
+            if (ResetGuard.Done)
+                return RefreshOutcome.Other;
             // Demo mode came on, or the fetcher was rebuilt (demo ended, account switched),
             // while this fetch was out: drop the answer. The rebuild's own fetch follows.
             if (!DemoMode.AnswerApplies(generation == _fetcherGeneration, IsDemo))
@@ -1345,6 +1348,11 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
             OnActiveFetchGood(data);
             FetchSucceeded?.Invoke();
             return RefreshOutcome.Ok;
+        }
+        catch (Exception) when (ResetGuard.Done)
+        {
+            // A failure that lands after Reset: no error snapshot, no seat file, no status.
+            return RefreshOutcome.Other;
         }
         catch (Exception) when (!DemoMode.AnswerApplies(generation == _fetcherGeneration, IsDemo))
         {
@@ -1932,6 +1940,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// the seat meters and the active fetch client. Reset Sanduhr… calls it before removing anything. The
     /// widget does not fetch again in this process.
     /// </summary>
+    /// <summary>The inactive-account reader, so Reset can delete the profile folders through its gate.</summary>
+    public InactiveUsageReader InactiveReader => _inactiveReader;
+
     public void StopBackgroundWork()
     {
         _refreshTimer.Stop();

@@ -118,6 +118,8 @@ public sealed class AccountFollower
         OnReadings();
     }
 
+    private bool MayWrite(CancellationToken ct) => WritePolicy.MayWrite(_stopped, ResetGuard.Done, ct.IsCancellationRequested);
+
     private void Bump(string label) => _epoch[label] = _epoch.GetValueOrDefault(label) + 1;
 
     /// <summary>The other accounts seen in use in their latest check (empty with following off).</summary>
@@ -138,7 +140,7 @@ public sealed class AccountFollower
     /// <summary>One round: a usage request per signed-in inactive account, then the decision.</summary>
     public async Task CheckAsync(CancellationToken ct = default)
     {
-        if (_checking || _stopped) return;
+        if (_checking || !MayWrite(ct)) return;
         var s = Current();
         if (!s.Enabled || s.Active is not { } active || s.ActiveSignedOut || s.Switching || s.SignedIn.Count <= 1) return;
         _checking = true;
@@ -148,6 +150,7 @@ public sealed class AccountFollower
             {
                 if (label == active) continue;
                 ct.ThrowIfCancellationRequested();
+                if (!MayWrite(ct)) break;
                 await CheckOneAsync(label, ct).ConfigureAwait(true);
             }
         }
@@ -155,6 +158,8 @@ public sealed class AccountFollower
         {
             _checking = false;
         }
+        // Stopped or Reset during the round: no readings pushed, no switch.
+        if (!MayWrite(ct)) return;
         OnReadings();
         if (AccountFollow.Decide(Current(), _now()) is { IsSwitch: true } d)
             OnSwitch(d.SwitchTo!);
@@ -172,6 +177,8 @@ public sealed class AccountFollower
         }
         int epoch = _epoch.GetValueOrDefault(label);
         var reading = await _reader.ReadAsync(label, creds, ct).ConfigureAwait(true);
+        // Reset or stop while the request ran: write nothing.
+        if (!MayWrite(ct)) return;
         // Renamed, signed out or removed while the request ran: the answer belongs to no one.
         if (_epoch.GetValueOrDefault(label) != epoch) return;
         OnResult(label, reading);
