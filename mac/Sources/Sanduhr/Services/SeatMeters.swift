@@ -12,8 +12,12 @@ extension ClaudeAPI: UsageFetching {}
 /// its state through `context`; clients, the clock and the wait between fetches are injectable.
 ///
 /// The fetch rule: after each active fetch that did not fail on the network, every inactive
-/// signed-in linked account following sees in use is fetched in turn, `SeatSnapshots.stagger`
-/// apart, one round at a time, through its own client (its org id cached). An account read within
+/// signed-in linked account in use is fetched in turn, `SeatSnapshots.stagger` apart, one round at
+/// a time, through its own client (its org id cached). In use: following saw it in use, or Claude
+/// Code wrote a session log in its folder in the last 10 minutes (`SeatActivity`, file times only,
+/// checked once per round; following itself never hears of it). An account that becomes a seat
+/// (linked, signed in, at launch, or no longer the active one) is also fetched once soon after when
+/// its file is missing or older than the interval, so a seat shows a reading with Follow off. An account read within
 /// the refresh interval (by a round or by following's own check) is skipped, so a manual refresh
 /// never fetches it again early. A refused key skips it until a different key is saved. An answer
 /// is written only while the account is still linked, signed in and not active.
@@ -40,6 +44,10 @@ final class SeatMeters {
     }
     var now: () -> Date = Date.init
     var sleep: (TimeInterval) async -> Void = { try? await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000)) }
+    /// Whether Claude Code wrote to a seat folder lately. Runs off the main thread.
+    var recentActivity: @Sendable (String) -> Bool = { folder in
+        SeatActivity.recent(folder: folder, fs: LocalCCLogFileSystem(), now: Date())
+    }
 
     /// When each account was last read for its seat (a round's request, or following's check).
     private(set) var lastFetch: [String: Date] = [:]
@@ -47,6 +55,10 @@ final class SeatMeters {
     private var authSkipped: [String: String] = [:]
     private(set) var round: Task<Void, Never>?
     private var synced: (seats: [SeatSnapshots.Seat], signedOut: Set<String>)?
+    /// The accounts a seat fetch may write, as of the last sync: one new here is fetched once.
+    private var knownFetchable: Set<String> = []
+    /// Accounts waiting for that one fetch.
+    private(set) var pending: Set<String> = []
 
     init(files: SeatSnapshots.Files = .standard, interval: TimeInterval = 5 * 60) {
         self.files = files
@@ -68,13 +80,26 @@ final class SeatMeters {
         let linked = c.linked
         let seats = SeatSnapshots.seats(linked)
         let signedOut = Set(linked.keys.filter { !c.signedIn.contains($0) }.compactMap(AccountRef.of))
-        if let synced, synced.seats == seats, synced.signedOut == signedOut { return }
-        synced = (seats, signedOut)
-        let keep = Set(linked.keys)
-        clients = clients.filter { keep.contains($0.key) && c.signedIn.contains($0.key) }
-        authSkipped = authSkipped.filter { keep.contains($0.key) }
-        lastFetch = lastFetch.filter { keep.contains($0.key) && c.signedIn.contains($0.key) }
-        SeatSnapshots.sync(seats, signedOut: signedOut, in: files, now: now())
+        if synced == nil || synced?.seats != seats || synced?.signedOut != signedOut {
+            synced = (seats, signedOut)
+            let keep = Set(linked.keys)
+            clients = clients.filter { keep.contains($0.key) && c.signedIn.contains($0.key) }
+            authSkipped = authSkipped.filter { keep.contains($0.key) }
+            lastFetch = lastFetch.filter { keep.contains($0.key) && c.signedIn.contains($0.key) }
+            SeatSnapshots.sync(seats, signedOut: signedOut, in: files, now: now())
+        }
+        // A new seat with no reading, or an old one, is fetched once soon.
+        let fetchable = Set(linked.keys.filter { SeatSnapshots.fetchable($0, linked: linked, signedIn: c.signedIn, active: c.active) })
+        for label in fetchable.subtracting(knownFetchable) where needsReading(label) { pending.insert(label) }
+        knownFetchable = fetchable
+        pending.formIntersection(fetchable)
+        if !pending.isEmpty { startRound() }
+    }
+
+    /// The seat's file is missing or older than the interval.
+    private func needsReading(_ label: String) -> Bool {
+        guard let url = target(label), let at = SeatSnapshots.capturedAt(url) else { return true }
+        return now().timeIntervalSince(at) >= interval
     }
 
     /// The active account's seat starts from the numbers on screen, stamped with their fetch time,
@@ -129,21 +154,33 @@ final class SeatMeters {
         return now().timeIntervalSince(last) < interval * 0.9
     }
 
-    /// One round: the due accounts in turn, `stagger` apart. Nil when a round is running or none is due.
+    /// One round: the due accounts in turn, `stagger` apart. Nil when a round is running or no
+    /// seat could be due. Due: waiting for its first fetch, in use for following, or, checked once
+    /// here off the main thread, with Claude Code activity in its folder.
     @discardableResult
     func startRound() -> Task<Void, Never>? {
         guard round == nil else { return nil }
         let c = context()
-        let due = SeatSnapshots.due(linked: c.linked, signedIn: c.signedIn, active: c.active, inUse: c.inUse)
-            .filter { !throttled($0) }
-        guard !due.isEmpty else { return nil }
+        let candidates = c.linked.keys.filter {
+            SeatSnapshots.fetchable($0, linked: c.linked, signedIn: c.signedIn, active: c.active) && !throttled($0)
+        }.sorted()
+        guard !candidates.isEmpty else { return nil }
         let task = Task { [weak self] in
-            for label in due {
-                guard let self else { return }
+            guard let self else { return }
+            var due = candidates.filter { c.inUse.contains($0) || self.pending.contains($0) }
+            let rest = candidates.filter { !due.contains($0) }.compactMap { l in c.linked[l].map { (l, $0) } }
+            if !rest.isEmpty {
+                let check = self.recentActivity
+                due += await Task.detached(priority: .utility) { rest.filter { check($0.1) }.map(\.0) }.value
+            }
+            self.pending.subtract(due)
+            for label in due.sorted() {
                 await self.sleep(SeatSnapshots.stagger)
                 await self.fetch(label)
             }
-            self?.round = nil
+            self.round = nil
+            // A seat that became new during the round gets its turn now.
+            if !self.pending.isEmpty { self.startRound() }
         }
         round = task
         return task
@@ -176,5 +213,19 @@ final class SeatMeters {
         else { return }
         if case .failure(let e) = result, SnapshotWriter.errorKind(e) != "network" { authSkipped[label] = key }
         write(label, result)
+    }
+}
+
+/// Whether Claude Code is working in a seat folder (item 74): the newest session log under
+/// `<folder>/projects` was modified within `window`. File times only: no log is opened.
+enum SeatActivity {
+    static let window: TimeInterval = 10 * 60
+
+    static func recent(folder: String, fs: CCLogFileSystem, now: Date, within: TimeInterval = window) -> Bool {
+        let projects = (folder as NSString).appendingPathComponent("projects")
+        guard fs.isDirectory(projects) else { return false }
+        return fs.jsonlFiles(under: projects).contains { file in
+            fs.stat(file).map { now.timeIntervalSince($0.modified) <= within } ?? false
+        }
     }
 }

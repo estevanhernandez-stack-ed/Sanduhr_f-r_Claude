@@ -1884,8 +1884,11 @@ Code folder such as `~/.claude-scratch` with a `projects` folder is enough for t
 2. Link one account's folder (Settings, Accounts, select it, **Link a Claude Code Folder…**):
    `seats: 1`, `seats.json` (mode 0600) lists the folder by its real path with an 8-digit
    `account_ref`, no label, and that folder's box says **Meters here show Work**. Link the other
-   account to the second folder: `seats: 2`. After the next fetch, `snapshots` is 1 or 2.
-3. Turn on Follow the account I'm using. In a terminal, `CLAUDE_CONFIG_DIR=~/.claude-scratch claude`
+   account to the second folder: `seats: 2`, and with Follow off, `snapshots: 2` within seconds
+   (each account read once).
+3. With Follow still off, work in a session in the inactive account's folder: its file is
+   rewritten every 5 minutes while that session writes its log, and stops 10 minutes after it goes
+   quiet (Follow stays off, no switch). Then turn on Follow the account I'm using. In a terminal, `CLAUDE_CONFIG_DIR=~/.claude-scratch claude`
    beside a session in `~/.claude`, and use the inactive account a while: once following marks it
    in use (the menu's "· in use"), its `snapshot.<ref>.json` is rewritten every 5 minutes, a few
    seconds after the active fetch, and Refresh by hand doesn't read it again sooner. Each
@@ -1900,3 +1903,6 @@ Code folder such as `~/.claude-scratch` with a `projects` folder is enough for t
    sign in again, never the other account's numbers. Rename the first account: its file moves to
    the new `account_ref`. Unlink both folders: `seats: 0`, `snapshots: 0`, `seats.json` and every
    per-account file are gone; `snapshot.json` is untouched.
+6. Meters mod Update with a session running (Mods & Config, a folder pinned to an older version):
+   the session's band stays and its transcript shows no "unloaded" line; the old
+   `integrations/<stamp>/` folder is still there until Sanduhr's next launch, then goes.

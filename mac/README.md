@@ -219,8 +219,13 @@ files; `SeatMeters` (the view model's, with an injectable client, clock and wait
   moves its file to the new ref with `account_ref` rewritten, and unlinking the last folder deletes
   everything (back to `snapshot.json` alone).
 - **Fetching.** The active account's fetch also writes its seat file (rechecked to still be the
-  active account). After an active fetch that did not fail on the network, every inactive signed-in
-  linked account following sees in use (`accountsInUse`) is fetched, one round at a time, one
+  active account). An account that becomes a seat (linked, signed in, at launch, or no longer the
+  active one) is fetched once soon after when its file is missing or older than the interval, so a
+  seat has a reading with Follow off. After an active fetch that did not fail on the network, every
+  inactive signed-in linked account in use is fetched: in use for following (`accountsInUse`), or
+  with Claude Code activity in its folder (`SeatActivity`: the newest `projects/**/*.jsonl`
+  modified within 10 minutes, file times only, checked once per round off the main thread; following
+  itself never hears of it, so it never switches on that). They go one round at a time, one
   account after another, `SeatSnapshots.stagger` (5 s) apart, through its own client. An account
   read within the refresh interval (less a tenth for timer jitter), by a round or by following's own
   15-minute check (whose answers are written too, no extra request), is skipped, so a manual
@@ -457,8 +462,12 @@ scripts' names and bytes) and points the symlink `integrations/current` at it wi
 `rename(2)`; the settings name `current/…`, so an app update never rewrites Claude Code's files.
 It is Windows' stamped-folder design: there a running session pins the exe; here nothing is
 locked, but a session starting mid-update must read the old set or the new one whole. The
-refresh runs on install and at launch when `current` exists; the folder swapped out is kept one
-refresh, older stamps are deleted, and Remove of the last install deletes them all. install.sh's
+refresh runs on install and at launch when `current` exists. Stamped folders are deleted only at
+launch: a Claude Code session keeps loading the mod from the folder it started with, so one swapped
+out or unpinned while the app runs (Update on the Mods page) stays until then; the launch keeps the
+current stamp, the one it swapped out, every stamp a receipt pins and every stamp a receipt's
+settings file still names (`…/integrations/<stamp>/`), and deletes the rest. Remove of the last
+install deletes them all. install.sh's
 flat copies beside them are never touched.
 
 **The meters mod (item 50).** `mac/integrations/mods/sanduhr-meters/` is a Claude Code mod (a

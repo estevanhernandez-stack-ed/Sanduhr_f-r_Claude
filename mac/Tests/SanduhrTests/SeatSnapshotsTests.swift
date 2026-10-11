@@ -208,6 +208,7 @@ private final class World {
         meters.context = { [unowned self] in self.context }
         meters.now = { [unowned self] in self.clock }
         meters.sleep = { [unowned self] s in self.waits.append(s) }
+        meters.recentActivity = { _ in false }
         meters.credentials = { [unowned self] label in AccountCredentials(sessionKey: self.keys[label], cfClearance: nil) }
         meters.makeClient = { [unowned self] creds in
             let label = self.keys.first { $0.value == creds.sessionKey }?.key ?? "?"
@@ -350,5 +351,85 @@ struct SeatMetersTests {
         w.context.choices = [:]
         w.meters.sync()
         #expect(try FileManager.default.contentsOfDirectory(atPath: w.dir.path).isEmpty)
+    }
+
+    @Test func withFollowOffANewSeatIsFetchedOnceAndAnIdleOneNotAgain() async throws {
+        let w = try World()
+        w.context.inUse = []
+        w.answers["Home"] = .success(usage(12))
+        w.meters.sync()                                         // launch: Home and Lab have no reading
+        await w.meters.round?.value
+        #expect((w.calls("Home"), w.calls("Lab"), w.calls("Work")) == (1, 1, 0))
+        #expect(five(w.file("Home")) == 12)
+        // Idle and Follow off: not read again, at any interval.
+        w.clock += 900
+        await w.activeAnswers()
+        w.meters.sync()
+        await w.meters.round?.value
+        #expect((w.calls("Home"), w.calls("Lab")) == (1, 1))
+        // A newly linked account is read once too.
+        w.context.labels.append("Spare")
+        w.context.choices["Spare"] = .init(folder: "/tmp/s/d")
+        w.context.signedIn.insert("Spare")
+        w.keys["Spare"] = "ks"
+        w.meters.sync()
+        await w.meters.round?.value
+        #expect(w.calls("Spare") == 1)
+        w.meters.sync()
+        await w.meters.round?.value
+        #expect(w.calls("Spare") == 1)
+    }
+
+    @Test func aSeatWithAFreshReadingAtLaunchIsNotFetched() async throws {
+        let w = try World()
+        w.context.inUse = []
+        SnapshotWriter.writeOk(usage(5), accountRef: ref("Home"), now: w.clock.addingTimeInterval(-60), to: w.file("Home"))
+        SnapshotWriter.writeOk(usage(5), accountRef: ref("Lab"), now: w.clock.addingTimeInterval(-3600), to: w.file("Lab"))
+        w.meters.sync()
+        await w.meters.round?.value
+        #expect((w.calls("Home"), w.calls("Lab")) == (0, 1))
+    }
+
+    @Test func claudeCodeActivityInASeatFolderKeepsItReadEveryInterval() async throws {
+        let w = try World()
+        w.context.inUse = []
+        w.meters.recentActivity = { $0 == "/tmp/s/b" }          // Home's folder
+        await w.activeAnswers()
+        #expect((w.calls("Home"), w.calls("Lab")) == (1, 0))
+        w.clock += 20
+        await w.activeAnswers()
+        #expect(w.calls("Home") == 1)
+        w.clock += 300
+        await w.activeAnswers()
+        #expect(w.calls("Home") == 2)
+        // Following never hears of it: the context's in-use set is untouched.
+        #expect(w.context.inUse.isEmpty)
+    }
+}
+
+/// A made-up disk for SeatActivity: file times only, and a read is a failure.
+private final class StatOnlyFS: CCLogFileSystem, @unchecked Sendable {
+    var files: [String: Date] = [:]
+    var reads = 0
+    func isDirectory(_ path: String) -> Bool { files.keys.contains { $0.hasPrefix(path + "/") } }
+    func subdirectories(of path: String) -> [String] { [] }
+    func jsonlFiles(under path: String) -> [String] { files.keys.filter { $0.hasPrefix(path + "/") && $0.hasSuffix(".jsonl") }.sorted() }
+    func stat(_ path: String) -> CCLogFileStat? { files[path].map { CCLogFileStat(size: 1, modified: $0) } }
+    func read(_ path: String, from offset: UInt64) -> Data? { reads += 1; return nil }
+}
+
+@Suite("Per-seat meters: activity")
+struct SeatActivityTests {
+    @Test func theNewestLogWithinTenMinutesCountsByItsTimeOnly() {
+        let now = Date(timeIntervalSince1970: 2_000_000)
+        let fs = StatOnlyFS()
+        #expect(!SeatActivity.recent(folder: "/h/.claude", fs: fs, now: now))       // no projects folder
+        fs.files["/h/.claude/projects/p/a.jsonl"] = now.addingTimeInterval(-20 * 60)
+        fs.files["/h/.claude/projects/p/notes.txt"] = now
+        #expect(!SeatActivity.recent(folder: "/h/.claude", fs: fs, now: now))
+        fs.files["/h/.claude/projects/q/sub/b.jsonl"] = now.addingTimeInterval(-5 * 60)
+        #expect(SeatActivity.recent(folder: "/h/.claude", fs: fs, now: now))
+        #expect(!SeatActivity.recent(folder: "/h/.claude-other", fs: fs, now: now))
+        #expect(fs.reads == 0)
     }
 }

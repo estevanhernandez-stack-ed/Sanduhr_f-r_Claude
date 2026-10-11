@@ -157,6 +157,16 @@ enum SeatSnapshots {
         }
     }
 
+    /// When a snapshot file's reading was taken, nil when it is missing or unreadable.
+    static func capturedAt(_ url: URL) -> Date? {
+        guard let s = json(url)?["captured_at"] as? String else { return nil }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = iso.date(from: s) { return d }
+        iso.formatOptions = [.withInternetDateTime]
+        return iso.date(from: s)
+    }
+
     /// The file `writeSignedOut` writes: an auth error with no tiers.
     static func isSignedOut(_ url: URL) -> Bool {
         guard let obj = json(url) else { return false }
