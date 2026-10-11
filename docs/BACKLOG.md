@@ -147,3 +147,39 @@ Shape to spec:
 
 Open questions: whether Just the Desk should also skip the Keychain prompt path entirely, and
 whether the tour gets a Desk-only variant.
+
+## #5 — Windows: adopt or repair a sanduhr MCP launcher the widget did not write (raised)
+
+Raised 2026-10-11 from a failure on Neb: some Claude Code sessions reported `sanduhr` as failed.
+The server was fine. The launcher was not ours. Neb's `%APPDATA%\Sanduhr\bin\sanduhr-mcp.cmd` ends
+in `exit /b %errorlevel%`, prints `[sanduhr-mcp] Could not resolve the server`, and there is no
+`%APPDATA%\Sanduhr\mcp\` version folder. That text exists in no branch, so it was hand-written or
+came from a build that never landed. Claude Code spawns a stdio server twice per session (a
+version-negotiation probe, then a pinned-legacy respawn about 100ms later), and two sessions
+starting together make four overlapping spawns. Neb's launcher resolves the exe through a shared
+file, the spawns collide on it ("The process cannot access the file because it is being used by
+another process"), and the session's connection closes in about 0.5s. Intermittent: PriceScout on
+2026-10-09 recovered on the respawn, a `Projects` session on 2026-10-11 11:34 did not.
+
+Why the widget never fixed it: `McpIntegrationInstaller.RefreshInstall` already overwrites the
+launcher on every run, but `App.xaml.cs` only calls it when `LoadMcpEnabled()` is true. A machine
+whose registration was made outside the consent dialog has the flag off, so the widget never
+touches a launcher that `.claude.json` is pointing Claude Code at.
+
+Shape to spec:
+
+- At app start, with the integration flag off, look for a `mcpServers.sanduhr` entry in each
+  detected CC home (`DetectCcHomes`, `ConfigPathFor`) whose command is `LauncherPath`.
+- If one exists and the launcher's content is not the one `WriteLauncher` would write for the
+  current version dir (or the version dir is missing), surface it on the Claude Code page:
+  "Claude Code is set to use a Sanduhr MCP launcher this app didn't install. Repair it?" Repair
+  runs the normal consent path (`RefreshInstall` + `Register`) and sets the flag.
+- Do not repair silently with the flag off: the consent dialog is the contract for writing into
+  a CC home, and that holds even when the write would only replace our own launcher path.
+- With the flag on, nothing changes: `RefreshInstall` already overwrites a foreign launcher.
+- Tests in `McpIntegrationInstallerTests`: a pure check, e.g. `LauncherMatches(versionDir)`, for
+  matching, foreign and missing launchers; a home whose registration points elsewhere is ignored.
+
+Open question: whether `ping` (the MCP side) should also report "launcher not managed by the
+widget", so the failure explains itself from inside Claude Code. The MCP process cannot see the
+launcher that started it without a new path in the trust-boundary allowlist, so likely no.
