@@ -38,6 +38,9 @@ enum SettingsNames {
     static let checkForUpdates = "Check for Updates…"
     /// Themes and a theme suggestion's card.
     static let saveAndApply = "Save & Apply"
+    /// Accounts, Data: an account with no Claude Code folder links one (item 74), through the
+    /// folder picker the Claude Code folder menu's Choose… opens.
+    static let linkFolder = "Link a Claude Code Folder…"
     /// Message's two editing modes, a segmented control.
     static let listMode = "List"
     static let textMode = "Text"
@@ -54,6 +57,7 @@ enum SettingsNames {
         (watchersOnNotch, .watchers), (watchersOnDesk, .watchers),
         (showWidget, .widgetLook), (checkForUpdates, .updates), (saveAndApply, .themes),
         (listMode, .message), (textMode, .message),
+        (linkFolder, .credentials),
     ]
 
     /// Names that are gone, each with the name that replaced it. None may appear in a menu, the

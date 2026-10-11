@@ -1872,3 +1872,28 @@ com.626labs.sanduhr.desk` on a throwaway profile with no Sanduhr Keychain item),
    again in Sanduhr", and a relaunch keeps the widget up until a key works.
 5. Without Just the Desk (a fresh profile, sign in or close the sheet): the sheet comes back at each
    launch until a key is saved, as before.
+
+## 46. Per-seat meters (item 74)
+
+Two Claude Code folders and two signed-in accounts, both made up for the test (a scratch Claude
+Code folder such as `~/.claude-scratch` with a `projects` folder is enough for the second seat).
+
+1. With one account linked to a folder (or none): `smoke/smoke state` shows `snapshots: 0` and
+   `seats: 0`, and `~/Library/Application Support/Sanduhr` has no `seats.json` and no
+   `snapshot.<ref>.json`. Each Claude Code folder box's Account row says **Meters here show the
+   active account**.
+2. Settings, Accounts, select the account without a folder: under Claude Code folder, **Link a
+   Claude Code Folder…** opens the folder picker. Pick the second folder. `seats: 2`, and
+   `seats.json` lists both folders by their real paths with an 8-digit `account_ref` each, no label.
+   The folder boxes say **Meters here show Work** and **Meters here show Personal**. After the
+   next fetch, `snapshots` is 1 (the active account's) or 2.
+3. Turn on Follow the account I'm using. In a terminal, `CLAUDE_CONFIG_DIR=~/.claude-scratch claude`
+   beside a session in `~/.claude`, and use the inactive account a while: once following marks it
+   in use (the menu's "· in use"), its `snapshot.<ref>.json` is rewritten every 5 minutes, a few
+   seconds after the active fetch. Each session's statusline and meters band show its own
+   account's numbers at the same time; `get_usage` in each answers with `scope: seat_account` and
+   its own `account.ref`. Switch the active account: both sessions keep their own numbers.
+4. A session in a folder no account links (`CLAUDE_CONFIG_DIR=/tmp/x claude`, or an old statusline
+   copy): shows the active account, as before (`scope: active_account_only`).
+5. Unlink the second folder (or Sign Out or Remove its account): `seats: 0`, `snapshots: 0`,
+   `seats.json` and both per-account files are gone; `snapshot.json` is untouched.

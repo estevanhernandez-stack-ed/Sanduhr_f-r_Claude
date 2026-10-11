@@ -290,6 +290,8 @@ struct IntegrationsSettings: View {
         }
         ForEach(model.folders) { f in
             IntegrationFolderBox(folder: f, model: model, owner: vm.account(linkedTo: f.path),
+                                 metersHere: SeatSnapshots.metersHere(owner: vm.account(linkedTo: f.path),
+                                                                      seatAccounts: vm.seatAccounts),
                                  meters: MetersModStatus.text(mods.own.first { $0.folder == f.path }, fallback: f.meters),
                                  install: { kind in ask(kind, folder: f.path) },
                                  update: { kind in Task { await run(kind, folder: f.path, replace: false, combine: nil) } },
@@ -401,6 +403,8 @@ private struct IntegrationFolderBox: View {
     let folder: IntegrationFolderState
     var model: IntegrationsModel
     let owner: String?
+    /// "Meters here show Work" (item 74).
+    let metersHere: String
     /// "Meters above the prompt: on" (MetersModStatus).
     let meters: String
     let install: (IntegrationKind) -> Void
@@ -411,7 +415,7 @@ private struct IntegrationFolderBox: View {
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 8) {
-                FolderAccountRow(owner: owner, open: { openAccounts(owner) })
+                FolderAccountRow(owner: owner, metersHere: metersHere, open: { openAccounts(owner) })
                 ForEach(IntegrationFolderKinds.withControls, id: \.self) { kind in
                     IntegrationRow(kind: kind, status: folder.status(kind),
                                    combined: kind == .statusline && folder.statuslineCombined,
@@ -435,15 +439,20 @@ enum IntegrationFolderKinds {
 }
 
 /// The account a folder follows (Settings v2, F18): the one Accounts' Data links to it, or the
-/// active account. The link itself is set in Accounts.
+/// active account, and whose meters its sessions show (item 74). The link itself is set in Accounts.
 private struct FolderAccountRow: View {
     let owner: String?
+    let metersHere: String
     let open: () -> Void
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text("Account").frame(width: 150, alignment: .leading)
-            Text(Self.text(owner)).font(.caption).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(Self.text(owner))
+                Text(metersHere)
+            }
+            .font(.caption).foregroundStyle(.secondary)
             Spacer(minLength: 8)
             Button("Change in Accounts…", action: open)
         }

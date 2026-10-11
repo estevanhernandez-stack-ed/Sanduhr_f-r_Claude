@@ -158,6 +158,8 @@ integrations:
   hooks_installed: 0
 follow: false
 follow_paused: false
+snapshots: 0
+seats: 0
 version: "2.1.0"
 build: "3"
 whats_new:

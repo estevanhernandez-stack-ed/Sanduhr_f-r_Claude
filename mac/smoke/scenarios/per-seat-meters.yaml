@@ -1,0 +1,11 @@
+# Item 74: per-seat meters. Sanduhr writes snapshot.<account_ref>.json for each signed-in account
+# with a Claude Code folder linked, and seats.json mapping each folder to its account, once two
+# accounts have a folder linked; with fewer, neither is written and snapshot.json alone carries
+# the meters, as before. state.yaml counts them (`snapshots`, `seats`), never a folder or a ref.
+# Read only: the run links, unlinks and switches nothing. By hand with two seats open side by
+# side: docs/mac-smoke-test.md, "Per-seat meters".
+name: Per-seat meter files are counted
+needs: [credentials]
+steps:
+  # seats.json is never written with a single seat: none, or two and more.
+  - expect_state: { snapshots: '/^\d+$/', seats: '/^(0|[2-9]|\d{2,})$/' }

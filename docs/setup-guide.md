@@ -177,7 +177,8 @@ You get your meters inside Claude Code, a notch that glows when Claude needs you
 
 1. Open Settings, **Claude Code**.
 2. Under **Folders**, each Claude Code folder has its own box (most people have one, `~/.claude`). Use **Add Folder…** beside the Folders heading if yours isn't listed.
-3. The box's first row, **Account**, says which account the folder belongs to, or **Follows the active account**. **Change in Accounts…** opens the account's Data, where the link is set.
+3. The box's first row, **Account**, says which account the folder belongs to, or **Follows the active account**, and whose meters its sessions show: **Meters here show Work**, or **Meters here show the active account**. **Change in Accounts…** opens the account's Data, where the link is set.
+   With two accounts each linked to their own folder (Work to `~/.claude`, Personal to `~/.claude-personal`), each folder's sessions show their own account's meters at the same time, whichever account Sanduhr shows. To link one, select the account in Settings, **Accounts** and click **Link a Claude Code Folder…** under Data. An account that isn't the one Sanduhr shows is fetched for its folder only while **Follow the account I'm using** sees it in use; otherwise its folder shows its last reading, with its age.
 4. Click **Install…** beside what you want:
    - **MCP server**: lets Claude Code ask Sanduhr about your usage, and suggest Desk messages, themes and song looks.
    - **Statusline**: your meters on a line under Claude Code's prompt.

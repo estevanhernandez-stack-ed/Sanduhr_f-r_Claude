@@ -8,6 +8,9 @@ output, so a statusline reads the same on either machine:
   dead  (> 15 min)   sanduhr: stale 22m - start widget
   error              sanduhr: reauth needed | last 5h 42% | wk 18%
   missing/malformed  prints nothing (the uninstalled look)
+Per-seat meters (item 74): the session's Claude Code folder (CLAUDE_CONFIG_DIR, unset meaning
+~/.claude) is looked up in seats.json beside the snapshot; a linked folder reads its own account's
+snapshot.<account_ref>.json, any other reads snapshot.json (Sanduhr's active account) as before.
 Per-model weeklies join only when hot (>= 80%). Reads the snapshot only; never
 touches claude.ai or the session key. When the snapshot is dead or missing and Claude
 Code's session JSON on stdin carries `rate_limits`, those numbers stand in, each marked
@@ -44,6 +47,7 @@ Usage: sanduhr_statusline.py                                    print the Sanduh
        sanduhr_statusline.py --inspect-b64 B                    the Combine sheet's pieces (JSON)
        sanduhr_statusline.py --compose-b64 O --join ...         the sheet's preview from output O
        SANDUHR_SNAPSHOT=path ...                                read another snapshot (tests)
+       SANDUHR_SUPPORT_DIR=dir ...                              read seats.json and snapshots there (tests)
 """
 import base64
 import binascii
@@ -61,8 +65,8 @@ from datetime import datetime, timezone
 SCHEMA_VERSION = 1
 FRESH_SECONDS = 450
 DEAD_SECONDS = 900
-SNAPSHOT = os.environ.get("SANDUHR_SNAPSHOT") or os.path.expanduser(
-    "~/Library/Application Support/Sanduhr/snapshot.json")
+# SANDUHR_SNAPSHOT names one file and skips the seat lookup; SANDUHR_SUPPORT_DIR moves the folder.
+SUPPORT_DIR = os.path.expanduser("~/Library/Application Support/Sanduhr")
 LABELS = {"five_hour": "5h", "seven_day": "wk"}
 
 CHAIN_BUDGET = 1.5          # seconds the user's command gets
@@ -239,9 +243,70 @@ def session_parts(session):
     return out
 
 
+# -- seats (item 74): the same block in sanduhr_statusline.py and sanduhr_mcp.py; a test pins them --
+
+SEATS_FILE = "seats.json"
+SEATS_SCHEMA_VERSION = 1
+SEAT_REF = re.compile(r"\A[0-9a-f]{8}\Z")
+
+
+def seat_home(path, env):
+    """`path` with a leading ~ expanded against env's HOME."""
+    if path == "~" or path.startswith("~/"):
+        return (env.get("HOME") or os.path.expanduser("~")) + path[1:]
+    return path
+
+
+def seat_folder(env=None):
+    """This session's Claude Code folder as seats.json writes it: CLAUDE_CONFIG_DIR (unset or
+    empty: ~/.claude), ~ expanded, every symbolic link followed, no trailing slash."""
+    env = os.environ if env is None else env
+    path = os.path.realpath(seat_home(env.get("CLAUDE_CONFIG_DIR") or "~/.claude", env))
+    return path.rstrip("/") or "/"
+
+
+def seat_snapshot(support_dir, env=None):
+    """(path, ref): the snapshot this session reads. A folder seats.json lists reads its account's
+    snapshot.<ref>.json (ref is that account's); any other folder, or no readable seats.json,
+    reads snapshot.json exactly as before (ref None). Reads two small files; never the network."""
+    default = os.path.join(support_dir, "snapshot.json")
+    try:
+        with open(os.path.join(support_dir, SEATS_FILE), encoding="utf-8") as f:
+            doc = json.load(f)
+        if int(doc.get("schema_version")) > SEATS_SCHEMA_VERSION:
+            return default, None
+        rows = doc.get("seats")
+    except (OSError, ValueError, TypeError, AttributeError):
+        return default, None
+    if not isinstance(rows, list):
+        return default, None
+    env = os.environ if env is None else env
+    folder = seat_folder(env)
+    for row in rows:
+        f = row.get("folder") if isinstance(row, dict) else None
+        ref = row.get("account_ref") if isinstance(row, dict) else None
+        if not isinstance(f, str) or not f or not isinstance(ref, str) or not SEAT_REF.match(ref):
+            continue
+        if folder in (f.rstrip("/") or "/", os.path.realpath(seat_home(f, env)).rstrip("/") or "/"):
+            return os.path.join(support_dir, "snapshot.%s.json" % ref), ref
+    return default, None
+
+# -- end seats --
+
+
+def snapshot_path(env=None):
+    """The file this session's line reads: SANDUHR_SNAPSHOT when set, else its seat's (item 74).
+    A linked seat whose account has no reading yet prints from Claude Code's own stdin numbers
+    (marked *), never another account's."""
+    env = os.environ if env is None else env
+    if env.get("SANDUHR_SNAPSHOT"):
+        return env["SANDUHR_SNAPSHOT"]
+    return seat_snapshot(env.get("SANDUHR_SUPPORT_DIR") or SUPPORT_DIR, env)[0]
+
+
 def load_snapshot():
     try:
-        with open(SNAPSHOT, encoding="utf-8") as f:
+        with open(snapshot_path(), encoding="utf-8") as f:
             snap = json.load(f)
     except (OSError, ValueError):
         return None

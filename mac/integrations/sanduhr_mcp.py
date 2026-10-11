@@ -31,7 +31,8 @@ not exist here. Meters: get_usage and the meter history. Meters and activity: al
 burn, model and record tools for the account's linked Claude Code folder, with project
 names as the account chose (Hidden returns the record's short code, never a name).
 
-Reads snapshot.json, mcp-access.json, the history files and vault folders it names, the
+Reads snapshot.json (or, in a Claude Code folder seats.json links to an account, that account's
+snapshot.<account_ref>.json: item 74), mcp-access.json, the history files and vault folders it names, the
 session logs under a folder it names, Desk's messages.txt and desk-messages-state.json (the pin
 and rotation, written by Sanduhr). Desk messages are not gated by Share with your agents: they are on
 the desktop already, and a proposal only asks (Sanduhr checks it again and the user approves,
@@ -109,6 +110,13 @@ REMEDY_NOT_SHARED = {
 REMEDY_ACTIVE_NOT_SHARED = (
     "The account Sanduhr shows is not shared with your agents. Set its Share with your agents to Meters "
     "(or Meters and activity) in " + SETTINGS_PLACE + ".")
+REMEDY_SEAT_NOT_SHARED = (
+    "The account this Claude Code folder is linked to in Sanduhr is not shared with your agents. Set its "
+    "Share with your agents to Meters (or Meters and activity) in " + SETTINGS_PLACE + ".")
+REMEDY_SEAT_MISSING = (
+    "Sanduhr has no reading yet for the account this Claude Code folder is linked to. It fetches that "
+    "account while it is the active account, or while following sees it in use (Settings > Accounts, "
+    "Follow the account I'm using).")
 REMEDY_NO_ACTIVITY = (
     "No account shares Claude Code activity from a folder Sanduhr reads. In " + SETTINGS_PLACE +
     ": link the account's Claude Code folder, set Claude Code activity to Live only or Keep a "
@@ -275,9 +283,11 @@ TOOLS = [
             "Check Claude subscription quota headroom (the Sanduhr widget's live snapshot of "
             "claude.ai usage, plus local Claude Code burn since that snapshot when the account "
             "shares its activity). Call BEFORE spawning subagents, launching long autonomous runs, "
-            "or choosing a bigger model for a large job. Reflects the Sanduhr widget's ACTIVE "
-            "account, which may not be the account this session bills to - confirm with the user "
-            "if they run multiple accounts. Answers only when the user shares that account with "
+            "or choosing a bigger model for a large job. Reflects the account this session's Claude "
+            "Code folder is linked to in Sanduhr (scope seat_account); in a folder no account is "
+            "linked to, the Sanduhr widget's ACTIVE account (scope active_account_only), which may "
+            "not be the account this session bills to - confirm with the user if they run multiple "
+            "accounts. Answers only when the user shares that account with "
             "Claude in Sanduhr. A stale, no_data or not_shared result means unknown headroom - "
             "never assume budget."),
         "inputSchema": NO_ARGS,
@@ -528,13 +538,14 @@ WATCH_ID_RE = re.compile(r"^w[0-9a-f]{12}$")
 
 class Paths:
     """Where the server reads. SANDUHR_SUPPORT_DIR (tests, a test folder) moves everything;
-    SANDUHR_SNAPSHOT moves the snapshot alone, as before."""
+    SANDUHR_SNAPSHOT moves the snapshot alone, as before, and skips the seat lookup (item 74)."""
 
     def __init__(self, support_dir=None, snapshot=None, desk_dir=None):
         self.support_dir = support_dir or os.environ.get("SANDUHR_SUPPORT_DIR") or os.path.expanduser(
             "~/Library/Application Support/Sanduhr")
-        self.snapshot = snapshot or os.environ.get("SANDUHR_SNAPSHOT") or os.path.join(
-            self.support_dir, "snapshot.json")
+        named = snapshot or os.environ.get("SANDUHR_SNAPSHOT")
+        self.snapshot_named = bool(named)
+        self.snapshot = named or os.path.join(self.support_dir, "snapshot.json")
         self.access = os.path.join(self.support_dir, "mcp-access.json")
         self.vault = os.path.join(self.support_dir, "vault")
         # Desk's folder sits beside Sanduhr's (Application Support/Desk), so a test folder moves
@@ -687,10 +698,61 @@ def not_shared(status):
 
 # -- snapshot ------------------------------------------------------------------------------
 
-def read_snapshot(paths):
+# -- seats (item 74): the same block in sanduhr_statusline.py and sanduhr_mcp.py; a test pins them --
+
+SEATS_FILE = "seats.json"
+SEATS_SCHEMA_VERSION = 1
+SEAT_REF = re.compile(r"\A[0-9a-f]{8}\Z")
+
+
+def seat_home(path, env):
+    """`path` with a leading ~ expanded against env's HOME."""
+    if path == "~" or path.startswith("~/"):
+        return (env.get("HOME") or os.path.expanduser("~")) + path[1:]
+    return path
+
+
+def seat_folder(env=None):
+    """This session's Claude Code folder as seats.json writes it: CLAUDE_CONFIG_DIR (unset or
+    empty: ~/.claude), ~ expanded, every symbolic link followed, no trailing slash."""
+    env = os.environ if env is None else env
+    path = os.path.realpath(seat_home(env.get("CLAUDE_CONFIG_DIR") or "~/.claude", env))
+    return path.rstrip("/") or "/"
+
+
+def seat_snapshot(support_dir, env=None):
+    """(path, ref): the snapshot this session reads. A folder seats.json lists reads its account's
+    snapshot.<ref>.json (ref is that account's); any other folder, or no readable seats.json,
+    reads snapshot.json exactly as before (ref None). Reads two small files; never the network."""
+    default = os.path.join(support_dir, "snapshot.json")
+    try:
+        with open(os.path.join(support_dir, SEATS_FILE), encoding="utf-8") as f:
+            doc = json.load(f)
+        if int(doc.get("schema_version")) > SEATS_SCHEMA_VERSION:
+            return default, None
+        rows = doc.get("seats")
+    except (OSError, ValueError, TypeError, AttributeError):
+        return default, None
+    if not isinstance(rows, list):
+        return default, None
+    env = os.environ if env is None else env
+    folder = seat_folder(env)
+    for row in rows:
+        f = row.get("folder") if isinstance(row, dict) else None
+        ref = row.get("account_ref") if isinstance(row, dict) else None
+        if not isinstance(f, str) or not f or not isinstance(ref, str) or not SEAT_REF.match(ref):
+            continue
+        if folder in (f.rstrip("/") or "/", os.path.realpath(seat_home(f, env)).rstrip("/") or "/"):
+            return os.path.join(support_dir, "snapshot.%s.json" % ref), ref
+    return default, None
+
+# -- end seats --
+
+
+def read_snapshot(paths, path=None):
     """('missing'|'malformed'|'ok', dict or None), one read, any parse failure = malformed."""
     try:
-        with open(paths.snapshot, encoding="utf-8") as f:
+        with open(path or paths.snapshot, encoding="utf-8") as f:
             raw = f.read()
     except FileNotFoundError:
         return "missing", None
@@ -989,18 +1051,23 @@ def read_meter_history(paths, account, first, last):
 
 # -- tools -------------------------------------------------------------------------------
 
-def build_usage(now=None, paths=None):
+def build_usage(now=None, paths=None, env=None):
     now = now or datetime.now(timezone.utc)
     paths = paths or Paths()
     access, accounts = read_access(paths)
     if access != "ok" or not accounts:
         return not_shared(access if access != "ok" else "none")
-    outcome, snap = read_snapshot(paths)
+    # Per-seat meters (item 74): a folder linked to an account answers for that account only,
+    # never falling back to another account's numbers; any other folder answers as before.
+    path, seat_ref = (paths.snapshot, None) if paths.snapshot_named else seat_snapshot(paths.support_dir, env)
+    outcome, snap = read_snapshot(paths, path)
     if outcome == "missing":
-        return no_data("missing", "No usage snapshot. " + REMEDY_START)
+        return no_data("missing", REMEDY_SEAT_MISSING if seat_ref else "No usage snapshot. " + REMEDY_START)
     if outcome == "malformed":
-        return no_data("malformed", "Usage snapshot unreadable. Restart Sanduhr; if it persists, delete " + paths.snapshot + ".")
+        return no_data("malformed", "Usage snapshot unreadable. Restart Sanduhr; if it persists, delete " + path + ".")
     account = snapshot_account(snap, accounts)
+    if seat_ref and (account is None or account.ref != seat_ref):
+        return no_data("not_shared", REMEDY_SEAT_NOT_SHARED)
     if account is None:
         return no_data("not_shared", REMEDY_ACTIVE_NOT_SHARED)
     try:
@@ -1039,7 +1106,7 @@ def build_usage(now=None, paths=None):
         "age_seconds": age,
         "writer_version": snap.get("writer_version"),
         "data_source": "snapshot",
-        "scope": "active_account_only",
+        "scope": "seat_account" if seat_ref else "active_account_only",
         "account": {"ref": account.ref, "plan": snap.get("plan")},
         "data_lag_note": DATA_LAG_NOTE,
         "schema_version": SCHEMA_VERSION,

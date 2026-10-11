@@ -30,17 +30,22 @@ import {
   WEEKLY,
   bandFor,
   bar,
+  configFolder,
+  parseSeats,
   parseSnapshot,
   remember,
+  seatSnapshotName,
   sessionReset,
+  trimFolder,
   warningKeys,
   warningToast,
 } from './meters'
 import type { Band, Bars, Meter, Style } from './meters'
 
-// Sanduhr's meters above the prompt, and its watchers (items 50, 65f, 66). Reads two files,
-// Sanduhr's snapshot.json and band.json, and nothing else: no network, no model calls, no writes
-// but the "already toasted" keys in $.store.
+// Sanduhr's meters above the prompt, and its watchers (items 50, 65f, 66). Reads Sanduhr's
+// snapshot (snapshot.json, or on macOS this seat's own snapshot.<ref>.json that seats.json names,
+// item 74) and band.json, and nothing else: no network, no model calls, no writes but the
+// "already toasted" keys in $.store.
 
 const snapshot = atom({ plugin: 'sanduhr-meters', key: 'snapshot' } as const, null as MetersSnapshot | null)
 const bandFile = atom({ plugin: 'sanduhr-meters', key: 'band' } as const, null as MetersBand | null)
@@ -72,6 +77,8 @@ let sweeps: Record<string, number> = {}
 let drawn = false
 let frameKey: string | null = null
 let timers: (() => void)[] = []
+// This session's Claude Code folder, resolved once per session.start (null on Windows).
+let seatFolder: string | null = null
 let frameTimer: (() => void) | null = null
 
 function pick<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
@@ -195,8 +202,40 @@ async function poll($: EngineInterface) {
   await toasts($, current, now)
 }
 
+/**
+ * The snapshot this seat reads (item 74): SANDUHR_SNAPSHOT when set; else the account seats.json
+ * links this session's folder to, else snapshot.json (Sanduhr's active account) as before. A
+ * linked seat whose account has no file yet draws nothing rather than another account's numbers.
+ */
 async function readSnapshot($: EngineInterface): Promise<string | null> {
-  return readFile($, 'snapshot.json', await $.env.get('SANDUHR_SNAPSHOT'))
+  const named = await $.env.get('SANDUHR_SNAPSHOT')
+
+  if (named !== undefined && named !== '') {
+    return readFile($, 'snapshot.json', named)
+  }
+
+  const seats = seatFolder === null ? null : parseSeats(await readFile($, 'seats.json', undefined))
+
+  return readFile($, seatSnapshotName(seats, seatFolder), undefined)
+}
+
+/** CLAUDE_CONFIG_DIR (unset: ~/.claude) as seats.json writes it: links followed, no trailing slash. macOS only. */
+async function resolveSeatFolder($: EngineInterface): Promise<string | null> {
+  const home = await $.env.get('HOME')
+
+  if ((await $.env.get('OS')) === 'Windows_NT' || home === undefined || home === '') {
+    return null
+  }
+
+  const folder = configFolder(await $.env.get('CLAUDE_CONFIG_DIR'), home)
+
+  try {
+    const stat = await $.fs.stat(folder, { resolve: true })
+
+    return trimFolder(stat.realPath ?? folder)
+  } catch {
+    return trimFolder(folder)
+  }
 }
 
 /** Reads band.json: the looks, Reduce Motion and the watchers. */
@@ -327,6 +366,7 @@ export const register: Register = (on, options) => {
 
     frameTimer?.()
     frameTimer = null
+    seatFolder = await resolveSeatFolder($).catch(() => null)
     await poll($).catch(() => undefined)
     await pollBand($).catch(() => undefined)
 

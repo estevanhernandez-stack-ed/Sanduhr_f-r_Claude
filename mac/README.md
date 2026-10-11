@@ -183,9 +183,9 @@ with the label. The notch stays as it is. A switch never needs a relaunch: the m
   SHA-256 of the label, as on Windows) and is deleted at once on a switch; `state.yaml` has
   `account_ref`, `accounts_count`, `history_days`, `data` (the active account's choices and
   `folder_linked`), `local_activity` (`reading`, and `events` counted since the last refresh),
-  `vault` (`recording`, `months`, `last_ingest_ok`), `usage_page` (`open`, `tab`), `follow` and
-  `follow_paused`. Labels and folder paths never go into a log,
-  `snapshot.json` or `state.yaml`.
+  `vault` (`recording`, `months`, `last_ingest_ok`), `usage_page` (`open`, `tab`), `follow`,
+  `follow_paused`, `snapshots` and `seats` (per-seat meters, counts). Labels and folder paths never
+  go into a log, `snapshot.json` or `state.yaml`.
 
 #### Following the account in use
 
@@ -200,6 +200,38 @@ Settings) pauses following for 3 hours, or until the account you picked has been
 minutes. After an automatic switch the chip and Desk's line read "Work (in use)" for a minute.
 No notification. A failed check is ignored; a refused key skips that account until a new key
 is saved for it. The decision is `AccountFollow.decide`, pure and unit-tested.
+
+#### Per-seat meters (item 74)
+
+Each Claude Code folder linked to a signed-in account (Accounts, Data) shows that account's meters
+in its sessions, whichever account Sanduhr shows. `SeatSnapshots` (pure, on an injected folder):
+
+- **Off until two signed-in accounts have a folder linked.** Then, beside `snapshot.json` (still
+  the active account's, unchanged), Sanduhr writes `snapshot.<account_ref>.json` per linked
+  account, the same schema (`SnapshotWriter`, atomic, `writer_version` stamped), and `seats.json`,
+  `{"schema_version": 1, "seats": [{"folder": "<real path>", "account_ref": "<8 hex>"}]}`: the
+  folder with `~` expanded, symbolic links followed (`realpath(3)`) and no trailing slash. No label,
+  email or key. `seats.json` is rewritten only when its bytes change; every change to the accounts,
+  their sign-in or their links re-syncs it and deletes the file of an account that is no longer a
+  seat (Sign Out, Remove, unlink, rename, or back to one linked account, which deletes them all).
+- **Fetching.** The active account's fetch also writes its seat file. An inactive linked account is
+  fetched only while following sees it in use (`accountsInUse`), at the 5-minute cadence, one
+  account at a time, `SeatSnapshots.stagger` (5 s) after the active fetch, through its own client;
+  a failed fetch writes the error kind and keeps its last tiers, and a refused key skips it until a
+  new key is saved. Following's own 15-minute checks write their answers too (no extra request).
+  Otherwise it is not fetched and its file keeps the last reading, stamped `captured_at`, so
+  readers show its age. An account with no folder is never fetched for a seat.
+- **Readers.** The statusline, the meters mod and `get_usage` take `CLAUDE_CONFIG_DIR` (unset:
+  `~/.claude`), resolve it the same way and look it up in `seats.json`: a linked folder reads its
+  account's file; any other folder, or no readable `seats.json`, reads `snapshot.json` as before. A
+  linked folder never borrows another account's numbers: until its file exists the statusline
+  falls back to Claude Code's own `rate_limits` (marked `*`), the mod draws nothing and `get_usage`
+  says `missing`. `get_usage` answers with `scope: seat_account` for a seat (Share with your agents
+  still decides), `active_account_only` otherwise. `SANDUHR_SNAPSHOT` still names one file and skips
+  the lookup. The Python helper is one block in both scripts, pinned identical by a test.
+- **Settings.** Each Claude Code folder box's Account row says "Meters here show Work" (or "the
+  active account" while the folder is no seat); Accounts, Data has **Link a Claude Code Folder…**
+  (`SettingsNames.linkFolder`) for an account with none, the folder picker of Choose….
 
 ### Signing out
 
@@ -229,7 +261,8 @@ Most accounts don't need this.
 
 `mac/integrations/` holds a statusline segment and the `sanduhr` MCP server, Python 3.9+ standard
 library only, and the `sanduhr-meters` Claude Code mod. The statusline and the mod read only
-`snapshot.json`.
+`snapshot.json`, or with per-seat meters (item 74) `seats.json` and this seat's
+`snapshot.<account_ref>.json`.
 
 **Installing from Settings (item 49).** Settings, Claude Code (Integrations before Settings v2; raw value `integrations`) lists the Claude Code folders
 (`ClaudeCodeFolders.discover`, the accounts' linked folders, folders installed into, and Add
@@ -438,7 +471,9 @@ reset time, folding to compact when the band is short or narrow) and `label` (a 
 shown first; the snapshot only carries `account_ref`). Toasts, at most once per limit and reset
 window across sessions (keys kept in `$.store`): when a limit starts warning, and when the
 session limit resets (within ten minutes of it). Redraws come from a changed file or the minute
-tick, and the tick redraws only when a countdown or age it shows changed. Windows reads
+tick, and the tick redraws only when a countdown or age it shows changed. On macOS (mod 0.3.0,
+item 74) it resolves `CLAUDE_CONFIG_DIR` once per session (`$.fs.stat` with `resolve`) and reads
+the snapshot `seats.json` names for it. Windows reads
 `%APPDATA%\Sanduhr\snapshot.json`; `SANDUHR_SNAPSHOT` names another file for testing. Tests:
 `claude plugin test mac/integrations/mods/sanduhr-meters` (the engine's own test kit; the band is
 mounted on the terminal surface with the file system, clock, env and store beneath mocked).

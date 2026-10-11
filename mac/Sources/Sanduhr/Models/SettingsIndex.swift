@@ -123,7 +123,8 @@ enum SettingsAnchor {
                                  "sign out", "remove account", "make active", "follow"]),
         SettingsEntry(title: "Data", page: .credentials, anchor: data,
                       synonyms: ["meter history", "Claude Code activity", "project names", "Share with your agents",
-                                 "work account", "erase", "privacy", "Claude Code folder"]),
+                                 "work account", "erase", "privacy", "Claude Code folder", "link folder",
+                                 "per-seat meters", "seat"]),
         SettingsEntry(title: "Notifications", page: .alerts, anchor: notifications,
                       synonyms: ["alert", "banner", "threshold", "Where alerts show", "sound", "Send a Test"]),
         SettingsEntry(title: "Quiet hours", page: .alerts, anchor: quietHours, synonyms: ["do not disturb", "night"]),
@@ -184,7 +185,8 @@ enum SettingsAnchor {
     private static let claudeCodePages: [SettingsEntry] = [
         SettingsEntry(title: "Python", page: .integrations, anchor: python, synonyms: ["python3", "Command Line Tools"]),
         SettingsEntry(title: "Folders", page: .integrations, anchor: folders,
-                      synonyms: ["Add Folder", "MCP server", "statusline", "prompt", "hooks", "install", "account"]),
+                      synonyms: ["Add Folder", "MCP server", "statusline", "prompt", "hooks", "install", "account",
+                                 "Meters here show", "per-seat meters", "seat"]),
         SettingsEntry(title: "Turning the glow on", page: .integrations, anchor: glowHint,
                       synonyms: ["Notch Settings…", "glow hook"]),
         SettingsEntry(title: SettingsNames.metersAbovePrompt, page: .mods, anchor: metersMod,
@@ -238,6 +240,7 @@ extension SettingsNames {
         watchersOnNotch: SettingsAnchor.whereTheyShow, watchersOnDesk: SettingsAnchor.whereTheyShow,
         showWidget: SettingsAnchor.show, checkForUpdates: SettingsAnchor.check, saveAndApply: SettingsAnchor.ownThemes,
         listMode: SettingsAnchor.editor, textMode: SettingsAnchor.editor,
+        linkFolder: SettingsAnchor.data,
     ]
 }
 

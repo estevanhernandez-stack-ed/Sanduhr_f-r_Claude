@@ -419,3 +419,76 @@ export const RESET_TOAST = 'Sanduhr: the session limit has reset.'
 export function remember(seen: readonly string[], key: string, cap = 24): string[] {
   return [...seen.filter(k => k !== key), key].slice(-cap)
 }
+
+// -- Seats (item 74) --------------------------------------------------------------------------
+
+// seats.json beside snapshot.json maps each linked Claude Code folder (its real path) to an
+// account ref; that folder's sessions read snapshot.<ref>.json. Any other folder, or no readable
+// seats.json, reads snapshot.json as before. The statusline and sanduhr-mcp read it the same way.
+export const SEATS_SCHEMA_VERSION = 1
+const SEAT_REF = /^[0-9a-f]{8}$/
+
+export type Seat = { folder: string; ref: string }
+
+/** A folder without its trailing slashes ("/" stays "/"). */
+export function trimFolder(path: string): string {
+  const t = path.replace(/\/+$/, '')
+
+  return t === '' && path.startsWith('/') ? '/' : t
+}
+
+/** The folder this session runs in: CLAUDE_CONFIG_DIR (~ expanded against HOME), unset or empty meaning ~/.claude. */
+export function configFolder(configDir: string | undefined, home: string): string {
+  const raw = configDir === undefined || configDir === '' ? '~/.claude' : configDir
+
+  return raw === '~' || raw.startsWith('~/') ? `${home}${raw.slice(1)}` : raw
+}
+
+/** seats.json's rows, or null for anything missing, malformed or newer (then snapshot.json is read). */
+export function parseSeats(text: string | null): Seat[] | null {
+  if (text === null) {
+    return null
+  }
+
+  let raw: unknown
+
+  try {
+    raw = JSON.parse(text)
+  } catch {
+    return null
+  }
+
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return null
+  }
+
+  const o = raw as Record<string, unknown>
+  const version = Number(o.schema_version)
+
+  if (!Number.isFinite(version) || version > SEATS_SCHEMA_VERSION || !Array.isArray(o.seats)) {
+    return null
+  }
+
+  const seats: Seat[] = []
+
+  for (const row of o.seats) {
+    if (typeof row !== 'object' || row === null) {
+      continue
+    }
+
+    const r = row as Record<string, unknown>
+
+    if (typeof r.folder === 'string' && r.folder !== '' && typeof r.account_ref === 'string' && SEAT_REF.test(r.account_ref)) {
+      seats.push({ folder: trimFolder(r.folder), ref: r.account_ref })
+    }
+  }
+
+  return seats
+}
+
+/** The snapshot file a session in `folder` (its real path) reads. */
+export function seatSnapshotName(seats: Seat[] | null, folder: string | null): string {
+  const seat = folder === null ? undefined : seats?.find(s => s.folder === trimFolder(folder))
+
+  return seat === undefined ? 'snapshot.json' : `snapshot.${seat.ref}.json`
+}
