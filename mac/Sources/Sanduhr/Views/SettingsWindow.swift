@@ -110,6 +110,13 @@ final class SettingsWindowController {
 
     func close() { window?.close() }
 
+    /// Paste a Key Instead, from the welcome sheet or the sign-in window: Accounts, with the
+    /// first-account form's key field already showing.
+    func showPasteKey() {
+        navigation.pasteKey = true
+        show(.credentials)
+    }
+
     /// The anchor the page was opened at is on screen (state.yaml `settings_anchor_visible`), nil
     /// with no anchor or the window closed.
     var anchorVisible: Bool? { isOpen ? navigation.anchorVisible : nil }
@@ -293,6 +300,9 @@ final class SettingsNavigation {
     var usageTab: UsageTab = .overview
     /// An account for Accounts to select on arrival (the Claude Usage page's "Accounts Settings…").
     var accountToShow: String?
+    /// The welcome sheet's Paste a Key Instead (slice 4): Accounts' first-account form opens with
+    /// its key field showing. Read once on arrival.
+    var pasteKey = false
     /// The Claude Usage page's state, kept while the window lives.
     let usagePage = UsagePageModel()
     /// The Mods page's state (item 64), kept while the window lives.

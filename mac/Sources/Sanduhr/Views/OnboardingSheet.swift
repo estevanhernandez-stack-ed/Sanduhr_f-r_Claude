@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// First run, shown while no sessionKey is saved: sign in to Claude in Sanduhr's own window
-/// (item 62), paste a key in Settings, Accounts, or use Just the Desk without an account.
+/// (item 62), paste a key in Settings, Accounts, use Just the Desk without an account, or put it
+/// off for this launch with Not Now (item 72, slice 4). No wider than the widget (F23).
 struct OnboardingSheet: View {
     @Bindable var vm: UsageViewModel
     /// Sign In to Claude.
@@ -10,6 +11,11 @@ struct OnboardingSheet: View {
     var onPaste: () -> Void
     /// Just the Desk: no account, the Desk on its own (JustTheDesk).
     var onJustTheDesk: () -> Void = {}
+    /// Not Now: the sheet goes for this launch; the widget's "Not signed in" line stays the way in.
+    var onNotNow: () -> Void = {}
+
+    /// The widget's narrowest width: the sheet never overhangs it.
+    static let width: CGFloat = 340
 
     var body: some View {
         let t = vm.theme.palette
@@ -18,7 +24,7 @@ struct OnboardingSheet: View {
                 .font(.title3.bold())
                 .foregroundStyle(t.text)
 
-            Text("Sign in to the claude.ai account whose usage you want to watch. Sanduhr keeps only its session key, in your macOS Keychain.")
+            Text("Sign in to the claude.ai account whose usage you want to watch. Sanduhr keeps only its session key, \(SignedOut.keyHome(KeychainStore.kind)).")
                 .font(.callout)
                 .foregroundStyle(t.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -29,26 +35,29 @@ struct OnboardingSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack {
-                Button("Paste a Key Instead", action: onPaste)
-                Spacer()
+                Button(SignedOut.pasteTitle, action: onPaste)
+                Spacer(minLength: 8)
                 Button("Sign In to Claude…", action: onSignIn)
                     .keyboardShortcut(.defaultAction)
             }
 
             Divider()
 
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(JustTheDesk.caption)
-                    .font(.system(size: 11))
-                    .foregroundStyle(t.textDim)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
+            Text(JustTheDesk.caption)
+                .font(.system(size: 11))
+                .foregroundStyle(t.textDim)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button(WelcomeNotNow.title, action: onNotNow)
+                    .keyboardShortcut(.cancelAction)
+                    .help("Put this away for now. The widget's “Not signed in” line signs in later.")
+                Spacer(minLength: 8)
                 Button(JustTheDesk.buttonTitle, action: onJustTheDesk)
                     .help("Use the Desk without a Claude account; nothing is asked for")
             }
         }
-        .padding(22)
-        .frame(width: 440)
+        .padding(18)
+        .frame(width: Self.width)
     }
 }
 

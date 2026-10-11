@@ -120,6 +120,8 @@ enum DebugHooks {
         case .glow: NotchGlowController.shared.fire()
         case .demo(let on):
             DeskController.shared.model.setDemo(on)
+            // The widget, the menu bar, both Claude meters pieces, Usage and Accounts (slice 4).
+            app.viewModel.setDemo(on)
             BandFileWriter.shared.refresh()
         case .theme(let id): app.viewModel.selectTheme(id: id)
         case .cycleAccount: app.viewModel.cycleAccount()
@@ -361,6 +363,9 @@ enum DebugHooks {
         s.usagePageOpen = settings.isOpen && settings.section == .usage
         s.usageTab = settings.usageTab
         s.justTheDesk = JustTheDesk.isOn()
+        s.demo = DemoDebug(on: vm.demo, widgetTiers: vm.visibleTiers().count, deskLine: desk.model.claudeLine != nil,
+                           notchMeters: desk.model.claudeCompact != nil, accounts: vm.accountLabels.count,
+                           usageRows: vm.demo ? DemoMode.coverage()[.usage] ?? 0 : 0)
         let meters = settings.usagePage
         s.meterHistory = MeterHistoryDebug(all: meters.metersAll && KeychainStore.accounts.labels.count > 1, window: meters.metersWindow.rawValue,
                                            rows: meters.meterRows.count, series: meters.meterRows.reduce(0) { $0 + $1.series.count })

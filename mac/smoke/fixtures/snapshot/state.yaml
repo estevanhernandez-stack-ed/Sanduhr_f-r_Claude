@@ -220,3 +220,10 @@ meter_history:
   rows: 2
   series: 2
 just_the_desk: false
+demo:
+  active: false
+  widget_tiers: 2
+  desk_line: true
+  notch_meters: true
+  accounts: 2
+  usage_rows: 0

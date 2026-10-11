@@ -183,6 +183,21 @@ final class UsageViewModel {
     /// The accounts with a session key in this launch's store (asked without reading a value).
     private(set) var signedInAccounts: Set<String> = UsageViewModel.signedIn(KeychainStore.accounts)
 
+    /// Demo mode (DemoMode, slice 4): the sample accounts and numbers stand in for the real ones
+    /// on every surface. In memory only; the real state waits in `demoStash` and comes back with off.
+    private(set) var demo = false
+    /// What demo mode covers up, kept current while it is on (an account change elsewhere).
+    private struct DemoStash {
+        var usage: UsageResponse?
+        var lastUpdated: Date?
+        var status: StatusMessage
+        var labels: [String]
+        var active: String?
+        var signedIn: Set<String>
+        var history: HistoryStore.History
+    }
+    @ObservationIgnored private var demoStash: DemoStash?
+
     /// Settings, Accounts, Follow the account I'm using: off by default (AccountFollower).
     var followEnabled: Bool = UserDefaults.standard.bool(forKey: AccountFollower.enabledKey) {
         didSet {
@@ -561,7 +576,7 @@ final class UsageViewModel {
         if wasEmpty {
             // The first account: no legacy copy may outlive it (KeychainStore.set does the same).
             accounts.dropLegacy()
-            accounts.adoptLegacyHistory()
+            accounts.adoptLegacyHistory(into: label)
             credentialsChanged()
         } else if makeActive {
             switchAccount(to: label)
@@ -583,10 +598,17 @@ final class UsageViewModel {
         let accounts = KeychainStore.accounts
         let labels = accounts.labels
         let active = accounts.active
-        if labels != accountLabels { accountLabels = labels }
-        if active != activeAccount { activeAccount = active }
         let signedIn = Self.signedIn(accounts)
-        if signedIn != signedInAccounts { signedInAccounts = signedIn }
+        if demo {
+            // The sample accounts stay on screen; the real ones wait for demo mode's end.
+            demoStash?.labels = labels
+            demoStash?.active = active
+            demoStash?.signedIn = signedIn
+        } else {
+            if labels != accountLabels { accountLabels = labels }
+            if active != activeAccount { activeAccount = active }
+            if signedIn != signedInAccounts { signedInAccounts = signedIn }
+        }
         let off = Set(MeterHistory.offLabels(in: accounts.defaults))
         if off != historyOffAccounts { historyOffAccounts = off }
         let data = AccountData.allChoices(in: accounts.defaults)
@@ -606,15 +628,25 @@ final class UsageViewModel {
     // MARK: Per-seat meters (item 74)
 
     /// What SeatMeters reads of the accounts, at each step.
+    /// Always the real accounts: demo mode's samples never reach a seat file.
     private func seatContext() -> SeatMeters.Context {
-        SeatMeters.Context(labels: accountLabels, choices: accountDataChoices, signedIn: signedInAccounts,
-                           active: activeAccount, inUse: accountsInUse)
+        if let s = demoStash {
+            return SeatMeters.Context(labels: s.labels, choices: accountDataChoices, signedIn: s.signedIn,
+                                      active: s.active, inUse: accountsInUse)
+        }
+        return SeatMeters.Context(labels: accountLabels, choices: accountDataChoices, signedIn: signedInAccounts,
+                                  active: activeAccount, inUse: accountsInUse)
     }
 
     /// seats.json and the per-account files follow every change to the accounts, their sign-in
-    /// and their links; the active account's seat starts from the numbers on screen.
+    /// and their links; the active account's seat starts from the numbers on screen (the real
+    /// ones under demo mode).
     private func syncSeats() {
         seatMeters.sync()
+        if let s = demoStash {
+            seatMeters.seed(s.usage, at: s.lastUpdated, label: apiAccount)
+            return
+        }
         seatMeters.seed(usage, at: lastUpdated, label: apiAccount)
     }
 
@@ -704,6 +736,11 @@ final class UsageViewModel {
     /// Both kinds of switch take the same path; an automatic one starts the 30-minute spacing
     /// and the minute of "(in use)", a manual one pauses following.
     private func switchAccount(to label: String, automatic: Bool) {
+        // Demo mode switches between the sample accounts only, and never by following.
+        if demo {
+            if !automatic { showDemo(label) }
+            return
+        }
         let accounts = KeychainStore.accounts
         // The name as it showed before anything changes (the follow note included).
         let leaving = accountLabel
@@ -717,8 +754,60 @@ final class UsageViewModel {
     /// The next account, wrapping (the widget chip's click, Windows `CycleAccount`). Nothing
     /// with fewer than two accounts.
     func cycleAccount() {
+        if demo {
+            let i = accountLabels.firstIndex(of: activeAccount ?? "") ?? -1
+            showDemo(accountLabels[(i + 1) % accountLabels.count])
+            return
+        }
         guard let next = KeychainStore.accounts.nextLabel else { return }
         switchAccount(to: next)
+    }
+
+    // MARK: Demo mode (slice 4)
+
+    /// Demo mode on or off (the debug hook's `demo`). On, the real numbers, accounts and history
+    /// step aside for DemoMode's samples and fetches wait; off brings the real ones back (with any
+    /// account change made meanwhile) and fetches at once. Writes nothing anywhere.
+    func setDemo(_ on: Bool, now: Date = Date()) {
+        if on {
+            if !demo {
+                demoStash = DemoStash(usage: usage, lastUpdated: lastUpdated, status: status, labels: accountLabels,
+                                      active: activeAccount, signedIn: signedInAccounts, history: history)
+                demo = true
+                activeAccount = DemoMode.active
+                accountLabels = DemoMode.accounts
+                signedInAccounts = Set(DemoMode.accounts)
+                refreshLocalBurn()
+            }
+            showDemo(DemoMode.accounts.contains(activeAccount ?? "") ? activeAccount ?? DemoMode.active : DemoMode.active,
+                     now: now)
+            return
+        }
+        guard demo, let s = demoStash else { return }
+        demo = false
+        demoStash = nil
+        accountLabels = s.labels
+        activeAccount = s.active
+        signedInAccounts = s.signedIn
+        usage = s.usage
+        lastUpdated = s.lastUpdated
+        status = s.status
+        history = s.history
+        reloadAccounts()
+        refreshLocalBurn()
+        onUsageUpdate?()
+        if api != nil { Task { await refresh() } }
+    }
+
+    /// One sample account on screen, as a switch would show it.
+    private func showDemo(_ label: String, now: Date = Date()) {
+        guard demo, DemoMode.accounts.contains(label) else { return }
+        activeAccount = label
+        usage = DemoMode.usage(for: label, now: now)
+        lastUpdated = now
+        status = .idle
+        history = HistoryStore.sparklines(DemoMode.history(for: label, now: now))
+        onUsageUpdate?()
     }
 
     /// After the active account changed: nothing of the old account stays on screen or in
@@ -854,7 +943,8 @@ final class UsageViewModel {
     // MARK: Refresh
 
     func refresh() async {
-        guard let api else { return }
+        // Demo mode's samples stay until it ends; off fetches at once.
+        guard let api, !demo else { return }
         let account = apiAccount
         let ref = AccountRef.of(account)
         // "Switching account…" stays up until the new account's first answer.
@@ -867,14 +957,15 @@ final class UsageViewModel {
         } catch {
             await waitOutSwitchFade()
             // Signed out, switched, or a new key saved while this fetch ran: its answer is stale.
-            guard self.api === api else { return }
+            // So is one that lands under demo mode.
+            guard self.api === api, !demo else { return }
             showFailure(error, accountRef: ref)
             if apiAccount == account { seatMeters.activeAnswered(account, .failure(error)) }
             endSwitchVeil()
             return
         }
         await waitOutSwitchFade()
-        guard self.api === api else { return }
+        guard self.api === api, !demo else { return }
         // Hidden limits that reset, refilled or are no longer temporary show again before the
         // numbers do (item 42).
         Self.reconcileHidden(u, now: Date())
@@ -924,7 +1015,8 @@ final class UsageViewModel {
     /// activity Not tracked, no folder or no refresh yet, clears the badges and reads nothing.
     func refreshLocalBurn() {
         let choices = shownAccountChoices
-        guard let anchor = lastUpdated, let folder = LocalActivity.folder(for: choices) else {
+        // Demo mode shows no real token counts.
+        guard !demo, let anchor = lastUpdated, let folder = LocalActivity.folder(for: choices) else {
             localBurnSource.drop()
             if localBurn != LocalBurn() { localBurn = LocalBurn() }
             if localActivityReading { localActivityReading = false }

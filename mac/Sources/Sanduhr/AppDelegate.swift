@@ -98,30 +98,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Desk takes the numbers straight from the view model, so its meters move with
             // every refresh even while the widget is hidden (or Desk is off, ready for when it starts).
             guard let vm = self?.viewModel else { return }
-            let fetched = vm.usage != nil && (vm.status == .idle || vm.status == .noTiers)
-            // Remembered for the next launch: has the active account's key fetched (SignInGate)?
-            SignInGate.record(fetched: fetched, needsSignIn: vm.status.needsSignIn,
-                              account: KeychainStore.accounts.active, in: UserDefaults.standard)
-            // A fresh install's welcome tour, once the first fetch has the user's own numbers.
-            self?.offerTourIfPending(fetched: fetched)
-            // Just the Desk ends once a key is saved (a failed one included): the sign-in reminder it
-            // turned off comes back on, and the widget waits for that key like any other.
-            if KeychainStore.exists(account: KeychainAccount.sessionKey), JustTheDesk.endBySignIn() {
-                DeskController.shared.model.refreshClaude()
-                // Not fetched yet: the widget comes up for this key's sign-in, as for any other.
-                if !fetched { self?.applyWidgetVisibility(.justTheDesk) }
-            }
-            // The widget showed for sign-in; once the numbers arrive the choice takes over.
-            if self?.awaitingSignIn == true, fetched {
-                self?.awaitingSignIn = false
-                self?.applyWidgetVisibility(.signedIn)
-            }
-            // Signed out (Settings, Credentials): the widget shows for sign-in again, as at a
-            // launch without a key, until the next successful fetch.
-            if vm.status == .signedOut, self?.awaitingSignIn == false {
-                self?.awaitingSignIn = true
-                self?.applyWidgetVisibility(.signedOut)
-            }
+            // Demo mode's samples are no sign-in: nothing is recorded and nothing waits on them.
+            if !vm.demo { self?.afterUsageUpdate(vm) }
             // During a switch the Desk lays out the old account's meters unseen (veiled), as the
             // widget's cards do, and fades in the new ones with the view model's animation. The
             // line keeps the old account's name until those numbers have faded out.
@@ -174,6 +152,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // replace the last one's (a new stamped folder, the link swapped). No install, no write.
         Task.detached(priority: .utility) { IntegrationScripts.standard.refreshIfInstalled() }
         showWhatsNewIfUpdated(fresh: firstRun == .fresh, tourPending: tour == .pending)
+    }
+
+    /// What a refresh's answer means for sign-in: the launch gate, the tour, Just the Desk and the
+    /// widget waiting for numbers. Skipped under demo mode, whose samples are no sign-in.
+    private func afterUsageUpdate(_ vm: UsageViewModel) {
+        let fetched = vm.usage != nil && (vm.status == .idle || vm.status == .noTiers)
+        // Remembered for the next launch: has the active account's key fetched (SignInGate)?
+        SignInGate.record(fetched: fetched, needsSignIn: vm.status.needsSignIn,
+                          account: KeychainStore.accounts.active, in: UserDefaults.standard)
+        // A fresh install's welcome tour, once the first fetch has the user's own numbers.
+        offerTourIfPending(fetched: fetched)
+        // Just the Desk ends once a key is saved (a failed one included): the sign-in reminder it
+        // turned off comes back on, and the widget waits for that key like any other.
+        if KeychainStore.exists(account: KeychainAccount.sessionKey), JustTheDesk.endBySignIn() {
+            DeskController.shared.model.refreshClaude()
+            // Not fetched yet: the widget comes up for this key's sign-in, as for any other.
+            if !fetched { applyWidgetVisibility(.justTheDesk) }
+        }
+        // The widget showed for sign-in; once the numbers arrive the choice takes over.
+        if awaitingSignIn, fetched {
+            awaitingSignIn = false
+            applyWidgetVisibility(.signedIn)
+        }
+        // Signed out (Settings, Credentials): the widget shows for sign-in again, as at a
+        // launch without a key, until the next successful fetch.
+        if vm.status == .signedOut, !awaitingSignIn {
+            awaitingSignIn = true
+            applyWidgetVisibility(.signedOut)
+        }
     }
 
     /// The welcome tour has been offered in this launch.

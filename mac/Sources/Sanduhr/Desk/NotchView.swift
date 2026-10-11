@@ -443,6 +443,17 @@ struct NotchWingsView: View {
     /// The notch text size for a notch this tall.
     static func textSize(_ notchHeight: CGFloat) -> CGFloat { max(10, notchHeight * 0.42) }
 
+    /// Empty wings collapse (item 72, slice 4, F25; open question 3 decided 2026-10-11): with Text
+    /// beside the camera on, a wing whose content has nothing to show (Claude meters with no fresh
+    /// numbers and the sign-in line off, Message with no line, a meeting-or-meters wing with
+    /// neither) is 0 wide and draws nothing, so the island shrinks to the camera on that side. The
+    /// chosen width (Extra width each side) comes back with the content. Two choices keep their
+    /// width: Nothing, picked on purpose as a plain black wing, and Text beside the camera off,
+    /// the island without text.
+    static func collapses(_ text: String?, _ content: NotchContent, showText: Bool) -> Bool {
+        showText && text == nil && content != .nothing
+    }
+
     static func layout(model: DeskModel, now: Date, wings: Double, showText: Bool,
                        left savedLeft: NotchContent, right savedRight: NotchContent, idle: NowPlayingIdle,
                        font: String, notchHeight: CGFloat,
@@ -468,6 +479,8 @@ struct NotchWingsView: View {
             return glyph + NowPlayingStyled.width(parts.rest, size: size, font: font, look: look)
         }
         func wingWidth(_ text: String?, _ content: NotchContent, _ place: NotchContent.Place) -> CGFloat {
+            // Nothing to show: no black slab, the island gives the room back (slice 4, F25).
+            if collapses(text, content, showText: showText) { return 0 }
             // A paused now playing also makes room for its Next button (item 53b).
             // A watcher also makes room for its dot (item 66).
             // The camera and mic indicators are their own width (item 67).

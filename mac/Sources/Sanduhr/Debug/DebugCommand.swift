@@ -40,8 +40,10 @@ enum DebugAction: Equatable {
     case glow(NotchGlowEvent.Kind)
     /// The widget's theme by id, picked as the Theme menu and the gallery pick it.
     case theme(String)
-    /// Demo data on the Desk for screenshots: made-up meetings and a pinned message, held in
-    /// memory only (the calendar is never touched). Off puts the real ones back.
+    /// Demo data for screenshots (DemoMode): made-up meetings and a pinned message on the Desk,
+    /// and since slice 4 two sample accounts with made-up numbers on the widget, both Claude meters
+    /// pieces, the notch, Usage and Accounts. Held in memory only (the calendar, the Keychain and
+    /// every file are never touched). Off puts the real ones back.
     case demo(Bool)
     /// The next account, as the widget's chip cycles it. Safe: nothing is added, signed out or
     /// removed, and no hook can do those.
