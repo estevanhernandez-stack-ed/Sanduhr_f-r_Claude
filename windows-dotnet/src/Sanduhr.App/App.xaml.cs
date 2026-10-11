@@ -28,6 +28,7 @@ public partial class App : Application
     private SettingsWindow? _settingsWindow;
     private DispatcherTimer? _trayRotateTimer;
     private GlobalHotKeyService? _hotKeys;
+    private ClaudeCodeGlowService? _glow;
     private MenuItem? _endDemoItem;
 
     /// <summary>Where this install stands with the welcome tour, decided once at launch.</summary>
@@ -78,6 +79,7 @@ public partial class App : Application
         SetupTray();
         SyncTrayRotation();
         SetupHotKeys();
+        StartGlow();
 
         // Usage vault (WS-C): consent resolves BEFORE the service attaches —
         // attach order is the consent gate; Start()'s first fetch cycle then
@@ -384,6 +386,15 @@ public partial class App : Application
     }
 
     /// <summary>The global shortcut: registers what <c>hotkey_settings</c> asks for (off until the user turns it on).</summary>
+    /// <summary>Claude Code edge glow (Stage 4.5): watches the hook signal files; both switches start off.</summary>
+    private void StartGlow()
+    {
+        if (_window is null) return;
+        var paths = new Sanduhr.Core.Paths();
+        _glow = new ClaudeCodeGlowService(new SettingsStore(paths), paths, _window);
+        _glow.Start();
+    }
+
     private void SetupHotKeys()
     {
         try
@@ -601,6 +612,7 @@ public partial class App : Application
     private void QuitApp()
     {
         WhatsNewWindow.Quitting = true;
+        _glow?.Dispose();
         _hotKeys?.Dispose();
         _tray?.Dispose();
         _trayIcon?.Dispose();
@@ -618,6 +630,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         WhatsNewWindow.Quitting = true;
+        _glow?.Dispose();
         _hotKeys?.Dispose();
         _tray?.Dispose();
         _trayIcon?.Dispose();

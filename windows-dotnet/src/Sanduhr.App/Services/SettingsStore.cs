@@ -560,6 +560,34 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>The Claude Code edge glow switches (settings.json "claude_code_glow"
+    /// {"waiting", "done", "skip_terminal"}). Off, off, and skip-terminal on until set.</summary>
+    public GlowSwitches LoadClaudeCodeGlow()
+    {
+        var o = Read()["claude_code_glow"] as JsonObject;
+        return new GlowSwitches(
+            Waiting: ReadBool(o, "waiting", false),
+            Done: ReadBool(o, "done", false),
+            SkipTerminal: ReadBool(o, "skip_terminal", true));
+    }
+
+    public void SaveClaudeCodeGlow(GlowSwitches switches)
+    {
+        var root = Read();
+        root["claude_code_glow"] = new JsonObject
+        {
+            ["waiting"] = switches.Waiting,
+            ["done"] = switches.Done,
+            ["skip_terminal"] = switches.SkipTerminal,
+        };
+        Write(root);
+    }
+
+    private static bool ReadBool(JsonObject? o, string key, bool fallback)
+    {
+        try { return o?[key]?.GetValue<bool>() ?? fallback; } catch { return fallback; }
+    }
+
     /// <summary>Linked Claude Code folders by account label (settings.json "account_folders"
     /// {label: folder path}). Blank paths are dropped.</summary>
     public Dictionary<string, string> LoadAccountFolders()
