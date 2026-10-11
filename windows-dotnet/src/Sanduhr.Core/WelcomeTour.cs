@@ -28,7 +28,7 @@ public static class WelcomeTour
     /// <summary>The settings key holding the tour's state.</summary>
     public const string StateKey = "tour_state";
 
-    public const string AgainLine = "You can take the tour again from Settings, General, or the tray menu.";
+    public const string AgainLine = "You can take the tour again from Settings, About, or the tray menu.";
 
     public const string SkipTitle = "Skip the tour";
 
@@ -81,7 +81,7 @@ public static class WelcomeTour
         return steps;
     }
 
-    /// <summary>Step 1 with no account: it sends to Sign In instead of showing meters. Other cards are unchanged.</summary>
+    /// <summary>Step 1 with no account: it sends to Sign in instead of showing meters. Other cards are unchanged.</summary>
     public static TourCard SignedOut(TourCard card) =>
         card.Step != 1
             ? card
@@ -90,7 +90,7 @@ public static class WelcomeTour
                 Card = new WhatsNewCard([], card.Card.Id, card.Card.Title,
                     "Sign in to see your meters here. Each bar is one of your limits, with a tick where an even pace would put you.",
                     card.Card.Glyph, card.Card.Preview, SettingsPage.Accounts),
-                ShowMeTitle = "Sign In",
+                ShowMeTitle = SettingsNames.SignIn,
             };
 
     /// <summary>"1 of 4" for the 0-based index 0 of 4.</summary>

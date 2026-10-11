@@ -34,6 +34,6 @@ public static class WhatsNewCards
         WhatsNewCard.Of("3.5.0", "whats-new", "What's new, after every update",
             "You'll see what changed after each update. It stays in the tray menu and Settings, so you can reopen it any time.",
             "\uE789", // Megaphone
-            WhatsNewPreview.None, SettingsPage.General),
+            WhatsNewPreview.None, SettingsPage.About),
     ];
 }
