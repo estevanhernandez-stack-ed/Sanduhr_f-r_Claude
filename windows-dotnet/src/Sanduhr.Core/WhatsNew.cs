@@ -1,7 +1,10 @@
 namespace Sanduhr.Core;
 
-/// <summary>The Settings pages a What's New card's "Show me" can open (Widget shows the widget).</summary>
-public enum SettingsPage { Accounts, Themes, Alerts, History, ClaudeUsage, Publish, General, Widget }
+/// <summary>
+/// The Settings pages a What's New card's "Show me" can open (Widget shows the widget). Their
+/// sidebar titles and groups are in <see cref="SettingsNames"/>. New pages go at the end.
+/// </summary>
+public enum SettingsPage { Accounts, Themes, Alerts, History, ClaudeUsage, Publish, General, Widget, About }
 
 /// <summary>The small live previews a card can ask for in place of a glyph.</summary>
 public enum WhatsNewPreview

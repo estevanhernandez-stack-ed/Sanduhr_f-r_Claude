@@ -68,17 +68,17 @@ public partial class TierCard : UserControl
         string key = vm.TierKey;
 
         if (host.CanHideUntilReset(key))
-            menu.Items.Add(Item("Hide until it resets", () => host.HideUntilReset(key)));
+            menu.Items.Add(Item(SettingsNames.HideUntilItResets, () => host.HideUntilReset(key)));
         menu.Items.Add(Item("Hide this tier", () => host.HideTier(key)));
         menu.Items.Add(host.WarningsOn(key)
-            ? Item("Stop warnings for this limit", () => host.SetWarnings(key, false))
-            : Item("Warn again for this limit", () => host.SetWarnings(key, true)));
+            ? Item(SettingsNames.StopWarnings, () => host.SetWarnings(key, false))
+            : Item(SettingsNames.WarnAgain, () => host.SetWarnings(key, true)));
         menu.Items.Add(new Separator());
 
         var hidden = host.HiddenTierKeys;
         if (hidden.Count > 0)
         {
-            var sub = new MenuItem { Header = "Hidden limits" };
+            var sub = new MenuItem { Header = SettingsNames.HiddenLimits };
             foreach (var hiddenKey in hidden)
             {
                 var k = hiddenKey;
@@ -86,7 +86,7 @@ public partial class TierCard : UserControl
             }
             menu.Items.Add(sub);
         }
-        menu.Items.Add(Item("Alerts Settings…", () => _ = host.OpenSettingsAtAsync(SettingsPage.Alerts)));
+        menu.Items.Add(Item(SettingsNames.LinkTitle(SettingsPage.Alerts), () => _ = host.OpenSettingsAtAsync(SettingsPage.Alerts)));
     }
 
     private static MenuItem Item(string header, Action onClick)

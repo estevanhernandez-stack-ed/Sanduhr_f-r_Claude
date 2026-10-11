@@ -92,7 +92,7 @@ public class WelcomeTourTests
             Assert.DoesNotContain("—", body);
             foreach (var word in banned) Assert.DoesNotContain(word, body.ToLowerInvariant());
         }
-        Assert.Equal("You can take the tour again from Settings, General, or the tray menu.", WelcomeTour.AgainLine);
+        Assert.Equal("You can take the tour again from Settings, About, or the tray menu.", WelcomeTour.AgainLine);
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public class WelcomeTourTests
         var out1 = WelcomeTour.SignedOut(paced);
         Assert.Equal("Sign in to see your meters here. Each bar is one of your limits, with a tick where an even pace would put you.", out1.Card.Body);
         Assert.Equal(SettingsPage.Accounts, out1.Card.Destination);
-        Assert.Equal("Sign In", out1.ShowMeTitle);
+        Assert.Equal("Sign in", out1.ShowMeTitle);
         Assert.Equal(paced.Id, out1.Id);
         Assert.Equal(paced.Card.Title, out1.Card.Title);
         Assert.Equal(paced.Card.Glyph, out1.Card.Glyph);
@@ -121,7 +121,7 @@ public class WelcomeTourTests
         var signedOut = WelcomeTour.Steps(None, signedIn: false);
         Assert.Equal(Ids(signedIn), Ids(signedOut));
         Assert.NotEqual(signedIn[0][0], signedOut[0][0]);
-        Assert.Equal("Sign In", signedOut[0][0].ShowMeTitle);
+        Assert.Equal("Sign in", signedOut[0][0].ShowMeTitle);
         for (var i = 1; i < signedIn.Count; i++) Assert.Equal(signedIn[i], signedOut[i]);
     }
 

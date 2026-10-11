@@ -228,9 +228,11 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         RaiseTray();
     }
 
-    private void RaiseTray() =>
-        TrayReadingChanged?.Invoke(
-            TrayReadout.Reading(_trayMode, _traySession, _trayWeekly, _trayHighest, _trayStep));
+    /// <summary>What the tray shows now: Settings, General's preview reads it.</summary>
+    public TrayReading? CurrentTrayReading =>
+        TrayReadout.Reading(_trayMode, _traySession, _trayWeekly, _trayHighest, _trayStep);
+
+    private void RaiseTray() => TrayReadingChanged?.Invoke(CurrentTrayReading);
 
     /// <summary>No data: forget the inputs and tell the tray to show "--".</summary>
     private void ClearTray()
@@ -272,7 +274,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// and selects the named page.</summary>
     public event Func<SettingsPage, Task>? SettingsPageRequested;
 
-    /// <summary>Open Settings on a named page (the tier card's "Alerts Settings…").</summary>
+    /// <summary>Open Settings on a named page (the tier card's "Alerts settings…").</summary>
     public async Task OpenSettingsAtAsync(SettingsPage page)
     {
         if (SettingsPageRequested is not null)
@@ -280,6 +282,10 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         else if (SettingsRequested is not null)
             await SettingsRequested.Invoke();
     }
+
+    /// <summary>A "<c>Page</c> settings…" menu item: Settings on that page.</summary>
+    [RelayCommand]
+    private Task OpenSettingsPage(SettingsPage page) => OpenSettingsAtAsync(page);
 
     /// <summary>Raised after any account-registry mutation routed through this VM
     /// (switch / rename / sign-out). Open menus + the Settings accounts list re-read
@@ -321,6 +327,24 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
 
     /// <summary>The active account label, or null when signed out.</summary>
     public string? ActiveAccount => _accounts.GetActive();
+
+    /// <summary>The accounts a surface shows: the sample accounts while demo mode runs, so no
+    /// real label reaches Settings or a menu in a screenshot; the registry otherwise.</summary>
+    public IReadOnlyList<string> ShownAccounts => IsDemo ? DemoMode.Accounts : ListAccounts();
+
+    /// <summary>The account a surface marks as active: the sample one in demo mode.</summary>
+    public string? ShownActiveAccount => IsDemo ? _demoAccount : ActiveAccount;
+
+    /// <summary>Demo mode: show another sample account (the menus' sample entries). Ignored
+    /// outside demo mode and for a label that is not a sample.</summary>
+    [RelayCommand]
+    private void ShowSampleAccount(string? label)
+    {
+        if (!IsDemo || label is null || !DemoMode.Accounts.Contains(label) || label == _demoAccount)
+            return;
+        _demoAccount = label;
+        ShowDemoAccount();
+    }
 
     /// <summary>The per-account usage history store — shared with the Settings
     /// History tab (chart + CSV export) so it reads the same files the live
@@ -831,6 +855,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         FooterText = "";
         OnPropertyChanged(nameof(DemoAccount));
         _refreshTimer.Start();
+        AccountsChanged?.Invoke();   // Settings and menus go back to the real accounts
     }
 
     /// <summary>Render the current sample account: cards, tray, chip and footer.</summary>
@@ -847,6 +872,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         RefreshAccountLabel();
         UpdateFooter();
         OnPropertyChanged(nameof(DemoAccount));
+        AccountsChanged?.Invoke();   // Settings and menus show the samples
     }
 
     /// <summary>Rebuild the fetcher against the now-active account, refresh the

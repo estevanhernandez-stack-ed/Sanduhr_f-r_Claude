@@ -25,7 +25,7 @@ public sealed class WhatsNewCardItem
     /// <summary>A tour card's in-place setting (the tray readout), empty otherwise.</summary>
     public IReadOnlyList<TrayChoiceItem> Choices { get; }
 
-    /// <summary>The button's title: "Show me", or "Sign In" on the signed-out tour's first card.</summary>
+    /// <summary>The button's title: "Show me", or "Sign in" on the signed-out tour's first card.</summary>
     public string ShowMeTitle { get; }
 
     public WhatsNewCardItem(WhatsNewCard card, ImageSource? trayImage,
@@ -66,14 +66,7 @@ public sealed class WhatsNewCardItem
 
     public string ShowMeToolTip => Card.Destination == SettingsPage.Widget
         ? "Shows the widget"
-        : $"Opens Settings, {PageName(Card.Destination)}";
-
-    private static string PageName(SettingsPage page) => page switch
-    {
-        SettingsPage.ClaudeUsage => "Claude Usage",
-        SettingsPage.Publish => "Publish usage",
-        _ => page.ToString(),
-    };
+        : $"Opens Settings, {SettingsNames.PageTitle(Card.Destination)}";
 }
 
 /// <summary>What the What's New window binds to: the header, the cards, and the persisted "don't show after updates" flag.</summary>
@@ -113,19 +106,5 @@ public sealed class WhatsNewViewModel : ObservableObject
     }
 
     /// <summary>The tray glyph at 12% as a WPF image, for the Tray preview.</summary>
-    internal static ImageSource? RenderTray()
-    {
-        try
-        {
-            using var icon = TrayIconRenderer.Render(12);
-            var source = Imaging.CreateBitmapSourceFromHIcon(icon.Handle, Int32Rect.Empty,
-                BitmapSizeOptions.FromEmptyOptions());
-            source.Freeze();
-            return source;
-        }
-        catch
-        {
-            return null;
-        }
-    }
+    internal static ImageSource? RenderTray() => TrayIconRenderer.RenderImage(12);
 }

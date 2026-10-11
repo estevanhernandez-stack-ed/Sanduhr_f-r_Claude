@@ -147,6 +147,20 @@ made-up numbers for screenshots, labelled on the widget, tray tooltip and tour. 
 no snapshot, history, alert or limit state. New `settings.json` key: `tour_state` (`pending`,
 `finished`, `skipped`, `not_offered`).
 
+### Since 3.4.3: Mac parity, Stage 3
+
+Settings v2 (`docs/settings-v2-spec.md`): Settings is a sidebar in four groups (General,
+Accounts, Alerts; Usage: History, Claude Usage, Publish usage; Widget: Themes; Help: About) with
+a search box that finds pages, sections and controls by name and synonyms and opens them in view.
+General shows a live tray preview. About holds the version, What's New… and Take the tour…, the
+trademark notice, where settings live (with Show in Explorer) and the third-party notices.
+Every control has one name across Settings, the menus, the tour and What's New
+(`Sanduhr.Core/SettingsNames.cs`, checked by tests); commands are sentence case. Demo mode now
+shows the sample accounts in Settings and the account menus too. No `settings.json` key changed,
+so nothing migrates; `SettingsKeysContractTests` pins the keys so a future rename needs a
+migration. Reset Sanduhr… waits on its wording. Windows can be rendered off screen for checking
+with `tools/Sanduhr.RenderHarness` (needs `SANDUHR_DEV_PROFILE`).
+
 ---
 
 ## Tech stack

@@ -60,6 +60,8 @@ public sealed partial class ClaudeCodeTabViewModel : ObservableObject
     {
         if (_widget.Vault is { } vault)
             vault.IngestCompleted -= _ingestHandler;
+        Overview.Detach();
+        Trends.Detach();
     }
 
     public async Task RefreshActiveAsync()

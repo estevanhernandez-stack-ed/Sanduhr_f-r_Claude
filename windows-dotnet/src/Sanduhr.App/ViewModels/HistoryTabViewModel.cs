@@ -59,11 +59,24 @@ public sealed partial class HistoryTabViewModel : ObservableObject
     {
         _widget = widget;
         // Live theme switch re-tints the chart (accent line / text inks).
-        _widget.ThemeChanged += _ => Changed?.Invoke();
-        // Registry mutations (add / remove / rename) rebuild the account selector.
+        _widget.ThemeChanged += OnThemeChanged;
+        // Registry mutations (add / remove / rename) and demo mode rebuild the account selector.
         _widget.AccountsChanged += RefreshAccountOptions;
         RefreshAccountOptions();
     }
+
+    private void OnThemeChanged(ThemePalette _) => Changed?.Invoke();
+
+    /// <summary>Stop following the widget (Settings closed): it outlives every Settings window.</summary>
+    public void Detach()
+    {
+        _widget.ThemeChanged -= OnThemeChanged;
+        _widget.AccountsChanged -= RefreshAccountOptions;
+    }
+
+    /// <summary>Export and Clear act on real history files: never while demo mode shows sample
+    /// accounts, whose labels can match a real account's ("Personal").</summary>
+    private bool NotDemo => !_widget.IsDemo;
 
     /// <summary>Modal dialogs (export result, clear confirm) parent to the Settings window.</summary>
     public void AttachOwner(Window owner) => _owner = owner;
@@ -73,9 +86,11 @@ public sealed partial class HistoryTabViewModel : ObservableObject
         var prev = SelectedOption?.Account;
         AccountOptions.Clear();
         AccountOptions.Add(new AccountOption("All accounts", null));
-        foreach (var label in _widget.ListAccounts())
+        foreach (var label in _widget.ShownAccounts)
             AccountOptions.Add(new AccountOption(label, label));
         SelectedOption = AccountOptions.FirstOrDefault(o => o.Account == prev) ?? AccountOptions[0];
+        ExportCsvCommand.NotifyCanExecuteChanged();
+        ClearHistoryCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnSelectedOptionChanged(AccountOption? value)
@@ -94,7 +109,7 @@ public sealed partial class HistoryTabViewModel : ObservableObject
             ShowLegend = false;
             return;
         }
-        var accounts = _widget.ListAccounts();
+        var accounts = _widget.ShownAccounts;
         if (accounts.Count == 0)
         {
             ShowLegend = false;
@@ -113,8 +128,11 @@ public sealed partial class HistoryTabViewModel : ObservableObject
     /// </summary>
     public IReadOnlyList<ChartRow> BuildRows()
     {
+        // Demo mode charts nothing: a sample label could match a real account's history file.
+        if (_widget.IsDemo)
+            return [];
         int days = WeekMode ? 7 : 30;
-        var accounts = _widget.ListAccounts();
+        var accounts = _widget.ShownAccounts;
         string? selected = SelectedOption?.Account;
         var rows = new List<ChartRow>();
 
@@ -156,7 +174,7 @@ public sealed partial class HistoryTabViewModel : ObservableObject
         if (WeekMode) WeekMode = false;
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(NotDemo))]
     private void ExportCsv()
     {
         string? account = SelectedOption?.Account;
@@ -190,7 +208,7 @@ public sealed partial class HistoryTabViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(NotDemo))]
     private void ClearHistory()
     {
         bool confirm = Confirm(

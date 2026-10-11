@@ -241,7 +241,7 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// The welcome tour: from the first fetch, the tray's "Take the Tour…" and Settings, General.
+    /// The welcome tour: from the first fetch, the tray's "Take the tour…" and Settings, About.
     /// Reopening shows the same steps with the current settings and records nothing.
     /// </summary>
     private void ShowTour()
@@ -314,19 +314,19 @@ public partial class App : Application
         var show = new MenuItem { Header = "Show" };
         show.Click += (_, _) => ShowWindow();
 
-        var settings = new MenuItem { Header = "Settings…" };
+        var settings = new MenuItem { Header = SettingsNames.OpenSettings };
         settings.Click += async (_, _) => await ShowSettingsAsync();
 
-        var whatsNew = new MenuItem { Header = "What's New…" };
+        var whatsNew = new MenuItem { Header = SettingsNames.WhatsNew };
         whatsNew.Click += (_, _) => ShowWhatsNewFromMenu();
 
-        var tour = new MenuItem { Header = "Take the Tour…" };
+        var tour = new MenuItem { Header = SettingsNames.TakeTheTour };
         tour.Click += (_, _) => ShowTour();
 
         // Only while demo mode is on: the way back to the real numbers, labelled as demo.
         _endDemoItem = new MenuItem
         {
-            Header = "End Demo Mode",
+            Header = SettingsNames.EndDemoMode,
             Visibility = _vm?.IsDemo == true ? Visibility.Visible : Visibility.Collapsed,
         };
         _endDemoItem.Click += async (_, _) =>
@@ -348,7 +348,7 @@ public partial class App : Application
                 AccountMenuBuilder.PopulateSwitchList(accounts.Items, _vm, includeAdd: false, includeManage: false);
         };
 
-        var addAccount = new MenuItem { Header = "Add account" };
+        var addAccount = new MenuItem { Header = SettingsNames.AddAccount };
         addAccount.Click += async (_, _) => await RunSignInAsync(embedded: true);
 
         // Focus + Game affordances (parity with widget.py's tray entries).
@@ -412,7 +412,7 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Open the tabbed Settings window (Accounts tab default) — single-instance and
+    /// Open the Settings window (on General, or on <paramref name="page"/>) — single-instance and
     /// non-modal so a live account switch from here reflects in the widget at once.
     /// Re-invoking focuses the existing window and refreshes its account list.
     /// </summary>
@@ -461,7 +461,7 @@ public partial class App : Application
     /// <summary>
     /// Run a sign-in (embedded WebView2 or manual paste) and, on success, kick the
     /// widget to rebuild its fetcher against the new active account and refetch.
-    /// Both tray "Add account" and the widget's empty-state prompt route here.
+    /// Both tray "Add account…" and the widget's empty-state prompt route here.
     /// </summary>
     private async Task RunSignInAsync(bool embedded)
     {
@@ -528,10 +528,10 @@ public partial class App : Application
                 : $"Sanduhr für Claude — {reading.Label} {reading.Percent}%";
     }
 
-    /// <summary>"Tray Shows" submenu: one checkable item per mode, checks refreshed on open.</summary>
+    /// <summary>"Tray shows" submenu: one checkable item per mode, checks refreshed on open.</summary>
     private MenuItem BuildTrayShowsMenu()
     {
-        var parent = new MenuItem { Header = "Tray Shows" };
+        var parent = new MenuItem { Header = SettingsNames.TrayShows };
         var items = new List<(TrayMode Mode, MenuItem Item)>();
         foreach (var mode in TrayReadout.All)
         {

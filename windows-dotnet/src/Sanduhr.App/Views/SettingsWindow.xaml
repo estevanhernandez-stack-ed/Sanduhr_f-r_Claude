@@ -8,11 +8,12 @@
         xmlns:vm="clr-namespace:Sanduhr.App.ViewModels"
         xmlns:views="clr-namespace:Sanduhr.App.Views"
         xmlns:conv="clr-namespace:Sanduhr.App.Converters"
+        xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
         Title="Sanduhr — Settings"
-        Height="800" Width="540"
-        MinHeight="520" MinWidth="480"
+        Height="800" Width="780"
+        MinHeight="520" MinWidth="680"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="False"
@@ -179,28 +180,68 @@
             </Setter>
         </Style>
 
-        <!-- Tab strip, themed. -->
-        <Style TargetType="TabControl">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-        </Style>
+        <!-- Sidebar (Settings v2): each page is a TabItem drawn as a sidebar row, with its
+             group's heading above the first page of a group (SettingsSidebar.GroupHeader).
+             Arrow keys move between pages; the selected row carries the accent. -->
         <Style TargetType="TabItem">
             <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
-                        <Border x:Name="bd" Padding="16,8" Margin="0,0,4,0" CornerRadius="6,6,0,0"
-                                Background="Transparent">
-                            <ContentPresenter ContentSource="Header" />
-                        </Border>
+                        <StackPanel>
+                            <TextBlock x:Name="group" IsHitTestVisible="False"
+                                       Text="{Binding (views:SettingsSidebar.GroupHeader), RelativeSource={RelativeSource TemplatedParent}}"
+                                       FontSize="10.5" FontWeight="SemiBold" Margin="10,14,0,4"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                            <Border x:Name="bd" Padding="10,7" Margin="0,1" CornerRadius="6"
+                                    Background="Transparent" BorderBrush="Transparent" BorderThickness="1">
+                                <ContentPresenter ContentSource="Header" />
+                            </Border>
+                        </StackPanel>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource Sanduhr.Brush.Glass}" />
-                                <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            <Trigger Property="views:SettingsSidebar.GroupHeader" Value="{x:Null}">
+                                <Setter TargetName="group" Property="Visibility" Value="Collapsed" />
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="bd" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource Sanduhr.Brush.Glass}" />
+                                <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- A search result row: a page in SemiBold, its sections indented under it. -->
+        <Style x:Key="SearchResultItem" TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="AutomationProperties.Name" Value="{Binding AutomationName}" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="row" Background="Transparent" BorderBrush="Transparent" BorderThickness="1"
+                                CornerRadius="5" Padding="8,5">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="row" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="row" Property="Background" Value="{DynamicResource Sanduhr.Brush.Glass}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="row" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -565,14 +606,223 @@
                         Click="CloseButton_Click" ToolTip="Close settings" />
             </Grid>
 
-            <!-- Tabs -->
-            <TabControl x:Name="Tabs" Margin="16,12,16,16" Background="Transparent"
+            <!-- Pages: a TabControl drawn as a grouped sidebar (Settings v2). Each TabItem's Tag is
+                 its SettingsPage, which the router (SelectPage) and the search use. The search box
+                 sits above the pages; while it has a query, its results replace the page list. -->
+            <TabControl x:Name="Tabs" Background="Transparent" TabStripPlacement="Left"
                         SelectionChanged="Tabs_SelectionChanged">
+                <TabControl.Template>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="{DynamicResource Sanduhr.Brush.TitleBg}"
+                                    BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="0,0,1,0">
+                                <DockPanel Margin="10,12,10,12">
+                                    <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                                        <TextBox x:Name="SearchBox" Style="{StaticResource Input}"
+                                                 Text="{Binding Search.Query, UpdateSourceTrigger=PropertyChanged}"
+                                                 AutomationProperties.Name="Search settings"
+                                                 ToolTip="Find a setting by name: tray, vault, CSV, shortcut, theme"
+                                                 PreviewKeyDown="SearchBox_PreviewKeyDown" />
+                                        <TextBlock Text="Search settings" IsHitTestVisible="False" Margin="9,0,0,0"
+                                                   VerticalAlignment="Center" FontSize="12"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Search.IsSearching}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
+                                    <Grid>
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+                                            <ScrollViewer.Style>
+                                                <Style TargetType="ScrollViewer">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Search.IsSearching}" Value="True">
+                                                            <Setter Property="Visibility" Value="Hidden" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ScrollViewer.Style>
+                                            <ScrollViewer.Resources>
+                                                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                                            </ScrollViewer.Resources>
+                                            <StackPanel IsItemsHost="True"
+                                                        KeyboardNavigation.TabNavigation="Once"
+                                                        KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                        </ScrollViewer>
+                                        <Grid Visibility="{Binding Search.IsSearching, Converter={StaticResource BoolVis}}">
+                                            <ListBox x:Name="SearchResults" ItemsSource="{Binding Search.Results}"
+                                                     Background="Transparent" BorderThickness="0"
+                                                     AutomationProperties.Name="Search results"
+                                                     ItemContainerStyle="{StaticResource SearchResultItem}"
+                                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                     PreviewKeyDown="SearchResults_PreviewKeyDown"
+                                                     PreviewMouseLeftButtonUp="SearchResults_PreviewMouseLeftButtonUp">
+                                                <ListBox.Resources>
+                                                    <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                                                </ListBox.Resources>
+                                                <ListBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock x:Name="t" Text="{Binding Title}" FontSize="12" TextWrapping="Wrap"
+                                                                   Margin="12,0,0,0"
+                                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                        <DataTemplate.Triggers>
+                                                            <DataTrigger Binding="{Binding IsPage}" Value="True">
+                                                                <Setter TargetName="t" Property="Margin" Value="0,4,0,0" />
+                                                                <Setter TargetName="t" Property="FontWeight" Value="SemiBold" />
+                                                                <Setter TargetName="t" Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+                                                            </DataTrigger>
+                                                        </DataTemplate.Triggers>
+                                                    </DataTemplate>
+                                                </ListBox.ItemTemplate>
+                                            </ListBox>
+                                            <TextBlock Text="No setting by that name." FontSize="11" Margin="4,4,0,0"
+                                                       AutomationProperties.LiveSetting="Polite"
+                                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                                       Visibility="{Binding Search.HasNoResults, Converter={StaticResource BoolVis}}" />
+                                        </Grid>
+                                    </Grid>
+                                </DockPanel>
+                            </Border>
+                            <ContentPresenter x:Name="PART_SelectedContentHost" Grid.Column="1"
+                                              ContentSource="SelectedContent" Margin="16,12,16,16" />
+                        </Grid>
+                    </ControlTemplate>
+                </TabControl.Template>
+
+
+                <!-- General: the tray, startup and the shortcut. Version, What's New and the tour
+                     moved to About (Settings v2). -->
+                <TabItem Header="General" Tag="General" AutomationProperties.Name="General">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ScrollViewer.Resources>
+                                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                            </ScrollViewer.Resources>
+                        <StackPanel Margin="20">
+                            <TextBlock Text="General" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
+
+                            <!-- Tray (W3): which number the tray icon shows, with a live preview. -->
+                            <StackPanel views:SettingsAnchor.Id="tray">
+                                <TextBlock Text="Tray" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                                <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
+                                        BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1"
+                                        Padding="10,8" Margin="0,0,0,10" HorizontalAlignment="Left"
+                                        ToolTip="What the tray icon shows now">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Source="{Binding General.TrayPreviewImage}" Width="32" Height="32"
+                                               Margin="0,0,10,0" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding General.TrayPreviewText}" VerticalAlignment="Center"
+                                                   FontSize="12" Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                    </StackPanel>
+                                </Border>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{x:Static core:SettingsNames.TrayShows}" VerticalAlignment="Center" FontSize="12"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,8,0" />
+                                    <ComboBox Style="{StaticResource ThemedComboBox}" Width="230"
+                                              ItemsSource="{Binding General.TrayModeOptions}"
+                                              DisplayMemberPath="Title"
+                                              SelectedItem="{Binding General.SelectedTrayMode, Mode=TwoWay}"
+                                              AutomationProperties.Name="{x:Static core:SettingsNames.TrayShows}" />
+                                </StackPanel>
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="The number on the tray icon. Rotate switches between session and weekly every 8 seconds." />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                            <!-- Startup (item 10): off by default; dual mechanism by install type. -->
+                            <StackPanel views:SettingsAnchor.Id="startup">
+                                <TextBlock Text="Startup" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+
+                                <!-- Unpackaged: a real toggle that writes the HKCU Run entry. -->
+                                <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                          Content="Start Sanduhr when Windows starts"
+                                          IsChecked="{Binding General.AutoStartEnabled, Mode=TwoWay}"
+                                          Visibility="{Binding General.IsUnpackaged, Converter={StaticResource BoolVis}}" />
+
+                                <!-- Packaged (Store): can't flip the manifest StartupTask without
+                                     WinRT, so deep-link to Windows Settings, Startup apps instead. -->
+                                <StackPanel Visibility="{Binding General.IsPackaged, Converter={StaticResource BoolVis}}">
+                                    <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,8"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                               Text="This Store install manages auto-start in Windows Settings. Sanduhr is off by default — turn it on under Startup apps." />
+                                    <Button Style="{StaticResource FlatButton}" HorizontalAlignment="Left"
+                                            Content="Open Windows Startup settings…"
+                                            Command="{Binding General.OpenStartupSettingsCommand}" />
+                                </StackPanel>
+
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="Off by default. When on, Sanduhr launches hidden in the tray at sign-in." />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                            <!-- Shortcuts (S1): the global "open Settings" key. -->
+                            <StackPanel views:SettingsAnchor.Id="shortcuts">
+                                <TextBlock Text="Shortcuts" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Shortcuts.Label}" VerticalAlignment="Center" FontSize="12"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <Button x:Name="ShortcutKeysButton" Style="{StaticResource ShortcutKeysButton}"
+                                            Content="{Binding Shortcuts.KeysText}"
+                                            Command="{Binding Shortcuts.StartRecordingCommand}"
+                                            ToolTip="{Binding Shortcuts.KeysToolTip}"
+                                            AutomationProperties.Name="{Binding Shortcuts.KeysAutomationName}"
+                                            LostKeyboardFocus="ShortcutKeys_LostKeyboardFocus" />
+                                    <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                              IsChecked="{Binding Shortcuts.IsOn, Mode=TwoWay}"
+                                              AutomationProperties.Name="{Binding Shortcuts.SwitchAutomationName}" />
+                                </StackPanel>
+                                <Button HorizontalAlignment="Left" Margin="0,6,0,0" Cursor="Hand"
+                                        Content="{Binding Shortcuts.ResetText}"
+                                        Command="{Binding Shortcuts.ResetCommand}"
+                                        AutomationProperties.Name="{Binding Shortcuts.ResetAutomationName}"
+                                        Visibility="{Binding Shortcuts.ShowReset, Converter={StaticResource BoolVis}}">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <TextBlock x:Name="t" Text="{TemplateBinding Content}" FontSize="11"
+                                                       Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="t" Property="TextDecorations" Value="Underline" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
+                                           Text="{Binding Shortcuts.Note}"
+                                           Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                           Visibility="{Binding Shortcuts.HasNote, Converter={StaticResource BoolVis}}" />
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="{Binding Shortcuts.Caption}" />
+                            </StackPanel>
+                        </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </TabItem>
 
                 <!-- Accounts tab — the feature. -->
-                <TabItem Header="Accounts">
-                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="16">
-                        <Grid DataContext="{Binding Accounts}">
+                <TabItem Header="Accounts" Tag="Accounts" AutomationProperties.Name="Accounts">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="16">
+                        <Grid DataContext="{Binding Accounts}" views:SettingsAnchor.Id="accounts">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
@@ -580,9 +830,15 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="11"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12"
-                                       Text="Track multiple Claude accounts in one install. Switch which one is active to send fetches and history to that account. Each account's history is stored in its own file." />
+                            <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                                <TextBlock TextWrapping="Wrap" FontSize="11"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                           Text="Track multiple Claude accounts in one install. Switch which one is active to send fetches and history to that account. Each account's history is stored in its own file." />
+                                <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Accent}"
+                                           Visibility="{Binding IsDemo, Converter={StaticResource BoolVis}}"
+                                           Text="Demo mode: these are sample accounts. End demo mode from the tray menu to manage your own." />
+                            </StackPanel>
 
                             <!-- Account list -->
                             <Border Grid.Row="1" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
@@ -670,9 +926,719 @@
                     </Border>
                 </TabItem>
 
+                <!-- Alerts tab (WS-B) — thresholds, projection, sounds. -->
+                <TabItem Header="Alerts" Tag="Alerts" AutomationProperties.Name="Alerts">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="16">
+                        <StackPanel DataContext="{Binding Alerts}" views:SettingsAnchor.Id="notifications">
+                            <TextBlock TextWrapping="Wrap" FontSize="11"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12"
+                                       Text="Get a toast and a soft chime when a tier crosses your thresholds, or when your pace will hit the cap before it resets. Toasts respect Focus Assist. Model-scoped weekly tiers alert silently by default — toast only, no chime." />
+
+                            <CheckBox Content="Enable alerts" IsChecked="{Binding AlertsEnabled}"
+                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,10" />
+
+                            <Grid Margin="0,0,0,10" views:SettingsAnchor.Id="thresholds">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="24" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="70" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Warn at" VerticalAlignment="Center" FontSize="12"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,8,0" />
+                                <TextBox Grid.Column="1" Text="{Binding WarnPct, UpdateSourceTrigger=LostFocus}"
+                                         AutomationProperties.Name="Warn at, percent"
+                                         FontSize="12" Padding="6,4"
+                                         Background="{DynamicResource Sanduhr.Brush.Bg}"
+                                         Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                                         BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
+                                         CaretBrush="{DynamicResource Sanduhr.Brush.Text}" />
+                                <TextBlock Grid.Column="3" Text="Urgent at" VerticalAlignment="Center" FontSize="12"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,8,0" />
+                                <TextBox Grid.Column="4" Text="{Binding UrgentPct, UpdateSourceTrigger=LostFocus}"
+                                         AutomationProperties.Name="Urgent at, percent"
+                                         FontSize="12" Padding="6,4"
+                                         Background="{DynamicResource Sanduhr.Brush.Bg}"
+                                         Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                                         BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
+                                         CaretBrush="{DynamicResource Sanduhr.Brush.Text}" />
+                            </Grid>
+
+                            <TextBlock Text="{Binding ValidationHint}" FontSize="11"
+                                       Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                       Visibility="{Binding ValidationHint, Converter={StaticResource StrVis}}"
+                                       Margin="0,0,0,10" />
+
+                            <CheckBox Content="Projection alerts (on pace to hit the cap before reset)"
+                                      IsChecked="{Binding ProjectionEnabled}"
+                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
+                            <CheckBox Content="Reset notifications"
+                                      IsChecked="{Binding ResetEnabled}"
+                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
+                            <CheckBox Content="Sound" IsChecked="{Binding SoundEnabled}" views:SettingsAnchor.Id="sound"
+                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
+                            <CheckBox Content="Chime for model-scoped weekly tiers"
+                                      IsChecked="{Binding ScopedChimeEnabled}"
+                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
+                            <CheckBox Content="100% plays the ! (you know the one)"
+                                      IsChecked="{Binding SnakeAtFull}"
+                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,14" />
+
+                            <Button Style="{StaticResource FlatButton}" Content="{x:Static core:SettingsNames.SendTestAlert}"
+                                    views:SettingsAnchor.Id="test"
+                                    Command="{Binding TestAlertCommand}" HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </Border>
+                </TabItem>
+
+                <!-- History tab (item 9) — 30-day usage chart + CSV export. -->
+                <TabItem Header="History" Tag="History" AutomationProperties.Name="History" views:SettingsSidebar.GroupHeader="Usage">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="16"
+                            DataContext="{Binding History}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="11"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12"
+                                       Text="Rolling 30-day usage history. Stored locally only — never uploaded. Export as CSV to analyze with any agent." />
+
+                            <!-- Window + account selector row -->
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8" views:SettingsAnchor.Id="chart">
+                                <TextBlock Text="Window:" VerticalAlignment="Center" FontSize="12"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,8,0" />
+                                <Button Content="Week" Style="{StaticResource RangePillWeek}"
+                                        Command="{Binding SetWeekCommand}" />
+                                <Button Content="Month" Style="{StaticResource RangePillMonth}"
+                                        Command="{Binding SetMonthCommand}" />
+                                <TextBlock Text="Account:" VerticalAlignment="Center" FontSize="12"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="12,0,8,0" />
+                                <ComboBox Style="{StaticResource ThemedComboBox}" Width="170"
+                                          VerticalAlignment="Center"
+                                          AutomationProperties.Name="History account"
+                                          ItemsSource="{Binding AccountOptions}"
+                                          DisplayMemberPath="Display"
+                                          SelectedItem="{Binding SelectedOption, Mode=TwoWay}" />
+                            </StackPanel>
+
+                            <!-- Legend — only when 'All accounts' is selected. -->
+                            <ItemsControl Grid.Row="2" ItemsSource="{Binding Legend}" Margin="0,0,0,4"
+                                          Visibility="{Binding ShowLegend, Converter={StaticResource BoolVis}}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,12,2" VerticalAlignment="Center">
+                                            <Ellipse Width="10" Height="10" VerticalAlignment="Center"
+                                                     Fill="{Binding Swatch}" Margin="0,0,5,0" />
+                                            <TextBlock Text="{Binding Label}" FontSize="11" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- The chart (custom-render control; data pushed from code-behind). -->
+                            <Border Grid.Row="3" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
+                                    BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1"
+                                    Padding="8" Margin="0,4,0,0">
+                                <views:HistoryChart x:Name="Chart" />
+                            </Border>
+
+                            <!-- Action row -->
+                            <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,12,0,0" views:SettingsAnchor.Id="export">
+                                <Button Style="{StaticResource AccentButton}" Content="{x:Static core:SettingsNames.ExportCsv}"
+                                        Command="{Binding ExportCsvCommand}" />
+                                <Button Style="{StaticResource FlatButton}" Content="Clear history"
+                                        Command="{Binding ClearHistoryCommand}"
+                                        Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" Margin="0" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </TabItem>
+
+                <!-- Claude Usage tab (WS-C): Overview / Trends / Sessions over
+                     the usage vault + live session-log reader.
+                     DataContext must live ON the TabItem: the CcSection* visibility triggers resolve
+                     DataContext.Section through AncestorType=TabItem (a child-level DataContext never
+                     reaches them). -->
+                <TabItem Header="Claude Usage" Tag="ClaudeUsage" AutomationProperties.Name="Claude Usage" DataContext="{Binding ClaudeCode}">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="16">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <!-- Sub-nav -->
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                <Button Content="Overview" Style="{StaticResource CcNavOverview}"
+                                        Command="{Binding SetOverviewCommand}" />
+                                <Button Content="Trends" Style="{StaticResource CcNavTrends}"
+                                        Command="{Binding SetTrendsCommand}" />
+                                <Button Content="Sessions" Style="{StaticResource CcNavSessions}"
+                                        Command="{Binding SetSessionsCommand}" />
+                            </StackPanel>
+
+                            <!-- Overview -->
+                            <Grid Grid.Row="1" Style="{StaticResource CcSectionOverview}"
+                                  DataContext="{Binding Overview}" views:SettingsAnchor.Id="overview">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="11"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,8"
+                                           Text="Claude Code deletes session logs after ~30 days. Sanduhr keeps a local history vault so your trends survive — never uploaded, per-home opt-in, erase any time below." />
+
+                                <TextBlock Grid.Row="1" FontSize="11" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                           Text="{Binding StatusLine}"
+                                           Visibility="{Binding StatusLine, Converter={StaticResource StrVis}}" />
+
+                                <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,12">
+                                    <StackPanel Margin="0,0,32,0">
+                                        <TextBlock Text="Today" FontSize="9"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                        <TextBlock Text="{Binding TodayText}" FontSize="22" FontWeight="Bold"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                        <TextBlock Text="{Binding TodaySplitText}" FontSize="10"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                                   Visibility="{Binding TodaySplitText, Converter={StaticResource StrVis}}" />
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="Last 30 days" FontSize="9"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                        <TextBlock Text="{Binding MonthText}" FontSize="22" FontWeight="Bold"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                        <TextBlock Text="{Binding MonthSplitText}" FontSize="10"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                                   Visibility="{Binding MonthSplitText, Converter={StaticResource StrVis}}" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <views:LocalCcBarStrip x:Name="BarStrip" Grid.Row="3" Height="60" Margin="0,0,0,8" />
+
+                                <views:CcCalendarControl x:Name="CalendarStrip" Grid.Row="4"
+                                                         Height="96" Margin="0,0,0,8" />
+
+                                <CheckBox Grid.Row="5" Style="{StaticResource ThemedCheckBox}"
+                                          Content="Show project &amp; skill breakdown"
+                                          IsChecked="{Binding ShowBreakdowns, Mode=TwoWay}" Margin="0,0,0,8" />
+
+                                <!-- Per-project + per-skill tables side by side. -->
+                                <Grid Grid.Row="6"
+                                      Visibility="{Binding ShowBreakdowns, Converter={StaticResource BoolVis}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <DockPanel Grid.Column="0">
+                                    <TextBlock DockPanel.Dock="Top" Text="Top projects (last 30 days)" FontSize="9"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,4" />
+                                    <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
+                                            BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                            <ScrollViewer.Resources>
+                                                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                                            </ScrollViewer.Resources>
+                                            <ItemsControl ItemsSource="{Binding Projects}" Margin="4">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Margin="4,3">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11"
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding Tokens}" FontSize="11"
+                                                                       Margin="8,0,0,0"
+                                                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </Border>
+                                </DockPanel>
+
+                                <DockPanel Grid.Column="2">
+                                    <TextBlock DockPanel.Dock="Top" Text="Top skills (last 30 days)" FontSize="9"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,4" />
+                                    <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
+                                            BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                            <ScrollViewer.Resources>
+                                                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                                            </ScrollViewer.Resources>
+                                            <ItemsControl ItemsSource="{Binding Skills}" Margin="4">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Margin="4,3">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11"
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding Tokens}" FontSize="11"
+                                                                       Margin="8,0,0,0"
+                                                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </Border>
+                                </DockPanel>
+                                </Grid>
+
+                                <!-- Data stewardship (spec: WS-A delete-completeness precedent). -->
+                                <StackPanel Grid.Row="7" Margin="0,10,0,0">
+                                    <TextBlock Text="History vault" FontSize="9" Margin="0,0,0,4" views:SettingsAnchor.Id="vault"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <ItemsControl ItemsSource="{Binding Roots}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,16,4"
+                                                          Content="{Binding Name}"
+                                                          IsChecked="{Binding IsEnabled, Mode=TwoWay}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                        <Button Style="{StaticResource FlatButton}" Content="Erase archive"
+                                                Command="{Binding EraseArchiveCommand}"
+                                                Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" />
+                                        <Button Style="{StaticResource FlatButton}" Content="Open vault folder"
+                                                Command="{Binding OpenVaultFolderCommand}" />
+                                    </StackPanel>
+
+                                    <!-- WS-E statusline bridge: consent-gated install into ONE CC home.
+                                         Compact by design — the fixed 620px window clips anything taller
+                                         below the fold; the tooltip + consent dialog carry the explanation. -->
+                                    <TextBlock Text="Claude Code statusline" FontSize="9" Margin="0,10,0,4" views:SettingsAnchor.Id="statusline"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Style="{StaticResource FlatButton}" Content="Install statusline…"
+                                                Command="{Binding InstallStatuslineCommand}"
+                                                ToolTip="Show your live session + weekly percentages under the Claude Code prompt — real cap numbers, right where the tokens burn."
+                                                Visibility="{Binding StatuslineNotInstalled, Converter={StaticResource BoolVis}}" />
+                                        <Button Style="{StaticResource FlatButton}" Content="Remove statusline"
+                                                Command="{Binding RemoveStatuslineCommand}"
+                                                Visibility="{Binding StatuslineInstalled, Converter={StaticResource BoolVis}}" />
+                                    </StackPanel>
+                                    <TextBlock TextWrapping="Wrap" FontSize="10.5" Margin="0,4,0,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                               Text="{Binding StatuslineStatusText}"
+                                               Visibility="{Binding StatuslineStatusText, Converter={StaticResource StrVis}}" />
+
+                                    <!-- WS-E MCP integration: consent-gated install; burn-attribution
+                                         roots stay per-home checkboxes, off by default. -->
+                                    <TextBlock Text="Claude quota tools (MCP)" FontSize="9" Margin="0,10,0,4" views:SettingsAnchor.Id="mcp"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Style="{StaticResource FlatButton}" Content="Install MCP server…"
+                                                Command="{Binding InstallMcpCommand}"
+                                                ToolTip="Let Claude check your live caps before spawning agents or picking a bigger model - read-only, consent-gated."
+                                                Visibility="{Binding McpNotInstalled, Converter={StaticResource BoolVis}}" />
+                                        <Button Style="{StaticResource FlatButton}" Content="Remove MCP server"
+                                                Command="{Binding RemoveMcpCommand}"
+                                                Visibility="{Binding McpInstalled, Converter={StaticResource BoolVis}}" />
+                                    </StackPanel>
+                                    <ItemsControl ItemsSource="{Binding McpRoots}" Margin="0,4,0,0"
+                                                  Visibility="{Binding McpInstalled, Converter={StaticResource BoolVis}}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,16,4"
+                                                          Content="{Binding Name}"
+                                                          ToolTip="Allow project-level burn attribution from this Claude Code home"
+                                                          IsChecked="{Binding IsEnabled, Mode=TwoWay}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock TextWrapping="Wrap" FontSize="10.5" Margin="0,4,0,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                               Text="{Binding McpStatusText}"
+                                               Visibility="{Binding McpStatusText, Converter={StaticResource StrVis}}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Trends -->
+                            <Grid Grid.Row="1" Style="{StaticResource CcSectionTrends}" views:SettingsAnchor.Id="trends"
+                                  DataContext="{Binding Trends}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                                    <TextBlock Text="Window:" VerticalAlignment="Center" FontSize="12"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,8,0" />
+                                    <Button Content="4 weeks" Style="{StaticResource TrendsPill4}"
+                                            Command="{Binding SetWeeksCommand}" CommandParameter="4" />
+                                    <Button Content="12 weeks" Style="{StaticResource TrendsPill12}"
+                                            Command="{Binding SetWeeksCommand}" CommandParameter="12" />
+                                    <Button Content="26 weeks" Style="{StaticResource TrendsPill26}"
+                                            Command="{Binding SetWeeksCommand}" CommandParameter="26" />
+                                </StackPanel>
+
+                                <TextBlock Grid.Row="1" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,6"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                           Text="{Binding InfoText}"
+                                           Visibility="{Binding InfoText, Converter={StaticResource StrVis}}" />
+
+                                <Border Grid.Row="2" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
+                                        BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1" Padding="8">
+                                    <views:CcTrendsControl x:Name="TrendsChart" />
+                                </Border>
+
+                                <DockPanel Grid.Row="3" Margin="0,8,0,0" MaxHeight="120">
+                                    <TextBlock DockPanel.Dock="Top" Text="Top projects (window)" FontSize="9"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,4" />
+                                    <ItemsControl ItemsSource="{Binding TopProjects}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,1">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding Tokens}" FontSize="11" Margin="8,0,0,0"
+                                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </DockPanel>
+
+                                <TextBlock Grid.Row="4" FontSize="10" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="{Binding FooterText}" />
+                            </Grid>
+
+                            <!-- Sessions (Ledger). The ListBox OWNS scrolling:
+                                 star-sized row, no ancestor ScrollViewer (the
+                                 spec's named in-repo trap), recycling
+                                 virtualization, pixel scroll. -->
+                            <Grid Grid.Row="1" Style="{StaticResource CcSectionSessions}" views:SettingsAnchor.Id="sessions"
+                                  DataContext="{Binding Ledger}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource AccentButton}"
+                                            Content="Export CSV…" Command="{Binding ExportCsvCommand}" />
+                                    <CheckBox DockPanel.Dock="Right" Style="{StaticResource ThemedCheckBox}"
+                                              Margin="0,0,12,0" VerticalAlignment="Center"
+                                              Content="Stack by project"
+                                              IsChecked="{Binding GroupByProject, Mode=TwoWay}" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="Today" Style="{StaticResource LedgerChipToday}"
+                                                Command="{Binding SetScopeCommand}" CommandParameter="Today" />
+                                        <Button Content="Yesterday" Style="{StaticResource LedgerChipYesterday}"
+                                                Command="{Binding SetScopeCommand}" CommandParameter="Yesterday" />
+                                        <Button Content="7 days" Style="{StaticResource LedgerChip7d}"
+                                                Command="{Binding SetScopeCommand}" CommandParameter="7d" />
+                                        <Button Content="All" Style="{StaticResource LedgerChipAll}"
+                                                Command="{Binding SetScopeCommand}" CommandParameter="All" />
+                                        <Button Content="{Binding Scope}" ContentStringFormat="{}{0}  ✕"
+                                                Style="{StaticResource LedgerChipDay}"
+                                                Command="{Binding ClearDayScopeCommand}"
+                                                ToolTip="Showing one day — click to go back" />
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <!-- Sort header row — glyph carries direction, never color alone. -->
+                                <Grid Grid.Row="1" Margin="4,0,4,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="150" />
+                                        <ColumnDefinition Width="110" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Style="{StaticResource FlatButton}" HorizontalAlignment="Left"
+                                            Content="{Binding LastActiveHeader}" FontSize="10"
+                                            Command="{Binding SortByCommand}" CommandParameter="LastActive" />
+                                    <Button Grid.Column="1" Style="{StaticResource FlatButton}" HorizontalAlignment="Left"
+                                            Content="{Binding ProjectHeader}" FontSize="10"
+                                            Command="{Binding SortByCommand}" CommandParameter="Project" />
+                                    <TextBlock Grid.Column="2" Text="Models" FontSize="10" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <Button Grid.Column="3" Style="{StaticResource FlatButton}" HorizontalAlignment="Right"
+                                            Content="{Binding TokensHeader}" FontSize="10"
+                                            Command="{Binding SortByCommand}" CommandParameter="Tokens" />
+                                </Grid>
+
+                                <Border Grid.Row="2" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
+                                        BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
+                                    <Grid>
+                                        <ListBox ItemsSource="{Binding View}" Background="Transparent" BorderThickness="0"
+                                                 HorizontalContentAlignment="Stretch"
+                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                 VirtualizingPanel.IsVirtualizing="True"
+                                                 VirtualizingPanel.VirtualizationMode="Recycling"
+                                                 VirtualizingPanel.ScrollUnit="Pixel">
+                                            <ListBox.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <VirtualizingStackPanel />
+                                                </ItemsPanelTemplate>
+                                            </ListBox.ItemsPanel>
+                                            <ListBox.ItemContainerStyle>
+                                                <Style TargetType="ListBoxItem">
+                                                    <Setter Property="Padding" Value="0" />
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                    <Setter Property="Focusable" Value="False" />
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="ListBoxItem">
+                                                                <ContentPresenter />
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                            </ListBox.ItemContainerStyle>
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel>
+                                                        <ToggleButton IsChecked="{Binding IsExpanded, Mode=TwoWay}" Cursor="Hand">
+                                                            <ToggleButton.Template>
+                                                                <ControlTemplate TargetType="ToggleButton">
+                                                                    <Border x:Name="rowBg" Background="Transparent" Padding="8,5">
+                                                                        <ContentPresenter />
+                                                                    </Border>
+                                                                    <ControlTemplate.Triggers>
+                                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                                            <Setter TargetName="rowBg" Property="Background"
+                                                                                    Value="{DynamicResource Sanduhr.Brush.Glass}" />
+                                                                        </Trigger>
+                                                                    </ControlTemplate.Triggers>
+                                                                </ControlTemplate>
+                                                            </ToggleButton.Template>
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="90" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="150" />
+                                                                    <ColumnDefinition Width="110" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBlock Grid.Column="0" Text="{Binding LastActiveText}" FontSize="11"
+                                                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                                <TextBlock Grid.Column="1" Text="{Binding ProjectText}" FontSize="11"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           ToolTip="{Binding CwdTooltip}"
+                                                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                                                <TextBlock Grid.Column="2" Text="{Binding ModelBadge}" FontSize="10"
+                                                                           TextTrimming="CharacterEllipsis"
+                                                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                                <TextBlock Grid.Column="3" Text="{Binding ScopedTokensText}" FontSize="11"
+                                                                           HorizontalAlignment="Right" Typography.NumeralAlignment="Tabular"
+                                                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                                            </Grid>
+                                                        </ToggleButton>
+                                                        <Border Padding="16,2,8,8"
+                                                                Visibility="{Binding IsExpanded, Converter={StaticResource BoolVis}}">
+                                                            <TextBlock Text="{Binding DetailText}" FontSize="10" TextWrapping="Wrap"
+                                                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                        <TextBlock Text="{Binding EmptyText}" FontSize="11" TextWrapping="Wrap"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20"
+                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                                   Visibility="{Binding EmptyText, Converter={StaticResource StrVis}}" />
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Grid>
+                    </Border>
+                </TabItem>
+
+                <!-- Publish usage tab: opt-in daily publish to an endpoint the user chooses.
+                     Nothing comes back to us. Everything defaults OFF — master toggle, every
+                     home — and the one sentence above the controls says exactly what leaves
+                     the machine. 626 Labs is a preset, not the name of the feature. -->
+                <TabItem Header="Publish usage" Tag="Publish" AutomationProperties.Name="Publish usage" DataContext="{Binding Publish}">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="20">
+                        <StackPanel>
+                            <TextBlock Text="Publish usage" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
+                            <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,12"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                       Text="Nothing about your usage comes back to us. If you want it somewhere, send it to yourself: once a day Sanduhr can post token counts per project name (folder names only, never paths) to an endpoint you choose." />
+
+                            <!-- Destination -->
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6" views:SettingsAnchor.Id="destination">
+                                <TextBlock Text="Preset" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                <ComboBox Style="{StaticResource ThemedComboBox}" Width="190"
+                                          VerticalAlignment="Center"
+                                          ItemsSource="{Binding PresetOptions}"
+                                          DisplayMemberPath="Display"
+                                          SelectedItem="{Binding SelectedPreset, Mode=TwoWay}"
+                                          AutomationProperties.Name="Publish preset"
+                                          ToolTip="Custom endpoint, or the 626 Labs dashboard preset (fills the URL, bearer auth, and the dashboard body format)." />
+                                <TextBlock Text="{Binding PresetHint}" FontSize="10.5" VerticalAlignment="Center"
+                                           Margin="10,0,0,0" TextWrapping="Wrap" MaxWidth="260"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Visibility="{Binding PresetHint, Converter={StaticResource StrVis}}" />
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                                <TextBlock Text="Endpoint URL" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                <TextBox Style="{StaticResource Input}" Width="360"
+                                         Text="{Binding EndpointUrl, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                         AutomationProperties.Name="Publish endpoint URL"
+                                         ToolTip="Where the daily POST goes. An absolute http(s) URL you control." />
+                            </StackPanel>
+                            <TextBlock FontSize="10.5" Margin="0,0,0,8"
+                                       Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                       Text="{Binding EndpointError}"
+                                       Visibility="{Binding EndpointError, Converter={StaticResource StrVis}}" />
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock Text="Auth" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                <ComboBox Style="{StaticResource ThemedComboBox}" Width="150"
+                                          VerticalAlignment="Center"
+                                          ItemsSource="{Binding AuthOptions}"
+                                          DisplayMemberPath="Display"
+                                          SelectedItem="{Binding SelectedAuth, Mode=TwoWay}"
+                                          AutomationProperties.Name="Publish auth scheme"
+                                          ToolTip="How the token rides on the request: Authorization: Bearer, a header you name, or no credential." />
+                                <StackPanel Orientation="Horizontal" Margin="10,0,0,0"
+                                            Visibility="{Binding ShowHeaderName, Converter={StaticResource BoolVis}}">
+                                    <TextBlock Text="Header name" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <TextBox Style="{StaticResource Input}" Width="150"
+                                             Text="{Binding AuthHeaderName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                             AutomationProperties.Name="Publish auth header name"
+                                             ToolTip="The header that carries the token, e.g. X-Api-Key." />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <TextBlock Text="Token" FontSize="9" Margin="0,0,0,4" views:SettingsAnchor.Id="token"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <Button Style="{StaticResource FlatButton}" Content="Set token…"
+                                        Command="{Binding SetTokenCommand}"
+                                        AutomationProperties.Name="Set publish token"
+                                        ToolTip="Paste the token your endpoint expects. Stored in Windows Credential Manager, never in a file." />
+                                <Button Style="{StaticResource FlatButton}" Content="Clear token"
+                                        Command="{Binding ClearTokenCommand}"
+                                        AutomationProperties.Name="Clear publish token"
+                                        ToolTip="Delete the stored token. Publishing stops until a new one is set."
+                                        Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                        Visibility="{Binding HasToken, Converter={StaticResource BoolVis}}" />
+                                <TextBlock Text="{Binding TokenStatusText}" FontSize="10.5" VerticalAlignment="Center"
+                                           Margin="8,0,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,0,0,12" />
+
+                            <!-- What and when -->
+                            <TextBlock Text="Homes to share (off until you tick them)" FontSize="9" Margin="0,0,0,4" views:SettingsAnchor.Id="homes"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            <ItemsControl ItemsSource="{Binding Roots}" Margin="0,0,0,10">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,16,4"
+                                                  Content="{Binding Name}"
+                                                  IsChecked="{Binding IsShared, Mode=TwoWay}"
+                                                  ToolTip="Include this Claude Code home's per-project token counts in the daily publish." />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,2" views:SettingsAnchor.Id="schedule">
+                                <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                          Content="Publish daily at"
+                                          IsChecked="{Binding Enabled, Mode=TwoWay}"
+                                          VerticalAlignment="Center" Margin="0,0,8,0"
+                                          ToolTip="The master switch. Off means nothing is ever sent, whatever else is set here." />
+                                <TextBox Style="{StaticResource Input}" Width="64"
+                                         Text="{Binding PublishTimeText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                         AutomationProperties.Name="Publish time"
+                                         ToolTip="24-hour, local time. Publishes the previous day." />
+                                <TextBlock Text="(24-hour, local time; publishes the previous day)" FontSize="10.5"
+                                           VerticalAlignment="Center" Margin="8,0,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                            </StackPanel>
+                            <TextBlock FontSize="10.5" Margin="0,0,0,8"
+                                       Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                       Text="{Binding TimeError}"
+                                       Visibility="{Binding TimeError, Converter={StaticResource StrVis}}" />
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,6,0,12" />
+
+                            <StackPanel Orientation="Horizontal">
+                                <Button Style="{StaticResource AccentButton}" Content="Publish now"
+                                        Command="{Binding PublishNowCommand}"
+                                        AutomationProperties.Name="Publish now"
+                                        ToolTip="Publish yesterday's totals right now, regardless of the schedule." />
+                            </StackPanel>
+                            <TextBlock TextWrapping="Wrap" FontSize="10.5" Margin="0,8,0,0"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                       Text="{Binding StatusText}" />
+                            <TextBlock TextWrapping="Wrap" FontSize="10" Margin="0,10,0,0"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                       Text="The sanduhr-mcp publish_usage tool queues the same upload through this widget; it never holds the token itself. Re-publishing a day sends that day's record again." />
+                        </StackPanel>
+                    </Border>
+                </TabItem>
+
                 <!-- Themes tab (item 8) — swatch grid + agent-assisted theme creation. -->
-                <TabItem Header="Themes">
-                    <Border x:Name="ThemesRoot" Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="16"
+                <TabItem Header="Themes" Tag="Themes" AutomationProperties.Name="Themes" views:SettingsSidebar.GroupHeader="Widget">
+                    <Border x:Name="ThemesRoot" Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8" Padding="16"
                             DataContext="{Binding Themes}">
                         <Grid>
                             <Grid.RowDefinitions>
@@ -691,7 +1657,7 @@
                             <!-- Swatch grid: the same tiles as the widget, bound to the
                                  SAME Themes collection so the active highlight stays in
                                  sync with the widget. Click a tile to switch live. -->
-                            <TextBlock Grid.Row="0" Text="Choose a theme" FontSize="11"
+                            <TextBlock Grid.Row="0" Text="Choose a theme" FontSize="11" views:SettingsAnchor.Id="gallery"
                                        FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                        Margin="0,0,0,8" />
                             <Border Grid.Row="1" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
@@ -727,12 +1693,12 @@
                                     <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
                                 </ScrollViewer.Resources>
                                 <StackPanel>
-                                <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,0,8"
+                                <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,0,8" views:SettingsAnchor.Id="studio"
                                           Content="Studio: edit the tokens, watch the widget re-tint live"
                                           IsChecked="{Binding IsStudioMode, Mode=TwoWay}" />
 
                                 <!-- Paste mode -->
-                                <StackPanel Visibility="{Binding IsPasteMode, Converter={StaticResource BoolVis}}">
+                                <StackPanel Visibility="{Binding IsPasteMode, Converter={StaticResource BoolVis}}" views:SettingsAnchor.Id="paste">
                                     <TextBlock TextWrapping="Wrap" FontSize="11"
                                                Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,8"
                                                Text="Paste a theme JSON below (or what an AI agent returned), give it a filename, and Save &amp; apply. Use Copy agent prompt to get the schema + design rules for any chat agent. With the MCP server installed, Claude Code can propose a theme directly." />
@@ -903,7 +1869,7 @@
                                 </StackPanel>
                             </ScrollViewer>
                             <!-- Installed user themes -->
-                            <TextBlock Grid.Row="7" Text="Installed user themes" FontSize="11"
+                            <TextBlock Grid.Row="7" Text="Installed user themes" FontSize="11" views:SettingsAnchor.Id="installed"
                                        FontWeight="SemiBold" Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                        Margin="0,16,0,6" />
 
@@ -937,825 +1903,138 @@
                     </Border>
                 </TabItem>
 
-                <!-- Alerts tab (WS-B) — thresholds, projection, sounds. -->
-                <TabItem Header="Alerts">
-                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="16">
-                        <StackPanel DataContext="{Binding Alerts}">
-                            <TextBlock TextWrapping="Wrap" FontSize="11"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12"
-                                       Text="Get a toast and a soft chime when a tier crosses your thresholds, or when your pace will hit the cap before it resets. Toasts respect Focus Assist. Model-scoped weekly tiers alert silently by default — toast only, no chime." />
+                <!-- About (Settings v2): the version, What's New and the tour, the trademark notice,
+                     where Sanduhr keeps its files, and the packages it ships with. -->
+                <TabItem Header="About" Tag="About" AutomationProperties.Name="About" views:SettingsSidebar.GroupHeader="Help">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ScrollViewer.Resources>
+                                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                            </ScrollViewer.Resources>
+                        <StackPanel Margin="20">
+                            <TextBlock Text="About" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
 
-                            <CheckBox Content="Enable alerts" IsChecked="{Binding AlertsEnabled}"
-                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,10" />
-
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="70" />
-                                    <ColumnDefinition Width="24" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="70" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Warn at" VerticalAlignment="Center" FontSize="12"
-                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,8,0" />
-                                <TextBox Grid.Column="1" Text="{Binding WarnPct, UpdateSourceTrigger=LostFocus}"
-                                         FontSize="12" Padding="6,4"
-                                         Background="{DynamicResource Sanduhr.Brush.Bg}"
-                                         Foreground="{DynamicResource Sanduhr.Brush.Text}"
-                                         BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
-                                         CaretBrush="{DynamicResource Sanduhr.Brush.Text}" />
-                                <TextBlock Grid.Column="3" Text="Urgent at" VerticalAlignment="Center" FontSize="12"
-                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,8,0" />
-                                <TextBox Grid.Column="4" Text="{Binding UrgentPct, UpdateSourceTrigger=LostFocus}"
-                                         FontSize="12" Padding="6,4"
-                                         Background="{DynamicResource Sanduhr.Brush.Bg}"
-                                         Foreground="{DynamicResource Sanduhr.Brush.Text}"
-                                         BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
-                                         CaretBrush="{DynamicResource Sanduhr.Brush.Text}" />
-                            </Grid>
-
-                            <TextBlock Text="{Binding ValidationHint}" FontSize="11"
-                                       Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
-                                       Visibility="{Binding ValidationHint, Converter={StaticResource StrVis}}"
-                                       Margin="0,0,0,10" />
-
-                            <CheckBox Content="Projection alerts (on pace to hit the cap before reset)"
-                                      IsChecked="{Binding ProjectionEnabled}"
-                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
-                            <CheckBox Content="Reset notifications"
-                                      IsChecked="{Binding ResetEnabled}"
-                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
-                            <CheckBox Content="Sound" IsChecked="{Binding SoundEnabled}"
-                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
-                            <CheckBox Content="Chime for model-scoped weekly tiers"
-                                      IsChecked="{Binding ScopedChimeEnabled}"
-                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
-                            <CheckBox Content="100% plays the ! (you know the one)"
-                                      IsChecked="{Binding SnakeAtFull}"
-                                      Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,14" />
-
-                            <Button Style="{StaticResource FlatButton}" Content="Send test alert"
-                                    Command="{Binding TestAlertCommand}" HorizontalAlignment="Left" />
-                        </StackPanel>
-                    </Border>
-                </TabItem>
-
-                <!-- History tab (item 9) — 30-day usage chart + CSV export. -->
-                <TabItem Header="History">
-                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="16"
-                            DataContext="{Binding History}">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="11"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,12"
-                                       Text="Rolling 30-day usage history. Stored locally only — never uploaded. Export as CSV to analyze with any agent." />
-
-                            <!-- Window + account selector row -->
-                            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
-                                <TextBlock Text="Window:" VerticalAlignment="Center" FontSize="12"
-                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,8,0" />
-                                <Button Content="Week" Style="{StaticResource RangePillWeek}"
-                                        Command="{Binding SetWeekCommand}" />
-                                <Button Content="Month" Style="{StaticResource RangePillMonth}"
-                                        Command="{Binding SetMonthCommand}" />
-                                <TextBlock Text="Account:" VerticalAlignment="Center" FontSize="12"
-                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="12,0,8,0" />
-                                <ComboBox Style="{StaticResource ThemedComboBox}" Width="170"
-                                          VerticalAlignment="Center"
-                                          ItemsSource="{Binding AccountOptions}"
-                                          DisplayMemberPath="Display"
-                                          SelectedItem="{Binding SelectedOption, Mode=TwoWay}" />
-                            </StackPanel>
-
-                            <!-- Legend — only when 'All accounts' is selected. -->
-                            <ItemsControl Grid.Row="2" ItemsSource="{Binding Legend}" Margin="0,0,0,4"
-                                          Visibility="{Binding ShowLegend, Converter={StaticResource BoolVis}}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel Orientation="Horizontal" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,12,2" VerticalAlignment="Center">
-                                            <Ellipse Width="10" Height="10" VerticalAlignment="Center"
-                                                     Fill="{Binding Swatch}" Margin="0,0,5,0" />
-                                            <TextBlock Text="{Binding Label}" FontSize="11" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-
-                            <!-- The chart (custom-render control; data pushed from code-behind). -->
-                            <Border Grid.Row="3" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
-                                    BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1"
-                                    Padding="8" Margin="0,4,0,0">
-                                <views:HistoryChart x:Name="Chart" />
-                            </Border>
-
-                            <!-- Action row -->
-                            <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,12,0,0">
-                                <Button Style="{StaticResource AccentButton}" Content="Export CSV…"
-                                        Command="{Binding ExportCsvCommand}" />
-                                <Button Style="{StaticResource FlatButton}" Content="Clear history"
-                                        Command="{Binding ClearHistoryCommand}"
-                                        Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" Margin="0" />
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                </TabItem>
-
-                <!-- Claude Usage tab (WS-C): Overview / Trends / Sessions over
-                     the usage vault + live session-log reader.
-                     DataContext must live ON the TabItem: the CcSection* visibility triggers resolve
-                     DataContext.Section through AncestorType=TabItem (a child-level DataContext never
-                     reaches them). -->
-                <TabItem Header="Claude Usage" DataContext="{Binding ClaudeCode}">
-                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="16">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
-
-                            <!-- Sub-nav -->
-                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                                <Button Content="Overview" Style="{StaticResource CcNavOverview}"
-                                        Command="{Binding SetOverviewCommand}" />
-                                <Button Content="Trends" Style="{StaticResource CcNavTrends}"
-                                        Command="{Binding SetTrendsCommand}" />
-                                <Button Content="Sessions" Style="{StaticResource CcNavSessions}"
-                                        Command="{Binding SetSessionsCommand}" />
-                            </StackPanel>
-
-                            <!-- Overview -->
-                            <Grid Grid.Row="1" Style="{StaticResource CcSectionOverview}"
-                                  DataContext="{Binding Overview}">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="*" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-
-                                <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="11"
-                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,8"
-                                           Text="Claude Code deletes session logs after ~30 days. Sanduhr keeps a local history vault so your trends survive — never uploaded, per-home opt-in, erase any time below." />
-
-                                <TextBlock Grid.Row="1" FontSize="11" Margin="0,0,0,8"
-                                           Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
-                                           Text="{Binding StatusLine}"
-                                           Visibility="{Binding StatusLine, Converter={StaticResource StrVis}}" />
-
-                                <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,12">
-                                    <StackPanel Margin="0,0,32,0">
-                                        <TextBlock Text="Today" FontSize="9"
-                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                        <TextBlock Text="{Binding TodayText}" FontSize="22" FontWeight="Bold"
-                                                   Foreground="{DynamicResource Sanduhr.Brush.Text}" />
-                                        <TextBlock Text="{Binding TodaySplitText}" FontSize="10"
-                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
-                                                   Visibility="{Binding TodaySplitText, Converter={StaticResource StrVis}}" />
-                                    </StackPanel>
-                                    <StackPanel>
-                                        <TextBlock Text="Last 30 days" FontSize="9"
-                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                        <TextBlock Text="{Binding MonthText}" FontSize="22" FontWeight="Bold"
-                                                   Foreground="{DynamicResource Sanduhr.Brush.Text}" />
-                                        <TextBlock Text="{Binding MonthSplitText}" FontSize="10"
-                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
-                                                   Visibility="{Binding MonthSplitText, Converter={StaticResource StrVis}}" />
-                                    </StackPanel>
+                            <StackPanel views:SettingsAnchor.Id="version">
+                                <TextBlock Text="{Binding AboutVersionLine}" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,10" />
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Style="{StaticResource FlatButton}" Content="{Binding WhatsNewTitle}"
+                                            AutomationProperties.Name="What's New"
+                                            ToolTip="What changed in this version and the ones before it"
+                                            Command="{Binding ShowWhatsNewCommand}" />
+                                    <Button Style="{StaticResource FlatButton}" Content="{Binding TakeTheTourTitle}"
+                                            AutomationProperties.Name="Take the tour"
+                                            ToolTip="Walks through what Sanduhr does, one step at a time"
+                                            Command="{Binding ShowTourCommand}" />
                                 </StackPanel>
-
-                                <views:LocalCcBarStrip x:Name="BarStrip" Grid.Row="3" Height="60" Margin="0,0,0,8" />
-
-                                <views:CcCalendarControl x:Name="CalendarStrip" Grid.Row="4"
-                                                         Height="96" Margin="0,0,0,8" />
-
-                                <CheckBox Grid.Row="5" Style="{StaticResource ThemedCheckBox}"
-                                          Content="Show project &amp; skill breakdown"
-                                          IsChecked="{Binding ShowBreakdowns, Mode=TwoWay}" Margin="0,0,0,8" />
-
-                                <!-- Per-project + per-skill tables side by side. -->
-                                <Grid Grid.Row="6"
-                                      Visibility="{Binding ShowBreakdowns, Converter={StaticResource BoolVis}}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="12" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-
-                                <DockPanel Grid.Column="0">
-                                    <TextBlock DockPanel.Dock="Top" Text="Top projects (last 30 days)" FontSize="9"
-                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,4" />
-                                    <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
-                                            BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
-                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                            <ScrollViewer.Resources>
-                                                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
-                                            </ScrollViewer.Resources>
-                                            <ItemsControl ItemsSource="{Binding Projects}" Margin="4">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Grid Margin="4,3">
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="*" />
-                                                                <ColumnDefinition Width="Auto" />
-                                                            </Grid.ColumnDefinitions>
-                                                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11"
-                                                                       TextTrimming="CharacterEllipsis"
-                                                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
-                                                            <TextBlock Grid.Column="1" Text="{Binding Tokens}" FontSize="11"
-                                                                       Margin="8,0,0,0"
-                                                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                                        </Grid>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </ScrollViewer>
-                                    </Border>
-                                </DockPanel>
-
-                                <DockPanel Grid.Column="2">
-                                    <TextBlock DockPanel.Dock="Top" Text="Top skills (last 30 days)" FontSize="9"
-                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,4" />
-                                    <Border Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
-                                            BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
-                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                            <ScrollViewer.Resources>
-                                                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
-                                            </ScrollViewer.Resources>
-                                            <ItemsControl ItemsSource="{Binding Skills}" Margin="4">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Grid Margin="4,3">
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="*" />
-                                                                <ColumnDefinition Width="Auto" />
-                                                            </Grid.ColumnDefinitions>
-                                                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11"
-                                                                       TextTrimming="CharacterEllipsis"
-                                                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
-                                                            <TextBlock Grid.Column="1" Text="{Binding Tokens}" FontSize="11"
-                                                                       Margin="8,0,0,0"
-                                                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                                        </Grid>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </ScrollViewer>
-                                    </Border>
-                                </DockPanel>
-                                </Grid>
-
-                                <!-- Data stewardship (spec: WS-A delete-completeness precedent). -->
-                                <StackPanel Grid.Row="7" Margin="0,10,0,0">
-                                    <TextBlock Text="History vault" FontSize="9" Margin="0,0,0,4"
-                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                    <ItemsControl ItemsSource="{Binding Roots}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <WrapPanel Orientation="Horizontal" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,16,4"
-                                                          Content="{Binding Name}"
-                                                          IsChecked="{Binding IsEnabled, Mode=TwoWay}" />
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                        <Button Style="{StaticResource FlatButton}" Content="Erase archive"
-                                                Command="{Binding EraseArchiveCommand}"
-                                                Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" />
-                                        <Button Style="{StaticResource FlatButton}" Content="Open vault folder"
-                                                Command="{Binding OpenVaultFolderCommand}" />
-                                    </StackPanel>
-
-                                    <!-- WS-E statusline bridge: consent-gated install into ONE CC home.
-                                         Compact by design — the fixed 620px window clips anything taller
-                                         below the fold; the tooltip + consent dialog carry the explanation. -->
-                                    <TextBlock Text="Claude Code statusline" FontSize="9" Margin="0,10,0,4"
-                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                    <StackPanel Orientation="Horizontal">
-                                        <Button Style="{StaticResource FlatButton}" Content="Install statusline…"
-                                                Command="{Binding InstallStatuslineCommand}"
-                                                ToolTip="Show your live session + weekly percentages under the Claude Code prompt — real cap numbers, right where the tokens burn."
-                                                Visibility="{Binding StatuslineNotInstalled, Converter={StaticResource BoolVis}}" />
-                                        <Button Style="{StaticResource FlatButton}" Content="Remove statusline"
-                                                Command="{Binding RemoveStatuslineCommand}"
-                                                Visibility="{Binding StatuslineInstalled, Converter={StaticResource BoolVis}}" />
-                                    </StackPanel>
-                                    <TextBlock TextWrapping="Wrap" FontSize="10.5" Margin="0,4,0,0"
-                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
-                                               Text="{Binding StatuslineStatusText}"
-                                               Visibility="{Binding StatuslineStatusText, Converter={StaticResource StrVis}}" />
-
-                                    <!-- WS-E MCP integration: consent-gated install; burn-attribution
-                                         roots stay per-home checkboxes, off by default. -->
-                                    <TextBlock Text="Claude quota tools (MCP)" FontSize="9" Margin="0,10,0,4"
-                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                    <StackPanel Orientation="Horizontal">
-                                        <Button Style="{StaticResource FlatButton}" Content="Install MCP server…"
-                                                Command="{Binding InstallMcpCommand}"
-                                                ToolTip="Let Claude check your live caps before spawning agents or picking a bigger model - read-only, consent-gated."
-                                                Visibility="{Binding McpNotInstalled, Converter={StaticResource BoolVis}}" />
-                                        <Button Style="{StaticResource FlatButton}" Content="Remove MCP server"
-                                                Command="{Binding RemoveMcpCommand}"
-                                                Visibility="{Binding McpInstalled, Converter={StaticResource BoolVis}}" />
-                                    </StackPanel>
-                                    <ItemsControl ItemsSource="{Binding McpRoots}" Margin="0,4,0,0"
-                                                  Visibility="{Binding McpInstalled, Converter={StaticResource BoolVis}}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <WrapPanel Orientation="Horizontal" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,16,4"
-                                                          Content="{Binding Name}"
-                                                          ToolTip="Allow project-level burn attribution from this Claude Code home"
-                                                          IsChecked="{Binding IsEnabled, Mode=TwoWay}" />
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                    <TextBlock TextWrapping="Wrap" FontSize="10.5" Margin="0,4,0,0"
-                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
-                                               Text="{Binding McpStatusText}"
-                                               Visibility="{Binding McpStatusText, Converter={StaticResource StrVis}}" />
-                                </StackPanel>
-                            </Grid>
-
-                            <!-- Trends -->
-                            <Grid Grid.Row="1" Style="{StaticResource CcSectionTrends}"
-                                  DataContext="{Binding Trends}">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="*" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-
-                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                                    <TextBlock Text="Window:" VerticalAlignment="Center" FontSize="12"
-                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,8,0" />
-                                    <Button Content="4 weeks" Style="{StaticResource TrendsPill4}"
-                                            Command="{Binding SetWeeksCommand}" CommandParameter="4" />
-                                    <Button Content="12 weeks" Style="{StaticResource TrendsPill12}"
-                                            Command="{Binding SetWeeksCommand}" CommandParameter="12" />
-                                    <Button Content="26 weeks" Style="{StaticResource TrendsPill26}"
-                                            Command="{Binding SetWeeksCommand}" CommandParameter="26" />
-                                </StackPanel>
-
-                                <TextBlock Grid.Row="1" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,6"
-                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
-                                           Text="{Binding InfoText}"
-                                           Visibility="{Binding InfoText, Converter={StaticResource StrVis}}" />
-
-                                <Border Grid.Row="2" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
-                                        BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1" Padding="8">
-                                    <views:CcTrendsControl x:Name="TrendsChart" />
-                                </Border>
-
-                                <DockPanel Grid.Row="3" Margin="0,8,0,0" MaxHeight="120">
-                                    <TextBlock DockPanel.Dock="Top" Text="Top projects (window)" FontSize="9"
-                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,0,4" />
-                                    <ItemsControl ItemsSource="{Binding TopProjects}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Grid Margin="0,1">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
-                                                    <TextBlock Grid.Column="1" Text="{Binding Tokens}" FontSize="11" Margin="8,0,0,0"
-                                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </DockPanel>
-
-                                <TextBlock Grid.Row="4" FontSize="10" Margin="0,8,0,0"
-                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                           Text="{Binding FooterText}" />
-                            </Grid>
-
-                            <!-- Sessions (Ledger). The ListBox OWNS scrolling:
-                                 star-sized row, no ancestor ScrollViewer (the
-                                 spec's named in-repo trap), recycling
-                                 virtualization, pixel scroll. -->
-                            <Grid Grid.Row="1" Style="{StaticResource CcSectionSessions}"
-                                  DataContext="{Binding Ledger}">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="*" />
-                                </Grid.RowDefinitions>
-
-                                <DockPanel Grid.Row="0" Margin="0,0,0,8">
-                                    <Button DockPanel.Dock="Right" Style="{StaticResource AccentButton}"
-                                            Content="Export CSV…" Command="{Binding ExportCsvCommand}" />
-                                    <CheckBox DockPanel.Dock="Right" Style="{StaticResource ThemedCheckBox}"
-                                              Margin="0,0,12,0" VerticalAlignment="Center"
-                                              Content="Stack by project"
-                                              IsChecked="{Binding GroupByProject, Mode=TwoWay}" />
-                                    <StackPanel Orientation="Horizontal">
-                                        <Button Content="Today" Style="{StaticResource LedgerChipToday}"
-                                                Command="{Binding SetScopeCommand}" CommandParameter="Today" />
-                                        <Button Content="Yesterday" Style="{StaticResource LedgerChipYesterday}"
-                                                Command="{Binding SetScopeCommand}" CommandParameter="Yesterday" />
-                                        <Button Content="7 days" Style="{StaticResource LedgerChip7d}"
-                                                Command="{Binding SetScopeCommand}" CommandParameter="7d" />
-                                        <Button Content="All" Style="{StaticResource LedgerChipAll}"
-                                                Command="{Binding SetScopeCommand}" CommandParameter="All" />
-                                        <Button Content="{Binding Scope}" ContentStringFormat="{}{0}  ✕"
-                                                Style="{StaticResource LedgerChipDay}"
-                                                Command="{Binding ClearDayScopeCommand}"
-                                                ToolTip="Showing one day — click to go back" />
-                                    </StackPanel>
-                                </DockPanel>
-
-                                <!-- Sort header row — glyph carries direction, never color alone. -->
-                                <Grid Grid.Row="1" Margin="4,0,4,4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="90" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="110" />
-                                    </Grid.ColumnDefinitions>
-                                    <Button Grid.Column="0" Style="{StaticResource FlatButton}" HorizontalAlignment="Left"
-                                            Content="{Binding LastActiveHeader}" FontSize="10"
-                                            Command="{Binding SortByCommand}" CommandParameter="LastActive" />
-                                    <Button Grid.Column="1" Style="{StaticResource FlatButton}" HorizontalAlignment="Left"
-                                            Content="{Binding ProjectHeader}" FontSize="10"
-                                            Command="{Binding SortByCommand}" CommandParameter="Project" />
-                                    <TextBlock Grid.Column="2" Text="Models" FontSize="10" VerticalAlignment="Center"
-                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                    <Button Grid.Column="3" Style="{StaticResource FlatButton}" HorizontalAlignment="Right"
-                                            Content="{Binding TokensHeader}" FontSize="10"
-                                            Command="{Binding SortByCommand}" CommandParameter="Tokens" />
-                                </Grid>
-
-                                <Border Grid.Row="2" Background="{DynamicResource Sanduhr.Brush.Bg}" CornerRadius="6"
-                                        BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
-                                    <Grid>
-                                        <ListBox ItemsSource="{Binding View}" Background="Transparent" BorderThickness="0"
-                                                 HorizontalContentAlignment="Stretch"
-                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                                 VirtualizingPanel.IsVirtualizing="True"
-                                                 VirtualizingPanel.VirtualizationMode="Recycling"
-                                                 VirtualizingPanel.ScrollUnit="Pixel">
-                                            <ListBox.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <VirtualizingStackPanel />
-                                                </ItemsPanelTemplate>
-                                            </ListBox.ItemsPanel>
-                                            <ListBox.ItemContainerStyle>
-                                                <Style TargetType="ListBoxItem">
-                                                    <Setter Property="Padding" Value="0" />
-                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                                    <Setter Property="Focusable" Value="False" />
-                                                    <Setter Property="Template">
-                                                        <Setter.Value>
-                                                            <ControlTemplate TargetType="ListBoxItem">
-                                                                <ContentPresenter />
-                                                            </ControlTemplate>
-                                                        </Setter.Value>
-                                                    </Setter>
-                                                </Style>
-                                            </ListBox.ItemContainerStyle>
-                                            <ListBox.ItemTemplate>
-                                                <DataTemplate>
-                                                    <StackPanel>
-                                                        <ToggleButton IsChecked="{Binding IsExpanded, Mode=TwoWay}" Cursor="Hand">
-                                                            <ToggleButton.Template>
-                                                                <ControlTemplate TargetType="ToggleButton">
-                                                                    <Border x:Name="rowBg" Background="Transparent" Padding="8,5">
-                                                                        <ContentPresenter />
-                                                                    </Border>
-                                                                    <ControlTemplate.Triggers>
-                                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                                            <Setter TargetName="rowBg" Property="Background"
-                                                                                    Value="{DynamicResource Sanduhr.Brush.Glass}" />
-                                                                        </Trigger>
-                                                                    </ControlTemplate.Triggers>
-                                                                </ControlTemplate>
-                                                            </ToggleButton.Template>
-                                                            <Grid>
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="90" />
-                                                                    <ColumnDefinition Width="*" />
-                                                                    <ColumnDefinition Width="150" />
-                                                                    <ColumnDefinition Width="110" />
-                                                                </Grid.ColumnDefinitions>
-                                                                <TextBlock Grid.Column="0" Text="{Binding LastActiveText}" FontSize="11"
-                                                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                                                <TextBlock Grid.Column="1" Text="{Binding ProjectText}" FontSize="11"
-                                                                           TextTrimming="CharacterEllipsis"
-                                                                           ToolTip="{Binding CwdTooltip}"
-                                                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" />
-                                                                <TextBlock Grid.Column="2" Text="{Binding ModelBadge}" FontSize="10"
-                                                                           TextTrimming="CharacterEllipsis"
-                                                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                                                <TextBlock Grid.Column="3" Text="{Binding ScopedTokensText}" FontSize="11"
-                                                                           HorizontalAlignment="Right" Typography.NumeralAlignment="Tabular"
-                                                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" />
-                                                            </Grid>
-                                                        </ToggleButton>
-                                                        <Border Padding="16,2,8,8"
-                                                                Visibility="{Binding IsExpanded, Converter={StaticResource BoolVis}}">
-                                                            <TextBlock Text="{Binding DetailText}" FontSize="10" TextWrapping="Wrap"
-                                                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                                        </Border>
-                                                    </StackPanel>
-                                                </DataTemplate>
-                                            </ListBox.ItemTemplate>
-                                        </ListBox>
-                                        <TextBlock Text="{Binding EmptyText}" FontSize="11" TextWrapping="Wrap"
-                                                   HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20"
-                                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
-                                                   Visibility="{Binding EmptyText, Converter={StaticResource StrVis}}" />
-                                    </Grid>
-                                </Border>
-                            </Grid>
-                        </Grid>
-                    </Border>
-                </TabItem>
-
-                <!-- Publish usage tab: opt-in daily publish to an endpoint the user chooses.
-                     Nothing comes back to us. Everything defaults OFF — master toggle, every
-                     home — and the one sentence above the controls says exactly what leaves
-                     the machine. 626 Labs is a preset, not the name of the feature. -->
-                <TabItem Header="Publish usage" DataContext="{Binding Publish}">
-                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="20">
-                        <StackPanel>
-                            <TextBlock Text="Publish usage" FontSize="14" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
-                            <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,12"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
-                                       Text="Nothing about your usage comes back to us. If you want it somewhere, send it to yourself: once a day Sanduhr can post token counts per project name (folder names only, never paths) to an endpoint you choose." />
-
-                            <!-- Destination -->
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                <TextBlock Text="Preset" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
-                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                <ComboBox Style="{StaticResource ThemedComboBox}" Width="190"
-                                          VerticalAlignment="Center"
-                                          ItemsSource="{Binding PresetOptions}"
-                                          DisplayMemberPath="Display"
-                                          SelectedItem="{Binding SelectedPreset, Mode=TwoWay}"
-                                          AutomationProperties.Name="Publish preset"
-                                          ToolTip="Custom endpoint, or the 626 Labs dashboard preset (fills the URL, bearer auth, and the dashboard body format)." />
-                                <TextBlock Text="{Binding PresetHint}" FontSize="10.5" VerticalAlignment="Center"
-                                           Margin="10,0,0,0" TextWrapping="Wrap" MaxWidth="260"
-                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                           Visibility="{Binding PresetHint, Converter={StaticResource StrVis}}" />
-                            </StackPanel>
-
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-                                <TextBlock Text="Endpoint URL" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
-                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                <TextBox Style="{StaticResource Input}" Width="360"
-                                         Text="{Binding EndpointUrl, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                         AutomationProperties.Name="Publish endpoint URL"
-                                         ToolTip="Where the daily POST goes. An absolute http(s) URL you control." />
-                            </StackPanel>
-                            <TextBlock FontSize="10.5" Margin="0,0,0,8"
-                                       Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
-                                       Text="{Binding EndpointError}"
-                                       Visibility="{Binding EndpointError, Converter={StaticResource StrVis}}" />
-
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                <TextBlock Text="Auth" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
-                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                <ComboBox Style="{StaticResource ThemedComboBox}" Width="150"
-                                          VerticalAlignment="Center"
-                                          ItemsSource="{Binding AuthOptions}"
-                                          DisplayMemberPath="Display"
-                                          SelectedItem="{Binding SelectedAuth, Mode=TwoWay}"
-                                          AutomationProperties.Name="Publish auth scheme"
-                                          ToolTip="How the token rides on the request: Authorization: Bearer, a header you name, or no credential." />
-                                <StackPanel Orientation="Horizontal" Margin="10,0,0,0"
-                                            Visibility="{Binding ShowHeaderName, Converter={StaticResource BoolVis}}">
-                                    <TextBlock Text="Header name" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
-                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                    <TextBox Style="{StaticResource Input}" Width="150"
-                                             Text="{Binding AuthHeaderName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                             AutomationProperties.Name="Publish auth header name"
-                                             ToolTip="The header that carries the token, e.g. X-Api-Key." />
-                                </StackPanel>
-                            </StackPanel>
-
-                            <TextBlock Text="Token" FontSize="9" Margin="0,0,0,4"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                <Button Style="{StaticResource FlatButton}" Content="Set token…"
-                                        Command="{Binding SetTokenCommand}"
-                                        AutomationProperties.Name="Set publish token"
-                                        ToolTip="Paste the token your endpoint expects. Stored in Windows Credential Manager, never in a file." />
-                                <Button Style="{StaticResource FlatButton}" Content="Clear token"
-                                        Command="{Binding ClearTokenCommand}"
-                                        AutomationProperties.Name="Clear publish token"
-                                        ToolTip="Delete the stored token. Publishing stops until a new one is set."
-                                        Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
-                                        Visibility="{Binding HasToken, Converter={StaticResource BoolVis}}" />
-                                <TextBlock Text="{Binding TokenStatusText}" FontSize="10.5" VerticalAlignment="Center"
-                                           Margin="8,0,0,0"
-                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                            </StackPanel>
-
-                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,0,0,12" />
-
-                            <!-- What and when -->
-                            <TextBlock Text="Homes to share (off until you tick them)" FontSize="9" Margin="0,0,0,4"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                            <ItemsControl ItemsSource="{Binding Roots}" Margin="0,0,0,10">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel Orientation="Horizontal" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,16,4"
-                                                  Content="{Binding Name}"
-                                                  IsChecked="{Binding IsShared, Mode=TwoWay}"
-                                                  ToolTip="Include this Claude Code home's per-project token counts in the daily publish." />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-                                <CheckBox Style="{StaticResource ThemedCheckBox}"
-                                          Content="Publish daily at"
-                                          IsChecked="{Binding Enabled, Mode=TwoWay}"
-                                          VerticalAlignment="Center" Margin="0,0,8,0"
-                                          ToolTip="The master switch. Off means nothing is ever sent, whatever else is set here." />
-                                <TextBox Style="{StaticResource Input}" Width="64"
-                                         Text="{Binding PublishTimeText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                         AutomationProperties.Name="Publish time"
-                                         ToolTip="24-hour, local time. Publishes the previous day." />
-                                <TextBlock Text="(24-hour, local time; publishes the previous day)" FontSize="10.5"
-                                           VerticalAlignment="Center" Margin="8,0,0,0"
-                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
-                            </StackPanel>
-                            <TextBlock FontSize="10.5" Margin="0,0,0,8"
-                                       Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
-                                       Text="{Binding TimeError}"
-                                       Visibility="{Binding TimeError, Converter={StaticResource StrVis}}" />
-
-                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,6,0,12" />
-
-                            <StackPanel Orientation="Horizontal">
-                                <Button Style="{StaticResource AccentButton}" Content="Publish now"
-                                        Command="{Binding PublishNowCommand}"
-                                        AutomationProperties.Name="Publish now"
-                                        ToolTip="Publish yesterday's totals right now, regardless of the schedule." />
-                            </StackPanel>
-                            <TextBlock TextWrapping="Wrap" FontSize="10.5" Margin="0,8,0,0"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
-                                       Text="{Binding StatusText}" />
-                            <TextBlock TextWrapping="Wrap" FontSize="10" Margin="0,10,0,0"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                       Text="The sanduhr-mcp publish_usage tool queues the same upload through this widget; it never holds the token itself. Re-publishing a day sends that day's record again." />
-                        </StackPanel>
-                    </Border>
-                </TabItem>
-
-                <!-- General tab — thin; room for item 10. -->
-                <TabItem Header="General">
-                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="0,8,8,8" Padding="20">
-                        <StackPanel>
-                            <TextBlock Text="General" FontSize="14" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
-
-                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                <TextBlock Text="Active account: " FontSize="12" Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                <TextBlock Text="{Binding Accounts.ActiveLabel}" FontSize="12" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
-                            </StackPanel>
-
-                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                <TextBlock Text="Version: " FontSize="12" Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                <TextBlock Text="{Binding Version}" FontSize="12" Foreground="{DynamicResource Sanduhr.Brush.Text}"
-                                           VerticalAlignment="Center" />
-                                <Button Style="{StaticResource FlatButton}" Content="What's New…" Margin="14,0,0,0" Padding="10,3"
-                                        Command="{Binding ShowWhatsNewCommand}" />
-                                <Button Style="{StaticResource FlatButton}" Content="Take the Tour…" Margin="8,0,0,0" Padding="10,3"
-                                        AutomationProperties.Name="Take the Tour"
-                                        ToolTip="Walks through what Sanduhr does, one step at a time"
-                                        Command="{Binding ShowTourCommand}" />
                             </StackPanel>
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
-                            <!-- Startup (item 10) — off by default; dual mechanism by install type. -->
-                            <TextBlock Text="Startup" FontSize="13" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                            <TextBlock views:SettingsAnchor.Id="trademark" Text="{Binding TrademarkNotice}"
+                                       TextWrapping="Wrap" FontSize="11"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
 
-                            <!-- Unpackaged: a real toggle that writes the HKCU Run entry. -->
-                            <CheckBox Style="{StaticResource ThemedCheckBox}"
-                                      Content="Start Sanduhr when Windows starts"
-                                      IsChecked="{Binding General.AutoStartEnabled, Mode=TwoWay}"
-                                      Visibility="{Binding General.IsUnpackaged, Converter={StaticResource BoolVis}}" />
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
-                            <!-- Packaged (Store): can't flip the manifest StartupTask without
-                                 WinRT — deep-link to Windows Settings → Startup apps instead. -->
-                            <StackPanel Visibility="{Binding General.IsPackaged, Converter={StaticResource BoolVis}}">
+                            <StackPanel views:SettingsAnchor.Id="where">
+                                <TextBlock Text="{Binding WhereSettingsLiveTitle}" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Settings, history, themes" FontSize="12"
+                                               VerticalAlignment="Center" Margin="0,0,12,6"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SettingsFolder}" FontSize="11"
+                                               FontFamily="Cascadia Code, Consolas" TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding SettingsFolder}" VerticalAlignment="Center" Margin="0,0,8,6"
+                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                    <Button Grid.Row="0" Grid.Column="2" Style="{StaticResource FlatButton}" Padding="10,4"
+                                            Margin="0,0,0,6" Content="Show in Explorer"
+                                            AutomationProperties.Name="Show the settings folder in File Explorer"
+                                            Command="{Binding ShowInExplorerCommand}" CommandParameter="{Binding SettingsFolder}" />
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Usage vault" FontSize="12"
+                                               VerticalAlignment="Center" Margin="0,0,12,6"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding LocalFolder}" FontSize="11"
+                                               FontFamily="Cascadia Code, Consolas" TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding LocalFolder}" VerticalAlignment="Center" Margin="0,0,8,6"
+                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                    <Button Grid.Row="1" Grid.Column="2" Style="{StaticResource FlatButton}" Padding="10,4"
+                                            Margin="0,0,0,6" Content="Show in Explorer"
+                                            AutomationProperties.Name="Show the usage vault folder in File Explorer"
+                                            Command="{Binding ShowInExplorerCommand}" CommandParameter="{Binding LocalFolder}" />
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Sign-in keys" FontSize="12"
+                                               VerticalAlignment="Center" Margin="0,0,12,0"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" FontSize="11" TextWrapping="Wrap"
+                                               VerticalAlignment="Center"
+                                               Text="Windows Credential Manager, under com.626labs.sanduhr"
+                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                </Grid>
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                            <StackPanel views:SettingsAnchor.Id="notices">
+                                <TextBlock Text="{Binding ThirdPartyNoticesTitle}" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
                                 <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,0,0,8"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
-                                           Text="This Store install manages auto-start in Windows Settings. Sanduhr is off by default — turn it on under Startup apps." />
-                                <Button Style="{StaticResource FlatButton}" HorizontalAlignment="Left"
-                                        Content="Open Windows Startup settings…"
-                                        Command="{Binding General.OpenStartupSettingsCommand}" />
+                                           Text="Sanduhr for Windows is built with these packages, each under its own license:" />
+                                <ItemsControl ItemsSource="{Binding Packages}" Focusable="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Name}" FontSize="12" VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding License}" FontSize="11" VerticalAlignment="Center"
+                                                           Margin="12,0,12,0" Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                <Button Grid.Column="2" Cursor="Hand" Content="Project page"
+                                                        ToolTip="{Binding Url}"
+                                                        AutomationProperties.Name="{Binding Name, StringFormat='{}{0} project page'}"
+                                                        Command="{Binding DataContext.OpenLinkCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                        CommandParameter="{Binding Url}">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <TextBlock x:Name="t" Text="{TemplateBinding Content}" FontSize="11"
+                                                                       Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="t" Property="TextDecorations" Value="Underline" />
+                                                                </Trigger>
+                                                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                                                    <Setter TargetName="t" Property="TextDecorations" Value="Underline" />
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                </Button>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </StackPanel>
-
-                            <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                       Text="Off by default. When on, Sanduhr launches hidden in the tray at sign-in." />
-
-                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
-
-                            <!-- Tray (W3) — which number the tray icon shows. -->
-                            <TextBlock Text="Tray" FontSize="13" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Tray shows" VerticalAlignment="Center" FontSize="12"
-                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="0,0,8,0" />
-                                <ComboBox Style="{StaticResource ThemedComboBox}" Width="230"
-                                          ItemsSource="{Binding General.TrayModeOptions}"
-                                          DisplayMemberPath="Title"
-                                          SelectedItem="{Binding General.SelectedTrayMode, Mode=TwoWay}"
-                                          AutomationProperties.Name="Tray shows" />
-                            </StackPanel>
-                            <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                       Text="The number on the tray icon. Rotate switches between session and weekly every 8 seconds." />
-
-                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
-
-                            <!-- Shortcuts (S1) — the global "open Settings" key. -->
-                            <TextBlock Text="Shortcuts" FontSize="13" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding Shortcuts.Label}" VerticalAlignment="Center" FontSize="12"
-                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-                                <Button x:Name="ShortcutKeysButton" Style="{StaticResource ShortcutKeysButton}"
-                                        Content="{Binding Shortcuts.KeysText}"
-                                        Command="{Binding Shortcuts.StartRecordingCommand}"
-                                        ToolTip="{Binding Shortcuts.KeysToolTip}"
-                                        AutomationProperties.Name="{Binding Shortcuts.KeysAutomationName}"
-                                        LostKeyboardFocus="ShortcutKeys_LostKeyboardFocus" />
-                                <CheckBox Style="{StaticResource ThemedCheckBox}"
-                                          IsChecked="{Binding Shortcuts.IsOn, Mode=TwoWay}"
-                                          AutomationProperties.Name="{Binding Shortcuts.SwitchAutomationName}" />
-                            </StackPanel>
-                            <Button HorizontalAlignment="Left" Margin="0,6,0,0" Cursor="Hand"
-                                    Content="{Binding Shortcuts.ResetText}"
-                                    Command="{Binding Shortcuts.ResetCommand}"
-                                    AutomationProperties.Name="{Binding Shortcuts.ResetAutomationName}"
-                                    Visibility="{Binding Shortcuts.ShowReset, Converter={StaticResource BoolVis}}">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <TextBlock x:Name="t" Text="{TemplateBinding Content}" FontSize="11"
-                                                   Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="t" Property="TextDecorations" Value="Underline" />
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Button.Template>
-                            </Button>
-                            <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
-                                       Text="{Binding Shortcuts.Note}"
-                                       Foreground="#ffcf4d"
-                                       Visibility="{Binding Shortcuts.HasNote, Converter={StaticResource BoolVis}}" />
-                            <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
-                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
-                                       Text="{Binding Shortcuts.Caption}" />
                         </StackPanel>
+                        </ScrollViewer>
                     </Border>
                 </TabItem>
             </TabControl>

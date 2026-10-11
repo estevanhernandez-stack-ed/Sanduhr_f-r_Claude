@@ -101,7 +101,7 @@ public partial class MainWindow : Window
         };
         menu.Items.Add(accounts);
 
-        var settings = new MenuItem { Header = "Settings…", Command = Vm.OpenSettingsCommand };
+        var settings = new MenuItem { Header = Sanduhr.Core.SettingsNames.OpenSettings, Command = Vm.OpenSettingsCommand };
         menu.Items.Add(settings);
 
         var refresh = new MenuItem { Header = "Refresh", Command = Vm.RefreshCommand };

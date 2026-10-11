@@ -21,6 +21,24 @@ public static class TrayIconRenderer
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool DestroyIcon(IntPtr handle);
 
+    /// <summary>The icon for <paramref name="percent"/> as a frozen WPF image, for the previews
+    /// (Settings, General and the What's New and tour cards); null if it can't be drawn.</summary>
+    public static System.Windows.Media.ImageSource? RenderImage(int percent)
+    {
+        try
+        {
+            using var icon = Render(percent);
+            var source = System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(icon.Handle,
+                System.Windows.Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+            source.Freeze();
+            return source;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     /// <summary>
     /// Build an icon showing <paramref name="percent"/> (clamped 0-100), tinted
     /// by the usage ramp. <paramref name="percent"/> &lt; 0 renders a neutral

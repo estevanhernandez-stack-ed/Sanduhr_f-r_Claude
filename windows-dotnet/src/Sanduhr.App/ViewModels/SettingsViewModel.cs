@@ -41,14 +41,40 @@ public sealed class SettingsViewModel
     /// publish-now, status).</summary>
     public PublishViewModel Publish { get; }
 
-    /// <summary>Assembly version for the General tab footer (e.g. "3.0.0").</summary>
+    /// <summary>Assembly version for About (e.g. "3.0.0").</summary>
     public string Version { get; }
 
-    /// <summary>General tab's "What's New…" button.</summary>
+    /// <summary>About's "What's New…" button.</summary>
     public ICommand ShowWhatsNewCommand { get; }
 
-    /// <summary>General tab's "Take the Tour…" button.</summary>
+    /// <summary>About's "Take the tour…" button.</summary>
     public ICommand ShowTourCommand { get; }
+
+    /// <summary>The sidebar search.</summary>
+    public SettingsSearchViewModel Search { get; } = new();
+
+    /// <summary>About: the names the buttons and sections carry.</summary>
+    public string WhatsNewTitle => SettingsNames.WhatsNew;
+    public string TakeTheTourTitle => SettingsNames.TakeTheTour;
+    public string TrademarkNotice => SettingsNames.TrademarkNotice;
+    public string WhereSettingsLiveTitle => SettingsNames.WhereSettingsLive;
+    public string ThirdPartyNoticesTitle => SettingsNames.ThirdPartyNotices;
+    public string AboutVersionLine => $"Sanduhr für Claude {Version}";
+
+    /// <summary>About, Third-party notices: the packages the app ships with.</summary>
+    public IReadOnlyList<ThirdPartyPackage> Packages => ThirdPartyNotices.Packages;
+
+    /// <summary>About, Where settings live: the roaming folder (settings, history, themes, logs).</summary>
+    public string SettingsFolder { get; }
+
+    /// <summary>About, Where settings live: the usage vault (PRIVACY.md: <c>%LOCALAPPDATA%\Sanduhr\vault\</c>).</summary>
+    public string LocalFolder { get; }
+
+    /// <summary>Opens a folder from About in File Explorer.</summary>
+    public ICommand ShowInExplorerCommand { get; }
+
+    /// <summary>Opens a third-party package's page in the browser.</summary>
+    public ICommand OpenLinkCommand { get; }
 
     /// <summary>Backs the General tab's Shortcuts section (global shortcut + recorder).</summary>
     public ShortcutsViewModel Shortcuts { get; }
@@ -75,5 +101,45 @@ public sealed class SettingsViewModel
         Publish = new PublishViewModel(widget.Publish);
         var v = Assembly.GetExecutingAssembly().GetName().Version;
         Version = v is null ? "3.0.0" : $"{v.Major}.{v.Minor}.{v.Build}";
+
+        // The real folders this build uses (a dev build's SANDUHR_DEV_PROFILE included).
+        var paths = new Paths();
+        SettingsFolder = paths.AppDataDir;
+        LocalFolder = paths.VaultDir;
+        ShowInExplorerCommand = new RelayCommand<string>(OpenFolder,
+            folder => !string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder));
+        OpenLinkCommand = new RelayCommand<string>(OpenLink);
+    }
+
+    private static void OpenFolder(string? folder)
+    {
+        // Opens what exists; never creates a folder (a fresh install may not have a vault yet).
+        if (string.IsNullOrEmpty(folder) || !System.IO.Directory.Exists(folder))
+            return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{folder}\"")
+            {
+                UseShellExecute = true,
+            });
+        }
+        catch
+        {
+            // Opening Explorer is a convenience; the path is on screen either way.
+        }
+    }
+
+    private static void OpenLink(string? url)
+    {
+        // Only the fixed https links from ThirdPartyNotices reach here.
+        if (url is null || !url.StartsWith("https://", StringComparison.Ordinal))
+            return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch
+        {
+        }
     }
 }
