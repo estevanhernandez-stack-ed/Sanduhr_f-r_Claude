@@ -105,22 +105,23 @@ public sealed class ThemePalette
     /// </summary>
     public static Color UsageColor(int pct) => Hex(ThemeCatalog.UsageColor(pct));
 
-    /// <summary>Each built-in theme's success hue, chosen to sit beside its accent.</summary>
-    private static readonly IReadOnlyDictionary<string, string> BuiltInSuccess = new Dictionary<string, string>
-    {
-        ["obsidian"] = "#4ade80",
-        ["aurora"] = "#2dd4bf",
-        ["ember"] = "#a3e635",
-        ["mint"] = "#bef264",
-        ["matrix"] = "#c6ff7a",
-        ["blueprint"] = "#bef264",
-    };
-
-    /// <summary>The success color for theme <paramref name="key"/>: its built-in hue, else the
+    /// <summary>The success color for theme <paramref name="key"/>: its built-in hue (each picked to sit beside its accent), else the
     /// healthy-bar green (<c>#4ade80</c>), or <c>#16a34a</c> on a light background.</summary>
     public static Color SuccessFor(string key, Color bg)
     {
-        if (BuiltInSuccess.TryGetValue(key, out var hex)) return Hex(hex);
+        // A switch, not a static table: ThemePalette.Obsidian is built during static init,
+        // before a table declared below it would exist.
+        string? hex = key switch
+        {
+            "obsidian" => "#4ade80",
+            "aurora" => "#2dd4bf",
+            "ember" => "#a3e635",
+            "mint" => "#bef264",
+            "matrix" => "#c6ff7a",
+            "blueprint" => "#bef264",
+            _ => null,
+        };
+        if (hex is not null) return Hex(hex);
         double luma = (0.2126 * bg.R + 0.7152 * bg.G + 0.0722 * bg.B) / 255.0;
         return luma > 0.6 ? Color.FromRgb(0x16, 0xa3, 0x4a) : UsageColor(0);
     }
