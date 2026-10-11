@@ -58,6 +58,7 @@ public static class SettingsIndex
     public const string Trademark = "trademark";
     public const string Notices = "notices";
     public const string Where = "where";
+    public const string Reset = "reset";
 
     /// <summary>The Claude Usage views an anchor can sit in.</summary>
     public const string OverviewView = "Overview";
@@ -121,6 +122,8 @@ public static class SettingsIndex
         E(SettingsNames.ThirdPartyNotices, SettingsPage.About, Notices, ["license", "licence", "credits", "open source"]),
         E(SettingsNames.WhereSettingsLive, SettingsPage.About, Where,
             ["settings.json", "folder", "AppData", "files", "data", "Credential Manager", "Show in Explorer"]),
+        E(SettingsNames.ResetSanduhr, SettingsPage.About, Reset,
+            ["reset", "uninstall", "erase", "start over"]),
     ];
 
     /// <summary>Where each name in <see cref="SettingsNames.Table"/> lives on its page.</summary>
@@ -136,6 +139,7 @@ public static class SettingsIndex
         [SettingsNames.TakeTheTour] = Version,
         [SettingsNames.WhereSettingsLive] = Where,
         [SettingsNames.ThirdPartyNotices] = Notices,
+        [SettingsNames.ResetSanduhr] = Reset,
     };
 
     /// <summary>Words a page goes by besides its title.</summary>

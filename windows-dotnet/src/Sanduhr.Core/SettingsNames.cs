@@ -99,6 +99,8 @@ public static class SettingsNames
     public const string WhereSettingsLive = "Where settings live";
     /// <summary>About.</summary>
     public const string ThirdPartyNotices = "Third-party notices";
+    /// <summary>About: removes what Sanduhr keeps on this PC (spec 4.7).</summary>
+    public const string ResetSanduhr = "Reset Sanduhr…";
 
     /// <summary>The trademark disclaimer, the standard text, word for word (About carries it).</summary>
     public const string TrademarkNotice =
@@ -119,6 +121,7 @@ public static class SettingsNames
         (TakeTheTour, SettingsPage.About),
         (WhereSettingsLive, SettingsPage.About),
         (ThirdPartyNotices, SettingsPage.About),
+        (ResetSanduhr, SettingsPage.About),
     ];
 
     /// <summary>
