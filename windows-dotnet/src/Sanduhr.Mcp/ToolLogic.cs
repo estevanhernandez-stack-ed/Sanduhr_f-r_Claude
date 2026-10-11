@@ -666,7 +666,8 @@ public sealed class ToolLogic
     /// lands the file.</summary>
     private static void WriteRequestAtomically(string path, JsonObject request)
     {
-        string tmp = path + ".tmp";
+        // A name per write: two sessions' servers may queue at the same moment.
+        string tmp = $"{path}.{Guid.NewGuid():N}.tmp";
         File.WriteAllText(tmp, request.ToJsonString());
         try
         {
@@ -678,6 +679,11 @@ public sealed class ToolLogic
         catch (FileNotFoundException) when (File.Exists(tmp))
         {
             File.Move(tmp, path, overwrite: true);
+        }
+        finally
+        {
+            // A failed write leaves no temp file behind.
+            try { if (File.Exists(tmp)) File.Delete(tmp); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
     }
 
