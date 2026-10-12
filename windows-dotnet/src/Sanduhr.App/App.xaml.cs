@@ -73,12 +73,19 @@ public partial class App : Application
         _vm.PasteKeyRequested += () => RunSignInAsync(embedded: false);
         _vm.SettingsRequested += () => ShowSettingsAsync();
         _vm.SettingsPageRequested += page => ShowSettingsAsync(page);
+        _vm.JustTheDeskRequested += ChooseJustTheDesk;
         // Keep an open Settings window's account list in sync with quick-switches
         // made elsewhere (tray / widget chip / right-click).
         _vm.AccountsChanged += () => _settingsWindow?.ViewModel.Accounts.Reload();
 
         _window = new MainWindow { DataContext = _vm };
-        _window.Show();
+        // Just the Desk with no account (spec 7.5): the widget starts hidden and the tray is the way back.
+        // The handle is created without showing, so the glow, alerts and tray have a window to point at.
+        if (JustTheDesk.WidgetStartsHidden(_vm.JustTheDesk, _vm.AccountStore.ListAccounts().Count > 0,
+                new SettingsStore(new Sanduhr.Core.Paths()).LoadDesk().Enabled))
+            new System.Windows.Interop.WindowInteropHelper(_window).EnsureHandle();
+        else
+            _window.Show();
 
         _vm.AttachAlertService(new AlertService(new Sanduhr.Core.Paths(), ShowWindow));
 
@@ -192,7 +199,7 @@ public partial class App : Application
             // After Start(): it migrates legacy credentials, so the account list is settled.
             var fresh = WhatsNew.IsFresh(lastSeen, store.LoadWhatsNewInstalledVersion(),
                 _vm.AccountStore.ListAccounts().Count);
-            var onboarding = _vm.ActiveAccount is null;
+            var onboarding = JustTheDesk.Onboarding(_vm.ActiveAccount is not null, store.LoadJustTheDesk().On);
 
             // The tour is decided before What's New records anything: pending only on a fresh
             // install (no account, nothing seen). While it is pending, What's New waits for it.
@@ -344,6 +351,15 @@ public partial class App : Application
                 await _vm.EndDemoAsync();
         };
 
+        // Only while the Desk is on (or arranging): starts Arrange mode, then finishes it with Done (spec 7.3).
+        _arrangeItem = new MenuItem { Header = DeskArrangeCopy.MenuItem, Visibility = Visibility.Collapsed };
+        _arrangeItem.Click += (_, _) =>
+        {
+            if (_desk?.Arranging == true) _desk.EndArrange(DeskArrangeEnd.Done);
+            else _desk?.BeginArrange();
+        };
+        menu.Opened += (_, _) => UpdateArrangeItem();
+
         var refresh = new MenuItem { Header = "Refresh" };
         refresh.Click += (_, _) => _vm?.RefreshCommand.Execute(null);
 
@@ -379,6 +395,7 @@ public partial class App : Application
         menu.Items.Add(settings);
         menu.Items.Add(whatsNew);
         menu.Items.Add(tour);
+        menu.Items.Add(_arrangeItem);
         menu.Items.Add(refresh);
         menu.Items.Add(BuildTrayShowsMenu());
         menu.Items.Add(new Separator());
@@ -390,6 +407,53 @@ public partial class App : Application
         menu.Items.Add(new Separator());
         menu.Items.Add(quit);
         _tray.ContextMenu = menu;
+    }
+
+    /// <summary>A Desk piece's right-click menu (spec 7.4): open its Settings page, arrange, or turn the Desk off.</summary>
+    private void OnDeskMenu(Desk.DeskMenuAction action)
+    {
+        switch (action)
+        {
+            case Desk.DeskMenuAction.EditMessages: _ = ShowSettingsAsync(SettingsPage.DeskMessage); break;
+            case Desk.DeskMenuAction.DeskSettings: _ = ShowSettingsAsync(SettingsPage.Desk); break;
+            case Desk.DeskMenuAction.Arrange: _desk?.BeginArrange(); break;
+            case Desk.DeskMenuAction.TurnOffDesk:
+                try
+                {
+                    var store = new SettingsStore(new Sanduhr.Core.Paths());
+                    store.SaveDesk(store.LoadDesk() with { Enabled = false });
+                }
+                catch (Exception e) when (e is System.IO.IOException or UnauthorizedAccessException)
+                {
+                    return;
+                }
+                _desk?.Reload();
+                _settingsWindow?.ViewModel.Desk.Reload();
+                break;
+        }
+    }
+
+    private MenuItem? _arrangeItem;
+
+    /// <summary>The tray's Arrange entry follows the Desk: hidden while it is off, "Finish arranging" while arranging.</summary>
+    private void UpdateArrangeItem()
+    {
+        if (_arrangeItem is null) return;
+        bool arranging = _desk?.Arranging == true;
+        _arrangeItem.Visibility = arranging || _desk?.Running == true ? Visibility.Visible : Visibility.Collapsed;
+        _arrangeItem.Header = arranging ? DeskArrangeCopy.TrayFinish : DeskArrangeCopy.MenuItem;
+    }
+
+    /// <summary>Arrange mode began, dropped a piece or ended: the tray entry and an open Settings window follow
+    /// (the Desk page's note, the live map, and after Done the saved rows).</summary>
+    private void OnArrangeChanged()
+    {
+        UpdateArrangeItem();
+        if (_desk is not { } desk || _settingsWindow?.ViewModel.Desk is not { } page) return;
+        bool was = page.Arranging;
+        page.Arranging = desk.Arranging;
+        page.ArrangingLayout = desk.Session?.Working.Layout;
+        if (was && !desk.Arranging) page.Reload();
     }
 
     /// <summary>The Desk (spec 5.1): off until switched on in Settings, Desk.</summary>
@@ -411,6 +475,10 @@ public partial class App : Application
             ThemeText = ThemeTextHex,
         };
         _vm.DeskUsageChanged += _desk.UsageChanged;
+        // The glow's Desk spot (spec 7.3): the glow service asks the Desk first and falls back to the window.
+        if (_glow is not null) _glow.DeskGlow = c => _desk?.Glow(c) == true;
+        _desk.ArrangeChanged += OnArrangeChanged;
+        _desk.MenuRequested += OnDeskMenu;
         _vm.ThemeChanged += _ => _desk?.ThemeChanged();
         // The widget's now-playing line (spec 6.3, W8) shares the Desk's media-session listener.
         _vm.NowPlaying = new NowPlayingLineViewModel(_nowPlaying, store);
@@ -482,8 +550,12 @@ public partial class App : Application
             ShowWhatsNewFromMenu, ShowTour);
         // The Claude Code page re-reads the glow switches and plays "Try it" through the running glow service.
         svm.ClaudeCodePage.GlowReload = () => _glow?.Reload();
+        svm.ClaudeCodePage.DeskReload = () => { _desk?.Reload(); svm.Desk.Reload(); };
         svm.ClaudeCodePage.GlowPreview = e => _glow?.Preview(e);
         svm.Desk.Changed = () => _desk?.Reload();
+        svm.Desk.ArrangeRequested = () => _desk?.BeginArrange();
+        svm.Desk.Arranging = _desk?.Arranging == true;
+        svm.Desk.ArrangingLayout = _desk?.Session?.Working.Layout;
         svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); };
         svm.WeatherPage.Changed = () => _desk?.Reload();
         svm.MessageChanged = () => _desk?.Reload();
@@ -531,7 +603,7 @@ public partial class App : Application
             : await coordinator.SignInManual(_window);
 
         if (outcome.Added && _vm is not null)
-            await _vm.ReloadAfterSignInAsync();
+            await ReloadAfterSignInAsync();
     }
 
     /// <summary>
@@ -544,7 +616,7 @@ public partial class App : Application
         var coordinator = new SignInCoordinator();
         var outcome = await coordinator.ReauthenticateActiveAsync(_window);
         if (outcome.Added && _vm is not null)
-            await _vm.ReloadAfterSignInAsync();
+            await ReloadAfterSignInAsync();
     }
 
     /// <summary>In-place MANUAL re-auth of the active account (recovery card,
@@ -554,7 +626,7 @@ public partial class App : Application
         var coordinator = new SignInCoordinator();
         var outcome = await coordinator.ReauthenticateManualActiveAsync(_window);
         if (outcome.Added && _vm is not null)
-            await _vm.ReloadAfterSignInAsync();
+            await ReloadAfterSignInAsync();
     }
 
     /// <summary>Settings "Update sign-in…": in-place credential refresh for ANY
@@ -570,7 +642,74 @@ public partial class App : Application
             ? await coordinator.ReauthenticateManualAsync(owner, label)
             : await coordinator.ReauthenticateEmbeddedAsync(owner, label);
         if (outcome.Added && _vm.ActiveAccount == label)
-            await _vm.ReloadAfterSignInAsync();
+            await ReloadAfterSignInAsync();
+    }
+
+    /// <summary>
+    /// The one place an added account is settled (spec 7.5): rebuild the widget on it, then end Just the
+    /// Desk if it was on. Every sign-in, pasted key and re-sign-in routes here, so the decision runs once
+    /// per add. Ending it restores the reminder only when Just the Desk had turned it off, redraws the
+    /// Desk and shows the widget for the new account, with no relaunch.
+    /// </summary>
+    private async Task ReloadAfterSignInAsync()
+    {
+        if (_vm is not { } vm)
+            return;
+        // The account is saved by now: end Just the Desk before the fetch, so the widget comes up for it at
+        // once and a fetch that throws can't leave Just the Desk on.
+        EndJustTheDeskIfAccount(vm);
+        await vm.ReloadAfterSignInAsync();
+    }
+
+    private void EndJustTheDeskIfAccount(WidgetViewModel vm)
+    {
+        try
+        {
+            if (vm.AccountStore.ListAccounts().Count == 0)
+                return;
+            var store = new SettingsStore(new Sanduhr.Core.Paths());
+            var (state, reminderOn, ended) = JustTheDesk.EndBySignIn(store.LoadJustTheDesk(), store.LoadDeskSignInReminder());
+            if (!ended)
+                return;
+            store.SaveJustTheDesk(state);
+            store.SaveDeskSignInReminder(reminderOn);
+            vm.JustTheDesk = false;
+            if (_settingsWindow?.ViewModel.Alerts is { } alerts) alerts.DeskSignInReminder = reminderOn;
+            vm.RefreshDesk();
+            ShowWindow();
+        }
+        catch
+        {
+            // Settings are best-effort here; the account is added either way.
+        }
+    }
+
+    /// <summary>
+    /// The first-run card's Just the Desk: save the choice, turn the Desk on, redraw it (the Claude pieces
+    /// stay placed and draw nothing) and put the widget away. The tray icon stays the way back.
+    /// </summary>
+    private void ChooseJustTheDesk()
+    {
+        if (_vm is not { } vm)
+            return;
+        try
+        {
+            var store = new SettingsStore(new Sanduhr.Core.Paths());
+            var (state, reminderOn, deskEnabled) = JustTheDesk.Choose(store.LoadJustTheDesk(), store.LoadDeskSignInReminder());
+            // The Desk first: a failed write after it leaves Just the Desk unchosen, never chosen with no Desk.
+            if (deskEnabled)
+                store.SaveDesk(store.LoadDesk() with { Enabled = true });
+            store.SaveDeskSignInReminder(reminderOn);
+            store.SaveJustTheDesk(state);
+        }
+        catch
+        {
+            return;   // nothing saved, nothing changed: the card stays
+        }
+        vm.JustTheDesk = true;
+        _desk?.Reload();
+        vm.RefreshDesk();
+        _window?.Hide();
     }
 
     private void OnTrayReadingChanged(TrayReading? reading)

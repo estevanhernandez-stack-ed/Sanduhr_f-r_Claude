@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 namespace Sanduhr.Core;
 
 /// <summary>Where the Claude Code glow lands (settings.json <c>claude_code_glow.target</c>, spec 6.8).
-/// <c>Desk</c> is Stage 7's placeholder: never offered, and it reads as Window until then.</summary>
+/// <c>Desk</c> is the glow's spot on the Desk (S7); it reads as Window when the Desk can't show it.</summary>
 public enum GlowTargetKind { Window, Edge, Widget, Desk }
 
 /// <summary>Which edge of the chosen monitor the Edge target lights.</summary>
@@ -19,12 +19,27 @@ public sealed record GlowTargetSettings(GlowTargetKind Kind, GlowEdgeSide Side, 
 {
     public static GlowTargetSettings Default { get; } = new(GlowTargetKind.Window, GlowEdgeSide.Top, null);
 
-    /// <summary>The kinds the Settings page offers. Desk joins in Stage 7.</summary>
+    /// <summary>The kinds the Settings page offers.</summary>
     public static IReadOnlyList<GlowTargetKind> Offered { get; } =
-        [GlowTargetKind.Window, GlowTargetKind.Edge, GlowTargetKind.Widget];
+        [GlowTargetKind.Window, GlowTargetKind.Edge, GlowTargetKind.Widget, GlowTargetKind.Desk];
 
-    /// <summary>The kind to act on: Desk reads as Window until Stage 7 gives it a meaning.</summary>
-    public GlowTargetKind Effective => Kind == GlowTargetKind.Desk ? GlowTargetKind.Window : Kind;
+    /// <summary>The kind to act on: Desk stays Desk while <paramref name="deskShowsGlow"/> (the Desk is
+    /// on, the spot is placed and its island is in sight), else reads as Window. Others are unchanged.</summary>
+    public GlowTargetKind Effective(bool deskShowsGlow) =>
+        Kind == GlowTargetKind.Desk && !deskShowsGlow ? GlowTargetKind.Window : Kind;
+
+    /// <summary>The caption under the four choices on the Claude Code page.</summary>
+    public const string DeskCaption =
+        "On the Desk while it is on and in sight; otherwise at the top of the window you're working in.";
+
+    /// <summary>The name of a target as the Settings page lists it.</summary>
+    public static string KindName(GlowTargetKind kind) => kind switch
+    {
+        GlowTargetKind.Edge => "A screen edge",
+        GlowTargetKind.Widget => "The widget only",
+        GlowTargetKind.Desk => "A spot on the Desk",
+        _ => "The window you're working in",
+    };
 
     public static string KindWord(GlowTargetKind kind) => kind switch
     {

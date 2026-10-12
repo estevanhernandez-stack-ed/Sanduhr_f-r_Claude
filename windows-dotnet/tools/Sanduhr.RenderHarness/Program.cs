@@ -21,7 +21,7 @@ using Sanduhr.Core;
 //
 // Options:
 //   --out <dir>          where PNGs and log.txt go (default ./harness-out)
-//   --scenario <name>    widget | whatsnew | tour | settings | glow | reset | desk | all; repeatable (default all)
+//   --scenario <name>    widget | whatsnew | tour | settings | glow | reset | desk | arrange | all; repeatable (default all)
 //   --theme <key>        built-in theme key to apply (default obsidian)
 //   --light              write a LIGHT user theme into the dev profile's themes folder and apply
 //                        it, to check dialogs for legibility on a light surface
@@ -99,7 +99,7 @@ public static class Program
                     return 2;
             }
         }
-        string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset", "desk" };
+        string[] known = { "widget", "whatsnew", "tour", "settings", "glow", "reset", "desk", "arrange" };
         if (scenarios.Count == 0 || scenarios.Contains("all"))
             scenarios = known.ToList();
         var bad = scenarios.Where(s => !known.Contains(s)).ToList();
@@ -296,6 +296,13 @@ public static class Program
                 main.Left = -20000;
                 await Settle();
                 Save((FrameworkElement)main.Content, "widget");
+                // The signed-out first-run card with Sign in, Not now and Just the Desk (S7 7.5). The sample
+                // account stays in the view model; only the reason flips, then goes back.
+                vm.Reason = SignInReason.FirstRun;
+                await Settle();
+                Save((FrameworkElement)main.Content, "widget-firstrun");
+                vm.Reason = SignInReason.None;
+                await Settle();
             }
 
             if (scenarios.Contains("whatsnew"))
@@ -337,8 +344,11 @@ public static class Program
             {
                 await RenderDesk(light);
                 await RenderDeskContent();
+                await RenderGlowSpot(light);
             }
 
+            if (scenarios.Contains("arrange"))
+                await RenderArrange();
             if (scenarios.Contains("settings"))
                 await RenderSettings(vm, asm);
         }
@@ -542,6 +552,107 @@ public static class Program
                 SaveScaled(root, $"desk-{name}-{gname}-{scale:0.0}x".Replace('.', '_'), scale);
             }
         }
+    }
+
+    /// <summary>
+    /// The glow's Desk spot lit (spec 7.3): the standard layout with the spot at top center, in the waiting
+    /// and the done color, held at full opacity for the still (the real fade is 0.2 s in, out by 1.5 s).
+    /// </summary>
+    static async Task RenderGlowSpot(bool light)
+    {
+        var now = new DateTimeOffset(2026, 10, 11, 10, 9, 0, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 10, 11, 10, 9, 0)));
+        var fonts = new Sanduhr.App.Desk.DeskFonts();
+        var bounds = new PxRect(0, 0, 1920, 1080);
+        var work = new PxRect(0, 0, 1920, 1032);
+        var screen = new Sanduhr.App.Desk.DeskScreen("DISPLAY1", bounds, work, 1.0, true, TaskbarClearance.Insets(bounds, work, [], 1.0));
+        var settings = (DeskSettings.Default with { Enabled = true, Layout = "clock:bl claude:bl glow:tc" }).Normalized();
+        var ground = light ? Color.FromRgb(0xd8, 0xdd, 0xe6) : Color.FromRgb(0x1e, 0x24, 0x30);
+        foreach (var ev in new[] { ClaudeCodeEvent.Waiting, ClaudeCodeEvent.Done })
+        {
+            var view = new Sanduhr.App.Desk.DeskView(screen, settings, fonts);
+            view.Update(new Sanduhr.App.Desk.DeskFrame { Now = now }, light
+                ? new Sanduhr.App.Desk.DeskInkMap(DeskInk.Resolve(DeskInkSettings.Default with { Mode = DeskInkMode.Dark }, null, null))
+                : Sanduhr.App.Desk.DeskInkMap.Light);
+            bool lit = view.Glow(Sanduhr.App.Views.GlowOverlayContent.ColorFor(ev));
+            // Hold the pill at full opacity: the animation would otherwise be mid-fade when the picture is taken.
+            foreach (var pill in Descendants<System.Windows.Shapes.Rectangle>(view).Where(r => r.Fill is RadialGradientBrush))
+            {
+                pill.BeginAnimation(UIElement.OpacityProperty, null);
+                pill.Opacity = 1;
+            }
+            var root = new Grid { Width = 1920, Height = 1080, Background = new SolidColorBrush(ground) };
+            root.Children.Add(view);
+            root.Measure(new Size(1920, 1080));
+            root.Arrange(new Rect(0, 0, 1920, 1080));
+            await Settle();
+            SaveScaled(root, $"desk-glow-spot-{ev.ToString().ToLowerInvariant()}", 1.0);
+            Log.Add($"desk glow spot {ev}: lit={lit}");
+            view.Dispose();
+        }
+    }
+
+    static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
+    {
+        int n = VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < n; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T t) yield return t;
+            foreach (var d in Descendants<T>(child)) yield return d;
+        }
+    }
+
+    /// <summary>
+    /// Arrange mode's surface (spec 7.3) for the primary monitor at 100%: the scrim over a wallpaper stand-in,
+    /// the Desk laid out in arranging mode (clock and Claude line, the meters, telemetry, the glow's spot at
+    /// top center and now playing with nothing playing as a named placeholder), every placed piece outlined
+    /// and named, the eight anchor points, then the clock mid-drag as a ghost with the top right point lit,
+    /// and the bar. Never opens a window; the content is the same control the real surface hosts.
+    /// </summary>
+    static async Task RenderArrange()
+    {
+        var now = new DateTimeOffset(2026, 10, 11, 10, 9, 0, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 10, 11, 10, 9, 0)));
+        string Iso(TimeSpan span) => now.Add(span).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fffK", System.Globalization.CultureInfo.InvariantCulture);
+        var usage = new DeskUsage(
+            [new DeskTier(TierModel.FiveHour, 42, Iso(TimeSpan.FromHours(2))),
+             new DeskTier(TierModel.SevenDay, 63, Iso(TimeSpan.FromDays(4)))],
+            now.AddMinutes(-1), false, false, null);
+        var telemetry = new Sanduhr.App.Desk.TelemetrySource();
+        telemetry.Preview(new TelemetrySample(23, 61, 48, now));
+        var frame = new Sanduhr.App.Desk.DeskFrame { Usage = usage, Now = now, Telemetry = telemetry };
+        var fonts = new Sanduhr.App.Desk.DeskFonts();
+        var bounds = new PxRect(0, 0, 1920, 1080);
+        var work = new PxRect(0, 0, 1920, 1032);
+        var screen = new Sanduhr.App.Desk.DeskScreen("DISPLAY1", bounds, work, 1.0, true, TaskbarClearance.Insets(bounds, work, [], 1.0));
+        const string layout = "clock:bl claude:bl meters:tr telemetry:mr glow:tc nowPlaying:br";
+        var settings = (DeskSettings.Default with { Enabled = true, Layout = layout }).Normalized();
+        foreach (var (gname, gcolor) in new[] { ("wallpaper-dark", Color.FromRgb(0x1e, 0x24, 0x30)), ("wallpaper-light", Color.FromRgb(0xd8, 0xdd, 0xe6)) })
+        {
+            var working = new DeskArrangement(layout);
+            var content = new Sanduhr.App.Desk.DeskArrangeContent(screen, settings, fonts, frame, working, primary: true);
+            var root = new Grid { Width = 1920, Height = 1080, Background = new SolidColorBrush(gcolor) };
+            root.Children.Add(new System.Windows.Shapes.Rectangle
+            {
+                Height = 48, VerticalAlignment = VerticalAlignment.Bottom,
+                Fill = new SolidColorBrush(Color.FromArgb(0x66, 0, 0, 0)),
+            });
+            root.Children.Add(content);
+            root.Measure(new Size(1920, 1080));
+            root.Arrange(new Rect(0, 0, 1920, 1080));
+            await Settle();
+            Save(root, $"arrange-rest-{gname}");
+            foreach (var (w, r) in content.PieceRects) Log.Add($"arrange piece {w}: {r}");
+
+            var clock = content.PieceRects["clock"];
+            content.BeginDrag("clock", new Point(clock.X + clock.Width / 2, clock.Y + clock.Height / 2));
+            content.MoveDrag(new Point(1640, 130));
+            await Settle();
+            Save(root, $"arrange-drag-{gname}");
+            Log.Add($"arrange drag clock: lit {content.Lit}");
+            content.CancelDrag();
+            content.Dispose();
+        }
+        telemetry.Dispose();
     }
 
     /// <summary>Like <see cref="Save"/>, rendered at <paramref name="scale"/> times 96 dpi.</summary>
@@ -756,6 +867,25 @@ public static class Program
             }
             index++;
         }
+        // The Claude Code page with the Desk's spot chosen (it also places the spot in the dev profile's layout),
+        // and the Desk page while Arrange mode would be running on the desktop.
+        var ccTab = tabs.Items.OfType<TabItem>().First(t => t.Tag is "ClaudeCode");
+        tabs.SelectedItem = ccTab;
+        svm.ClaudeCodePage.GlowTarget = ClaudeCodeViewModel.GlowTargets.First(c => c.Kind == GlowTargetKind.Desk);
+        double h0 = sw.Height;
+        sw.Height = 1900;
+        await Settle();
+        Save((FrameworkElement)sw.Content, "settings-claudecode-desk-target");
+        sw.Height = h0;
+        var deskTab = tabs.Items.OfType<TabItem>().First(t => t.Tag is "Desk");
+        tabs.SelectedItem = deskTab;
+        svm.Desk.Reload();
+        svm.Desk.Arranging = true;
+        svm.Desk.ArrangingLayout = "clock:tr claude:tr glow:tc";
+        await Settle();
+        Save((FrameworkElement)sw.Content, "settings-desk-arranging");
+        svm.Desk.Arranging = false;
+        svm.Desk.ArrangingLayout = null;
         File.WriteAllText(Path.Combine(Out, "settings-pages.txt"), pages.ToString());
         Log.Add($"txt settings-pages.txt {index} pages");
 

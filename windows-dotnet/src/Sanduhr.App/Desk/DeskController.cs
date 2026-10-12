@@ -15,9 +15,11 @@ namespace Sanduhr.App.Desk;
 /// or wallpaper change; between them the live pieces (telemetry, the position bar, the bars) update in
 /// place. Each source runs only while its piece is placed and the Desk shows: telemetry samples, the
 /// peak meter, the media-session listener and the weather fetch all stop otherwise. Off, at Reset and
-/// at quit, everything stops. Nothing here touches an HWND.
+/// at quit, everything stops. Arrange mode (spec 7.3) takes the screens over for its own surfaces while
+/// it runs: the islands come down, nothing is laid out for the host, and Done writes the layout once.
+/// The controller itself touches no HWND; the host and <see cref="DeskArrangeMode"/> own them.
 /// </summary>
-internal sealed class DeskController : IDisposable
+internal sealed class DeskController : IDisposable, IDeskClickActions
 {
     private readonly SettingsStore _store;
     private readonly Func<IDeskHost> _hostFactory;
@@ -49,6 +51,8 @@ internal sealed class DeskController : IDisposable
     private static readonly TimeSpan FullEvery = TimeSpan.FromMinutes(5);
     private string? _trackKey;
     private bool _stopped;
+    private DeskArrangeSession? _session;
+    private DeskArrangeMode? _arrangeMode;
 
     public DeskController(SettingsStore store, Func<IDeskHost> hostFactory, Func<DeskUsage> usageSource,
         NowPlayingHub nowPlaying, DeskMessageSource messages)
@@ -65,8 +69,47 @@ internal sealed class DeskController : IDisposable
         _nowPlaying.Changed += OnTrackChanged;
     }
 
+    private bool _piecesTakeClicks = DeskPieceClicks.DefaultOn;
+
+    /// <summary>A Desk menu item was chosen (spec 7.4); the app opens the page, arranges or turns the Desk off.</summary>
+    public event Action<DeskMenuAction>? MenuRequested;
+
+    public void PlayPause() => _nowPlaying.Service.TogglePlayPause();
+
+    public void OpenWeatherCredit()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(DeskClicks.WeatherCreditUrl) { UseShellExecute = true });
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            // No browser to open: nothing else to do.
+        }
+    }
+
+    public void Menu(DeskMenuAction action) => MenuRequested?.Invoke(action);
+
+    /// <summary>The system readings are sampling now (the live check reads it).</summary>
+    internal bool TelemetryRunning => _telemetry.Running;
+
+    /// <summary>The bars' level source is running now (the live check reads it).</summary>
+    internal bool AudioRunning => _audio.Running;
+
+    /// <summary>The arrange surfaces while Arrange mode runs (the live check reads them).</summary>
+    internal DeskArrangeMode? ArrangeMode => _arrangeMode;
+
     /// <summary>True while the Desk is on screen.</summary>
     public bool Running => _host?.IsShowing == true;
+
+    /// <summary>True while Arrange mode is up.</summary>
+    public bool Arranging => _session is not null;
+
+    /// <summary>The running Arrange edit (its working layout), null when none runs.</summary>
+    public DeskArrangeSession? Session => _session;
+
+    /// <summary>Raised when Arrange mode begins, after each drop and when it ends.</summary>
+    public event Action? ArrangeChanged;
 
     /// <summary>Supplies the live widget theme's text color, for Theme ink. Null: Light ink.</summary>
     public Func<string?> ThemeText { get; set; } = () => null;
@@ -79,16 +122,18 @@ internal sealed class DeskController : IDisposable
         _ink = _store.LoadDeskInk();
         _np = _store.LoadNowPlaying();
         _weatherSettings = _store.LoadDeskWeather();
+        _piecesTakeClicks = _store.LoadDeskPiecesTakeClicks();
         _messages.Reload();
         if (!_settings.Enabled)
         {
-            StopHost();
+            StopHost(); // ends Arrange mode too, as Cancel
             return;
         }
         if (_host is null)
         {
             _host = _hostFactory();
             _host.ScreensChanged += OnScreensChanged;
+            _host.CoverageChanged += OnCoverageChanged;
         }
         Rebuild();
     }
@@ -124,9 +169,108 @@ internal sealed class DeskController : IDisposable
         _weather.Dispose();
     }
 
+    /// <summary>
+    /// Lights the glow's Desk spot in <paramref name="color"/> (spec 7.3). True only when the Desk is
+    /// running, the spot is placed and at least one island holding it is in sight; then every screen's
+    /// spot lights. False means the caller shows the glow at the window in use instead.
+    /// </summary>
+    public bool Glow(Color color)
+    {
+        if (_host is null || _stopped || Arranging || !Running || !Placed("glow")) return false;
+        bool inSight = false, any = false;
+        foreach (var surface in _surfaces)
+            foreach (var island in surface.Islands)
+            {
+                if (!island.Widgets.Contains("glow")) continue;
+                any = true;
+                if (!island.Pause.Paused) inSight = true;
+            }
+        if (!any || !inSight) return false;
+        bool lit = false;
+        foreach (var view in _views) lit |= view.Glow(color);
+        return lit;
+    }
+
+    // ---- Arrange mode (spec 7.3) ----
+
+    /// <summary>
+    /// Starts Arrange mode: only while the Desk is running. The islands come down, a surface per monitor
+    /// goes up with the saved layout as the working one, and nothing is saved until Done.
+    /// </summary>
+    public void BeginArrange()
+    {
+        // Not tied to Running: a Desk that is on but draws nothing yet (an empty message, no numbers) can
+        // still be arranged, since arrange mode draws every placed piece.
+        if (_host is null || _stopped || Arranging || _screens.Count == 0) return;
+        _fonts ??= new DeskFonts();
+        var session = new DeskArrangeSession(_settings.Layout);
+        var now = DateTimeOffset.Now;
+        var track = _np.Prefs.Visible(_nowPlaying.Shown);
+        var frame = new DeskFrame
+        {
+            Usage = _usage,
+            Now = now,
+            Message = _messages.Frame(now, _settings) is { } m ? m with { Played = new HashSet<string>(m.Played, StringComparer.Ordinal) } : null,
+            Track = track,
+            Telemetry = Placed("telemetry") ? _telemetry : null,
+            WeatherOn = Placed("weather"),
+            Place = _weatherSettings.Place,
+            Weather = _weatherSettings.Place is null ? null : _weather.Latest,
+        };
+        DeskArrangeMode mode;
+        try
+        {
+            mode = new DeskArrangeMode(_screens, _settings, _fonts, frame, session.Working,
+                how => EndArrange(how), () => ArrangeChanged?.Invoke());
+        }
+        catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Sanduhr] Arrange mode did not start: {e.GetType().Name}");
+            return;
+        }
+        _session = session;
+        _arrangeMode = mode;
+        // The islands go down while the arrange surfaces are up; coverage and sources have nothing to follow.
+        foreach (var v in _views) v.Dispose();
+        _views.Clear();
+        _surfaces = [];
+        _host.Hide();
+        // The arrange view has no bars; the readings it shows keep sampling.
+        SyncSources(track);
+        mode.Activate();
+        ArrangeChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Ends Arrange mode. Done writes the working layout once, when it changed; Cancel writes nothing.
+    /// Either way the arrange windows close and the islands come back with whatever layout is saved.
+    /// </summary>
+    public void EndArrange(DeskArrangeEnd how) => EndArrangeCore(how, reload: true);
+
+    private void EndArrangeCore(DeskArrangeEnd how, bool reload)
+    {
+        if (_session is not { } session) return;
+        var mode = _arrangeMode;
+        _arrangeMode = null;
+        _session = null;
+        mode?.Dispose();
+        if (how == DeskArrangeEnd.Done && session.ToWrite is { } layout && !_stopped)
+        {
+            try { _store.SaveDesk((_store.LoadDesk() with { Layout = layout }).Normalized()); }
+            catch (Exception e) when (e is System.IO.IOException or UnauthorizedAccessException)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Sanduhr] Arrange could not save: {e.GetType().Name}");
+            }
+        }
+        if (reload) Reload();
+        ArrangeChanged?.Invoke();
+    }
+
     private void OnScreensChanged()
     {
         _wallpaper.Invalidate();
+        // The arrange windows sit on the old monitors: drop the edit and lay out on the new ones.
+        if (Arranging) EndArrangeCore(DeskArrangeEnd.Cancel, reload: false);
         Rebuild();
     }
 
@@ -143,17 +287,56 @@ internal sealed class DeskController : IDisposable
 
     private bool Placed(string widget) => new DeskArrangement(_settings.Layout).Placement(widget) is not null;
 
-    /// <summary>Starts the sources whose pieces are placed and stops the rest.</summary>
+    /// <summary>A widget's reading is wanted when its piece is placed and at least one island holding it
+    /// is in sight. With no islands yet nothing is paused, so it is wanted (S7, 7.1).</summary>
+    private bool InSight(string widget)
+    {
+        if (!Placed(widget)) return false;
+        bool any = false;
+        foreach (var surface in _surfaces)
+            foreach (var island in surface.Islands)
+            {
+                if (!island.Widgets.Contains(widget)) continue;
+                any = true;
+                if (!island.Pause.Paused) return true;
+            }
+        return !any;
+    }
+
+    /// <summary>Starts the sources whose pieces are placed and in sight, and stops the rest.</summary>
     private void SyncSources(NowPlayingInfo? track)
     {
         bool on = _host is not null && !_stopped;
-        if (on && Placed("telemetry")) _telemetry.Start(); else _telemetry.Stop();
+        if (on && InSight("telemetry")) _telemetry.Start(); else _telemetry.Stop();
         _nowPlaying.Want(this, on && Placed("nowPlaying"));
-        bool bars = on && _np.Bars && Placed("nowPlaying") && track?.State == NowPlayingState.Playing;
+        bool bars = on && !Arranging && _np.Bars && InSight("nowPlaying") && track?.State == NowPlayingState.Playing;
         if (bars) _audio.Start(); else if (_audio.Running) _audio.Stop();
         if (on && Placed("weather") && _weatherSettings.Place is { } place)
             _weather.Start(place, _weatherSettings.UnitOr(RegionInfo.CurrentRegion.IsMetric));
         else _weather.Stop();
+    }
+
+    /// <summary>Sets each island's gate from the host's coverage. Islands the host has no flag for are in
+    /// sight. A gate raises its change only when its value moves.</summary>
+    private void ApplyCoverage()
+    {
+        var covered = _host?.Coverage ?? [];
+        int i = 0;
+        foreach (var surface in _surfaces)
+            foreach (var island in surface.Islands)
+            {
+                island.Pause.Paused = DeskPauseRule.Paused(i < covered.Count && covered[i], Arranging);
+                i++;
+            }
+    }
+
+    /// <summary>Windows moved over or away from the Desk: pause or resume the islands and the sources
+    /// that feed them. Nothing is laid out again.</summary>
+    private void OnCoverageChanged()
+    {
+        if (_host is null || _stopped) return;
+        ApplyCoverage();
+        SyncSources(_np.Prefs.Visible(_nowPlaying.Shown));
     }
 
     /// <summary>A full redraw is due only when what the line says changes (the track, its app or
@@ -171,7 +354,8 @@ internal sealed class DeskController : IDisposable
     /// when the islands line up with the last ones.</summary>
     private void Render()
     {
-        if (_host is null || _stopped || _screens.Count == 0 || _rendering) return;
+        // While arranging the arrange surfaces draw; the islands come back when it ends.
+        if (_host is null || _stopped || _screens.Count == 0 || _rendering || Arranging) return;
         _rendering = true;
         try { RenderOnce(); }
         finally { _rendering = false; }
@@ -207,7 +391,7 @@ internal sealed class DeskController : IDisposable
             var view = new DeskView(screen, _settings, _fonts);
             view.Update(frame, InkFor(view, screen, frame));
             _views.Add(view);
-            surfaces.Add(new DeskSurface(screen, view.TakeIslands()));
+            surfaces.Add(new DeskSurface(screen, DeskClicks.Prepare(view.TakeIslands(), _piecesTakeClicks, this)));
         }
         _surfaces = surfaces;
         if (_host is not { } host) return;
@@ -221,7 +405,11 @@ internal sealed class DeskController : IDisposable
             // on the next rebuild rather than let a timer tick take the app down.
             System.Diagnostics.Debug.WriteLine($"[Sanduhr] Desk redraw failed: {e.GetType().Name}");
             host.Hide();
+            return;
         }
+        // The new islands start in sight: take the host's reading and let the sources follow it.
+        ApplyCoverage();
+        SyncSources(track);
     }
 
     /// <summary>
@@ -271,6 +459,11 @@ internal sealed class DeskController : IDisposable
     {
         _minute.Stop();
         if (_host is null || _stopped) return;
+        if (Arranging)
+        {
+            ScheduleMinute();
+            return;
+        }
         var now = DateTimeOffset.Now;
         // A full layout every five minutes, and on the hour (hourly rotation, special-day windows, a new day).
         if (now - _fullAt >= FullEvery || _surfaces.Count == 0 || now.ToLocalTime().Hour != _fullAt.ToLocalTime().Hour
@@ -291,6 +484,7 @@ internal sealed class DeskController : IDisposable
 
     private void StopHost()
     {
+        if (Arranging) EndArrangeCore(DeskArrangeEnd.Cancel, reload: false);
         _minute.Stop();
         _screens = [];
         foreach (var v in _views) v.Dispose();
@@ -302,6 +496,7 @@ internal sealed class DeskController : IDisposable
         _nowPlaying.Want(this, false);
         if (_host is null) return;
         _host.ScreensChanged -= OnScreensChanged;
+        _host.CoverageChanged -= OnCoverageChanged;
         _host.Dispose();
         _host = null;
     }

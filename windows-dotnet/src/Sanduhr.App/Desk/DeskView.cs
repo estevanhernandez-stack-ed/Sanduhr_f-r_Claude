@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Threading;
@@ -59,7 +60,7 @@ internal sealed class DeskView : Grid, IDisposable
     private static readonly Color WarningRed = Color.FromRgb(0xF8, 0x71, 0x71);
 
     /// <summary>The pieces this build draws (watchers: only from the harness until their tools ship).</summary>
-    public static readonly IReadOnlyList<string> Drawn = ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers"];
+    public static readonly IReadOnlyList<string> Drawn = ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "glow"];
 
     private readonly DeskScreen _screen;
     private readonly DeskSettings _settings;
@@ -71,6 +72,33 @@ internal sealed class DeskView : Grid, IDisposable
     private DeskFrame _frame = new();
     private DeskInkMap _inks = DeskInkMap.Light;
     private ResolvedInk _ink = DeskInkMap.Light.Default;
+    private readonly Dictionary<string, FrameworkElement> _pieces = new(StringComparer.Ordinal);
+    private readonly List<(Rectangle Pill, RadialGradientBrush Brush)> _glows = [];
+    private DeskRect _content = new(0, 0, 0, 0);
+
+    /// <summary>
+    /// Arrange mode's drawing (spec 7.3): a piece that would draw nothing (nothing playing, an empty
+    /// message, weather unset, no Claude numbers, the glow's spot) draws its name instead, so every
+    /// placed piece can be grabbed. Set before <see cref="Update(DeskFrame, DeskInkMap)"/>.
+    /// </summary>
+    public bool Arranging { get; set; }
+
+    /// <summary>The content area the layout used, in this view's DIPs (the anchor points hang from it).</summary>
+    public DeskRect ContentRect => _content;
+
+    /// <summary>Each drawn piece's frame in this view's DIPs after layout, by widget key.</summary>
+    public IReadOnlyDictionary<string, Rect> PieceFrames()
+    {
+        LayOut();
+        var frames = new Dictionary<string, Rect>(StringComparer.Ordinal);
+        foreach (var (widget, element) in _pieces)
+        {
+            // Laid out but maybe not yet in a window (IsVisible would read false then): the size decides.
+            if (element.RenderSize.Width <= 0 || element.RenderSize.Height <= 0) continue;
+            frames[widget] = element.TransformToAncestor(this).TransformBounds(new Rect(element.RenderSize));
+        }
+        return frames;
+    }
 
     public DeskView(DeskScreen screen, DeskSettings settings, DeskFonts fonts)
     {
@@ -98,7 +126,9 @@ internal sealed class DeskView : Grid, IDisposable
     private double TimeSize => _settings.TimeSize;
     private double Inset => TimeSize * 0.18;
 
-    private readonly List<(StackPanel Stack, DeskColumn Column, DeskRow Row)> _stacks = [];
+    private readonly List<(StackPanel Stack, DeskColumn Column, DeskRow Row, DeskPause Pause, List<string> Widgets)> _stacks = [];
+    /// <summary>The gate of the stack being built; the live pieces in it watch this one (S7, 7.1).</summary>
+    private DeskPause _gate = new();
 
     /// <summary>Each non-empty stack's rect in screen DIPs after layout (Automatic ink samples the
     /// wallpaper behind these).</summary>
@@ -106,7 +136,7 @@ internal sealed class DeskView : Grid, IDisposable
     {
         LayOut();
         var rects = new Dictionary<DeskAnchor, Rect>();
-        foreach (var (stack, column, row) in _stacks)
+        foreach (var (stack, column, row, _, _) in _stacks)
         {
             if (stack.Children.Count == 0 || DeskAnchors.At(column, row) is not { } a) continue;
             rects[a] = stack.TransformToAncestor(this).TransformBounds(new Rect(stack.RenderSize));
@@ -133,7 +163,7 @@ internal sealed class DeskView : Grid, IDisposable
     {
         LayOut();
         var islands = new List<DeskIsland>();
-        foreach (var (stack, column, row) in _stacks)
+        foreach (var (stack, column, row, pause, widgets) in _stacks)
         {
             if (stack.Children.Count == 0 || stack.Parent is not Panel parent) continue;
             var r = stack.TransformToAncestor(this).TransformBounds(new Rect(stack.RenderSize));
@@ -165,7 +195,7 @@ internal sealed class DeskView : Grid, IDisposable
                 ? col.MaxWidth : (parent as FrameworkElement)?.ActualWidth ?? r.Width;
             parent.Children.Remove(stack);
             stack.MaxWidth = maxWidth;
-            islands.Add(new DeskIsland(stack, new Point(x, y), h, v));
+            islands.Add(new DeskIsland(stack, new Point(x, y), h, v) { Pause = pause, Widgets = widgets });
         }
         Children.Clear();
         _stacks.Clear();
@@ -183,6 +213,7 @@ internal sealed class DeskView : Grid, IDisposable
     public void Dispose()
     {
         _ticks.Clear();
+        foreach (var (pill, _) in _glows) pill.BeginAnimation(UIElement.OpacityProperty, null);
         foreach (var d in _live) d.Dispose();
         _live.Clear();
     }
@@ -192,12 +223,15 @@ internal sealed class DeskView : Grid, IDisposable
         Dispose();
         Children.Clear();
         _stacks.Clear();
+        _pieces.Clear();
+        _glows.Clear();
         var arrangement = new DeskArrangement(_settings.Layout);
         var stacks = arrangement.Stacks(Drawn);
         var m = _settings.Margins;
         var margins = DeskGeometry.Margins(m.Left, m.Right, m.Top, m.Bottom, _screen.Taskbar, Inset);
         var size = _screen.SizeDips;
         var content = DeskGeometry.Content(size.Width, size.Height, margins, Inset);
+        _content = content;
 
         var area = new Grid
         {
@@ -253,13 +287,18 @@ internal sealed class DeskView : Grid, IDisposable
             var stack = new StackPanel { HorizontalAlignment = align };
             var row = rows.Count == 3 ? (i == 0 ? DeskRow.Top : DeskRow.Bottom)
                 : i == 0 ? DeskRow.Top : i == 2 ? DeskRow.Middle : DeskRow.Bottom;
-            _stacks.Add((stack, column, row));
+            var pause = new DeskPause();
+            var widgets = new List<string>();
+            _stacks.Add((stack, column, row, pause, widgets));
+            _gate = pause;
             if (DeskAnchors.At(column, row) is { } anchor) _ink = _inks.For(anchor);
             foreach (var p in rows[i].Pieces)
                 if (Piece(p, align, width) is { } piece)
                 {
                     piece.Margin = new Thickness(0, stack.Children.Count > 0 ? TimeSize * 0.12 : 0, 0, 0);
                     stack.Children.Add(piece);
+                    widgets.Add(p.Widget);
+                    _pieces[p.Widget] = piece;
                 }
             SetRow(stack, i);
             grid.Children.Add(stack);
@@ -272,7 +311,7 @@ internal sealed class DeskView : Grid, IDisposable
         double ts = TimeSize * p.Scale;
         FrameworkElement? piece = p.Widget switch
         {
-            "message" => _frame.Message is { } msg ? DeskMessagePiece.Create(msg, p.Scale, _ink, _fonts, _settings.Font, align, width, _live) : null,
+            "message" => _frame.Message is { } msg ? DeskMessagePiece.Create(msg, p.Scale, _ink, _fonts, _settings.Font, align, width, _live, _gate) : null,
             "clock" => Clock(ts, align),
             "claude" => ClaudeLine(ts),
             "meters" => Meters(ts, align),
@@ -280,14 +319,70 @@ internal sealed class DeskView : Grid, IDisposable
             "telemetry" => TelemetryPiece(ts, align),
             "weather" => WeatherPiece(ts, align),
             "watchers" => WatchersPiece(ts, align),
+            "glow" => GlowSlot(ts),
             _ => null,
         };
+        if (piece is null && Arranging && p.Widget != "glow")
+            piece = Text(SettingsNames.DeskPieceName(p.Widget), ts * 0.17, 0.75, alignment: TextAlign(align));
         if (piece is null) return null;
         piece.HorizontalAlignment = align;
-        // The message carries its own glow (spec 6.2); every other piece takes the ink's shadow.
-        if (p.Widget is not ("message" or "nowPlaying") && _ink.ShadowOpacity > 0)
+        piece.Tag = p.Widget; // which piece this is, for the Desk's clicks (DeskClicks, spec 7.4)
+        // The message carries its own glow (spec 6.2) and the glow's spot is clear at rest; every other
+        // piece takes the ink's shadow.
+        if (p.Widget is not ("message" or "nowPlaying" or "glow") && _ink.ShadowOpacity > 0)
             piece.Effect = Shadow(_ink);
         return piece;
+    }
+
+    /// <summary>
+    /// The glow's spot (spec 7.3): a fixed-size slot, so a glow never moves its stack-mates, fully clear
+    /// at rest. Inside, a pill filled with a radial wash whose opacity is 0 until <see cref="Glow"/>
+    /// lights it. While arranging the slot carries its name so it can be seen and grabbed.
+    /// </summary>
+    private FrameworkElement GlowSlot(double ts)
+    {
+        double width = ts * 2.2, height = ts * 0.42;
+        var slot = new Grid { Width = width, Height = height };
+        var brush = new RadialGradientBrush { Center = new Point(0.5, 0.5), GradientOrigin = new Point(0.5, 0.5), RadiusX = 0.5, RadiusY = 0.5 };
+        brush.GradientStops.Add(new GradientStop(Colors.White, 0));
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x99, 255, 255, 255), 0.45));
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0, 255, 255, 255), 1));
+        var pill = new Rectangle { RadiusX = height / 2, RadiusY = height / 2, Fill = brush, Opacity = 0, IsHitTestVisible = false };
+        slot.Children.Add(pill);
+        _glows.Add((pill, brush));
+        if (Arranging)
+            slot.Children.Add(Centered(Text(SettingsNames.DeskGlow, ts * 0.17, 0.75, alignment: TextAlignment.Center)));
+        return slot;
+    }
+
+    private static TextBlock Centered(TextBlock t)
+    {
+        t.HorizontalAlignment = HorizontalAlignment.Center;
+        t.VerticalAlignment = VerticalAlignment.Center;
+        return t;
+    }
+
+    /// <summary>
+    /// Lights the glow's spot in <paramref name="color"/>: the pill fades in over 0.2 s, holds, and is
+    /// clear again by 1.5 s, at 30 frames a second. False when this screen has no spot.
+    /// </summary>
+    public bool Glow(Color color)
+    {
+        if (_glows.Count == 0) return false;
+        foreach (var (pill, brush) in _glows)
+        {
+            brush.GradientStops[0].Color = color;
+            brush.GradientStops[1].Color = Color.FromArgb(0x99, color.R, color.G, color.B);
+            brush.GradientStops[2].Color = Color.FromArgb(0, color.R, color.G, color.B);
+            var fade = new DoubleAnimationUsingKeyFrames { FillBehavior = FillBehavior.Stop };
+            fade.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+            fade.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(0.2))));
+            fade.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(0.9))));
+            fade.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(1.5))));
+            Timeline.SetDesiredFrameRate(fade, 30);
+            pill.BeginAnimation(UIElement.OpacityProperty, fade);
+        }
+        return true;
     }
 
     internal static DropShadowEffect Shadow(ResolvedInk ink) => new()
@@ -418,7 +513,7 @@ internal sealed class DeskView : Grid, IDisposable
         double width = ts * 3.2;
         if (rows.Count == 0)
         {
-            if (!_frame.Usage.SignInNeeded) return null;
+            if (!DeskMeters.SignInLineShown(_frame.Usage)) return null;
             return Text(DeskClaudeText.SignInLine(_frame.Usage.FirstSignIn), size, 0.75);
         }
         var panel = new StackPanel { HorizontalAlignment = align, Opacity = _frame.Usage.IsStale(_frame.Now) ? 0.5 : 1 };
@@ -498,6 +593,7 @@ internal sealed class DeskView : Grid, IDisposable
         }
         var credit = Text(Weather.Credit, Math.Max(9, size * 0.55), 0.55, alignment: ta);
         credit.Margin = new Thickness(0, size * 0.3, 0, 0);
+        credit.Tag = DeskClicks.WeatherCreditTag;
         Add(credit);
         return panel;
     }
@@ -531,11 +627,22 @@ internal sealed class DeskView : Grid, IDisposable
 
         if (track.State == NowPlayingState.Playing && track.Duration is > 0)
         {
+            // While the island is covered the bar rests; on resume it reads the current track at once
+            // (a seek or a pause may have moved the anchor) and ticks again (S7, 7.1).
             var tick = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
             var current = _frame.TrackNow;
-            tick.Tick += (_, _) => fill.Width = width * ((current?.Invoke() ?? track).Progress(DateTimeOffset.Now) ?? 0);
-            tick.Start();
-            _live.Add(new Unhook(tick.Stop));
+            var gate = _gate;
+            void SetBar() => fill.Width = width * ((current?.Invoke() ?? track).Progress(DateTimeOffset.Now) ?? 0);
+            void OnGate()
+            {
+                if (gate.Paused) { tick.Stop(); return; }
+                SetBar();
+                tick.Start();
+            }
+            tick.Tick += (_, _) => SetBar();
+            if (!gate.Paused) tick.Start();
+            gate.Changed += OnGate;
+            _live.Add(new Unhook(() => { tick.Stop(); gate.Changed -= OnGate; }));
         }
 
         if (!_frame.Bars || _frame.Audio is not { } audio) return column;

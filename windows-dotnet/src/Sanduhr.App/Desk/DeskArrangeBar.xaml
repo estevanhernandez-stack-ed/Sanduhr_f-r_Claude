@@ -1,0 +1,67 @@
+<UserControl x:Class="Sanduhr.App.Desk.DeskArrangeBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Focusable="False">
+    <!-- Arrange mode's bar: its title, hint and keys line over Done and Cancel. Themed by resource
+         reference, so it reads in every widget theme, light or dark. -->
+    <UserControl.Resources>
+        <Style x:Key="BarButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Glass}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="18,7" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+            <Setter Property="MinWidth" Value="84" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bg" CornerRadius="7"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Opacity" Value="0.85" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Text}" />
+                                <Setter TargetName="bg" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="BarPrimary" TargetType="Button" BasedOn="{StaticResource BarButton}">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Bg}" />
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </UserControl.Resources>
+    <Border x:Name="Frame" CornerRadius="14" BorderThickness="1" Padding="24,20,24,18"
+            Background="{DynamicResource Sanduhr.Brush.Bg}"
+            BorderBrush="{DynamicResource Sanduhr.Brush.Border}">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="28" ShadowDepth="4" Opacity="0.45" Color="Black" />
+        </Border.Effect>
+        <StackPanel>
+            <TextBlock x:Name="Title" FontSize="18" FontWeight="SemiBold"
+                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+            <TextBlock x:Name="Hint" FontSize="13" TextWrapping="Wrap" Margin="0,8,0,0"
+                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+            <TextBlock x:Name="Keys" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0"
+                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+                <Button x:Name="CancelButton" Style="{StaticResource BarButton}" Content="Cancel" />
+                <Button x:Name="DoneButton" Style="{StaticResource BarPrimary}" Content="Done" IsDefault="True" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

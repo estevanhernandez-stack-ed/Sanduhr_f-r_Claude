@@ -702,6 +702,53 @@ public sealed class SettingsStore
         Write(root);
     }
 
+    /// <summary>"Clock and message take clicks" (spec 7.4): <c>desk_pieces_take_clicks</c>, absent = on.</summary>
+    public bool LoadDeskPiecesTakeClicks() => ReadBool(Read(), DeskPieceClicks.Key, DeskPieceClicks.DefaultOn);
+
+    public void SaveDeskPiecesTakeClicks(bool on)
+    {
+        var root = Read();
+        root["desk_pieces_take_clicks"] = on;
+        Write(root);
+    }
+
+    /// <summary>The Desk's sign-in reminder switch (spec 7.5): "desk_sign_in_reminder". Absent reads as on.</summary>
+    public bool LoadDeskSignInReminder() => ReadBool(Read(), "desk_sign_in_reminder", SignInReminder.DefaultOn);
+
+    public void SaveDeskSignInReminder(bool on)
+    {
+        var root = Read();
+        root["desk_sign_in_reminder"] = on;
+        Write(root);
+    }
+
+    /// <summary>Just the Desk (spec 7.5): "just_the_desk" and "just_the_desk_silenced_reminder". Both absent
+    /// read as <see cref="JustTheDeskState.Off"/>.</summary>
+    public JustTheDeskState LoadJustTheDesk()
+    {
+        var root = Read();
+        bool on = ReadBool(root, "just_the_desk", false);
+        return on ? new JustTheDeskState(true, ReadBool(root, "just_the_desk_silenced_reminder", false)) : JustTheDeskState.Off;
+    }
+
+    /// <summary>Writes Just the Desk. Off removes both keys; the silenced key is written only when true.</summary>
+    public void SaveJustTheDesk(JustTheDeskState state)
+    {
+        var root = Read();
+        if (state.On)
+        {
+            root["just_the_desk"] = true;
+            if (state.SilencedReminder) root["just_the_desk_silenced_reminder"] = true;
+            else root.Remove("just_the_desk_silenced_reminder");
+        }
+        else
+        {
+            root.Remove("just_the_desk");
+            root.Remove("just_the_desk_silenced_reminder");
+        }
+        Write(root);
+    }
+
     private static double ReadDouble(JsonObject? o, string key, double fallback)
     {
         try { return o?[key]?.GetValue<double>() ?? fallback; } catch { return fallback; }

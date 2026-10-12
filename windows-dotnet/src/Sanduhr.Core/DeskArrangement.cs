@@ -90,7 +90,7 @@ public sealed class DeskArrangement
     /// <summary>The widget words this build knows, in Settings order (also the order a newly placed piece takes among its neighbors):
     /// the Mac's list with Windows' telemetry and weather (S6, after Este's Knighthawk skins) before watchers.</summary>
     public static readonly IReadOnlyList<string> Known =
-        ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "meetings"];
+        ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "meetings", "glow"];
 
     /// <summary>The widgets Stage 5 draws.</summary>
     public static readonly IReadOnlyList<string> DrawnInS5 = ["clock", "claude", "meters"];
@@ -138,6 +138,7 @@ public sealed class DeskArrangement
         "message" => DeskAnchor.TL,
         "telemetry" => DeskAnchor.TR,
         "weather" => DeskAnchor.MR,
+        "glow" => DeskAnchor.TC,
         _ => DeskAnchor.BL,
     };
 
@@ -216,6 +217,30 @@ public sealed class DeskArrangement
         var first = there.FindIndex(i => Rank(_pieces[i].Widget) > rank);
         var insertAt = first >= 0 ? there[first] : (there.Count > 0 ? there[^1] + 1 : _pieces.Count);
         _pieces.Insert(insertAt, moved);
+    }
+
+    /// <summary>
+    /// Puts a placed piece at <paramref name="anchor"/>, in front of <paramref name="before"/> in that
+    /// anchor's stack (null: at its bottom). Into an empty anchor it keeps its place in the string, as
+    /// <see cref="Place"/> does. The piece keeps its size. Nothing changes for a piece that is not placed,
+    /// or when <paramref name="before"/> is the piece itself.
+    /// </summary>
+    public void Put(string widget, DeskAnchor anchor, string? before)
+    {
+        if (widget == before) return;
+        var from = _pieces.FindIndex(p => p.Widget == widget);
+        if (from < 0) return;
+        var piece = _pieces[from] with { Anchor = anchor };
+        _pieces.RemoveAt(from);
+        var i = before is null ? -1 : _pieces.FindIndex(p => p.Widget == before && p.Anchor == anchor);
+        if (i >= 0)
+        {
+            _pieces.Insert(i, piece);
+            return;
+        }
+        var last = _pieces.FindLastIndex(p => p.Anchor == anchor);
+        if (last >= 0) _pieces.Insert(last + 1, piece);
+        else _pieces.Insert(Math.Min(from, _pieces.Count), piece);
     }
 
     /// <summary>Sets a placed piece's size (snapped and kept within range). A hidden piece has none.</summary>

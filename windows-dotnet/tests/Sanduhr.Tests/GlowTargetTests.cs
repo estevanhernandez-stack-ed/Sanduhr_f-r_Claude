@@ -73,12 +73,33 @@ public class GlowTargetTests
     }
 
     [Fact]
-    public void DeskReadsAsWindowAndIsNeverOffered()
+    public void DeskIsOfferedAndReadsAsWindowWhenTheDeskCannotShowIt()
     {
-        Assert.Equal(GlowTargetKind.Window, new GlowTargetSettings(GlowTargetKind.Desk, GlowEdgeSide.Top, null).Effective);
-        Assert.Equal(GlowTargetKind.Edge, new GlowTargetSettings(GlowTargetKind.Edge, GlowEdgeSide.Top, null).Effective);
-        Assert.Equal(GlowTargetKind.Widget, new GlowTargetSettings(GlowTargetKind.Widget, GlowEdgeSide.Top, null).Effective);
-        Assert.Equal(new[] { GlowTargetKind.Window, GlowTargetKind.Edge, GlowTargetKind.Widget }, GlowTargetSettings.Offered);
+        var desk = new GlowTargetSettings(GlowTargetKind.Desk, GlowEdgeSide.Top, null);
+        Assert.Equal(GlowTargetKind.Desk, desk.Effective(true));
+        Assert.Equal(GlowTargetKind.Window, desk.Effective(false));
+        Assert.Equal(new[] { GlowTargetKind.Window, GlowTargetKind.Edge, GlowTargetKind.Widget, GlowTargetKind.Desk }, GlowTargetSettings.Offered);
+    }
+
+    [Theory]
+    [InlineData(GlowTargetKind.Window)]
+    [InlineData(GlowTargetKind.Edge)]
+    [InlineData(GlowTargetKind.Widget)]
+    public void OtherTargetsIgnoreTheDesk(GlowTargetKind kind)
+    {
+        var s = new GlowTargetSettings(kind, GlowEdgeSide.Top, null);
+        Assert.Equal(kind, s.Effective(true));
+        Assert.Equal(kind, s.Effective(false));
+    }
+
+    [Fact]
+    public void KindNamesAndDeskCaption()
+    {
+        Assert.Equal("The window you're working in", GlowTargetSettings.KindName(GlowTargetKind.Window));
+        Assert.Equal("A screen edge", GlowTargetSettings.KindName(GlowTargetKind.Edge));
+        Assert.Equal("The widget only", GlowTargetSettings.KindName(GlowTargetKind.Widget));
+        Assert.Equal("A spot on the Desk", GlowTargetSettings.KindName(GlowTargetKind.Desk));
+        Assert.Equal("On the Desk while it is on and in sight; otherwise at the top of the window you're working in.", GlowTargetSettings.DeskCaption);
     }
 
     [Fact]

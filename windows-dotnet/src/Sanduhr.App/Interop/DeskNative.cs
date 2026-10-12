@@ -18,6 +18,7 @@ internal static class DeskNative
     public const int GWL_STYLE = -16;
     public const int GWLP_HWNDPARENT = -8;
     public const int WS_POPUP = unchecked((int)0x80000000);
+    public const int WS_VISIBLE = 0x10000000;
     public const int WS_CAPTION = 0x00C00000;
     public const int WS_EX_TRANSPARENT = 0x00000020;
     public const int WS_EX_TOOLWINDOW = 0x00000080;
@@ -37,6 +38,9 @@ internal static class DeskNative
     public const int WM_DESTROY = 0x0002;
     public const int WM_SETTINGCHANGE = 0x001A;
     public const int WM_MOUSEACTIVATE = 0x0021;
+    public const int WM_KEYDOWN = 0x0100;
+    public const int VK_RETURN = 0x0D;
+    public const int VK_ESCAPE = 0x1B;
     public const int WM_WINDOWPOSCHANGING = 0x0046;
     public const int WM_DISPLAYCHANGE = 0x007E;
     public const int WM_DPICHANGED = 0x02E0;
@@ -45,6 +49,13 @@ internal static class DeskNative
     public const int SPI_SETDESKWALLPAPER = 0x0014;
 
     public const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
+    public const uint EVENT_SYSTEM_MOVESIZEEND = 0x000B;
+    public const uint EVENT_SYSTEM_MINIMIZESTART = 0x0016;
+    public const uint EVENT_SYSTEM_MINIMIZEEND = 0x0017;
+    public const uint EVENT_OBJECT_SHOW = 0x8002;
+    public const uint EVENT_OBJECT_HIDE = 0x8003;
+    public const uint EVENT_OBJECT_CLOAKED = 0x8017;
+    public const uint EVENT_OBJECT_UNCLOAKED = 0x8018;
     public const uint WINEVENT_OUTOFCONTEXT = 0x0000;
     public const uint WINEVENT_SKIPOWNPROCESS = 0x0002;
 
@@ -96,12 +107,14 @@ internal static class DeskNative
 
     [DllImport("user32.dll")] public static extern IntPtr GetShellWindow();
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] public static extern bool SetForegroundWindow(IntPtr h);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr FindWindowExW(IntPtr parent, IntPtr after, string? cls, string? name);
     [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr h, uint cmd);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassNameW(IntPtr h, StringBuilder sb, int max);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
     [DllImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] public static extern bool IsWindowVisible(IntPtr h);
     [DllImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] public static extern bool IsWindow(IntPtr h);
+    [DllImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] public static extern bool IsIconic(IntPtr h);
     [DllImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetWindowRect(IntPtr h, out RECT r);
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] public static extern int GetWindowLong(IntPtr h, int index);
     // SetWindowLongPtrW exists only in 64-bit user32 (32-bit exports SetWindowLongW alone); Sanduhr ships

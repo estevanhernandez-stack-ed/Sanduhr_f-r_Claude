@@ -102,6 +102,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             new DeskPieceRow(this, "nowPlaying", SettingsNames.DeskNowPlaying),
             new DeskPieceRow(this, "telemetry", SettingsNames.DeskTelemetry),
             new DeskPieceRow(this, "weather", SettingsNames.DeskWeather),
+            new DeskPieceRow(this, "glow", SettingsNames.DeskGlow),
         ];
         Load();
         LoadInk();
@@ -109,6 +110,41 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
 
     /// <summary>Called after every saved change (App re-applies the Desk).</summary>
     public Action? Changed { get; set; }
+
+    /// <summary>The Arrange Desk… button was pressed (App begins Arrange mode on the desktop).</summary>
+    public Action? ArrangeRequested { get; set; }
+
+    /// <summary>True while Arrange mode is up on the desktop (App sets it).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanArrange), nameof(ArrangeNote), nameof(NotArranging))]
+    private bool _arranging;
+
+    /// <summary>The piece rows are editable only while no Arrange session runs (Done would overwrite them).</summary>
+    public bool NotArranging => !Arranging;
+
+    /// <summary>The working layout of the running Arrange session, null when none runs: the map draws it live.</summary>
+    [ObservableProperty] private string? _arrangingLayout;
+
+    /// <summary>The button is live while the Desk is on and no Arrange session runs.</summary>
+    public bool CanArrange => Enabled && !Arranging;
+
+    /// <summary>The line under the button: why it is off, what Arrange mode is doing, or what it does.</summary>
+    public string ArrangeNote => Arranging ? DeskArrangeCopy.SettingsArranging
+        : !Enabled ? DeskArrangeCopy.SettingsDeskOff : DeskArrangeCopy.SettingsNote;
+
+    /// <summary>Starts Arrange mode on the desktop.</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void Arrange() => ArrangeRequested?.Invoke();
+
+    /// <summary>Reads the saved settings again without saving (Arrange mode wrote the layout, or the
+    /// glow's place was added): the rows and the map follow.</summary>
+    public void Reload()
+    {
+        _saved = _store.LoadDesk();
+        Load();
+        OnPropertyChanged(nameof(Layout));
+        OnPropertyChanged(nameof(Settings));
+    }
 
     /// <summary>Slider drags (clock size, margins) settle for this long before they save, so a drag
     /// writes settings.json and rebuilds the Desk once, not on every tick (PR #209 review, 6).</summary>
@@ -151,6 +187,19 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     [ObservableProperty] private bool _inkShadow = true;
 
     public bool IsCustomInk => InkChoice.Mode == DeskInkMode.Custom;
+
+    /// <summary>"Clock and message take clicks" (spec 7.4): saved at once, and the Desk follows.</summary>
+    public bool PiecesTakeClicks
+    {
+        get => _store.LoadDeskPiecesTakeClicks();
+        set
+        {
+            if (value == PiecesTakeClicks) return;
+            _store.SaveDeskPiecesTakeClicks(value);
+            OnPropertyChanged();
+            Changed?.Invoke();
+        }
+    }
 
     private void LoadInk()
     {
@@ -239,7 +288,12 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         _loading = false;
     }
 
-    partial void OnEnabledChanged(bool value) { if (!_loading) Save(_saved with { Enabled = value }); }
+    partial void OnEnabledChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanArrange));
+        OnPropertyChanged(nameof(ArrangeNote));
+        if (!_loading) Save(_saved with { Enabled = value });
+    }
 
     partial void OnFontChanged(string value)
     {

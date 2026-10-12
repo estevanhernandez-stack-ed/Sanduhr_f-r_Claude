@@ -128,8 +128,31 @@ public static class SettingsNames
     public const string DeskNowPlaying = "Now playing";
     public const string DeskTelemetry = "System (CPU, RAM, disk)";
     public const string DeskWeather = "Weather";
+    /// <summary>Desk, Where each piece sits: the glow's spot (spec 7.3), named as Arrange mode labels it.</summary>
+    public const string DeskGlow = "Claude Code glow";
+    /// <summary>Desk: starts Arrange mode on the desktop (spec 7.3).</summary>
+    public const string ArrangeDesk = DeskArrangeCopy.SettingsButton;
+    /// <summary>Desk: the clock, message and Claude line take clicks (spec 7.4).</summary>
+    public const string DeskPieceClicksSwitch = DeskPieceClicks.Title;
+    /// <summary>The name a Desk piece goes by on the layout map and in Arrange mode; an unknown piece goes by its key.</summary>
+    public static string DeskPieceName(string widget) => widget switch
+    {
+        "message" => DeskMessage,
+        "clock" => DeskClock,
+        "claude" => DeskClaudeLine,
+        "meters" => DeskClaudeBars,
+        "nowPlaying" => DeskNowPlaying,
+        "telemetry" => DeskTelemetry,
+        "weather" => DeskWeather,
+        "glow" => DeskGlow,
+        _ => widget,
+    };
     /// <summary>Desk, Look: the ink the Desk draws in (spec 6.7).</summary>
     public const string DeskInk = "Ink";
+    /// <summary>Alerts: the Desk's sign-in reminder switch (settings.json "desk_sign_in_reminder", on by default).</summary>
+    public const string SignInReminders = SignInReminder.Title;
+    /// <summary>The first-run card's third action (settings.json "just_the_desk"); it has no Settings control.</summary>
+    public const string JustTheDeskButton = JustTheDesk.ButtonTitle;
     /// <summary>Now playing: the widget's line (settings.json "now_playing.widget", off by default).</summary>
     public const string NowPlayingInWidget = "Show what's playing in the widget";
     /// <summary>Weather: looks a typed city up with Open-Meteo.</summary>
@@ -161,6 +184,9 @@ public static class SettingsNames
         (FollowAccount, SettingsPage.Accounts),
         (DeskSwitch, SettingsPage.Desk),
         (DeskInk, SettingsPage.Desk),
+        (ArrangeDesk, SettingsPage.Desk),
+        (DeskPieceClicksSwitch, SettingsPage.Desk),
+        (SignInReminders, SettingsPage.Alerts),
         (NowPlayingInWidget, SettingsPage.NowPlaying),
         (WeatherLookUp, SettingsPage.Weather),
         (GlowWhere, SettingsPage.ClaudeCode),

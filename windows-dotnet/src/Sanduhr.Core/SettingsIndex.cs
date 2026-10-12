@@ -34,6 +34,7 @@ public static class SettingsIndex
     public const string Thresholds = "thresholds";
     public const string Sound = "sound";
     public const string TestAlert = "test";
+    public const string SignInReminders = "signin-reminders";
     // History
     public const string Chart = "chart";
     public const string HistoryExport = "export";
@@ -71,6 +72,8 @@ public static class SettingsIndex
     public const string DeskMargins = "margins";
     public const string DeskMap = "map";
     public const string DeskInk = "ink";
+    public const string DeskArrange = "arrange";
+    public const string DeskClicks = "desk-clicks";
     // Desk: Message, Now playing, Weather (S6)
     public const string MessageLines = "lines";
     public const string MessageRotation = "rotation";
@@ -119,6 +122,8 @@ public static class SettingsIndex
         E("Warn at and Urgent at", SettingsPage.Alerts, Thresholds, ["threshold", "warn", "urgent", "percent"]),
         E("Sound", SettingsPage.Alerts, Sound, ["chime", "sound", "snake", "model-scoped", "mute"]),
         E(SettingsNames.SendTestAlert, SettingsPage.Alerts, TestAlert, ["test", "try"]),
+        E(SettingsNames.SignInReminders, SettingsPage.Alerts, SignInReminders,
+            ["sign in", "signed out", "without Claude", "reminder", "Just the Desk", "session expired"]),
 
         E("History chart", SettingsPage.History, Chart,
             ["meter history", "30 days", "week", "month", "account", "all accounts", "chart"]),
@@ -168,6 +173,10 @@ public static class SettingsIndex
 
         E(SettingsNames.DeskSwitch, SettingsPage.Desk, DeskOn,
             ["desktop", "wallpaper", "clock", "meters", "Rainmeter", "show the Desk", "on the desktop", "off by default", "monitors"]),
+        E(SettingsNames.ArrangeDesk, SettingsPage.Desk, DeskArrange,
+            ["drag", "move", "rearrange", "arrange", "reorder", "on the desktop", "layout"]),
+        E(SettingsNames.DeskPieceClicksSwitch, SettingsPage.Desk, DeskClicks,
+            ["click", "click-through", "right-click", "menu", "desktop icons", "clock", "message"]),
         E("Where each piece sits", SettingsPage.Desk, DeskPieces,
             ["layout", "place", "corner", "position", "size", "hidden", "clock", "meters", "Claude line", "taskbar", "anchor"]),
         E("Look", SettingsPage.Desk, DeskLook,
@@ -214,6 +223,7 @@ public static class SettingsIndex
         [SettingsNames.AddFolder] = Folders,
         [SettingsNames.FollowAccount] = Follow,
         [SettingsNames.SendTestAlert] = TestAlert,
+        [SettingsNames.SignInReminders] = SignInReminders,
         [SettingsNames.ExportCsv] = HistoryExport,
         [SettingsNames.SaveAndApply] = Paste,
         [SettingsNames.WhatsNew] = Version,
@@ -223,6 +233,8 @@ public static class SettingsIndex
         [SettingsNames.ResetSanduhr] = Reset,
         [SettingsNames.DeskSwitch] = DeskOn,
         [SettingsNames.DeskInk] = DeskInk,
+        [SettingsNames.ArrangeDesk] = DeskArrange,
+        [SettingsNames.DeskPieceClicksSwitch] = DeskClicks,
         [SettingsNames.NowPlayingInWidget] = NowPlayingWidget,
         [SettingsNames.WeatherLookUp] = WeatherPlace,
         [SettingsNames.GlowWhere] = GlowWhere,

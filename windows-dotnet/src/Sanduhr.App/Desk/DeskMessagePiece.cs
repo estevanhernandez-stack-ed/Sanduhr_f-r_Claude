@@ -133,7 +133,7 @@ internal static class DeskMessagePiece
     private static bool ReduceMotion => !SystemParameters.ClientAreaAnimation;
 
     public static FrameworkElement? Create(DeskMessageFrame frame, double scale, ResolvedInk ink, DeskFonts fonts,
-        string? deskFont, HorizontalAlignment align, double width, List<IDisposable> live)
+        string? deskFont, HorizontalAlignment align, double width, List<IDisposable> live, DeskPause gate)
     {
         var lines = frame.Today.Lines;
         if (lines.Count == 0) return null;
@@ -146,7 +146,7 @@ internal static class DeskMessagePiece
             HorizontalAlignment.Center => TextAlignment.Center,
             _ => TextAlignment.Left,
         };
-        var built = lines.Select(l => Line(l, s, ink, regular, bold, baseSize, ta, align, width, live, frame.Played)).ToList();
+        var built = lines.Select(l => Line(l, s, ink, regular, bold, baseSize, ta, align, width, live, frame.Played, gate)).ToList();
 
         if (!MessageSpecialModes.Cycles(s.Special, frame.Today))
         {
@@ -173,6 +173,11 @@ internal static class DeskMessagePiece
         int shown = MessageSpecialModes.Index(MessageSpecialModes.ToUnixSeconds(DateTimeOffset.Now), built.Count, s.Seconds);
         built[shown].Opacity = 1;
         var timer = new DispatcherTimer(DispatcherPriority.Background);
+        void Schedule()
+        {
+            double unix = MessageSpecialModes.ToUnixSeconds(DateTimeOffset.Now);
+            timer.Interval = TimeSpan.FromSeconds(Math.Max(0.2, MessageSpecialModes.NextChange(unix, s.Seconds) - unix));
+        }
         void Next()
         {
             double unix = MessageSpecialModes.ToUnixSeconds(DateTimeOffset.Now);
@@ -181,11 +186,35 @@ internal static class DeskMessagePiece
             shown = i;
             timer.Interval = TimeSpan.FromSeconds(Math.Max(0.2, MessageSpecialModes.NextChange(unix, s.Seconds) - unix));
         }
+        // While the island is covered the turns stop. On resume the line the clock says shows at once,
+        // without motion, and the timer is scheduled for the next change (S7, 7.1).
+        void StopMotion()
+        {
+            foreach (var b in built)
+            {
+                b.BeginAnimation(UIElement.OpacityProperty, null);
+                if (b.RenderTransform is TranslateTransform t) t.BeginAnimation(TranslateTransform.YProperty, null);
+            }
+        }
+        void OnGate()
+        {
+            timer.Stop();
+            StopMotion();
+            if (gate.Paused) return;
+            shown = MessageSpecialModes.Index(MessageSpecialModes.ToUnixSeconds(DateTimeOffset.Now), built.Count, s.Seconds);
+            for (int i = 0; i < built.Count; i++)
+            {
+                built[i].Opacity = i == shown ? 1 : 0;
+                if (built[i].RenderTransform is TranslateTransform t) t.Y = 0;
+            }
+            Schedule();
+            timer.Start();
+        }
         timer.Tick += (_, _) => Next();
-        double now0 = MessageSpecialModes.ToUnixSeconds(DateTimeOffset.Now);
-        timer.Interval = TimeSpan.FromSeconds(Math.Max(0.2, MessageSpecialModes.NextChange(now0, s.Seconds) - now0));
-        timer.Start();
-        live.Add(new Stopper(timer.Stop));
+        Schedule();
+        if (!gate.Paused) timer.Start();
+        gate.Changed += OnGate;
+        live.Add(new Stopper(() => { timer.Stop(); gate.Changed -= OnGate; }));
         return cell;
     }
 
@@ -225,7 +254,7 @@ internal static class DeskMessagePiece
 
     /// <summary>One line with its effects. A line that is nothing but tags draws as written.</summary>
     private static FrameworkElement Line(string raw, DeskMessageSettings s, ResolvedInk ink, FontFamily regular, FontFamily bold,
-        double baseSize, TextAlignment ta, HorizontalAlignment align, double width, List<IDisposable> live, ISet<string> played)
+        double baseSize, TextAlignment ta, HorizontalAlignment align, double width, List<IDisposable> live, ISet<string> played, DeskPause gate)
     {
         var parsed = MessageMarkup.Parse(raw);
         var e = parsed.Effects;
@@ -270,15 +299,29 @@ internal static class DeskMessagePiece
         host.Children.Add(block);
         bool reduce = ReduceMotion;
         if (MessageMotion.AnimatesWrite(e, reduce) && played.Add("write\n" + raw)) Write(block);
-        bool sweptOnce = e.SweepPeriod is null && played.Contains("sweep\n" + raw);
-        if (e.Sweep && MessageMotion.SweepPlan(e, reduce, false, sweptOnce, false) is { } plan)
+        // The Core rules decide whether and when each light runs, and are asked again on resume with the
+        // replay delay. A once-only sweep counts as played only when it is actually scheduled, so one that
+        // was waiting out a pause still runs when the island comes back into sight.
+        if (e.Sweep)
         {
-            if (plan.Every is null) played.Add("sweep\n" + raw);
-            Light(host, block, text, ink, live, plan.First, plan.Every, MessageMotion.SweepRun, band: null);
+            (double First, double? Every)? SweepFor(bool replay)
+            {
+                bool sweptOnce = e.SweepPeriod is null && played.Contains("sweep\n" + raw);
+                var plan = MessageMotion.SweepPlan(e, reduce, gate.Paused, sweptOnce, replay);
+                if (plan is { Every: null }) played.Add("sweep\n" + raw);
+                return plan;
+            }
+            Light(host, block, text, ink, live, gate, SweepFor, MessageMotion.SweepRun, band: null);
         }
-        if (MessageMotion.Shimmers(e, reduce, false))
-            Light(host, block, text, ink, live, MessageMotion.ShimmerPeriod - MessageMotion.ShimmerSweep,
-                MessageMotion.ShimmerPeriod, MessageMotion.ShimmerSweep, band: MessageMotion.ShimmerBand);
+        if (e.Shimmer)
+        {
+            (double First, double? Every)? ShimmerFor(bool replay) =>
+                MessageMotion.Shimmers(e, reduce, gate.Paused)
+                    ? (replay ? MessageMotion.SweepReplayDelay : MessageMotion.ShimmerPeriod - MessageMotion.ShimmerSweep,
+                        MessageMotion.ShimmerPeriod)
+                    : null;
+            Light(host, block, text, ink, live, gate, ShimmerFor, MessageMotion.ShimmerSweep, band: MessageMotion.ShimmerBand);
+        }
         return host;
     }
 
@@ -304,10 +347,13 @@ internal static class DeskMessagePiece
     /// {sweep} and {shimmer}: a band of light (white, toward <see cref="MessageMotion.SweepStrength"/>)
     /// crossing the line, drawn as a copy of the text in white masked to the band. {sweep}'s band is
     /// three characters wide; {shimmer}'s is 30% of the line. Runs once after <paramref name="first"/>
-    /// seconds and then every <paramref name="every"/> seconds when given; between runs nothing animates.
+    /// seconds and then every period when the plan gives one; between runs nothing animates.
+    /// <paramref name="plan"/> says when the light runs (null: not now), asked at the start and again with
+    /// <c>replay</c> set each time the island comes back into sight. While <paramref name="gate"/> is
+    /// paused the timer and any running band stop.
     /// </summary>
     private static void Light(Grid host, TextBlock block, string text, ResolvedInk ink, List<IDisposable> live,
-        double first, double? every, double run, double? band)
+        DeskPause gate, Func<bool, (double First, double? Every)?> plan, double run, double? band)
     {
         var glint = new TextBlock
         {
@@ -328,7 +374,8 @@ internal static class DeskMessagePiece
         glint.OpacityMask = mask;
         host.Children.Add(glint);
 
-        var timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(first) };
+        var timer = new DispatcherTimer(DispatcherPriority.Background);
+        double? every = null;
         timer.Tick += (_, _) =>
         {
             timer.Stop();
@@ -342,19 +389,37 @@ internal static class DeskMessagePiece
             Go(lead, -half);
             Go(mid, 0);
             Go(tail, half);
-            if (every is { } e)
+            if (every is { } period)
             {
-                timer.Interval = TimeSpan.FromSeconds(Math.Max(run, e));
+                timer.Interval = TimeSpan.FromSeconds(Math.Max(run, period));
                 timer.Start();
             }
         };
-        timer.Start();
-        live.Add(new Stopper(() =>
+        void Rest()
         {
             timer.Stop();
             lead.BeginAnimation(GradientStop.OffsetProperty, null);
             mid.BeginAnimation(GradientStop.OffsetProperty, null);
             tail.BeginAnimation(GradientStop.OffsetProperty, null);
+        }
+        void Begin(bool replay)
+        {
+            if (plan(replay) is not { } p) return;
+            every = p.Every;
+            timer.Interval = TimeSpan.FromSeconds(p.First);
+            timer.Start();
+        }
+        void OnGate()
+        {
+            Rest();
+            Begin(replay: true);
+        }
+        Begin(replay: false);
+        gate.Changed += OnGate;
+        live.Add(new Stopper(() =>
+        {
+            gate.Changed -= OnGate;
+            Rest();
         }));
     }
 

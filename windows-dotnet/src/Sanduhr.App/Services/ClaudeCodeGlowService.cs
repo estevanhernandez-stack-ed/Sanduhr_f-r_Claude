@@ -87,6 +87,12 @@ internal sealed class ClaudeCodeGlowService : IDisposable
     private GlowTargetSettings _target = GlowTargetSettings.Default;
 
     /// <summary>
+    /// Lights the Desk's glow spot in a color; true when it drew (the Desk is on, the spot is placed and
+    /// in sight), false when the glow should go to the window in use instead. Set by the app (spec 7.3).
+    /// </summary>
+    public Func<System.Windows.Media.Color, bool>? DeskGlow { get; set; }
+
+    /// <summary>
     /// Show the glow for <paramref name="e"/> on the current target, bypassing the switches, the terminal
     /// rule and the limiter (a Settings "Try it" button).
     /// </summary>
@@ -134,9 +140,15 @@ internal sealed class ClaudeCodeGlowService : IDisposable
     {
         try
         {
-            // Where it lands (spec 6.8): the window in use (S4), a chosen screen edge, or the widget's
-            // taskbar flash alone. The Desk placeholder reads as the window until S7.
-            var where = _target.Effective;
+            // Where it lands (spec 6.8, 7.3): the window in use (S4), a chosen screen edge, the Desk's spot,
+            // or the widget's taskbar flash alone. The Desk's spot draws when the Desk is on and the spot is
+            // in sight; otherwise the glow goes to the window in use.
+            if (_target.Kind == GlowTargetKind.Desk && DeskGlow?.Invoke(GlowOverlayContent.ColorFor(kind)) == true)
+            {
+                if (flash) GlowNative.FlashTray(new WindowInteropHelper(_widget).Handle);
+                return;
+            }
+            var where = _target.Effective(false);
             if (where == GlowTargetKind.Edge && EdgeMonitor() is { } mon)
             {
                 _overlay ??= new GlowOverlayWindow();
