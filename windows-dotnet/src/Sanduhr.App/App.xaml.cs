@@ -350,6 +350,15 @@ public partial class App : Application
                 await _vm.EndDemoAsync();
         };
 
+        // Only while the Desk is on (or arranging): starts Arrange mode, then finishes it with Done (spec 7.3).
+        _arrangeItem = new MenuItem { Header = DeskArrangeCopy.MenuItem, Visibility = Visibility.Collapsed };
+        _arrangeItem.Click += (_, _) =>
+        {
+            if (_desk?.Arranging == true) _desk.EndArrange(DeskArrangeEnd.Done);
+            else _desk?.BeginArrange();
+        };
+        menu.Opened += (_, _) => UpdateArrangeItem();
+
         var refresh = new MenuItem { Header = "Refresh" };
         refresh.Click += (_, _) => _vm?.RefreshCommand.Execute(null);
 
@@ -385,6 +394,7 @@ public partial class App : Application
         menu.Items.Add(settings);
         menu.Items.Add(whatsNew);
         menu.Items.Add(tour);
+        menu.Items.Add(_arrangeItem);
         menu.Items.Add(refresh);
         menu.Items.Add(BuildTrayShowsMenu());
         menu.Items.Add(new Separator());
@@ -396,6 +406,29 @@ public partial class App : Application
         menu.Items.Add(new Separator());
         menu.Items.Add(quit);
         _tray.ContextMenu = menu;
+    }
+
+    private MenuItem? _arrangeItem;
+
+    /// <summary>The tray's Arrange entry follows the Desk: hidden while it is off, "Finish arranging" while arranging.</summary>
+    private void UpdateArrangeItem()
+    {
+        if (_arrangeItem is null) return;
+        bool arranging = _desk?.Arranging == true;
+        _arrangeItem.Visibility = arranging || _desk?.Running == true ? Visibility.Visible : Visibility.Collapsed;
+        _arrangeItem.Header = arranging ? DeskArrangeCopy.TrayFinish : DeskArrangeCopy.MenuItem;
+    }
+
+    /// <summary>Arrange mode began, dropped a piece or ended: the tray entry and an open Settings window follow
+    /// (the Desk page's note, the live map, and after Done the saved rows).</summary>
+    private void OnArrangeChanged()
+    {
+        UpdateArrangeItem();
+        if (_desk is not { } desk || _settingsWindow?.ViewModel.Desk is not { } page) return;
+        bool was = page.Arranging;
+        page.Arranging = desk.Arranging;
+        page.ArrangingLayout = desk.Session?.Working.Layout;
+        if (was && !desk.Arranging) page.Reload();
     }
 
     /// <summary>The Desk (spec 5.1): off until switched on in Settings, Desk.</summary>
@@ -417,6 +450,9 @@ public partial class App : Application
             ThemeText = ThemeTextHex,
         };
         _vm.DeskUsageChanged += _desk.UsageChanged;
+        // The glow's Desk spot (spec 7.3): the glow service asks the Desk first and falls back to the window.
+        if (_glow is not null) _glow.DeskGlow = c => _desk?.Glow(c) == true;
+        _desk.ArrangeChanged += OnArrangeChanged;
         _vm.ThemeChanged += _ => _desk?.ThemeChanged();
         // The widget's now-playing line (spec 6.3, W8) shares the Desk's media-session listener.
         _vm.NowPlaying = new NowPlayingLineViewModel(_nowPlaying, store);
@@ -488,8 +524,12 @@ public partial class App : Application
             ShowWhatsNewFromMenu, ShowTour);
         // The Claude Code page re-reads the glow switches and plays "Try it" through the running glow service.
         svm.ClaudeCodePage.GlowReload = () => _glow?.Reload();
+        svm.ClaudeCodePage.DeskReload = () => { _desk?.Reload(); svm.Desk.Reload(); };
         svm.ClaudeCodePage.GlowPreview = e => _glow?.Preview(e);
         svm.Desk.Changed = () => _desk?.Reload();
+        svm.Desk.ArrangeRequested = () => _desk?.BeginArrange();
+        svm.Desk.Arranging = _desk?.Arranging == true;
+        svm.Desk.ArrangingLayout = _desk?.Session?.Working.Layout;
         svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); };
         svm.WeatherPage.Changed = () => _desk?.Reload();
         svm.MessageChanged = () => _desk?.Reload();

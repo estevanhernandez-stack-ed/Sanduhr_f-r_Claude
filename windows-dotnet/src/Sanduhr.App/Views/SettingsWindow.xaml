@@ -1771,6 +1771,10 @@
                                                               SelectedItem="{Binding GlowMonitor, Mode=TwoWay}"
                                                               AutomationProperties.Name="Glow monitor" />
                                                 </StackPanel>
+                                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                                           Text="{x:Static core:GlowTargetSettings.DeskCaption}"
+                                                           Visibility="{Binding GlowOnDesk, Converter={StaticResource BoolVis}}" />
                                                 <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
                                                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                                            Text="The taskbar button flashes in every choice. Only flash skips the light." />
@@ -2256,6 +2260,20 @@
                                 <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
                                            Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                            Text="Off by default. Draws on the desktop behind your windows, on every monitor, and keeps clear of the taskbar. Turn it off here at any time." />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                            <StackPanel views:SettingsAnchor.Id="arrange">
+                                <Button Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Padding="12,6"
+                                        Content="{x:Static core:SettingsNames.ArrangeDesk}"
+                                        Command="{Binding ArrangeCommand}"
+                                        IsEnabled="{Binding CanArrange}"
+                                        AutomationProperties.Name="{x:Static core:SettingsNames.ArrangeDesk}" />
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           AutomationProperties.LiveSetting="Polite"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="{Binding ArrangeNote}" />
                             </StackPanel>
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />

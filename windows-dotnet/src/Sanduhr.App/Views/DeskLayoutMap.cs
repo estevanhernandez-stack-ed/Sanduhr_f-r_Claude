@@ -16,7 +16,8 @@ namespace Sanduhr.App.Views;
 /// <c>DeskLayoutMap.swift</c>). Laid out with the same Core calls the Desk uses
 /// (<see cref="DeskArrangement.Stacks"/>, <see cref="DeskGeometry"/>, <see cref="TaskbarClearance"/>),
 /// scaled to a map <see cref="MapHeight"/> DIPs tall. It reads the <see cref="DeskSettingsViewModel"/>
-/// from its DataContext and redraws when the layout, margins or settings change. Strokes and text use
+/// from its DataContext and redraws when the layout, margins or settings change, and draws the working
+/// layout of an Arrange session live while one runs (<see cref="DeskSettingsViewModel.ArrangingLayout"/>). Strokes and text use
 /// the theme's brushes by resource reference, so a theme change recolors it.
 /// </summary>
 internal sealed class DeskLayoutMap : Canvas
@@ -79,13 +80,7 @@ internal sealed class DeskLayoutMap : Canvas
     }
 
     /// <summary>The name a widget key goes by on the map (the names table's).</summary>
-    internal static string NameOf(string widget) => widget switch
-    {
-        "clock" => SettingsNames.DeskClock,
-        "claude" => SettingsNames.DeskClaudeLine,
-        "meters" => SettingsNames.DeskClaudeBars,
-        _ => widget,
-    };
+    internal static string NameOf(string widget) => SettingsNames.DeskPieceName(widget);
 
     private void Attach(DeskSettingsViewModel? vm)
     {
@@ -105,7 +100,7 @@ internal sealed class DeskLayoutMap : Canvas
     private void OnVmChanged(object? sender, PropertyChangedEventArgs e)
     {
         // One redraw per saved change: Settings carries the layout, sizes and margins.
-        if (e.PropertyName is nameof(DeskSettingsViewModel.Settings))
+        if (e.PropertyName is nameof(DeskSettingsViewModel.Settings) or nameof(DeskSettingsViewModel.ArrangingLayout))
             Redraw();
     }
 
@@ -161,7 +156,7 @@ internal sealed class DeskLayoutMap : Canvas
         var c = DeskGeometry.Content(screen.Width, screen.Height, margins, inset);
         var content = new DeskRect(c.X * scale, c.Y * scale, c.Width * scale, c.Height * scale);
 
-        var stacks = new DeskArrangement(_vm?.Layout ?? settings.Layout).Stacks();
+        var stacks = new DeskArrangement(_vm?.ArrangingLayout ?? _vm?.Layout ?? settings.Layout).Stacks(Sanduhr.App.Desk.DeskView.Drawn);
         foreach (var anchor in DeskAnchors.All)
         {
             if (!stacks.TryGetValue(anchor, out var pieces) || pieces.Count == 0) continue;

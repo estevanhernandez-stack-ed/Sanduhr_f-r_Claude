@@ -169,7 +169,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         GlowDone = glow.Done;
         GlowSkipTerminal = glow.SkipTerminal;
         var target = _glowSaved = _glowStore.LoadGlowTarget();
-        GlowTarget = GlowTargets.First(c => c.Kind == target.Effective(false));
+        GlowTarget = GlowTargets.First(c => c.Kind == target.Kind);
         GlowSide = GlowSides.First(c => c.Side == target.Side);
         GlowMonitors = MonitorChoices();
         GlowMonitor = GlowMonitors.FirstOrDefault(m => string.Equals(m.Device, target.Monitor, StringComparison.OrdinalIgnoreCase))
@@ -189,12 +189,13 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     public sealed record GlowSideChoice(GlowEdgeSide Side, string Name) { public override string ToString() => Name; }
     public sealed record GlowMonitorChoice(string? Device, string Name) { public override string ToString() => Name; }
 
-    /// <summary>The offered targets (the Desk spot waits for S7 and is never listed).</summary>
+    /// <summary>The offered targets, the Desk's spot last (spec 7.3).</summary>
     public static IReadOnlyList<GlowTargetChoice> GlowTargets { get; } =
     [
         new(GlowTargetKind.Window, "At the top of the window you're working in"),
         new(GlowTargetKind.Edge, "Along an edge of a screen"),
         new(GlowTargetKind.Widget, "Only flash Sanduhr in the taskbar"),
+        new(GlowTargetKind.Desk, "On a spot on the Desk"),
     ];
 
     public static IReadOnlyList<GlowSideChoice> GlowSides { get; } =
@@ -206,6 +207,12 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     [ObservableProperty] private GlowMonitorChoice? _glowMonitor;
 
     public bool GlowOnEdge => GlowTarget.Kind == GlowTargetKind.Edge;
+
+    /// <summary>The Desk is the chosen target: the caption under the list says when it shows there.</summary>
+    public bool GlowOnDesk => GlowTarget.Kind == GlowTargetKind.Desk;
+
+    /// <summary>Asks the running Desk to read its settings again (App sets it); the glow's spot was just placed.</summary>
+    public Action? DeskReload { get; set; }
 
     private static IReadOnlyList<GlowMonitorChoice> MonitorChoices()
     {
@@ -223,7 +230,29 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     partial void OnGlowTargetChanged(GlowTargetChoice value)
     {
         OnPropertyChanged(nameof(GlowOnEdge));
+        OnPropertyChanged(nameof(GlowOnDesk));
         SaveGlowTarget(_glowSaved with { Kind = value.Kind });
+        if (!_loading && value.Kind == GlowTargetKind.Desk) PlaceGlowSpot();
+    }
+
+    /// <summary>Choosing the Desk places the glow's spot at its default anchor when it is not placed yet,
+    /// then asks the Desk to draw it (spec 7.3). A spot already placed stays where it is.</summary>
+    private void PlaceGlowSpot()
+    {
+        try
+        {
+            var desk = _glowStore.LoadDesk();
+            var layout = new DeskArrangement(desk.Layout);
+            if (layout.Placement("glow") is not null) return;
+            layout.Place("glow", DeskArrangement.DefaultAnchor("glow"));
+            _glowStore.SaveDesk((desk with { Layout = layout.Layout }).Normalized());
+            DeskReload?.Invoke();
+            GlowReload?.Invoke();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // The target is saved; the spot can be placed from Settings, Desk.
+        }
     }
 
     partial void OnGlowSideChanged(GlowSideChoice value) => SaveGlowTarget(_glowSaved with { Side = value.Side });

@@ -72,6 +72,7 @@ public static class SettingsIndex
     public const string DeskMargins = "margins";
     public const string DeskMap = "map";
     public const string DeskInk = "ink";
+    public const string DeskArrange = "arrange";
     // Desk: Message, Now playing, Weather (S6)
     public const string MessageLines = "lines";
     public const string MessageRotation = "rotation";
@@ -171,6 +172,8 @@ public static class SettingsIndex
 
         E(SettingsNames.DeskSwitch, SettingsPage.Desk, DeskOn,
             ["desktop", "wallpaper", "clock", "meters", "Rainmeter", "show the Desk", "on the desktop", "off by default", "monitors"]),
+        E(SettingsNames.ArrangeDesk, SettingsPage.Desk, DeskArrange,
+            ["drag", "move", "rearrange", "arrange", "reorder", "on the desktop", "layout"]),
         E("Where each piece sits", SettingsPage.Desk, DeskPieces,
             ["layout", "place", "corner", "position", "size", "hidden", "clock", "meters", "Claude line", "taskbar", "anchor"]),
         E("Look", SettingsPage.Desk, DeskLook,
@@ -227,6 +230,7 @@ public static class SettingsIndex
         [SettingsNames.ResetSanduhr] = Reset,
         [SettingsNames.DeskSwitch] = DeskOn,
         [SettingsNames.DeskInk] = DeskInk,
+        [SettingsNames.ArrangeDesk] = DeskArrange,
         [SettingsNames.NowPlayingInWidget] = NowPlayingWidget,
         [SettingsNames.WeatherLookUp] = WeatherPlace,
         [SettingsNames.GlowWhere] = GlowWhere,
