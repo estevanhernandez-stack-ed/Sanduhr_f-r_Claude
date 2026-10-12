@@ -16,14 +16,14 @@ namespace Sanduhr.App.Desk;
 /// the shell window and kept at the bottom of the z-order, just above the desktop and below every
 /// normal window. Never activated, never in Alt+Tab or the taskbar.
 ///
-/// Show desktop (Win+D, the taskbar corner) raises the desktop icons host above the normal windows. As
-/// Rainmeter does, a hidden sentinel marks where the icons host sits at rest: it is kept just above
-/// the host while an app is in front. When the host is found above the sentinel, the desktop is the
-/// foreground and no app is in front, Show desktop is on (<see cref="ShowDesktopRule"/>) and the Desk
-/// windows go just below the backmost topmost window, so they stay visible over the raised desktop;
-/// they go back to the bottom when it ends or as soon as any app window is in front. Checked on the
-/// foreground hook and on a timer: 250 ms while lifted or just after the desktop took the foreground,
-/// 2 s otherwise.
+/// Show desktop (Win+D, the taskbar corner) raises the desktop icons host above the normal windows.
+/// Ownership by the shell window carries the Desk up with it (Este's live run, 2026-10-11), and the
+/// z-order guard lets that happen while a sentinel kept just above the host at rest shows the host
+/// raised. As a fallback only, when a Desk window is measured below the icons host with the desktop in
+/// front and no app (<see cref="ShowDesktopRule"/>), it is re-seated just above the host, never
+/// topmost (Windows hides topmost windows in Show desktop); it goes back to the bottom as soon as an
+/// app is in front. Checked on the foreground hook and on a timer: 250 ms while re-seated or just after
+/// the desktop took the foreground, 2 s otherwise.
 ///
 /// The sentinel also hears <c>TaskbarCreated</c> (Explorer restarted, which destroys the owned Desk
 /// windows with their owner), display changes and work-area changes; each raises
@@ -60,7 +60,7 @@ internal sealed class DesktopLayerHost : IDeskHost
     /// apart from rest; the lift is never applied (the Desk stays at the bottom, owned by the shell).</summary>
     private bool _sentinelUnreliable;
 
-    /// <summary>True while Show desktop is on and the Desk windows are lifted over the desktop.</summary>
+    /// <summary>True while the fallback has re-seated the Desk above the raised desktop.</summary>
     public bool ShowDesktopLifted { get; private set; }
 
     /// <summary>Follow Show desktop (on in the app; the runner turns it off to see what ownership
@@ -347,13 +347,14 @@ internal sealed class DesktopLayerHost : IDeskHost
         }
         if (ShowDesktopRule.ShouldReseatSentinel(ShowDesktopLifted, desktopFg) && appInFront)
             SeatSentinel();
-        bool raised = !_sentinelUnreliable && host != IntPtr.Zero && DeskNative.IsBelow(_sentinel.Handle, host);
-        switch (ShowDesktopRule.Decide(raised, desktopFg, appInFront, ShowDesktopLifted))
+        // The measured failure, not an inference: a Desk window sits below the icons host.
+        bool deskBelow = host != IntPtr.Zero && _windows.Any(w => !w.IsDisposed && DeskNative.IsBelow(w.Handle, host));
+        switch (ShowDesktopRule.Decide(deskBelow, desktopFg, appInFront, ShowDesktopLifted))
         {
             case ShowDesktopAction.Lift:
                 ShowDesktopLifted = true;
                 Lift(host);
-                Log($"Show desktop on ({why}): lifted over the desktop");
+                Log($"Show desktop ({why}): the Desk was below the desktop; re-seated just above it");
                 break;
             case ShowDesktopAction.Drop:
                 ShowDesktopLifted = false;
@@ -364,9 +365,16 @@ internal sealed class DesktopLayerHost : IDeskHost
         _watch.Interval = ShowDesktopLifted || DateTime.UtcNow < _fastUntil ? FastWatch : SlowWatch;
     }
 
+    /// <summary>Re-seats the Desk windows just above the icons host, in the normal band: inserted after
+    /// the window directly above the host (or at the top when the host is topmost of the band).</summary>
     private void Lift(IntPtr host)
     {
-        var after = DeskNative.BackmostTopmostAbove(host);
+        var above = DeskNative.Above(host);
+        // Never after a topmost window (that would make the Desk topmost, which Show desktop hides):
+        // with the host at the top of the normal band, the top of that band is just above it.
+        var after = above == IntPtr.Zero || _windows.Any(w => w.Handle == above)
+            || (DeskNative.GetWindowLong(above, DeskNative.GWL_EXSTYLE) & DeskNative.WS_EX_TOPMOST) != 0
+            ? DeskNative.HWND_NOTOPMOST : above;
         DeskNative.PerMonitor(() =>
         {
             foreach (var w in _windows)

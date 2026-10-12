@@ -163,15 +163,6 @@ internal static class DeskNative
     /// <summary>The window just above <paramref name="h"/> in the z-order, or zero at the top.</summary>
     public static IntPtr Above(IntPtr h) => h == IntPtr.Zero ? IntPtr.Zero : GetWindow(h, GW_HWNDPREV);
 
-    /// <summary>The topmost window nearest above <paramref name="from"/> (the "backmost" topmost one),
-    /// or <see cref="HWND_TOPMOST"/> when there is none.</summary>
-    public static IntPtr BackmostTopmostAbove(IntPtr from)
-    {
-        for (var w = GetWindow(from, GW_HWNDPREV); w != IntPtr.Zero; w = GetWindow(w, GW_HWNDPREV))
-            if ((GetWindowLong(w, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0) return w;
-        return HWND_TOPMOST;
-    }
-
     /// <summary>Runs <paramref name="body"/> with this thread per-monitor DPI aware (v2), so monitor
     /// rectangles are physical pixels and windows created inside draw crisply on every monitor. The
     /// process stays system aware; only the Desk's windows are created this way.</summary>
