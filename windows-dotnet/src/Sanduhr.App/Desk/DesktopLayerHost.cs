@@ -448,6 +448,8 @@ internal sealed class DesktopLayerHost : IDeskHost
             Schedule("display changed");
         else if (msg == DeskNative.WM_SETTINGCHANGE && wParam.ToInt64() == DeskNative.SPI_SETWORKAREA)
             Schedule("work area changed");
+        else if (msg == DeskNative.WM_SETTINGCHANGE && wParam.ToInt64() == DeskNative.SPI_SETDESKWALLPAPER)
+            Schedule("wallpaper changed"); // Automatic ink samples the new wallpaper (spec 6.7)
         return IntPtr.Zero;
     }
 

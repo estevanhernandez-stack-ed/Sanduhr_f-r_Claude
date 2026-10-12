@@ -42,6 +42,7 @@ internal static class DeskNative
     public const int WM_DPICHANGED = 0x02E0;
     public const int MA_NOACTIVATE = 3;
     public const int SPI_SETWORKAREA = 0x002F;
+    public const int SPI_SETDESKWALLPAPER = 0x0014;
 
     public const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
     public const uint WINEVENT_OUTOFCONTEXT = 0x0000;
