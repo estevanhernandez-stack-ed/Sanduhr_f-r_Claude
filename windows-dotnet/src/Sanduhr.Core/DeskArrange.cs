@@ -191,3 +191,38 @@ public sealed class DeskArrangeSession
     /// <summary>The string Done writes, null when nothing changed (an older string stays as it was).</summary>
     public string? ToWrite => Changed ? Working.Layout : null;
 }
+
+/// <summary>
+/// One drag in Arrange mode, independent of the UI's mouse capture. Ending a drag releases the capture,
+/// and releasing it reports the capture lost; that report must not cancel the drag being dropped, or no
+/// drop ever lands (the S7 live run's r2 failure). <see cref="Up"/> takes the drag first, then lets the
+/// caller release the capture, so a loss reported during the release finds no drag to cancel.
+/// </summary>
+/// <typeparam name="T">What the UI keeps about the drag (the widget, where it was grabbed).</typeparam>
+public sealed class DeskArrangeGesture<T> where T : class
+{
+    /// <summary>The drag under way, or null.</summary>
+    public T? Current { get; private set; }
+
+    /// <summary>A drag starts.</summary>
+    public void Down(T drag) => Current = drag;
+
+    /// <summary>The button came up: the drag to drop (null when none), taken before
+    /// <paramref name="releaseCapture"/> runs, so a capture loss it reports cancels nothing.</summary>
+    public T? Up(Action releaseCapture)
+    {
+        var drag = Current;
+        Current = null;
+        releaseCapture();
+        return drag;
+    }
+
+    /// <summary>The capture was taken away (another window grabbed the mouse): the drag, if any, is
+    /// cancelled. Returns what was cancelled.</summary>
+    public T? CaptureLost()
+    {
+        var drag = Current;
+        Current = null;
+        return drag;
+    }
+}

@@ -41,7 +41,10 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
     private IReadOnlyDictionary<string, DeskRect> _frames = new Dictionary<string, DeskRect>();
     private DeskRect _content;
     private DeskAnchor? _lit;
-    private Drag? _drag;
+    /// <summary>The drag under way: held by the Core gesture, so the capture loss its own drop reports
+    /// can't cancel it (spec 7.3; the S7 live run's r2).</summary>
+    private readonly DeskArrangeGesture<Drag> _gesture = new();
+    private Drag? _drag => _gesture.Current;
     private Rectangle? _ghost;
 
     private sealed record Drag(string Widget, Size Size, Vector Grab, DeskAnchor? Own);
@@ -242,7 +245,7 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
     {
         if (!_rects.TryGetValue(widget, out var r)) return;
         CancelDrag();
-        _drag = new Drag(widget, r.Size, at - r.TopLeft, _working.Placement(widget)?.Anchor);
+        _gesture.Down(new Drag(widget, r.Size, at - r.TopLeft, _working.Placement(widget)?.Anchor));
         _ghost = new Rectangle
         {
             Width = r.Width + OutlinePad * 2,
@@ -272,7 +275,8 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
     /// whose middle is at or below the pointer.</summary>
     public void EndDrag(Point at)
     {
-        if (_drag is not { } drag) return;
+        // Take the drag first, then release the capture: the loss that release reports finds no drag.
+        if (_gesture.Up(() => { if (IsMouseCaptured) ReleaseMouseCapture(); }) is not { } drag) return;
         var target = DeskArrange.Target(at.X, at.Y, _content, DeskArrange.StackBounds(_working, _frames), drag.Own);
         var stack = _working.Stack(target)
             .Where(p => p.Widget != drag.Widget)
@@ -289,7 +293,7 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
     {
         if (_ghost is not null) _adorn.Children.Remove(_ghost);
         _ghost = null;
-        _drag = null;
+        _gesture.CaptureLost();
         SetLit(null);
         if (IsMouseCaptured) ReleaseMouseCapture();
     }
@@ -322,9 +326,7 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
     {
         base.OnMouseLeftButtonUp(e);
         if (_drag is null) return;
-        var p = e.GetPosition(this);
-        ReleaseMouseCapture();
-        EndDrag(p);
+        EndDrag(e.GetPosition(this));
         e.Handled = true;
     }
 
@@ -362,7 +364,7 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
 
     public void Dispose()
     {
-        _drag = null;
+        _gesture.CaptureLost();
         _view?.Dispose();
         _view = null;
     }
@@ -411,6 +413,10 @@ internal sealed class DeskArrangeMode : IDisposable
 
     /// <summary>The windows' handles, primary first is not promised (the runner may query them).</summary>
     public IReadOnlyList<IntPtr> Handles => [.. _surfaces.Select(s => s.Source.Handle)];
+
+    /// <summary>Each surface's window, screen and content (the live check reads the pieces' frames).</summary>
+    internal IReadOnlyList<(IntPtr Hwnd, DeskScreen Screen, DeskArrangeContent Content)> Surfaces =>
+        [.. _surfaces.Select(s => (s.Source.Handle, s.Screen, s.Content))];
 
     /// <summary>Brings the primary surface to the front and gives it the keys. The foreground can be
     /// refused to a process that did not just receive input; the buttons and the tray still end the mode then.</summary>

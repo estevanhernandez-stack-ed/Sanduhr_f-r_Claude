@@ -96,6 +96,9 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// <summary>The bars' level source is running now (the live check reads it).</summary>
     internal bool AudioRunning => _audio.Running;
 
+    /// <summary>The arrange surfaces while Arrange mode runs (the live check reads them).</summary>
+    internal DeskArrangeMode? ArrangeMode => _arrangeMode;
+
     /// <summary>True while the Desk is on screen.</summary>
     public bool Running => _host?.IsShowing == true;
 
