@@ -27,6 +27,7 @@ public class SettingsKeysContractTests
         "alert_urgent_pct",
         "alert_warn_pct",
         "alerts_enabled",
+        "cc_folders_added",
         "focus_mode_duration",
         "geom",
         "hidden_tiers",

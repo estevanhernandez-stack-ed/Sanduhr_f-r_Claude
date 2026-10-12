@@ -27,8 +27,15 @@ public static class PublishHandoff
 
     public sealed record Request(string Id, DateOnly Date, DateTimeOffset RequestedAt);
 
+    /// <summary>How old an unparseable request must be before it is deleted. A younger
+    /// one may be a writer mid-write, so it is left for the next look.</summary>
+    public static readonly TimeSpan MalformedGrace = TimeSpan.FromSeconds(10);
+
     /// <summary>Parse the request file. Null when missing, unreadable, malformed,
-    /// or expired (an expired file is deleted so it cannot linger).</summary>
+    /// or expired (an expired file is deleted so it cannot linger). A file that does
+    /// not parse as a JSON object is deleted only once its last write is at least
+    /// <see cref="MalformedGrace"/> before <paramref name="now"/>; a younger one is left
+    /// in place. A parseable request with bad fields is deleted at once.</summary>
     public static Request? TryReadRequest(string path, DateTimeOffset now)
     {
         try
@@ -37,7 +44,7 @@ public static class PublishHandoff
                 return null;
             if (JsonNode.Parse(File.ReadAllText(path)) is not JsonObject o)
             {
-                TryDelete(path);
+                TryDeleteIfStale(path, now);
                 return null;
             }
             string? id = (string?)o["id"];
@@ -59,7 +66,7 @@ public static class PublishHandoff
         }
         catch (JsonException)
         {
-            TryDelete(path);   // malformed = never valid; clear it so it cannot linger
+            TryDeleteIfStale(path, now);   // malformed = never valid, but a fresh one may be mid-write
             return null;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -90,6 +97,16 @@ public static class PublishHandoff
             TryDelete(tmp);
         }
         TryDelete(requestPath);
+    }
+
+    private static void TryDeleteIfStale(string path, DateTimeOffset now)
+    {
+        try
+        {
+            if (now - new DateTimeOffset(File.GetLastWriteTimeUtc(path), TimeSpan.Zero) >= MalformedGrace)
+                TryDelete(path);
+        }
+        catch { /* best-effort: leave it for the next look */ }
     }
 
     private static void TryDelete(string path)

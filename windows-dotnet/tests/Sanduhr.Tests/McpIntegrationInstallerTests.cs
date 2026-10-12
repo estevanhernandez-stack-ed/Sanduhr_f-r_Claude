@@ -135,8 +135,30 @@ public class McpIntegrationInstallerTests
         Assert.Equal(42, (int)root["numStartups"]!.GetValue<int>());          // untouched
         Assert.NotNull(root["mcpServers"]!["firebase"]);                       // untouched
         Assert.NotNull(root["mcpServers"]!["sanduhr"]);                        // added
-        Assert.Single(Directory.GetFiles(ccDir, ".claude.json.sanduhr-backup-*"));
+        Assert.Empty(Directory.GetFiles(ccDir, "*sanduhr-backup*"));            // never beside a Claude Code file
+        Assert.Single(Directory.GetFiles(Path.Combine(sanduhr.Path, "backups")));  // one copy of the original, in ours
         Assert.False(File.Exists(CcConfig(home, ".claude-personal") + ".tmp"));
+    }
+
+    [Fact]
+    public void Register_then_deregister_leave_other_bytes_untouched_and_no_backup_beside_the_file()
+    {
+        using var home = new TempDir();
+        using var sanduhr = new TempDir();
+        var ccDir = Path.Combine(home.Path, ".claude-personal");
+        Directory.CreateDirectory(ccDir);
+        const string original = "{\r\n    \"numStartups\": 42,\r\n    \"mcpServers\": {\r\n        \"firebase\": {\"command\": \"cmd\"}\r\n    },\r\n    \"tail\":   [1,  2]\r\n}\r\n";
+        File.WriteAllText(CcConfig(home, ".claude-personal"), original);
+        var installer = Make(home, sanduhr);
+
+        Assert.True(installer.Register(".claude-personal").Ok);
+        string registered = File.ReadAllText(CcConfig(home, ".claude-personal"));
+        Assert.Contains("\"tail\":   [1,  2]", registered);
+        Assert.True(installer.Deregister(".claude-personal"));
+
+        Assert.Equal(original, File.ReadAllText(CcConfig(home, ".claude-personal")));
+        Assert.Empty(Directory.GetFiles(ccDir, "*sanduhr-backup*"));
+        Assert.Equal(2, Directory.GetFiles(Path.Combine(sanduhr.Path, "backups")).Length);   // one per write
     }
 
     [Fact]
@@ -306,12 +328,167 @@ public class McpIntegrationInstallerTests
     }
 
     [Fact]
-    public void DetectCcHomes_finds_the_known_set_in_stable_order()
+    public void DetectCcHomes_finds_discovered_homes_in_stable_order()
+    {
+        // Discover requires projects/ (or the home's .claude.json) for a folder to count.
+        using var home = new TempDir();
+        using var sanduhr = new TempDir();
+        Directory.CreateDirectory(Path.Combine(home.Path, ".claude-personal", "projects"));
+        Directory.CreateDirectory(Path.Combine(home.Path, ".claude", "projects"));
+        Assert.Equal(new[] { ".claude", ".claude-personal" }, Make(home, sanduhr).DetectCcHomes());
+    }
+
+    [Fact]
+    public void DetectCcHomes_finds_a_third_home_and_skips_backup_copies()
+    {
+        using var home = new TempDir();
+        using var sanduhr = new TempDir();
+        foreach (var name in new[] { ".claude", ".claude-work", ".claude-backup-1", ".claude-work.config-backup-20261001" })
+            Directory.CreateDirectory(Path.Combine(home.Path, name, "projects"));
+        Assert.Equal(new[] { ".claude", ".claude-work" }, Make(home, sanduhr).DetectCcHomes());
+    }
+
+    // -- both candidate files for the default home -----------------------------
+
+    private const string OurEntryJson = """{"command":"C:\\x\\sanduhr-mcp.cmd","args":[]}""";
+
+    private static (string Outer, string Inner) Seed(TempDir home, string outerJson, string innerJson)
+    {
+        Directory.CreateDirectory(Path.Combine(home.Path, ".claude"));
+        string outer = Path.Combine(home.Path, ".claude.json");
+        string inner = Path.Combine(home.Path, ".claude", ".claude.json");
+        File.WriteAllText(outer, outerJson);
+        File.WriteAllText(inner, innerJson);
+        return (outer, inner);
+    }
+
+    [Fact]
+    public void An_entry_in_the_inner_stub_is_found_and_removed_while_the_outer_file_is_signed_in()
+    {
+        using var home = new TempDir();
+        using var sanduhr = new TempDir();
+        var (outer, inner) = Seed(home,
+            """{"oauthAccount":{"emailAddress":"a@b.c"},"mcpServers":{}}""",
+            "{\"mcpServers\":{\"sanduhr\":" + OurEntryJson + "}}");
+        var installer = Make(home, sanduhr);
+        Assert.Equal(outer, installer.ConfigPathFor(".claude"));   // the signed-in file wins
+
+        Assert.True(installer.IsRegistered(".claude"));
+        Assert.True(installer.Deregister(".claude"));
+
+        Assert.False(installer.IsRegistered(".claude"));
+        Assert.DoesNotContain("sanduhr", File.ReadAllText(inner));
+    }
+
+    [Fact]
+    public void An_entry_in_both_files_is_removed_from_both()
+    {
+        using var home = new TempDir();
+        using var sanduhr = new TempDir();
+        string json = "{\"oauthAccount\":{},\"mcpServers\":{\"sanduhr\":" + OurEntryJson + "}}";
+        var (outer, inner) = Seed(home, json, json);
+        var installer = Make(home, sanduhr);
+
+        Assert.True(installer.Deregister(".claude"));
+
+        Assert.DoesNotContain("sanduhr", File.ReadAllText(outer));
+        Assert.DoesNotContain("sanduhr", File.ReadAllText(inner));
+        Assert.Contains("oauthAccount", File.ReadAllText(outer));
+    }
+
+    [Fact]
+    public void A_foreign_entry_in_the_other_file_is_left_alone()
+    {
+        using var home = new TempDir();
+        using var sanduhr = new TempDir();
+        const string foreign = """{"mcpServers":{"sanduhr":{"command":"my-own-tool.exe"}}}""";
+        var (_, inner) = Seed(home, """{"oauthAccount":{}}""", foreign);
+
+        Assert.True(Make(home, sanduhr).Deregister(".claude"));
+        Assert.Equal(foreign, File.ReadAllText(inner));
+    }
+
+    [Fact]
+    public void UndoAll_removes_the_files_when_every_deregister_works()
     {
         using var home = new TempDir();
         using var sanduhr = new TempDir();
         Directory.CreateDirectory(Path.Combine(home.Path, ".claude-personal"));
-        Directory.CreateDirectory(Path.Combine(home.Path, ".claude"));
-        Assert.Equal(new[] { ".claude", ".claude-personal" }, Make(home, sanduhr).DetectCcHomes());
+        var installer = Make(home, sanduhr);
+        installer.RefreshInstall(MakeSource(sanduhr));
+        Assert.True(installer.Register(".claude-personal").Ok);
+
+        Assert.True(installer.UndoAll([".claude-personal"]));
+
+        Assert.False(installer.IsRegistered(".claude-personal"));
+        Assert.False(File.Exists(installer.LauncherPath));
+    }
+
+    [Fact]
+    public void UndoAll_keeps_the_files_when_a_deregister_failed()
+    {
+        using var home = new TempDir();
+        using var sanduhr = new TempDir();
+        Directory.CreateDirectory(Path.Combine(home.Path, ".claude-personal"));
+        Directory.CreateDirectory(Path.Combine(home.Path, ".claude-work"));
+        var installer = Make(home, sanduhr);
+        installer.RefreshInstall(MakeSource(sanduhr));
+        Assert.True(installer.Register(".claude-personal").Ok);
+        File.WriteAllText(CcConfig(home, ".claude-work"), "{ broken");   // cannot be read, so cannot be cleared
+
+        Assert.False(installer.UndoAll([".claude-personal", ".claude-work"]));
+
+        Assert.True(File.Exists(installer.LauncherPath));
+        Assert.True(Directory.Exists(installer.VersionsDir));
+        Assert.False(installer.IsRegistered(".claude-personal"));   // the working one was still cleared
+    }
+
+    [Fact]
+    public void ConfigPathFor_follows_the_shared_placement_rule()
+    {
+        using var home = new TempDir();
+        using var sanduhr = new TempDir();
+        var installer = Make(home, sanduhr);
+        Assert.Equal(Path.Combine(home.Path, ".claude-work", ".claude.json"), installer.ConfigPathFor(".claude-work"));
+        Assert.Equal(ClaudeCodeHomes.ConfigFile(Path.Combine(home.Path, ".claude"), home.Path),
+            installer.ConfigPathFor(".claude"));
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public void A_config_with_a_byte_order_mark_round_trips_through_register_and_deregister(string eol)
+    {
+        using var home = new TempDir();
+        using var sanduhr = new TempDir();
+        Directory.CreateDirectory(Path.Combine(home.Path, ".claude-work", "projects"));
+        string path = CcConfig(home, ".claude-work");
+        string text = "{" + eol + "  \"numStartups\": 3," + eol + "  \"mcpServers\": {" + eol
+                      + "    \"other\": {" + eol + "      \"command\": \"x\"" + eol + "    }" + eol + "  }" + eol + "}" + eol;
+        byte[] original = [0xEF, 0xBB, 0xBF, .. System.Text.Encoding.UTF8.GetBytes(text)];
+        File.WriteAllBytes(path, original);
+        var installer = Make(home, sanduhr);
+
+        Assert.True(installer.Register(".claude-work").Ok);
+        byte[] registered = File.ReadAllBytes(path);
+        Assert.Equal(original[..3], registered[..3]);   // the BOM stays
+        Assert.True(installer.IsRegistered(".claude-work"));
+
+        Assert.True(installer.Deregister(".claude-work"));
+        Assert.Equal(original, File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public void An_mcpServers_that_is_not_an_object_is_never_replaced()
+    {
+        using var home = new TempDir();
+        using var sanduhr = new TempDir();
+        Directory.CreateDirectory(Path.Combine(home.Path, ".claude-work", "projects"));
+        string path = CcConfig(home, ".claude-work");
+        File.WriteAllText(path, "{\"mcpServers\": [\"theirs\"]}");
+        byte[] before = File.ReadAllBytes(path);
+
+        Assert.False(Make(home, sanduhr).Register(".claude-work").Ok);
+        Assert.Equal(before, File.ReadAllBytes(path));
     }
 }

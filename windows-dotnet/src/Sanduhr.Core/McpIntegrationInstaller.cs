@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
+using System.Text;
 using System.Text.Json.Nodes;
 
 namespace Sanduhr.Core;
@@ -24,16 +25,17 @@ public readonly record struct McpRegisterResult(bool Ok, string? PriorCommand);
 ///    current version dir on every install / health-check (the widget is the
 ///    integration's updater, statusline precedent).
 /// 3. <b>Registration</b> — <c>mcpServers.sanduhr</c> in the chosen CC home's
-///    <c>.claude.json</c>, with the same config-write safety as the statusline:
-///    re-read, mutate ONLY the owned key, timestamped backup, temp + atomic
-///    move; a malformed config is never overwritten. Deregistration only
-///    removes an entry that points at Sanduhr's own launcher.
+///    <c>.claude.json</c>, written through the shared splice engine
+///    (<see cref="JsonEdit"/> + <see cref="ConfigCommit"/>): only the owned key's bytes
+///    change, the rest of the file stays byte for byte; the write is
+///    compare-and-swap (re-read, abort and plan again when Claude Code wrote
+///    meanwhile). A copy of the original bytes goes to <c>&lt;sanduhrDir&gt;\backups</c>
+///    and never beside the Claude Code file; a malformed config is never
+///    overwritten. Deregistration only removes an entry that points at Sanduhr's own
+///    launcher, from every file Claude Code may read for the home.
 /// </summary>
 public sealed class McpIntegrationInstaller
 {
-    private static readonly string[] KnownHomeNames = { ".claude", ".claude-personal" };
-    private const string DefaultHomeName = ".claude";
-
     private readonly string _homeDir;
     private readonly string _sanduhrDir;
     private readonly Action<string>? _logBestEffort;
@@ -50,33 +52,37 @@ public sealed class McpIntegrationInstaller
     public string VersionsDir => Path.Combine(_sanduhrDir, "mcp");
     public string LauncherPath => Path.Combine(_sanduhrDir, "bin", "sanduhr-mcp.cmd");
 
-    /// <summary>The .claude.json Claude Code reads for a home. Claude Code keeps
-    /// it INSIDE the home only when that home is selected through
-    /// <c>CLAUDE_CONFIG_DIR</c> (the only way a non-default home such as
-    /// <c>.claude-personal</c> is ever a home); for the default <c>.claude</c>
-    /// home it lives beside the home, at <c>%USERPROFILE%\.claude.json</c>.
-    /// An inner file that already exists wins for either name: its presence
-    /// means the config-dir layout is in use for that home.</summary>
+    /// <summary>The .claude.json Claude Code reads for a home: one placement rule,
+    /// <see cref="ClaudeCodeHomes.ConfigFile"/>. Any home but <c>.claude</c> keeps it
+    /// inside the home; for <c>.claude</c> the signed-in file wins, then the newer
+    /// inner one, else the one beside the home at <c>%USERPROFILE%\.claude.json</c>.</summary>
     public string ConfigPathFor(string ccHomeName)
+        => ClaudeCodeHomes.ConfigFile(Path.Combine(_homeDir, ccHomeName), _homeDir);
+
+    /// <summary>Every <c>.claude.json</c> that may hold Sanduhr's entry for the home. One file for any
+    /// home but <c>.claude</c>; for <c>.claude</c> both the file beside it and the stub inside it, because
+    /// which one <see cref="ClaudeCodeHomes.ConfigFile"/> picks changes with sign-in and file age, and an
+    /// earlier build may have written to the other.</summary>
+    public IReadOnlyList<string> CandidateConfigPaths(string ccHomeName)
     {
-        string inner = Path.Combine(_homeDir, ccHomeName, ".claude.json");
-        if (ccHomeName != DefaultHomeName || File.Exists(inner))
-            return inner;
-        return Path.Combine(_homeDir, ".claude.json");
+        string dir = Path.Combine(_homeDir, ccHomeName);
+        string chosen = ConfigPathFor(ccHomeName);
+        var list = new List<string> { chosen };
+        if (ClaudeCodeFolders.Same(dir, Path.Combine(_homeDir, ClaudeCodeHomes.DefaultName)))
+        {
+            foreach (var other in new[] { Path.Combine(_homeDir, ".claude.json"), Path.Combine(dir, ".claude.json") })
+                if (!list.Any(p => string.Equals(Path.GetFullPath(p), Path.GetFullPath(other), StringComparison.OrdinalIgnoreCase)))
+                    list.Add(other);
+        }
+        return list;
     }
 
-    /// <summary>CC homes that exist under the profile — same closed set as the
-    /// statusline installer; the consent dialog picks ONE.</summary>
+    private ConfigCommit Commit => new(Path.Combine(_sanduhrDir, "backups"));
+
+    /// <summary>CC homes under the profile, as <see cref="ClaudeCodeHomes.Discover"/>
+    /// finds them — same set as the statusline installer; the consent dialog picks ONE.</summary>
     public IReadOnlyList<string> DetectCcHomes()
-    {
-        var found = new List<string>();
-        foreach (var name in KnownHomeNames)
-        {
-            if (Directory.Exists(Path.Combine(_homeDir, name)))
-                found.Add(name);
-        }
-        return found;
-    }
+        => ClaudeCodeHomes.Discover(_homeDir, Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR"));
 
     /// <summary>Copy the server build from <paramref name="sourceDir"/> into a
     /// freshly stamped version dir. Returns the new dir, or null on failure.</summary>
@@ -214,120 +220,206 @@ public sealed class McpIntegrationInstaller
     public McpRegisterResult Register(string ccHomeName)
     {
         string path = ConfigPathFor(ccHomeName);
-        JsonObject root;
-        try
+        string? prior = null;
+        bool refuse = false;
+
+        byte[]? Plan(byte[]? original)
         {
-            if (File.Exists(path))
+            prior = null;
+            refuse = false;
+            if (original is null)
             {
-                if (JsonNode.Parse(File.ReadAllText(path)) is not JsonObject parsed)
+                return Encoding.UTF8.GetBytes(new JsonObject
                 {
-                    _logBestEffort?.Invoke("mcp register aborted (.claude.json not an object)");
-                    return new McpRegisterResult(false, null);
-                }
-                root = parsed;
+                    ["mcpServers"] = new JsonObject { ["sanduhr"] = OurEntryNode() },
+                }.ToJsonString(IndentedJson) + "\n");
+            }
+            if (!JsonEdit.IsObject(original))
+            {
+                refuse = true;
+                return null;
+            }
+            var top = JsonEdit.TopObject(original);
+            byte[] result;
+            if (top.Member("mcpServers") is { } serversMember && IsObjectAt(original, serversMember.ValueStart))
+            {
+                var servers = JsonEdit.Object(original, serversMember.ValueStart);
+                if (servers.Member("sanduhr") is { } existing)
+                    prior = CommandOf(JsonEdit.Text(original, existing));
+                result = JsonEdit.Set(original, servers, "sanduhr", OurEntry()).Bytes;
+            }
+            else if (top.Member("mcpServers") is not null)
+            {
+                // An mcpServers that isn't an object is someone else's value: never replace it.
+                refuse = true;
+                return null;
             }
             else
             {
-                root = new JsonObject();
+                // No mcpServers yet.
+                result = JsonEdit.Set(original, top, "mcpServers",
+                    JsonEdit.Value.Obj(new JsonEdit.Pair("sanduhr", OurEntry()))).Bytes;
             }
+            return result.AsSpan().SequenceEqual(original) ? null : result;
         }
-        catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
+
+        try
+        {
+            var outcome = Commit.RetryCommit(path, Plan, backup: true);
+            if (refuse)
+            {
+                _logBestEffort?.Invoke("mcp register aborted (.claude.json not an object)");
+                return new McpRegisterResult(false, null);
+            }
+            bool ok = outcome != CommitOutcome.Conflict;
+            if (!ok)
+                _logBestEffort?.Invoke("mcp register gave up (.claude.json kept changing)");
+            return new McpRegisterResult(ok, ok ? prior : null);
+        }
+        catch (Exception e) when (e is JsonEditException or JsonException or IOException or UnauthorizedAccessException)
         {
             _logBestEffort?.Invoke($"mcp register aborted ({e.GetType().Name})");
             return new McpRegisterResult(false, null);
         }
-
-        if (root["mcpServers"] is not JsonObject servers)
-        {
-            servers = new JsonObject();
-            root["mcpServers"] = servers;
-        }
-        string? prior = null;
-        if (servers["sanduhr"] is JsonObject existing)
-            prior = (string?)existing["command"];
-
-        servers["sanduhr"] = new JsonObject
-        {
-            ["command"] = LauncherPath,
-            ["args"] = new JsonArray(),
-        };
-        bool ok = WriteConfigSafely(path, root, "register");
-        return new McpRegisterResult(ok, prior);
     }
 
     /// <summary>Remove <c>mcpServers.sanduhr</c> — only when it points at a
-    /// Sanduhr launcher/binary. Foreign entries are left untouched; true means
+    /// Sanduhr launcher/binary — from every file Claude Code may read for the home
+    /// (<see cref="CandidateConfigPaths"/>: for <c>.claude</c> both the file beside
+    /// the home and the one inside it, since a registration written by an earlier
+    /// build can sit in either). Foreign entries are left untouched; true means
     /// "nothing of ours remains registered".</summary>
     public bool Deregister(string ccHomeName)
     {
-        string path = ConfigPathFor(ccHomeName);
+        bool all = true;
+        foreach (var path in CandidateConfigPaths(ccHomeName))
+            all &= DeregisterFile(path);
+        return all;
+    }
+
+    private bool DeregisterFile(string path)
+    {
+        bool failed = false;
+
+        byte[]? Plan(byte[]? original)
+        {
+            failed = false;
+            if (original is null)
+                return null;
+            if (!JsonEdit.IsObject(original))
+            {
+                // Valid JSON that is not an object is not ours to touch; broken JSON is a failure.
+                try { JsonNode.Parse(Utf8Text(original)); }
+                catch (JsonException) { failed = true; }
+                return null;
+            }
+            var top = JsonEdit.TopObject(original);
+            if (top.Member("mcpServers") is not { } serversMember || !IsObjectAt(original, serversMember.ValueStart))
+                return null;
+            var servers = JsonEdit.Object(original, serversMember.ValueStart);
+            if (servers.Member("sanduhr") is not { } entry || !IsOurs(original, entry))
+                return null;
+            return JsonEdit.Remove(original, servers, "sanduhr");
+        }
+
         try
         {
-            if (!File.Exists(path))
-                return true;
-            if (JsonNode.Parse(File.ReadAllText(path)) is not JsonObject root)
-                return true;
-            if (root["mcpServers"] is not JsonObject servers || !IsOurs(servers["sanduhr"]))
-                return true;
-            servers.Remove("sanduhr");
-            return WriteConfigSafely(path, root, "deregister");
+            var outcome = Commit.RetryCommit(path, Plan, backup: true);
+            if (failed)
+            {
+                _logBestEffort?.Invoke("mcp deregister failed (JsonException)");
+                return false;
+            }
+            if (outcome == CommitOutcome.Conflict)
+            {
+                _logBestEffort?.Invoke("mcp deregister gave up (.claude.json kept changing)");
+                return false;
+            }
+            return true;
         }
-        catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
+        catch (Exception e) when (e is JsonEditException or JsonException or IOException or UnauthorizedAccessException)
         {
             _logBestEffort?.Invoke($"mcp deregister failed ({e.GetType().Name})");
             return false;
         }
     }
 
-    /// <summary>True when the home's .claude.json carries Sanduhr's entry.</summary>
+    /// <summary>The reset path: deregister the server from every home, then delete the launcher and the
+    /// version dirs, but only when every deregister succeeded. A failed entry keeps its files, so the
+    /// registration Claude Code still holds keeps working until the user removes it by hand.</summary>
+    public bool UndoAll(IEnumerable<string> ccHomeNames)
+    {
+        bool all = true;
+        foreach (var home in ccHomeNames)
+            all &= Deregister(home);
+        if (all)
+            RemoveIntegrationFiles();
+        return all;
+    }
+
+    /// <summary>True when any file Claude Code may read for the home carries Sanduhr's entry.</summary>
     public bool IsRegistered(string ccHomeName)
+    {
+        foreach (var path in CandidateConfigPaths(ccHomeName))
+        {
+            try
+            {
+                if (Commit.Read(path) is not { } bytes || !JsonEdit.IsObject(bytes))
+                    continue;
+                var top = JsonEdit.TopObject(bytes);
+                if (top.Member("mcpServers") is { } sm && IsObjectAt(bytes, sm.ValueStart)
+                    && JsonEdit.Object(bytes, sm.ValueStart).Member("sanduhr") is { } entry
+                    && IsOurs(bytes, entry))
+                    return true;
+            }
+            catch (Exception e) when (e is JsonEditException or JsonException or IOException or UnauthorizedAccessException)
+            {
+                // An unreadable file does not count as registered.
+            }
+        }
+        return false;
+    }
+
+    private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
+
+    private static string Utf8Text(byte[] bytes)
+    {
+        int skip = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF ? 3 : 0;
+        return Encoding.UTF8.GetString(bytes, skip, bytes.Length - skip);
+    }
+
+    private static bool IsObjectAt(byte[] bytes, int valueStart)
+        => valueStart < bytes.Length && bytes[valueStart] == (byte)'{';
+
+    private JsonEdit.Value OurEntry()
+        => JsonEdit.Value.Obj(
+            new JsonEdit.Pair("command", JsonEdit.Value.Str(LauncherPath)),
+            new JsonEdit.Pair("args", JsonEdit.Value.Arr()));
+
+    private JsonNode OurEntryNode()
+        => new JsonObject { ["command"] = LauncherPath, ["args"] = new JsonArray() };
+
+    private static string? CommandOf(byte[] entryBytes)
     {
         try
         {
-            string path = ConfigPathFor(ccHomeName);
-            if (!File.Exists(path))
-                return false;
-            return JsonNode.Parse(File.ReadAllText(path)) is JsonObject root
-                && root["mcpServers"] is JsonObject servers
-                && IsOurs(servers["sanduhr"]);
+            return JsonNode.Parse(Utf8Text(entryBytes)) is JsonObject o ? (string?)o["command"] : null;
         }
-        catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
+        catch (Exception e) when (e is JsonException or InvalidOperationException or FormatException)
         {
-            return false;
+            return null;
         }
     }
 
-    private static bool IsOurs(JsonNode? entry)
+    private static bool IsOurs(byte[] bytes, JsonEdit.Member entry)
     {
         try
         {
-            return entry is JsonObject o
-                && (string?)o["command"] is { } cmd
+            return CommandOf(JsonEdit.Text(bytes, entry)) is { } cmd
                 && cmd.Contains("sanduhr-mcp", StringComparison.OrdinalIgnoreCase);
         }
         catch
         {
-            return false;
-        }
-    }
-
-    private bool WriteConfigSafely(string path, JsonObject root, string operation)
-    {
-        try
-        {
-            if (File.Exists(path))
-            {
-                string stamp = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
-                File.Copy(path, path + ".sanduhr-backup-" + stamp, overwrite: true);
-            }
-            string tmp = path + ".tmp";
-            File.WriteAllText(tmp, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
-            File.Move(tmp, path, overwrite: true);
-            return true;
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            _logBestEffort?.Invoke($"mcp {operation} write failed ({e.GetType().Name})");
             return false;
         }
     }

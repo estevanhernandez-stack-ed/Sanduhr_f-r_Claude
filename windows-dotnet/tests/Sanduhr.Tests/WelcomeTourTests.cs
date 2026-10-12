@@ -70,7 +70,7 @@ public class WelcomeTourTests
         Assert.Equal(SettingsPage.Widget, ById("paced").Card.Destination);
         Assert.Equal(SettingsPage.General, ById("tray").Card.Destination);
         Assert.Equal(SettingsPage.Accounts, ById("accounts").Card.Destination);
-        Assert.Equal(SettingsPage.ClaudeUsage, ById("claude-code").Card.Destination);
+        Assert.Equal(SettingsPage.ClaudeCode, ById("claude-code").Card.Destination);
     }
 
     [Fact]

@@ -35,7 +35,7 @@
 
   <!-- Trust boundary BY CONSTRUCTION (WS-E design review must-fix #11): this
        project deliberately has NO reference to Sanduhr.Core. It source-links
-       exactly the four files it needs, so CredentialStore /
+       an allowlisted slice of Core files (TrustBoundaryTests pins the list), so CredentialStore /
        WindowsCredentialManager / the WebView2 transport are not merely unused —
        they are not part of the compilation. The cert letter's "cannot touch
        credentials" claim is structural. A test pins this file's link list to
@@ -45,6 +45,10 @@
     <Compile Include="..\Sanduhr.Core\Pacing.cs" Link="Core\Pacing.cs" />
     <Compile Include="..\Sanduhr.Core\TierModel.cs" Link="Core\TierModel.cs" />
     <Compile Include="..\Sanduhr.Core\CcLogReader.cs" Link="Core\CcLogReader.cs" />
+    <!-- Root discovery (2026-10-11 ruling, decision 6h5YrnXr0YVjPqlqqi8i): folder names
+         under the profile matching .claude / .claude-*. BCL IO + System.Text.Json, no
+         credentials, no network. A root still counts only when mcp_roots consents to it. -->
+    <Compile Include="..\Sanduhr.Core\ClaudeCodeHomes.cs" Link="Core\ClaudeCodeHomes.cs" />
     <!-- propose_theme: the lint (pure) and the theme model it builds. No IO, no
          credentials; the widget still owns every write under the themes folder. -->
     <Compile Include="..\Sanduhr.Core\ThemeModel.cs" Link="Core\ThemeModel.cs" />

@@ -40,7 +40,11 @@ public class TrustBoundaryTests
         Assert.Equal(
             new[]
             {
-                "CcLogReader.cs", "Pacing.cs", "SnapshotContract.cs",
+                "CcLogReader.cs",
+                // Root discovery only (2026-10-11 ruling, decision 6h5YrnXr0YVjPqlqqi8i): folder
+                // names under the profile. Consent (mcp_roots) still gates every root.
+                "ClaudeCodeHomes.cs",
+                "Pacing.cs", "SnapshotContract.cs",
                 // propose_theme: the lint and the model it builds, both pure. The
                 // widget owns every write under the themes folder.
                 "ThemeLint.cs", "ThemeModel.cs", "TierModel.cs",

@@ -70,6 +70,18 @@ public sealed class SnapshotWriter
         WriteAtomic(root);
     }
 
+    /// <summary>Write a signed-out snapshot: an auth error with no tiers. Unlike
+    /// <see cref="WriteError"/> no last-good tiers are carried, so a reader says
+    /// "sign in again" instead of showing numbers.</summary>
+    public void WriteSignedOut(string? plan, string? accountLabel, DateTimeOffset now)
+    {
+        var root = BuildCommon(plan, accountLabel, now, _writerVersion);
+        root["status"] = "error";
+        root["error_kind"] = SnapshotContract.ErrorSessionExpired;
+        root["tiers"] = new JsonArray();
+        WriteAtomic(root);
+    }
+
     /// <summary>Delete the snapshot (toggle-off, account switch, sign-out).
     /// Best-effort; never throws into the caller's flow.</summary>
     public void Delete()

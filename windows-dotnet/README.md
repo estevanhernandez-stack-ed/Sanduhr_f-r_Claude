@@ -158,8 +158,42 @@ Every control has one name across Settings, the menus, the tour and What's New
 (`Sanduhr.Core/SettingsNames.cs`, checked by tests); commands are sentence case. Demo mode now
 shows the sample accounts in Settings and the account menus too. No `settings.json` key changed,
 so nothing migrates; `SettingsKeysContractTests` pins the keys so a future rename needs a
-migration. Reset Sanduhr… waits on its wording. Windows can be rendered off screen for checking
+migration. Windows can be rendered off screen for checking
 with `tools/Sanduhr.RenderHarness` (needs `SANDUHR_DEV_PROFILE`).
+
+### Since 3.4.3: Mac parity, Stage 4
+
+The Claude Code side (`docs/spec.md` Stage 4, `../docs/mods-and-config-spec.md`):
+
+- **Settings, Claude Code**: every folder Sanduhr finds (`~/.claude`, `~/.claude-*` with
+  `projects/` or a `.claude.json`, the `CLAUDE_CONFIG_DIR` folder in the profile) plus folders
+  added by hand (`cc_folders_added`); a linked account per folder; the MCP consent per folder;
+  Install and Remove for the statusline, the MCP server, the meters mod and the glow hooks, each
+  behind a consent dialog. The statusline and MCP moved here from Claude Usage.
+- **Edits with exact undo**: `JsonEdit` splices one member and keeps every other byte (LF and
+  CRLF); `ConfigCommit` re-reads and compares before replacing, with backups in
+  `%APPDATA%\Sanduhr\backups`; receipts in `%APPDATA%\Sanduhr\integrations\installs.json`, read
+  record by record. Remove returns a file byte for byte when nobody else changed it.
+- **Statusline combine**: keeps your own statusline and adds Sanduhr's segments (session, weekly,
+  weekly reset) on their own line or the same one; the script looks the folder up in
+  `seats.json` for per-folder meters.
+- **Meters mod**: the Mac's `sanduhr-meters` mod ships in the app output (`mods\`), installs to
+  `%APPDATA%\Sanduhr\mods\<stamp>` and joins `env.CLAUDE_CODE_PLUGIN_DIRS`; On, Off, Update and
+  Remove live on **Mods & Config**, which otherwise reads a folder without changing it (settings,
+  statusline, hooks, plugins, mods, MCP names, `CLAUDE.md`, retention). Secrets are masked.
+- **Glow when Claude needs you**: `Notification` and `Stop` hooks touch a signal file; the widget
+  lights the top edge of the window you are working in, in the theme's accent (waiting) or
+  success color (done), and flashes the taskbar button. Off by default (`claude_code_glow`).
+- **Accounts**: Follow the account I'm using (`follow_account`, off by default) checks the other
+  signed-in accounts every 15 minutes through their own WebView2 profiles
+  (`%APPDATA%\Sanduhr\webview2-<account_ref>`); linked folders get `snapshot.<account_ref>.json`
+  and `seats.json` (`account_folders`).
+- **Reset Sanduhr…** on About: five parts, all checked, then quit.
+- **The MCP** reads discovered folders behind the `mcp_roots` consent (it now source-links
+  `ClaudeCodeHomes.cs`); `publish_usage` hands its request over atomically.
+
+`statusline_enabled` now means "the statusline or the meters mod is installed in some folder", so
+`snapshot.json` is written while either is.
 
 ---
 

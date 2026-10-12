@@ -11,7 +11,7 @@ namespace Sanduhr.App.Views;
 
 /// <summary>
 /// The Settings window (Settings v2): a grouped sidebar with search over General,
-/// Accounts, Alerts, History, Claude Usage, Publish usage, Themes and About. The
+/// Accounts, Alerts, History, Claude Usage, Publish usage, Claude Code, Mods &amp; Config, Themes and About. The
 /// sidebar is the TabControl re-templated; each TabItem's Tag is its
 /// <see cref="SettingsPage"/>, which <see cref="SelectPage"/> and the search use.
 /// Opened non-modally and kept single-instance by the App so a live account switch
@@ -59,6 +59,8 @@ internal partial class SettingsWindow : Window
         ViewModel.ClaudeCode.Attach();
         ViewModel.Publish.AttachOwner(this);
         ViewModel.Publish.Attach();
+        ViewModel.ClaudeCodePage.AttachOwner(this);
+        ViewModel.Mods.AttachOwner(this);
 
         // Bridge the custom-render controls to their VMs.
         ViewModel.History.Changed += RenderHistory;
@@ -145,6 +147,12 @@ internal partial class SettingsWindow : Window
             if (page == SettingsPage.History)
                 RenderHistory();
         }
+
+        // The Claude Code pages read files other tools change: look again each time they are opened.
+        if (page == SettingsPage.ClaudeCode)
+            ViewModel.ClaudeCodePage.Reload();
+        else if (page == SettingsPage.Mods)
+            ViewModel.Mods.ReloadFolders();
     }
 
     /// <summary>The page a sidebar entry stands for: its Tag names the <see cref="SettingsPage"/>.</summary>

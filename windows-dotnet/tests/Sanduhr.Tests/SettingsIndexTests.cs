@@ -69,7 +69,11 @@ public class SettingsIndexTests
     [InlineData("percent", SettingsPage.General, SettingsIndex.Tray)]
     [InlineData("hotkey", SettingsPage.General, SettingsIndex.Shortcuts)]
     [InlineData("vault", SettingsPage.ClaudeUsage, SettingsIndex.Vault)]
-    [InlineData("statusline", SettingsPage.ClaudeUsage, SettingsIndex.Statusline)]
+    [InlineData("statusline", SettingsPage.ClaudeCode, SettingsIndex.Statusline)]
+    [InlineData("MCP", SettingsPage.ClaudeCode, SettingsIndex.Mcp)]
+    [InlineData("glow", SettingsPage.ClaudeCode, SettingsIndex.Glow)]
+    [InlineData("cleanupPeriodDays", SettingsPage.Mods, SettingsIndex.Retention)]
+    [InlineData("follow", SettingsPage.Accounts, SettingsIndex.Follow)]
     [InlineData("license", SettingsPage.About, SettingsIndex.Notices)]
     [InlineData("trademark", SettingsPage.About, SettingsIndex.Trademark)]
     public void Synonyms_and_words_resolve_to_the_expected_top_hit(string query, SettingsPage page, string anchor)
@@ -80,9 +84,13 @@ public class SettingsIndexTests
     }
 
     [Fact]
-    public void Statusline_hit_sits_in_the_Overview_view()
+    public void Statusline_and_MCP_left_Claude_Usage_for_the_Claude_Code_page()
     {
-        Assert.Equal(SettingsIndex.OverviewView, Top("statusline").Entry.Subsection);
+        Assert.Null(SettingsIndex.Find(SettingsPage.ClaudeUsage, SettingsIndex.Statusline));
+        Assert.Null(SettingsIndex.Find(SettingsPage.ClaudeUsage, SettingsIndex.Mcp));
+        Assert.NotNull(SettingsIndex.Find(SettingsPage.ClaudeCode, SettingsIndex.Statusline));
+        Assert.NotNull(SettingsIndex.Find(SettingsPage.ClaudeCode, SettingsIndex.Mcp));
+        Assert.Null(Top("statusline").Entry.Subsection);
     }
 
     [Fact]

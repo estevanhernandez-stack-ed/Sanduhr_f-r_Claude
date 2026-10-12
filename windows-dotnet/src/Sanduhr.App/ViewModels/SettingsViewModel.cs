@@ -29,6 +29,12 @@ public sealed class SettingsViewModel
     /// over the usage vault + live reader.</summary>
     public ClaudeCodeTabViewModel ClaudeCode { get; }
 
+    /// <summary>Backs the Claude Code page: folders, accounts linked to them, Sanduhr's pieces and the glow.</summary>
+    public ClaudeCodeViewModel ClaudeCodePage { get; }
+
+    /// <summary>Backs the Mods &amp; Config page: a read-only look at one folder, plus the meters mod switch.</summary>
+    public ModsConfigViewModel Mods { get; }
+
     /// <summary>Backs the General tab's auto-start control (item 10).</summary>
     public GeneralViewModel General { get; }
 
@@ -59,6 +65,7 @@ public sealed class SettingsViewModel
     public string TrademarkNotice => SettingsNames.TrademarkNotice;
     public string WhereSettingsLiveTitle => SettingsNames.WhereSettingsLive;
     public string ThirdPartyNoticesTitle => SettingsNames.ThirdPartyNotices;
+    public string ResetSanduhrTitle => SettingsNames.ResetSanduhr;
     public string AboutVersionLine => $"Sanduhr für Claude {Version}";
 
     /// <summary>About, Third-party notices: the packages the app ships with.</summary>
@@ -76,6 +83,12 @@ public sealed class SettingsViewModel
     /// <summary>Opens a third-party package's page in the browser.</summary>
     public ICommand OpenLinkCommand { get; }
 
+    /// <summary>About's "Reset Sanduhr…" button: asks the orchestrator to open the reset dialog.</summary>
+    public ICommand ResetSanduhrCommand { get; }
+
+    /// <summary>Connected by the orchestrator: opens the reset dialog. Null does nothing.</summary>
+    public Func<Task>? ResetRequested { get; set; }
+
     /// <summary>Backs the General tab's Shortcuts section (global shortcut + recorder).</summary>
     public ShortcutsViewModel Shortcuts { get; }
 
@@ -91,6 +104,12 @@ public sealed class SettingsViewModel
             widget, widget.LoadLocalCcShowBreakdowns(), widget.SaveLocalCcShowBreakdowns),
             new CcTrendsViewModel(widget),
             new CcLedgerViewModel(widget, widget.LoadLedgerGroupByProject(), widget.SaveLedgerGroupByProject));
+        ClaudeCodePage = new ClaudeCodeViewModel(widget);
+        Mods = new ModsConfigViewModel(widget);
+        // The two pages share one folder list and one set of installed pieces.
+        ClaudeCodePage.FoldersChanged += Mods.ReloadFolders;
+        ClaudeCodePage.PiecesChanged += Mods.Refresh;
+        Mods.OwnModChanged += ClaudeCodePage.Reload;
         General = new GeneralViewModel(widget: widget);
         Shortcuts = new ShortcutsViewModel(new SettingsStore(new Paths()), hotKeys);
         Alerts = new AlertsViewModel(widget, () =>
@@ -109,6 +128,11 @@ public sealed class SettingsViewModel
         ShowInExplorerCommand = new RelayCommand<string>(OpenFolder,
             folder => !string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder));
         OpenLinkCommand = new RelayCommand<string>(OpenLink);
+        ResetSanduhrCommand = new RelayCommand(async () =>
+        {
+            try { if (ResetRequested is { } reset) await reset(); }
+            catch (Exception) { /* the dialog reports its own failures */ }
+        });
     }
 
     private static void OpenFolder(string? folder)
