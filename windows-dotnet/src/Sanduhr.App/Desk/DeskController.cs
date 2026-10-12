@@ -89,6 +89,7 @@ internal sealed class DeskController : IDisposable
         {
             _host = _hostFactory();
             _host.ScreensChanged += OnScreensChanged;
+            _host.CoverageChanged += OnCoverageChanged;
         }
         Rebuild();
     }
@@ -143,17 +144,57 @@ internal sealed class DeskController : IDisposable
 
     private bool Placed(string widget) => new DeskArrangement(_settings.Layout).Placement(widget) is not null;
 
-    /// <summary>Starts the sources whose pieces are placed and stops the rest.</summary>
+    /// <summary>A widget's reading is wanted when its piece is placed and at least one island holding it
+    /// is in sight. With no islands yet nothing is paused, so it is wanted (S7, 7.1).</summary>
+    private bool InSight(string widget)
+    {
+        if (!Placed(widget)) return false;
+        bool any = false;
+        foreach (var surface in _surfaces)
+            foreach (var island in surface.Islands)
+            {
+                if (!island.Widgets.Contains(widget)) continue;
+                any = true;
+                if (!island.Pause.Paused) return true;
+            }
+        return !any;
+    }
+
+    /// <summary>Starts the sources whose pieces are placed and in sight, and stops the rest.</summary>
     private void SyncSources(NowPlayingInfo? track)
     {
         bool on = _host is not null && !_stopped;
-        if (on && Placed("telemetry")) _telemetry.Start(); else _telemetry.Stop();
+        if (on && InSight("telemetry")) _telemetry.Start(); else _telemetry.Stop();
         _nowPlaying.Want(this, on && Placed("nowPlaying"));
-        bool bars = on && _np.Bars && Placed("nowPlaying") && track?.State == NowPlayingState.Playing;
+        bool bars = on && _np.Bars && InSight("nowPlaying") && track?.State == NowPlayingState.Playing;
         if (bars) _audio.Start(); else if (_audio.Running) _audio.Stop();
         if (on && Placed("weather") && _weatherSettings.Place is { } place)
             _weather.Start(place, _weatherSettings.UnitOr(RegionInfo.CurrentRegion.IsMetric));
         else _weather.Stop();
+    }
+
+    /// <summary>Sets each island's gate from the host's coverage. Islands the host has no flag for are in
+    /// sight. A gate raises its change only when its value moves.</summary>
+    private void ApplyCoverage()
+    {
+        var covered = _host?.Coverage ?? [];
+        int i = 0;
+        foreach (var surface in _surfaces)
+            foreach (var island in surface.Islands)
+            {
+                // S7 arrange mode sets this
+                island.Pause.Paused = DeskPauseRule.Paused(i < covered.Count && covered[i], arranging: false);
+                i++;
+            }
+    }
+
+    /// <summary>Windows moved over or away from the Desk: pause or resume the islands and the sources
+    /// that feed them. Nothing is laid out again.</summary>
+    private void OnCoverageChanged()
+    {
+        if (_host is null || _stopped) return;
+        ApplyCoverage();
+        SyncSources(_np.Prefs.Visible(_nowPlaying.Shown));
     }
 
     /// <summary>A full redraw is due only when what the line says changes (the track, its app or
@@ -221,7 +262,11 @@ internal sealed class DeskController : IDisposable
             // on the next rebuild rather than let a timer tick take the app down.
             System.Diagnostics.Debug.WriteLine($"[Sanduhr] Desk redraw failed: {e.GetType().Name}");
             host.Hide();
+            return;
         }
+        // The new islands start in sight: take the host's reading and let the sources follow it.
+        ApplyCoverage();
+        SyncSources(track);
     }
 
     /// <summary>
@@ -302,6 +347,7 @@ internal sealed class DeskController : IDisposable
         _nowPlaying.Want(this, false);
         if (_host is null) return;
         _host.ScreensChanged -= OnScreensChanged;
+        _host.CoverageChanged -= OnCoverageChanged;
         _host.Dispose();
         _host = null;
     }

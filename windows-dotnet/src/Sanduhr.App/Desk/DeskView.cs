@@ -98,7 +98,9 @@ internal sealed class DeskView : Grid, IDisposable
     private double TimeSize => _settings.TimeSize;
     private double Inset => TimeSize * 0.18;
 
-    private readonly List<(StackPanel Stack, DeskColumn Column, DeskRow Row)> _stacks = [];
+    private readonly List<(StackPanel Stack, DeskColumn Column, DeskRow Row, DeskPause Pause, List<string> Widgets)> _stacks = [];
+    /// <summary>The gate of the stack being built; the live pieces in it watch this one (S7, 7.1).</summary>
+    private DeskPause _gate = new();
 
     /// <summary>Each non-empty stack's rect in screen DIPs after layout (Automatic ink samples the
     /// wallpaper behind these).</summary>
@@ -106,7 +108,7 @@ internal sealed class DeskView : Grid, IDisposable
     {
         LayOut();
         var rects = new Dictionary<DeskAnchor, Rect>();
-        foreach (var (stack, column, row) in _stacks)
+        foreach (var (stack, column, row, _, _) in _stacks)
         {
             if (stack.Children.Count == 0 || DeskAnchors.At(column, row) is not { } a) continue;
             rects[a] = stack.TransformToAncestor(this).TransformBounds(new Rect(stack.RenderSize));
@@ -133,7 +135,7 @@ internal sealed class DeskView : Grid, IDisposable
     {
         LayOut();
         var islands = new List<DeskIsland>();
-        foreach (var (stack, column, row) in _stacks)
+        foreach (var (stack, column, row, pause, widgets) in _stacks)
         {
             if (stack.Children.Count == 0 || stack.Parent is not Panel parent) continue;
             var r = stack.TransformToAncestor(this).TransformBounds(new Rect(stack.RenderSize));
@@ -165,7 +167,7 @@ internal sealed class DeskView : Grid, IDisposable
                 ? col.MaxWidth : (parent as FrameworkElement)?.ActualWidth ?? r.Width;
             parent.Children.Remove(stack);
             stack.MaxWidth = maxWidth;
-            islands.Add(new DeskIsland(stack, new Point(x, y), h, v));
+            islands.Add(new DeskIsland(stack, new Point(x, y), h, v) { Pause = pause, Widgets = widgets });
         }
         Children.Clear();
         _stacks.Clear();
@@ -253,13 +255,17 @@ internal sealed class DeskView : Grid, IDisposable
             var stack = new StackPanel { HorizontalAlignment = align };
             var row = rows.Count == 3 ? (i == 0 ? DeskRow.Top : DeskRow.Bottom)
                 : i == 0 ? DeskRow.Top : i == 2 ? DeskRow.Middle : DeskRow.Bottom;
-            _stacks.Add((stack, column, row));
+            var pause = new DeskPause();
+            var widgets = new List<string>();
+            _stacks.Add((stack, column, row, pause, widgets));
+            _gate = pause;
             if (DeskAnchors.At(column, row) is { } anchor) _ink = _inks.For(anchor);
             foreach (var p in rows[i].Pieces)
                 if (Piece(p, align, width) is { } piece)
                 {
                     piece.Margin = new Thickness(0, stack.Children.Count > 0 ? TimeSize * 0.12 : 0, 0, 0);
                     stack.Children.Add(piece);
+                    widgets.Add(p.Widget);
                 }
             SetRow(stack, i);
             grid.Children.Add(stack);
@@ -272,7 +278,7 @@ internal sealed class DeskView : Grid, IDisposable
         double ts = TimeSize * p.Scale;
         FrameworkElement? piece = p.Widget switch
         {
-            "message" => _frame.Message is { } msg ? DeskMessagePiece.Create(msg, p.Scale, _ink, _fonts, _settings.Font, align, width, _live) : null,
+            "message" => _frame.Message is { } msg ? DeskMessagePiece.Create(msg, p.Scale, _ink, _fonts, _settings.Font, align, width, _live, _gate) : null,
             "clock" => Clock(ts, align),
             "claude" => ClaudeLine(ts),
             "meters" => Meters(ts, align),
@@ -418,7 +424,7 @@ internal sealed class DeskView : Grid, IDisposable
         double width = ts * 3.2;
         if (rows.Count == 0)
         {
-            if (!_frame.Usage.SignInNeeded) return null;
+            if (!DeskMeters.SignInLineShown(_frame.Usage)) return null;
             return Text(DeskClaudeText.SignInLine(_frame.Usage.FirstSignIn), size, 0.75);
         }
         var panel = new StackPanel { HorizontalAlignment = align, Opacity = _frame.Usage.IsStale(_frame.Now) ? 0.5 : 1 };
@@ -531,11 +537,22 @@ internal sealed class DeskView : Grid, IDisposable
 
         if (track.State == NowPlayingState.Playing && track.Duration is > 0)
         {
+            // While the island is covered the bar rests; on resume it reads the current track at once
+            // (a seek or a pause may have moved the anchor) and ticks again (S7, 7.1).
             var tick = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
             var current = _frame.TrackNow;
-            tick.Tick += (_, _) => fill.Width = width * ((current?.Invoke() ?? track).Progress(DateTimeOffset.Now) ?? 0);
-            tick.Start();
-            _live.Add(new Unhook(tick.Stop));
+            var gate = _gate;
+            void SetBar() => fill.Width = width * ((current?.Invoke() ?? track).Progress(DateTimeOffset.Now) ?? 0);
+            void OnGate()
+            {
+                if (gate.Paused) { tick.Stop(); return; }
+                SetBar();
+                tick.Start();
+            }
+            tick.Tick += (_, _) => SetBar();
+            if (!gate.Paused) tick.Start();
+            gate.Changed += OnGate;
+            _live.Add(new Unhook(() => { tick.Stop(); gate.Changed -= OnGate; }));
         }
 
         if (!_frame.Bars || _frame.Audio is not { } audio) return column;

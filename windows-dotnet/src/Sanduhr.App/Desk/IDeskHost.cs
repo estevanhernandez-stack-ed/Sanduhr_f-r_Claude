@@ -16,7 +16,14 @@ internal sealed record DeskScreen(string Device, PxRect Bounds, PxRect Work, dou
 
 /// <summary>One stack of Desk pieces and where it hangs: <paramref name="Anchor"/> is a point in the
 /// screen's DIPs, and the alignments say which of the island's edges (or its middle) sits on it.</summary>
-internal sealed record DeskIsland(FrameworkElement Content, Point Anchor, HorizontalAlignment Horizontal, VerticalAlignment Vertical);
+internal sealed record DeskIsland(FrameworkElement Content, Point Anchor, HorizontalAlignment Horizontal, VerticalAlignment Vertical)
+{
+    /// <summary>The gate the stack's live pieces watch: paused while the island is covered (S7, 7.1).</summary>
+    public DeskPause Pause { get; init; } = new();
+
+    /// <summary>The widget words of the pieces in this stack ("telemetry", "nowPlaying", ...).</summary>
+    public IReadOnlyList<string> Widgets { get; init; } = [];
+}
 
 /// <summary>What the Desk draws on one screen: its islands, each drawn in a window just its size, so
 /// a redraw repaints a few small surfaces rather than a full-screen one (spec 5.1, cost).</summary>
@@ -47,4 +54,11 @@ internal interface IDeskHost : IDisposable
 
     /// <summary>True while Desk windows are up.</summary>
     bool IsShowing { get; }
+
+    /// <summary>One flag per island in the last <see cref="Show"/> order: true when other windows hide
+    /// the island completely. All false when unknown (nothing shown, or a host that cannot tell).</summary>
+    IReadOnlyList<bool> Coverage { get; }
+
+    /// <summary>The <see cref="Coverage"/> flags changed. Nothing is laid out again on this event.</summary>
+    event Action? CoverageChanged;
 }

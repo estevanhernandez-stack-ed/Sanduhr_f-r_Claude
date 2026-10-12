@@ -47,6 +47,7 @@ internal sealed class DesktopLayerHost : IDeskHost
     private readonly uint _taskbarCreated;
     private readonly DispatcherTimer _coalesce;
     private readonly DispatcherTimer _watch;
+    private readonly DeskCoverageWatch _coverage;
     private DeskNative.WinEventProc? _proc;
     private IntPtr _hook;
     private bool _reordering;
@@ -80,6 +81,10 @@ internal sealed class DesktopLayerHost : IDeskHost
 
     public bool IsShowing => _windows.Count > 0;
 
+    public IReadOnlyList<bool> Coverage => _coverage.Covered;
+
+    public event Action? CoverageChanged;
+
     /// <summary>The Desk windows' handles, in island order (the runner queries them).</summary>
     public IReadOnlyList<IntPtr> Handles => [.. _windows.Select(w => w.Handle)];
 
@@ -107,6 +112,10 @@ internal sealed class DesktopLayerHost : IDeskHost
         };
         _watch = new DispatcherTimer(DispatcherPriority.Background) { Interval = SlowWatch };
         _watch.Tick += (_, _) => CheckShowDesktop("timer");
+        _coverage = new DeskCoverageWatch(
+            () => [.. _windows.Select(w => w.IsDisposed ? IntPtr.Zero : w.Handle)],
+            () => _sentinel.Handle);
+        _coverage.Changed += () => CoverageChanged?.Invoke();
     }
 
     public IReadOnlyList<DeskScreen> Screens()
@@ -139,15 +148,23 @@ internal sealed class DesktopLayerHost : IDeskHost
         }
         for (int i = 0; i < wanted.Count; i++)
             Place(_windows[i], wanted[i].Screen, wanted[i].Island, first: !reuse);
-        if (reuse) return;
+        if (reuse)
+        {
+            // Same windows, but an island may have been re-fitted: read the z-order again soon.
+            _coverage.Schedule();
+            return;
+        }
         ShowDesktopLifted = false;
         SeatSentinel();
         StartWatching();
+        _coverage.Start(_windows.Count);
+        _coverage.Recompute();
         Log($"showing {_windows.Count} window(s)");
     }
 
     public void Hide()
     {
+        _coverage.Stop();
         StopWatching();
         CloseWindows();
         ShowDesktopLifted = false;
@@ -158,6 +175,7 @@ internal sealed class DesktopLayerHost : IDeskHost
         if (_disposed) return;
         Hide();
         _coalesce.Stop();
+        _coverage.Dispose();
         _disposed = true;
         _sentinel.Dispose();
     }
