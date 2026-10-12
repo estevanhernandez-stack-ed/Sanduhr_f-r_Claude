@@ -7,8 +7,26 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2180: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.18.0", id: "mods-catalog",
+            title: "Everything your Claude Code loads",
+            body: "Mods & Config opens on a Catalog of every plugin, skill, agent, command and MCP server, grouped, with what needs a look first.",
+            art: .symbol("square.grid.2x2"), destination: .mods),
+        WhatsNewCard(
+            version: "2.18.0", id: "session-load",
+            title: "What a session starts with",
+            body: "Each folder shows about how many tokens its skill listing takes, and turns orange when Claude Code would cut descriptions.",
+            art: .symbol("gauge.with.dots.needle.67percent"), destination: .mods),
+        WhatsNewCard(
+            version: "2.18.0", id: "compare-seats",
+            title: "Compare two folders",
+            body: "The Compare tab shows what only one folder has, what differs and what matches, side by side.",
+            art: .symbol("rectangle.split.2x1"), destination: .mods),
+    ]
 
     static let release2170: [WhatsNewCard] = [
         WhatsNewCard(

@@ -156,9 +156,10 @@ struct WhatsNewTableTests {
     }
 
     @Test func releasesSinceTwoFour() {
-        let releases: Set<String> = ["2.4.0", "2.5.0", "2.6.0", "2.7.0", "2.8.0", "2.9.0", "2.10.0", "2.11.0", "2.12.0", "2.13.0", "2.14.0", "2.15.0", "2.16.0", "2.17.0"]
+        let releases: Set<String> = ["2.4.0", "2.5.0", "2.6.0", "2.7.0", "2.8.0", "2.9.0", "2.10.0", "2.11.0", "2.12.0", "2.13.0", "2.14.0", "2.15.0", "2.16.0", "2.17.0", "2.18.0"]
         #expect(Set(table.map(\.version)) == releases)
-        #expect(table.count == 36)
+        #expect(table.count == 39)
+        #expect(table.filter { $0.version == "2.18.0" }.map(\.id) == ["mods-catalog", "session-load", "compare-seats"])
         #expect(table.filter { $0.version == "2.17.0" }.map(\.id) == ["reset-sanduhr", "signed-out-clarity", "mods-folders"])
         #expect(table.filter { $0.version == "2.16.0" }.map(\.id) == ["per-seat-meters"])
         #expect(table.filter { $0.version == "2.15.0" }.map(\.id) == ["just-the-desk"])
@@ -203,6 +204,7 @@ struct WhatsNewTableTests {
     @Test func showMeLandsOnTheRightPage() {
         let dest = Dictionary(uniqueKeysWithValues: table.map { ($0.id, $0.destination) })
         #expect(dest == [
+            "mods-catalog": .mods, "session-load": .mods, "compare-seats": .mods,
             "reset-sanduhr": .about, "signed-out-clarity": .credentials, "mods-folders": .mods,
             "per-seat-meters": .credentials, "just-the-desk": .deskLayout, "shortcut-app-menus": .general, "sign-in-reminders": .alerts,
             "meter-history": .usage, "shortcut-awareness": .general,
@@ -298,5 +300,11 @@ struct WhatsNewTableTests {
         let fromTwoSixteen = WhatsNew.cards(lastSeen: "2.16.0", current: "2.17.0")
         #expect(fromTwoSixteen.map(\.id) == ["reset-sanduhr", "signed-out-clarity", "mods-folders"])
         #expect(WhatsNew.rangeLabel(fromTwoSixteen, lastSeen: "2.16.0", current: "2.17.0") == "New in 2.17.0")
+    }
+
+    @Test func updatingToTwoEighteen() {
+        let fromTwoSeventeen = WhatsNew.cards(lastSeen: "2.17.0", current: "2.18.0")
+        #expect(fromTwoSeventeen.map(\.id) == ["mods-catalog", "session-load", "compare-seats"])
+        #expect(WhatsNew.rangeLabel(fromTwoSeventeen, lastSeen: "2.17.0", current: "2.18.0") == "New in 2.18.0")
     }
 }
