@@ -49,7 +49,18 @@ xcrun notarytool submit "$UPLOAD" "${CREDS[@]}" --wait
 
 echo "→ Stapling ticket to $TARGET..."
 xcrun stapler staple "$TARGET"
-xcrun stapler validate "$TARGET"
+# validate looks the ticket up online; a dropped connection there (error 68) is retried.
+for attempt in 1 2 3 4 5; do
+    if xcrun stapler validate "$TARGET"; then
+        break
+    fi
+    if [[ $attempt -eq 5 ]]; then
+        echo "✗ stapler validate failed 5 times" >&2
+        exit 1
+    fi
+    echo "→ validate failed (attempt $attempt of 5), retrying in 20 s..."
+    sleep 20
+done
 
 if [[ -n "$CLEANUP_ZIP" ]]; then
     rm -f "$CLEANUP_ZIP"
