@@ -383,9 +383,10 @@ enum DebugHooks {
         s.modsPage = ModsPageDebug(open: settings.isOpen && settings.section == .mods, loaded: mods.loaded,
                                    counts: mods.counts, checked: mods.checks.count, cli: mods.claude != nil)
         s.modsConfig = ModsConfigDebug(tab: mods.tab.debugName, seats: mods.seats.count,
-                                       counts: ConfigCatalog.counts(mods.catalog), shown: mods.shownCards(demo: vm.demo).count,
+                                       counts: ConfigCatalog.counts(mods.catalog, failedChecks: mods.failedChecks), shown: mods.shownCards(demo: vm.demo).count,
                                        selected: mods.shownSeat(demo: vm.demo).flatMap { s in mods.seats.firstIndex { $0.path == s.path } }.map { $0 + 1 } ?? 0,
-                                       bySeat: mods.seats.map { mods.counts($0.path) })
+                                       bySeat: mods.seats.map { mods.counts($0.path) },
+                                       loads: mods.shownLoads(demo: vm.demo).map(\.load))
         s.messageEditor = settings.messageEditor.debugState(open: settings.isOpen && settings.section == .message)
         s.messageEditor.todaySpecial = desk.model.specialMessages.count
         // A `defaults write` from the smoke runner posts no change notice here: apply the saved

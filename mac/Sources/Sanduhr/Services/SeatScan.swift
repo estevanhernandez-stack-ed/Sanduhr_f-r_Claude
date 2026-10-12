@@ -19,6 +19,53 @@ struct SeatEntry: Equatable, Sendable {
     let path: String
     /// The project folder for `.project`, nil otherwise. Never shown across the wall.
     var project: String?
+    /// A skill's `when_to_use`, which Claude Code appends to the description in its skill listing.
+    var whenToUse = ""
+    /// `disable-model-invocation: true`: Claude Code keeps it out of the listing Claude reads.
+    var modelHidden = false
+}
+
+/// What one plugin folder brings (item 71, slice 1c): its skills, agents, commands and output
+/// styles from the default folders, and how many MCP servers it declares. Read from frontmatter;
+/// nothing it names is run.
+struct PluginContents: Equatable, Sendable {
+    var skills: [SeatEntry] = []
+    var agents: [SeatEntry] = []
+    var commands: [SeatEntry] = []
+    var outputStyles: [SeatEntry] = []
+    var mcpServers = 0
+
+    var isEmpty: Bool { skills.isEmpty && agents.isEmpty && commands.isEmpty && outputStyles.isEmpty && mcpServers == 0 }
+}
+
+/// The settings that shape Claude Code's skill listing (item 71, slice 1c), from the seat's
+/// `settings.json` with managed settings over it. A shell's environment can't be seen.
+struct ListingSettings: Equatable, Sendable {
+    /// `skillListingBudgetFraction`: the share of the context window the listing may use.
+    var budgetFraction = 0.01
+    /// `SLASH_COMMAND_TOOL_CHAR_BUDGET` in the settings' `env`: a fixed budget in characters.
+    var budgetChars: Int?
+    /// `skillListingMaxDescChars`: each entry's description and `when_to_use`, cut to this.
+    var maxDescChars = 1_536
+    /// `skillOverrides`: skill name to `on`, `name-only`, `user-invocable-only` or `off`.
+    /// Plugin skills ignore it.
+    var overrides: [String: String] = [:]
+
+    static func read(_ layers: [[String: Any]]) -> ListingSettings {
+        var out = ListingSettings()
+        for o in layers {
+            if let f = (o["skillListingBudgetFraction"] as? NSNumber)?.doubleValue, f > 0 { out.budgetFraction = f }
+            if let n = (o["skillListingMaxDescChars"] as? NSNumber)?.intValue, n > 0 { out.maxDescChars = n }
+            if let env = o["env"] as? [String: Any], let v = env["SLASH_COMMAND_TOOL_CHAR_BUDGET"] {
+                let n = (v as? NSNumber)?.intValue ?? Int((v as? String ?? "").trimmingCharacters(in: .whitespaces))
+                if let n, n > 0 { out.budgetChars = n }
+            }
+            for (k, v) in o["skillOverrides"] as? [String: Any] ?? [:] {
+                if let v = v as? String { out.overrides[k] = v }
+            }
+        }
+        return out
+    }
 }
 
 /// An MCP server a seat knows of, by name, with what it runs and the names (never values) of
@@ -111,6 +158,11 @@ struct SeatScan: Equatable, Sendable {
     /// parsed once per load), and how many of its project keys differ from another only in case.
     var configKeys: [String] = []
     var caseTwinProjects = 0
+    /// Each plugin's contents by its item id (`ModItem.id`), for the plugins with a folder here.
+    var pluginContents: [String: PluginContents] = [:]
+    /// The plugin folders' walk hit its limit: their contents, and so the session load, are partial.
+    var pluginsPartial = false
+    var listing = ListingSettings()
 }
 
 enum SeatScanner {
@@ -199,10 +251,18 @@ enum SeatScanner {
 
         out.mcpServers = mcpServers(in: config, scope: .user, owner: nil)
         out.mcpServers += managedServers(managedFolder, fm)
+        // Plugin folders walk on their own budget, so many plugins can't crowd out the projects,
+        // and a folder two items share is walked once.
+        let pluginBudget = Budget()
+        var walked: [String: PluginContents] = [:]
         for item in out.plugins where item.state != .missing {
             guard let path = item.path else { continue }
-            out.mcpServers += pluginServers(path, name: item.name, fm)
+            let servers = pluginServers(path, name: item.name, fm)
+            out.mcpServers += servers
+            if walked[path] == nil { walked[path] = contents(of: path, servers: servers.count, fm, pluginBudget) }
+            out.pluginContents[item.id] = walked[path]
         }
+        out.listing = ListingSettings.read([settings, managed])
 
         // Each project: its own extensions, its MCP servers and the plugins it turns on.
         for project in out.projects {
@@ -227,6 +287,7 @@ enum SeatScanner {
             }
         }
         out.partial = budget.hit
+        out.pluginsPartial = pluginBudget.hit
         return out
     }
 
@@ -451,7 +512,8 @@ enum SeatScanner {
                 guard isRegular(file, fm) else { continue }
                 let front = frontmatter(file, fm)
                 out.append(SeatEntry(name: nonEmpty(front["name"]) ?? name, description: front["description"] ?? "",
-                                     scope: scope, path: file))
+                                     scope: scope, path: file, whenToUse: front["when_to_use"] ?? "",
+                                     modelHidden: isTrue(front["disable-model-invocation"])))
                 if out.count >= entryLimit { break }
             }
             return out
@@ -472,11 +534,25 @@ enum SeatScanner {
             let stem = String(rel.dropLast(3))
             let fallback = kind == .command ? stem.replacingOccurrences(of: "/", with: ":") : (stem as NSString).lastPathComponent
             let name = kind == .command ? fallback : (nonEmpty(front["name"]) ?? fallback)
-            out.append(SeatEntry(name: name, description: front["description"] ?? "", scope: scope, path: url.path))
+            out.append(SeatEntry(name: name, description: front["description"] ?? "", scope: scope, path: url.path,
+                                 whenToUse: front["when_to_use"] ?? "", modelHidden: isTrue(front["disable-model-invocation"])))
             if out.count >= entryLimit { break }
         }
         return out.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
+
+    /// A plugin folder's skills, agents, commands and output styles from their default folders,
+    /// on the seat's walk budget. A manifest that points elsewhere isn't followed.
+    static func contents(of path: String, servers: Int, _ fm: FileManager, _ budget: Budget = Budget()) -> PluginContents {
+        func at(_ sub: String) -> String { (path as NSString).appendingPathComponent(sub) }
+        return PluginContents(skills: entries(in: at("skills"), kind: .skill, scope: .seat, fm, budget),
+                              agents: entries(in: at("agents"), kind: .agent, scope: .seat, fm, budget),
+                              commands: entries(in: at("commands"), kind: .command, scope: .seat, fm, budget),
+                              outputStyles: entries(in: at("output-styles"), kind: .outputStyle, scope: .seat, fm, budget),
+                              mcpServers: servers)
+    }
+
+    static func isTrue(_ s: String?) -> Bool { s?.trimmingCharacters(in: .whitespaces).lowercased() == "true" }
 
     static func isRegular(_ path: String, _ fm: FileManager) -> Bool {
         ((try? fm.attributesOfItem(atPath: path))?[.type] as? FileAttributeType) == .typeRegular

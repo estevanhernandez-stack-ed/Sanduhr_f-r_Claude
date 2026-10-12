@@ -168,6 +168,7 @@ final class ModsPageModel {
                        config: seatConfigs[scan.seat] ?? [])
         }
         catalog = ConfigCatalog.build(Array(zip(seats, scans)).map { (seat: $0.0, scan: $0.1) })
+        loads = scans.map(SessionLoad.build)
         if let s = filter.seat, !seats.contains(where: { $0.path == s }) { filter.seat = nil }
         applyPendingSeat()
     }
@@ -200,6 +201,13 @@ final class ModsPageModel {
     private(set) var seats: [Seat] = []
     private(set) var scans: [SeatScan] = []
     private(set) var catalog: [CatalogCard] = []
+    /// Each seat's session load, in seat order (slice 1c).
+    private(set) var loads: [SessionLoad] = []
+    /// The Catalog's open groups and the plugin cards showing what's inside, kept while the
+    /// window lives; plugins sorted by name or by session load.
+    var openGroups: Set<CatalogGroup> = Set(CatalogGroup.allCases.filter(\.startsOpen))
+    var openContents: Set<String> = []
+    var sortByLoad = false
     private var seatConfigs: [String: [ClaudeCodeFolders.ConfigCandidate]] = [:]
 
     /// Card ids whose Check failed or found a high risk: Needs a look.
@@ -215,6 +223,16 @@ final class ModsPageModel {
     /// The cards to show: filters, search and (demo mode) no work-only card.
     func shownCards(demo: Bool) -> [CatalogCard] {
         ConfigCatalog.filter(catalog, filter, demo: demo, failedChecks: failedChecks)
+    }
+
+    /// The shown cards, grouped (slice 1c).
+    func sections(demo: Bool) -> [CatalogSection] {
+        ConfigCatalog.sections(shownCards(demo: demo), failedChecks: failedChecks, byLoad: sortByLoad)
+    }
+
+    /// The seats' session loads the Catalog shows: no work seat in demo mode.
+    func shownLoads(demo: Bool) -> [(seat: Seat, load: SessionLoad)] {
+        zip(seats, loads).filter { !(demo && $0.0.isWork) }.map { (seat: $0.0, load: $0.1) }
     }
 
     /// A chip's click: By Seat at that seat and that extension.

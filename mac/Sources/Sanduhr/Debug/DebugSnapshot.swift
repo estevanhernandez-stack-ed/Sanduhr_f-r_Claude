@@ -273,6 +273,8 @@ struct ModsConfigDebug: Equatable {
     /// counts in seat order.
     var selected = 0
     var bySeat: [SeatCounts] = []
+    /// Slice 1c: each shown seat's session load, numbers only.
+    var loads: [SessionLoad] = []
 }
 
 /// state.yaml's `notch_shows:`: each place's effective content, never its text.
@@ -438,7 +440,19 @@ enum DebugState {
               YAMLPair("cards", .int(m.counts.cards)), YAMLPair("available", .int(m.counts.available)),
               YAMLPair("needs_look", .int(m.counts.needsLook)), YAMLPair("duplicates", .int(m.counts.duplicates)),
               YAMLPair("work_only", .int(m.counts.workOnly)), YAMLPair("shown", .int(m.shown)),
-              YAMLPair("selected", .int(m.selected)), YAMLPair("by_seat", .list(m.bySeat.map(seatCountsYAML)))])
+              YAMLPair("selected", .int(m.selected)), YAMLPair("by_seat", .list(m.bySeat.map(seatCountsYAML))),
+              YAMLPair("groups", .map(zip(CatalogGroup.allCases, m.counts.groups + Array(repeating: 0, count: CatalogGroup.allCases.count)).map {
+                  YAMLPair($0.0.rawValue, .int($0.1))
+              })),
+              YAMLPair("loads", .list(m.loads.map(sessionLoadYAML)))])
+    }
+
+    /// One seat's session load (slice 1c): counts and estimates, never a name.
+    static func sessionLoadYAML(_ l: SessionLoad) -> YAMLNode {
+        .map([YAMLPair("listed", .int(l.listed)), YAMLPair("name_only", .int(l.nameOnly)), YAMLPair("hidden", .int(l.hidden)),
+              YAMLPair("agents", .int(l.agents)), YAMLPair("mcp", .int(l.mcpServers)),
+              YAMLPair("listing_tokens", .int(l.listingTokens)), YAMLPair("agent_tokens", .int(l.agentTokens)),
+              YAMLPair("over_budget", .bool(l.overBudget)), YAMLPair("sources", .int(l.sources.count))])
     }
 
     /// One seat's counts on By Seat (slice 1b): numbers and flags, never a name or a value.

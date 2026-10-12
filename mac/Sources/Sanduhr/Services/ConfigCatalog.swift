@@ -108,6 +108,10 @@ struct CatalogCard: Identifiable, Equatable, Sendable {
     var versions: [Contribution] = []
     /// Problems found in a work seat.
     var workProblems: Set<String> = []
+    /// A plugin's skills, agents, commands and servers (slice 1c), from a seat with its folder.
+    var contents: CatalogContents?
+    /// About how many tokens it adds to a new session, per seat path where it is on.
+    var load: [String: Int] = [:]
 
     var id: String { kind.rawValue + ":" + name }
 
@@ -131,9 +135,75 @@ struct CatalogCard: Identifiable, Equatable, Sendable {
         c.description = descriptions.first { !$0.work }?.text ?? ""
         c.version = versions.first { !$0.work }?.text
         c.problems = problems.filter { !workProblems.contains($0) }
+        if contents?.work == true { c.contents = nil }
+        let shownSeats = Set(c.chips.map(\.seat))
+        c.load = load.filter { shownSeats.contains($0.key) }
         guard !c.chips.isEmpty || !c.sources.isEmpty else { return nil }
         return c
     }
+}
+
+/// The names a plugin brings, for its card (slice 1c). `work`: only work seats supplied them,
+/// so demo mode leaves them out.
+struct CatalogContents: Equatable, Sendable {
+    var skills: [String] = []
+    var agents: [String] = []
+    var commands: [String] = []
+    var outputStyles: [String] = []
+    var mcpServers = 0
+    var work = false
+
+    init(_ c: PluginContents, work: Bool) {
+        skills = c.skills.map(\.name)
+        agents = c.agents.map(\.name)
+        commands = c.commands.map(\.name)
+        outputStyles = c.outputStyles.map(\.name)
+        mcpServers = c.mcpServers
+        self.work = work
+    }
+
+    /// "12 skills, 2 agents, 1 MCP server".
+    var summary: String {
+        func n(_ count: Int, _ one: String, _ many: String) -> String? {
+            count == 0 ? nil : "\(count) \(count == 1 ? one : many)"
+        }
+        return [n(skills.count, "skill", "skills"), n(agents.count, "agent", "agents"),
+                n(commands.count, "command", "commands"), n(outputStyles.count, "output style", "output styles"),
+                n(mcpServers, "MCP server", "MCP servers")].compactMap { $0 }.joined(separator: ", ")
+    }
+}
+
+/// Where a card sits on the Catalog (slice 1c): what needs a look first, then yours, plugins,
+/// MCP servers, and the marketplaces' plugins installed nowhere last.
+enum CatalogGroup: String, CaseIterable, Sendable {
+    case attention, yours, plugins, mcp, available
+
+    var title: String {
+        switch self {
+        case .attention: "Needs a look"
+        case .yours: "Yours"
+        case .plugins: "Plugins and mods"
+        case .mcp: "MCP servers"
+        case .available: "Available from marketplaces"
+        }
+    }
+
+    /// Open until the user closes it; the long marketplace list starts closed.
+    var startsOpen: Bool { self != .available }
+}
+
+/// One group of cards, split into titled runs (by kind, or by where the plugins come from).
+struct CatalogSection: Identifiable, Equatable, Sendable {
+    struct Run: Identifiable, Equatable, Sendable {
+        let title: String
+        var cards: [CatalogCard]
+        var id: String { title }
+    }
+
+    let group: CatalogGroup
+    var runs: [Run]
+    var id: String { group.rawValue }
+    var count: Int { runs.reduce(0) { $0 + $1.cards.count } }
 }
 
 /// The Catalog's filters across the top.
@@ -212,6 +282,16 @@ enum ConfigCatalog {
 
         for (seat, scan) in seats {
             work = seat.isWork
+            for src in SessionLoad.build(scan).sources where src.isPlugin {
+                cards[card(.plugin, src.name)]?.load[seat.path] = src.tokens
+            }
+            for item in scan.plugins {
+                guard let c = scan.pluginContents[item.id], !c.isEmpty else { continue }
+                let id = card(.plugin, item.name)
+                if cards[id]?.contents == nil || (cards[id]?.contents?.work == true && !work) {
+                    cards[id]?.contents = CatalogContents(c, work: work)
+                }
+            }
             // Plugins and mods: what the seat loads, then what its projects turn on.
             var byName: [String: [ModItem]] = [:]
             for item in scan.plugins { byName[item.name, default: []].append(item) }
@@ -352,6 +432,70 @@ enum ConfigCatalog {
         return out
     }
 
+    // MARK: Groups (slice 1c)
+
+    static func group(_ c: CatalogCard, failed: Bool) -> CatalogGroup {
+        if c.needsLook || failed { return .attention }
+        // Sanduhr's own mod keeps its place with the plugins, installed or not: its switch is above.
+        if c.isSanduhrs { return .plugins }
+        if c.isAvailable { return .available }
+        switch c.kind {
+        case .plugin: return .plugins
+        case .mcpServer: return .mcp
+        default: return .yours
+        }
+    }
+
+    /// Where a plugin comes from, for its run's title: the source it is installed from.
+    static func runTitle(_ c: CatalogCard) -> String {
+        let s = c.installedSources.first ?? c.sources.first ?? "Elsewhere"
+        return s.hasPrefix("Marketplace ") ? String(s.dropFirst("Marketplace ".count)) : s
+    }
+
+    /// The cards the filters let through, grouped. Groups with nothing in them are left out.
+    /// Plugins run by source (Sanduhr's first), sorted by name or by the most session load.
+    static func sections(_ cards: [CatalogCard], failedChecks: Set<String> = [], byLoad: Bool = false) -> [CatalogSection] {
+        var by: [CatalogGroup: [CatalogCard]] = [:]
+        for c in cards { by[group(c, failed: failedChecks.contains(c.id)), default: []].append(c) }
+        func runs(_ list: [CatalogCard], _ title: (CatalogCard) -> String) -> [CatalogSection.Run] {
+            var out: [CatalogSection.Run] = []
+            for c in list {
+                let t = title(c)
+                if let i = out.firstIndex(where: { $0.title == t }) { out[i].cards.append(c) } else { out.append(.init(title: t, cards: [c])) }
+            }
+            return out
+        }
+        func load(_ c: CatalogCard) -> Int { c.load.values.reduce(0, +) }
+        var out: [CatalogSection] = []
+        for g in CatalogGroup.allCases {
+            guard let list = by[g], !list.isEmpty else { continue }
+            switch g {
+            case .attention, .mcp:
+                out.append(CatalogSection(group: g, runs: [.init(title: "", cards: list)]))
+            case .yours:
+                out.append(CatalogSection(group: g, runs: runs(list) { $0.kind.title }))
+            case .plugins:
+                var r = runs(list, runTitle)
+                for i in r.indices {
+                    r[i].cards.sort { a, b in
+                        if a.isSanduhrs != b.isSanduhrs { return a.isSanduhrs }
+                        if byLoad, load(a) != load(b) { return load(a) > load(b) }
+                        return a.name.localizedStandardCompare(b.name) == .orderedAscending
+                    }
+                }
+                r.sort { a, b in
+                    let sa = a.cards.contains(where: \.isSanduhrs), sb = b.cards.contains(where: \.isSanduhrs)
+                    if sa != sb { return sa }
+                    return a.cards.count != b.cards.count ? a.cards.count > b.cards.count : a.title < b.title
+                }
+                out.append(CatalogSection(group: g, runs: r))
+            case .available:
+                out.append(CatalogSection(group: g, runs: runs(list, runTitle).sorted { $0.title < $1.title }))
+            }
+        }
+        return out
+    }
+
     // MARK: Filters
 
     /// One line per seat that has files Sanduhr couldn't read (item 71, slice 1): its label and
@@ -383,7 +527,8 @@ enum ConfigCatalog {
             case .needsLook: if !(c.needsLook || failedChecks.contains(c.id)) { return false }
             }
             guard !words.isEmpty else { return true }
-            let text = ([c.name, c.description] + c.sources).joined(separator: " ").lowercased()
+            let inside = c.contents.map { $0.skills + $0.agents + $0.commands + $0.outputStyles } ?? []
+            let text = ([c.name, c.description] + c.sources + inside).joined(separator: " ").lowercased()
             return words.allSatisfy(text.contains)
         }
     }
@@ -395,11 +540,15 @@ enum ConfigCatalog {
         var needsLook = 0
         var duplicates = 0
         var workOnly = 0
+        /// Cards per group, in `CatalogGroup` order (slice 1c).
+        var groups: [Int] = []
     }
 
-    static func counts(_ cards: [CatalogCard]) -> Counts {
+    /// `failedChecks` moves a card to Needs a look, as on the page.
+    static func counts(_ cards: [CatalogCard], failedChecks: Set<String> = []) -> Counts {
         Counts(cards: cards.count, available: cards.filter(\.isAvailable).count,
                needsLook: cards.filter(\.needsLook).count, duplicates: cards.filter(\.isDuplicate).count,
-               workOnly: cards.filter(\.isWorkOnly).count)
+               workOnly: cards.filter(\.isWorkOnly).count,
+               groups: CatalogGroup.allCases.map { g in cards.filter { group($0, failed: failedChecks.contains($0.id)) == g }.count })
     }
 }
