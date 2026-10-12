@@ -158,6 +158,9 @@ public static partial class ResetPlan
         AddMatchingFiles(history, app, "sanduhr.log*");
         AddFile(history, Path.Combine(app, "fetch-debug.log"));
         AddFile(history, Path.Combine(app, "signin-debug.log"));
+        // S6's handoffs: Claude's suggested Desk messages and watcher requests (spec 6.9).
+        AddMatchingFiles(history, app, "desk-messages-*.json");
+        AddMatchingFiles(history, app, "watch-request-*.json");
         map[ResetPart.History] = Finish(history, backups);
 
         var themes = new List<ResetItem>();
@@ -165,6 +168,9 @@ public static partial class ResetPlan
         map[ResetPart.Themes] = Finish(themes, backups);
 
         var settings = new List<ResetItem>();
+        // The Desk messages (spec 6.2) are the user's own lines, kept with the settings.
+        AddFile(settings, Path.Combine(app, "messages.txt"));
+        AddFile(settings, Path.Combine(app, "messages.txt.previous"));
         AddFile(settings, paths.SettingsFile);
         map[ResetPart.Settings] = Finish(settings, backups);
 

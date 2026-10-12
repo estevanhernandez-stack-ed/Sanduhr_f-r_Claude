@@ -108,7 +108,14 @@ public class SettingsSourceScanTests
             if (end < 0) end = xaml.Length;
             if (!ranges.TryGetValue(m.Groups[1].Value, out var list))
                 ranges[m.Groups[1].Value] = list = [];
-            list.Add(xaml[m.Index..end]);
+            var range = xaml[m.Index..end];
+            list.Add(range);
+            // A page drawn by its own control (S6: <views:DeskMessagePage />) carries its anchors there.
+            foreach (Match c in Regex.Matches(range, "<views:(\\w+Page)\\b"))
+            {
+                var page = Path.Combine(AppDir(), "Views", c.Groups[1].Value + ".xaml");
+                if (File.Exists(page)) list.Add(File.ReadAllText(page));
+            }
         }
 
         var missing = new List<string>();

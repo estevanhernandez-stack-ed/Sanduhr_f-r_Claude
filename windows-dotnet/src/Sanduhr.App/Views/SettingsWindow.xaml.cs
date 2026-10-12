@@ -35,6 +35,18 @@ internal partial class SettingsWindow : Window
 
     private readonly DispatcherTimer _localCcTimer;
 
+    /// <summary>Opens a page's https link (the Open-Meteo credit and licence) in the default browser.</summary>
+    private void Hyperlink_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+    {
+        e.Handled = true;
+        if (e.Uri is not { Scheme: "https" } uri) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true })?.Dispose();
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { }
+    }
+
     public SettingsWindow(SettingsViewModel viewModel)
     {
         ViewModel = viewModel;
@@ -73,6 +85,8 @@ internal partial class SettingsWindow : Window
         Deactivated += (_, _) => ViewModel.Shortcuts.CancelRecording();
         Closed += (_, _) =>
         {
+            ViewModel.Desk.Flush();
+            ViewModel.MessagePage.Dispose();
             ViewModel.Shortcuts.Detach();
             ViewModel.General.Detach();
             _localCcTimer.Stop();

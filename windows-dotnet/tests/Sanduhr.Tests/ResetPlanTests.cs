@@ -80,6 +80,7 @@ public class ResetPlanTests : IDisposable
             "bin\\sanduhr-statusline.ps1", "bin\\sanduhr-mcp.cmd", "themes\\mine.json",
             "webview2-0a1b2c3d\\Default\\Cookies", "webview2-fetch\\x", "webview2\\guid\\x",
             "backups\\keep-me.json", "backups\\sub\\also.json",
+            "messages.txt", "messages.txt.previous", "desk-messages-request.json", "watch-request-1-2-w1.json",
         ];
         foreach (var f in files) Touch(Path.Combine(app, f));
         Directory.CreateDirectory(Path.Combine(app, "webview2-nothex12"));   // not an account profile
@@ -98,12 +99,13 @@ public class ResetPlanTests : IDisposable
         {
             "history.json", "history.abcd1234.json", "snapshot.json", "snapshot.abcd1234.json", "seats.json",
             "publish-request.json", "publish-result.json", "theme-request.json", "theme-result.json",
-            "glow-waiting.signal", "glow-done.signal", "last_error.json", "sanduhr.log", "sanduhr.log.1", "<vault>",
+            "glow-waiting.signal", "glow-done.signal", "last_error.json", "sanduhr.log", "sanduhr.log.1", "<vault>", "desk-messages-request.json", "watch-request-1-2-w1.json",
+            "desk-messages-request.json", "watch-request-1-2-w1.json",
         })
             Assert.Contains(expected, hist);
 
         Assert.Equal(["themes"], inv[ResetPart.Themes].Select(Rel));
-        Assert.Equal(["settings.json"], inv[ResetPart.Settings].Select(Rel));
+        Assert.Equal(["messages.txt", "messages.txt.previous", "settings.json"], inv[ResetPart.Settings].Select(Rel));
 
         string backups = Path.Combine(app, "backups");
         foreach (var items in inv.Values)

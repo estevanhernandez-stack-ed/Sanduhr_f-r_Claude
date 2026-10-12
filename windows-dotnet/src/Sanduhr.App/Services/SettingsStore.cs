@@ -588,12 +588,75 @@ public sealed class SettingsStore
     public void SaveClaudeCodeGlow(GlowSwitches switches)
     {
         var root = Read();
-        root["claude_code_glow"] = new JsonObject
+        // The switches only: the glow target's members (spec 6.8) beside them are kept.
+        if (root["claude_code_glow"] is not JsonObject glow)
         {
-            ["waiting"] = switches.Waiting,
-            ["done"] = switches.Done,
-            ["skip_terminal"] = switches.SkipTerminal,
-        };
+            glow = new JsonObject();
+            root["claude_code_glow"] = glow;
+        }
+        glow["waiting"] = switches.Waiting;
+        glow["done"] = switches.Done;
+        glow["skip_terminal"] = switches.SkipTerminal;
+        Write(root);
+    }
+
+    /// <summary>Where the Claude Code glow lands (spec 6.8): "claude_code_glow" members "target",
+    /// "edge_side" and "edge_monitor". Absent reads as the window in use (S4's behavior).</summary>
+    public GlowTargetSettings LoadGlowTarget() => GlowTargetSettings.Decode(Read()["claude_code_glow"] as JsonObject);
+
+    /// <summary>Writes the target members; the glow switches beside them are kept.</summary>
+    public void SaveGlowTarget(GlowTargetSettings target)
+    {
+        var root = Read();
+        if (root["claude_code_glow"] is not JsonObject glow)
+        {
+            glow = new JsonObject();
+            root["claude_code_glow"] = glow;
+        }
+        target.WriteInto(glow);
+        Write(root);
+    }
+
+    /// <summary>The Desk ink (spec 6.7): "desk_ink" {mode, color, shadow}; absent is Automatic.</summary>
+    public DeskInkSettings LoadDeskInk() => DeskInkSettings.Decode(Read()["desk_ink"]);
+
+    public void SaveDeskInk(DeskInkSettings ink)
+    {
+        var root = Read();
+        root["desk_ink"] = ink.Encode();
+        Write(root);
+    }
+
+    /// <summary>The Desk message (spec 6.2): "desk_message" {pin, rotate, mix, special, seconds, size,
+    /// color, glow, font}; absent members are the Mac's defaults.</summary>
+    public DeskMessageSettings LoadDeskMessage() => DeskMessageSettings.Decode(Read()["desk_message"]);
+
+    public void SaveDeskMessage(DeskMessageSettings message)
+    {
+        var root = Read();
+        root["desk_message"] = message.Encode();
+        Write(root);
+    }
+
+    /// <summary>Now playing (spec 6.3): "now_playing" {widget, hide_paused, excluded, visualizer}.
+    /// App ids only; a title is never stored.</summary>
+    public NowPlayingSettings LoadNowPlaying() => NowPlayingSettings.Decode(Read()["now_playing"]);
+
+    public void SaveNowPlaying(NowPlayingSettings np)
+    {
+        var root = Read();
+        root["now_playing"] = np.Encode();
+        Write(root);
+    }
+
+    /// <summary>The weather piece's place (spec 6.5): "desk_weather" {name, admin, country, lat, lon,
+    /// unit}, coordinates rounded to two decimals.</summary>
+    public DeskWeatherSettings LoadDeskWeather() => DeskWeatherSettings.Decode(Read()["desk_weather"]);
+
+    public void SaveDeskWeather(DeskWeatherSettings weather)
+    {
+        var root = Read();
+        root["desk_weather"] = weather.Encode();
         Write(root);
     }
 
@@ -718,16 +781,27 @@ public sealed class SettingsStore
         Write(root);
     }
 
-    /// <summary>The global shortcut's stored state (<c>hotkey_settings</c>: on, vk, mods).
+    /// <summary>A global shortcut's stored state (<c>hotkey_settings</c>, a per-action map of
+    /// {on, vk, mods} since S6; the flat S1 shape still reads as the Settings shortcut).
     /// Missing or odd reads as off with the default combo.</summary>
     public HotKeySetting LoadHotKeySetting(HotKeyAction action)
-        => HotKeys.Decode(action, Read()["hotkey_settings"]);
+        => HotKeys.DecodeFrom(action, Read()["hotkey_settings"]);
 
+    /// <summary>Writes one action's entry; every other entry in the map is kept.</summary>
     public void SaveHotKeySetting(HotKeyAction action, HotKeySetting setting)
     {
         var root = Read();
-        root["hotkey_settings"] = HotKeys.Encode(action, setting);
+        root["hotkey_settings"] = HotKeys.EncodeInto(root["hotkey_settings"], action, setting);
         Write(root);
+    }
+
+    /// <summary>Runs <see cref="SettingsMigrations.RunAll"/> once at launch, before anything reads
+    /// settings; writes only when a migration changed something. A missing file stays missing.</summary>
+    public void RunMigrations()
+    {
+        if (!File.Exists(_path)) return;
+        var root = Read();
+        if (SettingsMigrations.RunAll(root)) Write(root);
     }
 
     /// <summary>The newest version whose What's New was shown or skipped; empty reads as null.</summary>

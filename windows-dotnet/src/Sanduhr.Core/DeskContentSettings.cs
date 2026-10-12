@@ -1,0 +1,166 @@
+using System.Globalization;
+using System.Text.Json.Nodes;
+
+namespace Sanduhr.Core;
+
+/// <summary>
+/// The Desk message's settings (spec 6.2), settings.json <c>desk_message</c>: the pinned line, the
+/// rotation, the mix switch, how special days show and for how long each line, and the message's own
+/// look (size, color, glow, font). Absent or odd members are their defaults, so an install without
+/// the key reads as the Mac's defaults.
+/// </summary>
+public sealed record DeskMessageSettings(
+    string Pin, bool Hourly, bool Mix, MessageSpecialMode Special, double Seconds,
+    double Size, string Color, bool Glow, string Font)
+{
+    public const string Key = "desk_message";
+    public const double DefaultSize = 84;
+    public const double MinSize = 24;
+    public const double MaxSize = 180;
+
+    public static DeskMessageSettings Default { get; } =
+        new("", false, false, MessageSpecialMode.Stack, MessageSpecialModes.DefaultSeconds, DefaultSize, "", true, "");
+
+    /// <summary>The pin as the engine takes it: null when empty.</summary>
+    public string? PinnedLine => string.IsNullOrWhiteSpace(Pin) ? null : Pin.Trim();
+
+    public static DeskMessageSettings Decode(JsonNode? node)
+    {
+        var d = Default;
+        if (node is not JsonObject o) return d;
+        double seconds = SettingsJson.Number(o, "seconds", d.Seconds);
+        double size = SettingsJson.Number(o, "size", d.Size);
+        return new DeskMessageSettings(
+            SettingsJson.String(o, "pin", d.Pin),
+            SettingsJson.String(o, "rotate", "daily") == "hourly",
+            SettingsJson.Bool(o, "mix", d.Mix),
+            MessageSpecialModes.Parse(SettingsJson.String(o, "special", "stack")),
+            MessageSpecialModes.Presets.Contains(seconds) ? seconds : MessageSpecialModes.DefaultSeconds,
+            double.IsFinite(size) ? Math.Clamp(Math.Round(size), MinSize, MaxSize) : DefaultSize,
+            SettingsJson.String(o, "color", d.Color),
+            SettingsJson.Bool(o, "glow", d.Glow),
+            SettingsJson.String(o, "font", d.Font));
+    }
+
+    public JsonObject Encode() => new()
+    {
+        ["pin"] = Pin,
+        ["rotate"] = Hourly ? "hourly" : "daily",
+        ["mix"] = Mix,
+        ["special"] = MessageSpecialModes.Word(Special),
+        ["seconds"] = Seconds,
+        ["size"] = Size,
+        ["color"] = Color,
+        ["glow"] = Glow,
+        ["font"] = Font,
+    };
+}
+
+/// <summary>
+/// Now playing's settings (spec 6.3), settings.json <c>now_playing</c>: the widget line (off), hide
+/// while paused (off), the excluded apps (by app id, picked from apps seen this session) and the bars
+/// beside the Desk piece (on). Titles are never stored here or anywhere.
+/// </summary>
+public sealed record NowPlayingSettings(bool Widget, bool HidePaused, IReadOnlyList<string> Excluded, bool Bars)
+{
+    public const string Key = "now_playing";
+
+    public static NowPlayingSettings Default { get; } = new(false, false, [], true);
+
+    public NowPlayingPrefs Prefs => new() { HideWhilePaused = HidePaused, Excluded = Excluded };
+
+    public static NowPlayingSettings Decode(JsonNode? node)
+    {
+        var d = Default;
+        if (node is not JsonObject o) return d;
+        var excluded = new List<string>();
+        if (o["excluded"] is JsonArray a)
+            foreach (var n in a)
+                if (n is JsonValue v && v.TryGetValue<string>(out var s) && !string.IsNullOrWhiteSpace(s) && !excluded.Contains(s))
+                    excluded.Add(s);
+        return new NowPlayingSettings(
+            SettingsJson.Bool(o, "widget", d.Widget),
+            SettingsJson.Bool(o, "hide_paused", d.HidePaused),
+            excluded,
+            SettingsJson.Bool(o, "visualizer", d.Bars));
+    }
+
+    public JsonObject Encode() => new()
+    {
+        ["widget"] = Widget,
+        ["hide_paused"] = HidePaused,
+        ["excluded"] = new JsonArray([.. Excluded.Select(e => (JsonNode?)JsonValue.Create(e))]),
+        ["visualizer"] = Bars,
+    };
+}
+
+/// <summary>
+/// The weather piece's place (spec 6.5), settings.json <c>desk_weather</c>: the place picked in
+/// Settings, Weather (name, admin area, country and coordinates rounded to two decimals) and the unit.
+/// Absent: no place, and the unit follows the region.
+/// </summary>
+public sealed record DeskWeatherSettings(WeatherPlace? Place, WeatherUnit? Unit)
+{
+    public const string Key = "desk_weather";
+
+    public static DeskWeatherSettings Default { get; } = new(null, null);
+
+    /// <summary>The unit to ask for: the saved one, else the region's.</summary>
+    public WeatherUnit UnitOr(bool isMetric) => Unit ?? Weather.DefaultUnit(isMetric);
+
+    public static DeskWeatherSettings Decode(JsonNode? node)
+    {
+        if (node is not JsonObject o) return Default;
+        WeatherUnit? unit = SettingsJson.String(o, "unit", "") switch
+        {
+            "celsius" => WeatherUnit.Celsius,
+            "fahrenheit" => WeatherUnit.Fahrenheit,
+            _ => null,
+        };
+        var name = SettingsJson.String(o, "name", "").Trim();
+        double lat = SettingsJson.Number(o, "lat", double.NaN), lon = SettingsJson.Number(o, "lon", double.NaN);
+        WeatherPlace? place = null;
+        if (name.Length > 0 && double.IsFinite(lat) && double.IsFinite(lon) && Math.Abs(lat) <= 90 && Math.Abs(lon) <= 180)
+        {
+            string? admin = SettingsJson.String(o, "admin", "");
+            string? country = SettingsJson.String(o, "country", "");
+            place = WeatherPlace.Create(name, admin.Length > 0 ? admin : null, country.Length > 0 ? country : null, lat, lon);
+        }
+        return new DeskWeatherSettings(place, unit);
+    }
+
+    public JsonObject Encode()
+    {
+        var o = new JsonObject();
+        if (Place is { } p)
+        {
+            o["name"] = p.Name;
+            if (p.Admin is { } a) o["admin"] = a;
+            if (p.Country is { } c) o["country"] = c;
+            o["lat"] = Math.Round(p.Lat, 2, MidpointRounding.AwayFromZero);
+            o["lon"] = Math.Round(p.Lon, 2, MidpointRounding.AwayFromZero);
+        }
+        if (Unit is { } u) o["unit"] = u == WeatherUnit.Celsius ? "celsius" : "fahrenheit";
+        return o;
+    }
+}
+
+/// <summary>Tolerant reads of one member of a settings object: a missing or odd member is the default.</summary>
+public static class SettingsJson
+{
+    public static bool Bool(JsonObject? o, string key, bool fallback) =>
+        o?[key] is JsonValue v && v.TryGetValue<bool>(out var b) ? b : fallback;
+
+    public static string String(JsonObject? o, string key, string fallback) =>
+        o?[key] is JsonValue v && v.TryGetValue<string>(out var s) ? s : fallback;
+
+    public static double Number(JsonObject? o, string key, double fallback)
+    {
+        if (o?[key] is not JsonValue v) return fallback;
+        if (v.TryGetValue<double>(out var d)) return d;
+        if (v.TryGetValue<int>(out var i)) return i;
+        if (v.TryGetValue<long>(out var l)) return l;
+        if (v.TryGetValue<string>(out var s) && double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var p)) return p;
+        return fallback;
+    }
+}

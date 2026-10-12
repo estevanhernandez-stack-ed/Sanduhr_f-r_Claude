@@ -6,6 +6,12 @@ using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
 
+/// <summary>One ink choice in Settings, Desk, Look.</summary>
+public sealed record DeskInkChoice(DeskInkMode Mode, string Name)
+{
+    public override string ToString() => Name;
+}
+
 /// <summary>A place a piece can sit: one of the eight anchors, or Hidden (null).</summary>
 public sealed record DeskPlaceOption(DeskAnchor? Anchor, string Name)
 {
@@ -89,11 +95,16 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         FontChoices = [.. fontFamilies, SystemFont];
         Pieces =
         [
+            new DeskPieceRow(this, "message", SettingsNames.DeskMessage),
             new DeskPieceRow(this, "clock", SettingsNames.DeskClock),
             new DeskPieceRow(this, "claude", SettingsNames.DeskClaudeLine),
             new DeskPieceRow(this, "meters", SettingsNames.DeskClaudeBars),
+            new DeskPieceRow(this, "nowPlaying", SettingsNames.DeskNowPlaying),
+            new DeskPieceRow(this, "telemetry", SettingsNames.DeskTelemetry),
+            new DeskPieceRow(this, "weather", SettingsNames.DeskWeather),
         ];
         Load();
+        LoadInk();
     }
 
     /// <summary>Called after every saved change (App re-applies the Desk).</summary>
@@ -115,6 +126,81 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     [ObservableProperty] private double _marginRight;
     [ObservableProperty] private double _marginTop;
     [ObservableProperty] private double _marginBottom;
+
+    // ---- Ink (spec 6.7) ----
+
+    /// <summary>The ink choices, in the order Settings lists them.</summary>
+    public static IReadOnlyList<DeskInkChoice> InkChoices { get; } =
+    [
+        new(DeskInkMode.Auto, "Automatic (from the wallpaper)"),
+        new(DeskInkMode.Light, "Light"),
+        new(DeskInkMode.Dark, "Dark"),
+        new(DeskInkMode.Theme, "The widget theme's color"),
+        new(DeskInkMode.Custom, "Custom"),
+    ];
+
+    /// <summary>Custom's presets (the Mac's), then Custom hex.</summary>
+    public static IReadOnlyList<string> InkPresetNames { get; } = [.. DeskInkPresets.All.Select(p => p.Name)];
+
+    private DeskInkSettings _ink = DeskInkSettings.Default;
+    private bool _loadingInk;
+
+    [ObservableProperty] private DeskInkChoice _inkChoice = InkChoices[0];
+    [ObservableProperty] private string _inkColors = "ffffff";
+    [ObservableProperty] private string? _inkPreset;
+    [ObservableProperty] private bool _inkShadow = true;
+
+    public bool IsCustomInk => InkChoice.Mode == DeskInkMode.Custom;
+
+    private void LoadInk()
+    {
+        _loadingInk = true;
+        _ink = _store.LoadDeskInk();
+        InkChoice = InkChoices.First(c => c.Mode == _ink.Mode);
+        InkColors = _ink.Color;
+        InkPreset = DeskInkPresets.All.FirstOrDefault(p => p.Value == _ink.Color).Name;
+        InkShadow = _ink.Shadow;
+        _loadingInk = false;
+    }
+
+    partial void OnInkChoiceChanged(DeskInkChoice value)
+    {
+        OnPropertyChanged(nameof(IsCustomInk));
+        SaveInk(_ink with { Mode = value.Mode });
+    }
+
+    partial void OnInkPresetChanged(string? value)
+    {
+        if (_loadingInk || value is null) return;
+        var preset = DeskInkPresets.All.FirstOrDefault(p => p.Name == value);
+        if (preset.Value is null) return;
+        _loadingInk = true;
+        InkColors = preset.Value;
+        _loadingInk = false;
+        SaveInk(_ink with { Color = preset.Value });
+    }
+
+    partial void OnInkColorsChanged(string value)
+    {
+        if (_loadingInk) return;
+        // One to four hex colors with commas; anything unreadable is kept as typed and drawn white.
+        var spec = string.Join(",", (value ?? "").Split(',').Select(s => Sanduhr.Core.InkHex.Normalize(s)).Where(s => s is not null));
+        if (spec.Length == 0) return;
+        _loadingInk = true;
+        InkPreset = DeskInkPresets.All.FirstOrDefault(p => p.Value == spec).Name;
+        _loadingInk = false;
+        SaveInk(_ink with { Color = spec });
+    }
+
+    partial void OnInkShadowChanged(bool value) => SaveInk(_ink with { Shadow = value });
+
+    private void SaveInk(DeskInkSettings next)
+    {
+        if (_loadingInk || next == _ink) return;
+        _ink = next;
+        _store.SaveDeskInk(next);
+        Changed?.Invoke();
+    }
 
     /// <summary>The saved layout string (the map reads it).</summary>
     public string Layout => _saved.Layout;

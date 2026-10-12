@@ -65,6 +65,37 @@ public static class GlowPlacement
             : Band(fallbackMonitor, fallbackMonitor, dpiScale);
     }
 
+    /// <summary>
+    /// The same light along the middle half of one edge of <paramref name="monitor"/> (the Edge target, spec
+    /// 6.8), the 24 DIP fade (times <paramref name="dpiScale"/>) pointing inward. Top and Bottom give a wide,
+    /// short rect; Left and Right a tall, thin one. Sizing follows <see cref="Compute"/>: the thickness is
+    /// rounded and at least 1 px, the length is half the edge rounded and at least 1 px, both kept inside
+    /// the monitor. An empty monitor gives an empty rect at its origin.
+    /// </summary>
+    public static PxRect Edge(PxRect monitor, GlowEdgeSide side, double dpiScale)
+    {
+        if (monitor.IsEmpty) return new PxRect(monitor.X, monitor.Y, 0, 0);
+        if (!(dpiScale > 0)) dpiScale = 1.0;
+        int thick = Math.Max(1, (int)Math.Round(BandHeightDip * dpiScale));
+        bool horizontal = side is GlowEdgeSide.Top or GlowEdgeSide.Bottom;
+        int along = horizontal ? monitor.Width : monitor.Height;
+        int across = horizontal ? monitor.Height : monitor.Width;
+        int len = Math.Min(Math.Max(1, (int)Math.Round(along * WidthFraction)), along);
+        thick = Math.Min(thick, across);
+        if (horizontal)
+        {
+            int x = monitor.X + (monitor.Width - len) / 2;
+            int y = side == GlowEdgeSide.Top ? monitor.Y : monitor.Bottom - thick;
+            return new PxRect(x, y, len, thick);
+        }
+        else
+        {
+            int y = monitor.Y + (monitor.Height - len) / 2;
+            int x = side == GlowEdgeSide.Left ? monitor.X : monitor.Right - thick;
+            return new PxRect(x, y, thick, len);
+        }
+    }
+
     private static PxRect Band(PxRect edge, PxRect monitor, double dpiScale)
     {
         int h = Math.Max(1, (int)Math.Round(BandHeightDip * dpiScale));

@@ -13,7 +13,7 @@ namespace Sanduhr.Tests;
 /// </summary>
 public class SettingsKeysContractTests
 {
-    // Keys as of 3.4.x plus parity Stages 1, 2 and 5 (the Desk). A key may be added; removing or renaming one needs a forward migration in SettingsMigrations with its own test, then move the key here to the migration's list.
+    // Keys as of 3.4.x plus parity Stages 1, 2, 5 (the Desk) and 6 (Desk content, the glow target). A key may be added; removing or renaming one needs a forward migration in SettingsMigrations with its own test, then move the key here to the migration's list.
     // "publish.*" keys live in the nested "publish" group (PublishSettingsJson).
     // Not frozen: "window" (legacy read fallback for "geom") and "publish_626" (migrated into "publish").
     private static readonly string[] Frozen =
@@ -28,15 +28,29 @@ public class SettingsKeysContractTests
         "alert_warn_pct",
         "alerts_enabled",
         "cc_folders_added",
+        "claude_code_glow",
+        "claude_code_glow.done",
+        "claude_code_glow.edge_monitor",
+        "claude_code_glow.edge_side",
+        "claude_code_glow.skip_terminal",
+        "claude_code_glow.target",
+        "claude_code_glow.waiting",
         "desk_enabled",
         "desk_font",
+        "desk_ink",
         "desk_layout",
         "desk_margins",
+        "desk_message",
         "desk_time_size",
+        "desk_weather",
         "focus_mode_duration",
         "geom",
         "hidden_tiers",
         "hotkey_settings",
+        "hotkey_settings.settings",
+        "hotkey_settings.settings.mods",
+        "hotkey_settings.settings.on",
+        "hotkey_settings.settings.vk",
         "ledger_group_by_project",
         "limit_first_seen",
         "limits_hidden_until_reset",
@@ -44,6 +58,7 @@ public class SettingsKeysContractTests
         "mcp_cc_home",
         "mcp_enabled",
         "mcp_roots",
+        "now_playing",
         "pinned",
         "publish",
         "publish.auth_header_name",
@@ -112,6 +127,22 @@ public class SettingsKeysContractTests
             keys.Add(m.Groups[1].Value);
         foreach (Match m in Regex.Matches(publish, "(?:\\bg|Group\\(root\\))\\[\"([a-z_0-9]+)\"\\]"))
             keys.Add("publish." + m.Groups[1].Value);
+
+        // The Claude Code glow group: the switches (SettingsStore, glow["k"] and ReadBool(o, "k")) and
+        // the target members (GlowTargetSettings, glow["k"] and Str("k")).
+        // The shortcut map (S6): each action's word and the members its entry is written with.
+        var hotkeys = ReadSrc("Sanduhr.Core", "HotKeyCombo.cs");
+        foreach (Match w in Regex.Matches(hotkeys, @"HotKeyAction\.\w+ => ""([a-z]+)"","))
+        {
+            keys.Add("hotkey_settings." + w.Groups[1].Value);
+            foreach (Match m in Regex.Matches(hotkeys, @"\[""(on|vk|mods)""\] ="))
+                keys.Add($"hotkey_settings.{w.Groups[1].Value}.{m.Groups[1].Value}");
+        }
+
+        var glowTarget = ReadSrc("Sanduhr.Core", "GlowTargetSettings.cs");
+        foreach (var src in new[] { store, glowTarget })
+            foreach (Match m in Regex.Matches(src, @"(?:\bglow\[|Str\(|ReadBool\(o, )""([a-z_]+)"""))
+                keys.Add("claude_code_glow." + m.Groups[1].Value);
         return keys;
     }
 

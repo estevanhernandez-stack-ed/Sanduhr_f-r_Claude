@@ -35,7 +35,7 @@ public class DeskArrangementTests
 
     [Theory]
     [InlineData("  claude:br   clock  a:b:c :bl meters: message:tl ", "claude:br message:tl")]
-    [InlineData("weather:tr clock:tl", "clock:tl")]
+    [InlineData("radar:tr clock:tl", "clock:tl")]
     [InlineData("", "")]
     [InlineData("   ", "")]
     public void StrayWordsAreDropped(string layout, string expected)
@@ -80,7 +80,7 @@ public class DeskArrangementTests
     [Fact]
     public void KnownIsTheMacList()
     {
-        Assert.Equal(["message", "clock", "claude", "meters", "nowPlaying", "watchers", "meetings"], DeskArrangement.Known);
+        Assert.Equal(["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "meetings"], DeskArrangement.Known);
         Assert.Equal(["clock", "claude", "meters"], DeskArrangement.DrawnInS5);
     }
 

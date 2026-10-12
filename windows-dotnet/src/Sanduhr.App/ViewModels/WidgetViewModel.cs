@@ -67,6 +67,9 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// fetched, and no snapshot, history, alert or limit state is written from the samples.</summary>
     [ObservableProperty] private bool _isDemo;
 
+    /// <summary>The now-playing line under the cards (spec 6.3); set by the app at startup.</summary>
+    [ObservableProperty] private NowPlayingLineViewModel? _nowPlaying;
+
     /// <summary>The widget's demo banner.</summary>
     public string DemoBanner => DemoMode.Banner;
 

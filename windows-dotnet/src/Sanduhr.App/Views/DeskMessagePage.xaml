@@ -1,0 +1,442 @@
+<UserControl x:Class="Sanduhr.App.Views.DeskMessagePage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:Sanduhr.App.Views"
+             xmlns:conv="clr-namespace:Sanduhr.App.Converters"
+             xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
+             xmlns:vm="clr-namespace:Sanduhr.App.ViewModels">
+    <!-- Settings, Message (spec 6.2, 6.9). Hosted inside SettingsWindow: the themed styles (ThemedCheckBox,
+         ThemedComboBox, ThemedSlider, Input, FlatButton, AccentButton) come from that window's resources,
+         so they are looked up with DynamicResource and resolve once the control is in the window. The page
+         is its own scroll area, so the host puts it straight into the page's TabItem. -->
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolVis" />
+        <conv:StringToVisibilityConverter x:Key="StrVis" />
+
+        <!-- A themed radio, legible on the window's own surface in either Windows mode. -->
+        <Style x:Key="MessageRadio" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="0,0,16,0" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <StackPanel Orientation="Horizontal" Background="Transparent">
+                            <Border x:Name="ring" Width="14" Height="14" CornerRadius="7" Margin="0,0,8,0"
+                                    VerticalAlignment="Center"
+                                    Background="{DynamicResource Sanduhr.Brush.Bg}"
+                                    BorderBrush="{DynamicResource Sanduhr.Brush.Border}" BorderThickness="1">
+                                <Ellipse x:Name="dot" Width="6" Height="6" Visibility="Collapsed"
+                                         Fill="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Border>
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="dot" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="ring" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ring" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="ring" Property="BorderThickness" Value="2" />
+                                <Setter TargetName="ring" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Accent}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Small captions over a row's controls. -->
+        <Style x:Key="RowCaption" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.TextDim}" />
+        </Style>
+
+        <Style x:Key="Heading" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+        </Style>
+
+        <Style x:Key="Dim" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.TextDim}" />
+        </Style>
+
+        <!-- One line of the list. The line's controls are all visible: nothing opens or folds. -->
+        <DataTemplate DataType="{x:Type vm:MessageRowViewModel}">
+            <Border Background="{DynamicResource Sanduhr.Brush.Bg}" BorderBrush="{DynamicResource Sanduhr.Brush.Border}"
+                    BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,0,8">
+                <StackPanel>
+                    <!-- A line the controls can set. -->
+                    <StackPanel Visibility="{Binding IsStyled, Converter={StaticResource BoolVis}}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                                <TextBlock Text="When" Style="{StaticResource RowCaption}" />
+                                <StackPanel Orientation="Horizontal">
+                                    <ComboBox Style="{DynamicResource ThemedComboBox}" Width="128"
+                                              ItemsSource="{Binding WhenOptions}" SelectedItem="{Binding When, Mode=TwoWay}"
+                                              AutomationProperties.Name="When this line shows" />
+                                    <StackPanel Orientation="Horizontal" Margin="6,0,0,0"
+                                                Visibility="{Binding IsDate, Converter={StaticResource BoolVis}}">
+                                        <ComboBox Style="{DynamicResource ThemedComboBox}" Width="112"
+                                                  ItemsSource="{Binding MonthOptions}" SelectedItem="{Binding Month, Mode=TwoWay}"
+                                                  AutomationProperties.Name="Month" />
+                                        <ComboBox Style="{DynamicResource ThemedComboBox}" Width="62" Margin="6,0,0,0"
+                                                  ItemsSource="{Binding DayOptions}" SelectedItem="{Binding Day, Mode=TwoWay}"
+                                                  AutomationProperties.Name="Day" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                                <TextBlock Text="Text" Style="{StaticResource RowCaption}" />
+                                <TextBox Style="{DynamicResource Input}" Height="30" VerticalContentAlignment="Center"
+                                         Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
+                                         Loaded="LineText_Loaded"
+                                         AutomationProperties.Name="Line text"
+                                         ToolTip="What the Desk says. Plain text: the look below adds the effects." />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Bottom">
+                                <Button Style="{DynamicResource FlatButton}" Content="Up" Padding="9,5" Margin="0,0,4,0" Height="30"
+                                        Command="{Binding MoveUpCommand}" AutomationProperties.Name="Move this line up" />
+                                <Button Style="{DynamicResource FlatButton}" Content="Down" Padding="9,5" Margin="0,0,4,0" Height="30"
+                                        Command="{Binding MoveDownCommand}" AutomationProperties.Name="Move this line down" />
+                                <Button Style="{DynamicResource FlatButton}" Content="Remove" Padding="9,5" Margin="0" Height="30"
+                                        Command="{Binding RemoveCommand}" AutomationProperties.Name="Remove this line" />
+                            </StackPanel>
+                        </Grid>
+                        <WrapPanel Margin="0,8,0,0">
+                            <StackPanel Margin="0,0,10,4">
+                                <TextBlock Text="Color" Style="{StaticResource RowCaption}" />
+                                <StackPanel Orientation="Horizontal">
+                                    <ComboBox Style="{DynamicResource ThemedComboBox}" Width="136"
+                                              ItemsSource="{Binding ColorOptions}" SelectedItem="{Binding Color, Mode=TwoWay}"
+                                              AutomationProperties.Name="Line color" />
+                                    <TextBox Style="{DynamicResource Input}" Width="150" Height="30" Margin="6,0,0,0"
+                                             VerticalContentAlignment="Center" FontFamily="Cascadia Code, Consolas"
+                                             Visibility="{Binding IsCustomColor, Converter={StaticResource BoolVis}}"
+                                             Text="{Binding CustomInk, UpdateSourceTrigger=PropertyChanged}"
+                                             AutomationProperties.Name="Custom line colors, hex, comma separated"
+                                             ToolTip="One to four hex colors. Two or more make a gradient." />
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,10,4">
+                                <TextBlock Text="Glow" Style="{StaticResource RowCaption}" />
+                                <ComboBox Style="{DynamicResource ThemedComboBox}" Width="104"
+                                          ItemsSource="{Binding GlowOptions}" SelectedItem="{Binding Glow, Mode=TwoWay}"
+                                          AutomationProperties.Name="Line glow" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,10,4">
+                                <TextBlock Text="Size" Style="{StaticResource RowCaption}" />
+                                <ComboBox Style="{DynamicResource ThemedComboBox}" Width="86"
+                                          ItemsSource="{Binding SizeChoices}" SelectedItem="{Binding Size, Mode=TwoWay}"
+                                          AutomationProperties.Name="Line size" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,10,4">
+                                <TextBlock Text="Letters" Style="{StaticResource RowCaption}" />
+                                <ComboBox Style="{DynamicResource ThemedComboBox}" Width="124"
+                                          ItemsSource="{Binding LetterOptions}" SelectedItem="{Binding Letters, Mode=TwoWay}"
+                                          AutomationProperties.Name="Line letter style" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,0,4">
+                                <TextBlock Text="Motion" Style="{StaticResource RowCaption}" />
+                                <ComboBox Style="{DynamicResource ThemedComboBox}" Width="150"
+                                          ItemsSource="{Binding MotionChoices}" SelectedItem="{Binding Motion, Mode=TwoWay}"
+                                          AutomationProperties.Name="Line motion" />
+                            </StackPanel>
+                        </WrapPanel>
+                        <TextBlock Margin="0,2,0,0" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                                   Text="{Binding CustomInkProblem}"
+                                   Visibility="{Binding CustomInkProblem, Converter={StaticResource StrVis}}" />
+                    </StackPanel>
+
+                    <!-- A line the editor can't represent: kept as written, editable as text. -->
+                    <StackPanel>
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsRaw}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,10,0">
+                                <TextBlock Text="Text" Style="{StaticResource RowCaption}" />
+                                <TextBox Style="{DynamicResource Input}" Height="30" VerticalContentAlignment="Center"
+                                         FontFamily="Cascadia Code, Consolas"
+                                         Text="{Binding RawText, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="Line text, kept as written"
+                                         ToolTip="The editor can't set everything on this line, so it is kept exactly as written." />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
+                                <Button Style="{DynamicResource FlatButton}" Content="Up" Padding="9,5" Margin="0,0,4,0" Height="30"
+                                        Command="{Binding MoveUpCommand}" AutomationProperties.Name="Move this line up" />
+                                <Button Style="{DynamicResource FlatButton}" Content="Down" Padding="9,5" Margin="0,0,4,0" Height="30"
+                                        Command="{Binding MoveDownCommand}" AutomationProperties.Name="Move this line down" />
+                                <Button Style="{DynamicResource FlatButton}" Content="Remove" Padding="9,5" Margin="0" Height="30"
+                                        Command="{Binding RemoveCommand}" AutomationProperties.Name="Remove this line" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Style="{StaticResource Dim}" Margin="0,4,0,0"
+                                   Text="Kept as written: the editor can't set everything on this line. Edit as text changes it." />
+                    </StackPanel>
+
+                    <TextBlock Style="{StaticResource Dim}" Margin="0,2,0,0" Text="{Binding Note}" />
+                    <TextBlock Margin="0,2,0,0" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                               Text="{Binding Problem}"
+                               Visibility="{Binding Problem, Converter={StaticResource StrVis}}" />
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="20">
+                <TextBlock Text="Message" FontSize="14" FontWeight="SemiBold"
+                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
+
+                <!-- Claude's suggestion (spec 6.9): only while one waits. -->
+                <StackPanel views:SettingsAnchor.Id="suggestion"
+                            Visibility="{Binding HasSuggestion, Converter={StaticResource BoolVis}}">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Bg}" BorderBrush="{DynamicResource Sanduhr.Brush.Accent}"
+                            BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="{Binding SuggestionTitle}" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                            <TextBlock Style="{StaticResource Dim}" Margin="0,4,0,0" Text="{Binding SuggestionNote}"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                       Visibility="{Binding SuggestionNote, Converter={StaticResource StrVis}}" />
+                            <TextBlock Style="{StaticResource Dim}" Margin="0,4,0,0" Text="{Binding SuggestionReplaceNote}"
+                                       Visibility="{Binding SuggestionReplaceNote, Converter={StaticResource StrVis}}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <Button Style="{DynamicResource AccentButton}" Content="{Binding SuggestionAddText}"
+                                        Command="{Binding AddSuggestionCommand}" IsEnabled="{Binding CanAddSuggestion}"
+                                        ToolTip="{Binding SuggestionAddTip}"
+                                        AutomationProperties.Name="Add Claude's suggested lines" />
+                                <Button Style="{DynamicResource FlatButton}" Content="{Binding ReviewButtonText}"
+                                        Command="{Binding ReviewSuggestionCommand}"
+                                        AutomationProperties.Name="Review Claude's suggested lines" />
+                                <Button Style="{DynamicResource FlatButton}" Content="Dismiss"
+                                        Command="{Binding DismissSuggestionCommand}"
+                                        AutomationProperties.Name="Dismiss Claude's suggested lines" />
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource Dim}" Margin="0,6,0,0" Text="{Binding SuggestionAddTip}"
+                                       Visibility="{Binding SuggestionAddTip, Converter={StaticResource StrVis}}" />
+                            <StackPanel Margin="0,10,0,0" Visibility="{Binding ReviewOpen, Converter={StaticResource BoolVis}}">
+                                <TextBlock Text="The suggested lines" Style="{StaticResource RowCaption}" />
+                                <ItemsControl ItemsSource="{Binding SuggestionLines}" Focusable="False"
+                                              AutomationProperties.Name="The suggested lines">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" FontFamily="Cascadia Code, Consolas" FontSize="12"
+                                                       TextWrapping="Wrap" Margin="0,1"
+                                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- Your lines -->
+                <StackPanel views:SettingsAnchor.Id="lines">
+                    <TextBlock Text="Your lines" Style="{StaticResource Heading}" />
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button Style="{DynamicResource AccentButton}" Content="Add line" Command="{Binding AddLineCommand}"
+                                AutomationProperties.Name="Add line"
+                                ToolTip="A new line, every day, at the top of the list." />
+                        <Button Style="{DynamicResource FlatButton}" Content="{Binding ModeButtonText}"
+                                Command="{Binding ToggleModeCommand}"
+                                AutomationProperties.Name="Switch between the list and the text of messages.txt"
+                                ToolTip="List: each line as controls. Text: the file itself, tags and all. Your edits carry over either way." />
+                        <Button Style="{DynamicResource FlatButton}" Content="Save" Command="{Binding SaveCommand}"
+                                IsEnabled="{Binding Unsaved}" AutomationProperties.Name="Save messages.txt" />
+                        <Button Style="{DynamicResource FlatButton}" Content="Revert" Command="{Binding RevertCommand}"
+                                IsEnabled="{Binding Unsaved}" AutomationProperties.Name="Revert to messages.txt as saved"
+                                ToolTip="Drops your unsaved edits and shows messages.txt as it is." />
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource Dim}" Margin="0,0,0,8" Text="{Binding StatusText}"
+                               Visibility="{Binding StatusText, Converter={StaticResource StrVis}}" />
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8"
+                                Visibility="{Binding FileChanged, Converter={StaticResource BoolVis}}">
+                        <TextBlock Text="{Binding FileChangedText}" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0"
+                                   Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}" />
+                        <Button Style="{DynamicResource FlatButton}" Content="Reload" Command="{Binding ReloadCommand}" Margin="0"
+                                AutomationProperties.Name="Reload messages.txt and drop unsaved edits" />
+                    </StackPanel>
+
+                    <StackPanel Visibility="{Binding IsListMode, Converter={StaticResource BoolVis}}">
+                        <TextBlock Style="{StaticResource Dim}" Margin="0,0,0,8"
+                                   Text="No lines yet. Add one and the Desk shows it."
+                                   Visibility="{Binding HasNoRows, Converter={StaticResource BoolVis}}" />
+                        <ItemsControl ItemsSource="{Binding Rows}" Focusable="False"
+                                      AutomationProperties.Name="Your lines" />
+                        <TextBlock Style="{StaticResource Dim}" Margin="0,0,0,0"
+                                   Text="Notes (#) and blank lines in the file stay where they are." />
+                    </StackPanel>
+
+                    <StackPanel Visibility="{Binding IsTextMode, Converter={StaticResource BoolVis}}">
+                        <TextBox Style="{DynamicResource Input}" Height="320" AcceptsReturn="True" AcceptsTab="False"
+                                 TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                                 VerticalContentAlignment="Top" FontFamily="Cascadia Code, Consolas" FontSize="12"
+                                 Text="{Binding EditorText, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="messages.txt" />
+                        <TextBlock Style="{StaticResource Dim}" Margin="0,6,0,0"
+                                   Text="Tags go first, after any day. Mon: text is for Mondays (Mon to Sun); 10-31: text is for that date, above the day's line. {ink:#ff2a6d,#05d9e8} sets one to four colors, {glow} or {noglow} the glow, {size:1.2} the size (0.5 to 2), {font:script} the letters, {write} draws it in, {shimmer} and {sweep} or {sweep:20} add a light. A line starting with # is a note the Desk skips." />
+                    </StackPanel>
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                <!-- Rotation -->
+                <StackPanel views:SettingsAnchor.Id="rotation">
+                    <TextBlock Text="Rotation" Style="{StaticResource Heading}" />
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageRotate" Content="Daily"
+                                     IsChecked="{Binding IsDaily, Mode=TwoWay}" AutomationProperties.Name="Change the line once a day" />
+                        <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageRotate" Content="Hourly"
+                                     IsChecked="{Binding IsHourly, Mode=TwoWay}" AutomationProperties.Name="Change the line every hour" />
+                    </StackPanel>
+                    <CheckBox Style="{DynamicResource ThemedCheckBox}"
+                              Content="Mix every-day lines in on days with their own line"
+                              IsChecked="{Binding Mix, Mode=TwoWay}"
+                              AutomationProperties.Name="Mix every-day lines in on days with their own line" />
+                    <TextBlock Style="{StaticResource Dim}" Margin="0,6,0,10"
+                               Text="Off: on a day with its own lines (Fridays), only those show. On: they take turns with the every-day lines." />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="90" />
+                            <ColumnDefinition Width="260" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Pin a line" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                        <TextBox Grid.Column="1" Style="{DynamicResource Input}" Height="30" VerticalContentAlignment="Center"
+                                 Text="{Binding Pin, UpdateSourceTrigger=LostFocus}"
+                                 AutomationProperties.Name="Pin a line" />
+                        <Button Grid.Column="2" Style="{DynamicResource FlatButton}" Content="Clear" Margin="8,0,0,0" Height="30"
+                                Command="{Binding ClearPinCommand}" AutomationProperties.Name="Clear the pinned line" />
+                    </Grid>
+                    <TextBlock Style="{StaticResource Dim}" Margin="0,6,0,0"
+                               Text="Leave it empty to rotate through the list. A pinned line shows every day; special days still show above it." />
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                <!-- On special days -->
+                <StackPanel views:SettingsAnchor.Id="special">
+                    <TextBlock Text="On special days" Style="{StaticResource Heading}" />
+                    <TextBlock Style="{StaticResource Dim}" Margin="0,0,0,8"
+                               Text="How a date's own lines share the Desk with the day's line." />
+                    <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageSpecial" Content="Stack"
+                                 IsChecked="{Binding IsStack, Mode=TwoWay}" AutomationProperties.Name="Stack special day lines" />
+                    <TextBlock Style="{StaticResource Dim}" Margin="22,2,0,8" Text="{Binding StackHelp}" />
+                    <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageSpecial" Content="Take turns"
+                                 IsChecked="{Binding IsTurns, Mode=TwoWay}" AutomationProperties.Name="Take turns showing special day lines" />
+                    <TextBlock Style="{StaticResource Dim}" Margin="22,2,0,8" Text="{Binding TurnsHelp}" />
+                    <RadioButton Style="{StaticResource MessageRadio}" GroupName="MessageSpecial" Content="Scroll"
+                                 IsChecked="{Binding IsScroll, Mode=TwoWay}" AutomationProperties.Name="Scroll special day lines" />
+                    <TextBlock Style="{StaticResource Dim}" Margin="22,2,0,10" Text="{Binding ScrollHelp}" />
+                    <Grid IsEnabled="{Binding SecondsApply}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="130" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Each line shows for" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                        <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
+                                  ItemsSource="{Binding SecondsOptions}" SelectedItem="{Binding Seconds, Mode=TwoWay}"
+                                  AutomationProperties.Name="Each line shows for" />
+                    </Grid>
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                <!-- Look -->
+                <StackPanel views:SettingsAnchor.Id="message-look">
+                    <TextBlock Text="Look" Style="{StaticResource Heading}" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="90" />
+                            <ColumnDefinition Width="230" />
+                            <ColumnDefinition Width="44" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Message size" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                        <Slider Grid.Column="1" x:Name="MessageSizeSlider" Style="{DynamicResource ThemedSlider}"
+                                Minimum="24" Maximum="180"
+                                TickFrequency="1" IsSnapToTickEnabled="True" SmallChange="1" LargeChange="10"
+                                Value="{Binding Size, Mode=TwoWay}" AutomationProperties.Name="Message size" />
+                        <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=MessageSizeSlider, StringFormat='{}{0:0}'}"
+                                   FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Right"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}" FontFamily="Cascadia Code, Consolas" />
+                    </Grid>
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="90" />
+                            <ColumnDefinition Width="230" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Color" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                        <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
+                                  ItemsSource="{Binding ColorOptions}" SelectedItem="{Binding Color, Mode=TwoWay}"
+                                  AutomationProperties.Name="Message color" />
+                        <TextBox Grid.Column="2" Style="{DynamicResource Input}" Width="170" Height="30" Margin="8,0,0,0"
+                                 VerticalContentAlignment="Center" FontFamily="Cascadia Code, Consolas"
+                                 Visibility="{Binding IsCustomColor, Converter={StaticResource BoolVis}}"
+                                 Text="{Binding CustomColorText, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="Custom message color, hex"
+                                 ToolTip="Hex colors like 9ad7ff. Two or more, separated by commas, make a gradient." />
+                    </Grid>
+                    <TextBlock Style="{StaticResource Dim}" Margin="90,4,0,0"
+                               Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
+                               Text="{Binding CustomColorProblem}"
+                               Visibility="{Binding CustomColorProblem, Converter={StaticResource StrVis}}" />
+                    <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,10,0,0"
+                              Content="Glow around the message" IsChecked="{Binding Glow, Mode=TwoWay}"
+                              AutomationProperties.Name="Glow around the message" />
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="90" />
+                            <ColumnDefinition Width="230" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Font" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                        <ComboBox Grid.Column="1" Style="{DynamicResource ThemedComboBox}"
+                                  ItemsSource="{Binding FontOptions}" SelectedItem="{Binding Font, Mode=TwoWay}"
+                                  AutomationProperties.Name="Message font" />
+                    </Grid>
+                </StackPanel>
+
+                <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                <TextBlock Text="{x:Static core:SettingsNames.TrademarkNotice}"
+                           TextWrapping="Wrap" FontSize="11"
+                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+            </StackPanel>
+        </ScrollViewer>
+    </Border>
+</UserControl>
