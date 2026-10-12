@@ -57,7 +57,17 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
         var size = screen.SizeDips;
         Width = size.Width;
         Height = size.Height;
-        Background = Scrim;
+        // The scrim covers the work area only: over the taskbar the surface stays fully clear, so its pixels
+        // pass clicks through and the tray's "Finish arranging" stays in reach.
+        Children.Add(new System.Windows.Shapes.Rectangle
+        {
+            Fill = Scrim,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness((screen.Work.X - screen.Bounds.X) / screen.Scale, (screen.Work.Y - screen.Bounds.Y) / screen.Scale, 0, 0),
+            Width = screen.Work.Width / screen.Scale,
+            Height = screen.Work.Height / screen.Scale,
+        });
         Focusable = true;
         FocusVisualStyle = null;
         SnapsToDevicePixels = true;
@@ -117,7 +127,7 @@ internal sealed class DeskArrangeContent : Grid, IDisposable
             old.Dispose();
         }
         _view = view;
-        Children.Insert(0, view);
+        Children.Insert(1, view); // above the scrim (child 0), below the outlines and the bar
         BuildAdorners();
     }
 

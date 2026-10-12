@@ -408,6 +408,30 @@ public partial class App : Application
         _tray.ContextMenu = menu;
     }
 
+    /// <summary>A Desk piece's right-click menu (spec 7.4): open its Settings page, arrange, or turn the Desk off.</summary>
+    private void OnDeskMenu(Desk.DeskMenuAction action)
+    {
+        switch (action)
+        {
+            case Desk.DeskMenuAction.EditMessages: _ = ShowSettingsAsync(SettingsPage.DeskMessage); break;
+            case Desk.DeskMenuAction.DeskSettings: _ = ShowSettingsAsync(SettingsPage.Desk); break;
+            case Desk.DeskMenuAction.Arrange: _desk?.BeginArrange(); break;
+            case Desk.DeskMenuAction.TurnOffDesk:
+                try
+                {
+                    var store = new SettingsStore(new Sanduhr.Core.Paths());
+                    store.SaveDesk(store.LoadDesk() with { Enabled = false });
+                }
+                catch (Exception e) when (e is System.IO.IOException or UnauthorizedAccessException)
+                {
+                    return;
+                }
+                _desk?.Reload();
+                _settingsWindow?.ViewModel.Desk.Reload();
+                break;
+        }
+    }
+
     private MenuItem? _arrangeItem;
 
     /// <summary>The tray's Arrange entry follows the Desk: hidden while it is off, "Finish arranging" while arranging.</summary>
@@ -453,6 +477,7 @@ public partial class App : Application
         // The glow's Desk spot (spec 7.3): the glow service asks the Desk first and falls back to the window.
         if (_glow is not null) _glow.DeskGlow = c => _desk?.Glow(c) == true;
         _desk.ArrangeChanged += OnArrangeChanged;
+        _desk.MenuRequested += OnDeskMenu;
         _vm.ThemeChanged += _ => _desk?.ThemeChanged();
         // The widget's now-playing line (spec 6.3, W8) shares the Desk's media-session listener.
         _vm.NowPlaying = new NowPlayingLineViewModel(_nowPlaying, store);

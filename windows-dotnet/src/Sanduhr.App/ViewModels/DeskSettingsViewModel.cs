@@ -185,6 +185,19 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
 
     public bool IsCustomInk => InkChoice.Mode == DeskInkMode.Custom;
 
+    /// <summary>"Clock and message take clicks" (spec 7.4): saved at once, and the Desk follows.</summary>
+    public bool PiecesTakeClicks
+    {
+        get => _store.LoadDeskPiecesTakeClicks();
+        set
+        {
+            if (value == PiecesTakeClicks) return;
+            _store.SaveDeskPiecesTakeClicks(value);
+            OnPropertyChanged();
+            Changed?.Invoke();
+        }
+    }
+
     private void LoadInk()
     {
         _loadingInk = true;
