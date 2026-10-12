@@ -206,6 +206,42 @@ struct CatalogSection: Identifiable, Equatable, Sendable {
     var count: Int { runs.reduce(0) { $0 + $1.cards.count } }
 }
 
+/// Two seats side by side (item 71, slice 1d): what one holds and the other doesn't, what both
+/// hold in a different state, and what is the same. Built from the Catalog's cards, so names and
+/// states only: settings values stay on By Seat's Drift, masked and wall-ruled.
+struct SeatComparison: Equatable, Sendable {
+    enum Bucket: String, CaseIterable, Sendable {
+        case onlyA, onlyB, differ, same
+
+        /// Open until the user closes it; what's the same starts closed.
+        var startsOpen: Bool { self != .same }
+    }
+
+    struct Row: Identifiable, Equatable, Sendable {
+        let card: CatalogCard
+        let a: CatalogChipState?
+        let b: CatalogChipState?
+        var id: String { card.id }
+    }
+
+    var onlyA: [Row] = []
+    var onlyB: [Row] = []
+    var differ: [Row] = []
+    var same: [Row] = []
+
+    func rows(_ bucket: Bucket) -> [Row] {
+        switch bucket {
+        case .onlyA: onlyA
+        case .onlyB: onlyB
+        case .differ: differ
+        case .same: same
+        }
+    }
+
+    /// Rows per bucket, in `Bucket` order (state.yaml).
+    var counts: [Int] { Bucket.allCases.map { rows($0).count } }
+}
+
 /// The Catalog's filters across the top.
 struct CatalogFilter: Equatable, Sendable {
     enum Show: String, CaseIterable, Sendable {
@@ -491,6 +527,26 @@ enum ConfigCatalog {
                 out.append(CatalogSection(group: g, runs: r))
             case .available:
                 out.append(CatalogSection(group: g, runs: runs(list, runTitle).sorted { $0.title < $1.title }))
+            }
+        }
+        return out
+    }
+
+    // MARK: Compare (slice 1d)
+
+    /// Seats `a` and `b` (paths) across `cards`, in the cards' order. A card neither holds is
+    /// left out, and so is Sanduhr's own mod when neither seat has it.
+    static func compare(_ cards: [CatalogCard], a: String, b: String) -> SeatComparison {
+        var out = SeatComparison()
+        for c in cards {
+            let sa = c.chips.first { $0.seat == a }?.state
+            let sb = c.chips.first { $0.seat == b }?.state
+            let row = SeatComparison.Row(card: c, a: sa, b: sb)
+            switch (sa, sb) {
+            case (nil, nil): continue
+            case (.some, nil): out.onlyA.append(row)
+            case (nil, .some): out.onlyB.append(row)
+            case let (x?, y?): if x == y { out.same.append(row) } else { out.differ.append(row) }
             }
         }
         return out

@@ -235,6 +235,46 @@ final class ModsPageModel {
         zip(seats, loads).filter { !(demo && $0.0.isWork) }.map { (seat: $0.0, load: $0.1) }
     }
 
+    // MARK: Compare (slice 1d)
+
+    /// The two seats Compare shows, as picked; nil picks the first shown seats.
+    var compareA: String?
+    var compareB: String?
+    var openBuckets: Set<SeatComparison.Bucket> = Set(SeatComparison.Bucket.allCases.filter(\.startsOpen))
+
+    /// The two seats to compare: the picks when both are shown and differ, else the first two
+    /// shown seats (no work seat in demo mode). Nil with fewer than two.
+    func comparePair(demo: Bool) -> (a: Seat, b: Seat)? {
+        Self.pair(filterSeats(demo: demo), a: compareA, b: compareB)
+    }
+
+    /// The pair from `shown` for picks `a` and `b`: a pick that isn't shown (gone, or a work
+    /// seat in demo mode) falls back to the first shown seat that isn't the other one.
+    nonisolated static func pair(_ shown: [Seat], a pickA: String?, b pickB: String?) -> (a: Seat, b: Seat)? {
+        guard let a = shown.first(where: { $0.path == pickA }) ?? shown.first,
+              let b = shown.first(where: { $0.path == pickB && $0.path != a.path }) ?? shown.first(where: { $0.path != a.path })
+        else { return nil }
+        return (a, b)
+    }
+
+    /// A seat picked on one side: picking the seat the other side shows swaps the two.
+    func pickCompare(_ path: String, first: Bool, current: (a: Seat, b: Seat)) {
+        (compareA, compareB) = Self.picked(path, first: first, a: current.a.path, b: current.b.path)
+    }
+
+    nonisolated static func picked(_ path: String, first: Bool, a: String, b: String) -> (String, String) {
+        if first { return path == b ? (b, a) : (path, b) }
+        return path == a ? (b, a) : (a, path)
+    }
+
+    func comparison(demo: Bool) -> SeatComparison? {
+        guard let pair = comparePair(demo: demo) else { return nil }
+        let cards = demo ? catalog.compactMap { $0.demoView() } : catalog
+        return ConfigCatalog.compare(cards, a: pair.a.path, b: pair.b.path)
+    }
+
+    func load(_ path: String) -> SessionLoad? { loads.first { $0.seat == path } }
+
     /// A chip's click: By Seat at that seat and that extension.
     func open(_ chip: CatalogChip, card: CatalogCard) {
         focus = ModsFocus(seat: chip.seat, card: card.id, name: card.name)
@@ -485,19 +525,26 @@ struct ModsPageRead: Sendable {
     var environmentSeat: String?
 }
 
-/// Mods & Config's two tabs (item 71, slice 1).
+/// Mods & Config's tabs (item 71, slice 1; Compare in slice 1d).
 enum ModsTab: String, CaseIterable, Sendable {
-    case catalog, bySeat
+    case catalog, bySeat, compare
 
     var title: String {
         switch self {
         case .catalog: "Catalog"
         case .bySeat: "By Seat"
+        case .compare: "Compare"
         }
     }
 
     /// state.yaml's word.
-    var debugName: String { self == .catalog ? "catalog" : "seat" }
+    var debugName: String {
+        switch self {
+        case .catalog: "catalog"
+        case .bySeat: "seat"
+        case .compare: "compare"
+        }
+    }
 }
 
 /// Where a chip's click lands on By Seat.
@@ -599,6 +646,8 @@ struct ModsSettings: View {
             ModsCatalogView(model: model, demo: vm.demo)
         case .bySeat:
             ModsBySeatView(model: model, demo: vm.demo, linked: linked)
+        case .compare:
+            ModsCompareView(model: model, demo: vm.demo)
         }
     }
 }

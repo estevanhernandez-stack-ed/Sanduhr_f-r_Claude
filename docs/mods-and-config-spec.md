@@ -184,6 +184,15 @@ Wall: demo mode drops a work seat's load row, and a plugin's contents and load w
 Acceptance: on the owner's seats the Catalog opens with the marketplace list closed and every installed plugin in a run by source; each seat's load row matches `/context`'s Skills row within the estimate's margin; nothing in any seat changes.
 Verify: swift-testing for plugin contents, the listing rules (overrides, hidden, name-only, the cap, the budget, a plugin on twice counted once), the groups and runs, sorting by load and demo mode; by hand against `/context` in each seat.
 
+### Slice 1d: Compare
+
+Added 2026-10-11 from the owner ("1-3 and then 4"). A third tab, **Catalog | By Seat | Compare**: two seats picked side by side (first two by default, a swap button), each with its session load line, and four groups from the Catalog's cards: only in the first, only in the second, in both in a different state (On in one, Off in the other; a different project count), and the same in both (closed). Rows run by kind with the state in each seat and, for a plugin, what it brings.
+
+Names and states only. Settings values stay on By Seat's Drift, where `SeatWall.showsValues` decides. Demo mode offers no work seat to pick. Read-only: a footnote says installs come with slice 3 through the CLI. A marketplace plugin can go into any seat by name. A seat's own skills, agents and commands are copied only out of a personal seat (`SeatWall.allowsCopy`).
+
+Acceptance: on the owner's seats, Compare lists the plugins only the work seat has, with nothing the same seat holds counted twice; swapping the seats swaps the first two groups; demo mode compares only seats that aren't work.
+Verify: swift-testing for the buckets, the swap, demo mode and the smoke hook (`mods-config arg=compare`); state.yaml reports the four counts.
+
 ### Slice 2: edits with undo, safest keys first
 
 A `configEdit` receipt (seat, file, key path, previous bytes or absent, created parent) and edits for: `cleanupPeriodDays` and `desktopSessionCleanupPeriodDays` (number, minimum 1), `syncClaudeAiSkills`, `syncClaudeAiPlugins`, `disableClaudeAiConnectors` (booleans), and adding or removing one `claudeMdExcludes` entry. All in the seat's `settings.json` only, never in a project file and never in `.claude.json`. Each edit shows the exact diff before it writes and names the consequence for a synced seat ("this change will be committed and pushed by the seat's next sync"). An Undo list per seat. Backups in Application Support.

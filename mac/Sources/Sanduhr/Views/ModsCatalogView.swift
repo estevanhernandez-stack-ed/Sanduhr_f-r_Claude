@@ -10,7 +10,7 @@ struct ModsTabBar: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        .frame(maxWidth: 260)
+        .frame(maxWidth: 340)
         .accessibilityLabel("Mods & Config view")
     }
 }
