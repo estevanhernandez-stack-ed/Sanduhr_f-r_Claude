@@ -97,7 +97,8 @@ struct ModsCatalogTests {
         #expect(byKey["tidy@alpha"]?.state == .off)
         #expect(byKey["ghost@alpha"]?.state == .on && byKey["ghost@alpha"]?.path == nil)
         #expect(scan.projectPlugins["tidy@alpha"] == [h.at("work/proj-one")])
-        #expect(scan.projectPlugins["scoped@alpha"] == [h.at("work/proj-one")])
+        // An install record at project scope means installed there, not on.
+        #expect(scan.projectPlugins["scoped@alpha"] == nil)
 
         #expect(scan.marketplaces.map(\.name) == ["alpha", "beta"])
         #expect(scan.marketplaces[0].cached && scan.marketplaces[0].source == "github example/alpha")
@@ -135,7 +136,7 @@ struct ModsCatalogTests {
         #expect(why != nil)
         #expect(why?.hasPrefix("isn't valid JSON") == true)
         #expect(why?.contains("line") == true)
-        #expect(why?.contains("comment") == false)
+        #expect(why?.contains("//") == false)   // where, never the file's text
         Self.put(h, ".claude-y/settings.json", "[1, 2]")
         #expect(SeatScanner.scan(seat: h.at(".claude-y"), home: h.path).settingsUnreadable == "has no JSON object at its top level")
         #expect(SeatScanner.scan(seat: h.at(".claude-none"), home: h.path).settingsUnreadable == nil)
@@ -190,7 +191,7 @@ struct ModsCatalogTests {
         // Off at user scope but on in one project: "In 1 project", never its name.
         let tidy = try card(.plugin, "tidy")
         #expect(tidy.chips.map(\.state) == [.projects(1)])
-        #expect(try card(.plugin, "scoped").chips.map(\.state) == [.projects(1)])
+        #expect(try card(.plugin, "scoped").chips.map(\.state) == [.off])
         let ghost = try card(.plugin, "ghost")
         #expect(ghost.chips.map(\.state) == [.declared])
         #expect(ghost.problems == ["Turned on in Alpha seat but not installed on this Mac."])
@@ -242,7 +243,14 @@ struct ModsCatalogTests {
         // Demo mode hides every card only work seats hold, and keeps shared and available ones.
         let demo = names(CatalogFilter(), demo: true)
         #expect(!demo.contains("tidy") && !demo.contains("proj-agent") && !demo.contains("local-db"))
-        #expect(demo.contains("lint") && demo.contains("reviewer") && demo.contains("unused"))
+        #expect(demo.contains("lint") && demo.contains("reviewer"))
+        // Listed only by a work seat's marketplace: hidden too.
+        #expect(!demo.contains("unused"))
+        // A shared card keeps only the personal seat's chip and sources it supplied.
+        let lintDemo = try #require(ConfigCatalog.filter(cards, CatalogFilter(search: "lint"), demo: true).first { $0.name == "lint" })
+        #expect(lintDemo.chips.map(\.mark) == [.personal])
+        #expect(lintDemo.sources == ["Marketplace alpha"] && !lintDemo.isDuplicate)
+        #expect(lintDemo.problems.isEmpty && lintDemo.description == "Lints things." && lintDemo.version == "1.0.0")
         let counts = ConfigCatalog.counts(cards)
         #expect(counts.cards == cards.count && counts.duplicates == 1 && counts.available == 2)
         #expect(counts.workOnly == cards.filter(\.isWorkOnly).count && counts.workOnly > 0)
@@ -263,6 +271,109 @@ struct ModsCatalogTests {
         #expect(ConfigCatalog.state([synced], projects: 0) == .on)
         #expect(CatalogChipState.projects(1).title == "In 1 project")
         #expect(ConfigCatalog.keySource("a@inline") == "Inline folder" && ConfigCatalog.keySource("a@m") == "Marketplace m")
+    }
+
+    // MARK: Review fixes
+
+    static func seat(_ path: String, _ mark: SeatMark, label: String) -> Seat {
+        let store = MemoryDefaults()
+        SeatPreferences.setMark(mark, for: path, in: store)
+        SeatPreferences.setLabel(label, for: path, in: store)
+        return Seats.seat(path, origin: .found, home: "/made-up", store: store, config: [])
+    }
+
+    @Test func demoKeepsOnlyWhatASeatThatIsntWorkSupplied() throws {
+        var w = SeatScan(seat: "/made-up/w"), p = SeatScan(seat: "/made-up/p")
+        w.marketplaces = [SeatMarketplace(name: "corp", source: "github x/y", present: true, cached: true,
+                                          plugins: [.init(name: "inhouse", description: "Work only.", version: "9"),
+                                                    .init(name: "shared", description: "Work words.", version: "2")])]
+        p.marketplaces = [SeatMarketplace(name: "public", source: "github a/b", present: true, cached: true,
+                                          plugins: [.init(name: "shared", description: "Public words.", version: "1")])]
+        let cards = ConfigCatalog.build([(Self.seat("/made-up/w", .work, label: "W"), w), (Self.seat("/made-up/p", .personal, label: "P"), p)])
+        let all = ConfigCatalog.filter(cards, CatalogFilter(), demo: false).map(\.name)
+        #expect(all.contains("inhouse") && all.contains("shared"))
+        let demo = ConfigCatalog.filter(cards, CatalogFilter(), demo: true)
+        #expect(!demo.contains { $0.name == "inhouse" })
+        let shared = try #require(demo.first { $0.name == "shared" })
+        #expect(shared.sources == ["Marketplace public"])
+        #expect(shared.description == "Public words." && shared.version == "1")
+        // Out of demo the first one read stands.
+        #expect(cards.first { $0.name == "shared" }?.description == "Work words.")
+    }
+
+    @Test func aDuplicateIsTwoInstallSourcesNotAListing() {
+        var s = SeatScan(seat: "/made-up/p")
+        s.plugins = [ModItem(folder: "/made-up/p", name: "one", path: "/x", origin: .installed(marketplace: "a"), key: "one@a", state: .on)]
+        s.marketplaces = [SeatMarketplace(name: "b", source: "github a/b", present: true, cached: true, plugins: [.init(name: "one")])]
+        let card = ConfigCatalog.build([(Self.seat("/made-up/p", .personal, label: "P"), s)]).first { $0.name == "one" }
+        #expect(card?.sources == ["Marketplace a", "Marketplace b"])
+        #expect(card?.isDuplicate == false)
+    }
+
+    @Test func projectPluginsResolveLocalOverSharedAndManagedOverBoth() {
+        let r = SeatScanner.projectEnabled(shared: ["a@m": true, "b@m": true, "c@m": false],
+                                          local: ["a@m": false, "c@m": true], managed: ["b@m": false])
+        #expect(r == ["a@m": false, "b@m": false, "c@m": true])
+        var items = [ModItem(folder: "/s", name: "x", path: "/p", origin: .installed(marketplace: "m"), key: "x@m", state: .on)]
+        SeatScanner.applyManaged(["x@m": false, "y@m": true], to: &items, folder: "/s")
+        #expect(items.map(\.state) == [.off, .on])
+        #expect(items[1].path == nil && items[1].key == "y@m")
+    }
+
+    @Test func theWalkIsBoundedAndSkipsHiddenAndNodeModules() {
+        let h = TempHome()
+        defer { h.cleanUp() }
+        Self.put(h, ".claude-b/commands/ok.md", "x")
+        Self.put(h, ".claude-b/commands/.git/objects/x.md", "x")
+        Self.put(h, ".claude-b/commands/node_modules/pkg/readme.md", "x")
+        Self.put(h, ".claude-b/commands/a/b/c/deep.md", "x")
+        Self.put(h, ".claude-b/commands/a/b/c/d/too-deep.md", "x")
+        let names = SeatScanner.entries(in: h.at(".claude-b/commands"), kind: .command, scope: .seat, .default).map(\.name)
+        #expect(names == ["a:b:c:deep", "ok"])
+        // Every visit spends the seat's budget; a spent budget stops the walk and says so.
+        let budget = SeatScanner.Budget(2)
+        _ = SeatScanner.entries(in: h.at(".claude-b/commands"), kind: .command, scope: .seat, .default, budget)
+        #expect(budget.hit)
+    }
+
+    @Test func oversizedAndSpecialFilesAreUnreadableNotEmpty() throws {
+        let h = TempHome()
+        defer { h.cleanUp() }
+        Self.put(h, "big.json", "{\"a\": \"" + String(repeating: "x", count: 2048) + "\"}")
+        if case .unreadable(let why) = SeatScanner.readObject(h.at("big.json"), cap: 1024) {
+            #expect(why.contains("larger than"))
+        } else { Issue.record("an oversized file read") }
+        #expect(mkfifo(h.at("pipe.json"), 0o600) == 0)
+        if case .unreadable(let why) = SeatScanner.readObject(h.at("pipe.json")) {
+            #expect(why == "isn't a regular file")
+        } else { Issue.record("a FIFO read") }
+        #expect(SeatScanner.frontmatter(h.at("pipe.json")).isEmpty)
+        Self.put(h, ".claude-u/settings.json", "{\"a\": 1,}")
+        Self.put(h, ".claude-u/plugins/known_marketplaces.json", "[")
+        let scan = SeatScanner.scan(seat: h.at(".claude-u"), home: h.path, managedFolder: h.at("managed"))
+        #expect(scan.unreadableFiles == ["settings.json", "plugins/known_marketplaces.json"])
+        #expect(scan.settingsUnreadable?.contains("trailing comma") == true)
+        let notes = ConfigCatalog.unreadableNotes([(Self.seat(h.at(".claude-u"), .work, label: "U"), scan)], demo: false)
+        #expect(notes == ["U: some files couldn't be read. See By Seat."])
+        #expect(ConfigCatalog.unreadableNotes([(Self.seat(h.at(".claude-u"), .work, label: "U"), scan)], demo: true).isEmpty)
+    }
+
+    @Test func descriptionsAndVersionsAreMasked() {
+        var s = SeatScan(seat: "/made-up/p")
+        let token = "ghp_" + String(repeating: "z", count: 20)
+        s.marketplaces = [SeatMarketplace(name: "m", source: "x", present: true, cached: true,
+                                          plugins: [.init(name: "leaky", description: "Use \(token) to sign in", version: "1 --token abc")])]
+        let card = ConfigCatalog.build([(Self.seat("/made-up/p", .personal, label: "P"), s)]).first { $0.name == "leaky" }
+        #expect(card?.description.contains(token) == false)
+        #expect(card?.version?.contains("abc") == false)
+    }
+
+    @Test func strictJSONRefusesTrailingCommasAndComments() {
+        #expect(SeatScanner.strictProblem(Data(#"{"a": [1, 2], "b": "x,}"}"#.utf8)) == nil)
+        #expect(SeatScanner.strictProblem(Data(#"{"a": "q\"//"}"#.utf8)) == nil)
+        #expect(SeatScanner.strictProblem(Data("{\n  \"a\": 1,\n}".utf8)) == "isn't valid JSON (a trailing comma around line 2, column 9)")
+        #expect(SeatScanner.strictProblem(Data("{\"é\": 1,}".utf8)) == "isn't valid JSON (a trailing comma around line 1, column 8)")
+        #expect(SeatScanner.strictProblem(Data("{\"a\": 1 /* x */}".utf8))?.contains("a comment around line 1") == true)
     }
 
     // MARK: Smoke hook and state.yaml

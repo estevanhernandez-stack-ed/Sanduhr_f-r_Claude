@@ -893,8 +893,28 @@ chip per seat that holds it: the seat's label, its Work, Personal or Unmarked ba
 **Off**, **Declared, not installed**, **In N projects** (never which) or **Its session only**. A
 card with no chip is **Available**. A chip opens By Seat at that seat with the extension lit.
 Filters: kind, seat, Everything, Installed somewhere, Available only, Needs a look (a duplicate,
-a problem or a Check that failed), and search over name, description and sources. Demo mode
-drops every card only work seats hold, and By Seat drops work seats. By Seat is the folder list
+a problem or a Check that failed), and search over name, description and sources. **Duplicate**
+counts only sources a plugin is installed or turned on from; a marketplace that merely lists it
+doesn't make one. Project plugins resolve as Claude Code does: managed `enabledPlugins` over a
+project's `settings.local.json` over its `settings.json`, key by key, and a project-scope install
+record means installed there, not on; managed `enabledPlugins` also switch a seat's own plugins.
+**Demo mode** shows each card as `CatalogCard.demoView` draws it: every source, description,
+version, problem and chip is recorded with whether a work seat supplied it, so demo keeps only
+what a seat that isn't work supplied (a personal seat's description wins), and drops a card only
+work seats hold or only a work seat's marketplace lists; the Seat filter offers no work seat, and
+By Seat drops work seats. Descriptions and versions go through `ConfigMask.maskString`.
+**Bounded reads:** only regular files are read (never a FIFO, socket or device), each with a
+size cap (`.claude.json` 32 MB, `installed_plugins.json` and `marketplace.json` 4 MB, settings
+2 MB, others 1 MB); a file over its cap, not JSON, or holding a comment or trailing comma (Claude
+Code's strict JSON refuses both, Foundation's parser doesn't) is unreadable, and the Catalog
+names each seat with such a file ("some files couldn't be read. See By Seat."). The walks of
+`agents/`, `commands/` and `output-styles/` skip hidden folders (`.git`) and `node_modules`, go at
+most three folders down and share a budget of 5,000 visits per seat; a spent budget marks the
+seat's list partial. Symlinked subfolders aren't followed, so a link loop can't trap a walk and a
+command kept behind a folder link isn't listed. A subfolder's command is named `folder:name`, as
+the slash-commands docs name it. The page reads in two passes, Sanduhr's own mod rows first, so
+Meters above the prompt never waits on the Catalog, and each seat's `.claude.json` placement is
+read once and handed to the scan. Closing the Settings window puts the page back on Catalog. By Seat is the folder list
 below, each box now headed by the seat's label and badge with **Label** and a Work, Personal or
 Unmarked picker (Sanduhr preferences under `seats`; a seat whose linked account is marked work
 stays work). Nothing on the page writes to a seat except Sanduhr's own mod.

@@ -93,14 +93,47 @@ struct CatalogCard: Identifiable, Equatable, Sendable {
     /// seat, a folder that's gone. Seat labels only.
     var problems: [String] = []
 
+    /// One seat's contribution to a card, and whether a work seat made it: demo mode keeps only
+    /// what a seat that isn't work supplied.
+    struct Contribution: Equatable, Sendable {
+        let text: String
+        let work: Bool
+    }
+
+    /// Per source, true while only work seats supplied it.
+    var sourceWork: [String: Bool] = [:]
+    /// The sources it is installed or turned on from (not just listed by a marketplace).
+    var installedSources: [String] = []
+    var descriptions: [Contribution] = []
+    var versions: [Contribution] = []
+    /// Problems found in a work seat.
+    var workProblems: Set<String> = []
+
     var id: String { kind.rawValue + ":" + name }
 
-    /// A plugin from two sources (two marketplaces, or a marketplace and a folder).
-    var isDuplicate: Bool { kind == .plugin && sources.count > 1 }
+    /// A plugin installed or turned on from two sources (two marketplaces, or a marketplace and
+    /// a folder). A marketplace that only lists it doesn't count.
+    var isDuplicate: Bool { kind == .plugin && installedSources.count > 1 }
     var isAvailable: Bool { chips.isEmpty }
     var needsLook: Bool { isDuplicate || !problems.isEmpty }
     /// Every seat holding it is a work seat: hidden in demo mode.
     var isWorkOnly: Bool { !chips.isEmpty && chips.allSatisfy { $0.mark == .work } }
+
+    /// The card as demo mode shows it: no work seat's chip, source, description, version or
+    /// problem. Nil when nothing but work seats stand behind it (a work-only card, or one only a
+    /// work seat's marketplace lists).
+    func demoView() -> CatalogCard? {
+        guard !isWorkOnly else { return nil }
+        var c = self
+        c.chips = chips.filter { $0.mark != .work }
+        c.sources = sources.filter { sourceWork[$0] != true }
+        c.installedSources = installedSources.filter { sourceWork[$0] != true }
+        c.description = descriptions.first { !$0.work }?.text ?? ""
+        c.version = versions.first { !$0.work }?.text
+        c.problems = problems.filter { !workProblems.contains($0) }
+        guard !c.chips.isEmpty || !c.sources.isEmpty else { return nil }
+        return c
+    }
 }
 
 /// The Catalog's filters across the top.
@@ -142,24 +175,43 @@ enum ConfigCatalog {
             }
             return id
         }
-        func addSource(_ id: String, _ s: String) {
+        // Who supplied what: a work seat's contributions are marked, so demo mode can drop them.
+        var work = false
+        func addSource(_ id: String, _ s: String, installed: Bool = false) {
             if cards[id]?.sources.contains(s) == false { cards[id]?.sources.append(s) }
+            if installed, cards[id]?.installedSources.contains(s) == false { cards[id]?.installedSources.append(s) }
+            let onlyWork = (cards[id]?.sourceWork[s] ?? true) && work
+            cards[id]?.sourceWork[s] = onlyWork
         }
         func describe(_ id: String, _ description: String, _ version: String?) {
-            if cards[id]?.description.isEmpty == true, !description.isEmpty { cards[id]?.description = description }
-            if cards[id]?.version == nil, let version, !version.isEmpty { cards[id]?.version = version }
+            // Descriptions and versions come from files anyone could write: masked like any value.
+            let d = ConfigMask.maskString(description)
+            if !d.isEmpty {
+                if cards[id]?.description.isEmpty == true { cards[id]?.description = d }
+                cards[id]?.descriptions.append(CatalogCard.Contribution(text: d, work: work))
+            }
+            if let version, !version.isEmpty {
+                let v = ConfigMask.maskString(version)
+                if cards[id]?.version == nil { cards[id]?.version = v }
+                cards[id]?.versions.append(CatalogCard.Contribution(text: v, work: work))
+            }
         }
         func chip(_ id: String, _ seat: Seat, _ state: CatalogChipState) {
             cards[id]?.chips.append(CatalogChip(seat: seat.path, label: seat.label, mark: seat.mark, state: state))
+        }
+        func problem(_ id: String, _ text: [String]) {
+            cards[id]?.problems += text
+            if work { cards[id]?.workProblems.formUnion(text) }
         }
 
         let own = card(.plugin, IntegrationScripts.modName)
         cards[own]?.isMod = true
         cards[own]?.isSanduhrs = true
-        addSource(own, sanduhrSource)
+        addSource(own, sanduhrSource, installed: true)
         describe(own, sanduhrDescription, nil)
 
         for (seat, scan) in seats {
+            work = seat.isWork
             // Plugins and mods: what the seat loads, then what its projects turn on.
             var byName: [String: [ModItem]] = [:]
             for item in scan.plugins { byName[item.name, default: []].append(item) }
@@ -169,17 +221,17 @@ enum ConfigCatalog {
                 let id = card(.plugin, name)
                 let items = byName[name] ?? []
                 for item in items {
-                    addSource(id, source(item))
+                    addSource(id, source(item), installed: true)
                     describe(id, item.description, item.version)
                     if item.isMod { cards[id]?.isMod = true }
                     cards[id]?.itemIDs.append(item.id)
                 }
                 for key in scan.projectPlugins.keys.sorted() where pluginName(key) == name && id != own {
-                    addSource(id, keySource(key))
+                    addSource(id, keySource(key), installed: true)
                 }
                 let projects = projectsByName[name]?.count ?? 0
                 chip(id, seat, state(items, projects: projects))
-                cards[id]?.problems += problems(items, seat: seat)
+                problem(id, problems(items, seat: seat))
             }
             for m in scan.marketplaces {
                 for listed in m.plugins {
@@ -302,12 +354,26 @@ enum ConfigCatalog {
 
     // MARK: Filters
 
-    /// The cards the filters let through. Demo mode drops every work-only card.
+    /// One line per seat that has files Sanduhr couldn't read (item 71, slice 1): its label and
+    /// a pointer to By Seat. Demo mode leaves work seats out.
+    static func unreadableNotes(_ seats: [(seat: Seat, scan: SeatScan)], demo: Bool) -> [String] {
+        seats.compactMap { pair -> String? in
+            let (seat, scan) = pair
+            guard !scan.unreadableFiles.isEmpty || scan.partial, !(demo && seat.isWork) else { return nil }
+            return scan.unreadableFiles.isEmpty
+                ? "\(seat.label): a folder walk stopped at its limit, so what's listed may be partial. See By Seat."
+                : "\(seat.label): some files couldn't be read. See By Seat."
+        }
+    }
+
+    /// The cards the filters let through. Demo mode drops every work seat's chip, source,
+    /// description, version and problem, and every card nothing but work seats stand behind.
     static func filter(_ cards: [CatalogCard], _ f: CatalogFilter, demo: Bool,
                        failedChecks: Set<String> = []) -> [CatalogCard] {
         let words = f.search.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
-        return cards.filter { c in
-            if demo && c.isWorkOnly { return false }
+        // Demo mode shows each card as demoView draws it, and drops the ones only work seats stand behind.
+        let shown = demo ? cards.compactMap { $0.demoView() } : cards
+        return shown.filter { c in
             if let k = f.kind, c.kind != k { return false }
             if let s = f.seat, !c.chips.contains(where: { $0.seat == s }) { return false }
             switch f.show {

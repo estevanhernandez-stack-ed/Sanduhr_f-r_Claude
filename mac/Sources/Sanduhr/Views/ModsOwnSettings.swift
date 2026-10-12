@@ -169,10 +169,10 @@ struct SanduhrModSection: View {
             SanduhrModIntro()
             GroupBox {
                 VStack(alignment: .leading, spacing: 10) {
-                    if model.loaded && model.own.isEmpty {
+                    if model.ownLoaded && model.own.isEmpty {
                         Text("No Claude Code folder found (~/.claude or a ~/.claude-name folder).")
                             .font(.caption).foregroundStyle(.secondary)
-                    } else if !model.loaded {
+                    } else if !model.ownLoaded {
                         Text("Reading your Claude Code folders…").font(.caption).foregroundStyle(.secondary)
                     }
                     ForEach(model.own) { row in
