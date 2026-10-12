@@ -703,6 +703,16 @@ public sealed class SettingsStore
     }
 
     /// <summary>The Desk's sign-in reminder switch (spec 7.5): "desk_sign_in_reminder". Absent reads as on.</summary>
+    /// <summary>"Clock and message take clicks" (spec 7.4): <c>desk_pieces_take_clicks</c>, absent = on.</summary>
+    public bool LoadDeskPiecesTakeClicks() => ReadBool(Read(), DeskPieceClicks.Key, DeskPieceClicks.DefaultOn);
+
+    public void SaveDeskPiecesTakeClicks(bool on)
+    {
+        var root = Read();
+        root["desk_pieces_take_clicks"] = on;
+        Write(root);
+    }
+
     public bool LoadDeskSignInReminder() => ReadBool(Read(), "desk_sign_in_reminder", SignInReminder.DefaultOn);
 
     public void SaveDeskSignInReminder(bool on)

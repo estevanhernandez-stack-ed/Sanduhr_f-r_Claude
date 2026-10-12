@@ -68,7 +68,9 @@ internal sealed class DesktopLayerHost : IDeskHost
     /// alone does).</summary>
     public bool WatchShowDesktop { get; set; } = true;
 
-    /// <summary>Every drawn pixel lets clicks through too (S5 has no Desk clicks; S7 turns this off).</summary>
+    /// <summary>Every island lets clicks through, whatever it holds. Off, every island takes clicks on its
+    /// drawn pixels (the S5 runner's test piece). In the app it stays on and an island holding a piece that
+    /// takes clicks (<see cref="DeskIsland.TakesClicks"/>) drops it on its own (spec 7.4).</summary>
     public bool ClickThrough { get; init; } = true;
 
     /// <summary>Own the Desk windows by the shell window (Este's ruling); off only in the runner.</summary>
@@ -225,12 +227,15 @@ internal sealed class DesktopLayerHost : IDeskHost
             _ => 0,
         };
         double w = cw + 2 * Pad, h = ch + 2 * Pad;
+        bool through = ClickThrough && !island.TakesClicks;
+        SetClickThrough(src.Handle, through);
         // The minute's in-place tick hands the same content back (spec 6.10): keep its frame and only
         // re-fit it, so nothing else in the island is rebuilt.
         if (src.RootVisual is Border same && ReferenceEquals(same.Child, content))
         {
             same.Width = w;
             same.Height = h;
+            same.IsHitTestVisible = !through;
             same.LayoutTransform = Math.Abs(k - 1) < 0.001 ? Transform.Identity : new ScaleTransform(k, k);
             Fit(src, screen, left, top, w, h, first);
             return;
@@ -244,7 +249,7 @@ internal sealed class DesktopLayerHost : IDeskHost
             Height = h,
             HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Top,
-            IsHitTestVisible = !ClickThrough,
+            IsHitTestVisible = !through,
             UseLayoutRounding = true,
             SnapsToDevicePixels = true,
             LayoutTransform = Math.Abs(k - 1) < 0.001 ? Transform.Identity : new ScaleTransform(k, k),
@@ -252,6 +257,15 @@ internal sealed class DesktopLayerHost : IDeskHost
         TextOptions.SetTextFormattingMode(root, TextFormattingMode.Ideal);
         src.RootVisual = root;
         Fit(src, screen, left, top, w, h, first);
+    }
+
+    /// <summary>Sets or clears <c>WS_EX_TRANSPARENT</c> on a Desk window when it differs. Fully transparent
+    /// pixels pass clicks to the desktop either way; without the flag the drawn ones take them.</summary>
+    private static void SetClickThrough(IntPtr hwnd, bool through)
+    {
+        int ex = DeskNative.GetWindowLong(hwnd, DeskNative.GWL_EXSTYLE);
+        int want = through ? ex | DeskNative.WS_EX_TRANSPARENT : ex & ~DeskNative.WS_EX_TRANSPARENT;
+        if (want != ex) DeskNative.SetWindowLongPtr(hwnd, DeskNative.GWL_EXSTYLE, new IntPtr(want));
     }
 
     /// <summary>Moves and sizes an island's window to its content, in the monitor's physical pixels.</summary>

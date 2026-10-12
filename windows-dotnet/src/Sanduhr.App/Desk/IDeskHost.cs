@@ -23,6 +23,11 @@ internal sealed record DeskIsland(FrameworkElement Content, Point Anchor, Horizo
 
     /// <summary>The widget words of the pieces in this stack ("telemetry", "nowPlaying", ...).</summary>
     public IReadOnlyList<string> Widgets { get; init; } = [];
+
+    /// <summary>The island holds a piece that takes clicks (spec 7.4): its window drops
+    /// <c>WS_EX_TRANSPARENT</c>, so its drawn pixels take the mouse while fully transparent ones still pass
+    /// it to the desktop. False keeps the whole window click-through, as before.</summary>
+    public bool TakesClicks { get; init; }
 }
 
 /// <summary>What the Desk draws on one screen: its islands, each drawn in a window just its size, so

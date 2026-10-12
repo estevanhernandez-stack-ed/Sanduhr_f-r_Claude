@@ -17,7 +17,7 @@ namespace Sanduhr.App.Desk;
 /// peak meter, the media-session listener and the weather fetch all stop otherwise. Off, at Reset and
 /// at quit, everything stops. Nothing here touches an HWND.
 /// </summary>
-internal sealed class DeskController : IDisposable
+internal sealed class DeskController : IDisposable, IDeskClickActions
 {
     private readonly SettingsStore _store;
     private readonly Func<IDeskHost> _hostFactory;
@@ -65,6 +65,27 @@ internal sealed class DeskController : IDisposable
         _nowPlaying.Changed += OnTrackChanged;
     }
 
+    private bool _piecesTakeClicks = DeskPieceClicks.DefaultOn;
+
+    /// <summary>A Desk menu item was chosen (spec 7.4); the app opens the page, arranges or turns the Desk off.</summary>
+    public event Action<DeskMenuAction>? MenuRequested;
+
+    public void PlayPause() => _nowPlaying.Service.TogglePlayPause();
+
+    public void OpenWeatherCredit()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(DeskClicks.WeatherCreditUrl) { UseShellExecute = true });
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            // No browser to open: nothing else to do.
+        }
+    }
+
+    public void Menu(DeskMenuAction action) => MenuRequested?.Invoke(action);
+
     /// <summary>True while the Desk is on screen.</summary>
     public bool Running => _host?.IsShowing == true;
 
@@ -79,6 +100,7 @@ internal sealed class DeskController : IDisposable
         _ink = _store.LoadDeskInk();
         _np = _store.LoadNowPlaying();
         _weatherSettings = _store.LoadDeskWeather();
+        _piecesTakeClicks = _store.LoadDeskPiecesTakeClicks();
         _messages.Reload();
         if (!_settings.Enabled)
         {
@@ -248,7 +270,7 @@ internal sealed class DeskController : IDisposable
             var view = new DeskView(screen, _settings, _fonts);
             view.Update(frame, InkFor(view, screen, frame));
             _views.Add(view);
-            surfaces.Add(new DeskSurface(screen, view.TakeIslands()));
+            surfaces.Add(new DeskSurface(screen, DeskClicks.Prepare(view.TakeIslands(), _piecesTakeClicks, this)));
         }
         _surfaces = surfaces;
         if (_host is not { } host) return;

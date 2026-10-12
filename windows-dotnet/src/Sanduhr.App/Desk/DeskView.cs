@@ -290,6 +290,7 @@ internal sealed class DeskView : Grid, IDisposable
         };
         if (piece is null) return null;
         piece.HorizontalAlignment = align;
+        piece.Tag = p.Widget; // which piece this is, for the Desk's clicks (DeskClicks, spec 7.4)
         // The message carries its own glow (spec 6.2); every other piece takes the ink's shadow.
         if (p.Widget is not ("message" or "nowPlaying") && _ink.ShadowOpacity > 0)
             piece.Effect = Shadow(_ink);
@@ -504,6 +505,7 @@ internal sealed class DeskView : Grid, IDisposable
         }
         var credit = Text(Weather.Credit, Math.Max(9, size * 0.55), 0.55, alignment: ta);
         credit.Margin = new Thickness(0, size * 0.3, 0, 0);
+        credit.Tag = DeskClicks.WeatherCreditTag;
         Add(credit);
         return panel;
     }
