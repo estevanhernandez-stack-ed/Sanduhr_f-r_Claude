@@ -1995,7 +1995,10 @@ and compare them at the end.
    marked work shows "Work from its account" and no picker. Nothing in the folder changes.
 6. Click a chip: By Seat opens on that folder with Extensions (or MCP servers) open and the item lit.
 7. Mark a folder Work, then `smoke/smoke do demo on` (debug hooks on): cards only that folder
-   holds disappear from the Catalog and its chip from By Seat's picker; `demo off` brings them back.
+   holds, and plugins only its marketplaces list, disappear from the Catalog; shared cards lose its
+   chip and any source, description or version only it supplied; the Seat filter and By Seat no
+   longer offer it. `demo off` brings them back. A folder with an unreadable file is named above the
+   filters ("some files couldn't be read. See By Seat.").
 8. Break a scratch folder's `settings.json` (add a `//` comment): Read Again. On By Seat its Settings
    summary says "settings.json is unreadable: it isn't valid JSON (a comment around line …, column …)",
    never that it loads nothing.

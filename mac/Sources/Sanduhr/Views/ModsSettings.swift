@@ -74,6 +74,23 @@ final class ModsPageModel {
             + "\(display(other.path)) (\(state(other))) is what Claude Code reads \(when). Remove always edits the file Sanduhr wrote to."
     }
 
+    /// How Sanduhr knows each folder `folders` lists, first reason first.
+    nonisolated static func origins(home: String, environment: [String: String], added: [String],
+                                    linked: [String], installed: [String]) -> [String: Seat.Origin] {
+        var out: [String: Seat.Origin] = [:]
+        func note(_ paths: [String], _ o: Seat.Origin) {
+            for p in paths.map(AccountData.normalized) where out[p] == nil { out[p] = o }
+        }
+        note(ClaudeCodeFolders.discover(home: home).map(\.path), .found)
+        note(ClaudeCodeFolders.discover(home: home, environment: environment).map(\.path), .environment)
+        note(added, .added)
+        note(linked, .linked)
+        note(installed, .installed)
+        return out
+    }
+
+    /// Two passes: first what Sanduhr's own mod needs (the folders, its rows, `claude`), so
+    /// Meters above the prompt never waits on the Catalog; then every seat's scan.
     func load(linked: [String]) async {
         guard !loading else { return }
         loading = true
@@ -81,15 +98,11 @@ final class ModsPageModel {
         let home = self.home
         let installer = self.installer
         let added = SeatPreferences.added(in: store)
-        let result = await Task.detached(priority: .userInitiated) { () -> ModsPageRead in
+        let first = await Task.detached(priority: .userInitiated) { () -> ModsPageRead in
             let env = ProcessInfo.processInfo.environment
-            let paths = ModsPageModel.folders(home: home, environment: env, added: added, linked: linked,
-                                              installed: installer.installedFolders())
-            // One read per seat (item 71, slice 1): its plugins are the inventory's.
-            let scans = paths.map { SeatScanner.scan(seat: $0, home: home) }
-            let inventory = scans.map { ModFolderInventory(folder: $0.seat, items: $0.plugins) }
+            let installed = installer.installedFolders()
+            let paths = ModsPageModel.folders(home: home, environment: env, added: added, linked: linked, installed: installed)
             let app = AppModVersion.read(installer.scripts)
-            let own = inventory.map { OwnModRow.read(installer, folder: $0.folder, app: app) }
             var notes: [String: String] = [:]
             var configs: [String: [ClaudeCodeFolders.ConfigCandidate]] = [:]
             for p in paths {
@@ -97,33 +110,49 @@ final class ModsPageModel {
                 configs[p] = ClaudeCodeFolders.configCandidates(for: p, home: home)
                 notes[p] = ModsPageModel.configNote(configs[p] ?? [], display: display)
             }
-            // By Seat (slice 1b): every seat's sections, and which seats a running claude uses.
-            let defaultSeat = (home as NSString).appendingPathComponent(ClaudeCodeFolders.defaultName)
-            let reports = SeatReports.build(scans.map { SeatReports.Input(seat: $0.seat, isDefault: $0.seat == defaultSeat, scan: $0) },
-                                            home: home)
-            let running = ClaudeProcesses.running(home: home)
             let claude = ModCheck.findClaude(environment: env, home: home)
-            return ModsPageRead(paths: paths, scans: scans, inventory: inventory,
-                                claude: claude, own: own, app: app,
-                                notes: notes, configs: configs, skipped: installer.readReceipts().skipped,
-                                reports: reports, running: Set(running.sessions.map(\.seat)), unreadableProcesses: running.unreadable,
-                                version: ModsPageModel.claudeVersion(claude),
-                                environmentSeat: env["CLAUDE_CONFIG_DIR"].flatMap { $0.isEmpty ? nil : ClaudeProcesses.seat(configDir: $0, home: home) })
+            var read = ModsPageRead(paths: paths, scans: [], inventory: [],
+                                    claude: claude,
+                                    own: paths.map { OwnModRow.read(installer, folder: $0, app: app) }, app: app,
+                                    notes: notes, configs: configs, skipped: installer.readReceipts().skipped,
+                                    origins: ModsPageModel.origins(home: home, environment: env, added: added, linked: linked,
+                                                                   installed: installed))
+            read.version = ModsPageModel.claudeVersion(claude)
+            read.environmentSeat = env["CLAUDE_CONFIG_DIR"].flatMap { $0.isEmpty ? nil : ClaudeProcesses.seat(configDir: $0, home: home) }
+            return read
         }.value
-        inventory = result.inventory
-        claude = result.claude
-        own = result.own
-        appMod = result.app
-        configNotes = result.notes
+        claude = first.claude
+        own = first.own
+        appMod = first.app
+        configNotes = first.notes
         addedFolders = added.map(AccountData.normalized)
-        receiptsSkipped = result.skipped
-        scans = result.scans
-        seatConfigs = result.configs
-        reports = result.reports
-        running = result.running
-        unreadableProcesses = result.unreadableProcesses
-        claudeVersion = result.version
-        environmentSeat = result.environmentSeat
+        receiptsSkipped = first.skipped
+        seatConfigs = first.configs
+        seatOrigins = first.origins
+        claudeVersion = first.version
+        environmentSeat = first.environmentSeat
+        ownLoaded = true
+        // One read per seat (item 71, slice 1): its plugins are the inventory's, and its
+        // `.claude.json` placement is the one just read. Then By Seat's sections (slice 1b),
+        // and which seats a running claude uses.
+        let paths = first.paths, configs = first.configs
+        let second = await Task.detached(priority: .userInitiated) { () -> ModsPageRead in
+            let scans = paths.map { SeatScanner.scan(seat: $0, home: home, config: configs[$0]) }
+            let defaultSeat = (home as NSString).appendingPathComponent(ClaudeCodeFolders.defaultName)
+            let running = ClaudeProcesses.running(home: home)
+            var read = ModsPageRead(paths: paths, scans: scans, inventory: [], claude: nil, own: [], app: nil,
+                                    notes: [:], configs: configs, skipped: 0)
+            read.reports = SeatReports.build(scans.map { SeatReports.Input(seat: $0.seat, isDefault: $0.seat == defaultSeat, scan: $0) },
+                                             home: home, configs: configs)
+            read.running = Set(running.sessions.map(\.seat))
+            read.unreadableProcesses = running.unreadable
+            return read
+        }.value
+        scans = second.scans
+        inventory = scans.map { ModFolderInventory(folder: $0.seat, items: $0.plugins) }
+        reports = second.reports
+        running = second.running
+        unreadableProcesses = second.unreadableProcesses
         refreshSeats()
         let ids = Set(inventory.flatMap(\.items).map(\.id))
         checks = checks.filter { ids.contains($0.key) }
@@ -135,16 +164,35 @@ final class ModsPageModel {
     func refreshSeats() {
         let store = self.store, home = self.home
         seats = scans.map { scan in
-            Seats.seat(scan.seat, origin: .found, home: home, store: store, config: seatConfigs[scan.seat] ?? [])
+            Seats.seat(scan.seat, origin: seatOrigins[scan.seat] ?? .found, home: home, store: store,
+                       config: seatConfigs[scan.seat] ?? [])
         }
         catalog = ConfigCatalog.build(Array(zip(seats, scans)).map { (seat: $0.0, scan: $0.1) })
         if let s = filter.seat, !seats.contains(where: { $0.path == s }) { filter.seat = nil }
         applyPendingSeat()
     }
 
+    /// The Settings window closed: Mods & Config reopens on its Catalog, nothing focused.
+    func windowClosed() {
+        tab = .catalog
+        focus = nil
+    }
+
+    /// Seats with files Sanduhr couldn't read, for the Catalog's note.
+    func unreadableNotes(demo: Bool) -> [String] {
+        ConfigCatalog.unreadableNotes(Array(zip(seats, scans)).map { (seat: $0.0, scan: $0.1) }, demo: demo)
+    }
+
+    /// The seats the Catalog's Seat filter offers: no work seat in demo mode.
+    func filterSeats(demo: Bool) -> [Seat] { seats.filter { !(demo && $0.isWork) } }
+
+    /// Sanduhr's own mod rows are read (the first pass of `load`).
+    private(set) var ownLoaded = false
+    private var seatOrigins: [String: Seat.Origin] = [:]
+
     // MARK: Catalog | By Seat (item 71, slice 1)
 
-    /// Which tab shows, kept while the Settings window lives.
+    /// Which tab shows, kept while the Settings window is open (closing it goes back to Catalog).
     var tab: ModsTab = .catalog
     var filter = CatalogFilter()
     /// A chip clicked on the Catalog: By Seat opens at this seat, with this card's items lit.
@@ -204,6 +252,18 @@ final class ModsPageModel {
     }
 
     func report(for seat: String) -> SeatReport? { reports.first { $0.seat == seat } }
+
+    /// Drift against the seats demo mode still shows (no work seat in demo mode).
+    func shownDrift(_ report: SeatReport, demo: Bool) -> [SeatReport.Drift] {
+        report.drift.filter { !(demo && isWork($0.other)) }
+    }
+
+    /// The report as By Seat summarizes it in demo mode: drift against shown seats only.
+    func shownReport(_ report: SeatReport, demo: Bool) -> SeatReport {
+        var r = report
+        r.drift = shownDrift(report, demo: demo)
+        return r
+    }
 
     func label(of path: String) -> String { seats.first { $0.path == path }?.label ?? (path as NSString).lastPathComponent }
 
@@ -399,9 +459,10 @@ struct ModsPageRead: Sendable {
     var notes: [String: String]
     var configs: [String: [ClaudeCodeFolders.ConfigCandidate]]
     var skipped: Int
-    var reports: [SeatReport]
-    var running: Set<String>
-    var unreadableProcesses: Int
+    var origins: [String: Seat.Origin] = [:]
+    var reports: [SeatReport] = []
+    var running: Set<String> = []
+    var unreadableProcesses = 0
     var version: String?
     var environmentSeat: String?
 }

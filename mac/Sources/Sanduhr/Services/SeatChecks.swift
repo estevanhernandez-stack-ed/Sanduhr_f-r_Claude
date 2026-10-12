@@ -4,7 +4,7 @@ import Foundation
 /// with shadowing notes, `skillOverrides`, plugins enabled, installed and declared side by
 /// side with the parity checks, and every hook from settings and plugins, read-only.
 enum SeatExtensionsCheck {
-    static func read(_ scan: SeatScan, settings: [String: Any], home: String) -> SeatReport.ExtensionsPart {
+    static func read(_ scan: SeatScan, settings: [String: Any], seat: String, home: String) -> SeatReport.ExtensionsPart {
         var part = SeatReport.ExtensionsPart()
         for (kind, entries) in [(CatalogKind.agent, scan.agents), (.skill, scan.skills), (.command, scan.commands),
                                 (.outputStyle, scan.outputStyles)] {
@@ -27,7 +27,7 @@ enum SeatExtensionsCheck {
                                                      declared: declared.contains(key)))
         }
         part.parity = parity(scan)
-        part.hooks = hooks(settings: settings, scan: scan, home: home)
+        part.hooks = hooks(settings: settings, scan: scan, seat: seat, home: home)
         return part
     }
 
@@ -86,7 +86,7 @@ enum SeatExtensionsCheck {
 
     /// Hooks from the seat's settings and each loaded plugin's `hooks/hooks.json`, as Claude
     /// Code merges them (all run), commands masked and shortened.
-    static func hooks(settings: [String: Any], scan: SeatScan, home: String) -> [SeatReport.HookRow] {
+    static func hooks(settings: [String: Any], scan: SeatScan, seat: String, home: String) -> [SeatReport.HookRow] {
         var out: [SeatReport.HookRow] = []
         func add(_ hooks: [String: Any], source: String) {
             for event in hooks.keys.sorted() {
@@ -96,7 +96,9 @@ enum SeatExtensionsCheck {
                         let raw = h["command"] as? String ?? h["url"] as? String ?? (h["type"] as? String ?? "")
                         let shown = ConfigMask.maskString(raw).replacingOccurrences(of: home, with: "~")
                         out.append(SeatReport.HookRow(id: out.count, event: event, matcher: ConfigMask.maskString(matcher),
-                                                      command: shown, timeout: (h["timeout"] as? NSNumber)?.intValue, source: source))
+                                                      command: shown, timeout: (h["timeout"] as? NSNumber)?.intValue, source: source,
+                                                      workCommand: WallMask.redact(ConfigMask.maskString(raw), seat: seat, home: home)
+                                                          .replacingOccurrences(of: home, with: "~")))
                     }
                 }
             }
@@ -191,7 +193,7 @@ enum SeatMCPView {
 enum SeatHousekeeping {
     static let kept = "Claude Code leaves it: kept until you delete it."
 
-    static func read(seat: String, isDefault: Bool, home: String, config: [String: Any], scan: SeatScan,
+    static func read(seat: String, isDefault: Bool, home: String, config candidates: [ClaudeCodeFolders.ConfigCandidate], scan: SeatScan,
                      _ fm: FileManager) -> [SeatReport.Leftover] {
         var out: [SeatReport.Leftover] = []
         func item(_ path: String, kind: String, origin: String, ifLeft: String) {
@@ -228,15 +230,12 @@ enum SeatHousekeeping {
             item((home as NSString).appendingPathComponent(name), kind: "A copy of the seat",
                  origin: name.hasPrefix(ClaudeCodeFolders.backupPrefix) ? "A seat migration" : "A config tool", ifLeft: kept)
         }
-        let candidates = ClaudeCodeFolders.configCandidates(for: seat, home: home, fileManager: fm)
         if candidates.filter(\.exists).count > 1, let stub = candidates.first(where: { $0.exists && !$0.inUse && !$0.signedIn }) {
             item(stub.path, kind: "A stub .claude.json beside the live one", origin: "A start with CLAUDE_CONFIG_DIR set to this folder",
                  ifLeft: "Read only when CLAUDE_CONFIG_DIR names this folder; kept until you delete it.")
         }
-        let projects = (config["projects"] as? [String: Any] ?? [:]).keys
-        let twins = Dictionary(grouping: projects, by: { $0.lowercased() }).values.filter { $0.count > 1 }
-        if !twins.isEmpty {
-            out.append(SeatReport.Leftover(kind: "Project keys that differ only in case", name: "\(twins.count) in .claude.json",
+        if scan.caseTwinProjects > 0 {
+            out.append(SeatReport.Leftover(kind: "Project keys that differ only in case", name: "\(scan.caseTwinProjects) in .claude.json",
                                            origin: "Claude Code", ifLeft: "Trust, MCP servers and allowed tools may sit on either copy."))
         }
         let memory = SeatScanner.visible((seat as NSString).appendingPathComponent("projects"), fm)
@@ -333,7 +332,14 @@ enum SeatRepo {
     }
 
     /// Words that put an ignored pattern in the never bucket.
-    static let neverWords = ["credential", ".env", "secret", "token", "key", ".pem", "log", "password", "auth"]
+    static let neverWords: Set<String> = ["credential", "credentials", "env", "secret", "secrets", "token", "tokens",
+                                          "key", "keys", "pem", "log", "logs", "password", "passwords", "auth"]
+
+    /// Whether a pattern names a never-word as a whole word of its path (`.env*`, `*.log`,
+    /// `.credentials.json`), never inside another word (`keybindings.json`, `catalog/`).
+    static func namesNever(_ pattern: String) -> Bool {
+        pattern.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }).contains { neverWords.contains(String($0)) }
+    }
 
     /// The seat's `.gitignore` as three buckets: `!pattern` lines are synced (the allow-list),
     /// ignored patterns naming credentials, env files, keys or logs are never, the rest
@@ -345,7 +351,7 @@ enum SeatRepo {
             guard !line.isEmpty, !line.hasPrefix("#") else { continue }
             if line.hasPrefix("!") {
                 out[.synced, default: []].append(String(line.dropFirst()))
-            } else if neverWords.contains(where: { line.lowercased().contains($0) }) {
+            } else if namesNever(line) {
                 out[.never, default: []].append(line)
             } else {
                 out[.machineOnly, default: []].append(line)
@@ -360,7 +366,8 @@ enum SeatRepo {
     static func routes(_ projects: [String], home: String, _ fm: FileManager = .default) -> [SeatReport.Route] {
         projects.compactMap { project in
             let file = (project as NSString).appendingPathComponent(".vscode/settings.json")
-            guard let o = SeatScanner.readObject(file, fm).object else { return nil }
+            // VS Code's settings are JSONC: comments and trailing commas are fine there.
+            guard let o = SeatScanner.lenientObject(file, fm) else { return nil }
             let vars = o["claudeCode.environmentVariables"]
             var value: String?
             if let list = vars as? [Any] {
@@ -377,9 +384,18 @@ enum SeatRepo {
 /// Drift between two seats (item 71, slice 1b): settings keys that differ (with masked values,
 /// shown only between two personal seats) and extensions one holds and the other doesn't.
 enum SeatDriftCheck {
-    static func drift(mine: [String: Any], theirs: [String: Any], myScan: SeatScan, theirScan: SeatScan,
+    /// `mine` or `theirs` is nil when that seat's settings.json is unreadable: keys aren't
+    /// compared then (an unreadable file isn't an empty one), extensions still are.
+    static func drift(mine: [String: Any]?, theirs: [String: Any]?, myScan: SeatScan, theirScan: SeatScan,
                       other: String) -> SeatReport.Drift {
         var d = SeatReport.Drift(other: other)
+        let here = names(myScan), there = names(theirScan)
+        d.onlyHere = here.subtracting(there).sorted()
+        d.onlyThere = there.subtracting(here).sorted()
+        guard let mine, let theirs else {
+            d.settingsUnreadable = true
+            return d
+        }
         let paths = Set(SettingsPrecedence.rowPaths(mine)).union(SettingsPrecedence.rowPaths(theirs))
         for path in paths.sorted(by: { $0.joined(separator: ".") < $1.joined(separator: ".") }) {
             let a = SettingsPrecedence.value(at: path, in: mine), b = SettingsPrecedence.value(at: path, in: theirs)
@@ -388,9 +404,6 @@ enum SeatDriftCheck {
                                               mine: a.map { ConfigMask.display($0, at: path) },
                                               theirs: b.map { ConfigMask.display($0, at: path) }))
         }
-        let here = names(myScan), there = names(theirScan)
-        d.onlyHere = here.subtracting(there).sorted()
-        d.onlyThere = there.subtracting(here).sorted()
         return d
     }
 

@@ -46,6 +46,8 @@ struct SeatReport: Equatable, Sendable {
         var gate: String?
         var outsideSeat = false
         var missing = false
+        /// Larger than the 1 MB read cap: its counts cover the first megabyte.
+        var truncated = false
     }
 
     struct Exclude: Equatable, Sendable {
@@ -104,6 +106,8 @@ struct SeatReport: Equatable, Sendable {
         let timeout: Int?
         /// "Settings" or "Plugin <name>".
         let source: String
+        /// The command as a work seat shows it: paths outside the seat replaced.
+        let workCommand: String
     }
 
     struct ExtensionsPart: Equatable, Sendable {
@@ -131,6 +135,8 @@ struct SeatReport: Equatable, Sendable {
         var orphanSidecars = 0
         /// The largest projects by transcript size: folder name and bytes (hidden for a work seat).
         var largest: [Sized] = []
+        /// The walk stopped at `SeatReports.transcriptLimit` entries: the sizes are partial.
+        var partial = false
         var warns: Bool { cleanupDays == nil }
     }
 
@@ -231,6 +237,8 @@ struct SeatReport: Equatable, Sendable {
         /// `kind:name` held here and not there, and the other way.
         var onlyHere: [String] = []
         var onlyThere: [String] = []
+        /// One side's settings.json is unreadable, so keys weren't compared.
+        var settingsUnreadable = false
         var count: Int { keys.count + onlyHere.count + onlyThere.count }
     }
 
@@ -275,14 +283,27 @@ enum SeatReports {
         let scan: SeatScan
     }
 
+    /// The managed files, merged into one layer, and a lint per file that doesn't parse.
+    struct Managed {
+        var layer: SettingsLayer?
+        var count = 0
+        var lints: [String] = []
+        var layers: [SettingsLayer] { layer.map { [$0] } ?? [] }
+    }
+
+    /// `configs` is each seat's `.claude.json` placement as the page already read it; the
+    /// file's contents come from the scan (`SeatScan.configKeys`, `caseTwinProjects`), so it is
+    /// parsed once per load.
     static func build(_ inputs: [Input], home: String,
                       managedFolder: String = (ModOverrides.managedFile as NSString).deletingLastPathComponent,
+                      configs: [String: [ClaudeCodeFolders.ConfigCandidate]] = [:],
                       now: Date = Date(), fileManager fm: FileManager = .default) -> [SeatReport] {
-        let managed = managedLayers(managedFolder, fm)
-        var raws: [[String: Any]] = []
+        let managed = managedSettings(managedFolder, fm)
+        var raws: [[String: Any]?] = []
         var reports: [SeatReport] = []
         for input in inputs {
-            let (report, raw) = build(input, home: home, managed: managed, managedFolder: managedFolder, now: now, fm)
+            let (report, raw) = build(input, home: home, managed: managed, managedFolder: managedFolder,
+                                      config: configs[input.seat], now: now, fm)
             reports.append(report)
             raws.append(raw)
         }
@@ -295,41 +316,52 @@ enum SeatReports {
         return reports
     }
 
-    /// One seat's report and its raw settings object (for drift, never kept).
-    static func build(_ input: Input, home: String, managed: [SettingsLayer], managedFolder: String, now: Date,
-                      _ fm: FileManager) -> (SeatReport, [String: Any]) {
+    /// One seat's report and its raw settings object (for drift, never kept; nil when the file
+    /// is unreadable).
+    static func build(_ input: Input, home: String, managed: Managed, managedFolder: String,
+                      config: [ClaudeCodeFolders.ConfigCandidate]?, now: Date, _ fm: FileManager) -> (SeatReport, [String: Any]?) {
         let seat = input.seat
         var report = SeatReport(seat: seat)
         let settingsFile = (seat as NSString).appendingPathComponent("settings.json")
-        let settings = SeatScanner.readObject(settingsFile, fm).object ?? [:]
-        let config = SeatScanner.readObject(ClaudeCodeFolders.configFile(for: seat, home: home, fileManager: fm), fm).object ?? [:]
+        let settings = SeatScanner.readObject(settingsFile, fm, cap: SeatScanner.Cap.settings).object ?? [:]
         let user = SettingsLayer(source: .user, file: settingsFile, object: settings)
-        report.settings = settingsPart(input, user: user, managed: managed, config: config, home: home, fm)
+        report.settings = settingsPart(input, user: user, managed: managed, home: home, fm)
         report.instructions = SeatInstructions.read(seat: seat, isDefault: input.isDefault, home: home,
                                                      projects: input.scan.projects, managedFolder: managedFolder,
-                                                     excludes: list("claudeMdExcludes", managed + [user]),
-                                                     managedClaudeMd: managed.compactMap { $0.object["claudeMd"] as? String }.first, fm)
-        report.extensions = SeatExtensionsCheck.read(input.scan, settings: settings, home: home)
+                                                     excludes: list("claudeMdExcludes", managed.layers + [user]),
+                                                     managedClaudeMd: managed.layer?.object["claudeMd"] as? String, fm)
+        report.extensions = SeatExtensionsCheck.read(input.scan, settings: settings, seat: seat, home: home)
         report.mcp = SeatMCPView.rows(input.scan.mcpServers, approvals: SeatMCPView.MCPApprovals(settings: settings))
         report.history = history(seat, rows: report.settings.rows, now: now, fm)
-        report.housekeeping = SeatHousekeeping.read(seat: seat, isDefault: input.isDefault, home: home, config: config,
+        report.housekeeping = SeatHousekeeping.read(seat: seat, isDefault: input.isDefault, home: home,
+                                                    config: config ?? ClaudeCodeFolders.configCandidates(for: seat, home: home, fileManager: fm),
                                                     scan: input.scan, fm)
         report.repo = SeatRepo.read(seat, fm)
         report.routes = SeatRepo.routes(input.scan.projects, home: home, fm)
-        return (report, settings)
+        return (report, input.scan.settingsUnreadable == nil ? settings : nil)
     }
 
-    /// The managed settings files: `managed-settings.json`, then the drop-ins in
-    /// `managed-settings.d/` by name.
-    static func managedLayers(_ folder: String, _ fm: FileManager) -> [SettingsLayer] {
-        var out: [SettingsLayer] = []
-        let file = (folder as NSString).appendingPathComponent("managed-settings.json")
-        if let o = SeatScanner.readObject(file, fm).object { out.append(SettingsLayer(source: .managed, file: file, object: o)) }
+    /// `managed-settings.json`, then the drop-ins in `managed-settings.d/` by name, merged into
+    /// one managed layer as Claude Code merges them. A file that doesn't parse is a lint: Claude
+    /// Code refuses to start with it.
+    static func managedSettings(_ folder: String, _ fm: FileManager) -> Managed {
+        var files: [(path: String, object: [String: Any])] = []
+        var out = Managed()
+        func read(_ path: String) {
+            switch SeatScanner.readObject(path, fm, cap: SeatScanner.Cap.settings) {
+            case .object(let o): files.append((path, o))
+            case .unreadable(let why):
+                out.lints.append("\((path as NSString).lastPathComponent) (managed) \(why): Claude Code won't start with this file.")
+            case .missing: break
+            }
+        }
+        read((folder as NSString).appendingPathComponent("managed-settings.json"))
         let drop = (folder as NSString).appendingPathComponent("managed-settings.d")
         for name in SeatScanner.visible(drop, fm) where name.hasSuffix(".json") {
-            let path = (drop as NSString).appendingPathComponent(name)
-            if let o = SeatScanner.readObject(path, fm).object { out.append(SettingsLayer(source: .managed, file: path, object: o)) }
+            read((drop as NSString).appendingPathComponent(name))
         }
+        out.count = files.count
+        out.layer = SettingsPrecedence.mergeManaged(files)
         return out
     }
 
@@ -345,7 +377,8 @@ enum SeatReports {
     /// The `.seat/local-keys.json` keys: an array of names, or an object's keys.
     static func machineOnlyKeys(_ seat: String, _ fm: FileManager) -> Set<String> {
         let file = (seat as NSString).appendingPathComponent(".seat/local-keys.json")
-        guard let data = fm.contents(atPath: file), let v = try? JSONSerialization.jsonObject(with: data) else { return [] }
+        guard case .data(let data) = SeatScanner.readFile(file, cap: SeatScanner.Cap.small, fm),
+              let v = try? JSONSerialization.jsonObject(with: data) else { return [] }
         if let a = v as? [Any] { return Set(a.compactMap { $0 as? String }) }
         if let o = v as? [String: Any] {
             if let keys = o["keys"] as? [Any] { return Set(keys.compactMap { $0 as? String }) }
@@ -354,20 +387,23 @@ enum SeatReports {
         return []
     }
 
-    static func settingsPart(_ input: SeatReports.Input, user: SettingsLayer, managed: [SettingsLayer], config: [String: Any],
+    /// The seat-wide view: managed and the seat's own settings walked; each project's files only
+    /// counted (never named), with values they set where they're ignored.
+    static func settingsPart(_ input: SeatReports.Input, user: SettingsLayer, managed: Managed,
                              home: String, _ fm: FileManager) -> SeatReport.SettingsPart {
         var part = SeatReport.SettingsPart()
         part.unreadable = input.scan.settingsUnreadable
         part.managedFiles = managed.count
-        part.rows = SettingsPrecedence.walk(managed + [user], machineOnly: machineOnlyKeys(input.seat, fm))
-        // Projects setting the same keys, counted, never named; and values ignored there.
+        part.rows = SettingsPrecedence.walk(managed.layers + [user], machineOnly: machineOnlyKeys(input.seat, fm),
+                                            seat: input.seat, home: home)
         var setIn: [String: Int] = [:]
         var ignoredIn: [String: Int] = [:]
         for project in input.scan.projects {
             let dot = (project as NSString).appendingPathComponent(".claude")
             var seen = Set<String>(), ignored = Set<String>()
             for (file, source) in [("settings.local.json", SettingsSource.projectLocal), ("settings.json", .projectShared)] {
-                guard let o = SeatScanner.readObject((dot as NSString).appendingPathComponent(file), fm).object else { continue }
+                guard let o = SeatScanner.readObject((dot as NSString).appendingPathComponent(file), fm,
+                                                     cap: SeatScanner.Cap.settings).object else { continue }
                 for path in SettingsPrecedence.rowPaths(o) {
                     let key = path.joined(separator: ".")
                     seen.insert(key)
@@ -384,8 +420,8 @@ enum SeatReports {
                 part.rows[i].warnings.append("Set in \(n) project file\(n == 1 ? "" : "s") that \(n == 1 ? "ignores" : "ignore") it.")
             }
         }
-        part.lints = SettingsPrecedence.lints(settings: user.object, config: config, seat: input.seat,
-                                              isDefault: input.isDefault, fileManager: fm)
+        part.lints = managed.lints + SettingsPrecedence.lints(settings: user.object, configKeys: input.scan.configKeys,
+                                                              seat: input.seat, isDefault: input.isDefault, fileManager: fm)
         return part
     }
 
@@ -416,11 +452,16 @@ enum SeatReports {
             part.sessions += sessions.count
             part.orphanSidecars += top.filter { isSessionID($0) && !sessions.contains($0) && isFolder((dir as NSString).appendingPathComponent($0), fm) }.count
             guard let e = fm.enumerator(at: URL(fileURLWithPath: dir), includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey, .isRegularFileKey]) else { continue }
-            while let url = e.nextObject() as? URL, measured < transcriptLimit {
+            while let url = e.nextObject() as? URL {
+                // Every entry visited counts toward the cap, not just transcripts.
+                measured += 1
+                guard measured <= transcriptLimit else {
+                    part.partial = true
+                    break
+                }
                 guard url.pathExtension == "jsonl",
                       let v = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey, .isRegularFileKey]),
                       v.isRegularFile == true else { continue }
-                measured += 1
                 let size = Int64(v.fileSize ?? 0)
                 bytes += size
                 if let m = v.contentModificationDate {
@@ -450,6 +491,16 @@ enum SeatReports {
 /// loads, with `@` imports resolved up to four hops, rules with their `paths` gates,
 /// `claudeMdExcludes`, the ancestor leak and auto memory's index sizes.
 enum SeatInstructions {
+    /// The most read from one CLAUDE.md, rule or MEMORY.md.
+    static let readCap = 1 << 20
+
+    /// The first `readCap` bytes of a regular file.
+    static func head(_ path: String, _ fm: FileManager) -> Data {
+        guard SeatScanner.isRegular(path, fm), let h = FileHandle(forReadingAtPath: path) else { return Data() }
+        defer { try? h.close() }
+        return (try? h.read(upToCount: readCap)) ?? Data()
+    }
+
     static func read(seat: String, isDefault: Bool, home: String, projects: [String], managedFolder: String,
                      excludes: [String], managedClaudeMd: String?, _ fm: FileManager) -> SeatReport.InstructionsPart {
         var part = SeatReport.InstructionsPart()
@@ -460,10 +511,23 @@ enum SeatInstructions {
             let p = AccountData.normalized(path)
             var node = SeatReport.InstructionNode(id: nodes.count, kind: kind, title: display(p), depth: depth, gate: gate)
             node.outsideSeat = kind == .imported && !(p == seat || p.hasPrefix(seat + "/"))
-            guard let data = fm.contents(atPath: p) else {
+            let data: Data
+            switch SeatScanner.readFile(p, cap: SeatInstructions.readCap, fm) {
+            case .data(let d): data = d
+            case .missing:
                 node.missing = true
                 nodes.append(node)
                 return
+            case .refused:
+                // Not a regular file: nothing Claude Code would load. Too large: counted from its
+                // first megabyte and marked.
+                guard SeatScanner.isRegular(p, fm) else {
+                    node.missing = true
+                    nodes.append(node)
+                    return
+                }
+                node.truncated = true
+                data = SeatInstructions.head(p, fm)
             }
             let text = String(decoding: data, as: UTF8.self)
             node.bytes = data.count
@@ -533,12 +597,18 @@ enum SeatInstructions {
             guard !fenced else { continue }
             // Inline code spans don't import.
             let plain = line.replacingOccurrences(of: #"`[^`]*`"#, with: "", options: .regularExpression)
-            guard let re = try? NSRegularExpression(pattern: #"(?:^|\s)@([~./A-Za-z0-9_][^\s]*)"#) else { continue }
+            // `@path` runs to the first unescaped space (`\ ` keeps one in the path); a quoted path
+            // isn't an import, and a bare `@README` is one (code.claude.com/docs/en/memory).
+            guard let re = try? NSRegularExpression(pattern: #"(?:^|\s)@((?:\\ |[^\s"'])+)"#) else { continue }
             let ns = plain as NSString
             for m in re.matches(in: plain, range: NSRange(location: 0, length: ns.length)) {
-                var token = ns.substring(with: m.range(at: 1))
-                while let last = token.last, ".,;:)]!?\"'".contains(last) { token.removeLast() }
-                guard token.contains("/") || token.contains("."), !token.isEmpty else { continue }
+                var token = ns.substring(with: m.range(at: 1)).replacingOccurrences(of: "\\ ", with: " ")
+                while let last = token.last, ",;:)]!?".contains(last) { token.removeLast() }
+                // A sentence's full stop ends the path, not the file name.
+                while token.hasSuffix("."), token != ".", token != "..", !token.hasSuffix("/.."), !token.hasSuffix("/.") {
+                    token.removeLast()
+                }
+                guard !token.isEmpty else { continue }
                 let resolved: String
                 if token.hasPrefix("~/") {
                     resolved = (home as NSString).appendingPathComponent(String(token.dropFirst(2)))
@@ -568,7 +638,8 @@ enum SeatInstructions {
         for name in SeatScanner.visible(projects, fm) {
             let dir = (projects as NSString).appendingPathComponent(name + "/memory")
             let file = (dir as NSString).appendingPathComponent("MEMORY.md")
-            guard let data = fm.contents(atPath: file) else { continue }
+            guard SeatScanner.isRegular(file, fm) else { continue }
+            let data = head(file, fm)
             let text = String(decoding: data, as: UTF8.self)
             var missing = 0
             if let re = try? NSRegularExpression(pattern: #"\]\(([^)#\s]+)\)"#) {

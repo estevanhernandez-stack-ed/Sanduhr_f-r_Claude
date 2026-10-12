@@ -209,7 +209,7 @@ private struct SeatSections: View {
         let others = model.pickerSeats(demo: demo).filter { $0.path != seat.path }.count
         VStack(alignment: .leading, spacing: 8) {
             ForEach(SeatSectionID.allCases, id: \.self) { id in
-                SeatSectionBox(id: id, summary: id.summary(report, others: others), model: model) {
+                SeatSectionBox(id: id, summary: id.summary(model.shownReport(report, demo: demo), others: others), model: model) {
                     SeatSectionBody(id: id, seat: seat, report: report, model: model, demo: demo)
                 }
             }
@@ -259,7 +259,7 @@ private struct SeatSectionBody: View {
 
     var body: some View {
         switch id {
-        case .settings: SeatSettingsSection(part: report.settings, display: model.display)
+        case .settings: SeatSettingsSection(part: report.settings, isWork: seat.isWork, display: model.display)
         case .instructions: SeatInstructionsSection(part: report.instructions, hideNames: seat.isWork)
         case .extensions: SeatExtensionsSection(seat: seat, part: report.extensions, model: model)
         case .mcp: SeatMCPSection(rows: report.mcp, hideNames: seat.isWork, display: model.display)

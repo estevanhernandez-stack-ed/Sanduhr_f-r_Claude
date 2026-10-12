@@ -29,9 +29,10 @@ struct ModsBySeatTests {
         let allow = try #require(Self.row(rows, "permissions.allow"))
         #expect(allow.value == .text(#"["Read","Edit(src)","Bash(ls)"]"#))
         #expect(allow.contributors == [.projectShared, .user])
-        // availableModels overrides: the highest level's list alone.
-        #expect(Self.row(rows, "availableModels")?.value == .text(#"["c"]"#))
-        #expect(Self.row(rows, "availableModels")?.source == .projectShared)
+        // availableModels merges across the scopes that aren't managed (the docs: "Across non-managed
+        // scopes Claude Code merges the arrays as usual").
+        #expect(Self.row(rows, "availableModels")?.value == .text(#"["c","a","b"]"#))
+        #expect(Self.row(rows, "availableModels")?.contributors == [.projectShared, .user])
         // enabledPlugins per plugin id.
         #expect(Self.row(rows, "enabledPlugins.x@m")?.value == .toggle(false))
         #expect(Self.row(rows, "enabledPlugins.x@m")?.source == .projectShared)
@@ -110,7 +111,7 @@ struct ModsBySeatTests {
         let settings: [String: Any] = ["permissions": ["allow": ["Write(src/**)", "Edit(src/**)"]],
                                        "hooks": ["Stop": [["hooks": [["type": "command", "command": #"C:\tools\x.exe"#]]]]],
                                        "statusLine": ["command": h.at("gone/statusline.sh") + " --x"]]
-        let lints = SettingsPrecedence.lints(settings: settings, config: ["hooks": [:]], seat: h.at(".claude-l"), isDefault: false)
+        let lints = SettingsPrecedence.lints(settings: settings, configKeys: ["hooks", "projects"], seat: h.at(".claude-l"), isDefault: false)
         #expect(lints.contains { $0.hasPrefix("1 Write(path) allow rule never match") })
         #expect(lints.contains { $0.contains("settings.local.json in the seat folder") })
         #expect(lints.contains { $0.contains("Windows paths in hooks") })
@@ -233,10 +234,12 @@ struct ModsBySeatTests {
         #expect(titles.contains { $0.hasSuffix("docs/one.md") })
         #expect(titles.contains { $0.hasSuffix("docs/c.md") })
         #expect(!titles.contains { $0.hasSuffix("docs/d.md") })   // a fifth hop isn't followed
-        #expect(!titles.contains { $0.contains("not/this") || $0.contains("nor/this") || $0.contains("mention") })
+        #expect(!titles.contains { $0.contains("not/this") || $0.contains("nor/this") })
+        // A bare @mention is an import too (the memory docs: @README imports README); here it doesn't resolve.
+        #expect(titles.contains { $0.hasSuffix("/mention") })
         #expect(part.nodes.first { $0.title.hasSuffix("shared/two.md") }?.outsideSeat == true)
         #expect(part.nodes.first { $0.title.hasSuffix("shared/two.md") }?.lines == 2)
-        #expect(part.unresolved == 1)
+        #expect(part.unresolved == 2)
         #expect(part.nodes.first { $0.kind == .rule }?.gate == "src/**")
         #expect(part.leak != nil)
         #expect(part.memory.first?.overLimit == true && part.memory.first?.missingLinks == 201)
@@ -341,12 +344,163 @@ struct ModsBySeatTests {
         #expect(s.warns && s.text.hasPrefix("settings.json is unreadable: it isn't valid JSON"))
     }
 
-    @Test func strictJSONRefusesTrailingCommasAndComments() {
-        #expect(SeatScanner.strictProblem(Data(#"{"a": [1, 2], "b": "x,}"}"#.utf8)) == nil)
-        #expect(SeatScanner.strictProblem(Data(#"{"a": "q\"//"}"#.utf8)) == nil)
-        #expect(SeatScanner.strictProblem(Data("{\n  \"a\": 1,\n}".utf8)) == "isn't valid JSON (a trailing comma around line 2, column 9)")
-        #expect(SeatScanner.strictProblem(Data(#"{"a": [1,]}"#.utf8))?.contains("trailing comma") == true)
-        #expect(SeatScanner.strictProblem(Data("{\"a\": 1 /* x */}".utf8))?.contains("a comment around line 1") == true)
+    // MARK: Review fixes: managed files, the docs' rules, the wall
+
+    static func obj(_ json: String) -> [String: Any] {
+        (try? JSONSerialization.jsonObject(with: Data(json.utf8))) as? [String: Any] ?? [:]
+    }
+
+    @Test func managedDropInsMergeIntoOneLayerLaterFileWins() throws {
+        let h = TempHome()
+        defer { h.cleanUp() }
+        Self.put(h, "managed/managed-settings.json", #"{"cleanupPeriodDays":30,"permissions":{"deny":["Read(a)"]},"env":{"A":"1"},"fallbackModel":["x","y"]}"#)
+        Self.put(h, "managed/managed-settings.d/20-later.json", #"{"cleanupPeriodDays":90,"permissions":{"deny":["Read(b)"]},"env":{"B":"2"},"fallbackModel":["z"]}"#)
+        Self.put(h, "managed/managed-settings.d/10-first.json", #"{"cleanupPeriodDays":60}"#)
+        Self.put(h, "managed/managed-settings.d/.hidden.json", #"{"cleanupPeriodDays":1}"#)
+        Self.put(h, "managed/managed-settings.d/notes.txt", "x")
+        let managed = SeatReports.managedSettings(h.at("managed"), .default)
+        #expect(managed.count == 3 && managed.lints.isEmpty)
+        let rows = SettingsPrecedence.walk(managed.layers + [Self.layer(.user, #"{"cleanupPeriodDays":7}"#)])
+        let cleanup = try #require(Self.row(rows, "cleanupPeriodDays"))
+        #expect(cleanup.value == .text("90") && cleanup.source == .managed)
+        #expect(cleanup.file == h.at("managed/managed-settings.d/20-later.json"))
+        #expect(Self.row(rows, "permissions.deny")?.value == .text(#"["Read(b)","Read(a)"]"#))
+        #expect(Self.row(rows, "env.A") != nil && Self.row(rows, "env.B") != nil)
+        #expect(Self.row(rows, "fallbackModel")?.value == .text(#"["z"]"#))
+        // A managed file that doesn't parse: Claude Code refuses to start with it.
+        Self.put(h, "managed/managed-settings.d/30-broken.json", "{")
+        let broken = SeatReports.managedSettings(h.at("managed"), .default)
+        #expect(broken.lints.contains { $0.hasPrefix("30-broken.json (managed) isn't valid JSON") && $0.hasSuffix("Claude Code won't start with this file.") })
+    }
+
+    @Test func theDocsExceptionsTable() {
+        let rows = SettingsPrecedence.walk([
+            Self.layer(.managed, #"{"availableModels":["m1"],"autoMode":{"classifyAllShell":false},"remoteControlAtStartup":true,"crossSessionInbound":"hold","useAutoModeDuringPlan":true,"enableArtifact":true}"#),
+            Self.layer(.projectLocal, #"{"remoteControlAtStartup":false,"crossSessionInbound":"refuse","useAutoModeDuringPlan":false}"#),
+            Self.layer(.projectShared, #"{"crossSessionInbound":"accept","syncClaudeAiSkills":true,"disableArtifact":true}"#),
+            Self.layer(.user, #"{"availableModels":["u1"],"autoMode":{"classifyAllShell":true}}"#),
+        ])
+        // availableModels from managed applies as-is.
+        #expect(Self.row(rows, "availableModels")?.value == .text(#"["m1"]"#))
+        // autoMode.classifyAllShell: true from user beats managed false.
+        #expect(Self.row(rows, "autoMode.classifyAllShell")?.value == .toggle(true))
+        #expect(Self.row(rows, "autoMode.classifyAllShell")?.source == .user)
+        // remoteControlAtStartup: a project false beats managed true.
+        #expect(Self.row(rows, "remoteControlAtStartup")?.value == .toggle(false))
+        // crossSessionInbound: the stricter project value wins; one that isn't stricter is ignored.
+        #expect(Self.row(rows, "crossSessionInbound")?.value == .text("refuse"))
+        #expect(Self.row(rows, "crossSessionInbound")?.warnings.contains { $0.contains("project shared value isn't stricter") } == true)
+        // useAutoModeDuringPlan: false from local beats managed true.
+        #expect(Self.row(rows, "useAutoModeDuringPlan")?.value == .toggle(false))
+        // A shared project file can't set syncClaudeAiSkills either way.
+        #expect(Self.row(rows, "syncClaudeAiSkills")?.warnings.first == "Not in effect.")
+        // disableArtifact: true from any scope turns enableArtifact off.
+        #expect(Self.row(rows, "enableArtifact")?.value == .toggle(false))
+        // remoteControlAtStartup: true in a project is ignored.
+        let rc = SettingsPrecedence.walk([Self.layer(.projectShared, #"{"remoteControlAtStartup":true}"#)])
+        #expect(Self.row(rc, "remoteControlAtStartup")?.warnings.first == "Not in effect.")
+    }
+
+    @Test func objectsMergeKeyByKeyAndListsCombineAtDepth() {
+        let rows = SettingsPrecedence.walk([
+            Self.layer(.user, #"{"sandbox":{"network":{"allowedDomains":["a.example"]},"enabled":true},"modelSettings":{"opus":{"effort":"low"},"haiku":{"effort":"high"}},"extraKnownMarketplaces":{"m":{"source":"u"},"n":{"source":"un"}},"autoMode":{"allow":["x"]}}"#),
+            Self.layer(.projectLocal, #"{"sandbox":{"network":{"allowedDomains":["b.example"]}},"modelSettings":{"opus":{"thinking":true}},"extraKnownMarketplaces":{"m":{"source":"p"}}}"#),
+        ])
+        #expect(Self.row(rows, "sandbox")?.value == .text(#"{"enabled":true,"network":{"allowedDomains":["b.example","a.example"]}}"#))
+        // modelSettings one model at a time, each whole: opus from the local file, haiku from user.
+        #expect(Self.row(rows, "modelSettings")?.value == .text(#"{"haiku":{"effort":"high"},"opus":{"thinking":true}}"#))
+        #expect(Self.row(rows, "extraKnownMarketplaces")?.value == .text(#"{"m":{"source":"p"},"n":{"source":"un"}}"#))
+        #expect(Self.row(rows, "autoMode.allow")?.value == .text(#"["x"]"#))
+    }
+
+    @Test func managedRulesOnlyAndTheEnvListAreHonored() {
+        let rows = SettingsPrecedence.walk([
+            Self.layer(.managed, #"{"allowManagedPermissionRulesOnly":true,"permissions":{"allow":["Read(m)"]}}"#),
+            Self.layer(.projectShared, #"{"env":{"OTEL_EXPORTER_OTLP_ENDPOINT":"https://x.example","OTEL_METRICS_EXPORTER":"none","XDG_DATA_HOME":"/x","PLAIN":"1"}}"#),
+            Self.layer(.user, #"{"permissions":{"allow":["Read(u)"],"defaultMode":"acceptEdits"}}"#),
+        ])
+        #expect(Self.row(rows, "permissions.allow")?.value == .text(#"["Read(m)"]"#))
+        #expect(Self.row(rows, "permissions.allow")?.warnings.contains { $0.hasPrefix("allowManagedPermissionRulesOnly") } == true)
+        #expect(Self.row(rows, "permissions.defaultMode")?.warnings.isEmpty == true)
+        #expect(Self.row(rows, "env.OTEL_EXPORTER_OTLP_ENDPOINT")?.warnings.first == "Not in effect.")
+        #expect(Self.row(rows, "env.XDG_DATA_HOME")?.warnings.first == "Not in effect.")
+        #expect(Self.row(rows, "env.OTEL_METRICS_EXPORTER")?.warnings.isEmpty == true)   // "none" turns it off: honored
+        #expect(Self.row(rows, "env.PLAIN")?.warnings.isEmpty == true)
+        #expect(SettingsPrecedence.envIgnoredInProject("OTEL_LOG_USER_PROMPTS", value: "0") == false)
+        #expect(SettingsPrecedence.envIgnoredInProject("OTEL_LOG_USER_PROMPTS", value: "1"))
+        #expect(SettingsPrecedence.envIgnoredInProject("ProgramFilesX86", value: nil))
+    }
+
+    @Test func aWorkSeatsValuesHideFolderPathsOutsideTheSeat() {
+        let rows = SettingsPrecedence.walk([Self.layer(.user, #"""
+        {"permissions":{"allow":["Read(//Users/someone/made-up-client/**)","Read(/Users/someone/.claude-w/agents/**)","Bash(ls)"],
+         "additionalDirectories":["~/made-up-client"]}}
+        """#)], seat: "/Users/someone/.claude-w", home: "/Users/someone")
+        let allow = Self.row(rows, "permissions.allow")
+        #expect(allow?.workValue == .text(#"["Read(‹path outside the seat›)","Read(/Users/someone/.claude-w/agents/**)","Bash(ls)"]"#))
+        if case .text(let t)? = allow?.value { #expect(t.contains("made-up-client")) }
+        #expect(allow?.shown(work: false) == allow?.value)
+        if case .text(let t)? = Self.row(rows, "permissions.additionalDirectories")?.shown(work: true) {
+            #expect(!t.contains("made-up-client"))
+        }
+        var scan = SeatScan(seat: "/Users/someone/.claude-w")
+        scan.plugins = []
+        let hooks = SeatExtensionsCheck.hooks(settings: Self.obj(#"{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"/Users/someone/made-up-client/bin/x.sh --y"}]}]}}"#),
+                                              scan: scan, seat: "/Users/someone/.claude-w", home: "/Users/someone")
+        #expect(hooks.first?.command.contains("made-up-client") == true)
+        #expect(hooks.first?.workCommand == "‹path outside the seat› --y")
+    }
+
+    @Test func aWorkSeatsImportsAreNumberedNotNamed() {
+        let nodes = [SeatReport.InstructionNode(id: 0, kind: .seat, title: "~/.claude-w/CLAUDE.md", depth: 0),
+                     SeatReport.InstructionNode(id: 1, kind: .imported, title: "~/.claude-w/docs/a.md", depth: 1),
+                     SeatReport.InstructionNode(id: 2, kind: .imported, title: "~/made-up-client/notes.md", depth: 1, outsideSeat: true),
+                     SeatReport.InstructionNode(id: 3, kind: .imported, title: "~/.claude-w/docs/b.md", depth: 2)]
+        #expect(nodes.map { SeatInstructionTitles.title($0, in: nodes, hideNames: true) }
+                == ["~/.claude-w/CLAUDE.md", "Import 1", "An import outside the seat", "Import 2"])
+        #expect(SeatInstructionTitles.title(nodes[2], in: nodes, hideNames: false) == "~/made-up-client/notes.md")
+    }
+
+    @Test func instructionReadsAreBoundedAndImportsFollowTheDocs() {
+        let h = TempHome()
+        defer { h.cleanUp() }
+        Self.put(h, ".claude-i/CLAUDE.md", "See @README and @Design\\ Docs/api.md, not @\"quoted.md\". Mail me@example.com.\n@big.md\n@pipe.md\n")
+        Self.put(h, ".claude-i/README", "readme\n")
+        Self.put(h, ".claude-i/Design Docs/api.md", "api\n")
+        Self.put(h, ".claude-i/big.md", String(repeating: "line\n", count: (SeatInstructions.readCap / 5) + 10))
+        #expect(mkfifo(h.at(".claude-i/pipe.md"), 0o600) == 0)
+        let part = SeatInstructions.read(seat: h.at(".claude-i"), isDefault: false, home: h.path, projects: [],
+                                         managedFolder: h.at("managed"), excludes: [], managedClaudeMd: nil, .default)
+        let byName = Dictionary(part.nodes.map { (($0.title as NSString).lastPathComponent, $0) }, uniquingKeysWith: { a, _ in a })
+        #expect(byName["README"]?.missing == false)
+        #expect(byName["api.md"]?.missing == false)
+        #expect(byName["quoted.md"] == nil && byName["example.com"] == nil)
+        #expect(byName["big.md"]?.truncated == true && byName["big.md"]?.bytes == SeatInstructions.readCap)
+        #expect(byName["pipe.md"]?.missing == true)
+    }
+
+    @Test func neverWordsMatchWholeWordsAndVSCodeSettingsReadAsJSONC() {
+        let b = SeatRepo.buckets("keybindings.json\ncatalog/\n.env.local\n*.log\n")
+        #expect(b[.machineOnly] == ["keybindings.json", "catalog/"])
+        #expect(b[.never] == [".env.local", "*.log"])
+        let h = TempHome()
+        defer { h.cleanUp() }
+        Self.put(h, "p/.vscode/settings.json", """
+        {
+          // VS Code allows comments
+          "claudeCode.environmentVariables": [{"name": "CLAUDE_CONFIG_DIR", "value": "\(h.at(".claude-z"))"},],
+        }
+        """)
+        #expect(SeatRepo.routes([h.at("p")], home: h.path) == [SeatReport.Route(project: h.at("p"), target: h.at(".claude-z"))])
+        #expect(SeatScanner.stripJSONC(Data(#"{"a": "x // y", "b": [1,],}"#.utf8)) == Data(#"{"a": "x // y", "b": [1]}"#.utf8))
+    }
+
+    @Test func driftSkipsKeysWhenASettingsFileIsUnreadable() {
+        var a = SeatScan(seat: "/a"), b = SeatScan(seat: "/b")
+        a.agents = [SeatEntry(name: "x", description: "", scope: .seat, path: "/a/agents/x.md")]
+        b.settingsUnreadable = "isn't valid JSON"
+        let d = SeatDriftCheck.drift(mine: ["model": "x"], theirs: nil, myScan: a, theirScan: b, other: "/b")
+        #expect(d.settingsUnreadable && d.keys.isEmpty && d.onlyHere == ["agent:x"])
     }
 
     @Test func summariesAndStateYAML() {

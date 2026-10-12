@@ -59,7 +59,10 @@ struct ModsCatalogView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            CatalogFilterBar(model: model)
+            ForEach(model.unreadableNotes(demo: demo), id: \.self) { note in
+                Text(note).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+            }
+            CatalogFilterBar(model: model, demo: demo)
             Text(countLine(shown: cards.count))
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -81,6 +84,7 @@ struct ModsCatalogView: View {
 
 private struct CatalogFilterBar: View {
     @Bindable var model: ModsPageModel
+    let demo: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -92,7 +96,7 @@ private struct CatalogFilterBar: View {
                 .frame(maxWidth: 200)
                 Picker("Seat", selection: $model.filter.seat) {
                     Text("All seats").tag(String?.none)
-                    ForEach(model.seats) { Text($0.label).tag(String?.some($0.path)) }
+                    ForEach(model.filterSeats(demo: demo)) { Text($0.label).tag(String?.some($0.path)) }
                 }
                 .frame(maxWidth: 200)
             }
@@ -240,13 +244,16 @@ struct SeatLabelControls: View {
     let seat: Seat
     var model: ModsPageModel
     @State private var draft = ""
+    @FocusState private var editing: Bool
 
     var body: some View {
         HStack(spacing: 8) {
             TextField("Label", text: $draft, prompt: Text(seat.name))
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 160)
-                .onSubmit { model.setLabel(draft, for: seat.path) }
+                .focused($editing)
+                .onSubmit { save() }
+                .onChange(of: editing) { if !editing { save() } }
                 .help("Your name for this folder. Sanduhr never takes one from the folder's files.")
             if seat.markSource == .account {
                 SeatMarkBadge(mark: .work)
@@ -264,5 +271,12 @@ struct SeatLabelControls: View {
         .controlSize(.small)
         .onAppear { draft = seat.labelChosen ? seat.label : "" }
         .onChange(of: seat.label) { draft = seat.labelChosen ? seat.label : "" }
+    }
+
+    /// Saves on Return and when the field loses focus; an unchanged label writes nothing.
+    private func save() {
+        let current = seat.labelChosen ? seat.label : ""
+        guard draft.trimmingCharacters(in: .whitespacesAndNewlines) != current else { return }
+        model.setLabel(draft, for: seat.path)
     }
 }

@@ -33,20 +33,21 @@ private func bytes(_ n: Int64) -> String { ByteCountFormatter.string(fromByteCou
 
 struct SeatSettingsSection: View {
     let part: SeatReport.SettingsPart
+    let isWork: Bool
     let display: (String) -> String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Caption("Computed by Sanduhr: managed settings, then each project's .claude/settings.local.json and .claude/settings.json, then this seat's settings.json. Lists merge, enabledPlugins, env, permissions and hooks resolve per member, and the strict keys take the strictest value. A --settings flag or shell variables of a running session can change this; Sanduhr can't see them.")
+            Caption("Computed by Sanduhr for the seat as a whole: managed settings, then this seat's settings.json. Each project's .claude/settings.local.json and .claude/settings.json can override a key inside that project; they're counted here, never named. Objects merge key by key and lists combine, the strict keys take the strictest value, and values where they're ignored are left out. A --settings flag or shell variables of a running session can change this; Sanduhr can't see them.")
             if let why = part.unreadable {
                 Caption(ModsPageModel.unreadableText(why), color: Color.hex("f87171"))
             }
-            if part.managedFiles > 0 { Caption("\(part.managedFiles) managed settings file\(part.managedFiles == 1 ? "" : "s") apply.") }
+            if part.managedFiles > 0 { Caption("\(part.managedFiles) managed settings file\(part.managedFiles == 1 ? "" : "s") apply, merged in name order.") }
             ForEach(part.lints, id: \.self) { Caption($0, color: .orange) }
             let families = Array(Set(part.rows.map(\.family))).sorted()
             ForEach(families, id: \.self) { family in
                 SubHeading(family)
-                ForEach(part.rows.filter { $0.family == family }) { SettingRowView(row: $0, display: display) }
+                ForEach(part.rows.filter { $0.family == family }) { SettingRowView(row: $0, isWork: isWork, display: display) }
             }
         }
     }
@@ -54,13 +55,14 @@ struct SeatSettingsSection: View {
 
 private struct SettingRowView: View {
     let row: SettingRow
+    let isWork: Bool
     let display: (String) -> String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(row.key).font(.caption.monospaced().weight(.medium))
-                switch row.value {
+                switch row.shown(work: isWork) {
                 case .toggle(let on):
                     Toggle("", isOn: .constant(on)).toggleStyle(.switch).controlSize(.mini).labelsHidden().disabled(true)
                 case .text(let t):
@@ -93,12 +95,18 @@ struct SeatInstructionsSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             if part.nodes.isEmpty { Caption("No managed CLAUDE.md, no CLAUDE.md in the seat and no rules.") }
-            ForEach(part.nodes) { InstructionNodeRow(node: $0) }
+            ForEach(part.nodes) { InstructionNodeRow(node: $0, title: SeatInstructionTitles.title($0, in: part.nodes, hideNames: hideNames)) }
             if let leak = part.leak { Caption(leak, color: .orange) }
             if !part.excludes.isEmpty {
                 SubHeading("claudeMdExcludes")
-                ForEach(part.excludes, id: \.pattern) { e in
-                    Caption("\(ConfigMask.maskString(e.pattern)): matches \(e.matches) CLAUDE.md file\(e.matches == 1 ? "" : "s") on this Mac.")
+                if hideNames {
+                    // A work seat's patterns can name its projects: counted only.
+                    let matched = part.excludes.reduce(0) { $0 + $1.matches }
+                    Caption("\(part.excludes.count) pattern\(part.excludes.count == 1 ? "" : "s"), matching \(matched) CLAUDE.md file\(matched == 1 ? "" : "s") on this Mac.")
+                } else {
+                    ForEach(part.excludes, id: \.pattern) { e in
+                        Caption("\(ConfigMask.maskString(e.pattern)): matches \(e.matches) CLAUDE.md file\(e.matches == 1 ? "" : "s") on this Mac.")
+                    }
                 }
             }
             if !part.memory.isEmpty {
@@ -119,12 +127,24 @@ struct SeatInstructionsSection: View {
     }
 }
 
+/// What an instruction file is called on screen. A work seat's imports are numbered, never
+/// named: a path can name a project.
+enum SeatInstructionTitles {
+    static func title(_ node: SeatReport.InstructionNode, in nodes: [SeatReport.InstructionNode], hideNames: Bool) -> String {
+        guard hideNames, node.kind == .imported else { return node.title }
+        if node.outsideSeat { return "An import outside the seat" }
+        let n = nodes.filter { $0.kind == .imported && !$0.outsideSeat && $0.id <= node.id }.count
+        return "Import \(n)"
+    }
+}
+
 private struct InstructionNodeRow: View {
     let node: SeatReport.InstructionNode
+    let title: String
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text(String(repeating: "  ", count: node.depth) + (node.depth > 0 ? "↳ " : "") + node.title)
+            Text(String(repeating: "  ", count: node.depth) + (node.depth > 0 ? "↳ " : "") + title)
                 .font(.caption.monospaced())
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -140,6 +160,7 @@ private struct InstructionNodeRow: View {
         case .rule: parts.insert(node.gate.map { "rule, paths \(ConfigMask.maskString($0))" } ?? "rule", at: 0)
         case .seat, .imported: break
         }
+        if node.truncated { parts.append("over 1 MB, counted from its first megabyte") }
         if node.outsideSeat { parts.append("outside the seat") }
         return parts.joined(separator: " · ")
     }
@@ -171,7 +192,7 @@ struct SeatExtensionsSection: View {
             ForEach(part.parity, id: \.self) { Caption($0, color: .orange) }
             SubHeading("Hooks (read-only)")
             if part.hooks.isEmpty { Caption("None.") }
-            ForEach(part.hooks) { HookRowView(row: $0) }
+            ForEach(part.hooks) { HookRowView(row: $0, isWork: seat.isWork) }
             ModsSeatMods(seat: seat.path, model: model).padding(.top, 6)
         }
     }
@@ -222,12 +243,13 @@ private struct PluginParityRow: View {
 
 private struct HookRowView: View {
     let row: SeatReport.HookRow
+    let isWork: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text("\(row.event)\(row.matcher.isEmpty ? "" : " (\(row.matcher))") · \(row.source)\(row.timeout.map { " · \($0) s" } ?? "")")
                 .font(.caption.weight(.medium))
-            Text(row.command).font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(2).truncationMode(.middle)
+            Text(isWork ? row.workCommand : row.command).font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(2).truncationMode(.middle)
         }
     }
 }
@@ -305,6 +327,9 @@ struct SeatHistorySection: View {
             if part.orphanSidecars > 0 {
                 Caption("\(part.orphanSidecars) subagent folder\(part.orphanSidecars == 1 ? "" : "s") outlived their session.", color: .orange)
             }
+            if part.partial {
+                Caption("The walk stopped at \(SeatReports.transcriptLimit) entries: these sizes are partial.", color: .orange)
+            }
             if !hideNames, !part.largest.isEmpty {
                 SubHeading("Largest projects")
                 ForEach(part.largest, id: \.name) { Caption("\($0.name): \(bytes($0.bytes))") }
@@ -363,7 +388,9 @@ struct SeatRepoSection: View {
                 SubHeading("The never-list, from the seat's .gitignore")
                 ForEach(SeatReport.Bucket.allCases, id: \.self) { b in
                     if let list = part.buckets[b], !list.isEmpty {
-                        Caption("\(b.title): " + list.map(ConfigMask.maskString).joined(separator: ", "))
+                        // A work seat's patterns can name its projects: counted only.
+                        Caption(hideNames ? "\(b.title): \(list.count) pattern\(list.count == 1 ? "" : "s")."
+                                          : "\(b.title): " + list.map(ConfigMask.maskString).joined(separator: ", "))
                     }
                 }
             }
@@ -375,14 +402,19 @@ private struct SeatSyncView: View {
     let sync: SeatReport.SyncState
     let hideNames: Bool
 
+    private func lastSync(_ s: SeatReport.SyncRead) -> String {
+        let parts: [String?] = [s.lastRun, s.phase.map { "phase \($0)" }, s.paused == true ? "paused" : nil]
+        let head: String = "Last sync: " + parts.compactMap { $0 }.joined(separator: ", ")
+        return head + (s.applySteps > 0 ? ", \(s.applySteps) apply steps seen." : ".")
+    }
+
     var body: some View {
         switch sync {
         case .none: Caption("No .seat/state.json.")
         case .unknownSchema: Caption(".seat/state.json is in an unknown schema: Sanduhr doesn't read it.", color: .orange)
         case .read(let s):
             VStack(alignment: .leading, spacing: 2) {
-                Caption("Last sync: " + [s.lastRun, s.phase.map { "phase \($0)" }, s.paused == true ? "paused" : nil]
-                    .compactMap { $0 }.joined(separator: ", ") + (s.applySteps > 0 ? ", \(s.applySteps) apply steps seen." : "."))
+                Caption(lastSync(s))
                 if hideNames {
                     if !s.report.isEmpty { Caption("Its last report has \(s.report.count) lines.") }
                 } else {
@@ -404,11 +436,11 @@ struct SeatDriftSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Caption("Read-only. Across the wall (a work seat and any other), names and \"differs\" only, never values.")
-            ForEach(report.drift.filter { d in !(demo && model.isWork(d.other)) }, id: \.other) { d in
+            ForEach(model.shownDrift(report, demo: demo), id: \.other) { d in
                 DriftBlock(drift: d, otherLabel: model.label(of: d.other),
                            values: SeatWall.showsValues(between: seat, and: other(d.other)))
             }
-            SeatRoutesView(seat: seat, routes: report.routes, model: model)
+            SeatRoutesView(seat: seat, routes: report.routes, model: model, demo: demo)
         }
     }
 
@@ -425,7 +457,11 @@ private struct DriftBlock: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             SubHeading("Against \(otherLabel)")
-            if drift.count == 0 { Caption("No differences.") }
+            if drift.settingsUnreadable {
+                Caption("A settings.json on one side is unreadable, so keys aren't compared.", color: .orange)
+            } else if drift.count == 0 {
+                Caption("No differences.")
+            }
             ForEach(drift.keys, id: \.key) { k in
                 Caption(values ? "\(k.key): \(k.mine ?? "not set") here, \(k.theirs ?? "not set") there" : "\(k.key): differs")
             }
@@ -441,6 +477,7 @@ private struct SeatRoutesView: View {
     let seat: Seat
     let routes: [SeatReport.Route]
     var model: ModsPageModel
+    let demo: Bool
 
     var body: some View {
         if !routes.isEmpty {
@@ -451,8 +488,14 @@ private struct SeatRoutesView: View {
                 Caption("\(crossing.count) of this work seat's projects route to a seat that isn't marked work.", color: Color.hex("f87171"))
             }
             if !seat.isWork {
-                ForEach(routes, id: \.project) { r in
+                // A project routed into a work seat is work's: counted, never named; in demo
+                // mode not even the work seat's label shows.
+                let toWork = routes.filter { model.isWork($0.target) }
+                ForEach(routes.filter { !model.isWork($0.target) }, id: \.project) { r in
                     Caption("\((r.project as NSString).lastPathComponent) → \(model.label(of: r.target))")
+                }
+                if !toWork.isEmpty, !demo {
+                    Caption("\(toWork.count) project\(toWork.count == 1 ? "" : "s") route\(toWork.count == 1 ? "s" : "") to a work seat.")
                 }
             }
         }

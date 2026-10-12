@@ -272,6 +272,8 @@ final class SettingsNavigation {
     func windowClosed() {
         openPreviews = []
         openAdvanced = []
+        // Mods & Config reopens on its Catalog, nothing focused (item 71, slice 1).
+        modsPage.windowClosed()
     }
 
     /// Opens `section` at `anchor`: an anchor under Advanced opens the disclosure first, and the
