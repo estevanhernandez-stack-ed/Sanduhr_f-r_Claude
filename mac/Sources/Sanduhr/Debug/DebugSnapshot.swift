@@ -275,6 +275,9 @@ struct ModsConfigDebug: Equatable {
     var bySeat: [SeatCounts] = []
     /// Slice 1c: each shown seat's session load, numbers only.
     var loads: [SessionLoad] = []
+    /// Slice 1d: Compare's rows per bucket (only in A, only in B, differ, same), empty with
+    /// fewer than two seats.
+    var compare: [Int] = []
 }
 
 /// state.yaml's `notch_shows:`: each place's effective content, never its text.
@@ -444,7 +447,8 @@ enum DebugState {
               YAMLPair("groups", .map(zip(CatalogGroup.allCases, m.counts.groups + Array(repeating: 0, count: CatalogGroup.allCases.count)).map {
                   YAMLPair($0.0.rawValue, .int($0.1))
               })),
-              YAMLPair("loads", .list(m.loads.map(sessionLoadYAML)))])
+              YAMLPair("loads", .list(m.loads.map(sessionLoadYAML))),
+              YAMLPair("compare", .list(m.compare.map { .int($0) }))])
     }
 
     /// One seat's session load (slice 1c): counts and estimates, never a name.

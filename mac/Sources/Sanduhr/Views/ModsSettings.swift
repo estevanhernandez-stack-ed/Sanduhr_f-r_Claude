@@ -235,6 +235,31 @@ final class ModsPageModel {
         zip(seats, loads).filter { !(demo && $0.0.isWork) }.map { (seat: $0.0, load: $0.1) }
     }
 
+    // MARK: Compare (slice 1d)
+
+    /// The two seats Compare shows, as picked; nil picks the first shown seats.
+    var compareA: String?
+    var compareB: String?
+    var openBuckets: Set<SeatComparison.Bucket> = Set(SeatComparison.Bucket.allCases.filter(\.startsOpen))
+
+    /// The two seats to compare: the picks when both are shown and differ, else the first two
+    /// shown seats (no work seat in demo mode). Nil with fewer than two.
+    func comparePair(demo: Bool) -> (a: Seat, b: Seat)? {
+        let shown = filterSeats(demo: demo)
+        guard shown.count >= 2 else { return nil }
+        let a = shown.first { $0.path == compareA } ?? shown[0]
+        let b = shown.first { $0.path == compareB && $0.path != a.path } ?? shown.first { $0.path != a.path }!
+        return (a, b)
+    }
+
+    func comparison(demo: Bool) -> SeatComparison? {
+        guard let pair = comparePair(demo: demo) else { return nil }
+        let cards = demo ? catalog.compactMap { $0.demoView() } : catalog
+        return ConfigCatalog.compare(cards, a: pair.a.path, b: pair.b.path)
+    }
+
+    func load(_ path: String) -> SessionLoad? { loads.first { $0.seat == path } }
+
     /// A chip's click: By Seat at that seat and that extension.
     func open(_ chip: CatalogChip, card: CatalogCard) {
         focus = ModsFocus(seat: chip.seat, card: card.id, name: card.name)
@@ -487,17 +512,24 @@ struct ModsPageRead: Sendable {
 
 /// Mods & Config's two tabs (item 71, slice 1).
 enum ModsTab: String, CaseIterable, Sendable {
-    case catalog, bySeat
+    case catalog, bySeat, compare
 
     var title: String {
         switch self {
         case .catalog: "Catalog"
         case .bySeat: "By Seat"
+        case .compare: "Compare"
         }
     }
 
     /// state.yaml's word.
-    var debugName: String { self == .catalog ? "catalog" : "seat" }
+    var debugName: String {
+        switch self {
+        case .catalog: "catalog"
+        case .bySeat: "seat"
+        case .compare: "compare"
+        }
+    }
 }
 
 /// Where a chip's click lands on By Seat.
@@ -599,6 +631,8 @@ struct ModsSettings: View {
             ModsCatalogView(model: model, demo: vm.demo)
         case .bySeat:
             ModsBySeatView(model: model, demo: vm.demo, linked: linked)
+        case .compare:
+            ModsCompareView(model: model, demo: vm.demo)
         }
     }
 }

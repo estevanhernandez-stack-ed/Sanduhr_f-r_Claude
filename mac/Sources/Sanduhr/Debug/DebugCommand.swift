@@ -271,8 +271,9 @@ enum DebugLink {
             switch words.first {
             case "catalog" where words.count == 1: return .success(.modsConfig(.catalog, seat: nil))
             case "seat" where words.count == 1: return .success(.modsConfig(.bySeat, seat: nil))
+            case "compare" where words.count == 1: return .success(.modsConfig(.compare, seat: nil))
             case "seat" where words.count == 2 && (Int(words[1]) ?? 0) >= 1: return .success(.modsConfig(.bySeat, seat: Int(words[1])))
-            default: return bad("mods-config needs arg=catalog, seat or seat <n> (from 1)")
+            default: return bad("mods-config needs arg=catalog, compare, seat or seat <n> (from 1)")
             }
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
