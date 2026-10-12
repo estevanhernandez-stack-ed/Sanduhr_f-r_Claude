@@ -193,7 +193,7 @@ public static class SettingsIndex
 
         E(SettingsNames.WeatherLookUp, SettingsPage.Weather, WeatherPlace,
             ["weather", "city", "forecast", "temperature", "Fahrenheit", "Celsius", "Open-Meteo", "location"]),
-        E("Weather data by Open-Meteo.com", SettingsPage.Weather, WeatherCredit, ["Open-Meteo", "credit", "licence", "license", "GeoNames"]),
+        E("Weather data by Open-Meteo.com", SettingsPage.Weather, WeatherCredit, ["Open-Meteo", "credit", "attribution", "GeoNames"]),
 
         E("Version", SettingsPage.About, Version,
             ["version", "What's New", "Take the tour", "tour", "release", "update"]),

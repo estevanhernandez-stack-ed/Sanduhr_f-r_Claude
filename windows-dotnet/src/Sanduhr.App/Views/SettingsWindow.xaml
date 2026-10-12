@@ -2440,6 +2440,11 @@
                     </Border>
                 </TabItem>
 
+                <!-- Settings, Message (spec 6.2): its own control, which carries its glass, scroller and anchors. -->
+                <TabItem Header="Message" Tag="DeskMessage" AutomationProperties.Name="Message" DataContext="{Binding MessagePage}">
+                    <views:DeskMessagePage />
+                </TabItem>
+
                 <TabItem Header="Now playing" Tag="NowPlaying" AutomationProperties.Name="Now playing" DataContext="{Binding NowPlayingPage}">
                     <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">

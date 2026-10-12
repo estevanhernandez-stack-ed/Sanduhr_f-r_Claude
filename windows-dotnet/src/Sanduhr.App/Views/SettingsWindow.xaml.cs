@@ -85,6 +85,8 @@ internal partial class SettingsWindow : Window
         Deactivated += (_, _) => ViewModel.Shortcuts.CancelRecording();
         Closed += (_, _) =>
         {
+            ViewModel.Desk.Flush();
+            ViewModel.MessagePage.Dispose();
             ViewModel.Shortcuts.Detach();
             ViewModel.General.Detach();
             _localCcTimer.Stop();

@@ -32,6 +32,7 @@ public partial class App : Application
     private Desk.DeskController? _desk;
     private Desk.NowPlayingHub? _nowPlaying;
     private Desk.DeskMessageSource? _messages;
+    private Desk.DeskMessageHandoffService? _handoff;
     private MenuItem? _endDemoItem;
 
     /// <summary>Where this install stands with the welcome tour, decided once at launch.</summary>
@@ -401,6 +402,9 @@ public partial class App : Application
         _nowPlaying = new Desk.NowPlayingHub();
         Desk.NowPlayingHub.Current = _nowPlaying;
         _messages = new Desk.DeskMessageSource(store, paths);
+        _handoff = new Desk.DeskMessageHandoffService(paths, _messages.FilePath);
+        Desk.DeskMessageHandoffService.Current = _handoff;
+        _handoff.Start(); // watches nothing until the MCP tool ships (spec 6.9)
         _desk = new Desk.DeskController(store, () => new Desk.DesktopLayerHost(),
             () => vm.CurrentDeskUsage, _nowPlaying, _messages)
         {
@@ -482,6 +486,7 @@ public partial class App : Application
         svm.Desk.Changed = () => _desk?.Reload();
         svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); };
         svm.WeatherPage.Changed = () => _desk?.Reload();
+        svm.MessageChanged = () => _desk?.Reload();
         svm.ResetRequested = () =>
         {
             ShowReset();
@@ -690,6 +695,7 @@ public partial class App : Application
         _glow?.Dispose();
         _desk?.Dispose();
         _messages?.Dispose();
+        _handoff?.Dispose();
         _vm?.NowPlaying?.Dispose();
         _nowPlaying?.Dispose();
         _hotKeys?.Dispose();
@@ -712,6 +718,7 @@ public partial class App : Application
         _glow?.Dispose();
         _desk?.Dispose();
         _messages?.Dispose();
+        _handoff?.Dispose();
         _vm?.NowPlaying?.Dispose();
         _nowPlaying?.Dispose();
         _hotKeys?.Dispose();

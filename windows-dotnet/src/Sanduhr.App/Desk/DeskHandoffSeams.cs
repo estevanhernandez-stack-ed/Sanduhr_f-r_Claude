@@ -19,6 +19,9 @@ internal sealed class DeskMessageHandoffService : IDisposable
     /// <summary>Off until the MCP tool ships (spec 6.9).</summary>
     public const bool Enabled = false;
 
+    /// <summary>The app's one service (Settings, Message shows its suggestion); null in tests and the harness.</summary>
+    public static DeskMessageHandoffService? Current { get; set; }
+
     private FileSystemWatcher? _watcher;
 
     public DeskMessageHandoffService(Paths paths, string messagesPath)
