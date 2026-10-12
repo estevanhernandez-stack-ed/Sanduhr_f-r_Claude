@@ -258,12 +258,13 @@ The Desk has its own fonts in Desk Look (task 3).
 
 ## 11. Mods
 
-You get one page that lists what each Claude Code folder loads.
+You get one page that shows what you have and where each Claude Code folder (a seat) uses it.
 
 1. Open Settings, **Mods & Config**.
-2. Under the heading **Mods and plugins**, the list shows every mod and plugin each folder loads, and what it can touch. The card at the top counts them: mods, plugins, enabled plugins and folders.
-3. Sanduhr's own mod, sanduhr-meters, sits at the top as **Meters above the prompt**, with a switch, **Update** and **Remove** per folder (task 7). Every other mod is read-only here.
-4. Click **Check** on a mod to run Claude Code's own validation. It reads the files and never runs the mod.
+2. Sanduhr's own mod, sanduhr-meters, sits at the top as **Meters above the prompt**, with a switch, **Update** and **Remove** per folder (task 7). It is the only switch on the page; everything else is read-only.
+3. Below it, the **Catalog** tab has one card per mod, plugin, skill, agent, command, output style and MCP server across your folders, plus the plugins your marketplaces list. Chips on each card show which folders have it and how (On, Off, Declared, not installed, In N projects). **Duplicate** marks a plugin from two marketplaces; **Available** marks one installed nowhere. Use the filters or search to narrow it down, and click a chip to open that folder.
+4. The **By Seat** tab lists each folder's mods and plugins and what they can touch. Give each folder a **Label** and mark it **Work** or **Personal**: Sanduhr keeps those in its own settings and never writes them into the folder. The summary card at the top of the page counts mods, plugins, enabled plugins and folders.
+5. On By Seat, click **Check** on a mod to run Claude Code's own validation. It reads the files and never runs the mod.
 
 If it doesn't work: Check needs Claude Code's command line (`claude`) installed. Changes reach new Claude Code sessions, or run /reload-plugins.
 

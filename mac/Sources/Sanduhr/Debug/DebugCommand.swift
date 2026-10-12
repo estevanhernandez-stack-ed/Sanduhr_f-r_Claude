@@ -96,12 +96,15 @@ enum DebugAction: Equatable {
     /// kinds and counts into state.yaml, nothing touched. No hook resets for real; any other arg
     /// is refused.
     case resetDryRun
+    /// Settings, Mods & Config on a tab (item 71, slice 1): `catalog`, or `seat` with the seat
+    /// picker on the nth seat (from 1; the first when left out). Reads only.
+    case modsConfig(ModsTab, seat: Int?)
 
     static let names = ["show-widget", "hide-widget", "settings", "settings-link", "settings-search", "close-settings", "refresh",
                         "test-alert", "pulse", "tool", "desk", "notch", "camera-light", "glow",
                         "theme", "account", "usage", "whats-new", "close-whats-new",
                         "tour", "tour-step", "close-tour", "watch-test", "av-test", "message-editor",
-                        "desk-arrange", "hot-key", "reset"]
+                        "desk-arrange", "hot-key", "reset", "mods-config"]
 }
 
 enum DebugCommand: Equatable {
@@ -263,6 +266,14 @@ enum DebugLink {
                 return bad("reset needs arg=--dry-run; a real reset starts only from About's Reset Sanduhr… sheet")
             }
             return .success(.resetDryRun)
+        case "mods-config":
+            let words = (arg ?? "").lowercased().split(separator: " ").map(String.init)
+            switch words.first {
+            case "catalog" where words.count == 1: return .success(.modsConfig(.catalog, seat: nil))
+            case "seat" where words.count == 1: return .success(.modsConfig(.bySeat, seat: nil))
+            case "seat" where words.count == 2 && (Int(words[1]) ?? 0) >= 1: return .success(.modsConfig(.bySeat, seat: Int(words[1])))
+            default: return bad("mods-config needs arg=catalog, seat or seat <n> (from 1)")
+            }
         case "": return bad("action needs name=<action>")
         default: return bad("unknown action: \(name) (one of \(DebugAction.names.joined(separator: ", ")))")
         }

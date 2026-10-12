@@ -80,7 +80,10 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   the card is folded to its 44 pt strip, as on a window under 600 pt; null for a page without one), `mods_page` (item 64: `open`,
   the Mods page shows; `loaded`, it has read the folders; `folders`, `mods`, `plugins`, `enabled` (on, or a
   session's dev mod) and `missing` counts across folders; `checked`, how many Checks have answered; `cli`,
-  `claude` was found; never a mod's name, a path or a report), `message_editor` (item 69: `open`, Settings,
+  `claude` was found; never a mod's name, a path or a report), `mods_config` (item 71, slice 1: `tab`, `catalog` or `seat`;
+  `seats`, how many Claude Code folders it read; `cards`, `available` (listed by a marketplace, installed nowhere),
+  `needs_look`, `duplicates` and `work_only` (cards only work seats hold, hidden in demo mode) across the Catalog;
+  `shown`, the cards the filters and demo mode let through; never a name, a label, a path or a value), `message_editor` (item 69: `open`, Settings,
   Message shows; `mode`, `list` or `text`; `rows`, `styled` and `raw` message lines and `notes`, comments
   and blank lines, in the editor's document; `unsaved`; `today_special`, how many date lines the Desk draws above the
   usual line today; `added`, the line `message-editor add` put in, else
@@ -130,7 +133,9 @@ read and never run, into state.yaml as `reset_dry_run`: `touched` (always false)
 Code folders hold a Sanduhr entry) and `steps`, in run order, each a `part` (`claude_code`, `accounts`,
 `records`, `desk_messages`, `themes`, `settings`), a `kind` and a `count`; never a path, a folder, a label or a
 domain's contents. `reset_dry_run` is null until one ran. Any other arg is an error: no hook resets for real,
-and the selftest fails a scenario whose `reset` step is anything but `--dry-run`).
+and the selftest fails a scenario whose `reset` step is anything but `--dry-run`),
+`mods-config catalog|seat [n]` (item 71, slice 1: Settings, Mods & Config on its Catalog or By Seat tab, as the tab
+bar picks it; `seat 2` opens By Seat at the second seat. Reads only, changes no seat and no preference).
 
 ## Scenarios
 

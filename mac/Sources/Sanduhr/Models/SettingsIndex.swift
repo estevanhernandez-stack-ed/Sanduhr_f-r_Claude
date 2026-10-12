@@ -193,7 +193,9 @@ enum SettingsAnchor {
         SettingsEntry(title: SettingsNames.metersAbovePrompt, page: .mods, anchor: metersMod,
                       synonyms: [IntegrationScripts.modName, "Sanduhr's own mod", "mod", "band", "bars", "animated",
                                  "Update", "Remove", "enabledPlugins"]),
-        SettingsEntry(title: "Mods and plugins", page: .mods, anchor: inventory, synonyms: ["mods", "plugins", "Check", "risk"]),
+        SettingsEntry(title: "Mods and plugins", page: .mods, anchor: inventory,
+                      synonyms: ["mods", "plugins", "Check", "risk", "Catalog", "By Seat", "marketplace", "skills", "agents",
+                                 "commands", "output styles", "MCP servers", "work", "personal", "label"]),
     ]
 
     private static let widgetAndHelp: [SettingsEntry] = [

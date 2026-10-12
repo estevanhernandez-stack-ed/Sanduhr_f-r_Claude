@@ -1,0 +1,36 @@
+# Item 71, slice 1: Mods & Config opens on Catalog | By Seat. The Catalog lists every extension
+# any Claude Code folder holds or any marketplace it added lists, one card each with a chip per
+# seat; By Seat shows each seat. state.yaml's `mods_config` carries the tab and counts only, never
+# a name, label, path or value. Read only: the run switches tabs and demo mode (in memory) and nothing else; no seat
+# file changes (the tests prove the scan writes nothing; by hand, docs/mac-smoke-test.md,
+# section 49, "Mods & Config: the Catalog").
+name: Mods & Config Catalog and By Seat
+steps:
+  # Demo mode first, so the snaps show no work seat, its sources or its descriptions.
+  - do: demo
+    arg: "on"
+  - do: mods-config
+    arg: catalog
+  - expect_state:
+      settings_section: mods
+      mods_page.open: true
+      mods_config.tab: catalog
+      mods_config.seats: '/^\d+$/'
+      mods_config.cards: '/^[1-9]\d*$/'
+      mods_config.shown: '/^[1-9]\d*$/'
+  - expect:
+      window: settings
+      contains: { text: "/in the catalog|shown\\./" }
+  - snap: mods-catalog
+  - do: mods-config
+    arg: seat
+  - expect_state: { mods_config.tab: seat }
+  - snap: mods-by-seat
+  - do: mods-config
+    arg: seat 1
+  - expect_state: { mods_config.tab: seat }
+  - do: mods-config
+    arg: catalog
+  - expect_state: { mods_config.tab: catalog }
+  - do: demo
+    arg: "off"

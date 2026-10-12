@@ -660,7 +660,7 @@ private struct Terminal: View {
 }
 
 /// Chips left to right, wrapping to the width offered.
-private struct ChipFlow: Layout {
+struct ChipFlow: Layout {
     var spacing: CGFloat = 6
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {

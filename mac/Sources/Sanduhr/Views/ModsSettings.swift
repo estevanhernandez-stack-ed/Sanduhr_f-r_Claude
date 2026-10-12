@@ -74,6 +74,23 @@ final class ModsPageModel {
             + "\(display(other.path)) (\(state(other))) is what Claude Code reads \(when). Remove always edits the file Sanduhr wrote to."
     }
 
+    /// How Sanduhr knows each folder `folders` lists, first reason first.
+    nonisolated static func origins(home: String, environment: [String: String], added: [String],
+                                    linked: [String], installed: [String]) -> [String: Seat.Origin] {
+        var out: [String: Seat.Origin] = [:]
+        func note(_ paths: [String], _ o: Seat.Origin) {
+            for p in paths.map(AccountData.normalized) where out[p] == nil { out[p] = o }
+        }
+        note(ClaudeCodeFolders.discover(home: home).map(\.path), .found)
+        note(ClaudeCodeFolders.discover(home: home, environment: environment).map(\.path), .environment)
+        note(added, .added)
+        note(linked, .linked)
+        note(installed, .installed)
+        return out
+    }
+
+    /// Two passes: first what Sanduhr's own mod needs (the folders, its rows, `claude`), so
+    /// Meters above the prompt never waits on the Catalog; then every seat's scan.
     func load(linked: [String]) async {
         guard !loading else { return }
         loading = true
@@ -81,31 +98,143 @@ final class ModsPageModel {
         let home = self.home
         let installer = self.installer
         let added = SeatPreferences.added(in: store)
-        let result = await Task.detached(priority: .userInitiated) { () -> ([ModFolderInventory], String?, [OwnModRow], AppModVersion?, [String: String], Int) in
+        let first = await Task.detached(priority: .userInitiated) { () -> ModsPageRead in
             let env = ProcessInfo.processInfo.environment
-            let paths = ModsPageModel.folders(home: home, environment: env, added: added, linked: linked,
-                                              installed: installer.installedFolders())
-            let inventory = ModInventory.scan(folders: paths, home: home)
+            let installed = installer.installedFolders()
+            let paths = ModsPageModel.folders(home: home, environment: env, added: added, linked: linked, installed: installed)
             let app = AppModVersion.read(installer.scripts)
-            let own = inventory.map { OwnModRow.read(installer, folder: $0.folder, app: app) }
             var notes: [String: String] = [:]
+            var configs: [String: [ClaudeCodeFolders.ConfigCandidate]] = [:]
             for p in paths {
                 let display = { (s: String) in ClaudeCodeFolders.Folder(path: s).display(home: home) }
-                notes[p] = ModsPageModel.configNote(ClaudeCodeFolders.configCandidates(for: p, home: home), display: display)
+                configs[p] = ClaudeCodeFolders.configCandidates(for: p, home: home)
+                notes[p] = ModsPageModel.configNote(configs[p] ?? [], display: display)
             }
-            return (inventory, ModCheck.findClaude(environment: env, home: home), own, app, notes,
-                    installer.readReceipts().skipped)
+            return ModsPageRead(paths: paths, scans: [], inventory: [],
+                                claude: ModCheck.findClaude(environment: env, home: home),
+                                own: paths.map { OwnModRow.read(installer, folder: $0, app: app) }, app: app,
+                                notes: notes, configs: configs, skipped: installer.readReceipts().skipped,
+                                origins: ModsPageModel.origins(home: home, environment: env, added: added, linked: linked,
+                                                               installed: installed))
         }.value
-        inventory = result.0
-        claude = result.1
-        own = result.2
-        appMod = result.3
-        configNotes = result.4
+        claude = first.claude
+        own = first.own
+        appMod = first.app
+        configNotes = first.notes
         addedFolders = added.map(AccountData.normalized)
-        receiptsSkipped = result.5
+        receiptsSkipped = first.skipped
+        seatConfigs = first.configs
+        seatOrigins = first.origins
+        ownLoaded = true
+        // One read per seat (item 71, slice 1): its plugins are the inventory's, and its
+        // `.claude.json` placement is the one just read.
+        let paths = first.paths, configs = first.configs
+        let scans = await Task.detached(priority: .userInitiated) {
+            paths.map { SeatScanner.scan(seat: $0, home: home, config: configs[$0]) }
+        }.value
+        self.scans = scans
+        inventory = scans.map { ModFolderInventory(folder: $0.seat, items: $0.plugins) }
+        refreshSeats()
         let ids = Set(inventory.flatMap(\.items).map(\.id))
         checks = checks.filter { ids.contains($0.key) }
         loaded = true
+    }
+
+    /// The seats with their current labels and marks, and the Catalog built from them. Reads
+    /// Sanduhr's preferences only; the folders were read by `load`.
+    func refreshSeats() {
+        let store = self.store, home = self.home
+        seats = scans.map { scan in
+            Seats.seat(scan.seat, origin: seatOrigins[scan.seat] ?? .found, home: home, store: store,
+                       config: seatConfigs[scan.seat] ?? [])
+        }
+        catalog = ConfigCatalog.build(Array(zip(seats, scans)).map { (seat: $0.0, scan: $0.1) })
+        if let s = filter.seat, !seats.contains(where: { $0.path == s }) { filter.seat = nil }
+        applyPendingSeat()
+    }
+
+    /// The Settings window closed: Mods & Config reopens on its Catalog, nothing focused.
+    func windowClosed() {
+        tab = .catalog
+        focus = nil
+    }
+
+    /// Seats with files Sanduhr couldn't read, for the Catalog's note.
+    func unreadableNotes(demo: Bool) -> [String] {
+        ConfigCatalog.unreadableNotes(Array(zip(seats, scans)).map { (seat: $0.0, scan: $0.1) }, demo: demo)
+    }
+
+    /// The seats the Catalog's Seat filter offers: no work seat in demo mode.
+    func filterSeats(demo: Bool) -> [Seat] { seats.filter { !(demo && $0.isWork) } }
+
+    /// Sanduhr's own mod rows are read (the first pass of `load`).
+    private(set) var ownLoaded = false
+    private var seatOrigins: [String: Seat.Origin] = [:]
+
+    // MARK: Catalog | By Seat (item 71, slice 1)
+
+    /// Which tab shows, kept while the Settings window is open (closing it goes back to Catalog).
+    var tab: ModsTab = .catalog
+    var filter = CatalogFilter()
+    /// A chip clicked on the Catalog: By Seat opens at this seat, with this card's items lit.
+    var focus: ModsFocus?
+    private(set) var seats: [Seat] = []
+    private(set) var scans: [SeatScan] = []
+    private(set) var catalog: [CatalogCard] = []
+    private var seatConfigs: [String: [ClaudeCodeFolders.ConfigCandidate]] = [:]
+
+    /// Card ids whose Check failed or found a high risk: Needs a look.
+    var failedChecks: Set<String> {
+        Set(catalog.filter { card in
+            card.itemIDs.contains { id in
+                guard case .report(let r)? = checks[id] else { return false }
+                return !r.passed
+            }
+        }.map(\.id))
+    }
+
+    /// The cards to show: filters, search and (demo mode) no work-only card.
+    func shownCards(demo: Bool) -> [CatalogCard] {
+        ConfigCatalog.filter(catalog, filter, demo: demo, failedChecks: failedChecks)
+    }
+
+    /// A chip's click: By Seat at that seat and that extension.
+    func open(_ chip: CatalogChip, card: CatalogCard) {
+        focus = ModsFocus(seat: chip.seat, card: card.id, name: card.name)
+        tab = .bySeat
+    }
+
+    /// A seat asked for by number (the smoke hook) before the seats were read.
+    private var pendingSeat: Int?
+
+    /// A tab, and on By Seat the nth seat (from 1), as the smoke hook asks for it.
+    func showTab(_ tab: ModsTab, seat: Int?) {
+        self.tab = tab
+        pendingSeat = seat
+        applyPendingSeat()
+    }
+
+    private func applyPendingSeat() {
+        guard let n = pendingSeat, !seats.isEmpty else { return }
+        pendingSeat = nil
+        let seat = seats[min(n, seats.count) - 1]
+        focus = ModsFocus(seat: seat.path, card: "", name: "")
+    }
+
+    /// The scroll id of a seat's place on By Seat.
+    nonisolated static func seatAnchor(_ path: String) -> String { "seat:" + path }
+
+    func isWork(_ path: String) -> Bool { seats.first { $0.path == path }?.isWork ?? false }
+
+    /// The label and mark a person gives a seat (Sanduhr preferences, never written into it).
+    func setLabel(_ label: String, for seat: String) {
+        SeatPreferences.setLabel(label, for: seat, in: store)
+        refreshSeats()
+    }
+
+    func setMark(_ mark: SeatMark, for seat: String) {
+        SeatPreferences.setMark(mark, for: seat, in: store)
+        refreshSeats()
     }
 
     /// Add Folder… (item 71, slice 0): a Claude Code folder discovery doesn't find (one outside
@@ -226,9 +355,50 @@ final class ModsPageModel {
         return "\(what) couldn't be read and \(n == 1 ? "was" : "were") set aside, kept as written. What \(n == 1 ? "it" : "they") recorded can't be undone from here; every other record still can."
     }
 
+    /// A seat's settings.json that doesn't parse: unreadable, never empty.
+    nonisolated static func unreadableText(_ why: String) -> String {
+        "settings.json is unreadable: it \(why). Claude Code can't read it either (comments and trailing commas aren't allowed), so what it holds isn't listed here."
+    }
+
     nonisolated static let takesEffect = "Takes effect in new Claude Code sessions (or after /reload-plugins)."
 
     static let cliMissing = "Check needs Claude Code's command line (claude), and it wasn't found on your PATH or in the usual install folders (~/.local/bin, /opt/homebrew/bin, /usr/local/bin)."
+}
+
+/// What one read of every seat found, handed from the background to the page.
+struct ModsPageRead: Sendable {
+    var paths: [String]
+    var scans: [SeatScan]
+    var inventory: [ModFolderInventory]
+    var claude: String?
+    var own: [OwnModRow]
+    var app: AppModVersion?
+    var notes: [String: String]
+    var configs: [String: [ClaudeCodeFolders.ConfigCandidate]]
+    var skipped: Int
+    var origins: [String: Seat.Origin] = [:]
+}
+
+/// Mods & Config's two tabs (item 71, slice 1).
+enum ModsTab: String, CaseIterable, Sendable {
+    case catalog, bySeat
+
+    var title: String {
+        switch self {
+        case .catalog: "Catalog"
+        case .bySeat: "By Seat"
+        }
+    }
+
+    /// state.yaml's word.
+    var debugName: String { self == .catalog ? "catalog" : "seat" }
+}
+
+/// Where a chip's click lands on By Seat.
+struct ModsFocus: Equatable, Sendable {
+    let seat: String
+    let card: String
+    let name: String
 }
 
 /// A terminal-styled sketch of where a mod draws in Claude Code (item 64): blocks stand in for
@@ -277,39 +447,30 @@ struct ModsSettings: View {
     private var linked: [String] { vm.realAccountLabels.compactMap { vm.dataChoices(for: $0).folder } }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                SanduhrModSection(model: model, linked: linked, install: { consent = MetersConsent(folder: $0) })
-                    .settingsAnchor(SettingsAnchor.metersMod)
-                if model.loaded && model.claude == nil {
-                    Text(ModsPageModel.cliMissing)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    SanduhrModSection(model: model, linked: linked, install: { consent = MetersConsent(folder: $0) })
+                        .settingsAnchor(SettingsAnchor.metersMod)
+                    if model.loaded && model.claude == nil {
+                        Text(ModsPageModel.cliMissing)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    // Catalog | By Seat (item 71, slice 1), right above what each shows.
+                    ModsTabBar(model: model)
+                        .settingsAnchor(SettingsAnchor.inventory)
+                    tabContent
+                    ModsFolderActions(model: model, linked: linked)
                 }
-                // The heading sits right above the list it describes (Settings v2, slice 1).
-                ModsIntro()
-                    .settingsAnchor(SettingsAnchor.inventory)
-                folders
-                if model.receiptsSkipped > 0 {
-                    Text(ModsPageModel.receiptsSkippedText(model.receiptsSkipped))
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                HStack(spacing: 8) {
-                    Button(model.loading ? "Reading…" : "Read Again") { Task { await model.load(linked: linked) } }
-                        .disabled(model.loading)
-                    Button("Add Folder…") { Task { await model.addFolder(linked: linked) } }
-                        .disabled(model.loading)
-                        .help("Add a Claude Code folder Sanduhr didn't find. Sanduhr remembers it; nothing is written into the folder.")
-                }
-                if let note = model.addNote {
-                    Text(note).font(.caption).foregroundStyle(Color.hex("f87171"))
-                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .padding(20)
             }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            .padding(20)
+            .onChange(of: model.focus) {
+                guard let f = model.focus else { return }
+                DispatchQueue.main.async { withAnimation { proxy.scrollTo(ModsPageModel.seatAnchor(f.seat), anchor: .top) } }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task { await model.load(linked: linked) }
@@ -326,6 +487,18 @@ struct ModsSettings: View {
     }
 
     @ViewBuilder
+    private var tabContent: some View {
+        switch model.tab {
+        case .catalog:
+            ModsCatalogView(model: model, demo: vm.demo)
+        case .bySeat:
+            // The heading sits right above the list it describes (Settings v2, slice 1).
+            ModsIntro()
+            folders
+        }
+    }
+
+    @ViewBuilder
     private var folders: some View {
         if model.loaded && model.inventory.isEmpty {
             Text("No Claude Code folder found (~/.claude or a ~/.claude-name folder).")
@@ -334,8 +507,35 @@ struct ModsSettings: View {
         } else if !model.loaded {
             Text("Reading your Claude Code folders…").font(.caption).foregroundStyle(.secondary)
         }
-        ForEach(model.inventory) { f in
+        // Demo mode shows no work seat (item 71: work rows hide in the mode screenshots use).
+        ForEach(model.inventory.filter { !(vm.demo && model.isWork($0.folder)) }) { f in
             ModsFolderBox(folder: f, model: model, linked: linked)
+                .id(ModsPageModel.seatAnchor(f.folder))
+        }
+    }
+}
+
+/// Read Again, Add Folder… and what the last read or add said, under either tab.
+private struct ModsFolderActions: View {
+    var model: ModsPageModel
+    let linked: [String]
+
+    var body: some View {
+        if model.receiptsSkipped > 0 {
+            Text(ModsPageModel.receiptsSkippedText(model.receiptsSkipped))
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        HStack(spacing: 8) {
+            Button(model.loading ? "Reading…" : "Read Again") { Task { await model.load(linked: linked) } }
+                .disabled(model.loading)
+            Button("Add Folder…") { Task { await model.addFolder(linked: linked) } }
+                .disabled(model.loading)
+                .help("Add a Claude Code folder Sanduhr didn't find. Sanduhr remembers it; nothing is written into the folder.")
+        }
+        if let note = model.addNote {
+            Text(note).font(.caption).foregroundStyle(Color.hex("f87171"))
         }
     }
 }
@@ -367,11 +567,21 @@ private struct ModsFolderBox: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                if folder.items.isEmpty {
+                if folder.items.isEmpty && unreadable == nil {
                     Text("Loads no mods or plugins.").font(.caption).foregroundStyle(.secondary)
+                }
+                if let seat = model.seats.first(where: { $0.path == folder.folder }) {
+                    SeatLabelControls(seat: seat, model: model)
+                }
+                if let why = unreadable {
+                    Text(ModsPageModel.unreadableText(why))
+                        .font(.caption)
+                        .foregroundStyle(Color.hex("f87171"))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 ForEach(folder.items) { item in
                     ModRow(item: item, model: model)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(lit(item) ? 0.18 : 0)).padding(-4))
                     if item.id != folder.items.last?.id { Divider() }
                 }
             }
@@ -379,6 +589,10 @@ private struct ModsFolderBox: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         } label: {
             HStack(spacing: 8) {
+                if let seat = model.seats.first(where: { $0.path == folder.folder }) {
+                    Text(seat.label).font(.body.weight(.semibold))
+                    SeatMarkBadge(mark: seat.mark)
+                }
                 Text(model.display(folder.folder)).font(.body.monospaced())
                 if model.addedFolders.contains(folder.folder) {
                     Button("Forget Folder") { Task { await model.forgetFolder(folder.folder, linked: linked) } }
@@ -387,6 +601,14 @@ private struct ModsFolderBox: View {
                 }
             }
         }
+    }
+
+    private var unreadable: String? { model.scans.first(where: { $0.seat == folder.folder })?.settingsUnreadable }
+
+    /// The item a Catalog chip opened this seat for.
+    private func lit(_ item: ModItem) -> Bool {
+        guard let f = model.focus, f.seat == folder.folder else { return false }
+        return item.name == f.name
     }
 }
 
