@@ -78,8 +78,10 @@ internal sealed class DeskCoverageWatch : IDisposable
         _proc = OnEvent;
         foreach (var (min, max) in Ranges)
         {
+            // Sanduhr's own windows count too (Settings or the widget can cover an island), so this
+            // process's events are not skipped; a recompute never shows or hides a window itself.
             var h = DeskNative.SetWinEventHook(min, max, IntPtr.Zero, _proc, 0, 0,
-                DeskNative.WINEVENT_OUTOFCONTEXT | DeskNative.WINEVENT_SKIPOWNPROCESS);
+                DeskNative.WINEVENT_OUTOFCONTEXT);
             if (h != IntPtr.Zero) _hooks.Add(h);
         }
     }
