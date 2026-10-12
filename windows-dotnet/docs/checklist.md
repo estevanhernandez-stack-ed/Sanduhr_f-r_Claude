@@ -118,8 +118,8 @@
   - [x] 14.1 Deepening pass: `spec.md > Stage 7` (7.0 to 7.7)
   - [x] 14.2 Core: arrange rules and session, `Put`, the glow word, the hit test, coverage, the sign-in reminder, Just the Desk, the glow's Desk target, with ported tests
   - [x] 14.3 App: covered islands pause their motion, bars and readings (7.1)
-  - [x] 14.4 Idle cost at its root: dynamic PGO off (7.2)
+  - [x] 14.4 Idle cost at its root: the S6 number was JIT warm-up; defaults kept, cost measured at steady state (7.2)
   - [x] 14.5 App: sign-in reminders switch and Just the Desk (7.5)
-  - [ ] 14.6 App: arrange mode, the glow's Desk spot and its target (7.3)
-  - [ ] 14.7 App: Desk clicks with the switch (7.4)
-  - [ ] 14.8 Harness renders, cost re-measured, runner, review, Este's live run, merge
+  - [x] 14.6 App: arrange mode, the glow's Desk spot and its target (7.3)
+  - [x] 14.7 App: Desk clicks with the switch (7.4)
+  - [ ] 14.8 Harness renders, cost re-measured, runner, review (done); Este's live run with `s7-runner`, merge
