@@ -56,6 +56,26 @@ Design energy: the Windows app's own look (glass widget, Mica, themed dialogs, t
 - **Reset Sanduhr… (S3)**: it deletes credentials, the vault and Claude Code entries; the wording of what it removes is a privacy claim.
 - **Per-seat meters (S4)**: if it adds a seat snapshot the MCP reads, that is a trust-boundary change.
 
+## What parity covers and what's left (cycle closed 2026-10-12)
+
+**Covered, all seven stages merged:** What's New and quick wins (#204), the welcome tour, signed-out first run and demo mode (#205), Settings v2 (#206), the Claude Code side with per-folder meters, account follow and Reset (#208), the Desk foundation on Rainmeter's "On desktop" route (#209), Desk content with messages, now playing, system readings, weather, ink and glow targets (#213), and Desk polish with covered pause, arrange by dragging, the glow's Desk spot, Desk clicks, sign-in reminders and Just the Desk (#214). Each stage passed 0 warnings, two green test runs, CI and an independent review; the Desk stages also passed Este's live runs.
+
+**Held, each for its reason:**
+- **The Desk and watcher MCP tools** (`get_desk_messages`, `propose_desk_messages`, `watch_start`, `watch_update`, `watch_end`): a trust-boundary decision. They change the MCP's tool surface and what it reads; the Desk side is wired and off (`DeskMessageHandoffService.Enabled`, `WatcherStore.Enabled`), so each tool is a thin addition once Este rules.
+- **Meetings and the Join shortcut**: `Windows.ApplicationModel.Appointments` is a manifest capability, a Store-reviewer surface.
+- **Watchers from Claude Code's background work** (the Stop hook's `background_tasks`): a privacy claim, since it changes what the S4 hooks read.
+- **A user-settable theme success color**: a trust-boundary item. `ThemeModel.cs` and `ThemeLint.cs` are compiled into the MCP for `propose_theme`, so a new theme field changes what the MCP compiles; built-in themes carry their success hue in the App and user themes fall back to the healthy green.
+
+**Cut:**
+- **The camera and mic indicators**: cut from the cycle by Este; no Windows spike was run.
+- Earlier cuts stand: the notch and its wings, app-menu shortcut scanning, song looks, Sparkle and Dock specifics, agent-styled text beyond message effects.
+
+**Follow-ups:**
+- **The arrange resize handle**: Core's `DeskArrange.Scale` and `Handle` are ported and tested; Windows draws no handle, so sizes stay in Settings.
+- **The meters' right-click limit menu on the Desk**: the Mac's two-finger menu on a meter row is not ported; Desk clicks cover the clock, message, Claude line, now playing and the weather credit.
+- **The open issues recorded in `spec.md > Open Issues`**, S6 and S7 included: the shortcut map read as off after a downgrade to a pre-S6 build (a release-note line), `SaveClaudeCodeGlow`'s switches tested only through Core, the glow spot placed during an arrange session being overwritten by Done, the right-click menu anchoring to the first piece of a repeated kind, a redraw cutting a Desk glow short, and the unexplained spread in steady-state idle cost (0.09 to 0.42% of one core, all under the 0.5% target).
+- **The Rainmeter adapter** (dashboard task `qu9fh8ot0`): post-parity, its own cycle.
+
 ## Loose Implementation Notes
 - Pure logic goes in `Sanduhr.Core` with xUnit tests ported from the Mac's tests; WPF stays in `Sanduhr.App`. Anything the MCP needs stays out of the four source-linked files unless Este widens the allowlist.
 - The What's New card model is the shared seam: S2's tour, S3's names table and every later stage's cards ride on it. Build it with the tour's fields (`step`, `requires`, `choice`) present from the start.

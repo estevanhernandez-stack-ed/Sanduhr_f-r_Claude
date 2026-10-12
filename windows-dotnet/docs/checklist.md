@@ -111,7 +111,7 @@
   - [x] 13.6 App: the Desk pieces, live updates, effects; the Message, Now playing and Weather pages; the handoff and watcher seams (6.2, 6.9, 6.10)
   - [x] 13.7 Harness renders, cost measured, PRIVACY rows, review, merge (6.11 to 6.13)
 
-- [ ] **14. Stage 7: Desk polish** (deepening pass first)
+- [x] **14. Stage 7: Desk polish** (deepening pass first)
   Spec ref: `spec.md > Stage 7`
   What to build: arrange by dragging, Desk clicks, sign-in reminders, Just the Desk (the camera and mic spike was cut from the cycle).
   Acceptance: PRD S7 stories. Verify: arrange always endable.
@@ -122,4 +122,6 @@
   - [x] 14.5 App: sign-in reminders switch and Just the Desk (7.5)
   - [x] 14.6 App: arrange mode, the glow's Desk spot and its target (7.3)
   - [x] 14.7 App: Desk clicks with the switch (7.4)
-  - [ ] 14.8 Harness renders, cost re-measured, runner, review (done); Este's live run with `s7-runner`, merge
+  - [x] 14.8 Harness renders, cost re-measured, runner, review; Este's live run with `s7-runner` (19/21, then the arrange drop fixed and `--only arrange` r1-r4 passed, 2026-10-12); merged as PR #214 (b550447)
+
+**Cycle closed 2026-10-12.** All seven stages merged (#204, #205, #206, #208, #209, #213, #214). What parity covers and what is left: `scope.md > What parity covers and what's left`. Releases stay Este's: no version, tag, package or Store change was made by the cycle.
