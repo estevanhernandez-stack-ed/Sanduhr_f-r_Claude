@@ -88,7 +88,7 @@
   - [x] 11.7 Reset Sanduhr... (Este's option C, spec 4.7)
   Built: Este's rulings (MCP folder set behind consent with ClaudeCodeHomes.cs on the allowlist, the publish race, one trademark source), the receipt engine, the Claude Code and Mods & Config pages, the meters mod, statusline combine with segments and the seat lookup, the glow at the top of the window in use with a success color per built-in theme, account follow and per-folder meters through per-account WebView2 profiles, and Reset. Rendered off screen from an invented profile in a dark and a light theme: both pages, the consent dialog, About, the glow over a maximized and a windowed target, Reset. Not exercised: anything needing the live app (the glow watcher, flash and click-through, the follow and seat timers, a live inactive-account read, Reset's real run, dialog clicks, OpenFolderDialog). Escalated: a success color in theme files (ThemeModel.cs is compiled into the MCP).
 
-- [ ] **12. Stage 5: Desk foundation** (deepening pass first)
+- [x] **12. Stage 5: Desk foundation** (deepening pass first)
   Spec ref: `spec.md > Stage 5`
   What to build: the WorkerW spike with a written verdict, then the Desk window, layout, taskbar clearance, EsteFont.
   Acceptance: PRD S5 stories. Verify: spike notes; layout tests.
@@ -97,9 +97,9 @@
   - [x] 12.3 Este rules on the window route: V3, Rainmeter's way; EsteFont bundling approved
   - [x] 12.4 Core: `DeskArrangement`, `DeskGeometry`, `TaskbarClearance`, `DeskMeters`, `DeskFont`, `DeskSettings`, font notices, with ported tests
   - [x] 12.5 App: `IDeskHost` and `DesktopLayerHost` (V3, island windows, Show-desktop watcher), `DeskView`, `DeskController`, the Desk page and its map, EsteFont resources, harness scenarios; (g) measured
-  - [ ] 12.6 V3 live checks (a), (b), (e) on Este's clear desktop with `DeskRunner`; then merge
+  - [x] 12.6 V3 live checks (a), (b), (e) on Este's clear desktop with `DeskRunner` (all 11 passed, 2026-10-11); merged as PR #209
 
-- [ ] **13. Stage 6: Desk content** (deepening pass first)
+- [x] **13. Stage 6: Desk content** (deepening pass first)
   Spec ref: `spec.md > Stage 6`
   What to build: messages and effects, editor, special days, now playing (widget then Desk), meetings, watchers, MCP tools (after Este rules). The Join shortcut arrives here: `hotkey_settings` is one flat object today, so move it to a per-action map with a one-time migration before adding Join (PR #204 review, finding 4).
   Acceptance: PRD S6 stories. Verify: parser tests ported from the Mac.
@@ -113,5 +113,13 @@
 
 - [ ] **14. Stage 7: Desk polish** (deepening pass first)
   Spec ref: `spec.md > Stage 7`
-  What to build: arrange by dragging, Desk clicks, sign-in reminders, Just the Desk, camera and mic spike.
+  What to build: arrange by dragging, Desk clicks, sign-in reminders, Just the Desk (the camera and mic spike was cut from the cycle).
   Acceptance: PRD S7 stories. Verify: arrange always endable.
+  - [x] 14.1 Deepening pass: `spec.md > Stage 7` (7.0 to 7.7)
+  - [x] 14.2 Core: arrange rules and session, `Put`, the glow word, the hit test, coverage, the sign-in reminder, Just the Desk, the glow's Desk target, with ported tests
+  - [x] 14.3 App: covered islands pause their motion, bars and readings (7.1)
+  - [x] 14.4 Idle cost at its root: dynamic PGO off (7.2)
+  - [x] 14.5 App: sign-in reminders switch and Just the Desk (7.5)
+  - [ ] 14.6 App: arrange mode, the glow's Desk spot and its target (7.3)
+  - [ ] 14.7 App: Desk clicks with the switch (7.4)
+  - [ ] 14.8 Harness renders, cost re-measured, runner, review, Este's live run, merge
