@@ -521,6 +521,33 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+
+                    <!-- Now playing (spec 6.3, W8): off until Settings, Now playing turns it on. A click
+                         plays or pauses; Next shows while paused. -->
+                    <DockPanel DataContext="{Binding NowPlaying}" Margin="12,2,12,6"
+                               Visibility="{Binding Visible, Converter={StaticResource BoolVis}, FallbackValue=Collapsed}">
+                        <Button DockPanel.Dock="Right" Command="{Binding NextCommand}" Background="Transparent" BorderThickness="0"
+                                Cursor="Hand" Margin="8,0,0,0" ToolTip="Next" AutomationProperties.Name="Next"
+                                Visibility="{Binding Paused, Converter={StaticResource BoolVis}}">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <ContentPresenter />
+                                </ControlTemplate>
+                            </Button.Template>
+                            <TextBlock Text="Next" FontSize="11" Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                        </Button>
+                        <Button Command="{Binding ToggleCommand}" Background="Transparent" BorderThickness="0"
+                                Cursor="Hand" HorizontalContentAlignment="Left" Padding="0"
+                                ToolTip="{Binding ToggleName}" AutomationProperties.Name="{Binding ToggleName}">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <ContentPresenter />
+                                </ControlTemplate>
+                            </Button.Template>
+                            <TextBlock Text="{Binding Text}" FontSize="11" TextTrimming="CharacterEllipsis"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                        </Button>
+                    </DockPanel>
                 </StackPanel>
             </ScrollViewer>
 

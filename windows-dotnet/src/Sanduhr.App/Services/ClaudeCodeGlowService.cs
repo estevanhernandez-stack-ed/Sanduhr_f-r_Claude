@@ -78,7 +78,13 @@ internal sealed class ClaudeCodeGlowService : IDisposable
     }
 
     /// <summary>Re-read the switches (Settings changed them).</summary>
-    public void Reload() => _switches = _store.LoadClaudeCodeGlow();
+    public void Reload()
+    {
+        _switches = _store.LoadClaudeCodeGlow();
+        _target = _store.LoadGlowTarget();
+    }
+
+    private GlowTargetSettings _target = GlowTargetSettings.Default;
 
     /// <summary>
     /// Show the glow for <paramref name="e"/> on the current target, bypassing the switches, the terminal
@@ -128,17 +134,37 @@ internal sealed class ClaudeCodeGlowService : IDisposable
     {
         try
         {
-            var (target, fallback, scale) = Observe();
-            var rect = GlowPlacement.Compute(target, fallback, scale);
-            _overlay ??= new GlowOverlayWindow();
-            _overlay.Glow(rect, GlowOverlayContent.ColorFor(kind));
-            if (flash) GlowNative.FlashTray(new WindowInteropHelper(_widget).Handle);
+            // Where it lands (spec 6.8): the window in use (S4), a chosen screen edge, or the widget's
+            // taskbar flash alone. The Desk placeholder reads as the window until S7.
+            var where = _target.Effective;
+            if (where == GlowTargetKind.Edge && EdgeMonitor() is { } mon)
+            {
+                _overlay ??= new GlowOverlayWindow();
+                _overlay.Glow(GlowPlacement.Edge(mon.Bounds, _target.Side, mon.Scale), GlowOverlayContent.ColorFor(kind), _target.Side);
+            }
+            else if (where != GlowTargetKind.Widget)
+            {
+                var (target, fallback, scale) = Observe();
+                var rect = GlowPlacement.Compute(target, fallback, scale);
+                _overlay ??= new GlowOverlayWindow();
+                _overlay.Glow(rect, GlowOverlayContent.ColorFor(kind));
+            }
+            if (flash || where == GlowTargetKind.Widget) GlowNative.FlashTray(new WindowInteropHelper(_widget).Handle);
         }
         catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception
                                       or DllNotFoundException or EntryPointNotFoundException)
         {
             // A glow that cannot draw is not worth a crash.
         }
+    }
+
+    /// <summary>The chosen edge's monitor: the saved device name, else the primary one.</summary>
+    private (PxRect Bounds, double Scale)? EdgeMonitor()
+    {
+        var monitors = Sanduhr.App.Interop.DeskNative.Monitors();
+        var m = monitors.FirstOrDefault(x => _target.Monitor is { } name && string.Equals(x.Device, name, StringComparison.OrdinalIgnoreCase))
+                ?? monitors.FirstOrDefault(x => x.Primary) ?? monitors.FirstOrDefault();
+        return m is null ? null : (m.Bounds, m.Scale);
     }
 
     /// <summary>The foreground window as a target, the fallback monitor's bounds, and the DPI scale to use.</summary>

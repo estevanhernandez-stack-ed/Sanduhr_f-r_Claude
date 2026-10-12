@@ -30,6 +30,8 @@ public partial class App : Application
     private GlobalHotKeyService? _hotKeys;
     private ClaudeCodeGlowService? _glow;
     private Desk.DeskController? _desk;
+    private Desk.NowPlayingHub? _nowPlaying;
+    private Desk.DeskMessageSource? _messages;
     private MenuItem? _endDemoItem;
 
     /// <summary>Where this install stands with the welcome tour, decided once at launch.</summary>
@@ -394,11 +396,26 @@ public partial class App : Application
     {
         if (_vm is null) return;
         var vm = _vm;
-        _desk = new Desk.DeskController(new SettingsStore(new Sanduhr.Core.Paths()), () => new Desk.DesktopLayerHost(),
-            () => vm.CurrentDeskUsage);
+        var paths = new Sanduhr.Core.Paths();
+        var store = new SettingsStore(paths);
+        _nowPlaying = new Desk.NowPlayingHub();
+        _messages = new Desk.DeskMessageSource(store, paths);
+        _desk = new Desk.DeskController(store, () => new Desk.DesktopLayerHost(),
+            () => vm.CurrentDeskUsage, _nowPlaying, _messages)
+        {
+            ThemeText = ThemeTextHex,
+        };
         _vm.DeskUsageChanged += _desk.UsageChanged;
+        _vm.ThemeChanged += _ => _desk?.ThemeChanged();
+        // The widget's now-playing line (spec 6.3, W8) shares the Desk's media-session listener.
+        _vm.NowPlaying = new NowPlayingLineViewModel(_nowPlaying, store);
         _desk.Reload();
     }
+
+    /// <summary>The live widget theme's text color as six hex digits (Theme ink, spec 6.7).</summary>
+    private static string? ThemeTextHex() =>
+        Current?.Resources["Sanduhr.Brush.Text"] is System.Windows.Media.SolidColorBrush b
+            ? $"{b.Color.R:x2}{b.Color.G:x2}{b.Color.B:x2}" : null;
 
     /// <summary>Claude Code edge glow (Stage 4.5): watches the hook signal files; both switches start off.</summary>
     private void StartGlow()
@@ -656,6 +673,7 @@ public partial class App : Application
                 vm.StopBackgroundWork();
                 _glow?.Stop();
                 _desk?.StopForReset();
+                _vm?.NowPlaying?.Dispose();
             },
             vm.InactiveReader.DeleteAllProfilesAsync);
         ResetWindow.ShowFor(_settingsWindow, service, QuitApp);
@@ -668,6 +686,9 @@ public partial class App : Application
         WhatsNewWindow.Quitting = true;
         _glow?.Dispose();
         _desk?.Dispose();
+        _messages?.Dispose();
+        _vm?.NowPlaying?.Dispose();
+        _nowPlaying?.Dispose();
         _hotKeys?.Dispose();
         _tray?.Dispose();
         _trayIcon?.Dispose();
@@ -687,6 +708,9 @@ public partial class App : Application
         WhatsNewWindow.Quitting = true;
         _glow?.Dispose();
         _desk?.Dispose();
+        _messages?.Dispose();
+        _vm?.NowPlaying?.Dispose();
+        _nowPlaying?.Dispose();
         _hotKeys?.Dispose();
         _tray?.Dispose();
         _trayIcon?.Dispose();

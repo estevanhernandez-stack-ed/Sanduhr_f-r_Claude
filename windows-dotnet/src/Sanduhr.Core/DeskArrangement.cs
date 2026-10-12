@@ -87,9 +87,10 @@ public sealed class DeskArrangement
     /// <summary>The layout a fresh install draws.</summary>
     public const string Standard = "clock:bl claude:bl";
 
-    /// <summary>The widget words this build knows, in Settings order (also the order a newly placed piece takes among its neighbors).</summary>
+    /// <summary>The widget words this build knows, in Settings order (also the order a newly placed piece takes among its neighbors):
+    /// the Mac's list with Windows' telemetry and weather (S6, after Este's Knighthawk skins) before watchers.</summary>
     public static readonly IReadOnlyList<string> Known =
-        ["message", "clock", "claude", "meters", "nowPlaying", "watchers", "meetings"];
+        ["message", "clock", "claude", "meters", "nowPlaying", "telemetry", "weather", "watchers", "meetings"];
 
     /// <summary>The widgets Stage 5 draws.</summary>
     public static readonly IReadOnlyList<string> DrawnInS5 = ["clock", "claude", "meters"];
@@ -130,8 +131,15 @@ public sealed class DeskArrangement
         return Math.Round(clamped * 100, MidpointRounding.AwayFromZero) / 100;
     }
 
-    /// <summary>Where a piece goes when its anchor is not one this build knows: the message top left, the rest bottom left.</summary>
-    public static DeskAnchor DefaultAnchor(string widget) => widget == "message" ? DeskAnchor.TL : DeskAnchor.BL;
+    /// <summary>Where a piece goes when its anchor is not one this build knows: the message top left, telemetry top
+    /// right, weather middle right, the rest bottom left.</summary>
+    public static DeskAnchor DefaultAnchor(string widget) => widget switch
+    {
+        "message" => DeskAnchor.TL,
+        "telemetry" => DeskAnchor.TR,
+        "weather" => DeskAnchor.MR,
+        _ => DeskAnchor.BL,
+    };
 
     /// <summary>The widget's place in Settings order; an unknown word sorts last.</summary>
     public static int Rank(string widget)

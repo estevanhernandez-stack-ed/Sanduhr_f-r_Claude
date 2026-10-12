@@ -33,18 +33,57 @@ public partial class GlowOverlayContent : UserControl
 
     public GlowOverlayContent() => InitializeComponent();
 
-    /// <summary>Line at full strength; wash fading from ~55% to transparent over the band's height.</summary>
+    private Sanduhr.Core.GlowEdgeSide _side = Sanduhr.Core.GlowEdgeSide.Top;
+
+    /// <summary>Which edge the light comes from (spec 6.8): the line sits on that edge and the wash falls
+    /// inward; the ends fade along the edge. Top is S4's look. Call before <see cref="SetColor"/>.</summary>
+    public void SetSide(Sanduhr.Core.GlowEdgeSide side)
+    {
+        _side = side;
+        bool vertical = side is Sanduhr.Core.GlowEdgeSide.Left or Sanduhr.Core.GlowEdgeSide.Right;
+        Line.Height = vertical ? double.NaN : 2;
+        Line.Width = vertical ? 2 : double.NaN;
+        Line.VerticalAlignment = side switch
+        {
+            Sanduhr.Core.GlowEdgeSide.Bottom => System.Windows.VerticalAlignment.Bottom,
+            Sanduhr.Core.GlowEdgeSide.Top => System.Windows.VerticalAlignment.Top,
+            _ => System.Windows.VerticalAlignment.Stretch,
+        };
+        Line.HorizontalAlignment = side switch
+        {
+            Sanduhr.Core.GlowEdgeSide.Left => System.Windows.HorizontalAlignment.Left,
+            Sanduhr.Core.GlowEdgeSide.Right => System.Windows.HorizontalAlignment.Right,
+            _ => System.Windows.HorizontalAlignment.Stretch,
+        };
+        var mask = new LinearGradientBrush
+        {
+            StartPoint = new System.Windows.Point(0, 0),
+            EndPoint = vertical ? new System.Windows.Point(0, 1) : new System.Windows.Point(1, 0),
+        };
+        mask.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), 0));
+        mask.GradientStops.Add(new GradientStop(Color.FromArgb(255, 0, 0, 0), 0.22));
+        mask.GradientStops.Add(new GradientStop(Color.FromArgb(255, 0, 0, 0), 0.78));
+        mask.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), 1));
+        mask.Freeze();
+        Root.OpacityMask = mask;
+    }
+
+    /// <summary>Line at full strength; wash fading from ~55% to transparent over the band's depth, away
+    /// from the edge the light comes from.</summary>
     public void SetColor(Color c)
     {
         var line = new SolidColorBrush(Color.FromRgb(c.R, c.G, c.B));
         line.Freeze();
         Line.Fill = line;
 
-        var wash = new LinearGradientBrush
+        var (from, to) = _side switch
         {
-            StartPoint = new System.Windows.Point(0, 0),
-            EndPoint = new System.Windows.Point(0, 1),
+            Sanduhr.Core.GlowEdgeSide.Bottom => (new System.Windows.Point(0, 1), new System.Windows.Point(0, 0)),
+            Sanduhr.Core.GlowEdgeSide.Left => (new System.Windows.Point(0, 0), new System.Windows.Point(1, 0)),
+            Sanduhr.Core.GlowEdgeSide.Right => (new System.Windows.Point(1, 0), new System.Windows.Point(0, 0)),
+            _ => (new System.Windows.Point(0, 0), new System.Windows.Point(0, 1)),
         };
+        var wash = new LinearGradientBrush { StartPoint = from, EndPoint = to };
         wash.GradientStops.Add(new GradientStop(Color.FromArgb(WashAlpha, c.R, c.G, c.B), 0));
         wash.GradientStops.Add(new GradientStop(Color.FromArgb(0, c.R, c.G, c.B), 1));
         wash.Freeze();

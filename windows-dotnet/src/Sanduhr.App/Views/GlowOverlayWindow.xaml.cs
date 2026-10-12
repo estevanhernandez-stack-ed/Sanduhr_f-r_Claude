@@ -36,9 +36,10 @@ internal partial class GlowOverlayWindow : Window
     }
 
     /// <summary>Show the glow at <paramref name="rect"/> (device pixels) in <paramref name="color"/>.</summary>
-    public void Glow(PxRect rect, Color color)
+    public void Glow(PxRect rect, Color color, GlowEdgeSide side = GlowEdgeSide.Top)
     {
         int run = ++_run;
+        Light.SetSide(side);
         Light.SetColor(color);
         BeginAnimation(OpacityProperty, null);
         Opacity = 0;
