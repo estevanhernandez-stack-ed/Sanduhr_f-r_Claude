@@ -4,6 +4,11 @@
     <ProjectReference Include="..\Sanduhr.Core\Sanduhr.Core.csproj" />
   </ItemGroup>
 
+  <!-- The off-screen render harness (tools/) draws the Desk's internal view for the spec's pictures. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Sanduhr.RenderHarness" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
@@ -25,6 +30,13 @@
        ApplicationIcon stamps the .exe. -->
   <ItemGroup>
     <Resource Include="Assets\Sanduhr.ico" />
+  </ItemGroup>
+
+  <!-- The Desk's handwriting (spec 5.1): EsteFont Pro and EsteFont 26, linked from the Mac's
+       copy (no second copy in the repo) and embedded as WPF resources under Fonts/, drawn through a
+       pack:// family for Sanduhr only. Licensed to 626Labs LLC, the publisher; About lists them. -->
+  <ItemGroup>
+    <Resource Include="..\..\..\mac\Resources\Fonts\*.ttf" Link="Fonts\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <!-- Theme-builder agent prompt: embedded so the Settings "Copy agent prompt"

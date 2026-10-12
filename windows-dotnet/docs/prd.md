@@ -110,6 +110,8 @@ Stages S1 to S4 carry full acceptance criteria. S5 to S7 (the Desk) are lighter,
   - [ ] A spike proves a click-through window in the desktop layer on Windows 11 (WorkerW), surviving an Explorer restart, before any Desk feature is built.
   - [ ] One Desk window per monitor; pieces in eight places; taskbar clearance (including auto-hide); EsteFont built in for the app only; a layout map in Settings.
   - [ ] Off by default; one switch turns it off; the reviewer letter names it (escalated).
+  - [ ] Rainmeter is the benchmark (Este, 2026-10-11). The Desk window passes, each with evidence: (a) above the wallpaper and below normal windows, staying there; (b) click-through outside drawn pieces, clicks landing on drawn pieces; (c) the right place and DPI on every monitor; (d) back after an Explorer restart; (e) Show desktop (Win+D, the taskbar corner) leaves it visible; (f) it coexists with Rainmeter in the desktop layer; (g) idle CPU near 0% and a modest working set, redrawing only on change; (h) no flicker or jump on wallpaper, theme, sleep and wake, or DPI changes. A failure on (a), (b) or (e) stops the stage and goes to Este with alternatives.
+  - [ ] Spike, 2026-10-11 (`spec.md > 5.0`): the `WorkerW` route fails (b) on 24H2 and later (the icons view sits over it and takes every click) and (a) is unproven; escalated with two routes.
 
 ### S6. Desk content (lighter; deepening pass before build)
 

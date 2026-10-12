@@ -186,6 +186,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowNotNow));
         OnPropertyChanged(nameof(ShowNotSignedInLine));
         NotifyPromptCopy();
+        RaiseDesk();
     }
 
     /// <summary>Re-raise the recovery-card copy bindings. Needed beyond
@@ -1607,6 +1608,12 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         var hiddenKeys = new HashSet<string>(_hidden);
         hiddenKeys.UnionWith(_limitState.HiddenUntilReset.Keys);
         var active = TierModel.ActiveTiers(utilByKey, _savedOrder, hiddenKeys);
+        // The Desk draws the visible tiers in order whatever compact mode shows; its Claude line
+        // reads session and week whether or not their cards are hidden (spec 5.1).
+        _deskTiers = [.. active.Select(k => DeskTierFor(data, k, utilByKey[k]))];
+        _deskLineTiers = [.. new[] { TierModel.FiveHour, TierModel.SevenDay }
+            .Where(k => utilByKey.TryGetValue(k, out var u) && u is not null)
+            .Select(k => DeskTierFor(data, k, utilByKey[k]))];
         if (IsCompact && active.Count > 0)
         {
             // Compact view: collapse to the single busiest tier (first-max, matching
@@ -1663,7 +1670,36 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         _trayWeekly = Util(data, TierModel.SevenDay);
         _trayHighest = highestKey is null ? null : (TierModel.Label(highestKey), highest);
         RaiseTray();
+
+        RaiseDesk();
     }
+
+    private static DeskTier DeskTierFor(JsonObject data, string key, double? util) =>
+        new(key, util ?? 0, (data[key] as JsonObject)?["resets_at"]?.GetValue<string>());
+
+    private IReadOnlyList<DeskTier> _deskTiers = [];
+    private IReadOnlyList<DeskTier> _deskLineTiers = [];
+
+    /// <summary>What the Desk shows: the visible tiers, when they were fetched, whether a sign-in is
+    /// needed, and the account's name with two or more accounts. Demo mode feeds its samples.</summary>
+    public DeskUsage CurrentDeskUsage
+    {
+        get
+        {
+            bool signIn = !IsDemo && Reason != SignInReason.None;
+            string? account = IsDemo ? DemoMode.ChipText(_demoAccount)
+                : _accounts.ListAccounts().Count > 1 ? _accounts.GetActive() : null;
+            return new DeskUsage(signIn ? [] : _deskTiers,
+                IsDemo ? DateTimeOffset.Now : _lastFetchAt,
+                signIn, Reason == SignInReason.FirstRun, account, signIn ? [] : _deskLineTiers);
+        }
+    }
+
+    /// <summary>Raised after each render and when the sign-in state changes; the Desk reads
+    /// <see cref="CurrentDeskUsage"/> only while it is on.</summary>
+    public event Action? DeskUsageChanged;
+
+    private void RaiseDesk() => DeskUsageChanged?.Invoke();
 
     /// <summary>Map the fetch payload to alert snapshots — every known tier
     /// (canonical + dynamic scoped) with data participates, manually hidden or not (a

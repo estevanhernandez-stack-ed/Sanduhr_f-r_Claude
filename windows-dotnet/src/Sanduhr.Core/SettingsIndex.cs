@@ -64,6 +64,12 @@ public static class SettingsIndex
     public const string Studio = "studio";
     public const string Paste = "paste";
     public const string Installed = "installed";
+    // Desk
+    public const string DeskOn = "desk";
+    public const string DeskPieces = "pieces";
+    public const string DeskLook = "look";
+    public const string DeskMargins = "margins";
+    public const string DeskMap = "map";
     // About
     public const string Version = "version";
     public const string Trademark = "trademark";
@@ -145,6 +151,17 @@ public static class SettingsIndex
             [SettingsNames.SaveAndApply, "json", "import", "Copy agent prompt", "themes folder"]),
         E("Installed user themes", SettingsPage.Themes, Installed, ["delete theme", "reload", "user themes"]),
 
+        E(SettingsNames.DeskSwitch, SettingsPage.Desk, DeskOn,
+            ["desktop", "wallpaper", "clock", "meters", "Rainmeter", "show the Desk", "on the desktop", "off by default", "monitors"]),
+        E("Where each piece sits", SettingsPage.Desk, DeskPieces,
+            ["layout", "place", "corner", "position", "size", "hidden", "clock", "meters", "Claude line", "taskbar", "anchor"]),
+        E("Look", SettingsPage.Desk, DeskLook,
+            ["font", "EsteFont", "EsteFont Pro", "EsteFont 26", "clock size", "time size", "typeface", "Segoe UI"]),
+        E("Margins", SettingsPage.Desk, DeskMargins,
+            ["margin", "edge", "padding", "taskbar", "inset", "spacing"]),
+        E("Layout map", SettingsPage.Desk, DeskMap,
+            ["map", "preview", "layout", "taskbar", "screen", "monitor", "where"]),
+
         E("Version", SettingsPage.About, Version,
             ["version", "What's New", "Take the tour", "tour", "release", "update"]),
         E("Trademark", SettingsPage.About, Trademark, ["Anthropic", "trademark", "disclaimer", "affiliated"]),
@@ -171,6 +188,7 @@ public static class SettingsIndex
         [SettingsNames.WhereSettingsLive] = Where,
         [SettingsNames.ThirdPartyNotices] = Notices,
         [SettingsNames.ResetSanduhr] = Reset,
+        [SettingsNames.DeskSwitch] = DeskOn,
     };
 
     /// <summary>Words a page goes by besides its title.</summary>
@@ -185,6 +203,7 @@ public static class SettingsIndex
         [SettingsPage.Mods] = ["mod", "plugin", "hooks", "statusline", "MCP", "CLAUDE.md", "retention", "config", "settings.json"],
         [SettingsPage.Publish] = ["publish", "upload", "endpoint", "share"],
         [SettingsPage.Themes] = ["theme", "colors", "look"],
+        [SettingsPage.Desk] = ["desktop", "wallpaper", "clock", "Rainmeter", "layout", "font", "EsteFont", "margins", "taskbar"],
         [SettingsPage.About] = ["help", "version", "trademark", "privacy"],
     };
 

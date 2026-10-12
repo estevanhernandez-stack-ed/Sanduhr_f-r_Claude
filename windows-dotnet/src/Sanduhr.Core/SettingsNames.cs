@@ -19,7 +19,7 @@ public static class SettingsNames
 {
     // ---- Pages ----
 
-    /// <summary>The sidebar: five groups, each page once. Widget is not a page (Show me on a widget card
+    /// <summary>The sidebar: six groups, each page once. Widget is not a page (Show me on a widget card
     /// shows the widget itself).</summary>
     public static IReadOnlyList<SettingsGroup> Sidebar { get; } =
     [
@@ -27,6 +27,7 @@ public static class SettingsNames
         new("Usage", [SettingsPage.History, SettingsPage.ClaudeUsage, SettingsPage.Publish]),
         new("Claude Code", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
         new("Widget", [SettingsPage.Themes]),
+        new("Desk", [SettingsPage.Desk]),
         new("Help", [SettingsPage.About]),
     ];
 
@@ -45,6 +46,7 @@ public static class SettingsNames
         SettingsPage.ClaudeCode => "Claude Code",
         SettingsPage.Mods => "Mods & Config",
         SettingsPage.Themes => "Themes",
+        SettingsPage.Desk => "Desk",
         SettingsPage.About => "About",
         SettingsPage.Widget => "Widget",
         _ => page.ToString(),
@@ -112,6 +114,12 @@ public static class SettingsNames
     public const string FollowAccount = "Follow the account I'm using";
     /// <summary>Mods &amp; Config: re-reads the folder.</summary>
     public const string RefreshFolder = "Refresh";
+    /// <summary>Desk: the switch at the top of the page (settings.json "desk_enabled", off by default).</summary>
+    public const string DeskSwitch = "Desk: the clock and your Claude meters on the desktop";
+    /// <summary>Desk, Where each piece sits: the pieces, named as on the Mac.</summary>
+    public const string DeskClock = "Clock and date";
+    public const string DeskClaudeLine = "Claude meters (line)";
+    public const string DeskClaudeBars = "Claude meters (bars)";
 
     /// <summary>The trademark disclaimer, the standard text, word for word (About carries it).</summary>
     public const string TrademarkNotice =
@@ -135,6 +143,7 @@ public static class SettingsNames
         (ResetSanduhr, SettingsPage.About),
         (AddFolder, SettingsPage.ClaudeCode),
         (FollowAccount, SettingsPage.Accounts),
+        (DeskSwitch, SettingsPage.Desk),
     ];
 
     /// <summary>

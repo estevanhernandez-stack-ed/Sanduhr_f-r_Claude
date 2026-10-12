@@ -13,7 +13,7 @@ namespace Sanduhr.Tests;
 /// </summary>
 public class SettingsKeysContractTests
 {
-    // Keys as of 3.4.x plus parity Stages 1 and 2. A key may be added; removing or renaming one needs a forward migration in SettingsMigrations with its own test, then move the key here to the migration's list.
+    // Keys as of 3.4.x plus parity Stages 1, 2 and 5 (the Desk). A key may be added; removing or renaming one needs a forward migration in SettingsMigrations with its own test, then move the key here to the migration's list.
     // "publish.*" keys live in the nested "publish" group (PublishSettingsJson).
     // Not frozen: "window" (legacy read fallback for "geom") and "publish_626" (migrated into "publish").
     private static readonly string[] Frozen =
@@ -28,6 +28,11 @@ public class SettingsKeysContractTests
         "alert_warn_pct",
         "alerts_enabled",
         "cc_folders_added",
+        "desk_enabled",
+        "desk_font",
+        "desk_layout",
+        "desk_margins",
+        "desk_time_size",
         "focus_mode_duration",
         "geom",
         "hidden_tiers",
