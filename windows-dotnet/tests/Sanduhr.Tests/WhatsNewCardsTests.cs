@@ -9,11 +9,48 @@ public class WhatsNewCardsTests
     private static IReadOnlyList<WhatsNewCard> Table => WhatsNewCards.Table;
 
     [Fact]
-    public void Table_HasTheSixCardsInOrder()
+    public void Table_HasTheNineCardsInOrder()
     {
         Assert.Equal(
-            ["shortcut-keys", "tray-shows", "limits-come-and-go", "every-folder", "steady-sparklines", "whats-new"],
+            ["desk", "settings-redesigned", "claude-code-page",
+             "shortcut-keys", "tray-shows", "limits-come-and-go", "every-folder", "steady-sparklines", "whats-new"],
             Table.Select(c => c.Id));
+    }
+
+    [Fact]
+    public void Release350_LeadsWithTheDeskSettingsAndClaudeCode()
+    {
+        var shown = WhatsNew.Cards("3.4.3", "3.5.0");
+        Assert.Equal(["desk", "settings-redesigned", "claude-code-page"], shown.Take(3).Select(c => c.Id));
+        Assert.All(shown, c => Assert.Equal("3.5.0", c.Version));
+    }
+
+    [Theory]
+    [InlineData("desk", SettingsPage.Desk)]
+    [InlineData("settings-redesigned", SettingsPage.General)]
+    [InlineData("claude-code-page", SettingsPage.ClaudeCode)]
+    public void Release350_LeadCards_ShowMeOpensTheirPage(string id, SettingsPage page) =>
+        Assert.Equal(page, Table.Single(c => c.Id == id).Destination);
+
+    [Fact]
+    public void DeskCard_SaysOffByDefaultAndNamesJustTheDesk()
+    {
+        var desk = Table.Single(c => c.Id == "desk");
+        Assert.Contains("off until you turn it on", desk.Body);
+        Assert.Contains("Just the Desk", desk.Body);
+    }
+
+    /// <summary>Nine 3.5.0 cards against the cap of eight: the update screen drops the last one,
+    /// the What's New card itself, and the tray menu's view still lists all nine.</summary>
+    [Fact]
+    public void Release350_AtLaunchCapsAtEight_MenuShowsAll()
+    {
+        var atLaunch = WhatsNew.Cards("3.4.3", "3.5.0");
+        Assert.Equal(WhatsNew.Cap, atLaunch.Count);
+        Assert.DoesNotContain(atLaunch, c => c.Id == "whats-new");
+        var (menu, header) = WhatsNew.ForMenu("3.5.0", "3.5.0");
+        Assert.Equal(Table.Count, menu.Count);
+        Assert.Equal("Highlights in 3.5.0", header);
     }
 
     [Fact]
