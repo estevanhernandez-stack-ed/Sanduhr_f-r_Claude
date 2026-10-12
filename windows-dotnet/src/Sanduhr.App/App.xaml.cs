@@ -73,12 +73,18 @@ public partial class App : Application
         _vm.PasteKeyRequested += () => RunSignInAsync(embedded: false);
         _vm.SettingsRequested += () => ShowSettingsAsync();
         _vm.SettingsPageRequested += page => ShowSettingsAsync(page);
+        _vm.JustTheDeskRequested += ChooseJustTheDesk;
         // Keep an open Settings window's account list in sync with quick-switches
         // made elsewhere (tray / widget chip / right-click).
         _vm.AccountsChanged += () => _settingsWindow?.ViewModel.Accounts.Reload();
 
         _window = new MainWindow { DataContext = _vm };
-        _window.Show();
+        // Just the Desk with no account (spec 7.5): the widget starts hidden and the tray is the way back.
+        // The handle is created without showing, so the glow, alerts and tray have a window to point at.
+        if (JustTheDesk.WidgetStartsHidden(_vm.JustTheDesk, _vm.AccountStore.ListAccounts().Count > 0))
+            new System.Windows.Interop.WindowInteropHelper(_window).EnsureHandle();
+        else
+            _window.Show();
 
         _vm.AttachAlertService(new AlertService(new Sanduhr.Core.Paths(), ShowWindow));
 
@@ -192,7 +198,7 @@ public partial class App : Application
             // After Start(): it migrates legacy credentials, so the account list is settled.
             var fresh = WhatsNew.IsFresh(lastSeen, store.LoadWhatsNewInstalledVersion(),
                 _vm.AccountStore.ListAccounts().Count);
-            var onboarding = _vm.ActiveAccount is null;
+            var onboarding = JustTheDesk.Onboarding(_vm.ActiveAccount is not null, store.LoadJustTheDesk().On);
 
             // The tour is decided before What's New records anything: pending only on a fresh
             // install (no account, nothing seen). While it is pending, What's New waits for it.
@@ -531,7 +537,7 @@ public partial class App : Application
             : await coordinator.SignInManual(_window);
 
         if (outcome.Added && _vm is not null)
-            await _vm.ReloadAfterSignInAsync();
+            await ReloadAfterSignInAsync();
     }
 
     /// <summary>
@@ -544,7 +550,7 @@ public partial class App : Application
         var coordinator = new SignInCoordinator();
         var outcome = await coordinator.ReauthenticateActiveAsync(_window);
         if (outcome.Added && _vm is not null)
-            await _vm.ReloadAfterSignInAsync();
+            await ReloadAfterSignInAsync();
     }
 
     /// <summary>In-place MANUAL re-auth of the active account (recovery card,
@@ -554,7 +560,7 @@ public partial class App : Application
         var coordinator = new SignInCoordinator();
         var outcome = await coordinator.ReauthenticateManualActiveAsync(_window);
         if (outcome.Added && _vm is not null)
-            await _vm.ReloadAfterSignInAsync();
+            await ReloadAfterSignInAsync();
     }
 
     /// <summary>Settings "Update sign-in…": in-place credential refresh for ANY
@@ -570,7 +576,65 @@ public partial class App : Application
             ? await coordinator.ReauthenticateManualAsync(owner, label)
             : await coordinator.ReauthenticateEmbeddedAsync(owner, label);
         if (outcome.Added && _vm.ActiveAccount == label)
-            await _vm.ReloadAfterSignInAsync();
+            await ReloadAfterSignInAsync();
+    }
+
+    /// <summary>
+    /// The one place an added account is settled (spec 7.5): rebuild the widget on it, then end Just the
+    /// Desk if it was on. Every sign-in, pasted key and re-sign-in routes here, so the decision runs once
+    /// per add. Ending it restores the reminder only when Just the Desk had turned it off, redraws the
+    /// Desk and shows the widget for the new account, with no relaunch.
+    /// </summary>
+    private async Task ReloadAfterSignInAsync()
+    {
+        if (_vm is not { } vm)
+            return;
+        await vm.ReloadAfterSignInAsync();
+        try
+        {
+            if (vm.AccountStore.ListAccounts().Count == 0)
+                return;
+            var store = new SettingsStore(new Sanduhr.Core.Paths());
+            var (state, reminderOn, ended) = JustTheDesk.EndBySignIn(store.LoadJustTheDesk(), store.LoadDeskSignInReminder());
+            if (!ended)
+                return;
+            store.SaveJustTheDesk(state);
+            store.SaveDeskSignInReminder(reminderOn);
+            vm.JustTheDesk = false;
+            vm.RefreshDesk();
+            ShowWindow();
+        }
+        catch
+        {
+            // Settings are best-effort here; the account is added either way.
+        }
+    }
+
+    /// <summary>
+    /// The first-run card's Just the Desk: save the choice, turn the Desk on, redraw it (the Claude pieces
+    /// stay placed and draw nothing) and put the widget away. The tray icon stays the way back.
+    /// </summary>
+    private void ChooseJustTheDesk()
+    {
+        if (_vm is not { } vm)
+            return;
+        try
+        {
+            var store = new SettingsStore(new Sanduhr.Core.Paths());
+            var (state, reminderOn, deskEnabled) = JustTheDesk.Choose(store.LoadJustTheDesk(), store.LoadDeskSignInReminder());
+            store.SaveJustTheDesk(state);
+            store.SaveDeskSignInReminder(reminderOn);
+            if (deskEnabled)
+                store.SaveDesk(store.LoadDesk() with { Enabled = true });
+        }
+        catch
+        {
+            return;   // nothing saved, nothing changed: the card stays
+        }
+        vm.JustTheDesk = true;
+        _desk?.Reload();
+        vm.RefreshDesk();
+        _window?.Hide();
     }
 
     private void OnTrayReadingChanged(TrayReading? reading)

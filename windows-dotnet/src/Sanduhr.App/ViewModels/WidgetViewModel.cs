@@ -156,14 +156,47 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
     /// <summary>The first-run card's Not now link (first run only; a recovery card stays).</summary>
     public bool ShowNotNow => Reason == SignInReason.FirstRun;
 
-    /// <summary>The one-line "Not signed in" way in, shown after Not now.</summary>
-    public bool ShowNotSignedInLine => Reason == SignInReason.FirstRun && SignInPutOff;
+    /// <summary>The one-line "Not signed in" way in, shown after Not now, and in place of the first-run
+    /// card while Just the Desk is on (spec 7.5).</summary>
+    public bool ShowNotSignedInLine =>
+        Reason == SignInReason.FirstRun && (SignInPutOff || !Sanduhr.Core.JustTheDesk.ShowsFirstRunCard(false, JustTheDesk));
 
     partial void OnSignInPutOffChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowSignInPrompt));
         OnPropertyChanged(nameof(ShowNotSignedInLine));
     }
+
+    /// <summary>Just the Desk is on (settings.json "just_the_desk"): the Desk without a Claude account.
+    /// Loaded at construction; the App sets it when the first-run card chooses it and when an account ends it.</summary>
+    [ObservableProperty] private bool _justTheDesk;
+
+    partial void OnJustTheDeskChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowSignInPrompt));
+        OnPropertyChanged(nameof(ShowNotSignedInLine));
+    }
+
+    /// <summary>Raised by the first-run card's Just the Desk button; the App saves the choice, turns the
+    /// Desk on and hides the widget.</summary>
+    public event Action? JustTheDeskRequested;
+
+    /// <summary>Just the Desk on the first-run card.</summary>
+    [RelayCommand]
+    private void ChooseJustTheDesk() => JustTheDeskRequested?.Invoke();
+
+    /// <summary>The Desk's sign-in reminder switch (spec 7.5), read for the Desk and Settings, Alerts.</summary>
+    public bool LoadDeskSignInReminder() => _settings.LoadDeskSignInReminder();
+
+    /// <summary>Saves the reminder switch and redraws the Desk at once.</summary>
+    public void SaveDeskSignInReminder(bool on)
+    {
+        _settings.SaveDeskSignInReminder(on);
+        RefreshDesk();
+    }
+
+    /// <summary>Re-reads <see cref="CurrentDeskUsage"/> into the Desk (after the reminder or Just the Desk changes).</summary>
+    public void RefreshDesk() => RaiseDesk();
 
     /// <summary>Not now: the first-run card goes for this launch; nothing is chosen or saved.</summary>
     [RelayCommand]
@@ -647,6 +680,7 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
         };
         AccountsChanged += SyncSeats;
 
+        _justTheDesk = _settings.LoadJustTheDesk().On;
         _pinned = _settings.LoadPinned();
         _isThemesExpanded = _settings.LoadThemesExpanded();
         _savedOrder = _settings.LoadTierOrder().ToList();
@@ -1694,7 +1728,8 @@ public sealed partial class WidgetViewModel : ObservableObject, IDisposable
                 : _accounts.ListAccounts().Count > 1 ? _accounts.GetActive() : null;
             return new DeskUsage(signIn ? [] : _deskTiers,
                 IsDemo ? DateTimeOffset.Now : _lastFetchAt,
-                signIn, Reason == SignInReason.FirstRun, account, signIn ? [] : _deskLineTiers);
+                signIn, Reason == SignInReason.FirstRun, account, signIn ? [] : _deskLineTiers,
+                signIn ? _settings.LoadDeskSignInReminder() : true);
         }
     }
 

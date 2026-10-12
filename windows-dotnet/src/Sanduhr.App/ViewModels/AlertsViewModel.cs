@@ -27,6 +27,9 @@ public sealed partial class AlertsViewModel : ObservableObject
     [ObservableProperty] private bool _snakeAtFull;
     [ObservableProperty] private string _validationHint = "";
 
+    /// <summary>The Desk's sign-in reminder switch (spec 7.5): saved at once, and the Desk redraws at once.</summary>
+    [ObservableProperty] private bool _deskSignInReminder = true;
+
     public AlertsViewModel(WidgetViewModel widget, Func<Task> sendTestAlertAsync)
     {
         _widget = widget;
@@ -41,6 +44,7 @@ public sealed partial class AlertsViewModel : ObservableObject
         SoundEnabled = widget.LoadAlertSound();
         ScopedChimeEnabled = widget.LoadAlertSoundScoped();
         SnakeAtFull = widget.LoadAlertSnakeFull();
+        DeskSignInReminder = widget.LoadDeskSignInReminder();
         _loading = false;
     }
 
@@ -49,6 +53,11 @@ public sealed partial class AlertsViewModel : ObservableObject
     partial void OnUrgentPctChanged(int value) => PersistConfig();
     partial void OnProjectionEnabledChanged(bool value) => PersistConfig();
     partial void OnResetEnabledChanged(bool value) => PersistConfig();
+
+    partial void OnDeskSignInReminderChanged(bool value)
+    {
+        if (!_loading) _widget.SaveDeskSignInReminder(value);
+    }
 
     partial void OnSoundEnabledChanged(bool value)
     {

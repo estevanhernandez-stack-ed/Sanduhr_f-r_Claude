@@ -130,6 +130,10 @@ public static class SettingsNames
     public const string DeskWeather = "Weather";
     /// <summary>Desk, Look: the ink the Desk draws in (spec 6.7).</summary>
     public const string DeskInk = "Ink";
+    /// <summary>Alerts: the Desk's sign-in reminder switch (settings.json "desk_sign_in_reminder", on by default).</summary>
+    public const string SignInReminders = SignInReminder.Title;
+    /// <summary>The first-run card's third action (settings.json "just_the_desk"); it has no Settings control.</summary>
+    public const string JustTheDeskButton = JustTheDesk.ButtonTitle;
     /// <summary>Now playing: the widget's line (settings.json "now_playing.widget", off by default).</summary>
     public const string NowPlayingInWidget = "Show what's playing in the widget";
     /// <summary>Weather: looks a typed city up with Open-Meteo.</summary>
@@ -161,6 +165,7 @@ public static class SettingsNames
         (FollowAccount, SettingsPage.Accounts),
         (DeskSwitch, SettingsPage.Desk),
         (DeskInk, SettingsPage.Desk),
+        (SignInReminders, SettingsPage.Alerts),
         (NowPlayingInWidget, SettingsPage.NowPlaying),
         (WeatherLookUp, SettingsPage.Weather),
         (GlowWhere, SettingsPage.ClaudeCode),

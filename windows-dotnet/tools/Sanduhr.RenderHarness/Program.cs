@@ -296,6 +296,13 @@ public static class Program
                 main.Left = -20000;
                 await Settle();
                 Save((FrameworkElement)main.Content, "widget");
+                // The signed-out first-run card with Sign in, Not now and Just the Desk (S7 7.5). The sample
+                // account stays in the view model; only the reason flips, then goes back.
+                vm.Reason = SignInReason.FirstRun;
+                await Settle();
+                Save((FrameworkElement)main.Content, "widget-firstrun");
+                vm.Reason = SignInReason.None;
+                await Settle();
             }
 
             if (scenarios.Contains("whatsnew"))

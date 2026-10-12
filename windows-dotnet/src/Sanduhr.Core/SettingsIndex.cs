@@ -34,6 +34,7 @@ public static class SettingsIndex
     public const string Thresholds = "thresholds";
     public const string Sound = "sound";
     public const string TestAlert = "test";
+    public const string SignInReminders = "signin-reminders";
     // History
     public const string Chart = "chart";
     public const string HistoryExport = "export";
@@ -119,6 +120,8 @@ public static class SettingsIndex
         E("Warn at and Urgent at", SettingsPage.Alerts, Thresholds, ["threshold", "warn", "urgent", "percent"]),
         E("Sound", SettingsPage.Alerts, Sound, ["chime", "sound", "snake", "model-scoped", "mute"]),
         E(SettingsNames.SendTestAlert, SettingsPage.Alerts, TestAlert, ["test", "try"]),
+        E(SettingsNames.SignInReminders, SettingsPage.Alerts, SignInReminders,
+            ["sign in", "signed out", "without Claude", "reminder", "Just the Desk", "session expired"]),
 
         E("History chart", SettingsPage.History, Chart,
             ["meter history", "30 days", "week", "month", "account", "all accounts", "chart"]),
@@ -214,6 +217,7 @@ public static class SettingsIndex
         [SettingsNames.AddFolder] = Folders,
         [SettingsNames.FollowAccount] = Follow,
         [SettingsNames.SendTestAlert] = TestAlert,
+        [SettingsNames.SignInReminders] = SignInReminders,
         [SettingsNames.ExportCsv] = HistoryExport,
         [SettingsNames.SaveAndApply] = Paste,
         [SettingsNames.WhatsNew] = Version,

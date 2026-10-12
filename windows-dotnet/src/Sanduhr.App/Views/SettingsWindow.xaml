@@ -1028,6 +1028,18 @@
                             <Button Style="{StaticResource FlatButton}" Content="{x:Static core:SettingsNames.SendTestAlert}"
                                     views:SettingsAnchor.Id="test"
                                     Command="{Binding TestAlertCommand}" HorizontalAlignment="Left" />
+
+                            <!-- Sign-in reminders (spec 7.5): the Desk's "sign in to Sanduhr" line. -->
+                            <StackPanel Margin="0,20,0,0" views:SettingsAnchor.Id="signin-reminders">
+                                <TextBlock Text="Sign-in reminders" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                                <CheckBox Content="{x:Static core:SettingsNames.SignInReminders}"
+                                          IsChecked="{Binding DeskSignInReminder}"
+                                          AutomationProperties.Name="{x:Static core:SettingsNames.SignInReminders}"
+                                          Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,4" />
+                                <TextBlock Text="{x:Static core:SignInReminder.Caption}" TextWrapping="Wrap" FontSize="11"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" Margin="22,0,0,0" />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
                 </TabItem>
