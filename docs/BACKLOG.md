@@ -148,7 +148,19 @@ Shape to spec:
 Open questions: whether Just the Desk should also skip the Keychain prompt path entirely, and
 whether the tour gets a Desk-only variant.
 
-## #5 — Windows Store build: AppData writes are invisible outside the package (raised)
+## #5 — Windows Store build: AppData writes are invisible outside the package (fixed in 3.4.3)
+
+**Fixed in 3.4.3** (PR #192, merged 2026-10-11; Store submission 1152921505702097635 in
+certification at the time of writing). Fix candidate 1 below shipped: `desktop6:FileSystemWriteVirtualization`
+`disabled` with `rescap:unvirtualizedResources`, scoped on Windows 11 (build 20348+) to
+`%APPDATA%\Sanduhr` and `%LOCALAPPDATA%\Sanduhr` through `virtualization:ExcludedDirectories`;
+MinVersion raised to 10.0.18362.0; a one-time migration (`PackagedDataMigration`) copies older
+Store data out of the package LocalCache. Verified on Neb: an in-place upgrade from the Store 3.4.2
+(8/8 steps, 8,204 files migrated, no fresh sign-in) and a parked-folder run in which both real
+folders were created and LocalCache got no new writes. A shipping app without the opt-out (RoRoRo)
+measured the opposite on the same machine, which is the negative control. Fix candidate 3 (a ping
+that tells "no snapshot" from "snapshot I can't see") was not built. Neb's hand-made junction,
+symlinks and resolver script were set aside during the smoke test. Kept below for the record.
 
 Raised 2026-10-11 from failures on Neb, which runs the Store (MSIX) build. Tracked as the critical
 dashboard task "MCP launcher points at a path Claude Code can't see on Store (MSIX) installs".
