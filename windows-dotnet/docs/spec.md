@@ -400,7 +400,7 @@ Este's rulings for S6 (2026-10-11, logged on the dashboard) are built here. Held
 **Keys**: `now_playing` `{widget: false, hide_paused: false, excluded: [], visualizer: true}`. Settings, **Now playing** page (Desk group): Show in the widget, Hide while paused, the apps seen this session with a switch each, Bars beside it on the Desk (6.6), and a status line ("Playing in Spotify", "Nothing playing"; never the title).
 
 ### 6.4 Telemetry (Desk piece)
-Knighthawk's System skin, cut to what Este asked for: **CPU, RAM and disk**, each a label, a percent and a bar in the ink, the meters' layout. Core `Telemetry.cs`: CPU from two `GetSystemTimes` readings (busy = (kernel + user − idle) deltas over total), RAM from `GlobalMemoryStatusEx.dwMemoryLoad`, disk as used share of the system drive (`GetDiskFreeSpaceEx`), clamped and rounded; formatting tested. App `TelemetrySource`: one P/Invoke sample every 2 s (at most once a second, per the ruling), only while the Desk shows the piece; the piece updates its numbers and bar widths in place (fixed widths, no relayout). No performance-counter package, no WMI. `telemetry` widget word, default place top right.
+Knighthawk's System skin, cut to what Este asked for: **CPU, RAM and disk**, each a label, a percent and a bar in the ink, the meters' layout. Core `Telemetry.cs`: CPU from two `GetSystemTimes` readings (busy = (kernel + user − idle) deltas over total), RAM from `GlobalMemoryStatusEx.dwMemoryLoad`, disk as used share of the system drive (`GetDiskFreeSpaceEx`), clamped and rounded; formatting tested. App `TelemetrySource`: one P/Invoke sample every 5 s (at most once a second, per the ruling; 5 s after the cost measurement, 6.11), only while the Desk shows the piece; the piece updates its numbers and bar widths in place (fixed widths, no relayout). No performance-counter package, no WMI. `telemetry` widget word, default place top right.
 
 ### 6.5 Weather (Desk piece, off by default)
 Knighthawk's Weather skin: the city as a heading, "Partly cloudy · 72°", "High 80° · Low 61°", "Tomorrow: Showers 75° / 60°", and under it in small type "Weather data by Open-Meteo.com".
@@ -432,7 +432,12 @@ Command Center-style bars beside the now-playing line, driven by the system **pe
 - **Live pieces.** A piece whose numbers change between redraws (the position bar, telemetry, the bars) updates its own elements in place with fixed widths, so its island repaints alone and no screen is laid out again. The controller lays the screens out only on the minute, a new reading, a track change, a weather reading or a setting change, and disposes the old live pieces each time.
 
 ### 6.11 Cost (Rainmeter's bar: near-zero idle)
-Measured as in S5 (the real host and view in a test process, 60 s, 4K): the standard layout plus message, telemetry, weather and now playing with nothing playing; and with audio playing (bars at 20 fps). Targets: idle (nothing playing) under 0.5% of one core; playing, the bars' island only. Numbers go in the PR and here.
+Measured on Dunder (4K, one monitor, 100%) with a scratch runner that drives the real `DeskController`, `DesktopLayerHost` and `DeskView` in a test process, three runs each, 120 s windows after warm-up; baseline is the same process with no Desk (0.08 to 0.23% of one core, 46 to 53 MB).
+- **Idle, S6 layout** (message, clock, Claude line, meters, now playing with nothing playing, system readings, weather without a place), Automatic ink: **0.85 to 1.00% of one core (0.05 to 0.06% of the machine), 134 to 136 MB** (about +83 MB).
+- **Idle without the system readings**: 0.27 to 0.29% of one core, 125 MB. The S5 layout alone: 0.16% over 180 s.
+- **Playing**, the bars at 20 fps (synthetic levels) with the readings and the position bar: **about 2% of one core (0.13% of the machine)**, 139 MB, only while a track plays.
+- What changed to get there: the minute no longer lays every screen out (the clock updates in place and the host re-fits its island; a full layout every 5 minutes and on any reading, track, weather, setting or screen change), the readings every 5 s and only on a change, no blur under the bars. Was about 0.9% of one core for the S5 layout alone, and 3.4% playing.
+- **Open**: one repaint of the readings' small island costs about 50 ms of CPU (the sampling itself is free; ink and shadow make no difference), so the readings are most of the idle cost. Profiling the per-pixel-transparent repaint path is S7's.
 
 ### 6.12 Render harness
 `desk` gains: the message (effects as still frames: glow, gradient ink, letter styles; a special day stacked), now playing with bars, telemetry, weather, watchers from samples; each in Light, Dark and Automatic ink over a dark and a light wallpaper stand-in (Automatic's sampler fed the stand-in image), at 100% and 150%. `settings` renders the Message, Now playing and Weather pages and the Desk page's ink, in a dark and a light theme.
@@ -457,6 +462,12 @@ All new state is keys in `settings.json`, defaults on absence:
 | `alert_muted_tiers` | `[tier]` | S1 | [] |
 | `tray_mode` | string | S1 | "highest" |
 | `tour_state` | string | S2 | fresh: "pending"; otherwise "not_offered" |
+| `hotkey_settings` | `{settings: {on, vk, mods}}` (was flat; migrated once) | S6 | as before |
+| `desk_ink` | `{mode, color, shadow}` | S6 | auto, "ffffff", true |
+| `desk_message` | `{pin, rotate, mix, special, seconds, size, color, glow, font}` | S6 | "", daily, false, stack, 10, 84, "" (follows the ink), true, "" |
+| `desk_weather` | `{name, admin, country, lat, lon, unit}` | S6 | no place; unit from the region |
+| `now_playing` | `{widget, hide_paused, excluded, visualizer}` | S6 | false, false, [], true |
+| `claude_code_glow.target` (+ `edge_side`, `edge_monitor`) | string | S6 | "window" |
 
 No new files outside `settings.json` in S1. Nothing new in Credential Manager, the vault or `snapshot.json`.
 

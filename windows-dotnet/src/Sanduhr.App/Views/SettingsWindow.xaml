@@ -2549,18 +2549,9 @@
                             </StackPanel>
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
                             <StackPanel views:SettingsAnchor.Id="weather-credit">
-                                <TextBlock FontSize="11" TextWrapping="Wrap">
-                                    <Hyperlink NavigateUri="{Binding CreditUrl}" RequestNavigate="Hyperlink_RequestNavigate"
-                                               Foreground="{DynamicResource Sanduhr.Brush.Accent}" AutomationProperties.Name="Weather data by Open-Meteo.com">
-                                        <Run Text="{Binding Credit, Mode=OneWay}" />
-                                    </Hyperlink>
-                                    <Run Text=" (CC BY 4.0, " Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
-                                    <Hyperlink NavigateUri="{Binding LicenceUrl}" RequestNavigate="Hyperlink_RequestNavigate"
-                                               Foreground="{DynamicResource Sanduhr.Brush.Accent}" AutomationProperties.Name="The licence">
-                                        <Run Text="licence" />
-                                    </Hyperlink>
-                                    <Run Text="). Place search by GeoNames (CC BY 4.0)." Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
-                                </TextBlock>
+                                <TextBlock FontSize="11" TextWrapping="Wrap"><Hyperlink NavigateUri="{Binding CreditUrl}" RequestNavigate="Hyperlink_RequestNavigate"
+                                               Foreground="{DynamicResource Sanduhr.Brush.Accent}" AutomationProperties.Name="Weather data by Open-Meteo.com"><Run Text="{Binding Credit, Mode=OneWay}" /></Hyperlink><Run Text=" (CC BY 4.0, " Foreground="{DynamicResource Sanduhr.Brush.TextDim}" /><Hyperlink NavigateUri="{Binding LicenceUrl}" RequestNavigate="Hyperlink_RequestNavigate"
+                                               Foreground="{DynamicResource Sanduhr.Brush.Accent}" AutomationProperties.Name="The licence"><Run Text="licence" /></Hyperlink><Run Text="). Place search by GeoNames (CC BY 4.0)." Foreground="{DynamicResource Sanduhr.Brush.TextDim}" /></TextBlock>
                             </StackPanel>
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
                             <TextBlock Text="{x:Static core:SettingsNames.TrademarkNotice}"

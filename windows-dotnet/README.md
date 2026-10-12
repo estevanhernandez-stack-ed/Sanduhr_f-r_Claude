@@ -195,6 +195,27 @@ The Claude Code side (`docs/spec.md` Stage 4, `../docs/mods-and-config-spec.md`)
 `statusline_enabled` now means "the statusline or the meters mod is installed in some folder", so
 `snapshot.json` is written while either is.
 
+### Since 3.4.3: Mac parity, Stages 5 and 6
+
+The Desk (`docs/spec.md` Stages 5 and 6), off until **Settings, Desk** turns it on:
+
+- **The window**: one bottom-most island window per stack of pieces, owned by the shell window
+  (Rainmeter's "On desktop"), per monitor and per-monitor DPI; it keeps clear of the taskbar.
+- **Pieces**: the clock and date, the Claude line and meters, the **message** (`messages.txt` in
+  `%APPDATA%\Sanduhr`, the Mac's grammar and effects, special days that stack, take turns or
+  scroll, edited on **Settings, Message**), **now playing** with bars from the output peak meter,
+  **system** readings (CPU, RAM, disk) and **weather** from Open-Meteo for a city you pick
+  (**Settings, Weather**). Watchers are drawn from the harness only until their MCP tools ship.
+- **Ink**: Automatic (from the wallpaper image behind each piece, never the screen), Light, Dark,
+  the theme's color or Custom (`desk_ink`).
+- **Now playing in the widget**: a line under the cards (`now_playing.widget`, off by default).
+- **Where the glow shows**: the window in use, a screen edge, or the taskbar flash only
+  (`claude_code_glow.target`).
+- `hotkey_settings` is a per-action map now; the flat value migrates once at launch
+  (`SettingsMigrations`).
+- New keys: `desk_ink`, `desk_message`, `desk_weather`, `now_playing`, and the glow group's
+  `target`, `edge_side`, `edge_monitor`. Reset removes `messages.txt` with the settings.
+
 ---
 
 ## Tech stack
