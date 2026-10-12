@@ -74,12 +74,6 @@
          Setting StartupObject suppresses the WPF-generated Main in App.g.cs (the build
          uses Program.Main instead). See Program.cs. -->
     <StartupObject>Sanduhr.App.Program</StartupObject>
-    <!-- S7 idle cost (spec 7.2): dynamic PGO adds an instrumented tier, so every method on the Desk's
-         repaint path is jitted twice more in the first minutes after start, and that recompiling was
-         most of the "50 ms repaint" S6 measured (the repaint itself costs a few ms). Off, the full Desk
-         idles at about 0.3% of one core from the start instead of about 1.1% for the first minutes;
-         steady state is about 0.03% either way. A widget gains nothing from PGO's peak throughput. -->
-    <TieredPGO>false</TieredPGO>
     <!-- v3.4.0: the statusline/MCP snapshot seam (snapshot.json stamped with this
          writer_version), the opt-in vendor-agnostic Publish usage with per-home consent,
          and the publish_usage MCP handoff. v3.3.0 was the Fable release (model-scoped
