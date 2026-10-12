@@ -96,6 +96,13 @@ internal sealed class AudioLevelSource : IDisposable
 
     public bool Running => _timer.IsEnabled;
 
+    /// <summary>Previews and the cost runner: one frame from a given level, without the meter.</summary>
+    internal void Pump(float peak)
+    {
+        Bars.Push(peak, DateTimeOffset.Now);
+        Frame?.Invoke();
+    }
+
     public void Start()
     {
         if (_timer.IsEnabled) return;

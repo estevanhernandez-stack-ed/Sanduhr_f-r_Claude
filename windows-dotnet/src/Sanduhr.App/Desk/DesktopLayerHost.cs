@@ -207,6 +207,17 @@ internal sealed class DesktopLayerHost : IDeskHost
             _ => 0,
         };
         double w = cw + 2 * Pad, h = ch + 2 * Pad;
+        // The minute's in-place tick hands the same content back (spec 6.10): keep its frame and only
+        // re-fit it, so nothing else in the island is rebuilt.
+        if (src.RootVisual is Border same && ReferenceEquals(same.Child, content))
+        {
+            same.Width = w;
+            same.Height = h;
+            same.LayoutTransform = Math.Abs(k - 1) < 0.001 ? Transform.Identity : new ScaleTransform(k, k);
+            Fit(src, screen, left, top, w, h, first);
+            return;
+        }
+        if (content.Parent is Border previous) previous.Child = null;
         var root = new Border
         {
             Child = content,
@@ -222,6 +233,12 @@ internal sealed class DesktopLayerHost : IDeskHost
         };
         TextOptions.SetTextFormattingMode(root, TextFormattingMode.Ideal);
         src.RootVisual = root;
+        Fit(src, screen, left, top, w, h, first);
+    }
+
+    /// <summary>Moves and sizes an island's window to its content, in the monitor's physical pixels.</summary>
+    private void Fit(HwndSource src, DeskScreen screen, double left, double top, double w, double h, bool first)
+    {
         int x = screen.Bounds.X + (int)Math.Round(left * screen.Scale);
         int y = screen.Bounds.Y + (int)Math.Round(top * screen.Scale);
         int pw = (int)Math.Ceiling(w * screen.Scale), ph = (int)Math.Ceiling(h * screen.Scale);

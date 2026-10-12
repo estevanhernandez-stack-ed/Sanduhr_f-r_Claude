@@ -19,8 +19,10 @@ public sealed record TelemetryRow(string Key, string Label, int Percent, double 
 /// </summary>
 public static class Telemetry
 {
-    /// <summary>How often the App samples. Two seconds keeps well inside the at-most-once-a-second ruling.</summary>
-    public static readonly TimeSpan Interval = TimeSpan.FromSeconds(2);
+    /// <summary>How often the App samples: five seconds. Each reading repaints the telemetry island, and a
+    /// per-pixel-transparent window repaints in software (measured about 2% of one core at two seconds),
+    /// so the Desk stays near zero idle; well inside the at-most-once-a-second ruling.</summary>
+    public static readonly TimeSpan Interval = TimeSpan.FromSeconds(5);
 
     /// <summary>
     /// CPU busy share between two readings: busy = (dKernel - dIdle) + dUser over

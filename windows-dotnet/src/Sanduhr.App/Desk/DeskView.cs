@@ -64,6 +64,7 @@ internal sealed class DeskView : Grid, IDisposable
     private readonly FontFamily _family;
     private readonly FontFamily _bold;
     private readonly List<IDisposable> _live = [];
+    private readonly List<Action<DateTimeOffset>> _ticks = [];
     private DeskFrame _frame = new();
     private DeskInkMap _inks = DeskInkMap.Light;
     private ResolvedInk _ink = DeskInkMap.Light.Default;
@@ -168,9 +169,17 @@ internal sealed class DeskView : Grid, IDisposable
         return islands;
     }
 
+    /// <summary>The minute's change without a new layout: the clock's time and date update in place
+    /// (the host then re-fits only the windows whose content changed size).</summary>
+    public void Tick(DateTimeOffset now)
+    {
+        foreach (var t in _ticks) t(now);
+    }
+
     /// <summary>Unhooks the live pieces (their timers and sources).</summary>
     public void Dispose()
     {
+        _ticks.Clear();
         foreach (var d in _live) d.Dispose();
         _live.Clear();
     }
@@ -273,7 +282,7 @@ internal sealed class DeskView : Grid, IDisposable
         if (piece is null) return null;
         piece.HorizontalAlignment = align;
         // The message carries its own glow (spec 6.2); every other piece takes the ink's shadow.
-        if (p.Widget != "message" && _ink.ShadowOpacity > 0)
+        if (p.Widget is not ("message" or "nowPlaying") && _ink.ShadowOpacity > 0)
             piece.Effect = Shadow(_ink);
         return piece;
     }
@@ -340,6 +349,14 @@ internal sealed class DeskView : Grid, IDisposable
         date.Margin = new Thickness(0, 2, 0, 0);
         panel.Children.Add(time);
         panel.Children.Add(date);
+        _ticks.Add(now =>
+        {
+            var l = now.ToLocalTime();
+            var t = l.ToString("h:mm", CultureInfo.CurrentCulture);
+            var d = l.ToString("dddd, MMMM d", CultureInfo.CurrentCulture);
+            if (time.Text != t) time.Text = t;
+            if (date.Text != d) date.Text = d;
+        });
         return panel;
     }
 
@@ -433,10 +450,14 @@ internal sealed class DeskView : Grid, IDisposable
         {
             if (source.Latest is not { } s) return;
             var rows = Telemetry.Rows(s);
+            // Only what changed on screen: an unchanged reading repaints nothing (the island's window
+            // redraws its whole surface on any change).
             for (int i = 0; i < rows.Count && i < cells.Count; i++)
             {
-                cells[i].Pct.Text = $"{rows[i].Percent}%";
-                cells[i].Fill.Width = width * Math.Clamp(rows[i].Fill, 0, 1);
+                var text = $"{rows[i].Percent}%";
+                if (cells[i].Pct.Text != text) cells[i].Pct.Text = text;
+                double w = Math.Round(width * Math.Clamp(rows[i].Fill, 0, 1));
+                if (Math.Abs(cells[i].Fill.Width - w) >= 1) cells[i].Fill.Width = w;
             }
         }
         source.Updated += Refresh;
@@ -501,6 +522,9 @@ internal sealed class DeskView : Grid, IDisposable
         };
         bar.Children.Add(fill);
         if (track.Duration is > 0) column.Children.Add(bar);
+        // The shadow on the line and its bar only: the bars beside it redraw 20 times a second, and a
+        // blur under them would be recomputed on every frame.
+        if (_ink.ShadowOpacity > 0) column.Effect = Shadow(_ink);
 
         if (track.State == NowPlayingState.Playing && track.Duration is > 0)
         {

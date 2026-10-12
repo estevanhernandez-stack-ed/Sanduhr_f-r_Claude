@@ -86,5 +86,5 @@ public class TelemetryTests
     }
 
     [Fact]
-    public void Interval_IsTwoSeconds() => Assert.Equal(TimeSpan.FromSeconds(2), Telemetry.Interval);
+    public void Interval_IsFiveSeconds() => Assert.Equal(TimeSpan.FromSeconds(5), Telemetry.Interval);
 }

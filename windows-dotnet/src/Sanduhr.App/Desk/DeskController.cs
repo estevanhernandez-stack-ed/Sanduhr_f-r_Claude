@@ -37,6 +37,13 @@ internal sealed class DeskController : IDisposable
     private DeskWeatherSettings _weatherSettings = DeskWeatherSettings.Default;
     private DeskUsage _usage = DeskUsage.Empty;
     private readonly List<DeskView> _views = [];
+    private IReadOnlyList<DeskSurface> _surfaces = [];
+    private DateTimeOffset _fullAt = DateTimeOffset.MinValue;
+
+    /// <summary>How often the minute's redraw lays the screens out again (the meters' pace tick, the
+    /// stale dim, reset words, watcher times); in between only the clock updates in place, so the
+    /// minute repaints one island instead of every one.</summary>
+    private static readonly TimeSpan FullEvery = TimeSpan.FromMinutes(5);
     private string? _trackKey;
     private bool _stopped;
 
@@ -180,6 +187,7 @@ internal sealed class DeskController : IDisposable
             Place = _weatherSettings.Place,
             Weather = _weatherSettings.Place is null ? null : _weather.Latest,
         };
+        _fullAt = now;
         foreach (var old in _views) old.Dispose();
         _views.Clear();
         var surfaces = new List<DeskSurface>();
@@ -190,6 +198,7 @@ internal sealed class DeskController : IDisposable
             _views.Add(view);
             surfaces.Add(new DeskSurface(screen, view.TakeIslands()));
         }
+        _surfaces = surfaces;
         try
         {
             _host.Show(surfaces);
@@ -237,7 +246,19 @@ internal sealed class DeskController : IDisposable
     {
         _minute.Stop();
         if (_host is null || _stopped) return;
-        Render();
+        var now = DateTimeOffset.Now;
+        if (now - _fullAt >= FullEvery || _surfaces.Count == 0 || now.ToLocalTime().Date != _fullAt.ToLocalTime().Date)
+            Render();
+        else
+        {
+            foreach (var v in _views) v.Tick(now);
+            try { _host.Show(_surfaces); }
+            catch (Exception e) when (e is ObjectDisposedException or InvalidOperationException or System.ComponentModel.Win32Exception)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Sanduhr] Desk tick failed: {e.GetType().Name}");
+                Render();
+            }
+        }
         ScheduleMinute();
     }
 
@@ -247,6 +268,7 @@ internal sealed class DeskController : IDisposable
         _screens = [];
         foreach (var v in _views) v.Dispose();
         _views.Clear();
+        _surfaces = [];
         _telemetry.Stop();
         if (_audio.Running) _audio.Stop();
         _weather.Stop();
