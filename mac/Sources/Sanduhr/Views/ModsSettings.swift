@@ -245,11 +245,26 @@ final class ModsPageModel {
     /// The two seats to compare: the picks when both are shown and differ, else the first two
     /// shown seats (no work seat in demo mode). Nil with fewer than two.
     func comparePair(demo: Bool) -> (a: Seat, b: Seat)? {
-        let shown = filterSeats(demo: demo)
-        guard shown.count >= 2 else { return nil }
-        let a = shown.first { $0.path == compareA } ?? shown[0]
-        let b = shown.first { $0.path == compareB && $0.path != a.path } ?? shown.first { $0.path != a.path }!
+        Self.pair(filterSeats(demo: demo), a: compareA, b: compareB)
+    }
+
+    /// The pair from `shown` for picks `a` and `b`: a pick that isn't shown (gone, or a work
+    /// seat in demo mode) falls back to the first shown seat that isn't the other one.
+    nonisolated static func pair(_ shown: [Seat], a pickA: String?, b pickB: String?) -> (a: Seat, b: Seat)? {
+        guard let a = shown.first(where: { $0.path == pickA }) ?? shown.first,
+              let b = shown.first(where: { $0.path == pickB && $0.path != a.path }) ?? shown.first(where: { $0.path != a.path })
+        else { return nil }
         return (a, b)
+    }
+
+    /// A seat picked on one side: picking the seat the other side shows swaps the two.
+    func pickCompare(_ path: String, first: Bool, current: (a: Seat, b: Seat)) {
+        (compareA, compareB) = Self.picked(path, first: first, a: current.a.path, b: current.b.path)
+    }
+
+    nonisolated static func picked(_ path: String, first: Bool, a: String, b: String) -> (String, String) {
+        if first { return path == b ? (b, a) : (path, b) }
+        return path == a ? (b, a) : (a, path)
     }
 
     func comparison(demo: Bool) -> SeatComparison? {
@@ -510,7 +525,7 @@ struct ModsPageRead: Sendable {
     var environmentSeat: String?
 }
 
-/// Mods & Config's two tabs (item 71, slice 1).
+/// Mods & Config's tabs (item 71, slice 1; Compare in slice 1d).
 enum ModsTab: String, CaseIterable, Sendable {
     case catalog, bySeat, compare
 

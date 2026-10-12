@@ -52,7 +52,7 @@ private struct CompareSeatPickers: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            picker("First seat", selection: Binding(get: { a.path }, set: { model.compareA = $0 }))
+            picker("First seat", selection: Binding(get: { a.path }, set: { model.pickCompare($0, first: true, current: (a, b)) }))
             Button {
                 model.compareA = b.path
                 model.compareB = a.path
@@ -62,7 +62,7 @@ private struct CompareSeatPickers: View {
             .buttonStyle(.borderless)
             .help("Swap the two seats")
             .accessibilityLabel("Swap the two seats")
-            picker("Second seat", selection: Binding(get: { b.path }, set: { model.compareB = $0 }))
+            picker("Second seat", selection: Binding(get: { b.path }, set: { model.pickCompare($0, first: false, current: (a, b)) }))
         }
         .controlSize(.small)
     }

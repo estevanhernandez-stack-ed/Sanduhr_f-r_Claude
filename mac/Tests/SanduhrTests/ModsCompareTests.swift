@@ -46,6 +46,40 @@ struct ModsCompareTests {
         #expect(!shown.flatMap(\.chips).contains { $0.mark == .work })
     }
 
+    static func seat(_ path: String, _ mark: SeatMark) -> Seat {
+        let store = MemoryDefaults()
+        SeatPreferences.setMark(mark, for: path, in: store)
+        return Seats.seat(path, origin: .found, home: "/nowhere", store: store)
+    }
+
+    @Test func thePairFallsBackAndNeverPicksOneSeatTwice() {
+        let w = Self.seat("/w", .work), p = Self.seat("/p", .personal), q = Self.seat("/q", .personal)
+        // No picks: the first two.
+        #expect(ModsPageModel.pair([w, p, q], a: nil, b: nil).map { [$0.a.path, $0.b.path] } == ["/w", "/p"])
+        // The same seat picked twice: the second falls back to another.
+        #expect(ModsPageModel.pair([w, p, q], a: "/q", b: "/q").map { [$0.a.path, $0.b.path] } == ["/q", "/w"])
+        // A pick that's gone, or hidden: the first shown seat that isn't the other one.
+        #expect(ModsPageModel.pair([p, q], a: "/w", b: "/p").map { [$0.a.path, $0.b.path] } == ["/p", "/q"])
+        // Fewer than two seats: nothing to compare.
+        #expect(ModsPageModel.pair([p], a: nil, b: nil) == nil)
+    }
+
+    @Test func pickingTheOtherSidesSeatSwaps() {
+        #expect(ModsPageModel.picked("/b", first: true, a: "/a", b: "/b") == ("/b", "/a"))
+        #expect(ModsPageModel.picked("/a", first: false, a: "/a", b: "/b") == ("/b", "/a"))
+        #expect(ModsPageModel.picked("/c", first: true, a: "/a", b: "/b") == ("/c", "/b"))
+        #expect(ModsPageModel.picked("/c", first: false, a: "/a", b: "/b") == ("/a", "/c"))
+    }
+
+    @Test func demoModeDropsAWorkSeatsChipFromASharedCard() {
+        // Held by the work seat and the personal one: in demo mode, compared against a second
+        // personal seat, it is only in the personal one.
+        let card = Self.card(.plugin, "shared", [("/a", .work, .on), ("/b", .personal, .on)])
+        let shown = [card].compactMap { $0.demoView() }
+        #expect(shown.first?.chips.map(\.seat) == ["/b"])
+        #expect(ConfigCatalog.compare(shown, a: "/b", b: "/c").onlyA.map(\.card.name) == ["shared"])
+    }
+
     @Test func theSmokeHookOpensCompare() {
         #expect((try? DebugLink.action("mods-config", arg: "compare").get()) == .modsConfig(.compare, seat: nil))
         #expect(ModsTab.compare.debugName == "compare" && ModsTab.allCases.count == 3)
