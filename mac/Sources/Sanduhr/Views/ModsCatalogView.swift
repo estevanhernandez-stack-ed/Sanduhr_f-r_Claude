@@ -46,14 +46,17 @@ struct SeatMarkBadge: View {
 }
 
 /// The Catalog (item 71, slice 1): every extension any seat holds or any marketplace a seat
-/// added lists, one card each, with a chip per seat. Read-only: Sanduhr's own mod switches
-/// above, nothing here writes.
+/// added lists, one card each, with a chip per seat. Slice 1c groups the cards (what needs a
+/// look, yours, plugins by source, MCP servers, then the marketplaces' long list, closed) and
+/// shows what each seat starts a session with. Read-only: Sanduhr's own mod switches above,
+/// nothing here writes.
 struct ModsCatalogView: View {
-    var model: ModsPageModel
+    @Bindable var model: ModsPageModel
     let demo: Bool
 
     var body: some View {
         let cards = model.shownCards(demo: demo)
+        let searching = !model.filter.search.trimmingCharacters(in: .whitespaces).isEmpty
         VStack(alignment: .leading, spacing: 10) {
             Text("Everything your Claude Code folders hold or a marketplace they added lists, one card each, with a chip for every folder (seat) that has it. Read from files only: nothing is fetched, run or changed. Click a chip to open that seat.")
                 .font(.caption)
@@ -62,15 +65,26 @@ struct ModsCatalogView: View {
             ForEach(model.unreadableNotes(demo: demo), id: \.self) { note in
                 Text(note).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
             }
+            if model.loaded { SessionLoadPanel(loads: model.shownLoads(demo: demo)) }
             CatalogFilterBar(model: model, demo: demo)
-            Text(countLine(shown: cards.count))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            HStack {
+                Text(countLine(shown: cards.count))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Picker("Sort plugins", selection: $model.sortByLoad) {
+                    Text("Plugins by name").tag(false)
+                    Text("Plugins by session load").tag(true)
+                }
+                .labelsHidden()
+                .controlSize(.small)
+                .frame(maxWidth: 200)
+            }
             if model.loaded && cards.isEmpty {
                 Text("Nothing matches these filters.").font(.caption).foregroundStyle(.secondary)
             }
-            LazyVStack(alignment: .leading, spacing: 10) {
-                ForEach(cards) { CatalogCardView(card: $0, model: model) }
+            ForEach(model.sections(demo: demo)) { section in
+                CatalogGroupView(section: section, model: model, open: searching || model.openGroups.contains(section.group))
             }
         }
     }
@@ -79,6 +93,136 @@ struct ModsCatalogView: View {
         guard model.loaded else { return "Reading your Claude Code folders…" }
         let total = ConfigCatalog.filter(model.catalog, CatalogFilter(), demo: demo).count
         return shown == total ? "\(total) in the catalog." : "\(shown) of \(total) shown."
+    }
+}
+
+/// What a new session in each seat starts with before anything is typed (slice 1c), estimated
+/// from the files. Claude Code shows no such figure across seats; `/context` and `/doctor` give
+/// it for the session they run in.
+private struct SessionLoadPanel: View {
+    let loads: [(seat: Seat, load: SessionLoad)]
+
+    var body: some View {
+        if !loads.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("What a new session starts with").font(.callout.weight(.semibold))
+                ForEach(loads, id: \.seat.path) { pair in
+                    SessionLoadRow(seat: pair.seat, load: pair.load)
+                }
+                Text("Estimated from the files at about four characters a token. Projects add their own. Inside a session, /context and /doctor give the exact figure.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.secondary.opacity(0.08)))
+        }
+    }
+}
+
+private struct SessionLoadRow: View {
+    let seat: Seat
+    let load: SessionLoad
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Text(seat.label).font(.caption.weight(.semibold))
+                SeatMarkBadge(mark: seat.mark)
+                Text("about \(SessionLoad.short(load.listingTokens + load.agentTokens)) tokens before you type")
+                    .font(.caption)
+            }
+            Text(detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if load.overBudget {
+                Text("Over Claude Code's skill list budget (about \(SessionLoad.short(load.budgetTokens(context: 200_000))) tokens with a 200K context, \(SessionLoad.short(load.budgetTokens(context: 1_000_000))) with 1M), so it drops the descriptions of the skills you use least and Claude may miss them. Turning off plugins you don't use frees room.")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !biggest.isEmpty {
+                Text("Biggest: " + biggest).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var detail: String {
+        var parts = ["Skill list: \(load.listed + load.nameOnly) entries, about \(SessionLoad.short(load.listingTokens)) tokens"]
+        if load.hidden > 0 { parts[0] += " (\(load.hidden) kept out of it)" }
+        parts.append("agents: \(load.agents), about \(SessionLoad.short(load.agentTokens))")
+        if load.mcpServers > 0 {
+            parts.append("\(load.mcpServers) MCP server\(load.mcpServers == 1 ? "" : "s"), their tools not counted")
+        }
+        return parts.joined(separator: "; ") + "."
+    }
+
+    private var biggest: String {
+        load.sources.prefix(4).map { "\($0.name) \(SessionLoad.short($0.tokens))" }.joined(separator: ", ")
+    }
+}
+
+/// One group: a header that opens and closes it, then its runs of cards.
+private struct CatalogGroupView: View {
+    let section: CatalogSection
+    var model: ModsPageModel
+    let open: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                if model.openGroups.contains(section.group) { model.openGroups.remove(section.group) } else { model.openGroups.insert(section.group) }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: open ? "chevron.down" : "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .frame(width: 12)
+                    Text(section.group.title).font(.callout.weight(.semibold))
+                        .foregroundStyle(section.group == .attention ? Color.orange : Color.primary)
+                    Text("\(section.count)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(section.group.title), \(section.count)")
+            .accessibilityValue(open ? "Open" : "Closed")
+            if open {
+                ForEach(section.runs) { run in
+                    if !run.title.isEmpty {
+                        Text(run.title + " · \(run.cards.count)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 2)
+                    }
+                    LazyVStack(alignment: .leading, spacing: section.group == .available ? 4 : 10) {
+                        ForEach(run.cards) { card in
+                            if section.group == .available {
+                                AvailableRow(card: card)
+                            } else {
+                                CatalogCardView(card: card, model: model)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.top, 4)
+    }
+}
+
+/// A marketplace's plugin installed nowhere: one line, so a list of hundreds stays short.
+private struct AvailableRow: View {
+    let card: CatalogCard
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(card.name).font(.caption.weight(.semibold))
+            if let v = card.version {
+                Text(v).font(.caption2.monospaced()).foregroundStyle(.secondary)
+            }
+            Text(card.description).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+        }
+        .help(card.description)
     }
 }
 
@@ -134,6 +278,12 @@ private struct CatalogCardView: View {
                     .font(.caption)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if let c = card.contents, !c.summary.isEmpty {
+                PluginContentsLine(card: card, contents: c, model: model)
+            }
+            if let line = loadLine {
+                Text(line).font(.caption).foregroundStyle(.secondary)
+            }
             if card.isSanduhrs {
                 Text("Switches per folder above, \(SettingsNames.metersAbovePrompt).")
                     .font(.caption)
@@ -150,6 +300,15 @@ private struct CatalogCardView: View {
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.secondary.opacity(0.08)))
     }
 
+    /// "About 1.2K tokens a session in Work, 300 in Personal": the seats where it is on.
+    private var loadLine: String? {
+        let parts = card.chips.compactMap { chip -> String? in
+            guard let n = card.load[chip.seat], n > 0 else { return nil }
+            return "\(SessionLoad.short(n)) in \(chip.label)"
+        }
+        return parts.isEmpty ? nil : "About " + parts.joined(separator: ", ") + " tokens a session."
+    }
+
     /// The validator's answer for one of its items, when Check ran.
     private var riskLine: String? {
         for id in card.itemIDs {
@@ -157,6 +316,42 @@ private struct CatalogCardView: View {
             return "Checked: " + r.risk.title + (r.passed ? "" : ", Claude Code would refuse it")
         }
         return nil
+    }
+}
+
+/// What a plugin brings, and its names behind Show.
+private struct PluginContentsLine: View {
+    let card: CatalogCard
+    let contents: CatalogContents
+    var model: ModsPageModel
+
+    var body: some View {
+        let open = model.openContents.contains(card.id)
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                Text(contents.summary).font(.caption)
+                Button(open ? "Hide" : "Show") {
+                    if open { model.openContents.remove(card.id) } else { model.openContents.insert(card.id) }
+                }
+                .buttonStyle(.link)
+                .font(.caption)
+                .accessibilityLabel(open ? "Hide what \(card.name) brings" : "Show what \(card.name) brings")
+            }
+            if open {
+                ForEach(rows, id: \.0) { title, names in
+                    Text(title + ": " + names.joined(separator: ", "))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    private var rows: [(String, [String])] {
+        [("Skills", contents.skills), ("Agents", contents.agents), ("Commands", contents.commands),
+         ("Output styles", contents.outputStyles)].filter { !$0.1.isEmpty }
     }
 }
 
