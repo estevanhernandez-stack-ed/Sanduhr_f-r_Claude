@@ -33,6 +33,8 @@ struct SessionLoad: Equatable, Sendable {
     /// tools aren't counted, because Sanduhr never starts a server.
     var mcpServers = 0
     var settings = ListingSettings()
+    /// A folder walk stopped at its limit: the figures are a floor.
+    var partial = false
     /// Biggest first.
     var sources: [Source] = []
 
@@ -66,7 +68,7 @@ struct SessionLoad: Equatable, Sendable {
     /// `plugin:name` as Claude Code lists them. Only plugins that are on and have a folder here
     /// count; one that loads only in its session or only in projects doesn't.
     static func build(_ scan: SeatScan) -> SessionLoad {
-        var load = SessionLoad(seat: scan.seat, settings: scan.listing)
+        var load = SessionLoad(seat: scan.seat, settings: scan.listing, partial: scan.partial || scan.pluginsPartial)
         let cap = scan.listing.maxDescChars
         var own = Source(name: "Yours")
 

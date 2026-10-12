@@ -188,6 +188,7 @@ struct ModsCatalogGroupsTests {
         let flagged = ConfigCatalog.sections(cards, failedChecks: [kit.id])
         #expect(flagged.first?.group == .attention && flagged.first?.runs[0].cards.map(\.name) == ["kit"])
         #expect(ConfigCatalog.counts(cards).groups == [0, 5, 3, 1, 1])
+        #expect(ConfigCatalog.counts(cards, failedChecks: [kit.id]).groups == [1, 5, 2, 1, 1])
     }
 
     @Test func pluginCardsCarryWhatTheyBringAndTheirLoad() throws {
@@ -219,9 +220,42 @@ struct ModsCatalogGroupsTests {
         b.chips = a.chips
         b.installedSources = a.installedSources
         b.load = ["s": 500]
-        let byName = ConfigCatalog.sections([a, b])[0].runs[0].cards.map(\.name)
+        let byName = ConfigCatalog.sections([b, a])[0].runs[0].cards.map(\.name)
         let byLoad = ConfigCatalog.sections([a, b], byLoad: true)[0].runs[0].cards.map(\.name)
         #expect(byName == ["a", "b"] && byLoad == ["b", "a"])
+    }
+
+    @Test func aPersonalSeatsContentsReplaceAWorkSeatsAcrossABuild() throws {
+        let h = TempHome()
+        defer { h.cleanUp() }
+        Self.seatC(h)
+        // A personal seat with its own copy of kit, which brings one skill only.
+        Self.put(h, ".claude-p/settings.json", #"{"enabledPlugins":{"kit@market":true}}"#)
+        Self.put(h, "cache/kit-p/.claude-plugin/plugin.json", #"{"name":"kit"}"#)
+        Self.put(h, "cache/kit-p/skills/solo/SKILL.md", "---\nname: solo\ndescription: Alone.\n---\n")
+        Self.put(h, ".claude-p/plugins/installed_plugins.json", """
+        {"version":2,"plugins":{"kit@market":[{"scope":"user","installPath":"\(h.at("cache/kit-p"))"}]}}
+        """)
+        let store = MemoryDefaults()
+        SeatPreferences.setMark(.work, for: h.at(".claude-c"), in: store)
+        SeatPreferences.setMark(.personal, for: h.at(".claude-p"), in: store)
+        let seats = [".claude-c", ".claude-p"].map { name in
+            (seat: Seats.seat(h.at(name), origin: .found, home: h.path, store: store),
+             scan: SeatScanner.scan(seat: h.at(name), home: h.path, managedFolder: h.at("managed")))
+        }
+        let kit = try #require(ConfigCatalog.build(seats).first { $0.name == "kit" })
+        // The work seat came first, but the personal seat's contents win, so demo mode keeps them.
+        #expect(kit.contents?.skills == ["solo"] && kit.contents?.work == false)
+        let shown = try #require(kit.demoView())
+        #expect(shown.contents?.skills == ["solo"])
+        #expect(Set(shown.load.keys) == [h.at(".claude-p")])
+    }
+
+    @Test func aPartialWalkMakesTheLoadAFloor() {
+        var scan = SeatScan(seat: "/s")
+        #expect(!SessionLoad.build(scan).partial)
+        scan.pluginsPartial = true
+        #expect(SessionLoad.build(scan).partial)
     }
 
     @Test func demoModeDropsAWorkSeatsContentsAndLoad() throws {

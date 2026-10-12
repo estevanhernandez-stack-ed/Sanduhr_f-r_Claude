@@ -160,6 +160,8 @@ struct SeatScan: Equatable, Sendable {
     var caseTwinProjects = 0
     /// Each plugin's contents by its item id (`ModItem.id`), for the plugins with a folder here.
     var pluginContents: [String: PluginContents] = [:]
+    /// The plugin folders' walk hit its limit: their contents, and so the session load, are partial.
+    var pluginsPartial = false
     var listing = ListingSettings()
 }
 
@@ -249,11 +251,16 @@ enum SeatScanner {
 
         out.mcpServers = mcpServers(in: config, scope: .user, owner: nil)
         out.mcpServers += managedServers(managedFolder, fm)
+        // Plugin folders walk on their own budget, so many plugins can't crowd out the projects,
+        // and a folder two items share is walked once.
+        let pluginBudget = Budget()
+        var walked: [String: PluginContents] = [:]
         for item in out.plugins where item.state != .missing {
             guard let path = item.path else { continue }
             let servers = pluginServers(path, name: item.name, fm)
             out.mcpServers += servers
-            out.pluginContents[item.id] = contents(of: path, servers: servers.count, fm, budget)
+            if walked[path] == nil { walked[path] = contents(of: path, servers: servers.count, fm, pluginBudget) }
+            out.pluginContents[item.id] = walked[path]
         }
         out.listing = ListingSettings.read([settings, managed])
 
@@ -280,6 +287,7 @@ enum SeatScanner {
             }
         }
         out.partial = budget.hit
+        out.pluginsPartial = pluginBudget.hit
         return out
     }
 

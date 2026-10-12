@@ -476,10 +476,11 @@ enum ConfigCatalog {
                 out.append(CatalogSection(group: g, runs: runs(list) { $0.kind.title }))
             case .plugins:
                 var r = runs(list, runTitle)
-                for i in r.indices where byLoad {
+                for i in r.indices {
                     r[i].cards.sort { a, b in
                         if a.isSanduhrs != b.isSanduhrs { return a.isSanduhrs }
-                        return load(a) != load(b) ? load(a) > load(b) : a.name.localizedStandardCompare(b.name) == .orderedAscending
+                        if byLoad, load(a) != load(b) { return load(a) > load(b) }
+                        return a.name.localizedStandardCompare(b.name) == .orderedAscending
                     }
                 }
                 r.sort { a, b in
@@ -543,10 +544,11 @@ enum ConfigCatalog {
         var groups: [Int] = []
     }
 
-    static func counts(_ cards: [CatalogCard]) -> Counts {
+    /// `failedChecks` moves a card to Needs a look, as on the page.
+    static func counts(_ cards: [CatalogCard], failedChecks: Set<String> = []) -> Counts {
         Counts(cards: cards.count, available: cards.filter(\.isAvailable).count,
                needsLook: cards.filter(\.needsLook).count, duplicates: cards.filter(\.isDuplicate).count,
                workOnly: cards.filter(\.isWorkOnly).count,
-               groups: CatalogGroup.allCases.map { g in cards.filter { group($0, failed: false) == g }.count })
+               groups: CatalogGroup.allCases.map { g in cards.filter { group($0, failed: failedChecks.contains($0.id)) == g }.count })
     }
 }

@@ -84,7 +84,7 @@ struct ModsCatalogView: View {
                 Text("Nothing matches these filters.").font(.caption).foregroundStyle(.secondary)
             }
             ForEach(model.sections(demo: demo)) { section in
-                CatalogGroupView(section: section, model: model, open: searching || model.openGroups.contains(section.group))
+                CatalogGroupView(section: section, model: model, searching: searching)
             }
         }
     }
@@ -130,7 +130,7 @@ private struct SessionLoadRow: View {
             HStack(spacing: 6) {
                 Text(seat.label).font(.caption.weight(.semibold))
                 SeatMarkBadge(mark: seat.mark)
-                Text("about \(SessionLoad.short(load.listingTokens + load.agentTokens)) tokens before you type")
+                Text("\(load.partial ? "at least" : "about") \(SessionLoad.short(load.listingTokens + load.agentTokens)) tokens before you type")
                     .font(.caption)
             }
             Text(detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -165,9 +165,11 @@ private struct SessionLoadRow: View {
 private struct CatalogGroupView: View {
     let section: CatalogSection
     var model: ModsPageModel
-    let open: Bool
+    /// A search opens every group and holds them open, so the header doesn't toggle meanwhile.
+    let searching: Bool
 
     var body: some View {
+        let open = searching || model.openGroups.contains(section.group)
         VStack(alignment: .leading, spacing: 8) {
             Button {
                 if model.openGroups.contains(section.group) { model.openGroups.remove(section.group) } else { model.openGroups.insert(section.group) }
@@ -184,6 +186,8 @@ private struct CatalogGroupView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .disabled(searching)
+            .help(searching ? "Every group is open while you search." : "")
             .accessibilityLabel("\(section.group.title), \(section.count)")
             .accessibilityValue(open ? "Open" : "Closed")
             if open {
