@@ -83,7 +83,11 @@ with `open -g` (no activation). The app writes its files into `dir`, then `done`
   `claude` was found; never a mod's name, a path or a report), `mods_config` (item 71, slice 1: `tab`, `catalog` or `seat`;
   `seats`, how many Claude Code folders it read; `cards`, `available` (listed by a marketplace, installed nowhere),
   `needs_look`, `duplicates` and `work_only` (cards only work seats hold, hidden in demo mode) across the Catalog;
-  `shown`, the cards the filters and demo mode let through; never a name, a label, a path or a value), `message_editor` (item 69: `open`, Settings,
+  `shown`, the cards the filters and demo mode let through; `selected`, the seat By Seat shows, from 1, 0 before the
+  seats are read; `by_seat`, one entry per seat in seat order with `settings` (keys in effect), `warnings`, `unreadable`
+  (its settings.json doesn't parse), `instructions` (files in the CLAUDE.md tree), `extensions`, `parity` (plugin
+  checks to look at), `hooks`, `mcp`, `history_warning` (the 30-day purge applies), `leftovers`, `drift` (differences
+  with the other seats) and `running` (a `claude` of this user runs in it); never a name, a label, a path or a value), `message_editor` (item 69: `open`, Settings,
   Message shows; `mode`, `list` or `text`; `rows`, `styled` and `raw` message lines and `notes`, comments
   and blank lines, in the editor's document; `unsaved`; `today_special`, how many date lines the Desk draws above the
   usual line today; `added`, the line `message-editor add` put in, else

@@ -269,6 +269,10 @@ struct ModsConfigDebug: Equatable {
     var seats = 0
     var counts = ConfigCatalog.Counts()
     var shown = 0
+    /// By Seat (slice 1b): the seat shown, from 1 (0 before the seats are read), and each seat's
+    /// counts in seat order.
+    var selected = 0
+    var bySeat: [SeatCounts] = []
 }
 
 /// state.yaml's `notch_shows:`: each place's effective content, never its text.
@@ -433,7 +437,17 @@ enum DebugState {
         .map([YAMLPair("tab", .string(m.tab)), YAMLPair("seats", .int(m.seats)),
               YAMLPair("cards", .int(m.counts.cards)), YAMLPair("available", .int(m.counts.available)),
               YAMLPair("needs_look", .int(m.counts.needsLook)), YAMLPair("duplicates", .int(m.counts.duplicates)),
-              YAMLPair("work_only", .int(m.counts.workOnly)), YAMLPair("shown", .int(m.shown))])
+              YAMLPair("work_only", .int(m.counts.workOnly)), YAMLPair("shown", .int(m.shown)),
+              YAMLPair("selected", .int(m.selected)), YAMLPair("by_seat", .list(m.bySeat.map(seatCountsYAML)))])
+    }
+
+    /// One seat's counts on By Seat (slice 1b): numbers and flags, never a name or a value.
+    static func seatCountsYAML(_ c: SeatCounts) -> YAMLNode {
+        .map([YAMLPair("settings", .int(c.settings)), YAMLPair("warnings", .int(c.warnings)),
+              YAMLPair("unreadable", .bool(c.unreadable)), YAMLPair("instructions", .int(c.instructions)),
+              YAMLPair("extensions", .int(c.extensions)), YAMLPair("parity", .int(c.parity)), YAMLPair("hooks", .int(c.hooks)),
+              YAMLPair("mcp", .int(c.mcp)), YAMLPair("history_warning", .bool(c.historyWarning)),
+              YAMLPair("leftovers", .int(c.leftovers)), YAMLPair("drift", .int(c.drift)), YAMLPair("running", .bool(c.running))])
     }
 
     /// `reset_dry_run:` (slice 5): what Reset would remove, step kinds and counts in run order;

@@ -55,6 +55,9 @@ struct SeatMCPServer: Equatable, Sendable {
     var target: String
     var envNames: [String] = []
     var headerNames: [String] = []
+    /// An env or header value is written out rather than a `${VAR}` reference (the value itself is
+    /// never kept).
+    var literalValues = false
     /// The project folder (local and project scopes) or the plugin's name. Never shown across the wall.
     var owner: String?
 }
@@ -104,6 +107,10 @@ struct SeatScan: Equatable, Sendable {
     var projects: [String] = []
     /// A folder walk hit its limit: what's listed is partial.
     var partial = false
+    /// The top-level keys of the seat's `.claude.json` (By Seat's lints read them, so the file is
+    /// parsed once per load), and how many of its project keys differ from another only in case.
+    var configKeys: [String] = []
+    var caseTwinProjects = 0
 }
 
 enum SeatScanner {
@@ -180,6 +187,8 @@ enum SeatScanner {
         let config = read(configPath, cap: Cap.claudeJSON, name: ".claude.json") ?? [:]
         let projectTable = config["projects"] as? [String: Any] ?? [:]
         out.projects = projectTable.keys.sorted().prefix(ModOverrides.projectLimit).map { $0 }
+        out.configKeys = config.keys.sorted()
+        out.caseTwinProjects = Dictionary(grouping: projectTable.keys, by: { $0.lowercased() }).values.filter { $0.count > 1 }.count
 
         out.agents = entries(in: (root as NSString).appendingPathComponent("agents"), kind: .agent, scope: .seat, fm, budget)
         out.commands = entries(in: (root as NSString).appendingPathComponent("commands"), kind: .command, scope: .seat, fm, budget)
@@ -349,6 +358,58 @@ enum SeatScanner {
             }
             return nil
         }
+    }
+
+    /// A JSONC file (VS Code's `.vscode/settings.json`): comments and trailing commas allowed,
+    /// stripped outside strings before parsing. Claude Code's own files stay strict.
+    static func lenientObject(_ path: String, _ fm: FileManager = .default, cap: Int = Cap.small) -> [String: Any]? {
+        guard case .data(let data) = readFile(path, cap: cap, fm) else { return nil }
+        let clean = stripJSONC(data)
+        return (try? JSONSerialization.jsonObject(with: clean)) as? [String: Any]
+    }
+
+    /// `data` without `//` and `/* */` comments and without commas right before `}` or `]`,
+    /// strings left as they are.
+    static func stripJSONC(_ data: Data) -> Data {
+        let b = [UInt8](data)
+        var out: [UInt8] = []
+        out.reserveCapacity(b.count)
+        var i = 0
+        var inString = false
+        while i < b.count {
+            let c = b[i]
+            if inString {
+                out.append(c)
+                if c == UInt8(ascii: "\\"), i + 1 < b.count {
+                    out.append(b[i + 1])
+                    i += 2
+                    continue
+                }
+                if c == UInt8(ascii: "\"") { inString = false }
+                i += 1
+                continue
+            }
+            if c == UInt8(ascii: "/"), i + 1 < b.count, b[i + 1] == UInt8(ascii: "/") {
+                while i < b.count, b[i] != UInt8(ascii: "\n") { i += 1 }
+                continue
+            }
+            if c == UInt8(ascii: "/"), i + 1 < b.count, b[i + 1] == UInt8(ascii: "*") {
+                i += 2
+                while i + 1 < b.count, !(b[i] == UInt8(ascii: "*") && b[i + 1] == UInt8(ascii: "/")) { i += 1 }
+                i += 2
+                continue
+            }
+            if c == UInt8(ascii: "}") || c == UInt8(ascii: "]") {
+                // Drop a comma left before this close, past any whitespace.
+                var j = out.count - 1
+                while j >= 0, [UInt8(ascii: " "), UInt8(ascii: "\t"), UInt8(ascii: "\r"), UInt8(ascii: "\n")].contains(out[j]) { j -= 1 }
+                if j >= 0, out[j] == UInt8(ascii: ",") { out.remove(at: j) }
+            }
+            if c == UInt8(ascii: "\"") { inString = true }
+            out.append(c)
+            i += 1
+        }
+        return Data(out)
     }
 
     /// "isn't valid JSON (around line 3, column 5)": the position only. Foundation's message can
@@ -566,10 +627,13 @@ enum SeatScanner {
             let args = (ConfigMask.mask(entry["args"] as? [Any] ?? [], at: ["args"]) as? [Any] ?? []).compactMap { $0 as? String }
             target = ([ConfigMask.maskString(command)] + args).joined(separator: " ")
         }
-        return SeatMCPServer(name: name, scope: scope, transport: transport, target: target,
-                             envNames: (entry["env"] as? [String: Any] ?? [:]).keys.sorted(),
-                             headerNames: (entry["headers"] as? [String: Any] ?? [:]).keys.sorted(),
-                             owner: owner)
+        let values = Array((entry["env"] as? [String: Any] ?? [:]).values) + Array((entry["headers"] as? [String: Any] ?? [:]).values)
+        var s = SeatMCPServer(name: name, scope: scope, transport: transport, target: target,
+                              envNames: (entry["env"] as? [String: Any] ?? [:]).keys.sorted(),
+                              headerNames: (entry["headers"] as? [String: Any] ?? [:]).keys.sorted(),
+                              owner: owner)
+        s.literalValues = values.contains { ($0 as? String).map { !$0.contains("${") } ?? false }
+        return s
     }
 
     static func managedServers(_ folder: String, _ fm: FileManager) -> [SeatMCPServer] {

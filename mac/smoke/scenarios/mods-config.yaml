@@ -3,7 +3,7 @@
 # seat; By Seat shows each seat. state.yaml's `mods_config` carries the tab and counts only, never
 # a name, label, path or value. Read only: the run switches tabs and demo mode (in memory) and nothing else; no seat
 # file changes (the tests prove the scan writes nothing; by hand, docs/mac-smoke-test.md,
-# section 49, "Mods & Config: the Catalog").
+# sections 49 and 50).
 name: Mods & Config Catalog and By Seat
 steps:
   # Demo mode first, so the snaps show no work seat, its sources or its descriptions.
@@ -26,9 +26,20 @@ steps:
     arg: seat
   - expect_state: { mods_config.tab: seat }
   - snap: mods-by-seat
+  # By Seat (slice 1b): the picker on the first seat, its eight sections' counts in
+  # `mods_config.by_seat`, numbers and flags only. Opening a seat reads files, changes none.
   - do: mods-config
     arg: seat 1
-  - expect_state: { mods_config.tab: seat }
+  - expect_state:
+      mods_config.tab: seat
+      mods_config.selected: 1
+      mods_config.by_seat.0.settings: '/^\d+$/'
+      mods_config.by_seat.0.unreadable: '/^(true|false)$/'
+      mods_config.by_seat.0.history_warning: '/^(true|false)$/'
+  - expect:
+      window: settings
+      contains: { text: Drift between seats }
+  - snap: mods-by-seat-1
   - do: mods-config
     arg: catalog
   - expect_state: { mods_config.tab: catalog }

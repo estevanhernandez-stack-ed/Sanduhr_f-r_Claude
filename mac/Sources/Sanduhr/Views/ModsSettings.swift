@@ -110,12 +110,16 @@ final class ModsPageModel {
                 configs[p] = ClaudeCodeFolders.configCandidates(for: p, home: home)
                 notes[p] = ModsPageModel.configNote(configs[p] ?? [], display: display)
             }
-            return ModsPageRead(paths: paths, scans: [], inventory: [],
-                                claude: ModCheck.findClaude(environment: env, home: home),
-                                own: paths.map { OwnModRow.read(installer, folder: $0, app: app) }, app: app,
-                                notes: notes, configs: configs, skipped: installer.readReceipts().skipped,
-                                origins: ModsPageModel.origins(home: home, environment: env, added: added, linked: linked,
-                                                               installed: installed))
+            let claude = ModCheck.findClaude(environment: env, home: home)
+            var read = ModsPageRead(paths: paths, scans: [], inventory: [],
+                                    claude: claude,
+                                    own: paths.map { OwnModRow.read(installer, folder: $0, app: app) }, app: app,
+                                    notes: notes, configs: configs, skipped: installer.readReceipts().skipped,
+                                    origins: ModsPageModel.origins(home: home, environment: env, added: added, linked: linked,
+                                                                   installed: installed))
+            read.version = ModsPageModel.claudeVersion(claude)
+            read.environmentSeat = env["CLAUDE_CONFIG_DIR"].flatMap { $0.isEmpty ? nil : ClaudeProcesses.seat(configDir: $0, home: home) }
+            return read
         }.value
         claude = first.claude
         own = first.own
@@ -125,15 +129,30 @@ final class ModsPageModel {
         receiptsSkipped = first.skipped
         seatConfigs = first.configs
         seatOrigins = first.origins
+        claudeVersion = first.version
+        environmentSeat = first.environmentSeat
         ownLoaded = true
         // One read per seat (item 71, slice 1): its plugins are the inventory's, and its
-        // `.claude.json` placement is the one just read.
+        // `.claude.json` placement is the one just read. Then By Seat's sections (slice 1b),
+        // and which seats a running claude uses.
         let paths = first.paths, configs = first.configs
-        let scans = await Task.detached(priority: .userInitiated) {
-            paths.map { SeatScanner.scan(seat: $0, home: home, config: configs[$0]) }
+        let second = await Task.detached(priority: .userInitiated) { () -> ModsPageRead in
+            let scans = paths.map { SeatScanner.scan(seat: $0, home: home, config: configs[$0]) }
+            let defaultSeat = (home as NSString).appendingPathComponent(ClaudeCodeFolders.defaultName)
+            let running = ClaudeProcesses.running(home: home)
+            var read = ModsPageRead(paths: paths, scans: scans, inventory: [], claude: nil, own: [], app: nil,
+                                    notes: [:], configs: configs, skipped: 0)
+            read.reports = SeatReports.build(scans.map { SeatReports.Input(seat: $0.seat, isDefault: $0.seat == defaultSeat, scan: $0) },
+                                             home: home, configs: configs)
+            read.running = Set(running.sessions.map(\.seat))
+            read.unreadableProcesses = running.unreadable
+            return read
         }.value
-        self.scans = scans
+        scans = second.scans
         inventory = scans.map { ModFolderInventory(folder: $0.seat, items: $0.plugins) }
+        reports = second.reports
+        running = second.running
+        unreadableProcesses = second.unreadableProcesses
         refreshSeats()
         let ids = Set(inventory.flatMap(\.items).map(\.id))
         checks = checks.filter { ids.contains($0.key) }
@@ -201,7 +220,70 @@ final class ModsPageModel {
     /// A chip's click: By Seat at that seat and that extension.
     func open(_ chip: CatalogChip, card: CatalogCard) {
         focus = ModsFocus(seat: chip.seat, card: card.id, name: card.name)
+        selectedSeat = chip.seat
+        openSections.insert(card.kind == .mcpServer ? SeatSectionID.mcp.rawValue : SeatSectionID.extensions.rawValue)
         tab = .bySeat
+    }
+
+    // MARK: By Seat (item 71, slice 1b)
+
+    /// Each seat's eight sections, in seat order.
+    private(set) var reports: [SeatReport] = []
+    /// Seats a running `claude` of this user uses, and processes that couldn't be read.
+    private(set) var running: Set<String> = []
+    private(set) var unreadableProcesses = 0
+    /// The Claude Code version on PATH, from the native installer's versioned folder; nil when
+    /// that can't say (the CLI is never run to ask).
+    private(set) var claudeVersion: String?
+    /// The seat Sanduhr's own `CLAUDE_CONFIG_DIR` names (Sanduhr runs from the Dock, so usually none).
+    private(set) var environmentSeat: String?
+    /// The seat By Seat shows.
+    var selectedSeat: String?
+    /// By Seat's sections that are open (SeatSectionID raw values), kept while the window lives.
+    var openSections: Set<String> = []
+
+    /// The seats By Seat offers: in demo mode, no work seat.
+    func pickerSeats(demo: Bool) -> [Seat] { seats.filter { !(demo && $0.isWork) } }
+
+    /// The selected seat, else the first one offered.
+    func shownSeat(demo: Bool) -> Seat? {
+        let offered = pickerSeats(demo: demo)
+        return offered.first { $0.path == selectedSeat } ?? offered.first
+    }
+
+    func report(for seat: String) -> SeatReport? { reports.first { $0.seat == seat } }
+
+    /// Drift against the seats demo mode still shows (no work seat in demo mode).
+    func shownDrift(_ report: SeatReport, demo: Bool) -> [SeatReport.Drift] {
+        report.drift.filter { !(demo && isWork($0.other)) }
+    }
+
+    /// The report as By Seat summarizes it in demo mode: drift against shown seats only.
+    func shownReport(_ report: SeatReport, demo: Bool) -> SeatReport {
+        var r = report
+        r.drift = shownDrift(report, demo: demo)
+        return r
+    }
+
+    func label(of path: String) -> String { seats.first { $0.path == path }?.label ?? (path as NSString).lastPathComponent }
+
+    func mark(of path: String) -> SeatMark { seats.first { $0.path == path }?.mark ?? .unmarked }
+
+    /// The account linked to a seat, by its label (Sanduhr's own name for it).
+    func linkedAccount(_ path: String) -> String? { AccountData.account(linkedTo: path, in: store) }
+
+    /// A seat's counts with its running dot, for state.yaml.
+    func counts(_ seat: String) -> SeatCounts {
+        var c = report(for: seat)?.counts ?? SeatCounts()
+        c.running = running.contains(seat)
+        return c
+    }
+
+    /// The version in a native install's path (`…/versions/2.1.296`), nil otherwise.
+    nonisolated static func claudeVersion(_ path: String?) -> String? {
+        guard let path else { return nil }
+        let last = URL(fileURLWithPath: path).resolvingSymlinksInPath().lastPathComponent
+        return last.range(of: #"^\d+\.\d+\.\d+"#, options: .regularExpression) != nil ? last : nil
     }
 
     /// A seat asked for by number (the smoke hook) before the seats were read.
@@ -218,6 +300,7 @@ final class ModsPageModel {
         guard let n = pendingSeat, !seats.isEmpty else { return }
         pendingSeat = nil
         let seat = seats[min(n, seats.count) - 1]
+        selectedSeat = seat.path
         focus = ModsFocus(seat: seat.path, card: "", name: "")
     }
 
@@ -377,6 +460,11 @@ struct ModsPageRead: Sendable {
     var configs: [String: [ClaudeCodeFolders.ConfigCandidate]]
     var skipped: Int
     var origins: [String: Seat.Origin] = [:]
+    var reports: [SeatReport] = []
+    var running: Set<String> = []
+    var unreadableProcesses = 0
+    var version: String?
+    var environmentSeat: String?
 }
 
 /// Mods & Config's two tabs (item 71, slice 1).
@@ -492,25 +580,7 @@ struct ModsSettings: View {
         case .catalog:
             ModsCatalogView(model: model, demo: vm.demo)
         case .bySeat:
-            // The heading sits right above the list it describes (Settings v2, slice 1).
-            ModsIntro()
-            folders
-        }
-    }
-
-    @ViewBuilder
-    private var folders: some View {
-        if model.loaded && model.inventory.isEmpty {
-            Text("No Claude Code folder found (~/.claude or a ~/.claude-name folder).")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        } else if !model.loaded {
-            Text("Reading your Claude Code folders…").font(.caption).foregroundStyle(.secondary)
-        }
-        // Demo mode shows no work seat (item 71: work rows hide in the mode screenshots use).
-        ForEach(model.inventory.filter { !(vm.demo && model.isWork($0.folder)) }) { f in
-            ModsFolderBox(folder: f, model: model, linked: linked)
-                .id(ModsPageModel.seatAnchor(f.folder))
+            ModsBySeatView(model: model, demo: vm.demo, linked: linked)
         }
     }
 }
@@ -540,10 +610,10 @@ private struct ModsFolderActions: View {
     }
 }
 
-private struct ModsIntro: View {
+struct ModsIntro: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Mods and plugins").font(.headline)
+            Text("Mods and plugins").font(.subheadline.weight(.semibold))
             Text("Everything each Claude Code folder loads: mods (plugins with a hooks module that draw in Claude Code) and plain plugins, from the plugin folders its settings list, its installed plugins, its skills folder and the mods a session made. Sanduhr finds them by reading files: no mod runs. Other mods are read-only here: Sanduhr's own switches per folder above, and switching other mods comes later. Check asks Claude Code's own validator, which reads a mod without running it, what the mod hooks and calls.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -552,62 +622,30 @@ private struct ModsIntro: View {
     }
 }
 
-/// One Claude Code folder and its items.
-private struct ModsFolderBox: View {
-    let folder: ModFolderInventory
+/// A seat's mods and plugins (item 64's list), now Extensions' Mods subsection on By Seat
+/// (item 71, slice 1b): each with where it loads from, what it touches, its sketch and Check.
+struct ModsSeatMods: View {
+    let seat: String
     var model: ModsPageModel
-    let linked: [String]
 
     var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
-                if let note = model.configNotes[folder.folder] {
-                    Text(note)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if folder.items.isEmpty && unreadable == nil {
-                    Text("Loads no mods or plugins.").font(.caption).foregroundStyle(.secondary)
-                }
-                if let seat = model.seats.first(where: { $0.path == folder.folder }) {
-                    SeatLabelControls(seat: seat, model: model)
-                }
-                if let why = unreadable {
-                    Text(ModsPageModel.unreadableText(why))
-                        .font(.caption)
-                        .foregroundStyle(Color.hex("f87171"))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                ForEach(folder.items) { item in
-                    ModRow(item: item, model: model)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(lit(item) ? 0.18 : 0)).padding(-4))
-                    if item.id != folder.items.last?.id { Divider() }
-                }
+        let items = model.inventory.first { $0.folder == seat }?.items ?? []
+        VStack(alignment: .leading, spacing: 10) {
+            ModsIntro()
+            if items.isEmpty {
+                Text("Loads no mods or plugins.").font(.caption).foregroundStyle(.secondary)
             }
-            .padding(4)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        } label: {
-            HStack(spacing: 8) {
-                if let seat = model.seats.first(where: { $0.path == folder.folder }) {
-                    Text(seat.label).font(.body.weight(.semibold))
-                    SeatMarkBadge(mark: seat.mark)
-                }
-                Text(model.display(folder.folder)).font(.body.monospaced())
-                if model.addedFolders.contains(folder.folder) {
-                    Button("Forget Folder") { Task { await model.forgetFolder(folder.folder, linked: linked) } }
-                        .controlSize(.small)
-                        .help("Stop listing this folder here. Nothing in the folder changes.")
-                }
+            ForEach(items) { item in
+                ModRow(item: item, model: model)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(lit(item) ? 0.18 : 0)).padding(-4))
+                if item.id != items.last?.id { Divider() }
             }
         }
     }
 
-    private var unreadable: String? { model.scans.first(where: { $0.seat == folder.folder })?.settingsUnreadable }
-
     /// The item a Catalog chip opened this seat for.
     private func lit(_ item: ModItem) -> Bool {
-        guard let f = model.focus, f.seat == folder.folder else { return false }
+        guard let f = model.focus, f.seat == seat else { return false }
         return item.name == f.name
     }
 }
