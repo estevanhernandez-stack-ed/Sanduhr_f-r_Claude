@@ -103,6 +103,13 @@
   Spec ref: `spec.md > Stage 6`
   What to build: messages and effects, editor, special days, now playing (widget then Desk), meetings, watchers, MCP tools (after Este rules). The Join shortcut arrives here: `hotkey_settings` is one flat object today, so move it to a per-action map with a one-time migration before adding Join (PR #204 review, finding 4).
   Acceptance: PRD S6 stories. Verify: parser tests ported from the Mac.
+  - [x] 13.1 Deepening pass: `spec.md > Stage 6` (6.0 to 6.13, Este's six rulings, the held tools and their seams)
+  - [ ] 13.2 `hotkey_settings` as a per-action map with a forward migration (6.1)
+  - [ ] 13.3 Core: messages, effects, letter styles, the message document and proposals (6.2, 6.9)
+  - [ ] 13.4 Core: now playing, watchers, telemetry, weather, audio bars, ink and wallpaper sampling, glow targets (6.3 to 6.9)
+  - [ ] 13.5 App: now playing service and the widget line, telemetry, weather, peak meter, wallpaper ink, glow targets (6.3 to 6.8)
+  - [ ] 13.6 App: the Desk pieces, live updates, effects; the Message, Now playing and Weather pages; the handoff and watcher seams (6.2, 6.9, 6.10)
+  - [ ] 13.7 Harness renders, cost measured, PRIVACY rows, review, merge (6.11 to 6.13)
 
 - [ ] **14. Stage 7: Desk polish** (deepening pass first)
   Spec ref: `spec.md > Stage 7`
