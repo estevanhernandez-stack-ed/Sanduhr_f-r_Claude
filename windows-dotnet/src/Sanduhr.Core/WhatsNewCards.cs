@@ -11,6 +11,18 @@ public static class WhatsNewCards
 
     private static WhatsNewCard[] Release350() =>
     [
+        WhatsNewCard.Of("3.5.0", "desk", "The Desk",
+            "A clock, your meters, messages, now playing and weather, drawn on your desktop behind your windows. It's off until you turn it on, and Just the Desk works without a Claude account.",
+            "", // TVMonitor
+            WhatsNewPreview.None, SettingsPage.Desk),
+        WhatsNewCard.Of("3.5.0", "settings-redesigned", "Settings, redesigned",
+            "Pages sit in groups down a sidebar, and the search box jumps to any setting by name. Try \"hotkey\" or \"csv\".",
+            "", // Setting
+            WhatsNewPreview.None, SettingsPage.General),
+        WhatsNewCard.Of("3.5.0", "claude-code-page", "A page for Claude Code",
+            "Set up the statusline, the MCP server, the meters mod and the glow for each Claude Code folder. Nothing is installed until you agree, and Remove undoes it exactly.",
+            "", // CommandPrompt
+            WhatsNewPreview.None, SettingsPage.ClaudeCode),
         WhatsNewCard.Of("3.5.0", "shortcut-keys", "Open Settings from any app",
             "Turn on the shortcut in Settings, General, and Ctrl+Alt+S opens Settings from anywhere. It's off until you ask for it.",
             "\uE765", // KeyboardClassic
