@@ -86,6 +86,12 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
 
     public void Menu(DeskMenuAction action) => MenuRequested?.Invoke(action);
 
+    /// <summary>The system readings are sampling now (the live check reads it).</summary>
+    internal bool TelemetryRunning => _telemetry.Running;
+
+    /// <summary>The bars' level source is running now (the live check reads it).</summary>
+    internal bool AudioRunning => _audio.Running;
+
     /// <summary>True while the Desk is on screen.</summary>
     public bool Running => _host?.IsShowing == true;
 
