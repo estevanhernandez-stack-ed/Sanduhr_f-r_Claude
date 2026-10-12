@@ -27,7 +27,7 @@ public static class SettingsNames
         new("Usage", [SettingsPage.History, SettingsPage.ClaudeUsage, SettingsPage.Publish]),
         new("Claude Code", [SettingsPage.ClaudeCode, SettingsPage.Mods]),
         new("Widget", [SettingsPage.Themes]),
-        new("Desk", [SettingsPage.Desk]),
+        new("Desk", [SettingsPage.Desk, SettingsPage.DeskMessage, SettingsPage.NowPlaying, SettingsPage.Weather]),
         new("Help", [SettingsPage.About]),
     ];
 
@@ -47,6 +47,9 @@ public static class SettingsNames
         SettingsPage.Mods => "Mods & Config",
         SettingsPage.Themes => "Themes",
         SettingsPage.Desk => "Desk",
+        SettingsPage.DeskMessage => "Message",
+        SettingsPage.NowPlaying => "Now playing",
+        SettingsPage.Weather => "Weather",
         SettingsPage.About => "About",
         SettingsPage.Widget => "Widget",
         _ => page.ToString(),
@@ -120,6 +123,19 @@ public static class SettingsNames
     public const string DeskClock = "Clock and date";
     public const string DeskClaudeLine = "Claude meters (line)";
     public const string DeskClaudeBars = "Claude meters (bars)";
+    /// <summary>Desk, Where each piece sits: the S6 pieces (spec 6.10).</summary>
+    public const string DeskMessage = "Message";
+    public const string DeskNowPlaying = "Now playing";
+    public const string DeskTelemetry = "System (CPU, RAM, disk)";
+    public const string DeskWeather = "Weather";
+    /// <summary>Desk, Look: the ink the Desk draws in (spec 6.7).</summary>
+    public const string DeskInk = "Ink";
+    /// <summary>Now playing: the widget's line (settings.json "now_playing.widget", off by default).</summary>
+    public const string NowPlayingInWidget = "Show what's playing in the widget";
+    /// <summary>Weather: looks a typed city up with Open-Meteo.</summary>
+    public const string WeatherLookUp = "Look up";
+    /// <summary>Claude Code: where the glow lands (settings.json "claude_code_glow.target").</summary>
+    public const string GlowWhere = "Where the glow shows";
 
     /// <summary>The trademark disclaimer, the standard text, word for word (About carries it).</summary>
     public const string TrademarkNotice =
@@ -144,6 +160,10 @@ public static class SettingsNames
         (AddFolder, SettingsPage.ClaudeCode),
         (FollowAccount, SettingsPage.Accounts),
         (DeskSwitch, SettingsPage.Desk),
+        (DeskInk, SettingsPage.Desk),
+        (NowPlayingInWidget, SettingsPage.NowPlaying),
+        (WeatherLookUp, SettingsPage.Weather),
+        (GlowWhere, SettingsPage.ClaudeCode),
     ];
 
     /// <summary>

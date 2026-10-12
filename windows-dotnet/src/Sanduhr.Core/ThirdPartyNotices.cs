@@ -27,6 +27,14 @@ public static class ThirdPartyNotices
         new("WPF-UI", "MIT", "https://github.com/lepoco/wpfui"),
     ];
 
+    /// <summary>Data the Desk's weather piece shows (spec 6.5), credited as their licences ask: Open-Meteo's
+    /// forecasts and GeoNames' place names, both CC BY 4.0.</summary>
+    public static IReadOnlyList<ThirdPartyPackage> DataServices { get; } =
+    [
+        new("Open-Meteo (weather data)", "CC BY 4.0", "https://open-meteo.com/"),
+        new("GeoNames (place search, through Open-Meteo)", "CC BY 4.0", "https://www.geonames.org/"),
+    ];
+
     private const string FontCopyright = "Copyright (c) 2009-2026 Estevan Hernandez / 626Labs LLC. All rights reserved.";
     private const string FontLicense = "Proprietary. Licensed only for use by 626Labs LLC and Estevan Hernandez. No redistribution, resale or modification without written permission from 626Labs LLC.";
 

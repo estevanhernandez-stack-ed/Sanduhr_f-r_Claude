@@ -267,6 +267,9 @@ internal sealed class NowPlayingHub : IDisposable
     private readonly NowPlayingService _service;
     private readonly HashSet<object> _wanted = [];
 
+    /// <summary>The app's one hub (Settings, Now playing reads the apps seen from it); null in tests and the harness.</summary>
+    public static NowPlayingHub? Current { get; set; }
+
     public NowPlayingHub(NowPlayingService? service = null)
     {
         _service = service ?? new NowPlayingService();

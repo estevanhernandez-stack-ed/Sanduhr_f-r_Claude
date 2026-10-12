@@ -70,6 +70,19 @@ public static class SettingsIndex
     public const string DeskLook = "look";
     public const string DeskMargins = "margins";
     public const string DeskMap = "map";
+    public const string DeskInk = "ink";
+    // Desk: Message, Now playing, Weather (S6)
+    public const string MessageLines = "lines";
+    public const string MessageRotation = "rotation";
+    public const string MessageSpecial = "special";
+    public const string MessageLook = "message-look";
+    public const string NowPlayingWidget = "np-widget";
+    public const string NowPlayingApps = "np-apps";
+    public const string NowPlayingBars = "np-bars";
+    public const string WeatherPlace = "weather-place";
+    public const string WeatherCredit = "weather-credit";
+    // Claude Code (S6)
+    public const string GlowWhere = "glow-where";
     // About
     public const string Version = "version";
     public const string Trademark = "trademark";
@@ -129,6 +142,8 @@ public static class SettingsIndex
             ["mod", "plugin", "meters", "band", "sanduhr-meters", "CLAUDE_CODE_PLUGIN_DIRS"]),
         E("Glow when Claude needs you", SettingsPage.ClaudeCode, Glow,
             ["glow", "hooks", "notification", "waiting", "finishes", "edge light", "terminal", "try it"]),
+        E(SettingsNames.GlowWhere, SettingsPage.ClaudeCode, GlowWhere,
+            ["where the glow shows", "screen edge", "monitor", "flash", "taskbar flash", "glow target"]),
 
         E("Settings and statusline", SettingsPage.Mods, ConfigFiles,
             ["settings.json", "folder", "hooks", "statusline", "readable", "unreadable", "refresh", "inventory"]),
@@ -161,6 +176,24 @@ public static class SettingsIndex
             ["margin", "edge", "padding", "taskbar", "inset", "spacing"]),
         E("Layout map", SettingsPage.Desk, DeskMap,
             ["map", "preview", "layout", "taskbar", "screen", "monitor", "where"]),
+        E(SettingsNames.DeskInk, SettingsPage.Desk, DeskInk,
+            ["ink", "text color", "automatic", "light", "dark", "wallpaper", "readable", "shadow", "gradient", "hex"]),
+
+        E("Your lines", SettingsPage.DeskMessage, MessageLines,
+            ["messages.txt", "message", "edit", "add line", "effects", "glow", "write", "sweep", "shimmer", "font", "ink", "edit as text"]),
+        E("Rotation", SettingsPage.DeskMessage, MessageRotation, ["rotate", "daily", "hourly", "pin", "mix", "every day"]),
+        E("On special days", SettingsPage.DeskMessage, MessageSpecial,
+            ["special day", "birthday", "date", "stack", "take turns", "scroll", "ticker"]),
+        E("Message look", SettingsPage.DeskMessage, MessageLook, ["message size", "message color", "message font", "glow"]),
+
+        E(SettingsNames.NowPlayingInWidget, SettingsPage.NowPlaying, NowPlayingWidget,
+            ["now playing", "music", "song", "track", "Spotify", "media", "play", "pause", "next", "hide while paused"]),
+        E("Apps", SettingsPage.NowPlaying, NowPlayingApps, ["apps", "exclude", "browser", "player"]),
+        E("Bars", SettingsPage.NowPlaying, NowPlayingBars, ["visualizer", "bars", "audio", "level", "equalizer"]),
+
+        E(SettingsNames.WeatherLookUp, SettingsPage.Weather, WeatherPlace,
+            ["weather", "city", "forecast", "temperature", "Fahrenheit", "Celsius", "Open-Meteo", "location"]),
+        E("Weather data by Open-Meteo.com", SettingsPage.Weather, WeatherCredit, ["Open-Meteo", "credit", "licence", "license", "GeoNames"]),
 
         E("Version", SettingsPage.About, Version,
             ["version", "What's New", "Take the tour", "tour", "release", "update"]),
@@ -189,6 +222,10 @@ public static class SettingsIndex
         [SettingsNames.ThirdPartyNotices] = Notices,
         [SettingsNames.ResetSanduhr] = Reset,
         [SettingsNames.DeskSwitch] = DeskOn,
+        [SettingsNames.DeskInk] = DeskInk,
+        [SettingsNames.NowPlayingInWidget] = NowPlayingWidget,
+        [SettingsNames.WeatherLookUp] = WeatherPlace,
+        [SettingsNames.GlowWhere] = GlowWhere,
     };
 
     /// <summary>Words a page goes by besides its title.</summary>
@@ -203,7 +240,10 @@ public static class SettingsIndex
         [SettingsPage.Mods] = ["mod", "plugin", "hooks", "statusline", "MCP", "CLAUDE.md", "retention", "config", "settings.json"],
         [SettingsPage.Publish] = ["publish", "upload", "endpoint", "share"],
         [SettingsPage.Themes] = ["theme", "colors", "look"],
-        [SettingsPage.Desk] = ["desktop", "wallpaper", "clock", "Rainmeter", "layout", "font", "EsteFont", "margins", "taskbar"],
+        [SettingsPage.Desk] = ["desktop", "wallpaper", "clock", "Rainmeter", "layout", "font", "EsteFont", "margins", "taskbar", "telemetry", "CPU", "RAM", "disk"],
+        [SettingsPage.DeskMessage] = ["messages", "messages.txt", "quote", "handwriting"],
+        [SettingsPage.NowPlaying] = ["music", "song", "media", "visualizer"],
+        [SettingsPage.Weather] = ["forecast", "temperature", "city"],
         [SettingsPage.About] = ["help", "version", "trademark", "privacy"],
     };
 

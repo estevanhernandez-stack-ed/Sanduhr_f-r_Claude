@@ -37,6 +37,12 @@ public sealed class SettingsViewModel
     /// <summary>Settings, Desk (spec 5.1).</summary>
     public DeskSettingsViewModel Desk { get; }
 
+    /// <summary>Settings, Now playing (spec 6.3).</summary>
+    public NowPlayingPageViewModel NowPlayingPage { get; }
+
+    /// <summary>Settings, Weather (spec 6.5).</summary>
+    public WeatherPageViewModel WeatherPage { get; }
+
     /// <summary>Backs the General tab's auto-start control (item 10).</summary>
     public GeneralViewModel General { get; }
 
@@ -73,6 +79,7 @@ public sealed class SettingsViewModel
     /// <summary>About, Third-party notices: the packages the app ships with.</summary>
     public IReadOnlyList<ThirdPartyPackage> Packages => ThirdPartyNotices.Packages;
     public IReadOnlyList<ThirdPartyFont> Fonts => ThirdPartyNotices.Fonts;
+    public IReadOnlyList<ThirdPartyPackage> DataServices => ThirdPartyNotices.DataServices;
 
     /// <summary>About, Where settings live: the roaming folder (settings, history, themes, logs).</summary>
     public string SettingsFolder { get; }
@@ -110,6 +117,8 @@ public sealed class SettingsViewModel
         ClaudeCodePage = new ClaudeCodeViewModel(widget);
         Mods = new ModsConfigViewModel(widget);
         Desk = new DeskSettingsViewModel(new SettingsStore(new Paths()), new Sanduhr.App.Desk.DeskFonts().PickerFamilies());
+        NowPlayingPage = new NowPlayingPageViewModel(new SettingsStore(new Paths()), Sanduhr.App.Desk.NowPlayingHub.Current);
+        WeatherPage = new WeatherPageViewModel(new SettingsStore(new Paths()));
         // The two pages share one folder list and one set of installed pieces.
         ClaudeCodePage.FoldersChanged += Mods.ReloadFolders;
         ClaudeCodePage.PiecesChanged += Mods.Refresh;

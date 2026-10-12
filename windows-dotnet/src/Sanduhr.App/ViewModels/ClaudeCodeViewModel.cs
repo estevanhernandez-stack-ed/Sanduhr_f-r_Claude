@@ -168,7 +168,68 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         GlowWaiting = glow.Waiting;
         GlowDone = glow.Done;
         GlowSkipTerminal = glow.SkipTerminal;
+        var target = _glowStore.LoadGlowTarget();
+        GlowTarget = GlowTargets.First(c => c.Kind == target.Effective);
+        GlowSide = GlowSides.First(c => c.Side == target.Side);
+        GlowMonitors = MonitorChoices();
+        GlowMonitor = GlowMonitors.FirstOrDefault(m => string.Equals(m.Device, target.Monitor, StringComparison.OrdinalIgnoreCase))
+                      ?? GlowMonitors[0];
         _loading = false;
+    }
+
+    // ------------------------------------------------------------------ where the glow lands (spec 6.8)
+
+    private readonly SettingsStore _glowStore = new(new Paths());
+
+    public sealed record GlowTargetChoice(GlowTargetKind Kind, string Name) { public override string ToString() => Name; }
+    public sealed record GlowSideChoice(GlowEdgeSide Side, string Name) { public override string ToString() => Name; }
+    public sealed record GlowMonitorChoice(string? Device, string Name) { public override string ToString() => Name; }
+
+    /// <summary>The offered targets (the Desk spot waits for S7 and is never listed).</summary>
+    public static IReadOnlyList<GlowTargetChoice> GlowTargets { get; } =
+    [
+        new(GlowTargetKind.Window, "At the top of the window you're working in"),
+        new(GlowTargetKind.Edge, "Along an edge of a screen"),
+        new(GlowTargetKind.Widget, "Only flash Sanduhr in the taskbar"),
+    ];
+
+    public static IReadOnlyList<GlowSideChoice> GlowSides { get; } =
+        [new(GlowEdgeSide.Top, "Top"), new(GlowEdgeSide.Bottom, "Bottom"), new(GlowEdgeSide.Left, "Left"), new(GlowEdgeSide.Right, "Right")];
+
+    [ObservableProperty] private GlowTargetChoice _glowTarget = GlowTargets[0];
+    [ObservableProperty] private GlowSideChoice _glowSide = GlowSides[0];
+    [ObservableProperty] private IReadOnlyList<GlowMonitorChoice> _glowMonitors = [new(null, "Main monitor")];
+    [ObservableProperty] private GlowMonitorChoice? _glowMonitor;
+
+    public bool GlowOnEdge => GlowTarget.Kind == GlowTargetKind.Edge;
+
+    private static IReadOnlyList<GlowMonitorChoice> MonitorChoices()
+    {
+        var list = new List<GlowMonitorChoice> { new(null, "Main monitor") };
+        try
+        {
+            int n = 1;
+            foreach (var m in Sanduhr.App.Interop.DeskNative.Monitors())
+                list.Add(new(m.Device, $"Monitor {n++}{(m.Primary ? " (main)" : "")}, {m.Bounds.Width}x{m.Bounds.Height}"));
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException) { }
+        return list;
+    }
+
+    partial void OnGlowTargetChanged(GlowTargetChoice value)
+    {
+        OnPropertyChanged(nameof(GlowOnEdge));
+        SaveGlowTarget();
+    }
+
+    partial void OnGlowSideChanged(GlowSideChoice value) => SaveGlowTarget();
+    partial void OnGlowMonitorChanged(GlowMonitorChoice? value) => SaveGlowTarget();
+
+    private void SaveGlowTarget()
+    {
+        if (_loading) return;
+        _glowStore.SaveGlowTarget(new GlowTargetSettings(GlowTarget.Kind, GlowSide.Side, GlowMonitor?.Device));
+        GlowReload?.Invoke();
     }
 
     public void AttachOwner(Window owner) => _owner = owner;

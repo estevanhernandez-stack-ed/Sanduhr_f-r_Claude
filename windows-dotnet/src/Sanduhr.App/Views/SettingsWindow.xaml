@@ -1741,6 +1741,28 @@
                                                         Command="{Binding TryDoneCommand}"
                                                         AutomationProperties.Name="Try the done glow" />
                                             </StackPanel>
+                                            <StackPanel views:SettingsAnchor.Id="glow-where" Margin="0,12,0,0">
+                                                <TextBlock Text="{x:Static core:SettingsNames.GlowWhere}" FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,6" />
+                                                <ComboBox Style="{StaticResource ThemedComboBox}" Width="300" HorizontalAlignment="Left"
+                                                          ItemsSource="{x:Static vm:ClaudeCodeViewModel.GlowTargets}"
+                                                          SelectedItem="{Binding GlowTarget, Mode=TwoWay}"
+                                                          AutomationProperties.Name="{x:Static core:SettingsNames.GlowWhere}" />
+                                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0"
+                                                            Visibility="{Binding GlowOnEdge, Converter={StaticResource BoolVis}}">
+                                                    <ComboBox Style="{StaticResource ThemedComboBox}" Width="110"
+                                                              ItemsSource="{x:Static vm:ClaudeCodeViewModel.GlowSides}"
+                                                              SelectedItem="{Binding GlowSide, Mode=TwoWay}"
+                                                              AutomationProperties.Name="Glow edge" />
+                                                    <ComboBox Style="{StaticResource ThemedComboBox}" Width="230" Margin="8,0,0,0"
+                                                              ItemsSource="{Binding GlowMonitors}"
+                                                              SelectedItem="{Binding GlowMonitor, Mode=TwoWay}"
+                                                              AutomationProperties.Name="Glow monitor" />
+                                                </StackPanel>
+                                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
+                                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                                           Text="The taskbar button flashes in every choice. Only flash skips the light." />
+                                            </StackPanel>
                                         </StackPanel>
                                     </Border>
                                 </StackPanel>
@@ -2313,6 +2335,48 @@
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
+                            <StackPanel views:SettingsAnchor.Id="ink">
+                                <TextBlock Text="{x:Static core:SettingsNames.DeskInk}" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="230" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Clock, date, Claude" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <ComboBox Grid.Column="1" Style="{StaticResource ThemedComboBox}"
+                                              ItemsSource="{x:Static vm:DeskSettingsViewModel.InkChoices}"
+                                              SelectedItem="{Binding InkChoice, Mode=TwoWay}"
+                                              AutomationProperties.Name="{x:Static core:SettingsNames.DeskInk}" />
+                                </Grid>
+                                <Grid Margin="0,10,0,0" Visibility="{Binding IsCustomInk, Converter={StaticResource BoolVis}}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="150" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="200" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Colors" FontSize="12" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <ComboBox Grid.Column="1" Style="{StaticResource ThemedComboBox}"
+                                              ItemsSource="{x:Static vm:DeskSettingsViewModel.InkPresetNames}"
+                                              SelectedItem="{Binding InkPreset, Mode=TwoWay}"
+                                              AutomationProperties.Name="Ink preset" />
+                                    <TextBox Grid.Column="3" Style="{StaticResource Input}" FontFamily="Cascadia Code, Consolas"
+                                             Text="{Binding InkColors, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                             AutomationProperties.Name="Ink hex colors" />
+                                </Grid>
+                                <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,10,0,0"
+                                          Content="Drop shadow under the text" IsChecked="{Binding InkShadow, Mode=TwoWay}"
+                                          AutomationProperties.Name="Drop shadow under the text" />
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="Automatic reads how bright your wallpaper image is behind each piece and picks light or dark ink, so it stays readable. It reads the wallpaper file only, never your screen. Custom takes one hex color, or two to four with commas for a gradient, such as 8f5bd6,3a63e0,33fdff. A meter near its limit stays red in every ink." />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
                             <StackPanel views:SettingsAnchor.Id="margins">
                                 <TextBlock Text="Margins" FontSize="13" FontWeight="SemiBold"
                                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
@@ -2368,6 +2432,132 @@
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
+                            <TextBlock Text="{x:Static core:SettingsNames.TrademarkNotice}"
+                                       TextWrapping="Wrap" FontSize="11"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                        </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </TabItem>
+
+                <TabItem Header="Now playing" Tag="NowPlaying" AutomationProperties.Name="Now playing" DataContext="{Binding NowPlayingPage}">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ScrollViewer.Resources>
+                                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                            </ScrollViewer.Resources>
+                        <StackPanel Margin="20">
+                            <TextBlock Text="Now playing" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
+                            <StackPanel views:SettingsAnchor.Id="np-widget">
+                                <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                          Content="{x:Static core:SettingsNames.NowPlayingInWidget}" IsChecked="{Binding Widget, Mode=TwoWay}"
+                                          AutomationProperties.Name="{x:Static core:SettingsNames.NowPlayingInWidget}" />
+                                <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,8,0,0"
+                                          Content="Hide while paused" IsChecked="{Binding HidePaused, Mode=TwoWay}"
+                                          AutomationProperties.Name="Hide while paused" />
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="Title and artist from the Windows media controls (Spotify, browsers and most players). A click on the line plays or pauses; Next shows while paused. What is playing stays in memory: Sanduhr never saves or logs it. To show it on the Desk, place Now playing on the Desk page." />
+                                <TextBlock Text="{Binding Status}" FontSize="11" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            </StackPanel>
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+                            <StackPanel views:SettingsAnchor.Id="np-apps">
+                                <TextBlock Text="Apps" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                                <ItemsControl ItemsSource="{Binding Apps}" Focusable="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Style="{StaticResource ThemedCheckBox}" Margin="0,0,0,6"
+                                                      Content="{Binding Name}" IsChecked="{Binding Shown, Mode=TwoWay}"
+                                                      AutomationProperties.Name="{Binding Name}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="Apps seen playing since Sanduhr started. Untick one to keep it off the widget and the Desk." />
+                            </StackPanel>
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+                            <StackPanel views:SettingsAnchor.Id="np-bars">
+                                <CheckBox Style="{StaticResource ThemedCheckBox}"
+                                          Content="Bars beside it on the Desk" IsChecked="{Binding Bars, Mode=TwoWay}"
+                                          AutomationProperties.Name="Bars beside it on the Desk" />
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="The bars follow the loudness of what is playing, read from the Windows output level meter. Sanduhr never records or captures audio, and the bars stop while nothing plays." />
+                            </StackPanel>
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+                            <TextBlock Text="{x:Static core:SettingsNames.TrademarkNotice}"
+                                       TextWrapping="Wrap" FontSize="11"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                        </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </TabItem>
+
+                <TabItem Header="Weather" Tag="Weather" AutomationProperties.Name="Weather" DataContext="{Binding WeatherPage}">
+                    <Border Background="{DynamicResource Sanduhr.Brush.Glass}" CornerRadius="8">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ScrollViewer.Resources>
+                                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                            </ScrollViewer.Resources>
+                        <StackPanel Margin="20">
+                            <TextBlock Text="Weather" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,12" />
+                            <StackPanel views:SettingsAnchor.Id="weather-place">
+                                <TextBlock Text="City" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
+                                <TextBlock Text="{Binding PlaceText}" FontSize="12" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBox Width="230" Style="{StaticResource Input}" Text="{Binding City, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             AutomationProperties.Name="City" />
+                                    <Button Style="{StaticResource AccentButton}" Margin="8,0,0,0" Content="{x:Static core:SettingsNames.WeatherLookUp}"
+                                            Command="{Binding LookUpCommand}"
+                                            AutomationProperties.Name="{x:Static core:SettingsNames.WeatherLookUp}" />
+                                    <Button Style="{StaticResource FlatButton}" Margin="8,0,0,0" Content="Clear"
+                                            Command="{Binding ClearCommand}" IsEnabled="{Binding HasPlace}"
+                                            AutomationProperties.Name="Clear the city" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding Note}" FontSize="11" Margin="0,6,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                <ListBox ItemsSource="{Binding Results}" SelectedItem="{Binding Picked, Mode=TwoWay}"
+                                         DisplayMemberPath="Label" MaxHeight="140" Margin="0,4,0,0" Width="400" HorizontalAlignment="Left"
+                                         Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Sanduhr.Brush.Text}"
+                                         AutomationProperties.Name="Places found" />
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="230" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Unit" FontSize="12" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                    <ComboBox Grid.Column="1" Style="{StaticResource ThemedComboBox}"
+                                              ItemsSource="{x:Static vm:WeatherPageViewModel.Units}"
+                                              SelectedItem="{Binding Unit, Mode=TwoWay}" AutomationProperties.Name="Unit" />
+                                </Grid>
+                                <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                           Text="Look up sends the city you type, and only that, to the Open-Meteo place search. The forecast is asked for with the place coordinates, rounded to about 1 km: no account, no identifier, no location services. It refreshes at most every 30 minutes, only while the Desk shows the weather piece, and stays in memory. Place Weather on the Desk page." />
+                            </StackPanel>
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+                            <StackPanel views:SettingsAnchor.Id="weather-credit">
+                                <TextBlock FontSize="11" TextWrapping="Wrap">
+                                    <Hyperlink NavigateUri="{Binding CreditUrl}" RequestNavigate="Hyperlink_RequestNavigate"
+                                               Foreground="{DynamicResource Sanduhr.Brush.Accent}" AutomationProperties.Name="Weather data by Open-Meteo.com">
+                                        <Run Text="{Binding Credit, Mode=OneWay}" />
+                                    </Hyperlink>
+                                    <Run Text=" (CC BY 4.0, " Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                    <Hyperlink NavigateUri="{Binding LicenceUrl}" RequestNavigate="Hyperlink_RequestNavigate"
+                                               Foreground="{DynamicResource Sanduhr.Brush.Accent}" AutomationProperties.Name="The licence">
+                                        <Run Text="licence" />
+                                    </Hyperlink>
+                                    <Run Text="). Place search by GeoNames (CC BY 4.0)." Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                </TextBlock>
+                            </StackPanel>
+                            <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
                             <TextBlock Text="{x:Static core:SettingsNames.TrademarkNotice}"
                                        TextWrapping="Wrap" FontSize="11"
                                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
@@ -2484,6 +2674,46 @@
                                            Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
                                            Text="Sanduhr for Windows is built with these packages, each under its own license:" />
                                 <ItemsControl ItemsSource="{Binding Packages}" Focusable="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Name}" FontSize="12" VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding License}" FontSize="11" VerticalAlignment="Center"
+                                                           Margin="12,0,12,0" Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                                <Button Grid.Column="2" Cursor="Hand" Content="Project page"
+                                                        ToolTip="{Binding Url}"
+                                                        AutomationProperties.Name="{Binding Name, StringFormat='{}{0} project page'}"
+                                                        Command="{Binding DataContext.OpenLinkCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                        CommandParameter="{Binding Url}">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <TextBlock x:Name="t" Text="{TemplateBinding Content}" FontSize="11"
+                                                                       Foreground="{DynamicResource Sanduhr.Brush.Accent}" />
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="t" Property="TextDecorations" Value="Underline" />
+                                                                </Trigger>
+                                                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                                                    <Setter TargetName="t" Property="TextDecorations" Value="Underline" />
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                </Button>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,12,0,8"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                           Text="The Desk's weather piece shows data from these services, under their licences:" />
+                                <ItemsControl ItemsSource="{Binding DataServices}" Focusable="False">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Grid Margin="0,0,0,4">

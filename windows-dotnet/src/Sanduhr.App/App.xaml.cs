@@ -399,6 +399,7 @@ public partial class App : Application
         var paths = new Sanduhr.Core.Paths();
         var store = new SettingsStore(paths);
         _nowPlaying = new Desk.NowPlayingHub();
+        Desk.NowPlayingHub.Current = _nowPlaying;
         _messages = new Desk.DeskMessageSource(store, paths);
         _desk = new Desk.DeskController(store, () => new Desk.DesktopLayerHost(),
             () => vm.CurrentDeskUsage, _nowPlaying, _messages)
@@ -479,6 +480,8 @@ public partial class App : Application
         svm.ClaudeCodePage.GlowReload = () => _glow?.Reload();
         svm.ClaudeCodePage.GlowPreview = e => _glow?.Preview(e);
         svm.Desk.Changed = () => _desk?.Reload();
+        svm.NowPlayingPage.Changed = () => { _vm?.NowPlaying?.Reload(); _desk?.Reload(); };
+        svm.WeatherPage.Changed = () => _desk?.Reload();
         svm.ResetRequested = () =>
         {
             ShowReset();
