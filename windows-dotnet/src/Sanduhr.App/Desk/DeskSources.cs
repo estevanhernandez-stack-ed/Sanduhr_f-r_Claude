@@ -28,6 +28,13 @@ internal sealed class TelemetrySource : IDisposable
 
     public bool Running => _timer.IsEnabled;
 
+    /// <summary>The render harness and demo previews: a fixed reading, no sampling.</summary>
+    internal void Preview(TelemetrySample sample)
+    {
+        Latest = sample;
+        Updated?.Invoke();
+    }
+
     public void Start()
     {
         if (_timer.IsEnabled) return;

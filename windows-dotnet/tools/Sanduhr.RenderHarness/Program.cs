@@ -334,7 +334,10 @@ public static class Program
             if (scenarios.Contains("reset"))
                 await RenderReset(asm);
             if (scenarios.Contains("desk"))
+            {
                 await RenderDesk(light);
+                await RenderDeskContent();
+            }
 
             if (scenarios.Contains("settings"))
                 await RenderSettings(vm, asm);
@@ -567,6 +570,126 @@ public static class Program
             throw new InvalidOperationException("A non-sample account label would render in Settings; stopping before any PNG.");
     }
 
+    /// <summary>
+    /// Stage 6's Desk content (spec 6.12): the message on a special day (a gradient line with its glow, a
+    /// script line, a write-in line, drawn as still frames), now playing with its bars, telemetry, weather
+    /// and watchers from samples, in Light, Dark and Automatic ink, over a dark, a light and a split
+    /// wallpaper stand-in (left half dark, right half light, so Automatic picks per island), at 100% and
+    /// 150%. Automatic reads the stand-in through the same WallpaperSampler the app uses. Never opens a Desk
+    /// window, never reads the real wallpaper, never touches media sessions, the network or the meter.
+    /// </summary>
+    static async Task RenderDeskContent()
+    {
+        var now = new DateTimeOffset(2026, 10, 31, 10, 9, 0, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 10, 31, 10, 9, 0)));
+        string Iso(TimeSpan span) => now.Add(span).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fffK", System.Globalization.CultureInfo.InvariantCulture);
+        var usage = new DeskUsage(
+            [new DeskTier(TierModel.FiveHour, 42, Iso(TimeSpan.FromHours(2))),
+             new DeskTier(TierModel.SevenDay, 91, Iso(TimeSpan.FromDays(4)))],
+            now.AddMinutes(-1), false, false, null);
+        const string text = "# sample\nkeep building.\n{write} one thing at a time.\n10-31: {ink:#ff7e5f,#feb47b,#ffd86f} {glow} happy halloween.\n10-31: {font:script} trick or treat.\n";
+        var today = DeskMessages.Today(text, now, hourly: false);
+        var message = new Sanduhr.App.Desk.DeskMessageFrame(today, DeskMessageSettings.Default with { Size = 64 });
+        var track = new NowPlayingInfo
+        {
+            Title = "Midnight City", Artist = "M83", Duration = 243, Elapsed = 101, ElapsedAt = now, Playing = true, AppId = "Spotify.exe",
+        };
+        var audio = new Sanduhr.App.Desk.AudioLevelSource();
+        float[] levels = [0.05f, 0.2f, 0.45f, 0.3f, 0.7f, 0.5f, 0.9f, 0.6f, 0.35f, 0.8f, 0.55f, 0.25f, 0.65f, 0.4f, 0.75f, 0.3f];
+        foreach (var l in levels) audio.Bars.Push(l * l, now);
+        var telemetry = new Sanduhr.App.Desk.TelemetrySource();
+        telemetry.Preview(new TelemetrySample(23, 61, 48, now));
+        var place = WeatherPlace.Create("Fort Worth", "Texas", "United States", 32.7555, -97.3308);
+        var reading = new WeatherReading(72, 2, 80, 61, 80, 75, 60, now.AddMinutes(-5));
+        IReadOnlyList<Watcher> watchers =
+        [
+            new Watcher { Id = "a:1", Source = WatcherSource.Agent, Title = "PR 210 CI", Total = 12, Done = 7, State = WatcherState.Running, Started = now.AddMinutes(-6), Touched = now },
+            new Watcher { Id = "a:2", Source = WatcherSource.Agent, Title = "Review the release notes", State = WatcherState.Waiting, Started = now.AddMinutes(-2), Touched = now },
+        ];
+        var frame = new Sanduhr.App.Desk.DeskFrame
+        {
+            Usage = usage, Now = now, Message = message, Track = track, Bars = true, Audio = audio,
+            Telemetry = telemetry, WeatherOn = true, Place = place, Weather = reading, Watchers = watchers,
+        };
+        const string layout = "message:tl clock:bl claude:bl meters:br nowPlaying:bc telemetry:tr weather:mr watchers:ml";
+        var fonts = new Sanduhr.App.Desk.DeskFonts();
+        var dark = Color.FromRgb(0x1e, 0x24, 0x30);
+        var light = Color.FromRgb(0xd8, 0xdd, 0xe6);
+        var grounds = new (string Name, Color Left, Color Right)[] { ("dark", dark, dark), ("light", light, light), ("split", dark, light) };
+        var inks = new[] { DeskInkMode.Light, DeskInkMode.Dark, DeskInkMode.Auto };
+        foreach (double scale in new[] { 1.0, 1.5 })
+        {
+            var bounds = new PxRect(0, 0, (int)(1920 * scale), (int)(1080 * scale));
+            int bar = (int)Math.Round(48 * scale);
+            var work = new PxRect(0, 0, bounds.Width, bounds.Height - bar);
+            var screen = new Sanduhr.App.Desk.DeskScreen("DISPLAY1", bounds, work, scale, true, TaskbarClearance.Insets(bounds, work, [], scale));
+            var settings = (DeskSettings.Default with { Enabled = true, Layout = layout }).Normalized();
+            foreach (var (gname, gl, gr) in grounds)
+            {
+                // The stand-in as a wallpaper image for Automatic: 192x108, left half gl, right half gr.
+                const int iw = 192, ih = 108;
+                var px = new byte[iw * ih * 4];
+                for (int y = 0; y < ih; y++)
+                    for (int x = 0; x < iw; x++)
+                    {
+                        var c = x < iw / 2 ? gl : gr;
+                        int o = (y * iw + x) * 4;
+                        px[o] = c.B; px[o + 1] = c.G; px[o + 2] = c.R; px[o + 3] = 255;
+                    }
+                foreach (var mode in inks)
+                {
+                    if (mode != DeskInkMode.Auto && gname == "split") continue;
+                    var view = new Sanduhr.App.Desk.DeskView(screen, settings, fonts);
+                    var inkSettings = DeskInkSettings.Default with { Mode = mode };
+                    Sanduhr.App.Desk.DeskInkMap map;
+                    var picks = new List<string>();
+                    if (mode != DeskInkMode.Auto)
+                        map = new(DeskInk.Resolve(inkSettings, null, null));
+                    else
+                    {
+                        view.Update(frame, Sanduhr.App.Desk.DeskInkMap.Light);
+                        var by = new Dictionary<DeskAnchor, ResolvedInk>();
+                        foreach (var (anchor, r) in view.StackRects())
+                        {
+                            var region = new PxRect((int)Math.Round(r.X * scale), (int)Math.Round(r.Y * scale),
+                                Math.Max(1, (int)Math.Round(r.Width * scale)), Math.Max(1, (int)Math.Round(r.Height * scale)));
+                            double? lum = WallpaperSampler.Luminance(px, iw, ih, iw * 4, iw, ih, bounds, region, WallpaperPosition.Fill, bounds, 0);
+                            by[anchor] = DeskInk.Resolve(inkSettings, null, lum);
+                            picks.Add($"{DeskAnchors.Word(anchor)}={(by[anchor].DarkInk ? "dark" : "light")}({lum:0.00})");
+                        }
+                        map = new(DeskInk.Resolve(inkSettings, null, null), by);
+                    }
+                    view.Update(frame, map);
+                    var root = new Grid { Width = 1920, Height = 1080 };
+                    root.ColumnDefinitions.Add(new ColumnDefinition());
+                    root.ColumnDefinitions.Add(new ColumnDefinition());
+                    var lr = new System.Windows.Shapes.Rectangle { Fill = new SolidColorBrush(gl) };
+                    var rr = new System.Windows.Shapes.Rectangle { Fill = new SolidColorBrush(gr) };
+                    Grid.SetColumn(rr, 1);
+                    root.Children.Add(lr);
+                    root.Children.Add(rr);
+                    var strip = new System.Windows.Shapes.Rectangle
+                    {
+                        Height = 48, VerticalAlignment = VerticalAlignment.Bottom,
+                        Fill = new SolidColorBrush(Color.FromArgb(0x66, 0, 0, 0)),
+                    };
+                    Grid.SetColumnSpan(strip, 2);
+                    root.Children.Add(strip);
+                    Grid.SetColumnSpan(view, 2);
+                    root.Children.Add(view);
+                    root.Measure(new Size(1920, 1080));
+                    root.Arrange(new Rect(0, 0, 1920, 1080));
+                    await Settle();
+                    var name = $"desk-s6-{mode.ToString().ToLowerInvariant()}-{gname}-{scale:0.0}x".Replace('.', '_');
+                    SaveScaled(root, name, scale);
+                    if (picks.Count > 0) Log.Add($"{name} auto ink: {string.Join(" ", picks)}");
+                    view.Dispose();
+                }
+            }
+        }
+        audio.Dispose();
+        telemetry.Dispose();
+    }
+
     /// <summary>Reset Sanduhr: the choose state, then a results state with one failure. No ResetService is built,
     /// so nothing can run; the window only shows what it is handed.</summary>
     static async Task RenderReset(Assembly asm)
@@ -621,7 +744,7 @@ public static class Program
             tabs.SelectedItem = item;
             await Settle();
             Save((FrameworkElement)sw.Content, $"settings-{index:00}-{Slug(header)}");
-            if (item.Tag is "ClaudeCode" or "Mods" or "Desk")
+            if (item.Tag is "ClaudeCode" or "Mods" or "Desk" or "DeskMessage" or "NowPlaying" or "Weather")
             {
                 // These pages scroll: a second picture with the window tall enough to show all of it.
                 double h = sw.Height;
