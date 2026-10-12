@@ -15,7 +15,8 @@ public sealed record DeskTier(string Key, double Utilization, string? ResetsAt);
 /// <paramref name="Account"/> is the active account as the Claude line names it with two or more
 /// accounts, else null. <paramref name="LineTiers"/> feeds the Claude line: every tier with data,
 /// hidden or not (the line reads session and week whatever the cards show); null uses
-/// <paramref name="Tiers"/>.
+/// <paramref name="Tiers"/>. <paramref name="SignInReminder"/> is the Desk's sign-in reminder switch
+/// (default on): with it off a needed sign-in draws nothing on the Claude line.
 /// </summary>
 public sealed record DeskUsage(
     IReadOnlyList<DeskTier> Tiers,
@@ -23,7 +24,8 @@ public sealed record DeskUsage(
     bool SignInNeeded,
     bool FirstSignIn,
     string? Account,
-    IReadOnlyList<DeskTier>? LineTiers = null)
+    IReadOnlyList<DeskTier>? LineTiers = null,
+    bool SignInReminder = true)
 {
     /// <summary>No tiers, never fetched, nothing needed.</summary>
     public static DeskUsage Empty { get; } = new([], null, false, false, null);
@@ -53,6 +55,9 @@ public static class DeskMeters
     /// <summary>The utilization at which the widget card's bar turns red
     /// (<see cref="ThemeCatalog.UsageColor"/>: under 90 is orange, 90 and up is red).</summary>
     public const double WarningAt = 90;
+
+    /// <summary>True when the Desk draws its sign-in line: a sign-in is needed and the reminder is on.</summary>
+    public static bool SignInLineShown(DeskUsage u) => u.SignInNeeded && u.SignInReminder;
 
     /// <summary>One row per tier, in the given order; none when a sign-in is needed.
     /// <paramref name="zone"/> converts reset times (default: local), for deterministic tests.</summary>
@@ -109,11 +114,12 @@ public static class DeskClaudeText
     /// <summary>"sign in to Sanduhr" before the first key, else "sign in again in Sanduhr".</summary>
     public static string SignInLine(bool first) => first ? CompactSignIn : "sign in again in Sanduhr";
 
-    /// <summary>"7% session, resets 3:00   63% week", or the sign-in line, or null with no numbers.
+    /// <summary>"7% session, resets 3:00   63% week", or the sign-in line (null when the reminder is
+    /// off), or null with no numbers.
     /// <paramref name="zone"/> converts the session reset time (default: local).</summary>
     public static Parts? GetParts(DeskUsage u, TimeZoneInfo? zone = null)
     {
-        if (u.SignInNeeded) return new Parts(u.Account, SignInLine(u.FirstSignIn));
+        if (u.SignInNeeded) return u.SignInReminder ? new Parts(u.Account, SignInLine(u.FirstSignIn)) : null;
         var parts = new List<string>();
         var tiers = u.LineTiers ?? u.Tiers;
         var session = tiers.FirstOrDefault(t => t.Key == TierModel.FiveHour);

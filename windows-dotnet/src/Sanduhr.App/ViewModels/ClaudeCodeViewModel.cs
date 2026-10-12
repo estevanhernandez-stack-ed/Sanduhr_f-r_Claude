@@ -169,7 +169,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         GlowDone = glow.Done;
         GlowSkipTerminal = glow.SkipTerminal;
         var target = _glowSaved = _glowStore.LoadGlowTarget();
-        GlowTarget = GlowTargets.First(c => c.Kind == target.Effective);
+        GlowTarget = GlowTargets.First(c => c.Kind == target.Effective(false));
         GlowSide = GlowSides.First(c => c.Side == target.Side);
         GlowMonitors = MonitorChoices();
         GlowMonitor = GlowMonitors.FirstOrDefault(m => string.Equals(m.Device, target.Monitor, StringComparison.OrdinalIgnoreCase))

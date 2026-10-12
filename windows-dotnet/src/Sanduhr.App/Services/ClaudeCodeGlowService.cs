@@ -136,7 +136,7 @@ internal sealed class ClaudeCodeGlowService : IDisposable
         {
             // Where it lands (spec 6.8): the window in use (S4), a chosen screen edge, or the widget's
             // taskbar flash alone. The Desk placeholder reads as the window until S7.
-            var where = _target.Effective;
+            var where = _target.Effective(false);
             if (where == GlowTargetKind.Edge && EdgeMonitor() is { } mon)
             {
                 _overlay ??= new GlowOverlayWindow();
