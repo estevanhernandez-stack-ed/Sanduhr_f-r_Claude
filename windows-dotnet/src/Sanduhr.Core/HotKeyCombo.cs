@@ -206,4 +206,76 @@ public static class HotKeys
         }
         return o;
     }
+
+    // ---- The per-action map (spec 6.1) ----
+    // hotkey_settings was one flat {"on","vk","mods"} object for the one shortcut through S5. From S6
+    // it is a map, {"settings": {...}, "join": {...}}, one member per action word. Both shapes read;
+    // SettingsMigrations.HotKeyMap moves a flat value into the map once, exactly as it was.
+
+    /// <summary>An action's member name in the <c>hotkey_settings</c> map.</summary>
+    public static string Word(HotKeyAction action) => action switch
+    {
+        HotKeyAction.Settings => "settings",
+        _ => throw new ArgumentOutOfRangeException(nameof(action)),
+    };
+
+    /// <summary>True for the flat S1 shape: an object with <c>on</c>, <c>vk</c> or <c>mods</c> at its top.
+    /// No action word is one of those, so a map is never mistaken for it.</summary>
+    public static bool IsFlat(JsonNode? node) =>
+        node is JsonObject o && (o.ContainsKey("on") || o.ContainsKey("vk") || o.ContainsKey("mods"));
+
+    /// <summary>The stored entry for <paramref name="action"/> in either shape; null when there is none.</summary>
+    public static JsonNode? Entry(HotKeyAction action, JsonNode? node)
+    {
+        if (IsFlat(node)) return action == HotKeyAction.Settings ? node : null;
+        return node is JsonObject map && map.TryGetPropertyValue(Word(action), out var entry) ? entry : null;
+    }
+
+    /// <summary>Reads <paramref name="action"/>'s setting from the whole <c>hotkey_settings</c> value,
+    /// flat or map; missing or odd reads as <see cref="Decode"/> reads it.</summary>
+    public static HotKeySetting DecodeFrom(HotKeyAction action, JsonNode? node) => Decode(action, Entry(action, node));
+
+    /// <summary>The value as a map: a flat value becomes <c>{"settings": value}</c> (a copy, byte for
+    /// byte), a map is copied with every member kept (actions this build does not know included),
+    /// anything else is an empty map.</summary>
+    public static JsonObject ToMap(JsonNode? node)
+    {
+        if (IsFlat(node)) return new JsonObject { [Word(HotKeyAction.Settings)] = node!.DeepClone() };
+        return node is JsonObject o ? (JsonObject)o.DeepClone() : new JsonObject();
+    }
+
+    /// <summary>The <c>hotkey_settings</c> value with <paramref name="action"/>'s entry replaced and every
+    /// other entry kept.</summary>
+    public static JsonObject EncodeInto(JsonNode? node, HotKeyAction action, HotKeySetting setting)
+    {
+        var map = ToMap(node);
+        map[Word(action)] = Encode(action, setting);
+        return map;
+    }
+}
+
+/// <summary>
+/// One-time, idempotent moves of settings whose shape changes (Settings v2's rule: an existing install
+/// keeps every choice). Each takes the whole settings object and says whether it changed it.
+/// </summary>
+public static class SettingsMigrations
+{
+    public const string HotKeySettingsKey = "hotkey_settings";
+
+    /// <summary>S6: a flat <c>hotkey_settings</c> becomes the per-action map, its value carried exactly
+    /// (an odd value is carried, not repaired). Absent, a map already, or not an object: unchanged.</summary>
+    public static bool HotKeyMap(JsonObject root)
+    {
+        if (!root.TryGetPropertyValue(HotKeySettingsKey, out var node) || !HotKeys.IsFlat(node)) return false;
+        root[HotKeySettingsKey] = HotKeys.ToMap(node);
+        return true;
+    }
+
+    /// <summary>Every migration, in order. True when any changed the object.</summary>
+    public static bool RunAll(JsonObject root)
+    {
+        var changed = false;
+        changed |= HotKeyMap(root);
+        return changed;
+    }
 }

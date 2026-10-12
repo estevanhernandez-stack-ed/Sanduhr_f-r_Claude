@@ -718,16 +718,27 @@ public sealed class SettingsStore
         Write(root);
     }
 
-    /// <summary>The global shortcut's stored state (<c>hotkey_settings</c>: on, vk, mods).
+    /// <summary>A global shortcut's stored state (<c>hotkey_settings</c>, a per-action map of
+    /// {on, vk, mods} since S6; the flat S1 shape still reads as the Settings shortcut).
     /// Missing or odd reads as off with the default combo.</summary>
     public HotKeySetting LoadHotKeySetting(HotKeyAction action)
-        => HotKeys.Decode(action, Read()["hotkey_settings"]);
+        => HotKeys.DecodeFrom(action, Read()["hotkey_settings"]);
 
+    /// <summary>Writes one action's entry; every other entry in the map is kept.</summary>
     public void SaveHotKeySetting(HotKeyAction action, HotKeySetting setting)
     {
         var root = Read();
-        root["hotkey_settings"] = HotKeys.Encode(action, setting);
+        root["hotkey_settings"] = HotKeys.EncodeInto(root["hotkey_settings"], action, setting);
         Write(root);
+    }
+
+    /// <summary>Runs <see cref="SettingsMigrations.RunAll"/> once at launch, before anything reads
+    /// settings; writes only when a migration changed something. A missing file stays missing.</summary>
+    public void RunMigrations()
+    {
+        if (!File.Exists(_path)) return;
+        var root = Read();
+        if (SettingsMigrations.RunAll(root)) Write(root);
     }
 
     /// <summary>The newest version whose What's New was shown or skipped; empty reads as null.</summary>

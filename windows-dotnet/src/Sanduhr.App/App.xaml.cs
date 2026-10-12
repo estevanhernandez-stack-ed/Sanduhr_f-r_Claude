@@ -45,6 +45,8 @@ public partial class App : Application
         // package's LocalCache to the real AppData paths. Must run before anything below
         // constructs Paths or reads settings. One-shot, never throws.
         PackagedDataMigrationRunner.RunIfPackaged();
+        // Settings whose shape changed (S6: hotkey_settings as a per-action map), once, before any read.
+        new SettingsStore(new Sanduhr.Core.Paths()).RunMigrations();
 
         _vm = new WidgetViewModel();
         // Apply the saved theme's palette to the Application resources before the
