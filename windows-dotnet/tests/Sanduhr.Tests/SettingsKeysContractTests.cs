@@ -47,6 +47,10 @@ public class SettingsKeysContractTests
         "geom",
         "hidden_tiers",
         "hotkey_settings",
+        "hotkey_settings.settings",
+        "hotkey_settings.settings.mods",
+        "hotkey_settings.settings.on",
+        "hotkey_settings.settings.vk",
         "ledger_group_by_project",
         "limit_first_seen",
         "limits_hidden_until_reset",
@@ -126,6 +130,15 @@ public class SettingsKeysContractTests
 
         // The Claude Code glow group: the switches (SettingsStore, glow["k"] and ReadBool(o, "k")) and
         // the target members (GlowTargetSettings, glow["k"] and Str("k")).
+        // The shortcut map (S6): each action's word and the members its entry is written with.
+        var hotkeys = ReadSrc("Sanduhr.Core", "HotKeyCombo.cs");
+        foreach (Match w in Regex.Matches(hotkeys, @"HotKeyAction\.\w+ => ""([a-z]+)"","))
+        {
+            keys.Add("hotkey_settings." + w.Groups[1].Value);
+            foreach (Match m in Regex.Matches(hotkeys, @"\[""(on|vk|mods)""\] ="))
+                keys.Add($"hotkey_settings.{w.Groups[1].Value}.{m.Groups[1].Value}");
+        }
+
         var glowTarget = ReadSrc("Sanduhr.Core", "GlowTargetSettings.cs");
         foreach (var src in new[] { store, glowTarget })
             foreach (Match m in Regex.Matches(src, @"(?:\bglow\[|Str\(|ReadBool\(o, )""([a-z_]+)"""))

@@ -22,6 +22,7 @@ internal sealed class NowPlayingService : IDisposable
     private GlobalSystemMediaTransportControlsSession? _session;
     private bool _running;
     private int _generation;
+    private int _refreshSeq;
 
     public NowPlayingService(Dispatcher? ui = null)
     {
@@ -119,6 +120,7 @@ internal sealed class NowPlayingService : IDisposable
     private async void Refresh()
     {
         int gen = _generation;
+        int seq = ++_refreshSeq;
         var session = _session;
         NowPlayingInfo info;
         try
@@ -130,7 +132,8 @@ internal sealed class NowPlayingService : IDisposable
             else
             {
                 var props = await session.TryGetMediaPropertiesAsync();
-                if (gen != _generation || !ReferenceEquals(session, _session)) return;
+                // A later event's read started after this one: let the newest answer win.
+                if (gen != _generation || seq != _refreshSeq || !ReferenceEquals(session, _session)) return;
                 var playback = session.GetPlaybackInfo();
                 var timeline = session.GetTimelineProperties();
                 var status = playback?.PlaybackStatus switch
@@ -154,7 +157,7 @@ internal sealed class NowPlayingService : IDisposable
             System.Diagnostics.Debug.WriteLine($"[Sanduhr] media session read failed: {e.GetType().Name}");
             info = new NowPlayingInfo();
         }
-        if (gen != _generation) return;
+        if (gen != _generation || seq != _refreshSeq) return;
         if (info.State != NowPlayingState.None) SeenApps = NowPlayingApps.Seen(SeenApps, info.AppId);
         var before = _tracker.Shown;
         Schedule(_tracker.Replace(info, DateTimeOffset.Now));

@@ -168,7 +168,7 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
         GlowWaiting = glow.Waiting;
         GlowDone = glow.Done;
         GlowSkipTerminal = glow.SkipTerminal;
-        var target = _glowStore.LoadGlowTarget();
+        var target = _glowSaved = _glowStore.LoadGlowTarget();
         GlowTarget = GlowTargets.First(c => c.Kind == target.Effective);
         GlowSide = GlowSides.First(c => c.Side == target.Side);
         GlowMonitors = MonitorChoices();
@@ -180,6 +180,10 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     // ------------------------------------------------------------------ where the glow lands (spec 6.8)
 
     private readonly SettingsStore _glowStore = new(new Paths());
+
+    /// <summary>The target as saved. Each control replaces only its own member, so a value the page can't
+    /// show (S7's Desk placeholder, a monitor that is unplugged) survives a change to the others.</summary>
+    private GlowTargetSettings _glowSaved = GlowTargetSettings.Default;
 
     public sealed record GlowTargetChoice(GlowTargetKind Kind, string Name) { public override string ToString() => Name; }
     public sealed record GlowSideChoice(GlowEdgeSide Side, string Name) { public override string ToString() => Name; }
@@ -219,16 +223,17 @@ public sealed partial class ClaudeCodeViewModel : ObservableObject
     partial void OnGlowTargetChanged(GlowTargetChoice value)
     {
         OnPropertyChanged(nameof(GlowOnEdge));
-        SaveGlowTarget();
+        SaveGlowTarget(_glowSaved with { Kind = value.Kind });
     }
 
-    partial void OnGlowSideChanged(GlowSideChoice value) => SaveGlowTarget();
-    partial void OnGlowMonitorChanged(GlowMonitorChoice? value) => SaveGlowTarget();
+    partial void OnGlowSideChanged(GlowSideChoice value) => SaveGlowTarget(_glowSaved with { Side = value.Side });
+    partial void OnGlowMonitorChanged(GlowMonitorChoice? value) => SaveGlowTarget(_glowSaved with { Monitor = value?.Device });
 
-    private void SaveGlowTarget()
+    private void SaveGlowTarget(GlowTargetSettings next)
     {
-        if (_loading) return;
-        _glowStore.SaveGlowTarget(new GlowTargetSettings(GlowTarget.Kind, GlowSide.Side, GlowMonitor?.Device));
+        if (_loading || next == _glowSaved) return;
+        _glowSaved = next;
+        _glowStore.SaveGlowTarget(next);
         GlowReload?.Invoke();
     }
 

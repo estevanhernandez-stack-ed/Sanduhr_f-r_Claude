@@ -10,8 +10,13 @@ using Sanduhr.Core;
 
 namespace Sanduhr.App.Desk;
 
-/// <summary>What the message piece draws on one redraw: today's lines and the message settings.</summary>
-internal sealed record DeskMessageFrame(MessageToday Today, DeskMessageSettings Settings);
+/// <summary>What the message piece draws on one redraw: today's lines, the message settings, and the
+/// lines whose once-only motion ({write}, a {sweep} without a period) has already run, kept by the
+/// controller across redraws so a line writes itself in once when it appears, as on the Mac.</summary>
+internal sealed record DeskMessageFrame(MessageToday Today, DeskMessageSettings Settings)
+{
+    public ISet<string> Played { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+}
 
 /// <summary>
 /// The Desk message (spec 6.2, W11): <c>messages.txt</c> read with the Mac's grammar and drawn with its
@@ -141,7 +146,7 @@ internal static class DeskMessagePiece
             HorizontalAlignment.Center => TextAlignment.Center,
             _ => TextAlignment.Left,
         };
-        var built = lines.Select(l => Line(l, s, ink, regular, bold, baseSize, ta, align, width, live)).ToList();
+        var built = lines.Select(l => Line(l, s, ink, regular, bold, baseSize, ta, align, width, live, frame.Played)).ToList();
 
         if (!MessageSpecialModes.Cycles(s.Special, frame.Today))
         {
@@ -220,7 +225,7 @@ internal static class DeskMessagePiece
 
     /// <summary>One line with its effects. A line that is nothing but tags draws as written.</summary>
     private static FrameworkElement Line(string raw, DeskMessageSettings s, ResolvedInk ink, FontFamily regular, FontFamily bold,
-        double baseSize, TextAlignment ta, HorizontalAlignment align, double width, List<IDisposable> live)
+        double baseSize, TextAlignment ta, HorizontalAlignment align, double width, List<IDisposable> live, ISet<string> played)
     {
         var parsed = MessageMarkup.Parse(raw);
         var e = parsed.Effects;
@@ -264,9 +269,13 @@ internal static class DeskMessagePiece
         var host = new Grid { HorizontalAlignment = align };
         host.Children.Add(block);
         bool reduce = ReduceMotion;
-        if (MessageMotion.AnimatesWrite(e, reduce)) Write(block);
-        if (e.Sweep && MessageMotion.SweepPlan(e, reduce, false, false, false) is { } plan)
+        if (MessageMotion.AnimatesWrite(e, reduce) && played.Add("write\n" + raw)) Write(block);
+        bool sweptOnce = e.SweepPeriod is null && played.Contains("sweep\n" + raw);
+        if (e.Sweep && MessageMotion.SweepPlan(e, reduce, false, sweptOnce, false) is { } plan)
+        {
+            if (plan.Every is null) played.Add("sweep\n" + raw);
             Light(host, block, text, ink, live, plan.First, plan.Every, MessageMotion.SweepRun, band: null);
+        }
         if (MessageMotion.Shimmers(e, reduce, false))
             Light(host, block, text, ink, live, MessageMotion.ShimmerPeriod - MessageMotion.ShimmerSweep,
                 MessageMotion.ShimmerPeriod, MessageMotion.ShimmerSweep, band: MessageMotion.ShimmerBand);

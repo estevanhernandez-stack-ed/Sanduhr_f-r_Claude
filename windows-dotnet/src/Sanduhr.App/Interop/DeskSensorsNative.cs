@@ -107,7 +107,15 @@ internal static class DeskSensorsNative
             }
             catch (Exception e) when (e is COMException or InvalidComObjectException) { }
             Release();
-            return Acquire() && _meter!.GetPeakValue(out var again) == 0 ? again : null;
+            try
+            {
+                return Acquire() && _meter!.GetPeakValue(out var again) == 0 ? again : null;
+            }
+            catch (Exception e) when (e is COMException or InvalidComObjectException)
+            {
+                Release();
+                return null;
+            }
         }
 
         private bool Acquire()

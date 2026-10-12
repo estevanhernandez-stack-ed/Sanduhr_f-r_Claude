@@ -29,6 +29,9 @@ internal sealed record DeskFrame
     public DeskMessageFrame? Message { get; init; }
     /// <summary>The track to show, after the hide rules; null hides the piece.</summary>
     public NowPlayingInfo? Track { get; init; }
+    /// <summary>The track as it stands now, for the position bar's tick (a seek moves the anchor
+    /// without a redraw); null uses <see cref="Track"/>.</summary>
+    public Func<NowPlayingInfo?>? TrackNow { get; init; }
     /// <summary>Draw the bars beside the track (spec 6.6).</summary>
     public bool Bars { get; init; }
     public AudioLevelSource? Audio { get; init; }
@@ -529,7 +532,8 @@ internal sealed class DeskView : Grid, IDisposable
         if (track.State == NowPlayingState.Playing && track.Duration is > 0)
         {
             var tick = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
-            tick.Tick += (_, _) => fill.Width = width * (track.Progress(DateTimeOffset.Now) ?? 0);
+            var current = _frame.TrackNow;
+            tick.Tick += (_, _) => fill.Width = width * ((current?.Invoke() ?? track).Progress(DateTimeOffset.Now) ?? 0);
             tick.Start();
             _live.Add(new Unhook(tick.Stop));
         }

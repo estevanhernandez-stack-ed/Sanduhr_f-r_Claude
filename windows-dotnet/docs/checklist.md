@@ -109,7 +109,7 @@
   - [x] 13.4 Core: now playing, watchers, telemetry, weather, audio bars, ink and wallpaper sampling, glow targets (6.3 to 6.9)
   - [x] 13.5 App: now playing service and the widget line, telemetry, weather, peak meter, wallpaper ink, glow targets (6.3 to 6.8)
   - [x] 13.6 App: the Desk pieces, live updates, effects; the Message, Now playing and Weather pages; the handoff and watcher seams (6.2, 6.9, 6.10)
-  - [ ] 13.7 Harness renders, cost measured, PRIVACY rows, review, merge (6.11 to 6.13)
+  - [x] 13.7 Harness renders, cost measured, PRIVACY rows, review, merge (6.11 to 6.13)
 
 - [ ] **14. Stage 7: Desk polish** (deepening pass first)
   Spec ref: `spec.md > Stage 7`

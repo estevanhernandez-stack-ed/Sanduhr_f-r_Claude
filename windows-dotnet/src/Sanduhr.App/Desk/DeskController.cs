@@ -37,6 +37,9 @@ internal sealed class DeskController : IDisposable
     private DeskWeatherSettings _weatherSettings = DeskWeatherSettings.Default;
     private DeskUsage _usage = DeskUsage.Empty;
     private readonly List<DeskView> _views = [];
+    /// <summary>Message lines whose once-only motion has run (spec 6.2), kept across redraws.</summary>
+    private readonly HashSet<string> _played = new(StringComparer.Ordinal);
+    private bool _rendering;
     private IReadOnlyList<DeskSurface> _surfaces = [];
     private DateTimeOffset _fullAt = DateTimeOffset.MinValue;
 
@@ -168,7 +171,14 @@ internal sealed class DeskController : IDisposable
     /// when the islands line up with the last ones.</summary>
     private void Render()
     {
-        if (_host is null || _stopped || _screens.Count == 0) return;
+        if (_host is null || _stopped || _screens.Count == 0 || _rendering) return;
+        _rendering = true;
+        try { RenderOnce(); }
+        finally { _rendering = false; }
+    }
+
+    private void RenderOnce()
+    {
         _fonts ??= new DeskFonts();
         var now = DateTimeOffset.Now;
         var track = _np.Prefs.Visible(_nowPlaying.Shown);
@@ -178,7 +188,8 @@ internal sealed class DeskController : IDisposable
         {
             Usage = _usage,
             Now = now,
-            Message = _messages.Frame(now, _settings),
+            Message = PlayedFor(_messages.Frame(now, _settings)),
+            TrackNow = () => _np.Prefs.Visible(_nowPlaying.Shown),
             Track = track,
             Bars = _np.Bars,
             Audio = _audio,
@@ -199,16 +210,17 @@ internal sealed class DeskController : IDisposable
             surfaces.Add(new DeskSurface(screen, view.TakeIslands()));
         }
         _surfaces = surfaces;
+        if (_host is not { } host) return;
         try
         {
-            _host.Show(surfaces);
+            host.Show(surfaces);
         }
         catch (Exception e) when (e is ObjectDisposedException or InvalidOperationException or System.ComponentModel.Win32Exception)
         {
             // A window went away under us (Explorer restarting mid-redraw): start over with new ones
             // on the next rebuild rather than let a timer tick take the app down.
             System.Diagnostics.Debug.WriteLine($"[Sanduhr] Desk redraw failed: {e.GetType().Name}");
-            _host.Hide();
+            host.Hide();
         }
     }
 
@@ -221,7 +233,10 @@ internal sealed class DeskController : IDisposable
     {
         if (_ink.Mode != DeskInkMode.Auto)
             return new DeskInkMap(DeskInk.Resolve(_ink, ThemeText(), null));
-        view.Update(frame, DeskInkMap.Light);
+        // The sampling pass draws nothing anyone sees: give its message a scratch copy of the played set
+        // so the drawn pass still writes a new line in.
+        var scratch = frame.Message is { } m ? frame with { Message = m with { Played = new HashSet<string>(m.Played, StringComparer.Ordinal) } } : frame;
+        view.Update(scratch, DeskInkMap.Light);
         var by = new Dictionary<DeskAnchor, ResolvedInk>();
         foreach (var (anchor, r) in view.StackRects())
         {
@@ -231,6 +246,16 @@ internal sealed class DeskController : IDisposable
             by[anchor] = DeskInk.Resolve(_ink, ThemeText(), _wallpaper.Luminance(screen, px));
         }
         return new DeskInkMap(DeskInk.Resolve(_ink, ThemeText(), null), by);
+    }
+
+    /// <summary>Hands the message its played set, forgetting lines no longer showing (one that comes back
+    /// later writes itself in again, as on the Mac when a line appears).</summary>
+    private DeskMessageFrame? PlayedFor(DeskMessageFrame? frame)
+    {
+        if (frame is null) return null;
+        var showing = new HashSet<string>(frame.Today.Lines, StringComparer.Ordinal);
+        _played.RemoveWhere(k => !showing.Contains(k[(k.IndexOf('\n') + 1)..]));
+        return frame with { Played = _played };
     }
 
     /// <summary>The clock shows h:mm, so it redraws once a minute, on the minute (no render loop).</summary>
@@ -247,7 +272,9 @@ internal sealed class DeskController : IDisposable
         _minute.Stop();
         if (_host is null || _stopped) return;
         var now = DateTimeOffset.Now;
-        if (now - _fullAt >= FullEvery || _surfaces.Count == 0 || now.ToLocalTime().Date != _fullAt.ToLocalTime().Date)
+        // A full layout every five minutes, and on the hour (hourly rotation, special-day windows, a new day).
+        if (now - _fullAt >= FullEvery || _surfaces.Count == 0 || now.ToLocalTime().Hour != _fullAt.ToLocalTime().Hour
+            || now.ToLocalTime().Date != _fullAt.ToLocalTime().Date)
             Render();
         else
         {
