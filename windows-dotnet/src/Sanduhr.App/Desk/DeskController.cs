@@ -196,7 +196,9 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     /// </summary>
     public void BeginArrange()
     {
-        if (_host is null || _stopped || Arranging || !Running || _screens.Count == 0) return;
+        // Not tied to Running: a Desk that is on but draws nothing yet (an empty message, no numbers) can
+        // still be arranged, since arrange mode draws every placed piece.
+        if (_host is null || _stopped || Arranging || _screens.Count == 0) return;
         _fonts ??= new DeskFonts();
         var session = new DeskArrangeSession(_settings.Layout);
         var now = DateTimeOffset.Now;
@@ -230,6 +232,8 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         _views.Clear();
         _surfaces = [];
         _host.Hide();
+        // The arrange view has no bars; the readings it shows keep sampling.
+        SyncSources(track);
         mode.Activate();
         ArrangeChanged?.Invoke();
     }
@@ -302,7 +306,7 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
         bool on = _host is not null && !_stopped;
         if (on && InSight("telemetry")) _telemetry.Start(); else _telemetry.Stop();
         _nowPlaying.Want(this, on && Placed("nowPlaying"));
-        bool bars = on && _np.Bars && InSight("nowPlaying") && track?.State == NowPlayingState.Playing;
+        bool bars = on && !Arranging && _np.Bars && InSight("nowPlaying") && track?.State == NowPlayingState.Playing;
         if (bars) _audio.Start(); else if (_audio.Running) _audio.Stop();
         if (on && Placed("weather") && _weatherSettings.Place is { } place)
             _weather.Start(place, _weatherSettings.UnitOr(RegionInfo.CurrentRegion.IsMetric));

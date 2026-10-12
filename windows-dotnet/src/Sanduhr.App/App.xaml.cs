@@ -81,7 +81,8 @@ public partial class App : Application
         _window = new MainWindow { DataContext = _vm };
         // Just the Desk with no account (spec 7.5): the widget starts hidden and the tray is the way back.
         // The handle is created without showing, so the glow, alerts and tray have a window to point at.
-        if (JustTheDesk.WidgetStartsHidden(_vm.JustTheDesk, _vm.AccountStore.ListAccounts().Count > 0))
+        if (JustTheDesk.WidgetStartsHidden(_vm.JustTheDesk, _vm.AccountStore.ListAccounts().Count > 0,
+                new SettingsStore(new Sanduhr.Core.Paths()).LoadDesk().Enabled))
             new System.Windows.Interop.WindowInteropHelper(_window).EnsureHandle();
         else
             _window.Show();
@@ -654,7 +655,14 @@ public partial class App : Application
     {
         if (_vm is not { } vm)
             return;
+        // The account is saved by now: end Just the Desk before the fetch, so the widget comes up for it at
+        // once and a fetch that throws can't leave Just the Desk on.
+        EndJustTheDeskIfAccount(vm);
         await vm.ReloadAfterSignInAsync();
+    }
+
+    private void EndJustTheDeskIfAccount(WidgetViewModel vm)
+    {
         try
         {
             if (vm.AccountStore.ListAccounts().Count == 0)
@@ -666,6 +674,7 @@ public partial class App : Application
             store.SaveJustTheDesk(state);
             store.SaveDeskSignInReminder(reminderOn);
             vm.JustTheDesk = false;
+            if (_settingsWindow?.ViewModel.Alerts is { } alerts) alerts.DeskSignInReminder = reminderOn;
             vm.RefreshDesk();
             ShowWindow();
         }
@@ -687,10 +696,11 @@ public partial class App : Application
         {
             var store = new SettingsStore(new Sanduhr.Core.Paths());
             var (state, reminderOn, deskEnabled) = JustTheDesk.Choose(store.LoadJustTheDesk(), store.LoadDeskSignInReminder());
-            store.SaveJustTheDesk(state);
-            store.SaveDeskSignInReminder(reminderOn);
+            // The Desk first: a failed write after it leaves Just the Desk unchosen, never chosen with no Desk.
             if (deskEnabled)
                 store.SaveDesk(store.LoadDesk() with { Enabled = true });
+            store.SaveDeskSignInReminder(reminderOn);
+            store.SaveJustTheDesk(state);
         }
         catch
         {

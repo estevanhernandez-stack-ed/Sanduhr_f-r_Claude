@@ -423,9 +423,27 @@ internal sealed class DeskArrangeMode : IDisposable
         first.Content.Focus();
     }
 
-    private HwndSource Create(DeskScreen screen, DeskArrangeContent content)
+    private const int WM_CLOSE = 0x0010;
+    private const int WM_SYSCOMMAND = 0x0112;
+    private const int SC_CLOSE = 0xF060;
+
+    /// <summary>
+    /// The surface's rectangle: the monitor less the taskbar's room (reserved or auto-hide). Explorer drops
+    /// the taskbar below a foreground window that covers the whole monitor, so stopping short of it keeps the
+    /// tray's "Finish arranging" in reach, auto-hide included.
+    /// </summary>
+    private static PxRect SurfaceRect(DeskScreen screen)
     {
         var b = screen.Bounds;
+        var t = screen.Taskbar;
+        int l = (int)Math.Ceiling(t.Left * screen.Scale), tp = (int)Math.Ceiling(t.Top * screen.Scale);
+        int r = (int)Math.Ceiling(t.Right * screen.Scale), bt = (int)Math.Ceiling(t.Bottom * screen.Scale);
+        return new PxRect(b.X + l, b.Y + tp, Math.Max(1, b.Width - l - r), Math.Max(1, b.Height - tp - bt));
+    }
+
+    private HwndSource Create(DeskScreen screen, DeskArrangeContent content)
+    {
+        var b = SurfaceRect(screen);
         var src = DeskNative.PerMonitor(() => new HwndSource(new HwndSourceParameters("SanduhrDeskArrange")
         {
             WindowStyle = DeskNative.WS_POPUP | DeskNative.WS_VISIBLE,
@@ -438,6 +456,14 @@ internal sealed class DeskArrangeMode : IDisposable
         }));
         src.AddHook((IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
         {
+            // Closed from outside (Alt+F4, a close sent by another program): end the edit as Cancel
+            // instead of losing a surface while the session runs on with the islands hidden.
+            if (msg == WM_CLOSE || (msg == WM_SYSCOMMAND && (wParam.ToInt64() & 0xFFF0) == SC_CLOSE))
+            {
+                handled = true;
+                Request(DeskArrangeEnd.Cancel);
+                return IntPtr.Zero;
+            }
             if (msg != DeskNative.WM_KEYDOWN) return IntPtr.Zero;
             string? name = (int)(wParam.ToInt64() & 0xFFFF) switch
             {
@@ -451,9 +477,14 @@ internal sealed class DeskArrangeMode : IDisposable
         // WPF draws in its own DPI for this window; scale the content so a DIP is the monitor's.
         double wpf = src.CompositionTarget?.TransformToDevice.M11 is > 0 and var t ? t : 1.0;
         double k = screen.Scale / wpf;
+        // The content is the whole screen in DIPs; the window starts past the taskbar, so shift it back.
+        content.Margin = new Thickness(-(b.X - screen.Bounds.X) / screen.Scale, -(b.Y - screen.Bounds.Y) / screen.Scale, 0, 0);
         src.RootVisual = new Border
         {
             Child = content,
+            ClipToBounds = true,
+            Width = b.Width / screen.Scale,
+            Height = b.Height / screen.Scale,
             HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Top,
             LayoutTransform = Math.Abs(k - 1) < 0.001 ? Transform.Identity : new ScaleTransform(k, k),

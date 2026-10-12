@@ -2291,7 +2291,7 @@
 
                             <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
 
-                            <StackPanel views:SettingsAnchor.Id="pieces">
+                            <StackPanel views:SettingsAnchor.Id="pieces" IsEnabled="{Binding NotArranging}">
                                 <TextBlock Text="Where each piece sits" FontSize="13" FontWeight="SemiBold"
                                            Foreground="{DynamicResource Sanduhr.Brush.Text}" Margin="0,0,0,8" />
                                 <ItemsControl ItemsSource="{Binding Pieces}" Focusable="False">

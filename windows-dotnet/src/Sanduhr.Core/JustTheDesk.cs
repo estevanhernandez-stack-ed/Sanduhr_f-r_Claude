@@ -47,8 +47,9 @@ public static class JustTheDesk
     /// <summary>The first-run flow shows only with no account and Just the Desk not chosen.</summary>
     public static bool Onboarding(bool hasAccount, bool justTheDesk) => !hasAccount && !justTheDesk;
 
-    /// <summary>The widget starts hidden (the tray is the way back) with Just the Desk and no account.</summary>
-    public static bool WidgetStartsHidden(bool justTheDesk, bool hasAccount) => justTheDesk && !hasAccount;
+    /// <summary>The widget starts hidden (the tray is the way back) with Just the Desk, no account and the Desk
+    /// on. With the Desk turned off since, the widget shows, so a launch never shows nothing at all.</summary>
+    public static bool WidgetStartsHidden(bool justTheDesk, bool hasAccount, bool deskOn) => justTheDesk && !hasAccount && deskOn;
 
     /// <summary>The first-run card shows with no account and Just the Desk not chosen.</summary>
     public static bool ShowsFirstRunCard(bool hasAccount, bool justTheDesk) => !hasAccount && !justTheDesk;

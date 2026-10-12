@@ -83,12 +83,13 @@ public class JustTheDeskTests
     }
 
     [Theory]
-    [InlineData(true, false, true)]
-    [InlineData(true, true, false)]
-    [InlineData(false, false, false)]
-    [InlineData(false, true, false)]
-    public void TheWidgetStartsHiddenOnlyWithJustTheDeskAndNoAccount(bool justTheDesk, bool hasAccount, bool expected) =>
-        Assert.Equal(expected, JustTheDesk.WidgetStartsHidden(justTheDesk, hasAccount));
+    [InlineData(true, false, true, true)]
+    [InlineData(true, false, false, false)]
+    [InlineData(true, true, true, false)]
+    [InlineData(false, false, true, false)]
+    [InlineData(false, true, true, false)]
+    public void TheWidgetStartsHiddenOnlyWithJustTheDeskNoAccountAndTheDeskOn(bool justTheDesk, bool hasAccount, bool deskOn, bool expected) =>
+        Assert.Equal(expected, JustTheDesk.WidgetStartsHidden(justTheDesk, hasAccount, deskOn));
 
     [Fact]
     public void TheDeskDrawsNoSignInLineWithTheReminderOff()

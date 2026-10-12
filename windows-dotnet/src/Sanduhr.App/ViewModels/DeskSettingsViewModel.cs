@@ -116,8 +116,11 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
 
     /// <summary>True while Arrange mode is up on the desktop (App sets it).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanArrange), nameof(ArrangeNote))]
+    [NotifyPropertyChangedFor(nameof(CanArrange), nameof(ArrangeNote), nameof(NotArranging))]
     private bool _arranging;
+
+    /// <summary>The piece rows are editable only while no Arrange session runs (Done would overwrite them).</summary>
+    public bool NotArranging => !Arranging;
 
     /// <summary>The working layout of the running Arrange session, null when none runs: the map draws it live.</summary>
     [ObservableProperty] private string? _arrangingLayout;

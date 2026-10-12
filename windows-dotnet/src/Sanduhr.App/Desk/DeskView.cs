@@ -93,7 +93,8 @@ internal sealed class DeskView : Grid, IDisposable
         var frames = new Dictionary<string, Rect>(StringComparer.Ordinal);
         foreach (var (widget, element) in _pieces)
         {
-            if (!element.IsVisible && element.RenderSize.IsEmpty) continue;
+            // Laid out but maybe not yet in a window (IsVisible would read false then): the size decides.
+            if (element.RenderSize.Width <= 0 || element.RenderSize.Height <= 0) continue;
             frames[widget] = element.TransformToAncestor(this).TransformBounds(new Rect(element.RenderSize));
         }
         return frames;

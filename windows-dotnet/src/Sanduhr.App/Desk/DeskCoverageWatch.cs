@@ -97,11 +97,11 @@ internal sealed class DeskCoverageWatch : IDisposable
         _covered = [];
     }
 
-    /// <summary>Asks for a recompute 250 ms from now, after the burst of events settles.</summary>
+    /// <summary>Asks for a recompute within 250 ms. A throttle, not a debounce: a steady stream of events
+    /// (tooltips, completion popups) still gets a recompute every 250 ms instead of none.</summary>
     public void Schedule()
     {
-        if (_disposed) return;
-        _settle.Stop();
+        if (_disposed || _settle.IsEnabled) return;
         _settle.Start();
     }
 
