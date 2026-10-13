@@ -89,11 +89,12 @@ final class IntegrationsModel {
     /// The user's statusline run once against sample statusline JSON and split into segments,
     /// with Sanduhr's, for the sheet's chips (item 63b). Nil when it couldn't run (no python3,
     /// a build without the scripts).
-    func inspectStatusline(chain: String, input: Data? = nil) async -> StatuslineInspection? {
+    func inspectStatusline(chain: String, input: Data? = nil, configDir: String? = nil) async -> StatuslineInspection? {
         guard let python = pythonPath else { return nil }
         return await Task.detached(priority: .userInitiated) { () -> StatuslineInspection? in
             guard let args = IntegrationInstaller.standard.inspectArguments(chain: chain),
-                  let text = StatuslinePreview.run(python: python, arguments: args, input: input) else { return nil }
+                  let text = StatuslinePreview.run(python: python, arguments: args, input: input,
+                                                   configDir: configDir) else { return nil }
             return StatuslineInspection.decode(text)
         }.value
     }
@@ -101,11 +102,11 @@ final class IntegrationsModel {
     /// What the combined line prints with these picks, from the user's output (their command
     /// doesn't run again), for the sheet's live preview. Nil when it couldn't run.
     func composeStatusline(theirs: String, join: StatuslineJoin, selection: StatuslineSelection,
-                           input: Data? = nil) async -> String? {
+                           input: Data? = nil, configDir: String? = nil) async -> String? {
         guard let python = pythonPath else { return nil }
         return await Task.detached(priority: .userInitiated) { () -> String? in
             guard let args = IntegrationInstaller.standard.composeArguments(theirs: theirs, join: join, selection: selection) else { return nil }
-            return StatuslinePreview.run(python: python, arguments: args, input: input)
+            return StatuslinePreview.run(python: python, arguments: args, input: input, configDir: configDir)
         }.value
     }
 
@@ -191,6 +192,30 @@ final class IntegrationsModel {
             note = (message(f), true)
             return nil
         }
+    }
+
+    /// Mods & Config, By Seat's Statusline (item 71, slice 1e): new picks for Sanduhr's own
+    /// entry, alone or combined, written as an update (the receipt and Remove are unchanged).
+    /// Nil when written, else what went wrong.
+    func repickStatusline(folder: String, selection: StatuslineSelection, combined: Bool) async -> String? {
+        guard let python = pythonPath else { return "Python 3 wasn't found, so the statusline can't run." }
+        busy = folder
+        defer { busy = nil }
+        let failure = await Task.detached(priority: .userInitiated) { () -> IntegrationInstaller.Failure? in
+            do {
+                _ = try IntegrationInstaller.standard.install(.statusline, folder: folder, python: python,
+                                                              selection: selection, repick: true)
+                return nil
+            } catch let f as IntegrationInstaller.Failure {
+                return f
+            } catch {
+                return .writeFailed(file: folder)
+            }
+        }.value
+        if let failure { return message(failure) }
+        // The band takes Sanduhr's segment looks from a combined line (item 65f).
+        if combined { BandFileWriter.shared.setMeterStyles(selection.theirs?.ours) }
+        return nil
     }
 
     func remove(_ kind: IntegrationKind, folder: String, linked: [String]) async {

@@ -55,6 +55,56 @@ struct StatuslineCombineTests {
         }
     }
 
+    @Test func sanduhrsLineAloneTakesItsOwnPicks() {
+        let picks = StatuslinePicks(keep: [], drop: [], keepNew: true, separators: [],
+                                    ours: [.label: SegmentStyle(bold: true)])
+        let selection = StatuslineSelection(theirs: picks, mine: [.label, .session, .weekly])
+        let built = IntegrationInstaller.statuslineCommand(python: "python3", script: Self.script, selection: selection)
+        #expect(built == "python3 \(Self.script) --keep-theirs-b64 \(picks.base64) --mine label,session,weekly")
+        #expect(IntegrationInstaller.parseStatusline(built) == StatuslineCommand(base: "python3 \(Self.script)", selection: selection))
+        // No picks: the bare command, as before. The band never rides on a line alone.
+        #expect(IntegrationInstaller.statuslineCommand(python: "python3", script: Self.script) == "python3 \(Self.script)")
+        #expect(IntegrationInstaller.statuslineCommand(python: "python3", script: Self.script,
+                                                       selection: StatuslineSelection(mine: [.session], band: true))
+                == "python3 \(Self.script) --mine session")
+        let base = "python3 \(Self.script)"
+        for bad in [
+            "\(base) --mine session --keep-theirs-b64 \(picks.base64)",     // order
+            "\(base) --mine session --band",
+            "\(base) --mine",
+            "\(base) --mine weekly,session",
+            "\(base) --keep-theirs-b64 !!!!",
+            "\(base) --mine session extra",
+            "my.sh --mine session",
+        ] {
+            #expect(!Self.ours(bad), "\(bad)")
+        }
+    }
+
+    @Test func repickWritesNewPicksAndAnUpdateKeepsThem() throws {
+        let r = IntegrationRig()
+        defer { r.cleanUp() }
+        r.home.dir(".claude-p/projects")
+        let folder = r.home.at(".claude-p")
+        let before = r.snapshot()
+        try r.installer.install(.statusline, folder: folder, python: r.python)
+        let selection = StatuslineSelection(mine: [.label, .weekly])
+        try r.installer.install(.statusline, folder: folder, python: r.python, selection: selection, repick: true)
+        func parsed() -> StatuslineCommand? {
+            let sl = r.json(".claude-p/settings.json")["statusLine"] as? [String: Any]
+            return IntegrationInstaller.parseStatusline(sl?["command"] as? String ?? "")
+        }
+        #expect(parsed()?.selection == selection && parsed()?.chain == nil)
+        #expect(r.installer.status(.statusline, folder: folder) == .installed)
+        // The Update button keeps them.
+        try r.installer.install(.statusline, folder: folder, python: r.python)
+        #expect(parsed()?.selection == selection)
+        // Remove still puts the folder back as it was.
+        try r.installer.remove(.statusline, folder: folder)
+        let after = r.snapshot()
+        #expect(after == before, "\(Set(after.keys).symmetricDifference(before.keys)) \(after.filter { before[$0.key] != $0.value }.keys)")
+    }
+
     @Test func unwrapFindsTheInnermostForeignCommand() {
         let plain = "python3 \(Self.script)"
         let once = IntegrationInstaller.statuslineCommand(python: "python3", script: Self.script, chain: "my.sh")

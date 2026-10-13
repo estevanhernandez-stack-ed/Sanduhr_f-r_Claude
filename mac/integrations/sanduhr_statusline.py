@@ -1136,7 +1136,9 @@ def parse_args(argv, flag="--chain-b64", blank=False):
     payload is their output (possibly empty) instead of a command."""
     if not argv:
         return []
-    if len(argv) < 4 or argv[0] != flag or argv[2] != "--join":
+    if argv[0] != flag:
+        return parse_plain(argv) if flag == "--chain-b64" else None
+    if len(argv) < 4 or argv[2] != "--join":
         return None
     b64, mode = argv[1], argv[3]
     if mode not in ("line", "same"):
@@ -1175,6 +1177,34 @@ def parse_args(argv, flag="--chain-b64", blank=False):
     if rest:
         return None
     return (command, mode, padding, picks, mine, band)
+
+
+def parse_plain(argv):
+    """Sanduhr's line alone with picks (item 71, slice 1e): `[--keep-theirs-b64 K] [--mine M]`,
+    of which only the picks' `ours` looks and `with` glyph apply. ("plain", picks, mine), or None
+    when the arguments aren't exactly that."""
+    picks, mine, rest = None, None, list(argv)
+    if rest[:1] == ["--keep-theirs-b64"]:
+        picks = parse_picks(rest[1]) if len(rest) >= 2 else None
+        if picks is None:
+            return None
+        rest = rest[2:]
+    if rest[:1] == ["--mine"]:
+        mine = parse_mine(rest[1]) if len(rest) >= 2 else None
+        if mine is None:
+            return None
+        rest = rest[2:]
+    if rest or (picks is None and mine is None):
+        return None
+    return ("plain", picks, mine)
+
+
+def plain_line(stdin_bytes, now, picks, mine):
+    """What Sanduhr's line alone prints with picks: its segments `mine` picks, the `ours` looks,
+    joined with the `with` glyph."""
+    glue = (picks or {}).get("with")
+    return segment(stdin_bytes, now, mine or MINE_DEFAULT, _glue(glue) if glue else " | ",
+                   (picks or {}).get("ours") or {})
 
 
 def combined(theirs, data, now, mode, padding, picks, mine, cols, band=False):
@@ -1265,7 +1295,11 @@ def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     now = datetime.now(timezone.utc)
     if argv[:1] == ["--inspect-b64"]:
-        # The Combine sheet (never a statusline): run theirs once, print the pieces as JSON.
+        # The Combine sheet (never a statusline): run theirs once, print the pieces as JSON. An
+        # empty command (Sanduhr's line alone, item 71 slice 1e) runs nothing: Sanduhr's pieces only.
+        if argv[1:] == [""]:
+            write(json.dumps(inspect("", read_stdin_all(), now), ensure_ascii=False) + "\n")
+            return 0
         args = parse_args(["--chain-b64", argv[1] if len(argv) > 1 else "", "--join", "line"])
         if len(argv) != 2 or not args:
             say("--inspect-b64 takes one base64 command")
@@ -1289,10 +1323,12 @@ def main(argv=None):
     args = parse_args(argv)
     if args is None:
         say("arguments aren't --chain-b64 <base64> --join line|same [--padding n] "
-            "[--keep-theirs-b64 <base64>] [--mine <list>] [--band]; showing Sanduhr only")
+            "[--keep-theirs-b64 <base64>] [--mine <list>] [--band], or [--keep-theirs-b64 <base64>] "
+            "[--mine <list>] alone; showing Sanduhr only")
         args = []
-    if not args:
-        out = segment(read_stdin_patiently, now)
+    if not args or args[0] == "plain":
+        picks, mine = (args[1], args[2]) if args else (None, None)
+        out = plain_line(read_stdin_patiently, now, picks, mine)
         if out:
             print(out)
         return 0

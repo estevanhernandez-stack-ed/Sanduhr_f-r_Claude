@@ -502,11 +502,13 @@ struct IntegrationInstaller {
     /// Someone else's entry is replaced only with `replaceOther`, and remembered for Remove.
     /// For the statusline, `combine` (item 63) keeps someone else's line instead: Sanduhr's
     /// command runs it and prints both, joined that way, keeping the segments `selection` picks
-    /// (item 63b); it is remembered for Remove the same.
+    /// (item 63b); it is remembered for Remove the same. With `repick`, Sanduhr's own entry
+    /// (alone or combined) takes `selection` as its new picks (item 71, slice 1e).
     @discardableResult
     func install(_ kind: IntegrationKind, folder: String, python: String,
                  replaceOther: Bool = false, combine: StatuslineJoin? = nil,
-                 selection: StatuslineSelection = StatuslineSelection(), pinned: String? = nil) throws -> Outcome {
+                 selection: StatuslineSelection = StatuslineSelection(), repick: Bool = false,
+                 pinned: String? = nil) throws -> Outcome {
         if kind.needsScripts {
             do {
                 try scripts.refresh()
@@ -525,7 +527,7 @@ struct IntegrationInstaller {
             let prior = receipts.first { $0.file == file && $0.kind == kind }
             let plan = try malformedNamed(file) {
                 try planInstall(kind, bytes: original ?? Array("{}\n".utf8), value: value, python: python,
-                                combine: combine, selection: selection, prior: prior,
+                                combine: combine, selection: selection, repick: repick, prior: prior,
                                 createdFile: original == nil)
             }
             if let other = plan.other, !replaceOther, combine == nil { return .needsReplaceConsent(existing: other) }
@@ -566,8 +568,8 @@ struct IntegrationInstaller {
     }
 
     private func planInstall(_ kind: IntegrationKind, bytes b: [UInt8], value: JSONEdit.Value, python: String,
-                             combine: StatuslineJoin?, selection: StatuslineSelection, prior: IntegrationReceipt?,
-                             createdFile: Bool) throws -> Plan {
+                             combine: StatuslineJoin?, selection: StatuslineSelection, repick: Bool = false,
+                             prior: IntegrationReceipt?, createdFile: Bool) throws -> Plan {
         let root = try parse(b)
         let top = try JSONEdit.topObject(b)
         var receipt = IntegrationReceipt(folder: "", file: "", kind: kind, createdFile: createdFile)
@@ -581,7 +583,7 @@ struct IntegrationInstaller {
             return try planInstallHooks(bytes: b, root: root, top: top, receipt: receipt, prior: prior)
         case .statusline:
             return try planInstallStatusline(bytes: b, root: root, top: top, python: python, combine: combine,
-                                             selection: selection, receipt: receipt, prior: prior)
+                                             selection: selection, repick: repick, receipt: receipt, prior: prior)
         case .mcp:
             if let m = top.member(Self.serversKey) {
                 guard root[Self.serversKey] is [String: Any] else { throw Failure.malformed(file: "") }
@@ -617,7 +619,7 @@ struct IntegrationInstaller {
     /// line's padding, refresh interval and vim choice.
     private func planInstallStatusline(bytes b: [UInt8], root: [String: Any], top: JSONEdit.Object, python: String,
                                        combine: StatuslineJoin?, selection picked: StatuslineSelection,
-                                       receipt start: IntegrationReceipt,
+                                       repick: Bool = false, receipt start: IntegrationReceipt,
                                        prior: IntegrationReceipt?) throws -> Plan {
         var receipt = start
         var other: String?
@@ -628,12 +630,13 @@ struct IntegrationInstaller {
         let command = (existing as? [String: Any])?["command"] as? String
         if let m = top.member(Self.statusLineKey) {
             if let ours = command.flatMap(Self.parseStatusline) {
-                // Updating Sanduhr's own entry keeps what the first install recorded.
+                // Updating Sanduhr's own entry keeps what the first install recorded, and its
+                // picks, alone or combined; `repick` (Mods & Config's Statusline) writes new ones.
                 if let prior { receipt = prior }
+                selection = repick ? picked : ours.selection
                 if let inner = ours.chain, let foreign = Self.innermostForeign(inner) {
                     chain = foreign
                     join = ours.join ?? .line
-                    selection = ours.selection
                 }
                 if receipt.previous != nil || chain != nil { receipt.mode = chain == nil ? .replace : .combine }
             } else {
@@ -1091,8 +1094,11 @@ struct IntegrationInstaller {
             NSLog("Sanduhr integration write failed (\(type(of: error)))")
             throw Failure.writeFailed(file: file)
         }
-        // Back to what it was before Sanduhr: the backup has nothing more to offer.
-        if let kept = fm.contents(atPath: backup) {
+        // Back to what it was before Sanduhr: the backup has nothing more to offer. A file deleted
+        // is one Sanduhr made (Remove deletes only those), so its backup was of Sanduhr's own bytes.
+        if bytes == nil {
+            try? fm.removeItem(atPath: backup)
+        } else if let kept = fm.contents(atPath: backup) {
             let current = fm.contents(atPath: target)
             if current.map(Array.init) == Array(kept) { try? fm.removeItem(atPath: backup) }
         }
