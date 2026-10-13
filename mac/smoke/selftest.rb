@@ -225,6 +225,7 @@ check('meter history holds only flags, a window and counts',
       state['meter_history'].values.all? { |v| v == true || v == false || v.is_a?(Integer) || %w[week month].include?(v) })
 # Item 38: the menu bar choice, Whichever is higher until changed.
 eq('menu bar follows the higher limit by default', state['menu_bar'], 'higher')
+eq('the hourglass shows by default', state['menu_bar_item'], 'shown')
 eq('no limit hidden by default', state['hidden_limits'], [])
 # Item 42: only limits believed temporary can be hidden; raw values only, never labels.
 eq('no temporary limit in the fixture', state['temporary_limits'], [])

@@ -971,6 +971,7 @@ private struct NotchGlowSection: View {
 struct GeneralSection: View {
     @AppStorage("menuIcon", store: .desk) private var menuIcon = false
     @AppStorage(MenuBarMode.key) private var menuBarMode = MenuBarMode.higher
+    @AppStorage(MenuBarItem.hiddenKey) private var menuBarItemHidden = false
     @State private var atLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -1001,9 +1002,19 @@ struct GeneralSection: View {
         .formStyle(.grouped)
     }
 
-    /// Menu Bar Shows (the percent beside the hourglass) and the meetings menu's item.
+    /// The hourglass itself, Menu Bar Shows (the percent beside it) and the meetings menu's item.
     private var menuBarSection: some View {
         Section("Menu bar") {
+            Toggle(SettingsNames.showMenuBarItem, isOn: Binding(
+                get: { !menuBarItemHidden }, set: { menuBarItemHidden = !$0 }))
+                .onChange(of: menuBarItemHidden) { _, _ in
+                    (NSApp.delegate as? AppDelegate)?.menuBarItemVisibilityDidChange()
+                }
+                .settingsAnchor(SettingsAnchor.menuBarItem)
+            if menuBarItemHidden {
+                Text("Sanduhr's menu is still in the widget (two-finger click) and on the Desk's clock. Opening Sanduhr again from Finder or Spotlight shows the widget, or Settings when the widget is already showing; \(SanduhrHotKeys.Shortcut.settings.name) (⌥S) works too when it's on.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Picker(SettingsNames.menuBarShows, selection: $menuBarMode) {
                 ForEach(MenuBarMode.allCases) { Text($0.label).tag($0) }
             }
@@ -1011,6 +1022,7 @@ struct GeneralSection: View {
                 (NSApp.delegate as? AppDelegate)?.menuBarModeDidChange()
             }
             .settingsAnchor(SettingsAnchor.menuBarShows)
+            .disabled(menuBarItemHidden)
             Text("The percent beside the hourglass, also in every Sanduhr menu. Only the session and the weekly all-models limit show here; Rotate switches between them every 8 seconds (S for session, W for weekly). The meetings menu is a second menu bar item with today's meetings, Join and Settings.")
                 .font(.caption).foregroundStyle(.secondary)
             Toggle(SettingsNames.meetingsMenu, isOn: $menuIcon)

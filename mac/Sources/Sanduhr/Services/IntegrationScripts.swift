@@ -23,7 +23,12 @@ import Foundation
 /// out, a version a receipt pins (item 64, slice 2) and any a known settings.json still names
 /// (`…/integrations/<stamp>/`). Python reads a script whole when it starts, so a running server or
 /// statusline never needs its folder again.
-/// The flat copies `install.sh` makes beside them are never touched.
+/// The flat copies `install.sh` makes beside them (`integrations/sanduhr_*.py`) follow the app too:
+/// a caller that names them directly, such as a seat's own statusline script, would otherwise run
+/// the copy from the day `install.sh` last ran, from before seats, and show the active account in
+/// every folder. Each refresh turns a flat copy that is a Sanduhr script into a link to
+/// `current/<script>`; `removeAll` turns those links back into files. A flat file that isn't a
+/// Sanduhr script, or a link to anything else, is left alone.
 ///
 /// The Claude Code mod (item 50) rides in the same stamped folder, under `mods/sanduhr-meters/`:
 /// its files join the stamp, and Claude Code loads it from `…/integrations/current/mods/sanduhr-meters`.
@@ -216,6 +221,7 @@ struct IntegrationScripts {
                     throw Failure.writeFailed
                 }
             }
+            linkFlatCopies()
             // A receipt Sanduhr can't read may pin a stamp or name a settings file: no prune then.
             if let settingsFiles, receiptsAllReadable {
                 prune(keep: [stamp, replaced].compactMap { $0 } + pinnedStamps + Self.referencedStamps(in: settingsFiles))
@@ -264,7 +270,7 @@ struct IntegrationScripts {
     private func pruneLeftovers() {
         let fm = FileManager.default
         guard let names = try? fm.contentsOfDirectory(atPath: dir.path) else { return }
-        for name in names where name.hasPrefix(".staging-") || name.hasPrefix(".current-") {
+        for name in names where name.hasPrefix(".staging-") || name.hasPrefix(".current-") || name.hasPrefix(".flat-") {
             try? fm.removeItem(at: dir.appendingPathComponent(name))
         }
     }
@@ -274,14 +280,58 @@ struct IntegrationScripts {
         let fm = FileManager.default
         guard let names = try? fm.contentsOfDirectory(atPath: dir.path) else { return }
         for name in names where !keep.contains(name) {
-            if Self.isStampName(name) || name.hasPrefix(".staging-") || name.hasPrefix(".current-") {
+            if Self.isStampName(name) || name.hasPrefix(".staging-") || name.hasPrefix(".current-") || name.hasPrefix(".flat-") {
                 try? fm.removeItem(at: dir.appendingPathComponent(name))
             }
         }
     }
 
+    // MARK: Flat copies
+
+    /// The link a flat copy becomes: relative, so it follows the `current` swap.
+    static func flatTarget(_ name: String) -> String { "\(currentName)/\(name)" }
+
+    /// A flat copy that is one of Sanduhr's scripts: a regular file naming Sanduhr near its top.
+    static func isSanduhrScript(_ url: URL) -> Bool {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              attrs[.type] as? FileAttributeType == .typeRegular,
+              let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        let head = (try? handle.read(upToCount: 512)) ?? Data()
+        return String(decoding: head, as: UTF8.self).lowercased().contains("sanduhr")
+    }
+
+    /// Turns each flat copy that is a Sanduhr script into a link to `current/<script>`, by a
+    /// `rename(2)` over it so a caller sees the old file or the link, whole.
+    func linkFlatCopies() {
+        let fm = FileManager.default
+        for name in Self.names {
+            let flat = dir.appendingPathComponent(name)
+            guard Self.isSanduhrScript(flat) else { continue }
+            let link = dir.appendingPathComponent(".flat-\(UUID().uuidString)")
+            guard (try? fm.createSymbolicLink(atPath: link.path, withDestinationPath: Self.flatTarget(name))) != nil else { continue }
+            if rename(link.path, flat.path) != 0 { unlink(link.path) }
+        }
+    }
+
+    /// Turns flat links back into files holding the current script, so a caller that names them
+    /// keeps working once the stamped folders are gone.
+    private func unlinkFlatCopies() {
+        let fm = FileManager.default
+        for name in Self.names {
+            let flat = dir.appendingPathComponent(name)
+            guard (try? fm.destinationOfSymbolicLink(atPath: flat.path)) == Self.flatTarget(name),
+                  let data = fm.contents(atPath: flat.path) else { continue }
+            let temp = dir.appendingPathComponent(".flat-\(UUID().uuidString)")
+            guard fm.createFile(atPath: temp.path, contents: data, attributes: [.posixPermissions: 0o755]) else { continue }
+            if rename(temp.path, flat.path) != 0 { unlink(temp.path) }
+        }
+    }
+
     /// Removes the link and every stamped folder (nothing is installed in any folder any more).
+    /// Flat copies stay, as files.
     func removeAll() {
+        unlinkFlatCopies()
         unlink(current.path)
         prune(keep: [])
         let fm = FileManager.default

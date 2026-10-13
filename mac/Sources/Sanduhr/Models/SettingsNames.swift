@@ -8,6 +8,8 @@ enum SettingsNames {
     /// General, Menu bar, and the shared Sanduhr menu's submenu: what the hourglass's percent
     /// follows (key `menuBarMode`). Was also "Percent beside the hourglass".
     static let menuBarShows = "Menu Bar Shows"
+    /// General, Menu bar: the hourglass itself (key `menuBarItemHidden`, inverted).
+    static let showMenuBarItem = "Show the hourglass in the menu bar"
     /// General, Menu bar: the Desk's meetings menu as its own menu bar item (desk key `menuIcon`).
     static let meetingsMenu = "Meetings menu in the menu bar"
     /// General, Shortcuts: check recorded keys against other apps' menus through Accessibility
@@ -49,7 +51,7 @@ enum SettingsNames {
 
     /// Every current name, with the page it lives on.
     static let table: [(name: String, page: SettingsSection)] = [
-        (menuBarShows, .general), (meetingsMenu, .general),
+        (menuBarShows, .general), (showMenuBarItem, .general), (meetingsMenu, .general),
         (SanduhrHotKeys.Shortcut.settings.name, .general), (SanduhrHotKeys.Shortcut.join.name, .general),
         (checkAppMenus, .general),
         (deskSwitch, .deskLayout),
