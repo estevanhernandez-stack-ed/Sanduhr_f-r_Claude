@@ -7,8 +7,26 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2190: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.19.0", id: "account-folder",
+            title: "Each account knows its folder",
+            body: "On Accounts, link an account to its Claude Code folder and mark it Work or Personal. Mods & Config names the folder after it.",
+            art: .symbol("link"), destination: .credentials),
+        WhatsNewCard(
+            version: "2.19.0", id: "seat-statusline",
+            title: "Every folder's statusline",
+            body: "By Seat shows each folder's statusline, led by its account's name, with segments to pick and style and a live preview.",
+            art: .symbol("terminal"), destination: .mods),
+        WhatsNewCard(
+            version: "2.19.0", id: "hide-hourglass",
+            title: "Hide the hourglass",
+            body: "Sanduhr can leave the menu bar. Open it again to get the widget, and quit from the foot of any Settings page.",
+            art: .symbol("hourglass"), destination: .general),
+    ]
 
     static let release2180: [WhatsNewCard] = [
         WhatsNewCard(
