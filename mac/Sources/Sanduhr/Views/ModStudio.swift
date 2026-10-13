@@ -6,7 +6,7 @@ import SwiftUI
 /// shape it; nothing is written until Save. Never reads a real snapshot, so it is safe to show and
 /// works signed out.
 
-/// A moment the preview can play: demo numbers, and the effect that goes with them.
+/// What the preview shows (the sheet's "Show" buttons): demo numbers, and the effect that goes with them.
 enum StudioMoment: String, CaseIterable, Identifiable, Sendable {
     case calm, near, crossing, beforeReset, nearlyFull, watchers
 
@@ -244,7 +244,7 @@ struct ModStudioSheet: View {
 
     private var moments: some View {
         HStack(spacing: 6) {
-            Text("Moment").font(.caption).foregroundStyle(.secondary)
+            Text("Show").font(.caption).foregroundStyle(.secondary)
             ForEach(StudioMoment.allCases) { m in
                 Button(m.title) { if model.moment == m { model.replay() } else { model.moment = m } }
                     .buttonStyle(.bordered)
