@@ -427,6 +427,22 @@ private struct SettingsSidebar: View {
                 }
             }
             .listStyle(.sidebar)
+            Divider()
+            // On every page, for a Settings opened from the notch or the Desk with the hourglass
+            // hidden: Quit without a trip to General. ⌘Q is the app menu's.
+            Button {
+                NSApp.terminate(nil)
+            } label: {
+                Label("Quit Sanduhr", systemImage: "power")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .help("Quit Sanduhr für Claude (⌘Q): closes the widget, the Desk and the notch.")
+            .accessibilityLabel("Quit Sanduhr für Claude")
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
         }
     }
 

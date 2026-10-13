@@ -43,7 +43,8 @@ struct SettingsSearchTests {
     @Test func theSpecsWordsFindTheirControl() {
         #expect(first("glow").map { [$0.page.rawValue, $0.anchor] } == ["notch", SettingsAnchor.glow])
         #expect(first("percent").map { [$0.page.rawValue, $0.anchor] } == ["general", SettingsAnchor.menuBarShows])
-        #expect(first("hourglass")?.anchor == SettingsAnchor.menuBarShows)
+        #expect(first("hourglass")?.anchor == SettingsAnchor.menuBarItem)
+        #expect(first("hide")?.anchor == SettingsAnchor.menuBarItem)
         let margins = first("margins")
         #expect(margins?.page == .deskLayout && margins?.anchor == SettingsAnchor.margins && margins?.advanced == true)
         #expect(first("corner")?.anchor == SettingsAnchor.pieces)

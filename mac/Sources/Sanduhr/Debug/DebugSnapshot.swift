@@ -38,6 +38,7 @@ struct DebugStateInput {
     var widgetVisibility = WidgetVisibility.always
     /// What the menu bar percent follows (MenuBarMode raw value).
     var menuBar = MenuBarMode.higher
+    var menuBarItemHidden = false
     var settingsOpen = false
     var settingsSection: SettingsSection?
     /// Where on the page Settings was opened (SettingsAnchor), nil for the top or closed.
@@ -515,6 +516,7 @@ enum DebugState {
         pairs.append(("widget_visible", .bool(s.widgetVisible)))
         pairs.append(("widget_visibility", .string(s.widgetVisibility.rawValue)))
         pairs.append(("menu_bar", .string(s.menuBar.rawValue)))
+        pairs.append(("menu_bar_item", .string(s.menuBarItemHidden ? "hidden" : "shown")))
         pairs.append(("settings_open", .bool(s.settingsOpen)))
         let section: YAMLNode = s.settingsSection.map { .string($0.rawValue) } ?? .null
         pairs.append(("settings_section", section))

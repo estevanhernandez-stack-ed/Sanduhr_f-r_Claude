@@ -73,6 +73,19 @@ enum MenuBarMode: String, CaseIterable, Identifiable {
     }
 }
 
+/// Whether the hourglass is in the menu bar at all (Settings, General, Menu bar). Standard
+/// defaults, key `menuBarItemHidden`; absent means shown:
+///   defaults write com.626labs.sanduhr menuBarItemHidden -bool true
+/// Hidden, Sanduhr's menu is still in the widget's menu, the Desk's clock and the notch, and
+/// opening Sanduhr again (Finder, Spotlight, the Dock) shows the widget.
+enum MenuBarItem {
+    static let hiddenKey = "menuBarItemHidden"
+
+    static func isHidden(in store: DefaultsStore = UserDefaults.standard) -> Bool {
+        store.bool(forKey: hiddenKey)
+    }
+}
+
 /// What the menu bar shows: which limit, its percent, and the text beside the hourglass.
 struct MenuBarReading: Equatable {
     let tier: Tier
