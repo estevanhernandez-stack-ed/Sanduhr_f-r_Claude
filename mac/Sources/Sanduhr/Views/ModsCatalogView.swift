@@ -58,7 +58,7 @@ struct ModsCatalogView: View {
         let cards = model.shownCards(demo: demo)
         let searching = !model.filter.search.trimmingCharacters(in: .whitespaces).isEmpty
         VStack(alignment: .leading, spacing: 10) {
-            Text("Everything your Claude Code folders hold or a marketplace they added lists, one card each, with a chip for every folder (seat) that has it. Read from files only: nothing is fetched, run or changed. Click a chip to open that seat.")
+            Text("Everything your Claude Code folders hold or a marketplace they added lists, one line each, with a dot for every folder (seat) that has it. Click a line for its card, and a chip on the card to open that seat. Read from files only: nothing is fetched, run or changed.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -72,6 +72,14 @@ struct ModsCatalogView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
+                Button("Expand All") { model.expandAll(demo: demo) }
+                    .buttonStyle(.link)
+                    .font(.caption)
+                    .disabled(cards.isEmpty)
+                Button("Collapse All") { model.collapseAll() }
+                    .buttonStyle(.link)
+                    .font(.caption)
+                    .disabled(model.openCards.isEmpty)
                 Picker("Sort plugins", selection: $model.sortByLoad) {
                     Text("Plugins by name").tag(false)
                     Text("Plugins by session load").tag(true)
@@ -198,12 +206,14 @@ private struct CatalogGroupView: View {
                             .foregroundStyle(.secondary)
                             .padding(.top, 2)
                     }
-                    LazyVStack(alignment: .leading, spacing: section.group == .available ? 4 : 10) {
+                    LazyVStack(alignment: .leading, spacing: 4) {
                         ForEach(run.cards) { card in
                             if section.group == .available {
                                 AvailableRow(card: card)
-                            } else {
+                            } else if model.isOpen(card) {
                                 CatalogCardView(card: card, model: model)
+                            } else {
+                                CatalogLine(card: card, model: model)
                             }
                         }
                     }
@@ -211,6 +221,61 @@ private struct CatalogGroupView: View {
             }
         }
         .padding(.top, 4)
+    }
+}
+
+/// A card folded to one line (item 75, slice A): what it is, its name, a dot per seat in that
+/// seat's state color, and the Needs a look mark. A click opens the full card in its place.
+private struct CatalogLine: View {
+    let card: CatalogCard
+    var model: ModsPageModel
+
+    var body: some View {
+        Button { model.toggleCard(card.id) } label: {
+            HStack(spacing: 7) {
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 10)
+                Image(systemName: card.kind.symbol)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16)
+                Text(card.name).font(.callout.weight(.medium)).lineLimit(1)
+                if card.kind == .plugin && card.isMod { CatalogBadge(text: "Mod", color: .secondary) }
+                if needsLook {
+                    Image(systemName: "exclamationmark.triangle.fill").font(.caption2).foregroundStyle(.orange)
+                }
+                Spacer(minLength: 8)
+                HStack(spacing: 4) {
+                    ForEach(card.chips) { chip in
+                        Circle()
+                            .fill(chip.state.color)
+                            .frame(width: 8, height: 8)
+                            .help("\(chip.label): \(chip.state.title)")
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.secondary.opacity(0.06)))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(card.description)
+        .accessibilityLabel(accessibilityText)
+        .accessibilityValue("Closed")
+        .accessibilityHint("Opens its card")
+    }
+
+    private var needsLook: Bool { card.needsLook || model.failedChecks.contains(card.id) }
+
+    private var accessibilityText: String {
+        var parts = [card.name, card.kind == .plugin && card.isMod ? "Mod" : card.kind.badge]
+        if needsLook { parts.append("needs a look") }
+        parts += card.chips.map { "\($0.label) \($0.state.title)" }
+        return parts.joined(separator: ", ")
     }
 }
 
@@ -269,7 +334,21 @@ private struct CatalogCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            CatalogCardHeader(card: card)
+            Button { model.toggleCard(card.id) } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: "chevron.down")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 10)
+                    CatalogCardHeader(card: card)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(card.name)
+            .accessibilityValue("Open")
+            .accessibilityHint("Folds it to one line")
             if !card.description.isEmpty {
                 Text(card.description)
                     .font(.caption)
@@ -330,7 +409,7 @@ private struct PluginContentsLine: View {
     var model: ModsPageModel
 
     var body: some View {
-        let open = model.openContents.contains(card.id)
+        let open = model.showsContents(card)
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
                 Text(contents.summary).font(.caption)
@@ -427,8 +506,13 @@ private struct CatalogChipLabel: View {
         .contentShape(Capsule())
     }
 
-    private var stateColor: Color {
-        switch chip.state {
+    private var stateColor: Color { chip.state.color }
+}
+
+extension CatalogChipState {
+    /// A chip's state word, and a compact line's dot, in this color.
+    var color: Color {
+        switch self {
         case .on: Color.hex("4ade80")
         case .declared: Color.hex("f87171")
         case .session: .orange

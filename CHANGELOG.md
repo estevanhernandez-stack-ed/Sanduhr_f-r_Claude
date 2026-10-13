@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **A shorter Catalog.** Mods & Config's Catalog shows each item as one line: what kind it is, its name, a dot per folder in that folder's state color (green on, red declared but missing, orange a session mod, gray off) and a mark when it needs a look. Click a line for its full card in place, click the card's name to fold it again, or use **Expand All** and **Collapse All**. A search that finds an item only by what it brings (a skill inside a plugin) opens that line with the names showing.
+
 ## v2.19.0-mac — 2026-10-13
 
 - **Each folder's statusline on Mods & Config.** By Seat has a **Statusline** section under the eight: what the folder's statusline is (Sanduhr's line, yours combined with Sanduhr's, someone else's, or none) and, where Sanduhr's is in it, its segments as chips with the brush for their looks and **Join with**, a preview run as a session in that folder would (its account and its label), and **Save**. Sanduhr's line alone now takes picks too, so a folder with no statusline of its own can choose and style its segments. Save rewrites only the `statusLine` entry, as an update: Remove on Settings, Claude Code still puts back what was there. Install, Update and Remove stay on Settings, Claude Code, and an Update keeps the picks.
