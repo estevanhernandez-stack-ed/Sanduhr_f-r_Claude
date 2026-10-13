@@ -172,21 +172,26 @@ struct StatuslineChipsTests {
 
     @Test func sanduhrsChipsAreSwitchesAndOneAlwaysStays() {
         var c = StatuslineChips(Self.inspection)
-        #expect(c.mineChips.map(\.label) == ["5h 42%", "wk 18%", "wk resets Thu 3p", "ctx 8%", "Opus"])
-        #expect(c.mineChips.map(\.kept) == [true, true, true, false, false])
+        func chip(_ s: SanduhrSegment) -> StatuslineChips.Chip { c.mineChips.first { $0.key == s.rawValue }! }
+        // The label's chip reads "Account" until the script names one (a folder linked to an account).
+        #expect(c.mineChips.map(\.label) == ["Account", "5h 42%", "wk 18%", "wk resets Thu 3p", "ctx 8%", "Opus"])
+        #expect(c.mineChips.map(\.kept) == [true, true, true, true, false, false])
         #expect(c.mineChips.allSatisfy { $0.source == .sanduhr })
-        c.toggle(c.mineChips[4])
-        c.toggle(c.mineChips[1])
-        c.toggle(c.mineChips[2])
-        #expect(c.selection.mine == [.session, .model])
-        c.toggle(c.mineChips[0])
-        #expect(c.selection.mine == [.model])
-        #expect(!c.mineChips[4].enabled)
-        c.toggle(c.mineChips[4])
+        c.toggle(chip(.model))
+        c.toggle(chip(.weekly))
+        c.toggle(chip(.resets))
+        #expect(c.selection.mine == [.label, .session, .model])
+        c.toggle(chip(.session))
+        #expect(c.selection.mine == [.label, .model])
+        // The last one besides the label stays; the label itself can still go.
+        #expect(!chip(.model).enabled && chip(.label).enabled)
+        c.toggle(chip(.model))
+        #expect(c.selection.mine == [.label, .model])
+        c.toggle(chip(.label))
         #expect(c.selection.mine == [.model])
         // Back to the defaults: no --mine.
-        for i in [0, 1, 2] { c.toggle(c.mineChips[i]) }
-        c.toggle(c.mineChips[4])
+        for s in [SanduhrSegment.label, .session, .weekly, .resets] { c.toggle(chip(s)) }
+        c.toggle(chip(.model))
         #expect(c.selection.mine == nil)
     }
 

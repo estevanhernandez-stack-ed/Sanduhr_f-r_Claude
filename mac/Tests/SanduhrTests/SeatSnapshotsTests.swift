@@ -32,7 +32,7 @@ struct SeatSnapshotsTests {
         let c: [String: AccountDataChoices] = ["Work": .init(folder: "/tmp/a/.claude"), "Home": .init(folder: "/tmp/a/.claude-home"),
                                                "Spare": .init(), "Gone": .init(folder: "/tmp/a/.claude-gone")]
         #expect(SeatSnapshots.linked(choices: c, labels: ["Work", "Home", "Spare"]) == ["Work": "/tmp/a/.claude", "Home": "/tmp/a/.claude-home"])
-        #expect(SeatSnapshots.seats(["Work": "/x"], realPath: { $0 }) == [.init(folder: "/x", accountRef: ref("Work"))])
+        #expect(SeatSnapshots.seats(["Work": "/x"], realPath: { $0 }) == [.init(folder: "/x", accountRef: ref("Work"), label: "Work")])
         #expect(SeatSnapshots.seats([:]).isEmpty)
     }
 
@@ -67,15 +67,19 @@ struct SeatSnapshotsTests {
         #expect(SeatSnapshots.ref(inFileName: "snapshot.../x.json") == nil)
     }
 
-    @Test func seatsJSONMapsFoldersToRefsAndNeverALabel() throws {
+    @Test func seatsJSONMapsFoldersToRefsWithTheAccountsLabel() throws {
         let dir = try tempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
         let files = SeatSnapshots.Files(dir: dir)
         SeatSnapshots.sync(SeatSnapshots.seats(["Work Label": "/tmp/s/.claude"], realPath: { $0 }), in: files)
-        #expect(!(try String(contentsOf: files.seats, encoding: .utf8)).contains("Label"))
         let obj = try #require(json(files.seats))
         #expect(obj["schema_version"] as? Int == 1)
-        #expect(obj["seats"] as? [[String: String]] == [["folder": "/tmp/s/.claude", "account_ref": ref("Work Label")]])
+        // The label is for that folder's statusline; the snapshot files never carry one.
+        #expect(obj["seats"] as? [[String: String]]
+            == [["folder": "/tmp/s/.claude", "account_ref": ref("Work Label"), "label": "Work Label"]])
+        for name in try FileManager.default.contentsOfDirectory(atPath: dir.path) where name.hasPrefix("snapshot") {
+            #expect(!(try String(contentsOf: dir.appendingPathComponent(name), encoding: .utf8)).contains("Label"))
+        }
         #expect(SeatSnapshots.counts(in: files).seats == 1)
     }
 

@@ -220,6 +220,28 @@ class Statusline(Seats):
         # With no stdin either: nothing, the uninstalled look.
         self.assertEqual(self.run_line(self.home).strip(), "")
 
+    def test_a_linked_folder_leads_with_its_accounts_label(self):
+        self.seats([{"folder": self.work, "account_ref": ref("Work"), "label": "Work"},
+                    {"folder": self.home, "account_ref": ref("Home"), "label": "Ho\x1bme\n"}])
+        self.snapshot("Work", 61, name="snapshot.json")
+        self.snapshot("Work", 61)
+        self.snapshot("Home", 12)
+        self.assertTrue(self.run_line(self.work).startswith("Work | 5h 61%"))
+        # Control characters never reach the terminal.
+        self.assertTrue(self.run_line(self.home).startswith("Home | 5h 12%"))
+        # An unlinked folder has no label; nor does a linked one with nothing else to show.
+        self.assertTrue(self.run_line(self.other).startswith("5h 61%"))
+        os.remove(self.path("Home"))
+        self.assertEqual(self.run_line(self.home).strip(), "")
+
+    def test_a_row_without_a_label_and_a_long_label(self):
+        self.seats([{"folder": self.work, "account_ref": ref("Work")},
+                    {"folder": self.home, "account_ref": ref("Home"), "label": "H" * 60}])
+        self.snapshot("Work", 61)
+        self.snapshot("Home", 12)
+        self.assertTrue(self.run_line(self.work).startswith("5h 61%"))
+        self.assertTrue(self.run_line(self.home).startswith("H" * sl.LABEL_MAX + " | 5h 12%"))
+
     def test_a_stale_seat_file_says_its_age(self):
         self.seats()
         self.snapshot("Home", 12, captured=datetime.now(timezone.utc) - timedelta(minutes=10))

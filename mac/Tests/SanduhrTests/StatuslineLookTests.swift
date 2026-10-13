@@ -23,8 +23,7 @@ struct StatuslineLookTests {
 
     private static func withContextAndModel() -> StatuslineChips {
         var c = StatuslineChips(inspection)
-        c.toggle(c.mineChips[3])
-        c.toggle(c.mineChips[4])
+        for s in [SanduhrSegment.context, .model] { c.toggle(c.mineChips.first { $0.key == s.rawValue }!) }
         return c
     }
 
@@ -34,7 +33,7 @@ struct StatuslineLookTests {
         let c = StatuslineChips(Self.inspection)
         #expect(c.chips(line: 0).map(\.name) == ["Branch", "Cost", "Model", "Context"])
         #expect(c.chips(line: 0).map(\.kind) == [.branch, .cost, .model, .context])
-        #expect(c.mineChips.map(\.name) == ["Session", "Weekly", "Weekly reset", "Context", "Model"])
+        #expect(c.mineChips.map(\.name) == ["Account", "Session", "Weekly", "Weekly reset", "Context", "Model"])
         // An older script without kinds, and a kind it doesn't know: "Your segment".
         var other = StatuslineChips(Self.inspection)
         other.setSeparator(.none, line: 0)
@@ -56,7 +55,7 @@ struct StatuslineLookTests {
         #expect(StatuslineDuplicate.find(StatuslineChips(Self.inspection), mods: []).isEmpty)
 
         c.resolve(found[0], keepYours: true)                 // Model: Sanduhr's goes
-        #expect(c.selection.mine == [.session, .weekly, .resets, .context])
+        #expect(c.selection.mine == [.label, .session, .weekly, .resets, .context])
         c.resolve(found[1], keepYours: false)                // Context: yours goes
         #expect(c.theirs?.drop == ["ctx"])
         #expect(StatuslineDuplicate.find(c, mods: []).isEmpty)
@@ -149,13 +148,13 @@ struct StatuslineLookTests {
         var c = StatuslineChips(Self.inspection)
         let branch = c.chips(line: 0)[0]
         c.setStyle(SegmentStyle(font: .fraktur), for: branch)
-        c.setStyle(SegmentStyle(underline: true), for: c.mineChips[0])
-        #expect(c.chips(line: 0)[0].styled && c.mineChips[0].styled)
+        c.setStyle(SegmentStyle(underline: true), for: c.mineChips[1])
+        #expect(c.chips(line: 0)[0].styled && c.mineChips[1].styled)
         #expect(c.theirs?.styles == ["⎇": SegmentStyle(font: .fraktur)])
         #expect(c.theirs?.ours == [.session: SegmentStyle(underline: true)])
         #expect(c.theirs?.drop == [])
         c.setStyle(SegmentStyle(), for: branch)
-        c.setStyle(SegmentStyle(), for: c.mineChips[0])
+        c.setStyle(SegmentStyle(), for: c.mineChips[1])
         #expect(c.selection == StatuslineSelection())
     }
 

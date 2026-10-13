@@ -98,10 +98,12 @@ struct StatuslineChips: Equatable, Sendable {
     /// Sanduhr's chips, in the order they print.
     var mineChips: [Chip] {
         let texts = Dictionary(inspection.mine.map { ($0.name, $0.text) }, uniquingKeysWith: { a, _ in a })
+        // The last segment besides the label stays: the label alone prints nothing.
+        let last = mine.filter { $0 != .label }.count == 1
         return SanduhrSegment.allCases.map { s in
             let kept = mine.contains(s)
             return Chip(id: "sanduhr-\(s.rawValue)", source: .sanduhr, label: texts[s.rawValue].flatMap { $0.isEmpty ? nil : $0 } ?? s.title,
-                        key: s.rawValue, kept: kept, enabled: !(kept && mine.count == 1), name: s.title,
+                        key: s.rawValue, kept: kept, enabled: !(kept && last && s != .label), name: s.title,
                         styled: !(ourStyles[s]?.isEmpty ?? true))
         }
     }
