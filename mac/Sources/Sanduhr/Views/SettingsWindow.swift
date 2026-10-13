@@ -431,7 +431,7 @@ private struct SettingsSidebar: View {
             // On every page, for a Settings opened from the notch or the Desk with the hourglass
             // hidden: Quit without a trip to General. ⌘Q is the app menu's.
             Button {
-                NSApp.terminate(nil)
+                AppQuit.now()
             } label: {
                 Label("Quit Sanduhr", systemImage: "power")
                     .frame(maxWidth: .infinity, alignment: .leading)

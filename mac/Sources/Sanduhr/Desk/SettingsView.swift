@@ -989,7 +989,7 @@ struct GeneralSection: View {
             ShortcutsSection()
             Section {
                 HStack {
-                    Button("Quit Sanduhr für Claude") { NSApp.terminate(nil) }
+                    Button("Quit Sanduhr für Claude") { AppQuit.now() }
                         .settingsAnchor(SettingsAnchor.quit)
                     Spacer()
                     Text("Sanduhr \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")

@@ -2,6 +2,7 @@
 
 ## Unreleased (mac)
 
+- **Fixed: Quit works while the Welcome sheet is up.** Signed out, the widget carries the Welcome sheet, and with any sheet attached macOS refused to quit: Quit and ⌘Q only beeped, and a quit from a script or from logging out was answered "canceled". Every Quit in Sanduhr now closes open sheets first, and so does a quit request from the system.
 - **A shorter Catalog.** Mods & Config's Catalog shows each item as one line: what kind it is, its name, a dot per folder in that folder's state color (green on, red declared but missing, orange a session mod, gray off) and a mark when it needs a look. Click a line for its full card in place, click the card's name to fold it again, or use **Expand All** and **Collapse All**. A search that finds an item only by what it brings (a skill inside a plugin) opens that line with the names showing.
 
 ## v2.19.0-mac — 2026-10-13

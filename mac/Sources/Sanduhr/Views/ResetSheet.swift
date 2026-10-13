@@ -225,7 +225,7 @@ private struct ResetSheetButtons: View {
                 Button("Reset and Quit", role: .destructive) { model.resetNow() }
                     .disabled(model.planIsEmpty)
             } else {
-                Button("Quit Sanduhr") { NSApp.terminate(nil) }
+                Button("Quit Sanduhr") { AppQuit.now() }
                     .keyboardShortcut(.defaultAction)
             }
         }

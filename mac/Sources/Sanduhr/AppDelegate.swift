@@ -41,6 +41,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // view draws, so the Desk and the widget find it on a Mac that never had it installed.
         BundledFonts.register()
         NSApp.setActivationPolicy(.accessory)
+        // A quit Apple Event (a script, logging out) ends any sheet first, or AppKit answers it
+        // "user canceled" while the Welcome sheet is up (AppQuit).
+        NSAppleEventManager.shared().setEventHandler(
+            self, andSelector: #selector(handleQuitEvent(_:withReplyEvent:)),
+            forEventClass: AEEventClass(kCoreEventClass), andEventID: AEEventID(kAEQuitApplication))
         // Tooltips (the theme gallery's descriptions, the widget's buttons) come up a little
         // sooner than AppKit's default of about a second. Registered, so a defaults write wins.
         UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 600])
@@ -401,11 +406,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: Actions
 
+    /// Every Quit in Sanduhr: menus, ⌘Q and Settings' buttons (AppQuit).
+    @objc func quitSanduhr(_ sender: Any?) {
+        AppQuit.now()
+    }
+
+    @objc private func handleQuitEvent(_ event: NSAppleEventDescriptor, withReplyEvent reply: NSAppleEventDescriptor) {
+        AppQuit.now()
+    }
+
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
         // Reset Sanduhr… ran: the only thing left to do is quit.
         if Self.resetting {
             let menu = NSMenu()
-            menu.addItem(withTitle: "Quit Sanduhr", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+            menu.addItem(withTitle: "Quit Sanduhr", action: #selector(AppDelegate.quitSanduhr(_:)), keyEquivalent: "q")
             statusItem?.menu = menu
             sender.performClick(nil)
             statusItem?.menu = nil
@@ -638,7 +652,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .checkForUpdates: updaterController.checkForUpdates(nil)
         case .whatsNew: WhatsNewWindowController.shared.show()
         case .tour: WelcomeTourWindowController.shared.show()
-        case .quit: NSApp.terminate(nil)
+        case .quit: AppQuit.now()
         }
     }
 
