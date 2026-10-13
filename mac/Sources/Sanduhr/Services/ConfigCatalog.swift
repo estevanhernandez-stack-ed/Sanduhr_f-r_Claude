@@ -27,6 +27,18 @@ enum CatalogKind: String, CaseIterable, Sendable {
         case .mcpServer: "MCP server"
         }
     }
+
+    /// The compact line's icon (item 75, slice A).
+    var symbol: String {
+        switch self {
+        case .plugin: "puzzlepiece.extension"
+        case .skill: "wand.and.stars"
+        case .agent: "person.crop.circle"
+        case .command: "chevron.left.forwardslash.chevron.right"
+        case .outputStyle: "text.quote"
+        case .mcpServer: "server.rack"
+        }
+    }
 }
 
 /// What a seat chip says about the extension in that seat.
@@ -587,6 +599,18 @@ enum ConfigCatalog {
             let text = ([c.name, c.description] + c.sources + inside).joined(separator: " ").lowercased()
             return words.allSatisfy(text.contains)
         }
+    }
+
+    /// A search that finds this card only by what it brings (a skill name behind Show), not by
+    /// its name, description or sources: its compact line opens so the match shows (item 75, A).
+    static func matchesInsideOnly(_ c: CatalogCard, search: String) -> Bool {
+        let words = search.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !words.isEmpty, let contents = c.contents else { return false }
+        let outside = ([c.name, c.description] + c.sources).joined(separator: " ").lowercased()
+        guard !words.allSatisfy(outside.contains) else { return false }
+        let inside = (contents.skills + contents.agents + contents.commands + contents.outputStyles)
+            .joined(separator: " ").lowercased()
+        return words.contains { !outside.contains($0) && inside.contains($0) }
     }
 
     /// The counts state.yaml reports: never a name.

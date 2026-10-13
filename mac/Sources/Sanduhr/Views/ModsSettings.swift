@@ -207,6 +207,8 @@ final class ModsPageModel {
     /// window lives; plugins sorted by name or by session load.
     var openGroups: Set<CatalogGroup> = Set(CatalogGroup.allCases.filter(\.startsOpen))
     var openContents: Set<String> = []
+    /// The cards opened from their compact line (item 75, slice A), kept while the window lives.
+    var openCards: Set<String> = []
     var sortByLoad = false
     private var seatConfigs: [String: [ClaudeCodeFolders.ConfigCandidate]] = [:]
 
@@ -219,6 +221,27 @@ final class ModsPageModel {
             }
         }.map(\.id))
     }
+
+    /// A card shows in full when it was opened, or when the search found it only by what it brings.
+    func isOpen(_ card: CatalogCard) -> Bool {
+        openCards.contains(card.id) || ConfigCatalog.matchesInsideOnly(card, search: filter.search)
+    }
+
+    /// Whether the search's match is inside this card's contents, so Show opens with it.
+    func showsContents(_ card: CatalogCard) -> Bool {
+        openContents.contains(card.id) || ConfigCatalog.matchesInsideOnly(card, search: filter.search)
+    }
+
+    func toggleCard(_ id: String) {
+        if openCards.contains(id) { openCards.remove(id) } else { openCards.insert(id) }
+    }
+
+    /// Expand All opens every card shown (the Available group's lines stay one line each).
+    func expandAll(demo: Bool) {
+        openCards.formUnion(shownCards(demo: demo).map(\.id))
+    }
+
+    func collapseAll() { openCards.removeAll() }
 
     /// The cards to show: filters, search and (demo mode) no work-only card.
     func shownCards(demo: Bool) -> [CatalogCard] {
