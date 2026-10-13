@@ -223,6 +223,7 @@ private struct SegmentChips: View {
     static func help(_ chip: StatuslineChips.Chip) -> String {
         let now = chip.label
         switch SanduhrSegment(rawValue: chip.key) {
+        case .label: return "Account: the name of the account this folder is linked to on Accounts. It shows only in a linked folder."
         case .session: return "Session: the 5-hour limit, as in \(now)."
         case .weekly: return "Weekly: the 7-day limit, as in \(now), and a model's own weekly limit when it nears full."
         case .resets: return "Weekly reset: when the 7-day limit resets, as in \(now)."

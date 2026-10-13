@@ -58,13 +58,15 @@ enum StatuslineJoinGlyph: String, CaseIterable, Sendable {
 
 /// Sanduhr's own segments in a combined statusline (item 63b), in the order they print.
 enum SanduhrSegment: String, CaseIterable, Sendable {
-    case session, weekly, resets, context, model
+    case label, session, weekly, resets, context, model
 
-    /// What Sanduhr's line shows without `--mine`.
-    static let defaults: [SanduhrSegment] = [.session, .weekly, .resets]
+    /// What Sanduhr's line shows without `--mine`. The label shows only in a folder linked to an
+    /// account.
+    static let defaults: [SanduhrSegment] = [.label, .session, .weekly, .resets]
 
     var title: String {
         switch self {
+        case .label: "Account"
         case .session: "Session"
         case .weekly: "Weekly"
         case .resets: "Weekly reset"

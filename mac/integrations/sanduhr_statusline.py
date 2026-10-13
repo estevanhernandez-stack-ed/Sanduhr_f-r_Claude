@@ -78,9 +78,11 @@ RESET = "\x1b[0m"
 STDIN_WAIT = 0.25           # plain mode: how long to wait for stdin that may never come
 B64 = re.compile(r"\A[A-Za-z0-9+/]+={0,2}\Z")
 
-# Sanduhr's own segments, in the order they print (item 63b); the first three are the default.
-MINE = ("session", "weekly", "resets", "context", "model")
-MINE_DEFAULT = ("session", "weekly", "resets")
+# Sanduhr's own segments, in the order they print (item 63b); the first four are the default.
+# `label` is the linked account's name from seats.json, shown only in a linked folder.
+MINE = ("label", "session", "weekly", "resets", "context", "model")
+MINE_DEFAULT = ("label", "session", "weekly", "resets")
+LABEL_MAX = 40
 
 
 def parse(ts):
@@ -169,6 +171,8 @@ def format_parts(base, mine=MINE_DEFAULT, extra=(), sep=" | ", styles=None):
     `extra` parts (context, model) from Claude Code's stdin, joined with `sep`. A notice always
     shows. `styles` (by part name) gives a part its look."""
     styles = styles or {}
+    lead = [styled_text(text, styles.get(name)) for name, text in extra if name == "label" and name in mine]
+    extra = [(name, text) for name, text in extra if name != "label"]
     if "notice" in base:
         line = base["notice"]
     else:
@@ -180,7 +184,9 @@ def format_parts(base, mine=MINE_DEFAULT, extra=(), sep=" | ", styles=None):
             line += " (as of %s)" % base["as_of"]
         elif line and base.get("ago") is not None:
             line += " (%dm ago)" % base["ago"]
-    return sep.join(x for x in [line] + [styled_text(text, styles.get(name)) for name, text in extra if name in mine] if x)
+    rest = [x for x in [line] + [styled_text(text, styles.get(name)) for name, text in extra if name in mine] if x]
+    # The label leads a line that has something to say; alone it would be a line with no numbers.
+    return sep.join(lead + rest) if rest else ""
 
 
 def render(snap, now):
@@ -339,6 +345,40 @@ def snapshot_source(env=None):
     return path, ref is not None
 
 
+def seat_label(env=None):
+    """This session's folder's account name from seats.json (item 74's row, its `label`), with
+    control characters dropped and at most LABEL_MAX characters; None when the folder isn't
+    linked, the row has no label, or SANDUHR_SNAPSHOT names a file (tests)."""
+    env = os.environ if env is None else env
+    if env.get("SANDUHR_SNAPSHOT"):
+        return None
+    folder = seat_folder(env)
+    if folder is None:
+        return None
+    support = env.get("SANDUHR_SUPPORT_DIR") or SUPPORT_DIR
+    try:
+        with open(os.path.join(support, SEATS_FILE), "rb") as f:
+            raw = f.read(SEATS_MAX_BYTES + 1)
+        if len(raw) > SEATS_MAX_BYTES:
+            return None
+        doc = json.loads(raw.decode("utf-8"))
+        rows = doc.get("seats") if doc.get("schema_version") == SEATS_SCHEMA_VERSION else None
+    except (OSError, ValueError, AttributeError):
+        return None
+    for row in rows if isinstance(rows, list) else []:
+        f = row.get("folder") if isinstance(row, dict) else None
+        if not isinstance(f, str):
+            continue
+        f = seat_home(f, env)
+        if os.path.isabs(f) and seat_same(folder, f):
+            label = row.get("label")
+            if not isinstance(label, str):
+                return None
+            label = "".join(c for c in label if unicodedata.category(c)[0] != "C").strip()
+            return label[:LABEL_MAX] or None
+    return None
+
+
 def load_snapshot():
     """(snapshot dict or None, whether it is a seat's own file)."""
     path, seat = snapshot_source()
@@ -377,6 +417,9 @@ def segment_parts(stdin_bytes, now, mine=MINE_DEFAULT):
         if base is None:
             base = render_parts(snap, now, seat) if snap is not None else {"notice": ""}
     extra = session_parts(session()) if "context" in mine or "model" in mine else []
+    label = seat_label() if "label" in mine else None
+    if label:
+        extra = [("label", label)] + list(extra)
     return base, extra
 
 

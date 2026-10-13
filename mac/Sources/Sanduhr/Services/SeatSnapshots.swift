@@ -7,9 +7,11 @@ import Foundation
 ///
 /// Beside `snapshot.json` (still the active account's, for older scripts and the Desk) Sanduhr
 /// writes `snapshot.<account_ref>.json`, the same schema, one per linked account, and `seats.json`,
-/// `{"schema_version": 1, "seats": [{"folder": "<real path>", "account_ref": "…"}]}`. Neither
-/// ever holds a label, an email or a key. The statusline, the meters mod and the MCP server look
-/// their `CLAUDE_CONFIG_DIR` (unset: `~/.claude`) up in `seats.json`.
+/// `{"schema_version": 1, "seats": [{"folder": "<real path>", "account_ref": "…", "label": "…"}]}`.
+/// `label` is the account's name as the user wrote it, for that folder's statusline to show; no
+/// file here holds an email or a key, and a snapshot holds no label. The statusline, the meters
+/// mod and the MCP server look their `CLAUDE_CONFIG_DIR` (unset: `~/.claude`) up in `seats.json`;
+/// only the statusline reads `label`.
 ///
 /// On while any account has a folder linked, signed in or not: a linked folder never shows another
 /// account's numbers. A signed-out linked account keeps its row and gets a signed-out file (no
@@ -26,6 +28,8 @@ enum SeatSnapshots {
     struct Seat: Equatable, Sendable {
         let folder: String
         let accountRef: String
+        /// The account's name, shown by that folder's statusline.
+        var label = ""
     }
 
     /// Where the files live: Sanduhr's Application Support folder, or a test's temp folder.
@@ -59,7 +63,7 @@ enum SeatSnapshots {
     /// The seats `seats.json` lists, sorted by folder: one per linked account.
     static func seats(_ linked: [String: String], realPath: (String) -> String = realPath) -> [Seat] {
         linked.compactMap { label, folder in
-            AccountRef.of(label).map { Seat(folder: realPath(folder), accountRef: $0) }
+            AccountRef.of(label).map { Seat(folder: realPath(folder), accountRef: $0, label: label) }
         }.sorted { ($0.folder, $0.accountRef) < ($1.folder, $1.accountRef) }
     }
 
@@ -113,7 +117,11 @@ enum SeatSnapshots {
     }
 
     static func encode(_ seats: [Seat]) -> Data {
-        let rows: [[String: Any]] = seats.map { ["folder": $0.folder, "account_ref": $0.accountRef] }
+        let rows: [[String: Any]] = seats.map {
+            var row: [String: Any] = ["folder": $0.folder, "account_ref": $0.accountRef]
+            if !$0.label.isEmpty { row["label"] = $0.label }
+            return row
+        }
         let root: [String: Any] = ["schema_version": schemaVersion, "seats": rows]
         let data = (try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .withoutEscapingSlashes])) ?? Data()
         return data + Data("\n".utf8)
