@@ -1,35 +1,26 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { BandStyle, MetersBand, MetersSnapshot } from '../types'
+import type { MetersBand, MetersSnapshot } from '../types'
 import {
   FAST_MS,
-  MAX_ROWS,
-  SHIMMER_BEFORE_MS,
   SLOW_MS,
   crossings,
-  glowLevel,
-  gradient,
   isMoving,
-  letters,
   liveWatchers,
-  mix,
   nextFrameIn,
   onceProgress,
-  paint,
   parseBand,
-  pulseProgress,
   watcherMovers,
   watcherRows,
 } from './band'
-import type { Movers, Run, WatcherRow } from './band'
+import type { Movers } from './band'
+import { draws, frameFor, isShimmering } from './draw'
+import type { Cell, Frame } from './draw'
 import {
-  PACE_COLOR,
   RESET_TOAST,
   SESSION,
-  WEEKLY,
   bandFor,
-  bar,
   SEATS_MAX_BYTES,
   configFolder,
   expandFolder,
@@ -42,7 +33,7 @@ import {
   warningKeys,
   warningToast,
 } from './meters'
-import type { Band, Bars, Meter, Style } from './meters'
+import type { Band, Bars, Style } from './meters'
 
 // Sanduhr's meters above the prompt, and its watchers (items 50, 65f, 66). Reads Sanduhr's
 // snapshot (snapshot.json, or on macOS this seat's own snapshot.<ref>.json that seats.json names,
@@ -56,11 +47,6 @@ const POLL_MS = 30_000
 // Watchers change by the second: band.json is a small local file, read every two.
 const BAND_POLL_MS = 2_000
 const TOASTED = 'toasted'
-const WARN_RED = '#f87171'
-const BAR_WIDTH: Record<Style, number> = { compact: 10, full: 20 }
-const NARROW_BAR = 6
-// Below this many columns a watcher shows its short title.
-const WIDE_ROW = 60
 
 type Motion = 'on' | 'off'
 type Options = { bars: Bars; style: Style; label: string; motion: Motion }
@@ -321,10 +307,6 @@ function movers(now: number): Movers {
   }
 }
 
-function isShimmering(m: Meter): boolean {
-  return m.resetLeft !== null && m.resetLeft <= SHIMMER_BEFORE_MS
-}
-
 /** What the band would draw at `now`, as a key: a frame redraws only when it changed. */
 function signature(now: number): string {
   const moving = motionAllowed(currentBand)
@@ -377,23 +359,22 @@ function kick($: EngineInterface) {
 
 // -- Drawing ----------------------------------------------------------------------------------
 
-/** The Text attributes a style turns on. */
-type Attrs = { bold: boolean; italic: boolean; underline: boolean; dim: boolean }
-
-function attrsOf(style: BandStyle | undefined, bold = false): Attrs {
-  return { bold: bold || style?.bold === true, italic: style?.italic === true, underline: style?.underline === true, dim: style?.dim === true }
-}
-
-/** `text` in `style`'s letters and ink (else `fallback`), lit by `t` and `glow`. */
-function styled(text: string, style: BandStyle | undefined, fallback: string | null, t: number | null, glow: number) {
-  const chars = letters(text, style?.font ?? null)
-  const base = style !== undefined && style.ink.length > 0 ? gradient(style.ink, chars.length) : chars.map(() => fallback)
-
-  return paint(chars, base, t, glow)
-}
-
-function styleFor(band: MetersBand | null, key: string): BandStyle | undefined {
-  return key === SESSION ? band?.styles.session : key === WEEKLY ? band?.styles.weekly : undefined
+/** One frame of the band at `now` (draw.ts decides everything; this only renders it). */
+function frameAt(snap: MetersSnapshot | null, look: MetersBand | null, now: number, width: number, maxRows: number): Frame {
+  return frameFor({
+    snap,
+    look,
+    now,
+    bars: opts.bars,
+    style: opts.style,
+    label: opts.label,
+    moving: motionAllowed(look),
+    width,
+    maxRows,
+    tzOffsetMinutes: new Date(now).getTimezoneOffset(),
+    seat: isSeat,
+    sweeps,
+  })
 }
 
 export const register: Register = (on, options) => {
@@ -442,17 +423,8 @@ export const register: Register = (on, options) => {
     }
 
     const now = await $.clock.now()
-    const width = e.props.bodyColumns
-    const moving = motionAllowed(look)
-    // Full style takes a row per meter; it folds to one line where the rows or columns are short.
-    const full = bandAt(snap, now, 'full')
-    const fullFits = full.kind !== 'meters' || (full.meters.length <= e.props.maxRows && width >= 64)
-    const shown = opts.style === 'full' && fullFits ? 'full' : 'compact'
-    const band = shown === 'full' ? full : bandAt(snap, now, 'compact')
-    const used = band.kind === 'none' ? 0 : band.kind === 'meters' && shown === 'full' ? band.meters.length : 1
-    const room = Math.max(0, Math.min(MAX_ROWS, e.props.maxRows - used))
-    const rows = watcherRows(liveWatchers(look, now), now, { wide: width >= WIDE_ROW, motion: moving })
-    drawn = band.kind !== 'none' || (rows.length > 0 && room > 0)
+    const f = frameAt(snap, look, now, e.props.bodyColumns, e.props.maxRows)
+    drawn = draws(f)
     frameKey = signature(now)
 
     if (!drawn) {
@@ -460,153 +432,74 @@ export const register: Register = (on, options) => {
     }
 
     const { Box, Text } = $.ui.resolve(e)
-    // Runs as Text elements in a style's attributes; a run without a color is dim when `dimBare`.
-    const texts = (prefix: string, runs: Run[], a: Attrs, dimBare: boolean) =>
-      runs.map((r, i) => (
+    // A watcher's title gives way at the edge rather than wrapping the row (`truncate`).
+    const texts = (prefix: string, cs: Cell[], truncate = false) =>
+      cs.map((c, i) => (
         <Text
           key={`${prefix}${i}`}
-          color={r.color ?? undefined}
-          bold={a.bold ? true : undefined}
-          italic={a.italic ? true : undefined}
-          underline={a.underline ? true : undefined}
-          dimColor={a.dim || (r.color === null && dimBare) ? true : undefined}
+          wrap={truncate ? 'truncate-end' : undefined}
+          color={c.color ?? undefined}
+          bold={c.bold ? true : undefined}
+          italic={c.italic ? true : undefined}
+          underline={c.underline ? true : undefined}
+          dimColor={c.dim ? true : undefined}
         >
-          {r.text}
+          {c.text}
         </Text>
       ))
-    const barWidth = shown === 'compact' && width < 80 ? NARROW_BAR : BAR_WIDTH[shown]
-    const plain = band.kind === 'meters' && band.isDim
-    const lit = moving && !plain
-
-    const meterRow = (m: Meter) => {
-      const style = styleFor(look, m.key)
-      const name = texts('n', styled(m.name, style, null, null, 0), attrsOf(style), plain)
-
-      if (m.isCrossed) {
-        return (
-          <Box key={`sm-${m.key}`} gap={1}>
-            <Box key="name">{texts('n', styled(m.name, style, null, null, 0), attrsOf(style), true)}</Box>
-            <Text key="reset" dimColor>
-              reset
-            </Text>
-          </Box>
-        )
-      }
-
-      const tone = m.isWarning ? WARN_RED : m.color
-      const cells = bar(m.pct, m.fraction, barWidth).flatMap(r =>
-        Array.from(r.text).map(ch => ({ ch, color: plain ? null : r.part === 'fill' ? tone : r.part === 'pace' ? PACE_COLOR : null })),
-      )
-      const pctChars = letters(`${m.pct}%`, style?.font ?? null)
-      const span = cells.length + pctChars.length
-      const sweep = lit ? onceProgress(sweeps[m.key], now) : null
-      const glow = lit && m.isWarning ? glowLevel(pulseProgress(now)) : 0
-      const barRuns = paint(cells.map(c => c.ch), cells.map(c => c.color), sweep, 0, 0, span)
-      const pctBase = plain ? pctChars.map(() => null) : style !== undefined && style.ink.length > 0 ? gradient(style.ink, pctChars.length) : pctChars.map(() => tone)
-      const pctRuns = paint(pctChars, pctBase, sweep, glow, cells.length, span)
-      const resets = look?.styles.resets
-      const shimmer = lit && isShimmering(m) ? pulseProgress(now) : null
-
-      return (
-        <Box key={`sm-${m.key}`} gap={1}>
-          <Box key="name">{name}</Box>
-          <Box key="bar">
-            <Text key="l" dimColor>
-              ▕
-            </Text>
-            {barRuns.map((r, i) => (
-              <Text key={`r${i}`} color={r.color ?? undefined} dimColor={plain || r.color === null ? true : undefined}>
-                {r.text}
-              </Text>
-            ))}
-            <Text key="r" dimColor>
-              ▏
-            </Text>
-          </Box>
-          <Box key="pct">{texts('p', pctRuns, attrsOf(style, m.isWarning), plain)}</Box>
-          {m.isWarning && (
-            <Text key="warn" color={mix(WARN_RED, '#ffffff', glow)}>
-              ⚠
-            </Text>
-          )}
-          {shown === 'full' && m.pace !== null && (
-            <Text key="pace" dimColor>
-              {m.pace}
-            </Text>
-          )}
-          {m.reset !== null && <Box key="reset">{texts('s', styled(m.reset, resets, null, shimmer, 0), attrsOf(resets), true)}</Box>}
-        </Box>
-      )
-    }
-
-    const watcherRow = (r: WatcherRow, more: number) => (
-      <Box key={`sw-${r.key}`} gap={1}>
-        <Text key="mark" color={r.color}>
-          {r.mark}
-        </Text>
-        <Text key="title" color={r.titleColor ?? undefined} dimColor={r.isDim ? true : undefined} wrap="truncate-end">
-          {r.text}
-        </Text>
-        {r.elapsed !== null && (
-          <Text key="elapsed" dimColor>
-            {r.elapsed}
-          </Text>
-        )}
-        {r.progress !== null && (
-          <Text key="progress" dimColor={r.isDim ? true : undefined}>
-            {r.progress}
-          </Text>
-        )}
-        {more > 0 && (
-          <Text key="more" dimColor>
-            {`+${more} more`}
-          </Text>
-        )}
+    const PIECES = ['name', 'bar', 'pct', 'warn', 'pace', 'reset']
+    const m = f.meters
+    const meterRow = (r: { key: string; pieces: Cell[][] }) => (
+      <Box key={`sm-${r.key}`} gap={1}>
+        {r.pieces.map((p, i) => (
+          <Box key={PIECES[i] ?? `p${i}`}>{texts(`${i}-`, p)}</Box>
+        ))}
       </Box>
     )
-
-    const visible = rows.slice(0, room)
+    const head = m.kind !== 'compact' && m.kind !== 'full' ? null : m.head === null ? null : (
+      <Text key="sm-label" dimColor>
+        {m.head}
+      </Text>
+    )
+    const note = m.kind !== 'compact' && m.kind !== 'full' ? null : m.note === null ? null : (
+      <Text key="sm-note" dimColor>
+        {m.note}
+      </Text>
+    )
+    const meters =
+      m.kind === 'line' ? (
+        <Text key="sm-line" dimColor wrap="truncate-end">
+          {m.text}
+        </Text>
+      ) : m.kind === 'full' ? (
+        <Box key="sm-full" flexDirection="column">
+          {m.rows.map((r, i) => (
+            <Box key={`sm-row-${r.key}`} gap={1}>
+              {i === 0 && head}
+              {meterRow(r)}
+              {i === m.rows.length - 1 && note}
+            </Box>
+          ))}
+        </Box>
+      ) : m.kind === 'compact' ? (
+        <Box key="sm-band" gap={3}>
+          {head}
+          {m.rows.map(meterRow)}
+          {note}
+        </Box>
+      ) : null
     const watchers =
-      visible.length === 0 ? null : (
+      f.watchers.length === 0 ? null : (
         <Box key="sm-watchers" flexDirection="column">
-          {visible.map((r, i) => watcherRow(r, i === visible.length - 1 ? rows.length - visible.length : 0))}
+          {f.watchers.map((w, i) => (
+            <Box key={`sw-w${i}`} gap={1}>
+              {w.map((p, k) => (
+                <Box key={`p${k}`}>{texts(`${k}-`, p, k === 1)}</Box>
+              ))}
+            </Box>
+          ))}
         </Box>
       )
-
-    const head =
-      opts.label === '' ? null : (
-        <Text key="sm-label" dimColor>
-          {opts.label}
-        </Text>
-      )
-    const note =
-      band.kind !== 'meters' || band.note === null ? null : (
-        <Text key="sm-note" dimColor>
-          {band.note}
-        </Text>
-      )
-    const meters =
-      band.kind === 'line' ? (
-        <Text key="sm-line" dimColor wrap="truncate-end">
-          {band.text}
-        </Text>
-      ) : band.kind !== 'meters' ? null : shown === 'full' ? (
-          <Box key="sm-full" flexDirection="column">
-            {band.meters.map((m, i) => (
-              <Box key={`sm-row-${m.key}`} gap={1}>
-                {i === 0 && head}
-                {meterRow(m)}
-                {i === band.meters.length - 1 && note}
-              </Box>
-            ))}
-          </Box>
-        ) : (
-          <Box key="sm-band" gap={3}>
-            {head}
-            {band.meters.map(meterRow)}
-            {note}
-          </Box>
-        )
 
     return (
       <Box flexDirection="column">

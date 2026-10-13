@@ -1,5 +1,9 @@
 import { expect, mock, test } from 'claude-code/testing'
 
+import { parseBand } from './band'
+import { frameFor, frameLines } from './draw'
+import { parseSnapshot } from './meters'
+
 // Sunday 2026-10-04 15:00 UTC.
 const NOW = Date.parse('2026-10-04T15:00:00Z')
 const MIN = 60_000
@@ -560,4 +564,53 @@ test('a watcher waiting on you pulses; a passed one fades, then Sanduhr drops it
   world.files[BAND] = bandFile({ watchers: [] }, ended + 6_000)
   await clock.advance(2_000)
   expect(await (await $.ui.mount(band())).find({ type: 'Text', text: '✓' })).toBeUndefined()
+})
+
+// Item 75, slice B: the band renders draw.ts's frame cell for cell, so the Mod Studio's preview
+// (frameLines through a Swift port) shows what a session shows.
+async function rendersTheFrame($: any, on: any, files: Record<string, string>, o: { bars?: 'both' | 'session' | 'weekly'; style?: 'compact' | 'full'; label?: string; width?: number; maxRows?: number } = {}) {
+  mock.clock(on, { now: NOW })
+  beneath(on, files)
+  await $.session.start(START)
+  const width = o.width ?? 120
+  const maxRows = o.maxRows ?? 4
+  const ui = await $.ui.mount(band({ bodyColumns: width, maxRows }))
+  const drawn = (await ui.findAll({ type: 'Text' }))
+    .filter((t: any) => t.text !== 'beneath')
+    .map((t: any) => [t.text, t.props.color ?? null, t.props.bold === true, t.props.italic === true, t.props.dimColor === true])
+  const f = frameFor({
+    snap: files[PATH] === undefined ? null : parseSnapshot(files[PATH] as string),
+    look: files[BAND] === undefined ? null : parseBand(files[BAND] as string),
+    now: NOW,
+    bars: o.bars ?? 'both',
+    style: o.style ?? 'compact',
+    label: o.label ?? '',
+    moving: true,
+    width,
+    maxRows,
+    tzOffsetMinutes: new Date(NOW).getTimezoneOffset(),
+    seat: false,
+    sweeps: {},
+  })
+  const lines = frameLines(f)
+  const cells = lines.flat().filter(c => c.text.trim() !== '' || c.dim || c.color !== null)
+  expect(drawn).toEqual(cells.map(c => [c.text, c.color, c.bold, c.italic, c.dim]))
+  return lines
+}
+
+test('the band draws the frame: compact, both meters', async ($, on) => {
+  const lines = await rendersTheFrame($, on, { [PATH]: NORMAL })
+  expect(lines.length).toBe(1)
+  expect(lines[0]?.map(c => c.text).join('')).toContain('Session ▕')
+})
+
+test('the band draws the frame: full, a label, the looks, watchers', { options: { style: 'full', label: 'Work' } }, async ($, on) => {
+  const look = { meters: { styles: { session: { ink: ['#ff0000', '#0000ff'], font: 'script', bold: true }, resets: { italic: true } } }, watchers: WATCHERS }
+  const lines = await rendersTheFrame($, on, { [PATH]: HOT, [BAND]: bandFile(look) }, { style: 'full', label: 'Work', maxRows: 6 })
+  expect(lines.length).toBeGreaterThan(2)
+  expect(lines[0]?.[0]?.text).toBe('Work')
+})
+
+test('the band draws the frame: a narrow terminal', async ($, on) => {
+  await rendersTheFrame($, on, { [PATH]: NORMAL }, { width: 70 })
 })

@@ -183,7 +183,13 @@ struct SanduhrModSection: View {
                 .padding(4)
                 .frame(maxWidth: .infinity, alignment: .leading)
             } label: {
-                Text("\(IntegrationScripts.modName), Sanduhr's own mod").font(.body.weight(.semibold))
+                HStack {
+                    Text("\(IntegrationScripts.modName), Sanduhr's own mod").font(.body.weight(.semibold))
+                    Spacer()
+                    Button("Open Studio…") { model.studioOpen = true }
+                        .controlSize(.small)
+                        .help("Preview the band with demo numbers and style it.")
+                }
             }
             WatchersAbovePromptLine()
         }

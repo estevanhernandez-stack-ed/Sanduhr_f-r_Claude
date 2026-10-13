@@ -49,6 +49,14 @@ jobs:
             mac/.build/checkouts
             mac/.build/artifacts
           key: mac-spm-${{ runner.os }}-${{ hashFiles('mac/Package.resolved') }}
+      # The meters mod's band, drawn by its own code, is the fixture the Swift port (the Mod
+      # Studio's preview) must match: fail when the fixture no longer matches the mod (item 75).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Band frames match the mod
+        working-directory: mac/integrations/band-fixtures
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./register.mjs generate.ts --check
       # No separate swift build: swift test builds everything it runs.
       - name: Test
         run: swift test

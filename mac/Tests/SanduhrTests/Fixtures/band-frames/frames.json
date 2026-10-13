@@ -1,0 +1,7212 @@
+{
+ "note": "Written by mac/integrations/band-fixtures/generate.ts from the meters mod (draw.ts). Do not edit by hand.",
+ "cases": [
+  {
+   "name": "calm, compact, both",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":34,\"resets_at\":\"2026-10-04T18:12:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":21,\"resets_at\":\"2026-10-08T17:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "███",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "34%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets 3h 12m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██▏",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "21%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Thu",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "calm, full, a label",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":34,\"resets_at\":\"2026-10-04T18:12:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":21,\"resets_at\":\"2026-10-08T17:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "full",
+    "label": "Personal",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Personal",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██████▊",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░░░░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "34%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "on pace",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets in 3h 12m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ],
+    [
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "████▎",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░░░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "21%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "20% under",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Thu 5:00 PM",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "calm, full folds when short",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":34,\"resets_at\":\"2026-10-04T18:12:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":21,\"resets_at\":\"2026-10-08T17:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "full",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 1,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "███",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "34%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets 3h 12m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██▏",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "21%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Thu",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "calm, full folds when narrow",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":34,\"resets_at\":\"2026-10-04T18:12:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":21,\"resets_at\":\"2026-10-08T17:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "full",
+    "label": "",
+    "moving": true,
+    "width": 63,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "34%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets 3h 12m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "█▎",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "21%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Thu",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "calm, compact narrows its bars",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":34,\"resets_at\":\"2026-10-04T18:12:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":21,\"resets_at\":\"2026-10-08T17:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 70,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "34%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets 3h 12m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "█▎",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "21%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Thu",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "calm, session only",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":34,\"resets_at\":\"2026-10-04T18:12:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":21,\"resets_at\":\"2026-10-08T17:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "session",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "███",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "34%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets 3h 12m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "calm, weekly only, full, a time zone",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":34,\"resets_at\":\"2026-10-04T18:12:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":21,\"resets_at\":\"2026-10-08T17:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "weekly",
+    "style": "full",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 300,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "████▎",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░░░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "21%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "20% under",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Thu 12:00 PM",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "near a line",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":78,\"resets_at\":\"2026-10-04T17:14:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":52,\"resets_at\":\"2026-10-06T15:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "full",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "███████████",
+      "color": "#fb923c",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "███▋",
+      "color": "#fb923c",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "78%",
+      "color": "#fb923c",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "22% ahead",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets in 2h 14m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ],
+    [
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██████████▍",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "52%",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "19% under",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Tue 3:00 PM",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "crossing: early in the sweep",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":78,\"resets_at\":\"2026-10-04T17:14:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":52,\"resets_at\":\"2026-10-06T15:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {
+     "five_hour": 1791126006300
+    }
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "█",
+      "color": "#fca762",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "█",
+      "color": "#fdd5b5",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "█",
+      "color": "#fedabc",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "█",
+      "color": "#fcab69",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "█",
+      "color": "#fb923c",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "█▊",
+      "color": "#fb923c",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "78%",
+      "color": "#fb923c",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets 2h 14m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "█████▎",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "52%",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Tue",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "crossing: mid sweep",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":78,\"resets_at\":\"2026-10-04T17:14:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":52,\"resets_at\":\"2026-10-06T15:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {
+     "five_hour": 1791126005950
+    }
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "█████",
+      "color": "#fb923c",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f9aed5",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "█",
+      "color": "#feefe2",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▊",
+      "color": "#fdc08f",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "78%",
+      "color": "#fb923c",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets 2h 14m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "█████▎",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "52%",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Tue",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "crossing: sweep over",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":78,\"resets_at\":\"2026-10-04T17:14:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":52,\"resets_at\":\"2026-10-06T15:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {
+     "five_hour": 1791126005000
+    }
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "█████",
+      "color": "#fb923c",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "█▊",
+      "color": "#fb923c",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "78%",
+      "color": "#fb923c",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets 2h 14m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "█████▎",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "52%",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Tue",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "crossing: still with motion off",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":78,\"resets_at\":\"2026-10-04T17:14:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":52,\"resets_at\":\"2026-10-06T15:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": false,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {
+     "five_hour": 1791126005950
+    }
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "█████",
+      "color": "#fb923c",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "█▊",
+      "color": "#fb923c",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "78%",
+      "color": "#fb923c",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets 2h 14m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "█████▎",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "52%",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Tue",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "before reset: shimmer mid pass",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:04.550Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":62,\"resets_at\":\"2026-10-04T15:06:04.550Z\"},{\"key\":\"seven_day\",\"utilization\":40,\"resets_at\":\"2026-10-09T15:00:04.550Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126004550,
+    "bars": "both",
+    "style": "full",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "████████████▍",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "62%",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "36% under",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "rese",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "t",
+      "color": "#b1b7c0",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "s ",
+      "color": "#dbdee2",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "i",
+      "color": "#b1b7c0",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "n 6m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ],
+    [
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "█████",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "██",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░░░░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "40%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "11% ahead",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Fri 3:00 PM",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "before reset: between passes",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":62,\"resets_at\":\"2026-10-04T15:06:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":40,\"resets_at\":\"2026-10-09T15:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "full",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "████████████▍",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "62%",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "36% under",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets in 6m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ],
+    [
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "█████",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "██",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░░░░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "40%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "11% ahead",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Fri 3:00 PM",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "nearly full: glow early",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:04.180Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":93,\"resets_at\":\"2026-10-04T17:00:04.180Z\"},{\"key\":\"seven_day\",\"utilization\":61,\"resets_at\":\"2026-10-07T15:00:04.180Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126004180,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██████",
+      "color": "#f87171",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "██▎",
+      "color": "#f87171",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "93%",
+      "color": "#fa9b9b",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "⚠",
+      "color": "#fa9b9b",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets 2h 0m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "█████",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▏",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "61%",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Wed",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "nearly full: glow mid",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:04.550Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":93,\"resets_at\":\"2026-10-04T17:00:04.550Z\"},{\"key\":\"seven_day\",\"utilization\":61,\"resets_at\":\"2026-10-07T15:00:04.550Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126004550,
+    "bars": "both",
+    "style": "full",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "████████████",
+      "color": "#f87171",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "█████▋",
+      "color": "#f87171",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "93%",
+      "color": "#fcc6c6",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "⚠",
+      "color": "#fcc6c6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "33% ahead",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets in 2h 0m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ],
+    [
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "███████████",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▎",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "61%",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "on pace",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Wed 3:00 PM",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "nearly full: still with motion off",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:04.550Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":93,\"resets_at\":\"2026-10-04T17:00:04.550Z\"},{\"key\":\"seven_day\",\"utilization\":61,\"resets_at\":\"2026-10-07T15:00:04.550Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126004550,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": false,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██████",
+      "color": "#f87171",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "██▎",
+      "color": "#f87171",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "93%",
+      "color": "#f87171",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "⚠",
+      "color": "#f87171",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets 2h 0m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "█████",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▏",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "61%",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Wed",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "looks: gradients, letters, attributes",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":34,\"resets_at\":\"2026-10-04T18:12:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":21,\"resets_at\":\"2026-10-08T17:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": "{\"schema_version\":1,\"written_at\":\"2026-10-04T15:00:01.500Z\",\"reduce_motion\":false,\"meters\":{\"styles\":{\"session\":{\"ink\":[\"#ff2a6d\",\"#05d9e8\"],\"font\":\"script\",\"bold\":true},\"weekly\":{\"ink\":[\"#a78bfa\"],\"font\":\"small-caps\",\"italic\":true},\"resets\":{\"ink\":[\"#fbbf24\",\"#f472b6\",\"#38bdf8\"],\"font\":\"double-struck\",\"underline\":true}}}}",
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "full",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "𝒮",
+      "color": "#ff2a6d",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "ℯ",
+      "color": "#d54782",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝓈",
+      "color": "#ac6496",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝓈",
+      "color": "#8282ab",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝒾",
+      "color": "#589fbf",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "ℴ",
+      "color": "#2fbcd4",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝓃",
+      "color": "#05d9e8",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██████▊",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░░░░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "3",
+      "color": "#ff2a6d",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "4",
+      "color": "#8282ab",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "%",
+      "color": "#05d9e8",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "on pace",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝕣",
+      "color": "#fbbf24",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕖",
+      "color": "#fab537",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕤",
+      "color": "#f9aa4b",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕖",
+      "color": "#f8a05e",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕥",
+      "color": "#f79672",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕤",
+      "color": "#f68c85",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": "#f58199",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕚",
+      "color": "#f477ac",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕟",
+      "color": "#e777ba",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": "#ce81c3",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝟛",
+      "color": "#b58bcc",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕙",
+      "color": "#9c95d5",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": "#839fde",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝟙",
+      "color": "#6aa9e6",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝟚",
+      "color": "#51b3ef",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕞",
+      "color": "#38bdf8",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     }
+    ],
+    [
+     {
+      "text": "Wᴇᴇᴋʟʏ",
+      "color": "#a78bfa",
+      "bold": false,
+      "italic": true,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "████▎",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░░░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "21%",
+      "color": "#a78bfa",
+      "bold": false,
+      "italic": true,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "20% under",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝕣",
+      "color": "#fbbf24",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕖",
+      "color": "#fab635",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕤",
+      "color": "#f9ad46",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕖",
+      "color": "#f9a458",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕥",
+      "color": "#f89b69",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕤",
+      "color": "#f7927a",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": "#f6898b",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕋",
+      "color": "#f5809c",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕙",
+      "color": "#f477ad",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕦",
+      "color": "#e976ba",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": "#d37fc2",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝟝",
+      "color": "#bd88c9",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": ":",
+      "color": "#a791d1",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝟘",
+      "color": "#909ad9",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝟘",
+      "color": "#7aa3e1",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": "#64abe8",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "ℙ",
+      "color": "#4eb4f0",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕄",
+      "color": "#38bdf8",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     }
+    ]
+   ]
+  },
+  {
+   "name": "looks: compact, nearly full, mid glow",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:04.550Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":93,\"resets_at\":\"2026-10-04T17:00:04.550Z\"},{\"key\":\"seven_day\",\"utilization\":61,\"resets_at\":\"2026-10-07T15:00:04.550Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": "{\"schema_version\":1,\"written_at\":\"2026-10-04T14:59:59.550Z\",\"reduce_motion\":false,\"meters\":{\"styles\":{\"session\":{\"ink\":[\"#ff2a6d\",\"#05d9e8\"],\"font\":\"script\",\"bold\":true},\"weekly\":{\"ink\":[\"#a78bfa\"],\"font\":\"small-caps\",\"italic\":true},\"resets\":{\"ink\":[\"#fbbf24\",\"#f472b6\",\"#38bdf8\"],\"font\":\"double-struck\",\"underline\":true}}}}",
+   "input": {
+    "now": 1791126004550,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "𝒮",
+      "color": "#ff2a6d",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "ℯ",
+      "color": "#d54782",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝓈",
+      "color": "#ac6496",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝓈",
+      "color": "#8282ab",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝒾",
+      "color": "#589fbf",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "ℴ",
+      "color": "#2fbcd4",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝓃",
+      "color": "#05d9e8",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██████",
+      "color": "#f87171",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "██▎",
+      "color": "#f87171",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "9",
+      "color": "#ffaac5",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "3",
+      "color": "#cdcddd",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "%",
+      "color": "#9bf0f6",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "⚠",
+      "color": "#fcc6c6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝕣",
+      "color": "#fbbf24",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕖",
+      "color": "#fab13f",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕤",
+      "color": "#f8a359",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕖",
+      "color": "#f79574",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕥",
+      "color": "#f6878e",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕤",
+      "color": "#f579a9",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": "#e379bc",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝟚",
+      "color": "#c186c8",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕙",
+      "color": "#9f94d4",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": "#7ca2e0",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝟘",
+      "color": "#5aafec",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕞",
+      "color": "#38bdf8",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Wᴇᴇᴋʟʏ",
+      "color": "#a78bfa",
+      "bold": false,
+      "italic": true,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "█████",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▏",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "61%",
+      "color": "#a78bfa",
+      "bold": false,
+      "italic": true,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝕣",
+      "color": "#fbbf24",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕖",
+      "color": "#f9ae44",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕤",
+      "color": "#f89d65",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕖",
+      "color": "#f68c85",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕥",
+      "color": "#f57ba6",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕤",
+      "color": "#df7abd",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": "#b58bcc",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕎",
+      "color": "#8c9cdb",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕖",
+      "color": "#62ace9",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕕",
+      "color": "#38bdf8",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     }
+    ]
+   ]
+  },
+  {
+   "name": "looks: shimmer on styled resets",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:04.550Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":62,\"resets_at\":\"2026-10-04T15:06:04.550Z\"},{\"key\":\"seven_day\",\"utilization\":40,\"resets_at\":\"2026-10-09T15:00:04.550Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": "{\"schema_version\":1,\"written_at\":\"2026-10-04T14:59:59.550Z\",\"reduce_motion\":false,\"meters\":{\"styles\":{\"session\":{\"ink\":[\"#ff2a6d\",\"#05d9e8\"],\"font\":\"script\",\"bold\":true},\"weekly\":{\"ink\":[\"#a78bfa\"],\"font\":\"small-caps\",\"italic\":true},\"resets\":{\"ink\":[\"#fbbf24\",\"#f472b6\",\"#38bdf8\"],\"font\":\"double-struck\",\"underline\":true}}}}",
+   "input": {
+    "now": 1791126004550,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "𝒮",
+      "color": "#ff2a6d",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "ℯ",
+      "color": "#d54782",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝓈",
+      "color": "#ac6496",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝓈",
+      "color": "#8282ab",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝒾",
+      "color": "#589fbf",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "ℴ",
+      "color": "#2fbcd4",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝓃",
+      "color": "#05d9e8",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██████▎",
+      "color": "#facc15",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "6",
+      "color": "#ff2a6d",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "2",
+      "color": "#8282ab",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "%",
+      "color": "#05d9e8",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝕣",
+      "color": "#fbbf24",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕖",
+      "color": "#f9ac49",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕤",
+      "color": "#f8996d",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕖",
+      "color": "#fab9c0",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕥",
+      "color": "#fdeaf4",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕤",
+      "color": "#deb9df",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": "#9698d7",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝟞",
+      "color": "#67aae8",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕞",
+      "color": "#38bdf8",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Wᴇᴇᴋʟʏ",
+      "color": "#a78bfa",
+      "bold": false,
+      "italic": true,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "█",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "40%",
+      "color": "#a78bfa",
+      "bold": false,
+      "italic": true,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "𝕣",
+      "color": "#fbbf24",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕖",
+      "color": "#f9ae44",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕤",
+      "color": "#f89d65",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕖",
+      "color": "#f68c85",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕥",
+      "color": "#f57ba6",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕤",
+      "color": "#df7abd",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": "#b58bcc",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝔽",
+      "color": "#8c9cdb",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕣",
+      "color": "#62ace9",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     },
+     {
+      "text": "𝕚",
+      "color": "#38bdf8",
+      "bold": false,
+      "italic": false,
+      "underline": true,
+      "dim": false
+     }
+    ]
+   ]
+  },
+  {
+   "name": "watchers: wide, all states",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:04.550Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":34,\"resets_at\":\"2026-10-04T18:12:04.550Z\"},{\"key\":\"seven_day\",\"utilization\":21,\"resets_at\":\"2026-10-08T17:00:04.550Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": "{\"schema_version\":1,\"written_at\":\"2026-10-04T14:59:59.550Z\",\"reduce_motion\":false,\"watchers\":[{\"source\":\"agent\",\"title\":\"Run the test suite\",\"short\":\"tests\",\"state\":\"running\",\"done\":3,\"total\":12,\"started_at\":\"2026-10-04T14:55:52.550Z\"},{\"source\":\"agent\",\"title\":\"Approve the deploy to production\",\"short\":\"deploy\",\"state\":\"waiting\",\"started_at\":\"2026-10-04T13:50:04.550Z\"},{\"source\":\"agent\",\"title\":\"Lint\",\"state\":\"passed\",\"started_at\":\"2026-10-04T14:58:04.550Z\",\"ended_at\":\"2026-10-04T15:00:02.050Z\"},{\"source\":\"agent\",\"title\":\"Nightly\",\"state\":\"failed\",\"started_at\":\"2026-10-04T14:50:04.550Z\",\"ended_at\":\"2026-10-04T14:59:04.550Z\"},{\"source\":\"automatic\",\"kind\":\"shell\",\"state\":\"running\"},{\"source\":\"agent\",\"title\":\"Old job\",\"state\":\"lost_touch\",\"started_at\":\"2026-10-04T14:40:04.550Z\"},{\"source\":\"agent\",\"title\":\"Build docs\",\"state\":\"finished\",\"started_at\":\"2026-10-04T14:51:04.550Z\",\"ended_at\":\"2026-10-04T15:00:00.550Z\"}]}",
+   "input": {
+    "now": 1791126004550,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 8,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "███",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "34%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets 3h 12m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██▏",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "21%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Thu",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ],
+    [
+     {
+      "text": "●",
+      "color": "#38bdf8",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Run the test suite",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "4m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "3/12",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     }
+    ],
+    [
+     {
+      "text": "◉",
+      "color": "#fde5a7",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Approve the deploy to production",
+      "color": "#fde5a7",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "1h 10m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ],
+    [
+     {
+      "text": "✓",
+      "color": "#4ab577",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Lint",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "1m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ],
+    [
+     {
+      "text": "⚠",
+      "color": "#f87171",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Nightly",
+      "color": "#f87171",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "9m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ],
+    [
+     {
+      "text": "●",
+      "color": "#38bdf8",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "background shell",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     }
+    ],
+    [
+     {
+      "text": "○",
+      "color": "#6b7280",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Old job",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "20m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "+1 more",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "watchers: narrow, short titles, folded",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":34,\"resets_at\":\"2026-10-04T18:12:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":21,\"resets_at\":\"2026-10-08T17:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": "{\"schema_version\":1,\"written_at\":\"2026-10-04T15:00:01.500Z\",\"reduce_motion\":false,\"watchers\":[{\"source\":\"agent\",\"title\":\"Run the test suite\",\"short\":\"tests\",\"state\":\"running\",\"done\":3,\"total\":12,\"started_at\":\"2026-10-04T14:55:54.500Z\"},{\"source\":\"agent\",\"title\":\"Approve the deploy to production\",\"short\":\"deploy\",\"state\":\"waiting\",\"started_at\":\"2026-10-04T13:50:06.500Z\"},{\"source\":\"agent\",\"title\":\"Lint\",\"state\":\"passed\",\"started_at\":\"2026-10-04T14:58:06.500Z\",\"ended_at\":\"2026-10-04T15:00:04.000Z\"},{\"source\":\"agent\",\"title\":\"Nightly\",\"state\":\"failed\",\"started_at\":\"2026-10-04T14:50:06.500Z\",\"ended_at\":\"2026-10-04T14:59:06.500Z\"},{\"source\":\"automatic\",\"kind\":\"shell\",\"state\":\"running\"},{\"source\":\"agent\",\"title\":\"Old job\",\"state\":\"lost_touch\",\"started_at\":\"2026-10-04T14:40:06.500Z\"},{\"source\":\"agent\",\"title\":\"Build docs\",\"state\":\"finished\",\"started_at\":\"2026-10-04T14:51:06.500Z\",\"ended_at\":\"2026-10-04T15:00:02.500Z\"}]}",
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 50,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "34%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets 3h 12m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "█▎",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "21%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Thu",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ],
+    [
+     {
+      "text": "●",
+      "color": "#38bdf8",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "tests",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "4m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "3/12",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     }
+    ],
+    [
+     {
+      "text": "◉",
+      "color": "#fbbf24",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "deploy",
+      "color": "#fbbf24",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "1h 10m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ],
+    [
+     {
+      "text": "✓",
+      "color": "#4ab577",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Lint",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "1m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "+4 more",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "watchers: no snapshot",
+   "snapshot": null,
+   "band": "{\"schema_version\":1,\"written_at\":\"2026-10-04T15:00:01.500Z\",\"reduce_motion\":false,\"watchers\":[{\"source\":\"agent\",\"title\":\"Run the test suite\",\"short\":\"tests\",\"state\":\"running\",\"done\":3,\"total\":12,\"started_at\":\"2026-10-04T14:55:54.500Z\"},{\"source\":\"agent\",\"title\":\"Approve the deploy to production\",\"short\":\"deploy\",\"state\":\"waiting\",\"started_at\":\"2026-10-04T13:50:06.500Z\"}]}",
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "●",
+      "color": "#38bdf8",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Run the test suite",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "4m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "3/12",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     }
+    ],
+    [
+     {
+      "text": "◉",
+      "color": "#fbbf24",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Approve the deploy to production",
+      "color": "#fbbf24",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "1h 10m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "watchers: stale band.json shows none",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":34,\"resets_at\":\"2026-10-04T18:12:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":21,\"resets_at\":\"2026-10-08T17:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": "{\"schema_version\":1,\"written_at\":\"2026-10-04T14:56:06.500Z\",\"watchers\":[{\"source\":\"agent\",\"title\":\"Run the test suite\",\"short\":\"tests\",\"state\":\"running\",\"done\":3,\"total\":12,\"started_at\":\"2026-10-04T14:55:54.500Z\"},{\"source\":\"agent\",\"title\":\"Approve the deploy to production\",\"short\":\"deploy\",\"state\":\"waiting\",\"started_at\":\"2026-10-04T13:50:06.500Z\"},{\"source\":\"agent\",\"title\":\"Lint\",\"state\":\"passed\",\"started_at\":\"2026-10-04T14:58:06.500Z\",\"ended_at\":\"2026-10-04T15:00:04.000Z\"},{\"source\":\"agent\",\"title\":\"Nightly\",\"state\":\"failed\",\"started_at\":\"2026-10-04T14:50:06.500Z\",\"ended_at\":\"2026-10-04T14:59:06.500Z\"},{\"source\":\"automatic\",\"kind\":\"shell\",\"state\":\"running\"},{\"source\":\"agent\",\"title\":\"Old job\",\"state\":\"lost_touch\",\"started_at\":\"2026-10-04T14:40:06.500Z\"},{\"source\":\"agent\",\"title\":\"Build docs\",\"state\":\"finished\",\"started_at\":\"2026-10-04T14:51:06.500Z\",\"ended_at\":\"2026-10-04T15:00:02.500Z\"}]}",
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "███",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "34%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets 3h 12m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██▏",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "21%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Thu",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "stale snapshot dims",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:51:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":34,\"resets_at\":\"2026-10-04T18:00:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":21,\"resets_at\":\"2026-10-08T15:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "███▍│░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "34%",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets 3h 0m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██▏░│░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "21%",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Thu",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "(9m ago)",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "dead snapshot is a line",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:40:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":34,\"resets_at\":\"2026-10-04T18:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Sanduhr: no update for 20m. Is the widget running?",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "dead seat reading dims with its age",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T10:00:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":34,\"resets_at\":\"2026-10-04T18:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": true,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "███▍│░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "34%",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets 3h 0m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "as of 5h",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "signed out",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":\"session_expired\",\"plan\":null,\"schema_version\":1,\"status\":\"error\",\"tiers\":[],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Sanduhr: sign in to see your meters.",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "offline, last known",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":\"network\",\"plan\":null,\"schema_version\":1,\"status\":\"error\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":34,\"resets_at\":\"2026-10-04T18:00:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":21,\"resets_at\":\"2026-10-08T15:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "███▍│░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "34%",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets 3h 0m",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██▏░│░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "21%",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Thu",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "last known, offline",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "a reset passed",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":88,\"resets_at\":\"2026-10-04T14:58:06.500Z\"},{\"key\":\"seven_day\",\"utilization\":21,\"resets_at\":\"2026-10-08T15:00:06.500Z\"}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "reset",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "   ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "██▏",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "│",
+      "color": "#f472b6",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "21%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "resets Thu",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     }
+    ]
+   ]
+  },
+  {
+   "name": "no reset time, nothing over",
+   "snapshot": "{\"account_ref\":\"1a2b3c4d\",\"captured_at\":\"2026-10-04T14:59:06.500Z\",\"error_kind\":null,\"plan\":null,\"schema_version\":1,\"status\":\"ok\",\"tiers\":[{\"key\":\"five_hour\",\"utilization\":0,\"resets_at\":null},{\"key\":\"seven_day\",\"utilization\":100,\"resets_at\":null}],\"writer_version\":\"3.9.0\"}",
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "full",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": [
+    [
+     {
+      "text": "Session",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "░░░░░░░░░░░░░░░░░░░░",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "0%",
+      "color": "#4ade80",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     }
+    ],
+    [
+     {
+      "text": "Weekly",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▕",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": "████████████████████",
+      "color": "#f87171",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "▏",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": true
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "100%",
+      "color": "#f87171",
+      "bold": true,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": " ",
+      "color": null,
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     },
+     {
+      "text": "⚠",
+      "color": "#f87171",
+      "bold": false,
+      "italic": false,
+      "underline": false,
+      "dim": false
+     }
+    ]
+   ]
+  },
+  {
+   "name": "nothing: no snapshot",
+   "snapshot": null,
+   "band": null,
+   "input": {
+    "now": 1791126006500,
+    "bars": "both",
+    "style": "compact",
+    "label": "",
+    "moving": true,
+    "width": 120,
+    "maxRows": 4,
+    "tzOffsetMinutes": 0,
+    "seat": false,
+    "sweeps": {}
+   },
+   "lines": []
+  }
+ ]
+}

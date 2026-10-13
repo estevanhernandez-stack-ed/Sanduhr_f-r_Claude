@@ -210,6 +210,8 @@ final class ModsPageModel {
     /// The cards opened from their compact line (item 75, slice A), kept while the window lives.
     var openCards: Set<String> = []
     var sortByLoad = false
+    /// The Mod Studio sheet is up (item 75, slice B).
+    var studioOpen = false
     private var seatConfigs: [String: [ClaudeCodeFolders.ConfigCandidate]] = [:]
 
     /// Card ids whose Check failed or found a high risk: Needs a look.
@@ -220,6 +222,12 @@ final class ModsPageModel {
                 return !r.passed
             }
         }.map(\.id))
+    }
+
+    /// The Studio's header: on in how many of the folders found, nil before they are read.
+    var studioOnLine: String? {
+        guard ownLoaded, !own.isEmpty else { return nil }
+        return "On in \(own.filter(\.state.isOn).count) of \(own.count) folder\(own.count == 1 ? "" : "s")"
     }
 
     /// A card shows in full when it was opened, or when the search found it only by what it brings.
@@ -651,6 +659,9 @@ struct ModsSettings: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task { await model.load(linked: linked) }
         .ownModQuestions(model, linked: linked)
+        .sheet(isPresented: Binding(get: { model.studioOpen }, set: { model.studioOpen = $0 })) {
+            ModStudioSheet(model: .live(), onLine: model.studioOnLine, close: { model.studioOpen = false })
+        }
         .sheet(item: $consent) { c in
             MetersConsentSheet(folder: model.display(c.folder),
                                file: model.display(model.installer.configFile(.meters, folder: c.folder)),
