@@ -147,3 +147,54 @@ Shape to spec:
 
 Open questions: whether Just the Desk should also skip the Keychain prompt path entirely, and
 whether the tour gets a Desk-only variant.
+
+## #5 — Windows Store build: AppData writes are invisible outside the package (fixed in 3.4.3)
+
+**Fixed in 3.4.3** (PR #192, merged 2026-10-11; Store submission 1152921505702097635 in
+certification at the time of writing). Fix candidate 1 below shipped: `desktop6:FileSystemWriteVirtualization`
+`disabled` with `rescap:unvirtualizedResources`, scoped on Windows 11 (build 20348+) to
+`%APPDATA%\Sanduhr` and `%LOCALAPPDATA%\Sanduhr` through `virtualization:ExcludedDirectories`;
+MinVersion raised to 10.0.18362.0; a one-time migration (`PackagedDataMigration`) copies older
+Store data out of the package LocalCache. Verified on Neb: an in-place upgrade from the Store 3.4.2
+(8/8 steps, 8,204 files migrated, no fresh sign-in) and a parked-folder run in which both real
+folders were created and LocalCache got no new writes. A shipping app without the opt-out (RoRoRo)
+measured the opposite on the same machine, which is the negative control. Fix candidate 3 (a ping
+that tells "no snapshot" from "snapshot I can't see") was not built. Neb's hand-made junction,
+symlinks and resolver script were set aside during the smoke test. Kept below for the record.
+
+Raised 2026-10-11 from failures on Neb, which runs the Store (MSIX) build. Tracked as the critical
+dashboard task "MCP launcher points at a path Claude Code can't see on Store (MSIX) installs".
+
+`Package.appxmanifest` declares only `rescap:runFullTrust`, and its comment assumes that lets the
+app read and write `%APPDATA%\Sanduhr` directly. It doesn't: full trust leaves MSIX AppData write
+redirection on. New folders and files the packaged app creates under AppData land in
+`%LOCALAPPDATA%\Packages\626LabsLLC.SanduhrfrClaude_wz1chhb2h2v4a\LocalCache\Roaming\Sanduhr`.
+A folder that already existed in the real AppData is written in place. The result is a split
+install:
+
+- `bin\sanduhr-mcp.cmd` lands in the real `bin\` and names `%APPDATA%\Sanduhr\mcp\v...\sanduhr-mcp.exe`,
+  but `mcp\` was redirected, so Claude Code (outside the package) finds no exe: "The system cannot
+  find the path specified", then CONNECTION_CLOSED.
+- On 2026-10-07 the same split hid `snapshot.json`, history and settings from `sanduhr-mcp`:
+  `ping` reported `no_data` with `cc_roots_consented=[]`, which reads as a consent problem
+  rather than a path problem.
+- Neb was patched by hand on the way: a resolver launcher (`sanduhr-mcp-resolve.ps1`, a cache under
+  `%LOCALAPPDATA%\Sanduhr\mcp-cache`, a temp file that races when spawns overlap), four symlinks, and
+  a junction for `mcp\`. None of it is app code. Remove it once the fix ships.
+
+Velopack installs aren't packaged and never see this, which is why Dunder is clean.
+
+Fix candidates (verify against Microsoft docs before choosing):
+
+1. **Recommended:** turn off write virtualization in the manifest: the
+   `desktop6:FileSystemWriteVirtualization` property set to `disabled`, with the
+   `rescap:unvirtualizedResources` capability. Fixes every path at once. Costs a second rescap
+   justification in the reviewer letter and an OS-floor check.
+2. Have the packaged app write everything an outside process reads (snapshot, history, `mcp\`,
+   `bin\`) to the real path explicitly. Brittle: every new file has to remember.
+3. Have `sanduhr-mcp` also probe the LocalCache path. Needs a `TrustBoundaryTests` allowlist change,
+   and fixes only the reader side; the launcher's exe path is still wrong.
+
+Also: `ping` should tell "no snapshot anywhere" apart from "snapshot at a path I can't see", and
+the manifest comment should be corrected. Verify with a clean Store install on a machine with no
+existing `%APPDATA%\Sanduhr`.

@@ -226,6 +226,88 @@ Also:
 - **Alerts.** Settings ▸ Alerts turns on macOS notifications: the session (5 hr) and weekly meters each warn at a threshold you set (50 to 95%, default 80), optionally again at 100% of the session and when the session resets. Each alert fires once per tier per reset window. Includes a test button and a shortcut to System Settings, Notifications. The old "Show reminder at 100% of session" toggle, which saved a setting nothing read, now drives the 100% alert.
 - **snapshot.json on the Mac.** After every fetch the widget writes `~/Library/Application Support/Sanduhr/snapshot.json` in the Windows schema (version 1: status, error_kind, captured_at, tiers with key, utilization and resets_at), atomically, keeping the last good tiers on a failed fetch. Other tools on the Mac can show the meters from it without a login of their own. It never holds the session key.
 
+## v3.5.0 — 2026-10-12
+
+**Platform:** Windows (.NET 10 / WPF). The Windows parity cycle: the Windows app catches up with the Mac's features (PRs #204, #205, #206, #208, #209, #213, #214). `Sanduhr.Mcp` to 3.5.0. No change to `Package.appxmanifest` since 3.4.3 other than the version: no new capability.
+
+### What's New and the welcome tour
+
+- **What's New after an update.** A themed window of cards, each with a live preview and a **Show me** button that opens the right Settings page or shows the widget. A **Don't show after updates** checkbox turns it off; it opens any time from the tray menu and Settings ▸ About. It carries the trademark notice.
+- **Welcome tour.** On a fresh install the tour opens after the first successful fetch: your limits and pacing, the tray readout (you pick it in the tour), more than one account, and Claude Code. Back, Next, Skip (Escape) and Finish (Enter). **Take the tour…** is in the tray menu and Settings ▸ About.
+- **Signed-out first run.** The first-run card gains **Not now**, which leaves a "Not signed in · Sign in" line for the rest of that launch.
+- **Demo mode** (`--demo` or `SANDUHR_DEMO=1`) shows two sample accounts with made-up numbers, labelled as samples on the widget, the tray, the tour and Settings. It never writes the snapshot, history, alerts or the vault, so the MCP server and the statusline never see sample data.
+
+### Shortcuts and the tray
+
+- **A global shortcut opens Settings from any app.** Off until you turn it on; the default is Ctrl+Alt+S. It has a recorder and a Reset link, and names the conflict when another app holds the keys. Shortcuts are now saved as a per-action map; the old single value moves over once, on first launch.
+- **Choose what the tray shows:** the highest of any limit (the default, as before), Session, Weekly, whichever is higher, or Rotate (every 8 seconds). From a tray submenu or Settings ▸ General, with a live preview. The tooltip says what the number is.
+- **Limits that come and go.** "Hide until it resets" for temporary limits, which come back on a new window or a refill; "Stop warnings for this limit"; and a **Hidden limits** submenu, the first way on Windows to un-hide a limit.
+- **Steady sparklines.** A series that moves by 2 points or less draws as a level line instead of magnified noise.
+
+### Settings v2
+
+- **A grouped sidebar with search.** General, Accounts, Alerts; Usage (History, Claude Usage, Publish usage); Claude Code (Claude Code, Mods & Config); Desk; Widget (Themes); Help (About). Search finds pages, sections and controls by name or synonym ("percent", "vault", "csv", "hotkey"); Enter jumps to the best hit and outlines it.
+- **One name for each control**, used the same way across the widget, the tray and Settings.
+- **About** holds the version, What's New…, Take the tour…, the trademark notice word for word, where settings live (Show in Explorer), and third-party notices with each shipped package's license, the bundled EsteFont fonts and the weather data credits.
+
+### The Claude Code page and Mods & Config
+
+- **Every Claude Code folder counts.** Sanduhr finds every `.claude` and `.claude-*` folder in your profile (and `CLAUDE_CONFIG_DIR`) for local burn and model usage. A newly found folder starts **off** in the vault and publish lists, so nothing new is stored or published without your say.
+- **Settings ▸ Claude Code** (new): your folders (plus Add folder… and Forget folder), a linked account per folder, whether the MCP server may read it, and Install and Remove for the statusline, the MCP server, the meters mod and the glow hooks, each behind a consent dialog. The statusline and MCP sections moved here from Claude Usage.
+- **Edits you can undo exactly.** Sanduhr changes only the one entry it owns in a Claude Code file and keeps every other byte, keeps a backup in `%APPDATA%\Sanduhr\backups` (never beside the file), and records a receipt so Remove and Reset put things back.
+- **Statusline: Replace or Combine.** Combine runs your own statusline command first, then Sanduhr's line; a segment picker chooses what Sanduhr shows.
+- **The meters mod.** The Mac's `sanduhr-meters` mod for Claude Code now ships with the Windows app and installs from the Claude Code page.
+- **Settings ▸ Mods & Config** (new, read-only): one folder's settings, statusline, hooks, plugins, mods, MCP server names, `CLAUDE.md` and log retention, with a warning when retention is 30 days or less. The meters mod switch (On, Off, Update, Remove) lives here.
+
+### The glow
+
+- **The glow when Claude needs you.** Optional Claude Code hooks light the top edge of the window you are working in: the theme's accent while Claude waits for you, its success color when it is done, and the taskbar button flashes (three times at most). Rate-limited, skipped while a terminal or editor is in front, and off by default.
+- **Where the glow shows:** the window (the default), a screen edge you pick, the widget (taskbar flash only), or a spot on the Desk.
+
+### Account follow and per-folder meters
+
+- **Follow the account I'm using** (Settings ▸ Accounts, off by default) checks your other signed-in accounts every 15 minutes and switches the widget to the one whose session meter is climbing, at most once every 30 minutes, with " · in use" marks in the tray and Settings. Switching by hand pauses it for up to 3 hours.
+- **Per-folder meters.** Once a folder is linked to an account, Sanduhr writes that account's meters for it, so the statusline and the meters mod in each folder show the right account. Each account now signs in through its own WebView2 profile (`%APPDATA%\Sanduhr\webview2-<account>`).
+
+### Reset
+
+- **Reset Sanduhr…** (Settings ▸ About) removes, in five parts that start checked: the Claude Code entries Sanduhr installed (undone through their receipts), your accounts with the publish token and every sign-in profile, history with the snapshots, the usage vault and the logs, your themes, and your settings with the Desk messages. It warns about Claude Code entries left unchecked, keeps the backups, then quits; nothing is written after it runs.
+
+### The Desk
+
+The Mac's Desk comes to Windows: Sanduhr draws on your desktop, behind your windows. **Off by default**; turn it on in Settings ▸ Desk.
+
+- **Clock and date**, in the bundled EsteFont faces, with a clock size setting.
+- **Your meters:** the Claude line (session and week with their reset time) and bars with a pace tick, turning red at 90%.
+- **Messages.** Your own lines from `messages.txt`, with weekday and date lines, daily or hourly rotation, pinned lines, special days, and effects such as ink, glow, size, write, shimmer and sweep. **Settings ▸ Message** edits them as rows or as text.
+- **Now playing.** The track from any app using Windows media controls, with a position bar; click to play or pause. Also available as an optional line on the widget (Settings ▸ Now playing). Titles stay in memory.
+- **Bars** beside now playing that move with your audio's output level, only while a track plays. Nothing is recorded.
+- **System readings:** CPU, memory and disk, every 5 seconds.
+- **Weather** from Open-Meteo for a city you look up (Settings ▸ Weather). Only the city name (to look it up) and coordinates rounded to about 1 km (for the forecast) are sent, at most every 30 minutes. No location permission is used. The credit sits on the Desk and links to open-meteo.com.
+- **Ink:** Automatic picks light or dark from your wallpaper image behind each piece (never the screen), or choose Light, Dark, the theme's color or a custom color.
+- **Arrange by dragging.** Arrange Desk… (Settings ▸ Desk or the tray) dims the screen and lets you drag each piece to one of eight places; Done saves, Escape cancels. Sizes, margins and the font stay in Settings ▸ Desk, which shows a live map of the layout.
+- **Desk clicks.** Now playing and the weather credit take clicks; right-click the clock, message or Claude line for the Desk menu (Edit messages…, Desk settings…, Arrange Desk…, Turn off the Desk). Clicks everywhere else pass through to the desktop. "Clock and message take clicks" turns the right-click menu off.
+- **Pieces pause when covered.** A piece hidden behind a window stops its motion, bars and readings until it shows again.
+- **Just the Desk.** No Claude account? The first-run card offers **Just the Desk**: the Desk on its own, the widget hidden (the tray icon brings it back). Signing in later brings the widget back on its own. Settings ▸ Alerts has "Sign-in reminders on the Desk".
+- The Desk keeps clear of the taskbar (including an auto-hiding one), follows Show desktop, and redraws after an Explorer restart or a display change. Idle cost at steady state is under 0.5% of one core.
+
+### MCP
+
+- **Consent-gated folders.** The MCP server and both installers now offer every Claude Code folder Sanduhr finds, not just `.claude` and `.claude-personal`. The server reads a folder only after you tick it on the Claude Code page, and never reads a folder you added by hand.
+- `publish_usage` writes its request to a temp file and swaps it in, so the widget never reads half a request.
+
+### Fixed
+
+- Settings no longer leaks an event handler each time it opens.
+- The shortcut note used a fixed yellow that was hard to read on light themes; it now uses the theme's warning color.
+- The Warn at and Urgent at boxes and the History account picker have accessible names.
+- Installing the MCP server refuses a `.claude.json` whose `mcpServers` is not an object, and a `.claude.json` with a byte order mark round-trips byte for byte.
+- Two flaky tests fixed at the root (a registry race between test classes, and a file-open race in the publish tests).
+
+### Note on going back
+
+Going back to a version before 3.5 turns the Settings shortcut off; your keys are kept and come back when you update again.
+
 ## v3.4.3 — 2026-10-11
 
 **Platform:** Windows (.NET 10 / WPF). Store (MSIX) build only; the Setup.exe build is unchanged.
