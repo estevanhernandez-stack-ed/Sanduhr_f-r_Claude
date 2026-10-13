@@ -495,12 +495,50 @@ class PicksGrammarTests(unittest.TestCase):
             ["--chain-b64", self.good, "--join", "line", "--mine", "session,cost"],
             ["--chain-b64", self.good, "--join", "line", "--mine", "session,"],
             ["--chain-b64", self.good, "--join", "line", "--padding", "²"],
-            ["--mine", "session"],
             ["--chain-b64", self.good, "--join", "line", "--band", "--mine", "session"],    # order
             ["--chain-b64", self.good, "--join", "line", "--band", "--band"],
             ["--chain-b64", self.good, "--join", "line", "--band=1"],
         ):
             self.assertIsNone(sl.parse_args(argv), argv)
+
+
+class PlainPicksTests(unittest.TestCase):
+    """Sanduhr's line alone with picks (item 71, slice 1e): `[--keep-theirs-b64 K] [--mine M]`."""
+
+    def test_the_plain_forms(self):
+        k = picks_b64(ours={"session": {"bold": True}}, **{"with": "dot"})
+        self.assertEqual(sl.parse_args(["--mine", "session"]), ("plain", None, ("session",)))
+        self.assertEqual(sl.parse_args(["--keep-theirs-b64", k]),
+                         ("plain", {"ours": {"session": {"bold": True}}, "with": "dot"}, None))
+        self.assertEqual(sl.parse_args(["--keep-theirs-b64", k, "--mine", "label,weekly"])[2], ("label", "weekly"))
+
+    def test_anything_else_alone_is_refused(self):
+        k = picks_b64()
+        for argv in (
+            ["--mine", "session", "--keep-theirs-b64", k],     # order
+            ["--mine"],
+            ["--mine", ""],
+            ["--mine", "weekly,session"],
+            ["--keep-theirs-b64"],
+            ["--keep-theirs-b64", "!!!!"],
+            ["--mine", "session", "--band"],                    # the band needs a combined line
+            ["--padding", "2", "--mine", "session"],
+            ["--mine", "session", "--mine", "session"],
+            ["--extra"],
+        ):
+            self.assertIsNone(sl.parse_args(argv), argv)
+
+    def test_plain_picks_choose_segments_looks_and_glue(self):
+        r = Rig()
+        try:
+            r.fresh()
+            p, _ = r.run(["--mine", "weekly,resets"])
+            self.assertEqual(p.returncode, 0)
+            self.assertTrue(p.stdout.decode().startswith("wk 18% | wk resets"), p.stdout)
+            p, _ = r.run(["--keep-theirs-b64", picks_b64(**{"with": "dot"}), "--mine", "session,weekly"])
+            self.assertEqual(p.stdout.decode().strip(), "5h 42% · wk 18%")
+        finally:
+            r.close()
 
 
 class MineTests(unittest.TestCase):

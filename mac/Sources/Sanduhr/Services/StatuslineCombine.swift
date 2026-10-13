@@ -219,7 +219,8 @@ struct StatuslineSelection: Equatable, Sendable {
 
 /// Sanduhr's statusline command taken apart: `<python> <…/sanduhr_statusline.py>`, optionally
 /// followed by exactly `--chain-b64 <base64> --join line|same [--padding <n>]
-/// [--keep-theirs-b64 <base64>] [--mine <list>] [--band]`.
+/// [--keep-theirs-b64 <base64>] [--mine <list>] [--band]`, or, for Sanduhr's line alone,
+/// `[--keep-theirs-b64 <base64>] [--mine <list>]` (the picks' `ours` looks and `with` glyph).
 struct StatuslineCommand: Equatable, Sendable {
     /// `<python> <script>`, as written.
     var base: String
@@ -244,7 +245,12 @@ extension IntegrationInstaller {
                                   join: StatuslineJoin = .line, padding: Int? = nil,
                                   selection: StatuslineSelection = StatuslineSelection()) -> String {
         let base = "\(shellQuoted(python)) \(shellQuoted(script))"
-        guard let chain else { return base }
+        guard let chain else {
+            // Sanduhr's line alone (item 71, slice 1e): its own segments and their looks only.
+            var plain = selection
+            plain.band = false
+            return ([base] + pickFlags(plain)).joined(separator: " ")
+        }
         var c = "\(base) --chain-b64 \(Data(chain.utf8).base64EncodedString()) --join \(join.rawValue)"
         if let padding, padding > 0, padding <= 999 { c += " --padding \(padding)" }
         c += pickFlags(selection).map { " " + $0 }.joined()
@@ -293,6 +299,14 @@ extension IntegrationInstaller {
             guard let picks = StatuslinePicks(base64: words[words.count - 1]) else { return nil }
             selection.theirs = picks
             words.removeLast(2)
+        }
+        // Sanduhr's line alone with picks: no chain, no padding, no band.
+        if selection != StatuslineSelection() || words.count < c.components(separatedBy: " ").count {
+            let rest = words.joined(separator: " ")
+            if isPlainStatusline(rest) {
+                guard !selection.band else { return nil }
+                return StatuslineCommand(base: rest, selection: selection)
+            }
         }
         var padding: Int?
         if words.count >= 2, words[words.count - 2] == "--padding" {

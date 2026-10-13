@@ -72,8 +72,6 @@ struct StatuslineChipsTests {
             "\(chain) --mine session,session",
             "\(chain) --mine session,cost",
             "\(chain) --mine session,",
-            "\(Self.base) --mine session",                                    // picks without a chain
-            "\(Self.base) --keep-theirs-b64 \(k)",
         ] {
             #expect(!Self.ours(bad), "\(bad)")
         }
