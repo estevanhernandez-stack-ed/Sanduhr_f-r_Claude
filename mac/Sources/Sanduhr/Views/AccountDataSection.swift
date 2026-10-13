@@ -43,11 +43,17 @@ struct AccountDataSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
+                Text("Claude Code").font(.headline)
+                Caption("The Claude Code folder this account signs in to, and its side of the wall. Sessions in that folder show this account's meters (the statusline, the meters above the prompt and your agents), and Mods & Config names the folder after this account.")
+            }
+            folderRow
+            sideRow
+            Divider()
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Data").font(.headline)
                 Caption("What Sanduhr keeps for this account and what Claude can see of it. The meters themselves never change with these choices, and nothing leaves this Mac.")
             }
             historyRow
-            folderRow
             DataChoiceRows(vm: vm, label: label, stoppedRecording: offerRecordErase)
             eraseAllRow
             if let note {
@@ -200,7 +206,24 @@ struct AccountDataSection: View {
             if choices.folder == nil, let suggestion {
                 SuggestionBox(folder: suggestion.display(home: home)) { pick(suggestion.path) }
             }
-            Caption("The Claude Code folder whose logs belong to this account, such as ~/.claude or a ~/.claude-name folder used with CLAUDE_CONFIG_DIR. A folder links to one account. Sanduhr suggests the folder signed in to this account's organization and never links one by itself. Claude Code sessions in the linked folder show this account's meters, whichever account Sanduhr shows.")
+            Caption("Such as ~/.claude or a ~/.claude-name folder used with CLAUDE_CONFIG_DIR. A folder links to one account. Sanduhr suggests the folder signed in to this account's organization and never links one by itself. Sessions in the linked folder show this account's meters, whichever account Sanduhr shows.")
+        }
+    }
+
+    /// The account's side: Work (item 66: its folder's watchers hide in demo mode, and Mods &
+    /// Config treats the folder as work), Personal, or not set.
+    private var sideRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Picker("This account is", selection: Binding(
+                get: { choices.side },
+                set: { vm.setSide($0, for: label) })) {
+                Text("Not set").tag(SeatMark.unmarked)
+                Text("Work").tag(SeatMark.work)
+                Text("Personal").tag(SeatMark.personal)
+            }
+            .pickerStyle(.segmented)
+            .fixedSize()
+            Caption("Work: what its folder supplies hides while demo mode is on (watchers, and Mods & Config's entries), and comparisons show its settings by key name only. Personal: Mods & Config shows its folder as yours. Not set: the folder can be marked on Mods & Config, By Seat.")
         }
     }
 
@@ -294,7 +317,6 @@ private struct DataChoiceRows: View {
             activityRow
             namesRow
             shareRow
-            workRow
         }
     }
 
@@ -352,15 +374,6 @@ private struct DataChoiceRows: View {
         }
     }
 
-    /// Item 66: watchers from this account's Claude Code folder hide in demo mode.
-    private var workRow: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Toggle("Work account", isOn: Binding(
-                get: { choices.work },
-                set: { vm.setWork($0, for: label) }))
-            Caption("Watchers from this account's linked Claude Code folder are work: they hide while demo mode is on, so screenshots never show them.")
-        }
-    }
 }
 
 /// A short secondary caption that wraps.

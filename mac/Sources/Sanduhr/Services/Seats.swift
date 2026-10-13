@@ -103,7 +103,7 @@ struct Seat: Identifiable, Equatable, Sendable {
 
     /// Where the mark comes from.
     enum MarkSource: String, Sendable {
-        /// The linked account's work flag (Settings, Accounts, Data); only ever marks work.
+        /// The linked account's side (Settings, Accounts, beside its folder link).
         case account
         /// The per-seat toggle.
         case toggle
@@ -113,8 +113,11 @@ struct Seat: Identifiable, Equatable, Sendable {
     let origin: Origin
     /// `~/.claude`, the folder Claude Code uses when `CLAUDE_CONFIG_DIR` is unset.
     let isDefault: Bool
-    /// The user's label, or the folder's name.
+    /// The account this folder is linked to on Accounts: its label and side are the seat's.
+    let account: String?
+    /// The linked account's name, else the user's label, else the folder's name.
     let label: String
+    /// The user typed this label on By Seat (never true for a linked folder).
     let labelChosen: Bool
     let mark: SeatMark
     let markSource: MarkSource?
@@ -168,21 +171,24 @@ enum Seats {
                      config: [ClaudeCodeFolders.ConfigCandidate]) -> Seat {
         let p = AccountData.normalized(path)
         let h = AccountData.normalized(home)
-        let chosen = SeatPreferences.label(for: p, in: store)
+        let account = AccountData.account(linkedTo: p, in: store)
+        let own = account == nil ? SeatPreferences.label(for: p, in: store) : nil
+        let chosen = account ?? own
         let (mark, source) = mark(for: p, store: store)
         return Seat(path: p, origin: origin,
                     isDefault: p == (h as NSString).appendingPathComponent(ClaudeCodeFolders.defaultName),
-                    label: chosen ?? (p as NSString).lastPathComponent, labelChosen: chosen != nil,
+                    account: account,
+                    label: chosen ?? (p as NSString).lastPathComponent, labelChosen: own != nil,
                     mark: mark, markSource: source, config: config)
     }
 
-    /// A linked account marked work makes the seat work. A link never makes a seat personal (an
-    /// account's work flag is off by default, so "not flagged" says nothing): otherwise the
-    /// per-seat toggle decides, and unmarked when it was never set.
+    /// A linked account whose side was chosen on Accounts decides: the link is the folder's
+    /// identity. An account with no side says nothing (its side starts unset), so the per-seat
+    /// toggle decides, and unmarked when it was never set.
     static func mark(for path: String, store: DefaultsStore) -> (SeatMark, Seat.MarkSource?) {
-        if let account = AccountData.account(linkedTo: path, in: store),
-           AccountData.choices(for: account, in: store).work {
-            return (.work, .account)
+        if let account = AccountData.account(linkedTo: path, in: store) {
+            let side = AccountData.choices(for: account, in: store).side
+            if side != .unmarked { return (side, .account) }
         }
         if let m = SeatPreferences.mark(for: path, in: store), m != .unmarked {
             return (m, .toggle)

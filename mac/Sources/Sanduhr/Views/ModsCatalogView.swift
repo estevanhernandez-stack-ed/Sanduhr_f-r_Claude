@@ -438,7 +438,8 @@ private struct CatalogChipLabel: View {
 }
 
 /// A seat's label and side of the wall, as Sanduhr preferences: nothing is written into the
-/// folder. A seat whose linked account is marked work stays work (the link only ever marks work).
+/// folder. A folder linked to an account on Accounts takes that account's name and side, set
+/// there; the controls here are for folders no account links.
 struct SeatLabelControls: View {
     let seat: Seat
     var model: ModsPageModel
@@ -446,6 +447,30 @@ struct SeatLabelControls: View {
     @FocusState private var editing: Bool
 
     var body: some View {
+        if let account = seat.account {
+            linked(account)
+        } else {
+            own
+        }
+    }
+
+    private func linked(_ account: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "link").foregroundStyle(.secondary).accessibilityHidden(true)
+            Text(account).font(.callout.weight(.medium))
+            if seat.markSource == .account {
+                SeatMarkBadge(mark: seat.mark)
+            } else {
+                Text("side not set").font(.caption).foregroundStyle(.secondary)
+            }
+            Button("Edit on Accounts…") { SettingsWindowController.shared.showAccount(account) }
+                .help("This folder is linked to \(account). Its name and Work or Personal side are set on Accounts.")
+        }
+        .controlSize(.small)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var own: some View {
         HStack(spacing: 8) {
             TextField("Label", text: $draft, prompt: Text(seat.name))
                 .textFieldStyle(.roundedBorder)
@@ -454,18 +479,13 @@ struct SeatLabelControls: View {
                 .onSubmit { save() }
                 .onChange(of: editing) { if !editing { save() } }
                 .help("Your name for this folder. Sanduhr never takes one from the folder's files.")
-            if seat.markSource == .account {
-                SeatMarkBadge(mark: .work)
-                Text("from its account").font(.caption).foregroundStyle(.secondary)
-            } else {
-                Picker("Side", selection: Binding(get: { seat.mark }, set: { model.setMark($0, for: seat.path) })) {
-                    Text("Unmarked").tag(SeatMark.unmarked)
-                    Text("Work").tag(SeatMark.work)
-                    Text("Personal").tag(SeatMark.personal)
-                }
-                .labelsHidden()
-                .frame(maxWidth: 120)
+            Picker("Side", selection: Binding(get: { seat.mark }, set: { model.setMark($0, for: seat.path) })) {
+                Text("Unmarked").tag(SeatMark.unmarked)
+                Text("Work").tag(SeatMark.work)
+                Text("Personal").tag(SeatMark.personal)
             }
+            .labelsHidden()
+            .frame(maxWidth: 120)
         }
         .controlSize(.small)
         .onAppear { draft = seat.labelChosen ? seat.label : "" }

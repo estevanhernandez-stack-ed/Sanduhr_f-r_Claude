@@ -1194,8 +1194,8 @@ Watchers; in Settings, Desk, Layout put Watchers in the top right corner.
    the folder with `ls` during a turn). The item 51 glow still works with either switch. Switch
    it back on and quit Sanduhr; finish a Claude Code turn: Sanduhr does not start and no
    `watch-stop-*` file is written. Open Sanduhr: no old background watcher appears.
-9. Work tagging: in Settings, Accounts, Data, link `~/.claude-smoketest` to an account and turn
-   **Work account** on. Start a watcher from that folder: `smoke/smoke do demo on` hides it (the
+9. Work tagging: in Settings, Accounts, Claude Code, link `~/.claude-smoketest` to an account and
+   set **This account is** to **Work**. Start a watcher from that folder: `smoke/smoke do demo on` hides it (the
    wing shows its default), `demo off` brings it back. One flagged `work: true` from any folder
    hides too.
 10. `smoke/smoke do watch-test start` (then `wait`, `pass`, `fail`, `clear`) drives a made-up

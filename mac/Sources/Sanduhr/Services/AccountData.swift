@@ -49,8 +49,16 @@ struct AccountDataChoices: Equatable, Sendable {
     var names: ProjectNamesChoice = .names
     var share: ShareChoice = .off
     var folder: String?
-    /// Marked as a work account (item 66): watchers from its linked folder hide in demo mode.
-    var work = false
+    /// The account's side of the wall, chosen on Accounts beside its folder link: work (item 66:
+    /// watchers from its linked folder hide in demo mode), personal, or not chosen. Its linked
+    /// folder takes this side on Mods & Config.
+    var side: SeatMark = .unmarked
+
+    /// Marked as a work account.
+    var work: Bool {
+        get { side == .work }
+        set { side = newValue ? .work : (side == .work ? .unmarked : side) }
+    }
 
     /// The spec's defaults: nothing linked, nothing tracked, names, nothing shared.
     static let defaults = AccountDataChoices()
@@ -58,7 +66,9 @@ struct AccountDataChoices: Equatable, Sendable {
 
 /// The per-account data choices (item 44), in the registry's defaults under `accountData`:
 /// `{label: {"activity": "off|live|record", "names": "names|hidden|full",
-/// "share": "off|meters|activity", "folder": "/abs/path", "work": "true"}}`. A missing account, field or an
+/// "share": "off|meters|activity", "folder": "/abs/path", "work": "true", "side": "personal"}}`.
+/// Work keeps its old `work` field, so an older build still reads it; `side` holds only personal.
+/// A missing account, field or an
 /// unknown value reads as the default. Follows renames and removals like `MeterHistory`.
 ///
 /// Link rules: an account links at most one folder and a folder at most one account.
@@ -71,6 +81,7 @@ enum AccountData {
         static let share = "share"
         static let folder = "folder"
         static let work = "work"
+        static let side = "side"
     }
 
     /// The label the choices are kept under: the account, or Personal while a launch runs on the
@@ -94,7 +105,11 @@ enum AccountData {
         if let v = raw[Field.names].flatMap(ProjectNamesChoice.init(rawValue:)) { c.names = v }
         if let v = raw[Field.share].flatMap(ShareChoice.init(rawValue:)) { c.share = v }
         if let f = raw[Field.folder], !f.isEmpty { c.folder = f }
-        if raw[Field.work] == "true" { c.work = true }
+        if raw[Field.work] == "true" {
+            c.side = .work
+        } else if raw[Field.side] == SeatMark.personal.rawValue {
+            c.side = .personal
+        }
         return c
     }
 
@@ -115,7 +130,8 @@ enum AccountData {
             var raw = [Field.activity: c.activity.rawValue, Field.names: c.names.rawValue,
                        Field.share: c.share.rawValue]
             if let f = c.folder { raw[Field.folder] = f }
-            if c.work { raw[Field.work] = "true" }
+            if c.side == .work { raw[Field.work] = "true" }
+            if c.side == .personal { raw[Field.side] = SeatMark.personal.rawValue }
             everything[name] = raw
         }
         write(everything, in: store)
@@ -142,6 +158,12 @@ enum AccountData {
     static func setWork(_ v: Bool, for account: String?, in s: DefaultsStore) {
         var c = choices(for: account, in: s)
         c.work = v
+        store(c, for: account, in: s)
+    }
+
+    static func setSide(_ v: SeatMark, for account: String?, in s: DefaultsStore) {
+        var c = choices(for: account, in: s)
+        c.side = v
         store(c, for: account, in: s)
     }
 
