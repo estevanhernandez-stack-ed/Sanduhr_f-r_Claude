@@ -39,6 +39,7 @@ notch_shows:
 widget_visible: true
 widget_visibility: always
 menu_bar: higher
+menu_bar_item: shown
 settings_open: true
 settings_section: notch
 settings_anchor: null

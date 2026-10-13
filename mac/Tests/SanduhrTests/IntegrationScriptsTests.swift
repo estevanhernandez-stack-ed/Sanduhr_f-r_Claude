@@ -110,6 +110,44 @@ struct IntegrationScriptsTests {
         #expect(Set(try FileManager.default.contentsOfDirectory(atPath: r.support.path)) == ["sanduhr_mcp.py"])
     }
 
+    @Test func installShsFlatCopiesFollowTheApp() throws {
+        let r = IntegrationRig()
+        defer { r.cleanUp() }
+        let s = r.scripts
+        let fm = FileManager.default
+        let mcp = r.support.appendingPathComponent(IntegrationScripts.mcpScript)
+        let statusline = r.support.appendingPathComponent(IntegrationScripts.statuslineScript)
+        try fm.createDirectory(at: r.support, withIntermediateDirectories: true)
+        // An old install.sh copy of the statusline, and an MCP file that isn't Sanduhr's.
+        try Data("#!/usr/bin/env python3\n\"\"\"Sanduhr statusline, before seats.\"\"\"\n".utf8).write(to: statusline)
+        try Data("someone else's script\n".utf8).write(to: mcp)
+
+        try s.refresh()
+        #expect(try fm.destinationOfSymbolicLink(atPath: statusline.path) == "current/sanduhr_statusline.py")
+        #expect(try String(contentsOf: statusline, encoding: .utf8) == "# sanduhr_statusline.py v1\n")
+        #expect(try String(contentsOf: mcp, encoding: .utf8) == "someone else's script\n")
+        #expect((try? fm.destinationOfSymbolicLink(atPath: mcp.path)) == nil)
+
+        // An update moves the flat link with it.
+        r.ship(version: "2")
+        try s.refresh()
+        #expect(try String(contentsOf: statusline, encoding: .utf8) == "# sanduhr_statusline.py v2\n")
+
+        // A link somewhere else is the user's: left alone.
+        try fm.removeItem(at: mcp)
+        try fm.createSymbolicLink(atPath: mcp.path, withDestinationPath: "/elsewhere/sanduhr_mcp.py")
+        try s.refresh()
+        #expect(try fm.destinationOfSymbolicLink(atPath: mcp.path) == "/elsewhere/sanduhr_mcp.py")
+
+        // Removing everything leaves the flat statusline as a file with the last script, still runnable.
+        s.removeAll()
+        #expect((try? fm.destinationOfSymbolicLink(atPath: statusline.path)) == nil)
+        #expect(try String(contentsOf: statusline, encoding: .utf8) == "# sanduhr_statusline.py v2\n")
+        #expect(fm.isExecutableFile(atPath: statusline.path))
+        #expect(!fm.fileExists(atPath: s.current.path))
+        #expect(!(try fm.contentsOfDirectory(atPath: r.support.path)).contains { $0.hasPrefix(".flat-") })
+    }
+
     @Test func theModRidesInTheStampedFolderAndClaudeCodesTypesDontAlterIt() throws {
         let r = IntegrationRig()
         defer { r.cleanUp() }

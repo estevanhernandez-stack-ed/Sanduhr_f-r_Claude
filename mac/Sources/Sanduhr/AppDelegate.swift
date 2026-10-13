@@ -346,6 +346,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.action = #selector(statusItemClicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
+        item.isVisible = !MenuBarItem.isHidden()
+    }
+
+    /// Settings, General, Menu bar's hourglass switch changed.
+    func menuBarItemVisibilityDidChange() {
+        statusItem?.isVisible = !MenuBarItem.isHidden()
     }
 
     /// Settings, General, Menu bar changed: start or stop Rotate's timer and redraw at once.
@@ -687,7 +693,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The widget and the other windows go without writing their hidden state.
         panel?.orderOut(nil)
         let settings = SettingsWindowController.shared.window
-        // The menu bar icon's own window stays: its menu now offers only Quit Sanduhr.
+        // The menu bar icon's own window stays: its menu now offers only Quit Sanduhr, so it
+        // shows even when Settings had hidden it.
+        statusItem?.isVisible = true
         for w in NSApp.windows where w !== settings && w.sheetParent == nil && w.isVisible
             && !String(describing: type(of: w)).contains("StatusBar") {
             w.orderOut(nil)
@@ -730,7 +738,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `open -a Sanduhr` (or a launcher, or clicking it in Applications) while it is
     /// already running toggles the widget, so a hidden Sanduhr is one command away.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        togglePanel()
+        // With the hourglass hidden, reopening is a way back in: it never puts the widget away.
+        if MenuBarItem.isHidden(), panel?.isVisible == true {
+            DeskController.shared.showSettings()
+        } else {
+            togglePanel()
+        }
         return false
     }
 
