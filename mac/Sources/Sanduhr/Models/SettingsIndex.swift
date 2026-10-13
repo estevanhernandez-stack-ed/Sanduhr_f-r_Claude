@@ -23,6 +23,7 @@ enum SettingsAnchor {
     // General
     static let surfaces = "surfaces"
     static let menuBarShows = "menu-bar-shows"
+    static let menuBarItem = "menu-bar-item"
     static let meetingsMenu = "meetings-menu"
     static let startup = "startup"
     static let shortcuts = "shortcuts"
@@ -110,6 +111,8 @@ enum SettingsAnchor {
         SettingsEntry(title: "Menu bar", page: .general, anchor: menuBarShows),
         SettingsEntry(title: SettingsNames.menuBarShows, page: .general, anchor: menuBarShows,
                       synonyms: ["percent", "hourglass", "rotate", "session", "weekly"]),
+        SettingsEntry(title: SettingsNames.showMenuBarItem, page: .general, anchor: menuBarItem,
+                      synonyms: ["hide", "menu bar icon", "status item", "hourglass"]),
         SettingsEntry(title: SettingsNames.meetingsMenu, page: .general, anchor: meetingsMenu, synonyms: ["calendar", "join"]),
         SettingsEntry(title: "Startup", page: .general, anchor: startup, synonyms: ["Open Sanduhr at login", "login", "launch"]),
         SettingsEntry(title: "Shortcuts", page: .general, anchor: shortcuts,
@@ -234,7 +237,8 @@ enum SettingsAnchor {
 extension SettingsNames {
     /// Where each name in `table` lives on its page: the anchor search and links open it at.
     static let anchors: [String: String] = [
-        menuBarShows: SettingsAnchor.menuBarShows, meetingsMenu: SettingsAnchor.meetingsMenu,
+        menuBarShows: SettingsAnchor.menuBarShows, showMenuBarItem: SettingsAnchor.menuBarItem,
+        meetingsMenu: SettingsAnchor.meetingsMenu,
         SanduhrHotKeys.Shortcut.settings.name: SettingsAnchor.shortcuts,
         SanduhrHotKeys.Shortcut.join.name: SettingsAnchor.shortcuts,
         checkAppMenus: SettingsAnchor.shortcuts,
