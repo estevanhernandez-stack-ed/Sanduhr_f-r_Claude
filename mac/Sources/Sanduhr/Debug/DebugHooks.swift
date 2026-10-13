@@ -349,6 +349,7 @@ enum DebugHooks {
         s.widgetVisible = widgetVisible
         s.widgetVisibility = .saved()
         s.menuBar = .saved()
+        s.menuBarItemHidden = MenuBarItem.isHidden()
         s.settingsOpen = settings.isOpen
         s.settingsSection = settings.window == nil ? nil : settings.section
         s.settingsAnchor = settings.window == nil ? nil : settings.anchor
