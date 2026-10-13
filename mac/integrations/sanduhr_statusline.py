@@ -1295,7 +1295,11 @@ def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     now = datetime.now(timezone.utc)
     if argv[:1] == ["--inspect-b64"]:
-        # The Combine sheet (never a statusline): run theirs once, print the pieces as JSON.
+        # The Combine sheet (never a statusline): run theirs once, print the pieces as JSON. An
+        # empty command (Sanduhr's line alone, item 71 slice 1e) runs nothing: Sanduhr's pieces only.
+        if argv[1:] == [""]:
+            write(json.dumps(inspect("", read_stdin_all(), now), ensure_ascii=False) + "\n")
+            return 0
         args = parse_args(["--chain-b64", argv[1] if len(argv) > 1 else "", "--join", "line"])
         if len(argv) != 2 or not args:
             say("--inspect-b64 takes one base64 command")

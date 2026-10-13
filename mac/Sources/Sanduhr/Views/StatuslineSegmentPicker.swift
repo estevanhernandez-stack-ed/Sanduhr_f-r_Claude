@@ -190,6 +190,8 @@ private struct Caption: View {
 private struct SegmentChips: View {
     let chips: StatuslineChips
     let badges: Badges
+    /// Sanduhr's line alone (no statusline of theirs): only Sanduhr's chips and Join with.
+    var alone = false
     let change: ((inout StatuslineChips) -> Void) -> Void
 
     var body: some View {
@@ -199,12 +201,14 @@ private struct SegmentChips: View {
                 LineChips(chips: chips, line: line, badges: badges, change: change)
             }
             JoinWithPicker(chips: chips, change: change)
-            VStack(alignment: .leading, spacing: 2) {
-                Toggle("Keep segments yours shows later", isOn: Binding(
-                    get: { chips.keepNew },
-                    set: { on in change { $0.keepNew = on } }))
-                    .help("Keep segments yours shows later: what happens to a segment Sanduhr hasn't seen yet.")
-                HelpCaption("When your statusline shows a segment that isn't here now, on keeps it and off leaves it out.")
+            if !alone {
+                VStack(alignment: .leading, spacing: 2) {
+                    Toggle("Keep segments yours shows later", isOn: Binding(
+                        get: { chips.keepNew },
+                        set: { on in change { $0.keepNew = on } }))
+                        .help("Keep segments yours shows later: what happens to a segment Sanduhr hasn't seen yet.")
+                    HelpCaption("When your statusline shows a segment that isn't here now, on keeps it and off leaves it out.")
+                }
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text("Sanduhr's").font(.caption.weight(.medium))
@@ -608,6 +612,9 @@ private struct CombinePreview: View {
     let input: Data?
     let mods: [ModStatusEntry]
     var model: IntegrationsModel
+    /// Run as a session in this folder would (its account and label).
+    var configDir: String?
+    var caption: String?
     @State private var output: String?
 
     private struct Key: Equatable {
@@ -619,8 +626,8 @@ private struct CombinePreview: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Caption(input == nil ? "Preview, with sample data (your statusline ran once to draw it):"
-                                 : "Preview, with live data:")
+            Caption(caption ?? (input == nil ? "Preview, with sample data (your statusline ran once to draw it):"
+                                            : "Preview, with live data:"))
             Terminal(text: output.flatMap { $0.isEmpty ? nil : $0.trimmingCharacters(in: .newlines) },
                      placeholder: loading ? "Running…" : "No preview: Python or the scripts weren't found.")
             if !mods.isEmpty {
@@ -634,7 +641,8 @@ private struct CombinePreview: View {
                 output = nil
                 return
             }
-            output = await model.composeStatusline(theirs: theirs, join: join, selection: selection, input: input)
+            output = await model.composeStatusline(theirs: theirs, join: join, selection: selection, input: input,
+                                                   configDir: configDir)
         }
     }
 }
@@ -692,5 +700,167 @@ struct ChipFlow: Layout {
             row = max(row, size.height)
         }
         return subviews.isEmpty ? 0 : y + row
+    }
+}
+
+/// Mods & Config, By Seat: the folder's statusline (item 71, slice 1e). Sanduhr's line, alone or
+/// combined with the folder's own, edited in place: its segments, their looks and the glyph
+/// between them, with a preview run as a session in this folder would. Save rewrites only the
+/// `statusLine` entry, as an update (Remove on Settings, Claude Code still puts back what was
+/// there). Install, Update and Remove stay on Settings, Claude Code.
+struct SeatStatuslineBox: View {
+    let folder: String
+    let folderName: String
+    @State private var integrations = IntegrationsModel()
+    @State private var current: Current?
+    @State private var chips: StatuslineChips?
+    @State private var saved = StatuslineSelection()
+    @State private var loading = true
+    @State private var expanded = false
+    @State private var note: (text: String, isError: Bool)?
+
+    /// What the folder's statusLine holds now.
+    struct Current: Equatable {
+        let status: IntegrationStatus
+        /// Sanduhr's command taken apart; nil when it isn't Sanduhr's.
+        let command: StatuslineCommand?
+    }
+
+    private var summary: String {
+        guard let current else { return "Reading…" }
+        switch current.status {
+        case .notInstalled: return "None. Sanduhr's statusline can be installed on Settings, Claude Code."
+        case .other: return "This folder's own statusline; Sanduhr's isn't in it."
+        case .unreadable: return "The settings.json here isn't JSON Sanduhr can read, so its statusline is left alone."
+        case .installed, .outdated:
+            let combined = current.command?.chain != nil
+            let what = combined ? "Yours combined with Sanduhr's" : "Sanduhr's line"
+            let shows = (current.command?.selection.mine ?? SanduhrSegment.defaults).map(\.title).joined(separator: ", ")
+            return "\(what): \(shows)\(current.status == .outdated ? ". Outdated: Update on Settings, Claude Code" : "")"
+        }
+    }
+
+    private var ours: Bool { current.map { $0.status == .installed || $0.status == .outdated } ?? false }
+    private var combined: Bool { current?.command?.chain != nil }
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $expanded) {
+            content
+                .padding(.top, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Statusline").font(.body.weight(.semibold))
+                Text(summary).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.06)))
+        .task(id: folder) { await load() }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if ours {
+            VStack(alignment: .leading, spacing: 10) {
+                if let chips {
+                    SegmentChips(chips: chips, badges: Badges([], mods: []), alone: !combined, change: change)
+                    CombinePreview(theirs: chips.inspection.theirs, join: current?.command?.join ?? .line,
+                                   selection: chips.previewSelection, loading: loading, input: nil, mods: [],
+                                   model: integrations, configDir: folder,
+                                   caption: combined ? "Preview, with sample data (your statusline ran once to draw it):"
+                                                     : "Preview, with sample data:")
+                    HStack {
+                        Button("Save") { save() }
+                            .disabled(chips.selection == saved || integrations.busy != nil)
+                            .keyboardShortcut(.defaultAction)
+                        Button("Revert") { change { $0.load(saved) } }
+                            .disabled(chips.selection == saved)
+                        Spacer()
+                        SettingsLinkButton(.integrations)
+                    }
+                    Text("Save rewrites only the statusLine entry in \(folderName)'s settings.json. Sessions started afterwards show it; Remove on Settings, Claude Code still puts back what was there before Sanduhr.")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text(loading ? "Running the statusline once…" : "The segments can't be shown: Python or Sanduhr's scripts weren't found.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if let note {
+                    Text(note.text).font(.caption)
+                        .foregroundStyle(Color.hex(note.isError ? "f87171" : "4ade80"))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        } else {
+            HStack {
+                Text(current?.status == .other
+                     ? "Sanduhr's statusline can combine with this one: Install on Settings, Claude Code, then pick segments here."
+                     : "Install Sanduhr's statusline on Settings, Claude Code, then pick its segments here.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Spacer()
+                SettingsLinkButton(.integrations)
+            }
+        }
+    }
+
+    private func change(_ body: (inout StatuslineChips) -> Void) {
+        guard var c = chips else { return }
+        body(&c)
+        chips = c
+        note = nil
+    }
+
+    private func load() async {
+        loading = true
+        let folder = self.folder
+        current = await Task.detached(priority: .userInitiated) { () -> Current in
+            let installer = IntegrationInstaller.standard
+            let status = installer.status(.statusline, folder: folder)
+            let file = installer.configFile(.statusline, folder: folder)
+            var command: StatuslineCommand?
+            if let data = FileManager.default.contents(atPath: file), let root = try? JSONEdit.root(data),
+               let o = root[IntegrationInstaller.statusLineKey] as? [String: Any], let text = o["command"] as? String {
+                command = IntegrationInstaller.parseStatusline(text)
+            }
+            return Current(status: status, command: command)
+        }.value
+        await integrations.load(linked: [])
+        guard ours, let command = current?.command else {
+            chips = nil
+            loading = false
+            return
+        }
+        let chain = command.chain.flatMap(IntegrationInstaller.innermostForeign) ?? ""
+        if var c = await integrations.inspectStatusline(chain: chain, configDir: folder).map(StatuslineChips.init) {
+            c.load(command.selection)
+            saved = c.selection
+            chips = c
+        } else {
+            chips = nil
+        }
+        loading = false
+    }
+
+    private func save() {
+        guard let selection = chips?.selection else { return }
+        Task {
+            if let error = await integrations.repickStatusline(folder: folder, selection: selection, combined: combined) {
+                note = (error, true)
+            } else {
+                saved = selection
+                note = ("Saved. Claude Code sessions started from now on show it.", false)
+                await reloadStatus()
+            }
+        }
+    }
+
+    private func reloadStatus() async {
+        let folder = self.folder
+        let status = await Task.detached { IntegrationInstaller.standard.status(.statusline, folder: folder) }.value
+        current = Current(status: status, command: current?.command.map {
+            var c = $0
+            c.selection = saved
+            return c
+        })
     }
 }

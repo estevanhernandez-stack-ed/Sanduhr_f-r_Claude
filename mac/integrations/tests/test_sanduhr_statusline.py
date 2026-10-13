@@ -541,6 +541,19 @@ class PlainPicksTests(unittest.TestCase):
             r.close()
 
 
+class InspectAloneTests(unittest.TestCase):
+    def test_an_empty_command_inspects_sanduhrs_segments_only(self):
+        r = Rig()
+        try:
+            r.fresh()
+            p, _ = r.run(["--inspect-b64", ""])
+            d = json.loads(p.stdout.decode())
+            self.assertEqual((d["theirs"], d["lines"]), ("", []))
+            self.assertEqual([m["name"] for m in d["mine"]], list(sl.MINE))
+        finally:
+            r.close()
+
+
 class MineTests(unittest.TestCase):
     def setUp(self):
         self.r = Rig()

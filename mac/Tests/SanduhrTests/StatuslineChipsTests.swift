@@ -168,6 +168,23 @@ struct StatuslineChipsTests {
         #expect(c.theirs == StatuslinePicks(keep: ["~", "⎇", "Opus", "ctx"], drop: [], keepNew: false, separators: [nil, nil, nil]))
     }
 
+    @Test func writtenPicksLoadBackOntoTheChips() {
+        // Mods & Config's Statusline edits what a command already carries.
+        var made = StatuslineChips(Self.inspection)
+        made.toggle(made.chips(line: 0)[1])
+        made.joinWith = .dot
+        made.setStyle(SegmentStyle(bold: true), for: made.mineChips[0])
+        made.toggle(made.mineChips.first { $0.key == "model" }!)
+        let written = made.selection
+        var loaded = StatuslineChips(Self.inspection)
+        loaded.load(written)
+        #expect(loaded.selection == written)
+        // Nothing written: the defaults.
+        var plain = StatuslineChips(Self.inspection)
+        plain.load(StatuslineSelection())
+        #expect(plain.selection == StatuslineSelection())
+    }
+
     @Test func sanduhrsChipsAreSwitchesAndOneAlwaysStays() {
         var c = StatuslineChips(Self.inspection)
         func chip(_ s: SanduhrSegment) -> StatuslineChips.Chip { c.mineChips.first { $0.key == s.rawValue }! }

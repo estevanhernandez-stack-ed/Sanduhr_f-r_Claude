@@ -489,14 +489,16 @@ enum StatuslinePreview {
     static let columns = 100
 
     /// Runs `python args` with the sample on stdin (or `input`); its stdout, or nil when it couldn't run.
-    /// The runner keeps its own 1.5 s budget; this stops it after 4 s whatever happens.
-    static func run(python: String, arguments: [String], input stdin: Data? = nil) -> String? {
+    /// The runner keeps its own 1.5 s budget; this stops it after 4 s whatever happens. `configDir`
+    /// runs it as a session in that Claude Code folder would (its account, its label).
+    static func run(python: String, arguments: [String], input stdin: Data? = nil, configDir: String? = nil) -> String? {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: python)
         p.arguments = arguments
         var env = ProcessInfo.processInfo.environment
         env["COLUMNS"] = String(columns)
         env.removeValue(forKey: "SANDUHR_CHAIN_DEPTH")
+        if let configDir { env["CLAUDE_CONFIG_DIR"] = configDir }
         p.environment = env
         let input = Pipe(), output = Pipe()
         p.standardInput = input

@@ -108,6 +108,19 @@ struct StatuslineChips: Equatable, Sendable {
         }
     }
 
+    /// The picks a written command carries, back on the chips (Mods & Config's Statusline edits
+    /// what is there). Their separators line up with the lines as they run now.
+    mutating func load(_ selection: StatuslineSelection) {
+        mine = selection.mine ?? SanduhrSegment.defaults
+        let picks = selection.theirs ?? StatuslinePicks()
+        dropped = Set(picks.drop)
+        keepNew = picks.keepNew
+        joinWith = picks.joinWith
+        styles = picks.styles
+        ourStyles = picks.ours
+        separators = (0..<inspection.lines.count).map { $0 < picks.separators.count ? picks.separators[$0] : nil }
+    }
+
     mutating func toggle(_ chip: Chip) {
         guard chip.enabled else { return }
         switch chip.source {

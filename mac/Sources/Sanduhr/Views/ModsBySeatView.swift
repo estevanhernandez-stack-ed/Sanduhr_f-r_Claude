@@ -113,6 +113,8 @@ struct ModsBySeatView: View {
                 if let report = model.report(for: seat.path) {
                     SeatSections(seat: seat, report: report, model: model, demo: demo)
                 }
+                SeatStatuslineBox(folder: seat.path, folderName: model.display(seat.path))
+                    .id(seat.path)
             } else {
                 Text("No Claude Code folder found (~/.claude or a ~/.claude-name folder).")
                     .font(.caption)
