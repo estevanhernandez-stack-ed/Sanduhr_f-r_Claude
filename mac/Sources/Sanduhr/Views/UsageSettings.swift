@@ -430,7 +430,7 @@ private struct UsageOverviewTab: View {
             VStack(alignment: .leading, spacing: 16) {
                 switch source {
                 case .notTracked, .noFolder:
-                    UsageNeedsSetup(text: "Choose a Claude Code folder and Live only or Keep a record in \(label)'s Data settings to see its activity here.",
+                    UsageNeedsSetup(text: "Link \(label)'s Claude Code folder on Accounts, then choose Live only or Keep a record under Data, to see its activity here.",
                                     label: label, navigation: navigation)
                 case .live, .record:
                     if let o = page.overview {

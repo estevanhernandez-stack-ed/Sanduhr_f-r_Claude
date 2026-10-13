@@ -474,9 +474,16 @@ final class UsageViewModel {
         reloadAccounts()
     }
 
-    /// Settings, Accounts, Data: Work account (item 66). Watchers from its folder hide in demo mode.
+    /// Settings, Accounts: the side set to Work (item 66). Watchers from its folder hide in demo mode.
     func setWork(_ value: Bool, for label: String) {
         AccountData.setWork(value, for: label, in: KeychainStore.accounts.defaults)
+        reloadAccounts()
+    }
+
+    /// Settings, Accounts: the account's side (Work, Personal, not set), beside its folder link.
+    /// Its linked folder takes it on Mods & Config; Work also hides its watchers in demo mode.
+    func setSide(_ value: SeatMark, for label: String) {
+        AccountData.setSide(value, for: label, in: KeychainStore.accounts.defaults)
         reloadAccounts()
     }
 

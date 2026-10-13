@@ -120,6 +120,12 @@ final class SettingsWindowController {
         show(.credentials)
     }
 
+    /// Accounts, with `label` selected: where a folder's link, label and side are set.
+    func showAccount(_ label: String) {
+        navigation.accountToShow = label
+        show(.credentials)
+    }
+
     /// The anchor the page was opened at is on screen (state.yaml `settings_anchor_visible`), nil
     /// with no anchor or the window closed.
     var anchorVisible: Bool? { isOpen ? navigation.anchorVisible : nil }

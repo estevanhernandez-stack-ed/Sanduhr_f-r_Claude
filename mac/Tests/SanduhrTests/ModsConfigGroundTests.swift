@@ -247,7 +247,9 @@ struct ModsConfigGroundTests {
         let seats = Seats.discover(home: h.path, store: d, installed: [h.at(".claude-beta")])
         #expect(seats.map(\.name) == [".claude", ".claude-alpha", ".claude-beta", "seat"])
         #expect(seats.map(\.origin) == [.found, .found, .found, .added])
-        #expect(seats.map(\.label) == [".claude", ".claude-alpha", "Lab", "seat"])
+        // A linked folder takes its account's name; the others keep their own label or name.
+        #expect(seats.map(\.label) == ["Personal", "Work", "Lab", "seat"])
+        #expect(seats.map(\.account) == ["Personal", "Work", nil, nil])
         #expect(seats.map(\.labelChosen) == [false, false, true, false])
         // A link to an account not marked work says nothing: unmarked, not personal.
         #expect(seats.map(\.mark) == [.unmarked, .work, .work, .unmarked])
@@ -313,7 +315,7 @@ struct ModsConfigGroundTests {
 
     @Test func nothingCrossesOutOfAWorkSeat() {
         func seat(_ path: String, _ mark: SeatMark) -> Seat {
-            Seat(path: path, origin: .found, isDefault: false, label: path, labelChosen: false, mark: mark,
+            Seat(path: path, origin: .found, isDefault: false, account: nil, label: path, labelChosen: false, mark: mark,
                  markSource: mark == .unmarked ? nil : .toggle, config: [])
         }
         let work = seat("/w", .work), work2 = seat("/w2", .work)
@@ -469,19 +471,41 @@ struct ModsConfigGroundTests {
         #expect(r.installer.readReceipts().records.first?.createdFile == true)
     }
 
-    @Test func aLinkNeverDemotesAWorkToggle() {
+    @Test func aLinkedAccountsSideDecidesOnceChosen() {
         let h = TempHome()
         defer { h.cleanUp() }
         h.dir(".claude-a/projects")
         let d = MemoryDefaults()
         AccountData.link(h.at(".claude-a"), to: "Unflagged", in: d)
         SeatPreferences.setMark(.work, for: h.at(".claude-a"), in: d)
+        // No side chosen on Accounts: the folder's own toggle still decides.
         let seat = Seats.seat(h.at(".claude-a"), origin: .found, home: h.path, store: d)
-        #expect(seat.mark == .work && seat.markSource == .toggle)
-        SeatPreferences.setMark(.personal, for: h.at(".claude-a"), in: d)
+        #expect(seat.mark == .work && seat.markSource == .toggle && seat.label == "Unflagged")
+        AccountData.setSide(.personal, for: "Unflagged", in: d)
+        let personal = Seats.seat(h.at(".claude-a"), origin: .found, home: h.path, store: d)
+        #expect(personal.mark == .personal && personal.markSource == .account)
         AccountData.setWork(true, for: "Unflagged", in: d)
         let flagged = Seats.seat(h.at(".claude-a"), origin: .found, home: h.path, store: d)
         #expect(flagged.mark == .work && flagged.markSource == .account)
+        // Back to not set: the toggle again.
+        AccountData.setSide(.unmarked, for: "Unflagged", in: d)
+        #expect(Seats.seat(h.at(".claude-a"), origin: .found, home: h.path, store: d).markSource == .toggle)
+    }
+
+    @Test func anAccountsSideKeepsTheOldWorkField() {
+        let d = MemoryDefaults()
+        AccountData.setSide(.work, for: "A", in: d)
+        AccountData.setSide(.personal, for: "B", in: d)
+        let raw = d.object(forKey: AccountData.key) as? [String: [String: String]]
+        // An older build reads `work`; `side` carries only personal.
+        #expect(raw?["A"]?["work"] == "true" && raw?["A"]?["side"] == nil)
+        #expect(raw?["B"]?["side"] == "personal" && raw?["B"]?["work"] == nil)
+        #expect(AccountData.choices(for: "A", in: d).work && !AccountData.choices(for: "B", in: d).work)
+        #expect(AccountData.choices(for: "B", in: d).side == .personal)
+        AccountData.setWork(false, for: "B", in: d)          // turning work off leaves personal alone
+        #expect(AccountData.choices(for: "B", in: d).side == .personal)
+        AccountData.setSide(.unmarked, for: "B", in: d)
+        #expect(d.object(forKey: AccountData.key) as? [String: [String: String]] == ["A": raw?["A"] ?? [:]])
     }
 
     @Test func addedFoldersListOnlyWhileTheyLookLikeHomes() {
