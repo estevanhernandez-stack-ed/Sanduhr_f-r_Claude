@@ -3,6 +3,9 @@
 ## Unreleased (mac)
 
 - **An account's Claude Code folder is part of the account.** Settings, Accounts now starts each account with a **Claude Code** block: the folder it signs in to and **This account is** Work, Personal or Not set (in place of the Work account switch, which keeps its meaning). Mods & Config names a linked folder after its account and takes its side from there; By Seat shows the link with **Edit on Accounts…**, and its own Label and side controls are only for folders no account links. Data keeps Meter history, activity, project names and sharing. Usage's prompt points to the link on Accounts.
+- **Quit from any Settings page.** The foot of the Settings sidebar has **Quit Sanduhr**, so a Settings window opened from the notch or the Desk can quit Sanduhr without going to General. ⌘Q works there too.
+- **Hide the hourglass.** Settings, General, Menu bar has **Show the hourglass in the menu bar**. Turned off, Sanduhr has no menu bar item; its menu is still in the widget (two-finger click) and on the Desk's clock, and opening Sanduhr again from Finder or Spotlight shows the widget, or Settings when the widget is already showing. Reset Sanduhr… brings the hourglass back so its Quit is always reachable.
+- **Fixed: a statusline that calls `integrations/sanduhr_statusline.py` directly shows the right account.** The flat copies `install.sh` leaves in `~/Library/Application Support/Sanduhr/integrations/` were never updated, so a script that called them (a Claude Code folder's own statusline, for example) ran the copy from the day `install.sh` last ran, from before each folder had its own account, and showed the active account's meters in every folder. Sanduhr now turns each flat copy of its scripts into a link to the current ones, so they follow every update, and turns them back into files if its integrations are removed. A file there that isn't Sanduhr's, or a link to somewhere else, is left alone.
 
 ## v2.18.0-mac — 2026-10-12
 

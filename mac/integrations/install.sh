@@ -27,6 +27,9 @@ fi
 
 [ -n "$PY" ] || { echo "Needs python3 (xcode-select --install)."; exit 1; }
 mkdir -p "$DEST"
+# Sanduhr turns these copies into links to its current scripts; remove a link first, or cp
+# would write through it into the app's folder.
+rm -f "$DEST/sanduhr_statusline.py" "$DEST/sanduhr_mcp.py"
 cp "$HERE/sanduhr_statusline.py" "$HERE/sanduhr_mcp.py" "$DEST/"
 chmod +x "$DEST"/*.py
 echo "Installed to $DEST"
