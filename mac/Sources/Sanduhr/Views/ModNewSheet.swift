@@ -151,11 +151,39 @@ extension ModsPageModel {
         return r.passed
     }
 
-    func trySession(_ mod: KeptMod) {
+    /// The folder Try last started in, while it is still there.
+    static let tryFolderKey = "keptModTryFolder"
+
+    var lastTryFolder: URL? {
+        guard let path = UserDefaults.standard.string(forKey: Self.tryFolderKey) else { return nil }
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue else { return nil }
+        return URL(fileURLWithPath: path)
+    }
+
+    /// Try in a Session, in `folder` (remembered for next time) or a new empty one.
+    func trySession(_ mod: KeptMod, in folder: URL? = nil) {
         guard let claude, canTry(mod) else { return }
-        do { try keptStore.trySession(mod, claude: claude) } catch {
+        do {
+            try keptStore.trySession(mod, claude: claude, in: folder)
+            if let folder { UserDefaults.standard.set(folder.path, forKey: Self.tryFolderKey) }
+        } catch {
             keptNote = (error as? KeptMods.Failure)?.message ?? KeptMods.Failure.writeFailed.message
         }
+    }
+
+    /// Asks for the folder Try starts in, then tries there.
+    func chooseTryFolder(_ mod: KeptMod) {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Try Here"
+        panel.message = "Claude Code starts in this folder with \(mod.name) loaded for that session only."
+        panel.directoryURL = lastTryFolder ?? FileManager.default.homeDirectoryForCurrentUser
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        trySession(mod, in: url)
     }
 }
 
@@ -205,7 +233,13 @@ struct NewModSheet: View {
         .frame(width: 580)
         .task { await model.refreshKept() }
         .alert("Try \(trying?.name ?? "the mod") in a session?", isPresented: Binding(get: { trying != nil }, set: { if !$0 { trying = nil } })) {
-            Button("Try in a Session") { if let m = trying { model.trySession(m) } }
+            if let last = model.lastTryFolder {
+                Button("Try in \(last.lastPathComponent)") { if let m = trying { model.trySession(m, in: last) } }
+            }
+            Button("Choose Folder…") {
+                if let m = trying { DispatchQueue.main.async { model.chooseTryFolder(m) } }
+            }
+            Button("Try in an Empty Folder") { if let m = trying { model.trySession(m) } }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(tryMessage)
@@ -349,7 +383,7 @@ struct NewModSheet: View {
                     .controlSize(.small)
                     .disabled(!model.canTry(mod))
                     .help(model.canTry(mod)
-                          ? "Opens Terminal in an empty folder with Claude Code and this mod loaded. Runs its code."
+                          ? "Opens Terminal with Claude Code and this mod loaded, in a folder you choose or an empty one. Runs its code."
                           : "Check has to read a report Claude Code would load first.")
                 Menu {
                     Button("Check Again") { Task { await model.checkKept(mod) } }
@@ -446,7 +480,7 @@ struct NewModSheet: View {
     private var tryMessage: String {
         guard let mod = trying else { return "" }
         let seat = mod.folder.map { " in \(model.display($0))" } ?? ""
-        var lines = ["Opens Terminal in a new empty folder and starts Claude Code\(seat) with \(mod.name) loaded for that session only. The mod's code runs there with your permissions."]
+        var lines = ["Opens Terminal and starts Claude Code\(seat) with \(mod.name) loaded for that session only, in a folder you choose or a new empty one. The mod's code runs there with your permissions."]
         if case .report(let r)? = model.keptChecks[mod.id] {
             lines.append("\(r.risk.title): \(r.reasons.first ?? "")")
         }
