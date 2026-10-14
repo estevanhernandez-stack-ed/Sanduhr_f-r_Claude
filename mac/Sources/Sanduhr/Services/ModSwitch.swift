@@ -225,7 +225,7 @@ extension IntegrationInstaller {
         guard done else { throw Failure.writeFailed(file: file) }
         receipts[i].switched = nil
         // A receipt that held only the switch has nothing left to undo.
-        if !receipts[i].recordsList { receipts.remove(at: i) }
+        if !receipts[i].recordsList && receipts[i].options == nil { receipts.remove(at: i) }
         saveReceipts(receipts)
     }
 

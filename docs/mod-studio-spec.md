@@ -57,7 +57,7 @@ Looks are one setting for every folder because `band.json` is one file. The tab 
 
 ### Layout
 
-The mod's options: **Bars** (both, session, weekly), **Style** (compact, full), **Label** (a few words before the bars; empty uses the account name when the folder is linked), **Motion** (on, off). Each changes the preview.
+The mod's options: **Bars** (both, session, weekly), **Style** (compact, full), **Label** (a few words before the bars; empty shows none, as the manifest says), **Motion** (on, off). Each changes the preview.
 
 Options are per folder in Claude Code (`pluginConfigs` lives in a settings file), so Save asks where: **This folder** (a picker, the folder the sheet was opened for first) or **Every folder where it's on**. Each folder written gets a receipt; Remove on the folder's row restores the file byte-exact, as the meters switch does. Folders whose `pluginConfigs` already has a value Sanduhr didn't write keep it, and Save says which.
 
@@ -97,7 +97,7 @@ Each ships on its own and is useful without the next.
 | A | Compact Catalog | nothing |
 | B | Studio shell, Preview with its Show buttons, Look tab; looks saved for every statusline kind | `bandMeterStyles` only |
 | C | Folders tab (move from the page) and About tab (built 2026-10-13: the page keeps the on-line with **Folders…** and **Open Studio…**) | none new (existing installer) |
-| D | Layout tab: options per folder through a `pluginConfigs` receipt | folder `settings.json`, with receipt |
+| D | Layout tab: options per folder through a `pluginConfigs` receipt (built 2026-10-13) | folder `settings.json`, with receipt |
 | E | New Mod: Build with Claude prompt | clipboard only |
 | F | Adopt a session-built mod; Try in a session | managed mod folder; consent per folder |
 | G | `propose_mod`, `propose_install`, `list_catalog` behind **Let agents propose mods** | staged proposals |
@@ -114,8 +114,8 @@ A and B are the owner's immediate ask: a shorter list and a real preview with ed
 
 ## Open questions
 
-1. The exact settings key Claude Code reads for an `@inline` mod's options, `pluginConfigs["sanduhr-meters@inline"]`, and its shape (flat object, or `{ "options": { … } }`). Check against the mods reference and a live session before slice D.
-2. Does a running session pick up a `pluginConfigs` change, or only new sessions?
+1. ~~The exact key and shape.~~ Answered 2026-10-13: `pluginConfigs["sanduhr-meters@inline"].options.<field>`, read from user or managed settings only; project and local entries are ignored since v2.1.207 [docs https://code.claude.com/docs/en/settings-reference#pluginconfigs]. So the project-override risk above doesn't apply to options. Claude Code's `/config` writes the same member, so Save writes only where there is none or Sanduhr's own is still as written, and leaves any other.
+2. Does a running session pick up a `pluginConfigs` change? Not checked live. The mod copies its options in `register`, which runs when the mod loads, so Layout says sessions started after Save use them and a running one keeps its layout. Whether `/reload-plugins` re-reads them is [unverified].
 3. Do mods declare an options schema in `plugin.json` that the Studio could build a Layout tab from for any mod?
 4. Should looks become per folder? It would need `band.json` to carry styles per account ref. Not proposed now: one look everywhere matches the statusline's Combine styles.
 
