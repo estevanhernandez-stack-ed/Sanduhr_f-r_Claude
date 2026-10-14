@@ -612,8 +612,9 @@ Outdated, and Update moves it to the app's copy.
 The server (`sanduhr_mcp.py`) speaks the Windows `sanduhr-mcp` protocol with the same tool names
 and result shapes: `get_usage`, `get_local_burn_by_project`, `get_model_usage`,
 `get_usage_history`, `ping`, `propose_theme` (below), plus two Mac tools for Desk messages (below),
-the watcher tools, `propose_now_playing_looks` (Now playing, below), and `propose_mod` with
-`get_mod_status` (Mod Studio: a mod's files for you to review, only while **Let agents propose
+the watcher tools, `propose_now_playing_looks` (Now playing, below), and `propose_mod`,
+`list_catalog`, `propose_install` with `get_mod_status` (Mod Studio: a mod's files for you to
+review, your kept mods, a request to turn one on in a folder; only while **Let agents propose
 mods** is on).
 `publish_usage` is dropped on the Mac. What it may read comes from
 `mcp-access.json`, which the app writes:

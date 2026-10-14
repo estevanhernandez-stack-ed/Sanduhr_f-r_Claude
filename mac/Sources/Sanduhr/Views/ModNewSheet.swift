@@ -56,6 +56,8 @@ extension ModsPageModel {
         sessionMods = rows
         self.kept = kept
         keptStates = states
+        // list_catalog's file follows what is kept and where it is on (slice G2).
+        ModProposalStore.shared.publishCatalog()
     }
 
     /// The folders a kept mod can be turned on in: every Claude Code folder, no work folder in demo mode.
@@ -243,6 +245,8 @@ struct NewModSheet: View {
     struct KeptConsent: Identifiable {
         let mod: KeptMod
         let folder: String
+        /// The propose_install request it answers, if any.
+        var request: String?
         var id: String { mod.id + "\n" + folder }
     }
 
@@ -288,7 +292,16 @@ struct NewModSheet: View {
             Text(tryMessage)
         }
         .alert(consentTitle, isPresented: Binding(get: { consent != nil }, set: { if !$0 { consent = nil } })) {
-            Button("Turn On") { if let c = consent { Task { await model.setKept(c.mod, on: true, folder: c.folder) } } }
+            Button("Turn On") {
+                if let c = consent {
+                    Task {
+                        await model.setKept(c.mod, on: true, folder: c.folder)
+                        if let id = c.request, model.keptState(c.mod, folder: c.folder) == .on {
+                            proposals.decideInstall(id, approved: true)
+                        }
+                    }
+                }
+            }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(consentMessage)
@@ -357,7 +370,7 @@ struct NewModSheet: View {
         @Bindable var proposals = proposals
         Toggle("Let agents propose mods", isOn: $proposals.allowed)
             .help("Lets Claude send a mod it built to Sanduhr with the propose_mod tool. You review its files and what it can do, then keep it or dismiss it; nothing is turned on anywhere by a proposal.")
-        Text("Off, Sanduhr's MCP server refuses propose_mod. On, a proposed mod waits here for you; keeping it doesn't turn it on in any folder.")
+        Text("Off, Sanduhr's MCP server refuses propose_mod, propose_install and list_catalog. On, Claude can see your kept mods and where they're on, send a mod for you to review, or ask to turn a kept one on in a folder; each waits here for you.")
             .font(.caption).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         Text("A mod Claude makes in a session lives in that session's folder, and Claude Code deletes it after a while. Keep copies it, unchanged, into Sanduhr's own folder and checks what it can do. None of its code runs until you try it or turn it on in a folder, and each asks first.")
@@ -371,6 +384,12 @@ struct NewModSheet: View {
                 if !proposals.pending.isEmpty {
                     Text("Proposed by Claude").font(.callout.weight(.semibold))
                     ForEach(proposals.pending) { proposalRow($0) }
+                    Divider()
+                }
+                let asks = proposals.pendingInstalls.filter { !(demo && model.isWork($0.folder)) }
+                if !asks.isEmpty {
+                    Text("Claude asks to turn on").font(.callout.weight(.semibold))
+                    ForEach(asks) { installRow($0) }
                     Divider()
                 }
                 Text("In your sessions").font(.callout.weight(.semibold))
@@ -511,6 +530,39 @@ struct NewModSheet: View {
                 }
             }
             .font(.caption)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func installRow(_ r: ModInstallRecord) -> some View {
+        let mod = model.kept.first { $0.name == r.name }
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(r.name) in \(model.display(r.folder))").font(.callout)
+                    Text("Asked \(r.requestedAt.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Dismiss") { proposals.decideInstall(r.id, approved: false) }
+                    .controlSize(.small)
+                Button("Turn On…") {
+                    if let mod { consent = KeptConsent(mod: mod, folder: r.folder, request: r.id) }
+                }
+                .controlSize(.small)
+                .disabled(mod.map { !model.canTry($0) || model.keptClash($0, folder: r.folder) } ?? true)
+                .help(mod == nil ? "Sanduhr no longer keeps this mod." : "Asks first, as Turn On does on the mod's own line.")
+            }
+            if let mod {
+                if let outcome = model.keptChecks[mod.id] {
+                    ModRiskCard(outcome: outcome)
+                } else {
+                    Text("Checking what it can do…").font(.caption).foregroundStyle(.secondary)
+                        .task { await model.checkKept(mod) }
+                }
+            } else {
+                Text("This mod isn't kept any more, so it can't be turned on.").font(.caption).foregroundStyle(.orange)
+            }
         }
         .padding(.vertical, 2)
     }

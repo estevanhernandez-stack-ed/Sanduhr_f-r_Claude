@@ -66,11 +66,11 @@ struct ModsCatalogView: View {
                 Text(note).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
             }
             if model.loaded { SessionLoadPanel(loads: model.shownLoads(demo: demo)) }
-            let proposed = ModProposalStore.shared.pending.count
+            let proposed = ModProposalStore.shared.pending.count + ModProposalStore.shared.pendingInstalls.count
             if proposed > 0 {
                 HStack(spacing: 8) {
                     Image(systemName: "shippingbox").foregroundStyle(Color.accentColor)
-                    Text(proposed == 1 ? "Claude proposed a mod for you to review." : "Claude proposed \(proposed) mods for you to review.")
+                    Text(proposed == 1 ? "Claude has a mod request for you to review." : "Claude has \(proposed) mod requests for you to review.")
                         .font(.callout)
                     Spacer()
                     Button("Review…") {

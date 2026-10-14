@@ -23,9 +23,10 @@ tools the same way on either machine:
   propose_now_playing_looks  suggests a gradient and letter style per song for now playing; Sanduhr
                              asks the user (or saves them when the user lets Claude style songs
                              directly)
-  propose_mod, get_mod_status
+  propose_mod, get_mod_status, list_catalog, propose_install
                              hands a Claude Code mod's files to Sanduhr for the user to review and
-                             keep, and reports the decision, when the user lets agents propose mods
+                             keep, lists the kept mods and where they are on, asks to turn one on in
+                             a folder, and reports each decision, when the user lets agents propose mods
 
 What each tool may read is decided per account in Sanduhr (Settings, Accounts, Data, Share
 with Claude) and handed over in ~/Library/Application Support/Sanduhr/mcp-access.json. No
@@ -44,8 +45,8 @@ the Keychain or account names; never calls claude.ai or anything else on the net
 logs. The files it writes are desk-messages-request.json (propose_desk_messages),
 theme-request.json (propose_theme), now-playing-looks-request.json (propose_now_playing_looks) and
 watch-request-<ms>-<seq>-<id>.json (the watch tools, only while watchers.json, written by Sanduhr,
-says agents may show watchers) and mod-request.json (propose_mod, only while mods-agents.json says
-agents may propose mods), atomically and owner-only; it never writes messages.txt, a theme or
+says agents may show watchers) and mod-request.json and mod-install-request.json (propose_mod and propose_install, only while
+mods-agents.json says agents may propose mods), atomically and owner-only; it never writes messages.txt, a theme or
 the saved looks. No tool takes a path. Failures are typed results (status/reason/remedy), never protocol
 errors. Python 3.9 standard library only.
 
@@ -302,6 +303,19 @@ MOD_STATUS_GUIDE = (
     "newer proposal under the same name took its place) or rejected with reasons. Pass the request_id "
     "propose_mod returned. Works only while the user lets agents propose mods.")
 
+CATALOG_GUIDE = (
+    "The mods the user keeps in Sanduhr (made in their sessions or proposed with propose_mod and "
+    "kept), and where each is on: for every Claude Code folder by name (.claude, .claude-work), on, "
+    "off or other_version. Nothing else the folders hold is listed. Use it before propose_install. "
+    "Works only while the user lets agents propose mods.")
+INSTALL_GUIDE = (
+    "Ask the user to turn on a mod they keep in Sanduhr (see list_catalog) in one Claude Code folder, "
+    "named as list_catalog names it (.claude-personal). Sanduhr shows the request; turning it on asks "
+    "the user again and writes that folder's settings.json by receipt, so new sessions there load "
+    "the mod. pending_review means the user has it; call get_mod_status with request_id for the "
+    "decision (approved, dismissed). rejected comes with reasons. Works only while the user lets "
+    "agents propose mods.")
+
 READ_ONLY = {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False}
 NO_ARGS = {"type": "object", "properties": {}, "additionalProperties": False}
 TOOLS = [
@@ -546,6 +560,27 @@ TOOLS += [
                         "openWorldHint": False},
     },
     {
+        "name": "list_catalog",
+        "description": CATALOG_GUIDE,
+        "inputSchema": NO_ARGS,
+        "annotations": READ_ONLY,
+    },
+    {
+        "name": "propose_install",
+        "description": INSTALL_GUIDE,
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,39}$"},
+                "folder": {"type": "string", "pattern": "^\\.claude(-[A-Za-z0-9._-]{1,40})?$"},
+            },
+            "required": ["name", "folder"],
+            "additionalProperties": False,
+        },
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True,
+                        "openWorldHint": False},
+    },
+    {
         "name": "get_mod_status",
         "description": MOD_STATUS_GUIDE,
         "inputSchema": {
@@ -621,6 +656,11 @@ MOD_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 MOD_PATH_RE = re.compile(r"^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$")
 MOD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 MOD_WAIT_SECONDS = 10.0
+MOD_CATALOG_FILE = "mods-catalog.json"
+MOD_INSTALL_REQUEST_FILE = "mod-install-request.json"
+MOD_INSTALL_RESULT_FILE = "mod-install-result.json"
+MOD_FOLDER_RE = re.compile(r"^\.claude(-[A-Za-z0-9._-]{1,40})?$")
+MOD_STATES = ("on", "off", "other_version")
 
 
 class Paths:
@@ -651,6 +691,9 @@ class Paths:
         self.mod_request = os.path.join(self.support_dir, MOD_REQUEST_FILE)
         self.mod_result = os.path.join(self.support_dir, MOD_RESULT_FILE)
         self.mod_status = os.path.join(self.support_dir, MOD_STATUS_FILE)
+        self.mod_catalog = os.path.join(self.support_dir, MOD_CATALOG_FILE)
+        self.mod_install_request = os.path.join(self.support_dir, MOD_INSTALL_REQUEST_FILE)
+        self.mod_install_result = os.path.join(self.support_dir, MOD_INSTALL_RESULT_FILE)
 
     def history_file(self, name):
         return os.path.join(self.support_dir, name)
@@ -2649,6 +2692,92 @@ def build_propose_mod(args, now=None, paths=None, wait=MOD_WAIT_SECONDS, poll=DE
                       "ten minutes of when it was made." % int(wait)}
 
 
+def read_catalog(paths):
+    """The app's mods-catalog.json, cleaned: (folders, mods), or None when it can't be read."""
+    doc = read_json(paths.mod_catalog)
+    if not isinstance(doc, dict) or doc.get("schema_version") != 1:
+        return None
+    folders = [f for f in doc.get("folders") or [] if isinstance(f, str) and MOD_FOLDER_RE.match(f)]
+    mods = []
+    for m in doc.get("mods") or []:
+        if not isinstance(m, dict) or not isinstance(m.get("name"), str) or not MOD_NAME_RE.match(m["name"]):
+            continue
+        where = m.get("folders") if isinstance(m.get("folders"), dict) else {}
+        out = {"name": m["name"],
+               "origin": m.get("origin") if m.get("origin") in ("session", "proposed") else "session",
+               "folders": {f: where[f] for f in folders if where.get(f) in MOD_STATES}}
+        for k in ("version", "description"):
+            if isinstance(m.get(k), str) and m[k]:
+                out[k] = m[k][:300]
+        mods.append(out)
+    return folders, mods
+
+
+def build_list_catalog(paths=None):
+    paths = paths or Paths()
+    if not mods_allowed(paths):
+        return dict(MOD_SWITCHED_OFF)
+    cat = read_catalog(paths)
+    if cat is None:
+        return {"status": "ok", "folders": [], "mods": [],
+                "remedy": "Sanduhr hasn't listed its kept mods yet: start Sanduhr."}
+    folders, mods = cat
+    return {"status": "ok", "folders": folders, "mods": mods}
+
+
+def build_propose_install(args, now=None, paths=None, wait=MOD_WAIT_SECONDS, poll=DESK_POLL_SECONDS,
+                          sleep=time.sleep, clock=time.monotonic):
+    """Checks the request against the catalog here, then hands it to the app through
+    mod-install-request.json. Never writes a settings file."""
+    now = now or datetime.now(timezone.utc)
+    paths = paths or Paths()
+    args = args if isinstance(args, dict) else {}
+    if not mods_allowed(paths):
+        return dict(MOD_SWITCHED_OFF)
+    name, folder = args.get("name"), args.get("folder")
+    if sorted(args) != ["folder", "name"] or not isinstance(name, str) or not MOD_NAME_RE.match(name) \
+            or not isinstance(folder, str) or not MOD_FOLDER_RE.match(folder):
+        return {"status": "rejected", "reason": "invalid_params",
+                "remedy": "Pass name (a kept mod's) and folder (.claude or .claude-<name>), as list_catalog gives them."}
+    cat = read_catalog(paths)
+    if cat is not None:
+        folders, mods = cat
+        mod = next((m for m in mods if m["name"] == name), None)
+        if mod is None:
+            return {"status": "rejected", "reason": "not_kept",
+                    "remedy": "The user keeps no mod named '%s'. Propose it with propose_mod first." % name}
+        if folder not in folders:
+            return {"status": "rejected", "reason": "unknown_folder",
+                    "remedy": "Sanduhr knows no Claude Code folder named '%s'; list_catalog names them." % folder}
+        if mod["folders"].get(folder) == "on":
+            return {"status": "rejected", "reason": "already_on", "remedy": "%s is on in %s already." % (name, folder)}
+    request_id = uuid.uuid4().hex
+    request = {"schema_version": 1, "id": request_id, "requested_at": iso_o(now), "name": name, "folder": folder}
+    try:
+        os.makedirs(paths.support_dir, mode=0o700, exist_ok=True)
+        tmp = paths.mod_install_request + ".tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(request, f, ensure_ascii=False)
+        os.replace(tmp, paths.mod_install_request)
+    except OSError as e:
+        return {"status": "error", "reason": "request_write_failed",
+                "remedy": "Could not queue the request (%s)." % type(e).__name__}
+    deadline = clock() + wait
+    while True:
+        res = read_desk_result(paths.mod_install_result, request_id)
+        if res is not None:
+            out = {k: res[k] for k in ("status", "reason", "reasons", "remedy", "name", "folder") if k in res}
+            out["request_id"] = request_id
+            return out
+        if clock() >= deadline:
+            break
+        sleep(poll)
+    return {"status": "queued", "reason": "app_not_responding", "request_id": request_id,
+            "remedy": "Sanduhr did not answer within %d seconds. Start Sanduhr: it picks the request up within "
+                      "ten minutes of when it was made." % int(wait)}
+
+
 def build_get_mod_status(args, paths=None):
     paths = paths or Paths()
     args = args if isinstance(args, dict) else {}
@@ -2662,7 +2791,7 @@ def build_get_mod_status(args, paths=None):
     items = doc.get("proposals") if isinstance(doc, dict) and doc.get("schema_version") == 1 else None
     for p in items if isinstance(items, list) else []:
         if isinstance(p, dict) and p.get("id") == rid:
-            out = {k: p[k] for k in ("status", "name", "version", "reasons", "decided_at") if k in p}
+            out = {k: p[k] for k in ("status", "kind", "name", "version", "folder", "reasons", "decided_at") if k in p}
             out["request_id"] = rid
             return out
     return {"status": "unknown", "request_id": rid,
@@ -2701,6 +2830,10 @@ def call_tool(name, args):
         return build_propose_mod(args)
     if name == "get_mod_status":
         return build_get_mod_status(args)
+    if name == "list_catalog":
+        return build_list_catalog()
+    if name == "propose_install":
+        return build_propose_install(args)
     return None
 
 

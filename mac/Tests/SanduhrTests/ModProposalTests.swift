@@ -131,6 +131,83 @@ struct ModProposalTests {
         #expect(Set(index(h).compactMap { $0["status"] as? String }) == ["replaced", "dismissed"])
     }
 
+    // Slice G2: list_catalog's file and propose_install's requests.
+
+    private func installRig() throws -> (IntegrationRig, ModProposalStore, KeptMod) {
+        let r = IntegrationRig()
+        r.home.dir(".claude/projects")
+        r.home.dir(".claude-personal/projects")
+        r.home.file(".claude/settings.json", "{}\n")
+        r.home.dir("dev/ci-band/.claude-plugin")
+        r.home.file("dev/ci-band/.claude-plugin/plugin.json", #"{"name": "ci-band", "version": "0.1.0", "description": "CI runs."}"#)
+        let kept = KeptMods(dir: URL(fileURLWithPath: r.home.at("Support/Sanduhr/mods")))
+        let mod = try kept.keep(r.home.at("dev/ci-band"), session: "s", proposed: true)
+        let defaults = UserDefaults(suiteName: "installs-\(UUID().uuidString)")!
+        defaults.set(true, forKey: ModProposalStore.switchKey)
+        let store = ModProposalStore(paths: .init(support: URL(fileURLWithPath: r.home.at("Support/Sanduhr")), kept: kept),
+                                     defaults: defaults, now: { Self.at.addingTimeInterval(5) },
+                                     folders: { [r.home.at(".claude"), r.home.at(".claude-personal")] }, installer: r.installer)
+        return (r, store, mod)
+    }
+
+    private func installRequest(_ name: String, _ folder: String, id: String = String(repeating: "c", count: 32)) -> Data {
+        try! JSONSerialization.data(withJSONObject: ["schema_version": 1, "id": id, "requested_at": HandoffFiles.stamp(Self.at),
+                                                     "name": name, "folder": folder])
+    }
+
+    private func installResult(_ r: IntegrationRig) -> [String: Any] {
+        let data = FileManager.default.contents(atPath: r.home.at("Support/Sanduhr/mod-install-result.json")) ?? Data()
+        return ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["result"] as? [String: Any] ?? [:]
+    }
+
+    @Test func theCatalogNamesKeptModsAndWhereTheyreOn() throws {
+        let (r, store, mod) = try installRig()
+        defer { r.cleanUp() }
+        store.publishCatalog()
+        let file = r.home.at("Support/Sanduhr/mods-catalog.json")
+        var doc = try #require((try? JSONSerialization.jsonObject(with: FileManager.default.contents(atPath: file) ?? Data())) as? [String: Any])
+        #expect(doc["folders"] as? [String] == [".claude", ".claude-personal"])
+        var entry = (doc["mods"] as? [[String: Any]])?.first
+        #expect(entry?["name"] as? String == "ci-band")
+        #expect(entry?["origin"] as? String == "proposed")
+        #expect(entry?["folders"] as? [String: String] == [".claude": "off", ".claude-personal": "off"])
+        try store.paths.kept.turnOn(mod, folder: r.home.at(".claude"), installer: r.installer)
+        store.publishCatalog()
+        doc = try #require((try? JSONSerialization.jsonObject(with: FileManager.default.contents(atPath: file) ?? Data())) as? [String: Any])
+        entry = (doc["mods"] as? [[String: Any]])?.first
+        #expect((entry?["folders"] as? [String: String])?[".claude"] == "on")
+        // Switched off, the catalog goes.
+        store.allowed = false
+        #expect(!FileManager.default.fileExists(atPath: file))
+    }
+
+    @Test func installRequestsWaitForTheUser() throws {
+        let (r, store, mod) = try installRig()
+        defer { r.cleanUp() }
+        store.receiveInstall(installRequest("other", ".claude"))
+        #expect(installResult(r)["reason"] as? String == "not_kept")
+        store.receiveInstall(installRequest("ci-band", ".claude-work"))
+        #expect(installResult(r)["reason"] as? String == "unknown_folder")
+        store.receiveInstall(installRequest("ci-band", "/etc"))
+        #expect(installResult(r)["reason"] as? String == "invalid_params")
+        #expect(store.installs.isEmpty)
+
+        store.receiveInstall(installRequest("ci-band", ".claude-personal"))
+        #expect(installResult(r)["status"] as? String == "pending_review")
+        let ask = try #require(store.pendingInstalls.first)
+        #expect(ask.folder == r.home.at(".claude-personal") && ask.folderName == ".claude-personal")
+        // Nothing is written until the user turns it on.
+        #expect(store.paths.kept.state(mod, folder: ask.folder, installer: r.installer) == .off)
+        store.decideInstall(ask.id, approved: true)
+        #expect(store.pendingInstalls.isEmpty)
+        let index = String(decoding: FileManager.default.contents(atPath: r.home.at("Support/Sanduhr/mod-proposals.json")) ?? Data(), as: UTF8.self)
+        #expect(index.contains(#""kind":"install""#) && index.contains(#""status":"approved""#))
+
+        try store.paths.kept.turnOn(mod, folder: r.home.at(".claude"), installer: r.installer)
+        store.receiveInstall(installRequest("ci-band", ".claude", id: String(repeating: "d", count: 32)))
+        #expect(installResult(r)["reason"] as? String == "already_on")
+    }
+
     @Test func thePromptAsksForProposeModOnlyWhenOn() {
         #expect(!ModPrompt.text(idea: "x").contains("propose_mod"))
         #expect(ModPrompt.text(idea: "x", canPropose: true).contains("propose_mod"))
