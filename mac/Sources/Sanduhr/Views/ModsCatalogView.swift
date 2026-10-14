@@ -98,7 +98,7 @@ struct ModsCatalogView: View {
                 CatalogGroupView(section: section, model: model, searching: searching)
             }
         }
-        .sheet(isPresented: $model.newModOpen) { NewModSheet(close: { model.newModOpen = false }) }
+        .sheet(isPresented: $model.newModOpen) { NewModSheet(model: model, demo: demo, close: { model.newModOpen = false }) }
     }
 
     private func countLine(shown: Int) -> String {
