@@ -15,7 +15,9 @@ enum ModPrompt {
         return line.count > maxIdea ? String(line.prefix(maxIdea)).trimmingCharacters(in: .whitespaces) : line
     }
 
-    static func text(idea raw: String) -> String {
+    /// With `canPropose` (Let agents propose mods is on), the prompt ends by sending the mod to
+    /// Sanduhr with `propose_mod`.
+    static func text(idea raw: String, canPropose: Bool = false) -> String {
         let idea = idea(raw)
         let ask = idea.isEmpty
             ? "Build me a Claude Code mod. Ask me what it should show or do before you start."
@@ -49,7 +51,7 @@ enum ModPrompt {
 
         Where to build it
         - Build it in this session, in the folder Claude Code offers for a mod made in a session (it asks to turn on hot reloading), so I can watch it as you write it.
-        - Don't add it to my settings or install it anywhere else. When it works, tell me its name and what it draws.
+        - Don't add it to my settings or install it anywhere else. When it works, tell me its name and what it draws.\(canPropose ? "\n- Then send it to Sanduhr with its propose_mod tool (the files inline, never a folder), so I can review and keep it, and check get_mod_status for my answer." : "")
         """
     }
 }

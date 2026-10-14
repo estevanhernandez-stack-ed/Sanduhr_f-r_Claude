@@ -173,53 +173,6 @@ enum MetersModStatus {
 /// the prompt are a mod, so their controls live with the mods; slice 2 had them on Claude Code).
 /// Since item 75 slice C its per-folder rows live in the Mod Studio's Folders tab; the page keeps
 /// where it is on, in one line, and the ways into the Studio.
-struct SanduhrModSection: View {
-    var model: ModsPageModel
-    let demo: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SanduhrModIntro()
-            GroupBox {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(line).font(.callout)
-                        .foregroundStyle(model.ownLoaded ? .primary : .secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 8)
-                    Button("Folders…") { model.openStudio(.folders) }
-                        .help("Switch the mod on or off, update or remove it, per Claude Code folder.")
-                    Button("Open Studio…") { model.openStudio() }
-                        .help("Preview the band with demo numbers and style it.")
-                }
-                .controlSize(.small)
-                .padding(4)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            } label: {
-                Text("\(IntegrationScripts.modName), Sanduhr's own mod").font(.body.weight(.semibold))
-            }
-            WatchersAbovePromptLine()
-        }
-    }
-
-    private var line: String {
-        guard model.ownLoaded else { return "Reading your Claude Code folders…" }
-        guard let on = model.studioOnLine(demo: demo) else { return "No Claude Code folder found (~/.claude or a ~/.claude-name folder)." }
-        return on + "."
-    }
-}
-
-private struct SanduhrModIntro: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(SettingsNames.metersAbovePrompt).font(.headline)
-            Text("Sanduhr's own mod draws the active account's session and weekly bars above Claude Code's prompt, animated, with the pace mark and reset countdowns, and the watchers as rows when you show them there. The Mod Studio previews it with demo numbers and styles it, switches it per Claude Code folder, and shows what it can do.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-}
-
 /// One folder's meters mod: its state, Update, Remove and the switch, then where it stands and
 /// what the last action said (a project's override included). The Studio's Folders tab.
 struct MetersModRow: View {
@@ -295,12 +248,12 @@ private struct MetersModButtons: View {
 
 /// The watchers' switch for the band lives on Watchers (it decides what band.json carries): its
 /// state here, with the way there.
-private struct WatchersAbovePromptLine: View {
+struct WatchersAbovePromptLine: View {
     @AppStorage(BandFile.watchersKey) private var inBand = false
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text("Show watchers above the prompt: \(inBand ? "on" : "off"). The rows draw through this mod; the switch is on Watchers.")
+            Text("Watcher rows above the prompt: \(inBand ? "on" : "off"). They draw through this mod; switch them on Watchers.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
