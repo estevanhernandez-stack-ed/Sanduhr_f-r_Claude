@@ -22,8 +22,14 @@ extension ModsPageModel {
             guard case .devMods(let session) = item.origin, item.path != nil, item.state != .missing else { return nil }
             return (item, session)
         }
-        let (rows, kept) = await Task.detached(priority: .userInitiated) {
+        let installer = installer
+        let folders = inventory.map(\.folder)
+        let (rows, kept, states) = await Task.detached(priority: .userInitiated) {
             let kept = store.list()
+            var states: [String: [String: KeptModState]] = [:]
+            for mod in kept {
+                for folder in folders { states[mod.id, default: [:]][folder] = store.state(mod, folder: folder, installer: installer) }
+            }
             let rows = items.map { item, session in
                 var row = SessionModRow(item: item, session: session)
                 let url = URL(fileURLWithPath: item.path ?? "")
@@ -37,10 +43,53 @@ extension ModsPageModel {
                 }
                 return row
             }
-            return (rows, kept)
+            return (rows, kept, states)
         }.value
         sessionMods = rows
         self.kept = kept
+        keptStates = states
+    }
+
+    /// The folders a kept mod can be turned on in: every Claude Code folder, no work folder in demo mode.
+    func keptFolders(demo: Bool) -> [String] {
+        inventory.map(\.folder).filter { !(demo && isWork($0)) }
+    }
+
+    func keptState(_ mod: KeptMod, folder: String) -> KeptModState {
+        keptStates[mod.id]?[folder] ?? .off
+    }
+
+    /// Another plugin of the same name already loads in the folder (not a kept copy, not a
+    /// session's): turning this one on there would shadow one of the two.
+    func keptClash(_ mod: KeptMod, folder: String) -> Bool {
+        inventory.first { $0.folder == folder }?.items.contains { item in
+            guard item.name == mod.name else { return false }
+            if case .devMods = item.origin { return false }
+            return item.path.flatMap(keptStore.keptEntry) == nil
+        } ?? false
+    }
+
+    /// On (after the consent) or Off for one folder, by receipt.
+    func setKept(_ mod: KeptMod, on: Bool, folder: String) async {
+        let key = mod.id + "\n" + folder
+        guard !keptBusy.contains(key) else { return }
+        keptBusy.insert(key)
+        defer { keptBusy.remove(key) }
+        let store = keptStore, installer = installer
+        let failed = await Task.detached(priority: .userInitiated) { () -> String? in
+            do {
+                if on { try store.turnOn(mod, folder: folder, installer: installer) } else {
+                    try store.turnOff(mod.name, folder: folder, installer: installer)
+                }
+                return nil
+            } catch let f as KeptMods.Failure {
+                return f.message
+            } catch {
+                return "Sanduhr couldn't change \(installer.configFile(.meters, folder: folder)): it was changed while writing, or isn't JSON Sanduhr can edit."
+            }
+        }.value
+        keptNote = failed
+        await refreshKept()
     }
 
     func shownSessionMods(demo: Bool) -> [SessionModRow] {
@@ -82,6 +131,11 @@ extension ModsPageModel {
     }
 
     func forget(_ mod: KeptMod) async {
+        let using = keptStates[mod.id]?.filter { $0.value == .on }.count ?? 0
+        guard using == 0 else {
+            keptNote = "\(mod.name) is on in \(using) \(using == 1 ? "folder" : "folders"). Turn it off there first."
+            return
+        }
         let store = keptStore
         let failed = await Task.detached(priority: .userInitiated) { () -> KeptMods.Failure? in
             do { try store.forget(mod); return nil } catch { return (error as? KeptMods.Failure) ?? .writeFailed }
@@ -125,6 +179,13 @@ struct NewModSheet: View {
     @State private var copied = false
     @State private var trying: KeptMod?
     @State private var forgetting: KeptMod?
+    @State private var consent: KeptConsent?
+
+    struct KeptConsent: Identifiable {
+        let mod: KeptMod
+        let folder: String
+        var id: String { mod.id + "\n" + folder }
+    }
 
     private var prompt: String { ModPrompt.text(idea: idea) }
 
@@ -148,6 +209,12 @@ struct NewModSheet: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(tryMessage)
+        }
+        .alert(consentTitle, isPresented: Binding(get: { consent != nil }, set: { if !$0 { consent = nil } })) {
+            Button("Turn On") { if let c = consent { Task { await model.setKept(c.mod, on: true, folder: c.folder) } } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(consentMessage)
         }
         .confirmationDialog("Forget \(forgetting?.name ?? "the mod")?", isPresented: Binding(get: { forgetting != nil }, set: { if !$0 { forgetting = nil } })) {
             Button("Forget", role: .destructive) { if let m = forgetting { Task { await model.forget(m) } } }
@@ -210,7 +277,7 @@ struct NewModSheet: View {
 
     @ViewBuilder
     private var session: some View {
-        Text("A mod Claude makes in a session lives in that session's folder, and Claude Code deletes it after a while. Keep copies it, unchanged, into Sanduhr's own folder and checks what it can do. No Claude Code folder loads a kept mod, and none of its code runs until you try it.")
+        Text("A mod Claude makes in a session lives in that session's folder, and Claude Code deletes it after a while. Keep copies it, unchanged, into Sanduhr's own folder and checks what it can do. None of its code runs until you try it or turn it on in a folder, and each asks first.")
             .font(.caption).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         if let note = model.keptNote {
@@ -302,6 +369,7 @@ struct NewModSheet: View {
             }
             if let outcome = model.keptChecks[mod.id] {
                 ModRiskCard(outcome: outcome)
+                folderLines(mod)
             } else {
                 Button("Check") { Task { await model.checkKept(mod) } }
                     .controlSize(.small)
@@ -309,6 +377,70 @@ struct NewModSheet: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    /// The mod per Claude Code folder: On asks first, Off takes it out by receipt.
+    @ViewBuilder
+    private func folderLines(_ mod: KeptMod) -> some View {
+        let folders = model.keptFolders(demo: demo)
+        if !folders.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("In your Claude Code folders").font(.caption.weight(.semibold))
+                ForEach(folders, id: \.self) { folder in
+                    folderLine(mod, folder: folder)
+                }
+            }
+            .padding(.leading, 8)
+        }
+    }
+
+    private func folderLine(_ mod: KeptMod, folder: String) -> some View {
+        let state = model.keptState(mod, folder: folder)
+        let clash = model.keptClash(mod, folder: folder)
+        return HStack(spacing: 8) {
+            Text(model.display(folder)).font(.caption).frame(minWidth: 140, alignment: .leading)
+            Text(stateText(state, clash: clash)).font(.caption).foregroundStyle(clash && state == .off ? .orange : .secondary)
+            Spacer()
+            if model.keptBusy.contains(mod.id + "\n" + folder) {
+                ProgressView().controlSize(.small)
+            } else {
+                switch state {
+                case .on:
+                    Button("Turn Off") { Task { await model.setKept(mod, on: false, folder: folder) } }
+                        .help("Takes the kept copy out of this folder's plugin folders list, leaving settings.json as it was before.")
+                case .otherVersion:
+                    Button("Use This Version…") { consent = KeptConsent(mod: mod, folder: folder) }
+                        .disabled(!model.canTry(mod))
+                case .off:
+                    Button("Turn On…") { consent = KeptConsent(mod: mod, folder: folder) }
+                        .disabled(!model.canTry(mod) || clash)
+                        .help(clash ? "A plugin with this name already loads in this folder." : "Asks first.")
+                }
+            }
+        }
+        .controlSize(.small)
+    }
+
+    private func stateText(_ state: KeptModState, clash: Bool) -> String {
+        switch state {
+        case .on: "On, new sessions load it"
+        case .otherVersion(let stamp): "Another version is on (\(stamp.prefix(7)))"
+        case .off: clash ? "Another plugin has this name here" : "Off"
+        }
+    }
+
+    private var consentTitle: String {
+        guard let c = consent else { return "" }
+        return "Turn on \(c.mod.name) in \(model.display(c.folder))?"
+    }
+
+    private var consentMessage: String {
+        guard let c = consent else { return "" }
+        var lines = ["Adds the kept copy to CLAUDE_CODE_PLUGIN_DIRS in \(model.display(model.installer.configFile(.meters, folder: c.folder))). New sessions in that folder load it and run its code with your permissions. Turn Off takes it out again and leaves the file as it was."]
+        if case .report(let r)? = model.keptChecks[c.mod.id] {
+            lines.append("\(r.risk.title): \(r.reasons.joined(separator: " "))")
+        }
+        return lines.joined(separator: "\n\n")
     }
 
     private var tryMessage: String {

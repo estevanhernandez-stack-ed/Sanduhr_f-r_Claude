@@ -222,6 +222,8 @@ final class ModsPageModel {
     var keptBusy: Set<String> = []
     var keptNote: String?
     var keptStore = KeptMods.standard
+    /// Each kept mod's state per folder (slice F2), by mod id then folder.
+    var keptStates: [String: [String: KeptModState]] = [:]
     /// The About tab's Check of the mod this Sanduhr carries, and whether it is running.
     private(set) var ownCheck: ModCheckOutcome?
     private(set) var checkingOwn = false
