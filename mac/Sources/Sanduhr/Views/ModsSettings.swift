@@ -213,6 +213,8 @@ final class ModsPageModel {
     /// The Mod Studio sheet is up (item 75, slice B), and the tab it opens on (slice C).
     var studioOpen = false
     var studioTab: StudioTab = .look
+    /// New Mod, the Build with Claude prompt (slice E).
+    var newModOpen = false
     /// The About tab's Check of the mod this Sanduhr carries, and whether it is running.
     private(set) var ownCheck: ModCheckOutcome?
     private(set) var checkingOwn = false
