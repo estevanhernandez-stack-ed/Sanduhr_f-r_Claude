@@ -23,7 +23,9 @@ struct KeptModsTests {
         defer { h.cleanUp() }
         let source = sessionMod(h)
         let store = KeptMods(dir: URL(fileURLWithPath: h.at("support/mods")))
-        let kept = try store.keep(source, session: "0123456789abcdef", now: Date(timeIntervalSince1970: 1_790_000_000))
+        let kept = try store.keep(source, session: "0123456789abcdef", folder: h.at(".claude-personal"),
+                                  now: Date(timeIntervalSince1970: 1_790_000_000))
+        #expect(kept.folder == h.at(".claude-personal"))
         #expect(kept.name == "ci-band" && kept.version == "0.1.0" && kept.session == "01234567" && kept.files == 3)
         #expect(IntegrationScripts.isStampName(kept.stamp))
         let copy = store.path(kept)
@@ -84,5 +86,9 @@ struct KeptModsTests {
         exec /opt/homebrew/bin/claude --plugin-dir /x/mods/ci-band/abc
 
         """)
+        // In the folder whose session made it; the default folder needs no setting.
+        let personal = KeptMods.tryScript(claude: "/c", mod: "/m", folder: "/t", config: "/h/.claude-personal", home: "/h")
+        #expect(personal.contains("\nCLAUDE_CONFIG_DIR=/h/.claude-personal exec /c --plugin-dir /m\n"))
+        #expect(!KeptMods.tryScript(claude: "/c", mod: "/m", folder: "/t", config: "/h/.claude", home: "/h").contains("CLAUDE_CONFIG_DIR"))
     }
 }

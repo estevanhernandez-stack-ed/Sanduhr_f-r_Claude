@@ -15,6 +15,8 @@ struct KeptMod: Codable, Equatable, Identifiable, Sendable {
     var keptAt: Date
     /// The first 8 characters of the session that made it.
     var session: String
+    /// The Claude Code folder whose session made it: Try in a Session starts Claude Code there.
+    var folder: String?
     var files: Int
     var bytes: Int
 
@@ -149,7 +151,7 @@ struct KeptMods: Sendable {
     /// Copies the mod at `source` (made in `session`) into its stamped folder, read-only, and
     /// records it. Keeping the same files again returns the copy already kept.
     @discardableResult
-    func keep(_ source: String, session: String, now: Date = Date()) throws -> KeptMod {
+    func keep(_ source: String, session: String, folder: String? = nil, now: Date = Date()) throws -> KeptMod {
         let src = URL(fileURLWithPath: source)
         let files = try Self.files(in: src)
         let m = try Self.manifest(src)
@@ -180,7 +182,8 @@ struct KeptMods: Sendable {
             throw (error as? Failure) ?? Failure.writeFailed
         }
         let kept = KeptMod(name: m.name, version: m.version, description: m.description, stamp: stamp, keptAt: now,
-                           session: String(session.prefix(8)), files: files.count, bytes: bytes)
+                           session: String(session.prefix(8)), folder: folder.map(AccountData.normalized),
+                           files: files.count, bytes: bytes)
         mods.append(kept)
         try save(mods)
         return kept
@@ -212,13 +215,17 @@ struct KeptMods: Sendable {
     // MARK: Try in a session
 
     /// The script Try in a Session opens in Terminal: an empty folder, and Claude Code with the
-    /// kept copy loaded for that session only.
-    static func tryScript(claude: String, mod: String, folder: String) -> String {
+    /// kept copy loaded for that session only, in the Claude Code folder `config` (the one whose
+    /// session made it) unless that is the default `~/.claude`.
+    static func tryScript(claude: String, mod: String, folder: String, config: String? = nil,
+                          home: String = NSHomeDirectory()) -> String {
         let q = IntegrationInstaller.shellQuoted
+        let fallback = AccountData.normalized((home as NSString).appendingPathComponent(".claude"))
+        let env = config.map(AccountData.normalized).flatMap { $0 == fallback ? nil : "CLAUDE_CONFIG_DIR=\(q($0)) " } ?? ""
         return """
         #!/bin/zsh
         cd \(q(folder)) || exit 1
-        exec \(q(claude)) --plugin-dir \(q(mod))
+        \(env)exec \(q(claude)) --plugin-dir \(q(mod))
 
         """
     }
@@ -233,7 +240,7 @@ struct KeptMods: Sendable {
         let script = folder.appendingPathComponent("try.command")
         do {
             try fm.createDirectory(at: folder, withIntermediateDirectories: true)
-            try Self.tryScript(claude: claude, mod: path(mod), folder: folder.path).write(to: script, atomically: true, encoding: .utf8)
+            try Self.tryScript(claude: claude, mod: path(mod), folder: folder.path, config: mod.folder).write(to: script, atomically: true, encoding: .utf8)
             try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: script.path)
         } catch {
             throw Failure.writeFailed

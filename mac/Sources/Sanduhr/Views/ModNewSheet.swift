@@ -54,7 +54,7 @@ extension ModsPageModel {
         defer { keptBusy.remove(row.id) }
         let store = keptStore
         let result = await Task.detached(priority: .userInitiated) { () -> Result<KeptMod, KeptMods.Failure> in
-            do { return .success(try store.keep(path, session: row.session)) } catch {
+            do { return .success(try store.keep(path, session: row.session, folder: row.item.folder)) } catch {
                 return .failure((error as? KeptMods.Failure) ?? .writeFailed)
             }
         }.value
@@ -313,7 +313,8 @@ struct NewModSheet: View {
 
     private var tryMessage: String {
         guard let mod = trying else { return "" }
-        var lines = ["Opens Terminal in a new empty folder and starts Claude Code with \(mod.name) loaded for that session only. The mod's code runs there with your permissions."]
+        let seat = mod.folder.map { " in \(model.display($0))" } ?? ""
+        var lines = ["Opens Terminal in a new empty folder and starts Claude Code\(seat) with \(mod.name) loaded for that session only. The mod's code runs there with your permissions."]
         if case .report(let r)? = model.keptChecks[mod.id] {
             lines.append("\(r.risk.title): \(r.reasons.first ?? "")")
         }
