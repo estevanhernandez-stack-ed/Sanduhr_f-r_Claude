@@ -406,5 +406,11 @@ struct ModsCatalogTests {
         var other = ModItem(folder: "/p", name: "finish-line", path: "/elsewhere/finish-line", origin: .skillsDir)
         other.state = .on
         #expect(ConfigCatalog.problems([kept, other], seat: seat).contains { $0.contains("On twice") })
+        // Nor a duplicate: the session's copy is a source, not a second install.
+        var scan = SeatScan(seat: "/p")
+        scan.plugins = [kept, dev]
+        let card = ConfigCatalog.build([(seat, scan)]).first { $0.name == "finish-line" }
+        #expect(card?.isDuplicate == false && card?.needsLook == false)
+        #expect(card?.sources.count == 2)
     }
 }

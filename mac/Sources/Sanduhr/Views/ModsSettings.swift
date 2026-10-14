@@ -693,6 +693,14 @@ enum ModSketch {
 struct ModsSettings: View {
     var vm: UsageViewModel
     var model: ModsPageModel
+    @Environment(SettingsNavigation.self) private var navigation: SettingsNavigation?
+
+    private func openMetersIfAsked() {
+        guard navigation?.anchor == SettingsAnchor.metersMod else { return }
+        navigation?.anchor = nil
+        model.tab = .catalog
+        model.openStudio(.folders)
+    }
 
     private var linked: [String] { vm.realAccountLabels.compactMap { vm.dataChoices(for: $0).folder } }
 
@@ -700,8 +708,6 @@ struct ModsSettings: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    SanduhrModSection(model: model, demo: vm.demo)
-                        .settingsAnchor(SettingsAnchor.metersMod)
                     if model.loaded && model.claude == nil {
                         Text(ModsPageModel.cliMissing)
                             .font(.caption)
@@ -724,6 +730,10 @@ struct ModsSettings: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task { await model.load(linked: linked) }
+        // The meters mod lives in the Catalog with the other mods (2026-10-14, the owner): links and
+        // search that name it open the Studio's Folders tab, where it switches per folder.
+        .onAppear { openMetersIfAsked() }
+        .onChange(of: navigation?.scrollRequest) { openMetersIfAsked() }
         .sheet(isPresented: Binding(get: { model.studioOpen }, set: { model.studioOpen = $0 })) {
             ModStudioSheet(model: .live(), mods: model, linked: linked, demo: vm.demo, tab: model.studioTab,
                            close: { model.studioOpen = false })
@@ -894,7 +904,7 @@ private struct ModRowOwnership: View {
     var body: some View {
         switch item.ownership {
         case .sanduhrs:
-            Text("Sanduhr's own mod. It switches per folder at the top of this page, \(SettingsNames.metersAbovePrompt).")
+            Text("Sanduhr's own mod, \(SettingsNames.metersAbovePrompt). It switches per folder in the Mod Studio's Folders tab (its line in the Catalog).")
                 .font(.caption)
                 .foregroundStyle(Color.hex("a78bfa"))
                 .fixedSize(horizontal: false, vertical: true)

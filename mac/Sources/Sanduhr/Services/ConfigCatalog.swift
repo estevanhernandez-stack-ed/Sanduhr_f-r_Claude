@@ -349,7 +349,8 @@ enum ConfigCatalog {
                 let id = card(.plugin, name)
                 let items = byName[name] ?? []
                 for item in items {
-                    addSource(id, source(item), installed: true)
+                    // A session's own copy is listed as a source, not as a second install.
+                    addSource(id, source(item), installed: item.state != .session)
                     describe(id, item.description, item.version)
                     if item.isMod { cards[id]?.isMod = true }
                     cards[id]?.itemIDs.append(item.id)

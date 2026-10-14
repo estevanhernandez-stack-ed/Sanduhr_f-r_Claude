@@ -114,7 +114,7 @@ struct ModsCatalogView: View {
                 Text("Nothing matches these filters.").font(.caption).foregroundStyle(.secondary)
             }
             ForEach(model.sections(demo: demo)) { section in
-                CatalogGroupView(section: section, model: model, searching: searching)
+                CatalogGroupView(section: section, model: model, searching: searching, demo: demo)
             }
         }
         .sheet(isPresented: $model.newModOpen) { NewModSheet(model: model, demo: demo, close: { model.newModOpen = false }) }
@@ -198,6 +198,7 @@ private struct CatalogGroupView: View {
     var model: ModsPageModel
     /// A search opens every group and holds them open, so the header doesn't toggle meanwhile.
     let searching: Bool
+    let demo: Bool
 
     var body: some View {
         let open = searching || model.openGroups.contains(section.group)
@@ -234,9 +235,9 @@ private struct CatalogGroupView: View {
                             if section.group == .available {
                                 AvailableRow(card: card)
                             } else if model.isOpen(card) {
-                                CatalogCardView(card: card, model: model)
+                                CatalogCardView(card: card, model: model, demo: demo)
                             } else {
-                                CatalogLine(card: card, model: model)
+                                CatalogLine(card: card, model: model, demo: demo)
                             }
                         }
                     }
@@ -252,15 +253,24 @@ private struct CatalogGroupView: View {
 private struct CatalogLine: View {
     let card: CatalogCard
     var model: ModsPageModel
+    let demo: Bool
 
     var body: some View {
         HStack(spacing: 8) {
             line
             if card.isSanduhrs {
+                // Sanduhr's own mod (2026-10-14: in the list, not above it): where it's on, and its two doors.
+                if let on = model.studioOnLine(demo: demo) {
+                    Text(on).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Button("Folders…") { model.openStudio(.folders) }
+                    .buttonStyle(.link)
+                    .font(.caption)
+                    .help("Switch it on or off, update or remove it, per Claude Code folder.")
                 Button("Studio…") { model.openStudio() }
                     .buttonStyle(.link)
                     .font(.caption)
-                    .help("Open the Mod Studio")
+                    .help("Preview the band with demo numbers and style it.")
             }
         }
         .padding(.trailing, card.isSanduhrs ? 8 : 0)
@@ -367,6 +377,7 @@ private struct CatalogFilterBar: View {
 private struct CatalogCardView: View {
     let card: CatalogCard
     var model: ModsPageModel
+    let demo: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -405,13 +416,17 @@ private struct CatalogCardView: View {
             }
             if card.isSanduhrs {
                 HStack(spacing: 8) {
-                    Text("Switches per folder in the Studio's Folders tab.")
+                    Text((model.studioOnLine(demo: demo) ?? "Sanduhr's own mod") + ".")
                         .font(.caption)
                         .foregroundStyle(Color.hex("a78bfa"))
-                    Button("Open Studio…") { model.openStudio(.folders) }
+                    Button("Folders…") { model.openStudio(.folders) }
+                        .buttonStyle(.link)
+                        .font(.caption)
+                    Button("Studio…") { model.openStudio() }
                         .buttonStyle(.link)
                         .font(.caption)
                 }
+                WatchersAbovePromptLine()
             }
             if let risk = riskLine {
                 Text(risk).font(.caption).foregroundStyle(.orange)
