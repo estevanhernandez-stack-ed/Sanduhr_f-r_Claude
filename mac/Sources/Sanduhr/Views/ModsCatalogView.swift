@@ -234,7 +234,7 @@ private struct CatalogLine: View {
         HStack(spacing: 8) {
             line
             if card.isSanduhrs {
-                Button("Studio…") { model.studioOpen = true }
+                Button("Studio…") { model.openStudio() }
                     .buttonStyle(.link)
                     .font(.caption)
                     .help("Open the Mod Studio")
@@ -382,10 +382,10 @@ private struct CatalogCardView: View {
             }
             if card.isSanduhrs {
                 HStack(spacing: 8) {
-                    Text("Switches per folder above, \(SettingsNames.metersAbovePrompt).")
+                    Text("Switches per folder in the Studio's Folders tab.")
                         .font(.caption)
                         .foregroundStyle(Color.hex("a78bfa"))
-                    Button("Open Studio…") { model.studioOpen = true }
+                    Button("Open Studio…") { model.openStudio(.folders) }
                         .buttonStyle(.link)
                         .font(.caption)
                 }
