@@ -2,9 +2,15 @@ import SwiftUI
 import AppKit
 
 /// What a click on the island itself does: Settings at the Notch page (Settings v2, slice 1),
-/// not wherever Settings was left. Its tooltip names the page.
+/// not wherever Settings was left. Its tooltip names the page. With Settings already on screen,
+/// the click only brings it forward, on the page it shows (2026-10-14, the owner).
 enum NotchIsland {
     static let clickOpens = SettingsSection.notch
+
+    /// The page a click opens: the Notch page, or none (stay where Settings is) while it's open.
+    static func clickSection(settingsOpen: Bool) -> SettingsSection? {
+        settingsOpen ? nil : clickOpens
+    }
 }
 
 /// The notch, extended. On a Mac with a camera notch, Desk draws pure black that continues the
@@ -265,7 +271,9 @@ struct NotchWingsView: View {
                     }
                     .frame(width: notchWidth + w.totalLeft + w.totalRight, height: barHeight)
                     .contentShape(Rectangle())
-                    .onTapGesture { DeskController.shared.showSettings(NotchIsland.clickOpens) }
+                    .onTapGesture {
+                        DeskController.shared.showSettings(NotchIsland.clickSection(settingsOpen: SettingsWindowController.shared.isOpen))
+                    }
                     .help(NotchIsland.clickOpens.linkTitle)
                     // Last, so the island's click area moves with its drawing: an offset before
                     // contentShape left the click area at the unshifted place, so the far end of

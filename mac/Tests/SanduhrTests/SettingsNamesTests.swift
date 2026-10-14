@@ -46,6 +46,9 @@ struct SettingsNamesTests {
         // F8: the island's click said it opened "these settings" and opened wherever Settings was.
         #expect(NotchIsland.clickOpens == .notch)
         #expect(NotchIsland.clickOpens.linkTitle == "Notch Settings…")
+        // With Settings on screen, a click keeps the page it shows.
+        #expect(NotchIsland.clickSection(settingsOpen: false) == .notch)
+        #expect(NotchIsland.clickSection(settingsOpen: true) == nil)
     }
 
     @Test func tableNamesAreUniqueAndOnRealPages() {
