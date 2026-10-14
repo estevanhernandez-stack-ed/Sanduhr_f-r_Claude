@@ -17,6 +17,8 @@ struct KeptMod: Codable, Equatable, Identifiable, Sendable {
     var session: String
     /// The Claude Code folder whose session made it: Try in a Session starts Claude Code there.
     var folder: String?
+    /// Proposed by an agent through `propose_mod` (slice G) and approved, not made in a session.
+    var proposed: Bool?
     var files: Int
     var bytes: Int
 
@@ -151,7 +153,8 @@ struct KeptMods: Sendable {
     /// Copies the mod at `source` (made in `session`) into its stamped folder, read-only, and
     /// records it. Keeping the same files again returns the copy already kept.
     @discardableResult
-    func keep(_ source: String, session: String, folder: String? = nil, now: Date = Date()) throws -> KeptMod {
+    func keep(_ source: String, session: String, folder: String? = nil, proposed: Bool = false,
+              now: Date = Date()) throws -> KeptMod {
         let src = URL(fileURLWithPath: source)
         let files = try Self.files(in: src)
         let m = try Self.manifest(src)
@@ -183,7 +186,7 @@ struct KeptMods: Sendable {
         }
         let kept = KeptMod(name: m.name, version: m.version, description: m.description, stamp: stamp, keptAt: now,
                            session: String(session.prefix(8)), folder: folder.map(AccountData.normalized),
-                           files: files.count, bytes: bytes)
+                           proposed: proposed ? true : nil, files: files.count, bytes: bytes)
         mods.append(kept)
         try save(mods)
         return kept

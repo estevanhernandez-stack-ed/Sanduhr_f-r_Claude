@@ -154,6 +154,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         WatcherStore.shared.startForApp()
         // Per-song looks (item 65c): propose_now_playing_looks' requests, on the same folder watch.
         NowPlayingLookStore.shared.start()
+        // Claude's proposed mods (item 75, slice G): propose_mod's requests, on the same folder
+        // watch; mods-agents.json follows Let agents propose mods.
+        ModProposalStore.shared.start()
         // The meters mod's band (items 65f, 66): band.json, the looks and the watchers it draws.
         BandFileWriter.shared.startForApp()
         // Claude Code's hooks (items 51, 66): their Darwin notifications go where the

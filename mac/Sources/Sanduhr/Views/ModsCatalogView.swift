@@ -66,13 +66,32 @@ struct ModsCatalogView: View {
                 Text(note).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
             }
             if model.loaded { SessionLoadPanel(loads: model.shownLoads(demo: demo)) }
+            let proposed = ModProposalStore.shared.pending.count
+            if proposed > 0 {
+                HStack(spacing: 8) {
+                    Image(systemName: "shippingbox").foregroundStyle(Color.accentColor)
+                    Text(proposed == 1 ? "Claude proposed a mod for you to review." : "Claude proposed \(proposed) mods for you to review.")
+                        .font(.callout)
+                    Spacer()
+                    Button("Review…") {
+                        model.newModWay = .fromClaude
+                        model.newModOpen = true
+                    }
+                    .controlSize(.small)
+                }
+                .padding(8)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.1)))
+            }
             CatalogFilterBar(model: model, demo: demo)
             HStack {
                 Text(countLine(shown: cards.count))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("New Mod…") { model.newModOpen = true }
+                Button("New Mod…") {
+                    model.newModWay = .build
+                    model.newModOpen = true
+                }
                     .controlSize(.small)
                     .help("A prompt for Claude to build a mod in a session. Copies it to the clipboard; installs nothing.")
                 Button("Expand All") { model.expandAll(demo: demo) }

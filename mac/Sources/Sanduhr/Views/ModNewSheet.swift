@@ -1,6 +1,14 @@
 import AppKit
 import SwiftUI
 
+/// New Mod's two ways in: the prompt, or what Claude made (in a session, or proposed).
+enum NewModWay: String, CaseIterable, Identifiable, Sendable {
+    case build, fromClaude
+
+    var id: String { rawValue }
+    var title: String { self == .build ? "Build with Claude" : "From Claude" }
+}
+
 /// A mod made in a session, as New Mod lists it (slice F): where it is, and its kept copy when
 /// the files are the same as one Sanduhr kept.
 struct SessionModRow: Identifiable, Equatable, Sendable {
@@ -145,6 +153,33 @@ extension ModsPageModel {
         await refreshKept()
     }
 
+    /// Check for a proposed mod's staged files (slice G): reads them, runs none of the code.
+    func checkProposal(_ r: ModProposalRecord, store: ModProposalStore) async {
+        guard !keptBusy.contains(r.id) else { return }
+        guard let claude else {
+            proposalChecks[r.id] = .unavailable
+            return
+        }
+        keptBusy.insert(r.id)
+        defer { keptBusy.remove(r.id) }
+        let dir = store.stagedPath(r)
+        proposalChecks[r.id] = await Task.detached(priority: .userInitiated) { ModCheck.run(claude: claude, dir: dir) }.value
+    }
+
+    /// Approve: the proposal becomes a kept mod, checked as one.
+    func approve(_ r: ModProposalRecord, store: ModProposalStore) async {
+        do {
+            let kept = try store.approve(r.id)
+            keptNote = nil
+            if let outcome = proposalChecks[r.id] { keptChecks[kept.id] = outcome }
+            proposalChecks[r.id] = nil
+            await refreshKept()
+            if keptChecks[kept.id] == nil { await checkKept(kept) }
+        } catch {
+            keptNote = (error as? KeptMods.Failure)?.message ?? KeptMods.Failure.writeFailed.message
+        }
+    }
+
     /// Try in a Session is offered once Check read a report Claude Code would load.
     func canTry(_ mod: KeptMod) -> Bool {
         guard claude != nil, case .report(let r)? = keptChecks[mod.id] else { return false }
@@ -188,20 +223,16 @@ extension ModsPageModel {
 }
 
 /// New Mod, from the Catalog. Build with Claude (slice E): the idea in a sentence, then Copy
-/// Prompt puts the prompt on the clipboard. Made in a Session (slice F): keep a mod Claude made in
-/// a session, check it, and try it in a new one.
+/// Prompt puts the prompt on the clipboard. From Claude (slices F, G): keep a mod Claude made in
+/// a session or one it proposed, check it, and try it in a new one.
 struct NewModSheet: View {
-    enum Way: String, CaseIterable, Identifiable {
-        case build, session
-
-        var id: String { rawValue }
-        var title: String { self == .build ? "Build with Claude" : "Made in a Session" }
-    }
-
     var model: ModsPageModel
     let demo: Bool
     let close: () -> Void
-    @State private var way: Way = .build
+    var proposals = ModProposalStore.shared
+    @State private var way: NewModWay = .build
+    @State private var approving: ModProposalRecord?
+    @State private var typedName = ""
     @State private var idea = ""
     @State private var showPrompt = false
     @State private var copied = false
@@ -215,23 +246,35 @@ struct NewModSheet: View {
         var id: String { mod.id + "\n" + folder }
     }
 
-    private var prompt: String { ModPrompt.text(idea: idea) }
+    private var prompt: String { ModPrompt.text(idea: idea, canPropose: proposals.allowed) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("New Mod").font(.title3.weight(.semibold))
             Picker("Way", selection: $way) {
-                ForEach(Way.allCases) { Text($0.title).tag($0) }
+                ForEach(NewModWay.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented).labelsHidden().fixedSize()
             switch way {
             case .build: build
-            case .session: session
+            case .fromClaude: session
             }
         }
         .padding(20)
-        .frame(width: 580)
+        .frame(width: 600)
+        .onAppear { way = model.newModWay }
         .task { await model.refreshKept() }
+        .alert(approveTitle, isPresented: Binding(get: { approving != nil }, set: { if !$0 { approving = nil; typedName = "" } })) {
+            if needsTypedName { TextField("The mod's name", text: $typedName) }
+            Button("Keep It") {
+                if let r = approving { Task { await model.approve(r, store: proposals) } }
+                typedName = ""
+            }
+            .disabled(needsTypedName && typedName != approving?.name)
+            Button("Cancel", role: .cancel) { typedName = "" }
+        } message: {
+            Text(approveMessage)
+        }
         .alert("Try \(trying?.name ?? "the mod") in a session?", isPresented: Binding(get: { trying != nil }, set: { if !$0 { trying = nil } })) {
             if let last = model.lastTryFolder {
                 Button("Try in \(last.lastPathComponent)") { if let m = trying { model.trySession(m, in: last) } }
@@ -286,7 +329,7 @@ struct NewModSheet: View {
             .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.secondary.opacity(0.08)))
         }
         .font(.callout)
-        Text("The prompt names no folder on this Mac and carries none of your settings. Nothing is installed from here: the mod runs only in the session that builds it. Keep it afterwards from Made in a Session.")
+        Text("The prompt names no folder on this Mac and carries none of your settings. Nothing is installed from here: the mod runs only in the session that builds it. Keep it afterwards from From Claude.")
             .font(.caption).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         HStack {
@@ -307,10 +350,16 @@ struct NewModSheet: View {
         copied = true
     }
 
-    // MARK: Made in a Session
+    // MARK: From Claude
 
     @ViewBuilder
     private var session: some View {
+        @Bindable var proposals = proposals
+        Toggle("Let agents propose mods", isOn: $proposals.allowed)
+            .help("Lets Claude send a mod it built to Sanduhr with the propose_mod tool. You review its files and what it can do, then keep it or dismiss it; nothing is turned on anywhere by a proposal.")
+        Text("Off, Sanduhr's MCP server refuses propose_mod. On, a proposed mod waits here for you; keeping it doesn't turn it on in any folder.")
+            .font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         Text("A mod Claude makes in a session lives in that session's folder, and Claude Code deletes it after a while. Keep copies it, unchanged, into Sanduhr's own folder and checks what it can do. None of its code runs until you try it or turn it on in a folder, and each asks first.")
             .font(.caption).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -319,6 +368,11 @@ struct NewModSheet: View {
         }
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
+                if !proposals.pending.isEmpty {
+                    Text("Proposed by Claude").font(.callout.weight(.semibold))
+                    ForEach(proposals.pending) { proposalRow($0) }
+                    Divider()
+                }
                 Text("In your sessions").font(.callout.weight(.semibold))
                 let rows = model.shownSessionMods(demo: demo)
                 if !model.loaded {
@@ -338,7 +392,7 @@ struct NewModSheet: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.trailing, 8)
         }
-        .frame(height: 340)
+        .frame(height: 380)
         HStack {
             Spacer()
             Button("Done") { close() }.keyboardShortcut(.defaultAction)
@@ -374,7 +428,7 @@ struct NewModSheet: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(mod.name + (mod.version.map { " " + $0 } ?? "")).font(.callout)
-                    Text("Kept \(mod.keptAt.formatted(date: .abbreviated, time: .shortened)) from session \(mod.session), \(mod.files) \(mod.files == 1 ? "file" : "files")")
+                    Text("Kept \(mod.keptAt.formatted(date: .abbreviated, time: .shortened)) \(mod.proposed == true ? "from Claude's proposal" : "from session \(mod.session)"), \(mod.files) \(mod.files == 1 ? "file" : "files")")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -411,6 +465,77 @@ struct NewModSheet: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    private func proposalRow(_ r: ModProposalRecord) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(r.name + (r.version.map { " " + $0 } ?? "")).font(.callout)
+                    Text("Proposed \(r.requestedAt.formatted(date: .abbreviated, time: .shortened)), \(r.files) \(r.files == 1 ? "file" : "files"), \(ByteCountFormatter.string(fromByteCount: Int64(r.bytes), countStyle: .file))")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if model.keptBusy.contains(r.id) { ProgressView().controlSize(.small) }
+                Button("Dismiss") { proposals.dismiss(r.id) }
+                    .controlSize(.small)
+                    .help("Deletes the proposed files. Claude hears that you dismissed it.")
+                Button("Keep…") { approving = r }
+                    .controlSize(.small)
+                    .disabled(!proposalPassed(r))
+                    .help(proposalPassed(r) ? "Keeps it with your kept mods. Turning it on in a folder asks again." : "Check has to read a report Claude Code would load first.")
+            }
+            Text(r.summary).font(.caption).fixedSize(horizontal: false, vertical: true)
+            if let outcome = model.proposalChecks[r.id] {
+                ModRiskCard(outcome: outcome)
+            } else {
+                Text("Checking what it can do…").font(.caption).foregroundStyle(.secondary)
+                    .task { await model.checkProposal(r, store: proposals) }
+            }
+            DisclosureGroup("Its files") {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(proposals.files(r), id: \.path) { f in
+                        DisclosureGroup(f.path) {
+                            ScrollView {
+                                Text(f.text)
+                                    .font(.caption.monospaced())
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(6)
+                            }
+                            .frame(maxHeight: 200)
+                            .background(RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.08)))
+                        }
+                        .font(.caption.monospaced())
+                    }
+                }
+            }
+            .font(.caption)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func proposalPassed(_ r: ModProposalRecord) -> Bool {
+        guard case .report(let report)? = model.proposalChecks[r.id] else { return false }
+        return report.passed
+    }
+
+    /// A high risk asks for the mod's name typed out.
+    private var needsTypedName: Bool {
+        guard let r = approving, case .report(let report)? = model.proposalChecks[r.id] else { return false }
+        return report.risk == .high
+    }
+
+    private var approveTitle: String { "Keep \(approving?.name ?? "the mod")?" }
+
+    private var approveMessage: String {
+        guard let r = approving else { return "" }
+        var lines = ["It joins your kept mods. No Claude Code folder loads it until you turn it on there, which asks again."]
+        if case .report(let report)? = model.proposalChecks[r.id] {
+            lines.append("\(report.risk.title): \(report.reasons.joined(separator: " "))")
+        }
+        if needsTypedName { lines.append("Type \(r.name) to keep it.") }
+        return lines.joined(separator: "\n\n")
     }
 
     /// The mod per Claude Code folder: On asks first, Off takes it out by receipt.
