@@ -230,17 +230,20 @@ struct KeptMods: Sendable {
         """
     }
 
-    /// Writes the script into a new empty folder under the temporary folder and opens it in
-    /// Terminal. Returns the folder.
+    /// Writes the script into a new folder under the temporary folder and opens it in Terminal.
+    /// Claude Code starts in `workingFolder`, or in that new, empty folder without one. Returns the
+    /// folder it starts in.
     @discardableResult
-    func trySession(_ mod: KeptMod, claude: String) throws -> URL {
+    func trySession(_ mod: KeptMod, claude: String, in workingFolder: URL? = nil) throws -> URL {
         let fm = FileManager.default
-        let folder = fm.temporaryDirectory.appendingPathComponent("sanduhr-try-\(mod.name)-\(UUID().uuidString.prefix(8))",
-                                                                  isDirectory: true)
-        let script = folder.appendingPathComponent("try.command")
+        let scratch = fm.temporaryDirectory.appendingPathComponent("sanduhr-try-\(mod.name)-\(UUID().uuidString.prefix(8))",
+                                                                   isDirectory: true)
+        let start = workingFolder ?? scratch
+        let script = scratch.appendingPathComponent("try.command")
         do {
-            try fm.createDirectory(at: folder, withIntermediateDirectories: true)
-            try Self.tryScript(claude: claude, mod: path(mod), folder: folder.path, config: mod.folder).write(to: script, atomically: true, encoding: .utf8)
+            try fm.createDirectory(at: scratch, withIntermediateDirectories: true)
+            try Self.tryScript(claude: claude, mod: path(mod), folder: start.path, config: mod.folder)
+                .write(to: script, atomically: true, encoding: .utf8)
             try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: script.path)
         } catch {
             throw Failure.writeFailed
@@ -251,6 +254,6 @@ struct KeptMods: Sendable {
         } else {
             NSWorkspace.shared.open(script)
         }
-        return folder
+        return start
     }
 }
