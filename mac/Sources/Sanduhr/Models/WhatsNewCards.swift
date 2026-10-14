@@ -7,8 +7,31 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2200: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.20.0", id: "new-mod",
+            title: "Build a mod with Claude",
+            body: "New Mod writes the prompt for your idea. Keep a mod Claude made in a session, or review one Claude proposes, before it runs anywhere.",
+            art: .symbol("wand.and.stars"), destination: .mods),
+        WhatsNewCard(
+            version: "2.20.0", id: "mod-studio",
+            title: "Mod Studio",
+            body: "Preview the band above the prompt in every state with demo numbers, then pick its meters, style, label and motion per folder.",
+            art: .symbol("paintpalette"), destination: .mods),
+        WhatsNewCard(
+            version: "2.20.0", id: "compact-catalog",
+            title: "A shorter Catalog",
+            body: "One line per item with a dot per folder. Search marks what matched, groups and runs fold, and By Seat opens on your mods and plugins.",
+            art: .symbol("list.bullet.rectangle"), destination: .mods),
+        WhatsNewCard(
+            version: "2.20.0", id: "notch-keeps-settings",
+            title: "The notch keeps your place",
+            body: "With Settings open, a click on the notch brings it forward on the page you were on.",
+            art: .symbol("macbook"), destination: .notch),
+    ]
 
     static let release2190: [WhatsNewCard] = [
         WhatsNewCard(
