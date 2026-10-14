@@ -224,20 +224,39 @@ private struct CatalogGroupView: View {
             .accessibilityValue(open ? "Open" : "Closed")
             if open {
                 ForEach(section.runs) { run in
+                    let key = section.group.rawValue + "/" + run.title
+                    let runOpen = searching || run.title.isEmpty || !model.closedRuns.contains(key)
                     if !run.title.isEmpty {
-                        Text(run.title + " · \(run.cards.count)")
-                            .font(.caption.weight(.semibold))
+                        Button {
+                            if model.closedRuns.contains(key) { model.closedRuns.remove(key) } else { model.closedRuns.insert(key) }
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: runOpen ? "chevron.down" : "chevron.right")
+                                    .font(.caption2.weight(.semibold))
+                                    .frame(width: 10)
+                                Text(run.title + " · \(run.cards.count)")
+                                    .font(.caption.weight(.semibold))
+                                Spacer()
+                            }
                             .foregroundStyle(.secondary)
-                            .padding(.top, 2)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(searching)
+                        .padding(.top, 2)
+                        .accessibilityLabel("\(run.title), \(run.cards.count)")
+                        .accessibilityValue(runOpen ? "Open" : "Closed")
                     }
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(run.cards) { card in
-                            if section.group == .available {
-                                AvailableRow(card: card)
-                            } else if model.isOpen(card) {
-                                CatalogCardView(card: card, model: model, demo: demo)
-                            } else {
-                                CatalogLine(card: card, model: model, demo: demo)
+                    if runOpen {
+                        LazyVStack(alignment: .leading, spacing: 4) {
+                            ForEach(run.cards) { card in
+                                if section.group == .available {
+                                    AvailableRow(card: card)
+                                } else if model.isOpen(card) {
+                                    CatalogCardView(card: card, model: model, demo: demo)
+                                } else {
+                                    CatalogLine(card: card, model: model, demo: demo)
+                                }
                             }
                         }
                     }

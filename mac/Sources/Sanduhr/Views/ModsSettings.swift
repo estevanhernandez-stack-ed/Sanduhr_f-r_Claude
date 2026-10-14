@@ -211,6 +211,9 @@ final class ModsPageModel {
     /// window lives; plugins sorted by name or by session load.
     var openGroups: Set<CatalogGroup> = Set(CatalogGroup.allCases.filter(\.startsOpen))
     var openContents: Set<String> = []
+    /// Runs inside a group folded by their title (2026-10-14), "group/title", kept while the
+    /// window lives; every run starts open.
+    var closedRuns: Set<String> = []
     /// The cards opened from their compact line (item 75, slice A), kept while the window lives.
     var openCards: Set<String> = []
     var sortByLoad = false

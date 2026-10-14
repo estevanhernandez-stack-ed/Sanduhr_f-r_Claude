@@ -498,13 +498,18 @@ enum ConfigCatalog {
     }
 
     /// Where a plugin comes from, for its run's title: the source it is installed from.
+    /// The run every mod goes in, first in Plugins and mods (2026-10-14, the owner: a mod belongs
+    /// with the mods, not under where it loads from).
+    static let modsRun = "Mods"
+
     static func runTitle(_ c: CatalogCard) -> String {
         let s = c.installedSources.first ?? c.sources.first ?? "Elsewhere"
         return s.hasPrefix("Marketplace ") ? String(s.dropFirst("Marketplace ".count)) : s
     }
 
     /// The cards the filters let through, grouped. Groups with nothing in them are left out.
-    /// Plugins run by source (Sanduhr's first), sorted by name or by the most session load.
+    /// Plugins run by source after the Mods run (Sanduhr's first in it), sorted by name or by the
+    /// most session load.
     static func sections(_ cards: [CatalogCard], failedChecks: Set<String> = [], byLoad: Bool = false) -> [CatalogSection] {
         var by: [CatalogGroup: [CatalogCard]] = [:]
         for c in cards { by[group(c, failed: failedChecks.contains(c.id)), default: []].append(c) }
@@ -526,7 +531,7 @@ enum ConfigCatalog {
             case .yours:
                 out.append(CatalogSection(group: g, runs: runs(list) { $0.kind.title }))
             case .plugins:
-                var r = runs(list, runTitle)
+                var r = runs(list) { $0.isMod ? modsRun : runTitle($0) }
                 for i in r.indices {
                     r[i].cards.sort { a, b in
                         if a.isSanduhrs != b.isSanduhrs { return a.isSanduhrs }
@@ -535,7 +540,7 @@ enum ConfigCatalog {
                     }
                 }
                 r.sort { a, b in
-                    let sa = a.cards.contains(where: \.isSanduhrs), sb = b.cards.contains(where: \.isSanduhrs)
+                    let sa = a.title == modsRun, sb = b.title == modsRun
                     if sa != sb { return sa }
                     return a.cards.count != b.cards.count ? a.cards.count > b.cards.count : a.title < b.title
                 }
