@@ -53,4 +53,28 @@ struct ModsCatalogCompactTests {
     @Test func everyKindHasAnIcon() {
         #expect(Set(CatalogKind.allCases.map(\.symbol)).count == CatalogKind.allCases.count)
     }
+
+    @Test func theSearchMarksEveryWordInTheName() {
+        func marked(_ text: String, _ search: String) -> [String] {
+            ConfigCatalog.matchRanges(in: text, search: search).map { String(text[$0]) }
+        }
+        #expect(marked("superpowers-chrome", "chrome") == ["chrome"])
+        // Case and accents don't matter; every occurrence of every word.
+        #expect(marked("Café Mod café", "CAFE") == ["Café", "café"])
+        #expect(marked("plugin-dev tools", "dev tool") == ["dev", "tool"])
+        // Overlapping words mark one run.
+        #expect(marked("statusline", "status tusl") == ["statusl"])
+        #expect(marked("anything", "  ").isEmpty && marked("abc", "zz").isEmpty)
+    }
+
+    @MainActor
+    @Test func rightOpensALineAndLeftFoldsIt() {
+        let model = ModsPageModel()
+        model.openCard("a")
+        model.openCard("a")
+        #expect(model.openCards == ["a"])
+        model.foldCard("a")
+        model.foldCard("b")
+        #expect(model.openCards.isEmpty)
+    }
 }
