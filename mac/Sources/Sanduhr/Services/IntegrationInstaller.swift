@@ -90,6 +90,9 @@ struct IntegrationReceipt: Codable, Equatable, Sendable {
     /// The meters mod's switch (item 64, slice 2): what the Mods page wrote in
     /// `enabledPlugins`, so switching back (or Remove) undoes exactly that.
     var switched: SwitchReceipt?
+    /// The meters mod's options (item 75, slice D): the `pluginConfigs` member the Mod Studio's
+    /// Save wrote, so Reset, Remove or another Save undoes exactly that.
+    var options: OptionsReceipt?
 }
 
 /// One `enabledPlugins` member a Mods page switch wrote (item 64, slice 2), byte for byte.
@@ -539,6 +542,7 @@ struct IntegrationInstaller {
                 // The version the entry names now, and a switch made earlier, which stays.
                 receipt.pinned = pinned
                 receipt.switched = prior?.switched
+                receipt.options = prior?.options
             }
             receipts.removeAll { $0.file == file && $0.kind == kind }
             receipts.append(receipt)
@@ -783,8 +787,11 @@ struct IntegrationInstaller {
     /// An entry that isn't Sanduhr's stays. With nothing installed anywhere any more, the
     /// scripts go too.
     func remove(_ kind: IntegrationKind, folder: String) throws {
-        // The meters mod's switch comes out first, so the folder is back to what it was.
-        if kind == .meters { try undoModSwitch(folder: folder) }
+        // The meters mod's switch and options come out first, so the folder is back to what it was.
+        if kind == .meters {
+            try undoModSwitch(folder: folder)
+            try undoModOptions(folder: folder)
+        }
         let ledger = readReceipts()
         var receipts = ledger.records
         // The files the receipts name, never the placement rule's answer today (item 71, slice

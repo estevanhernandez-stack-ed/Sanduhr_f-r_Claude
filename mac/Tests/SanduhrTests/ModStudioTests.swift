@@ -53,7 +53,7 @@ struct ModStudioTests {
         }
         model.moment = .nearlyFull
         #expect(model.lines(at: at).first?.contains { $0.text == "⚠" } == true)
-        model.full = true
+        model.layout.style = .full
         #expect(model.lines(at: at).count == 2)
     }
 
@@ -102,7 +102,7 @@ struct ModStudioTests {
         model.studioOpen = false
         model.openStudio()
         #expect(model.studioTab == .look)
-        #expect(StudioTab.allCases.map(\.title) == ["Look", "Folders", "About"])
+        #expect(StudioTab.allCases.map(\.title) == ["Look", "Layout", "Folders", "About"])
     }
 
     @Test func checkWaitsForTheFoldersToBeRead() async {
@@ -110,5 +110,43 @@ struct ModStudioTests {
         await model.checkOwnMod()
         // Before the read, `claude` isn't known yet: no answer rather than "unavailable".
         #expect(model.ownCheck == nil && !model.checkingOwn)
+    }
+
+    // Slice D: Layout drafts the mod's options for one folder or every folder where it's on.
+
+    @Test func layoutDraftsForTheFolderShownOrEveryFolderWhereItsOn() {
+        let model = ModStudioModel(saved: [:]) { _ in }
+        var a = row("/a", on: true)
+        a.options.values.style = .full
+        a.options.isSet = true
+        a.options.isOurs = true
+        let b = row("/b", on: true)
+        var c = row("/c", on: false)
+        c.options.isSet = true
+        let rows = [a, b, c]
+        model.showLayout(of: a)
+        #expect(model.layout.style == .full && !model.layoutDirty(rows))
+        model.layoutEverywhere = true
+        // /b still has the defaults; /c is off.
+        #expect(model.layoutTargets(rows).map(\.folder) == ["/a", "/b"] && model.layoutDirty(rows))
+        model.layoutEverywhere = false
+        model.layout.label = "Personal"
+        #expect(model.layoutDirty(rows))
+        model.revert()
+        #expect(model.layout.label.isEmpty && !model.layoutDirty(rows))
+        // Options someone else set aren't Save's to change.
+        model.showLayout(of: c)
+        model.layout.bars = .weekly
+        #expect(!model.layoutDirty(rows))
+    }
+
+    @Test func thePreviewDrawsTheLayout() {
+        let model = ModStudioModel(saved: [:]) { _ in }
+        let at = Date(timeIntervalSince1970: 1_790_000_000)
+        model.layout.bars = .session
+        let one = model.lines(at: at).first.map { $0.map(\.text).joined() } ?? ""
+        #expect(one.contains("Session") && !one.contains("Weekly"))
+        model.layout.label = " Personal "
+        #expect(model.lines(at: at).first?.first?.text == "Personal")
     }
 }

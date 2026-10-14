@@ -513,6 +513,24 @@ final class ModsPageModel {
         if let added = note?.added { updateQuestion = OwnModUpdateQuestion(folder: folder, added: added) }
     }
 
+    /// The Studio's Layout Save (item 75, slice D): the options into each folder's settings.json,
+    /// by receipt. Each folder's note says what happened; options set in Claude Code stay.
+    func saveOptions(_ options: MetersOptions, folders: [String], linked: [String]) async {
+        for folder in folders {
+            await act(folder, linked: linked) { installer, _ in
+                switch try installer.setOwnModOptions(options, folder: folder) {
+                case .written: return OwnModNote(text: "Layout saved. " + ModsPageModel.optionsTakeEffect, kind: .info)
+                case .removed: return OwnModNote(text: "Back to the mod's defaults: Sanduhr's options came out of settings.json. " + ModsPageModel.optionsTakeEffect, kind: .info)
+                case .unchanged: return nil
+                case .keptTheirs: return OwnModNote(text: ModsPageModel.optionsKept, kind: .warning)
+                }
+            }
+        }
+    }
+
+    nonisolated static let optionsTakeEffect = "Sessions started from now on use it; a session already running keeps the layout it started with."
+    nonisolated static let optionsKept = "This folder's settings.json already has options for the mod that Sanduhr didn't write (Claude Code's /config writes them there), so Sanduhr left them as they are."
+
     func remove(folder: String, linked: [String]) async {
         await act(folder, linked: linked) { installer, _ in
             try installer.remove(.meters, folder: folder)

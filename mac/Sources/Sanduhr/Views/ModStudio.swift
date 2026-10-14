@@ -84,7 +84,12 @@ final class ModStudioModel {
     private(set) var startedAt = Date()
     var columns = 100
     var reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-    var full = false
+    /// The Layout tab (slice D): the options drafted, and what the folder shown has now.
+    var layout = MetersOptions.defaults
+    private(set) var layoutSaved = MetersOptions.defaults
+    /// The folder Layout shows and saves to, and whether Save writes every folder where it's on.
+    private(set) var layoutFolder: String?
+    var layoutEverywhere = false
     var draft: [SanduhrSegment: SegmentStyle]
     private(set) var saved: [SanduhrSegment: SegmentStyle]
     @ObservationIgnored private let write: ([SanduhrSegment: SegmentStyle]) -> Void
@@ -116,7 +121,28 @@ final class ModStudioModel {
         draft = kept
     }
 
-    func revert() { draft = saved }
+    func revert() {
+        draft = saved
+        layout = layoutSaved
+    }
+
+    /// Layout shows `row`'s folder: its options become the draft's starting point.
+    func showLayout(of row: OwnModRow?) {
+        layoutFolder = row?.folder
+        layoutSaved = row?.options.values ?? .defaults
+        layout = layoutSaved
+    }
+
+    /// The folders a Layout Save writes: the one shown, or every folder where the mod is on.
+    func layoutTargets(_ rows: [OwnModRow]) -> [OwnModRow] {
+        if layoutEverywhere { return rows.filter(\.state.isOn) }
+        return rows.filter { $0.folder == layoutFolder }
+    }
+
+    /// A Layout Save would change a folder (one whose options Claude Code set is left alone).
+    func layoutDirty(_ rows: [OwnModRow]) -> Bool {
+        layoutTargets(rows).contains { !$0.options.isTheirs && $0.options.values != layout.normalized }
+    }
 
     func replay() { startedAt = Date() }
 
@@ -142,7 +168,8 @@ final class ModStudioModel {
         var file = previewFile
         file.watchers = moment.watchers(now: now, startedAt: start)
         let input = BandFrame.Input(
-            now: now, bars: .both, style: full ? .full : .compact, label: "", moving: !reduceMotion,
+            now: now, bars: layout.bars, style: layout.style, label: layout.normalized.label,
+            moving: !reduceMotion && layout.motion == .on,
             width: columns, maxRows: 6, tzOffsetMinutes: -TimeZone.current.secondsFromGMT(for: date) / 60,
             seat: false, sweeps: moment.sweeps(now: now, startedAt: start))
         return BandFrame.lines(moment.snapshot(now: now), file, input)
@@ -212,6 +239,7 @@ struct ModStudioSheet: View {
     @State private var askingToClose = false
     @State private var styling: SanduhrSegment?
     @State private var consent: MetersConsent?
+    @State private var saving = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -245,12 +273,12 @@ struct ModStudioSheet: View {
                                },
                                cancel: { consent = nil })
         }
-        .confirmationDialog("Save the band's new look?", isPresented: $askingToClose) {
-            Button("Save") { model.save(); close() }
+        .confirmationDialog("Save your changes?", isPresented: $askingToClose) {
+            Button("Save") { Task { await saveAll(); close() } }
             Button("Discard Changes", role: .destructive) { close() }
             Button("Keep Editing", role: .cancel) {}
         } message: {
-            Text("Saved looks show in every Claude Code session's band right away.")
+            Text("Saved looks show in every Claude Code session's band right away; a saved layout in sessions started after.")
         }
     }
 
@@ -290,8 +318,6 @@ struct ModStudioSheet: View {
                     .accessibilityValue("\(model.columns) columns")
                 Text("\(model.columns) columns").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
             }
-            Toggle("Full style", isOn: $model.full)
-                .help("A row per meter with pace words, as the mod's Full style draws it. It folds to one line in a terminal narrower than 64 columns.")
             Toggle("Reduce Motion", isOn: $model.reduceMotion)
                 .help("The band honors macOS's Reduce Motion. Flip it here to see the band still; this changes the preview only.")
         }
@@ -303,6 +329,7 @@ struct ModStudioSheet: View {
     private var tabContent: some View {
         switch tab {
         case .look: look
+        case .layout: StudioLayout(studio: model, model: mods, demo: demo)
         case .folders: StudioFolders(model: mods, linked: linked, demo: demo, install: { consent = MetersConsent(folder: $0) })
         case .about: StudioAbout(model: mods)
         }
@@ -341,15 +368,44 @@ struct ModStudioSheet: View {
         return parts.joined(separator: ", ").prefix(1).uppercased() + parts.joined(separator: ", ").dropFirst()
     }
 
+    private var layoutRows: [OwnModRow] { StudioLayout.rows(mods, demo: demo) }
+
+    private var dirty: Bool { model.isDirty || model.layoutDirty(layoutRows) }
+
+    private var footerText: String {
+        switch (model.isDirty, model.layoutDirty(layoutRows)) {
+        case (true, true): "Not saved: the look and the layout."
+        case (true, false): "Not saved. Save shows the new look in every session's band."
+        case (false, true): "Not saved. Save writes the layout into settings.json for sessions started after."
+        case (false, false): "Saved looks show in every session's band."
+        }
+    }
+
     private var footer: some View {
         HStack {
-            Text(model.isDirty ? "Not saved. Save shows the new look in every session's band." : "Saved looks show in every session's band.")
-                .font(.caption).foregroundStyle(.secondary)
+            Text(footerText).font(.caption).foregroundStyle(.secondary)
             Spacer()
-            Button("Revert") { model.revert() }.disabled(!model.isDirty)
-            Button("Save") { model.save() }.disabled(!model.isDirty).keyboardShortcut("s")
-            Button("Done") { if model.isDirty { askingToClose = true } else { close() } }
+            if saving { ProgressView().controlSize(.small) }
+            Button("Revert") { model.revert() }.disabled(!dirty || saving)
+            Button("Save") { Task { await saveAll() } }.disabled(!dirty || saving).keyboardShortcut("s")
+            Button("Done") { if dirty { askingToClose = true } else { close() } }
                 .keyboardShortcut(.defaultAction)
+                .disabled(saving)
         }
+    }
+
+    /// Save: the looks into band.json, and the layout into each target folder by receipt; then
+    /// Layout shows what its folder has now.
+    private func saveAll() async {
+        if model.isDirty { model.save() }
+        let rows = layoutRows
+        guard model.layoutDirty(rows) else { return }
+        saving = true
+        defer { saving = false }
+        await mods.saveOptions(model.layout, folders: model.layoutTargets(rows).map(\.folder), linked: linked)
+        let draft = model.layout
+        model.showLayout(of: layoutRows.first { $0.folder == model.layoutFolder })
+        // A folder that kept its own options leaves the draft as it was, so it isn't lost.
+        if model.layoutSaved != draft.normalized { model.layout = draft }
     }
 }

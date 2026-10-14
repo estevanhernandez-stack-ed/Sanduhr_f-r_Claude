@@ -25,6 +25,8 @@ struct OwnModRow: Identifiable, Equatable, Sendable {
     var updateAvailable = false
     /// The pinned folder is gone.
     var missing = false
+    /// The mod's options in this folder's settings.json (item 75, slice D).
+    var options = MetersOptionsState()
 
     var folder: String { state.folder }
     var id: String { folder }
@@ -38,6 +40,7 @@ struct OwnModRow: Identifiable, Equatable, Sendable {
             row.version = ModStatusEntries.manifest(dir)["version"] as? String
         }
         if let pinned = state.pinned, let app { row.updateAvailable = pinned != app.stamp }
+        row.options = installer.ownModOptions(folder: folder)
         return row
     }
 
