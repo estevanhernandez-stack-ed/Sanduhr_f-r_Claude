@@ -407,8 +407,9 @@ private struct SegmentChip: View {
     }
 }
 
-/// A segment's look: its own colors or ink (one color or a gradient), attributes, letters.
-private struct StylePopover: View {
+/// A segment's look: its own colors or ink (one color or a gradient), attributes, letters. The
+/// statusline's chips and the Mod Studio's Look share it.
+struct StylePopover: View {
     let name: String
     @Binding var style: SegmentStyle
 

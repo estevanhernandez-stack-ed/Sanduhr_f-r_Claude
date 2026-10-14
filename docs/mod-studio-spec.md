@@ -36,7 +36,7 @@ Opened by **Open Studio…** on the meters mod's card (Mods & Config, and its Ca
 │ │           resets 1h 12m              │  Weekly    [brush]  ▓   one color      │
 │ │ ─ prompt ──────────────────────────  │  Resets    [brush]  default            │
 │ └──────────────────────────────────────┘                                        │
-│  Moment: (Calm) (Near a line) (Crossing) (Before reset) (Nearly full) (Watchers)│
+│  Show:   (Calm) (Near a line) (Crossing) (Before reset) (Nearly full) (Watchers)│
 │  Width: ──●────  Reduce Motion: off                                             │
 │                                                         [Revert]  [Save]        │
 └─────────────────────────────────────────────────────────────────────────────────┘
@@ -45,7 +45,7 @@ Opened by **Open Studio…** on the meters mod's card (Mods & Config, and its Ca
 ### Preview
 
 - The band as a session draws it: bars, pace mark, reset words, label, and watchers rows when **Watchers** is picked. Monospaced, on a terminal-dark background, with a width slider (narrow terminals wrap differently).
-- **Moments** set the demo numbers and play the effect that goes with them: **Calm** (no effect), **Near a line** (amber), **Crossing** (the one-shot sweep when a meter crosses a warning line), **Before reset** (the shimmer), **Nearly full** (the glow), **Watchers** (two demo rows, one waiting with its pulse). The moment replays on click.
+- **Show** (2026-10-13: the owner found "Moment" unclear) sets the demo numbers and play the effect that goes with them: **Calm** (no effect), **Near a line** (amber), **Crossing** (the one-shot sweep when a meter crosses a warning line), **Before reset** (the shimmer), **Nearly full** (the glow), **Watchers** (two demo rows, one waiting with its pulse). Clicking the one showing replays it; Crossing replays every three seconds.
 - **Reduce Motion** follows macOS and can be flipped in the preview alone, since the band honors it through `band.json` `reduce_motion`.
 - Drawn natively in SwiftUI from a Swift port of the band's pure functions: `bandFor`, `meterText`, `resetWords`, `gradient`, `lightAt`, `glowLevel` and the moving-light timing [repo mac/integrations/mods/sanduhr-meters/hooks/meters.ts, band.ts]. To keep the two in step, the mod's tests (`claude plugin test`) write golden fixtures (inputs and the cells they produce, color per character) to `mac/integrations/mods/sanduhr-meters/fixtures/`, and a Swift test renders the same inputs and compares. A change to either side that the other doesn't match fails CI.
 
@@ -95,7 +95,7 @@ Each ships on its own and is useful without the next.
 | Slice | What | Writes |
 |---|---|---|
 | A | Compact Catalog | nothing |
-| B | Studio shell, Preview with Moments, Look tab; looks saved for every statusline kind | `bandMeterStyles` only |
+| B | Studio shell, Preview with its Show buttons, Look tab; looks saved for every statusline kind | `bandMeterStyles` only |
 | C | Folders tab (move from the page) and About tab | none new (existing installer) |
 | D | Layout tab: options per folder through a `pluginConfigs` receipt | folder `settings.json`, with receipt |
 | E | New Mod: Build with Claude prompt | clipboard only |
@@ -122,14 +122,14 @@ A and B are the owner's immediate ask: a shorter list and a real preview with ed
 ## Acceptance
 
 - The Catalog opens compact; an expanded line shows the full card; search finds a skill inside a plugin and opens that line.
-- From the meters mod's card, the Studio opens; every Moment plays its effect in the preview; a gradient on Session shows in the preview before Save, and in a running Claude Code session's band after Save, in a folder whose statusline is Sanduhr's line alone.
+- From the meters mod's card, the Studio opens; every Show button plays its effect in the preview; a gradient on Session shows in the preview before Save, and in a running Claude Code session's band after Save, in a folder whose statusline is Sanduhr's line alone.
 - Bars set to weekly for one folder appears in that folder's new sessions only, and Remove on that folder's row returns its `settings.json` byte-identical.
 - Build with Claude copies a prompt containing no path under the home folder and no settings value.
 - Nothing in the Studio reads a real snapshot; demo mode shows no work folder.
 
 ## Verify
 
-swift-testing for the band port against the golden fixtures, the options receipt (write, undo byte-exact, a value not Sanduhr's left alone), the prompt's contents, and the compact Catalog's expand and search state. `claude plugin test` for the fixtures' generator, beside the band's existing tests. By hand: the owner's two seats, one with Sanduhr's line alone, one combined; each Moment; Save and Revert; a live session's band after Save.
+swift-testing for the band port against the golden fixtures, the options receipt (write, undo byte-exact, a value not Sanduhr's left alone), the prompt's contents, and the compact Catalog's expand and search state. `claude plugin test` for the fixtures' generator, beside the band's existing tests. By hand: the owner's two seats, one with Sanduhr's line alone, one combined; each Show button; Save and Revert; a live session's band after Save.
 
 ## Checklist entry
 

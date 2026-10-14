@@ -120,7 +120,10 @@ final class BandFileWriter {
 
     var showsWatchers: Bool { defaults.bool(forKey: BandFile.watchersKey) }
 
-    /// The Combine sheet's looks for Sanduhr's segments (nil clears them: Replace).
+    /// The looks the band draws Sanduhr's segments in, as stored (the Mod Studio's Look starts here).
+    var meterStyles: [SanduhrSegment: SegmentStyle] { BandFile.styles(from: defaults.string(forKey: BandFile.stylesKey)) }
+
+    /// The looks for Sanduhr's segments, from the Mod Studio or the Combine sheet (nil clears them: Replace).
     func setMeterStyles(_ ours: [SanduhrSegment: SegmentStyle]?) {
         if let text = BandFile.stylesText(ours) {
             defaults.set(text, forKey: BandFile.stylesKey)

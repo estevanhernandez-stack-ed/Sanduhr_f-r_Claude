@@ -231,6 +231,20 @@ private struct CatalogLine: View {
     var model: ModsPageModel
 
     var body: some View {
+        HStack(spacing: 8) {
+            line
+            if card.isSanduhrs {
+                Button("Studio…") { model.studioOpen = true }
+                    .buttonStyle(.link)
+                    .font(.caption)
+                    .help("Open the Mod Studio")
+            }
+        }
+        .padding(.trailing, card.isSanduhrs ? 8 : 0)
+        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.secondary.opacity(0.06)))
+    }
+
+    private var line: some View {
         Button { model.toggleCard(card.id) } label: {
             HStack(spacing: 7) {
                 Image(systemName: "chevron.right")
@@ -259,7 +273,6 @@ private struct CatalogLine: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.secondary.opacity(0.06)))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -368,9 +381,14 @@ private struct CatalogCardView: View {
                 Text(line).font(.caption).foregroundStyle(.secondary)
             }
             if card.isSanduhrs {
-                Text("Switches per folder above, \(SettingsNames.metersAbovePrompt).")
-                    .font(.caption)
-                    .foregroundStyle(Color.hex("a78bfa"))
+                HStack(spacing: 8) {
+                    Text("Switches per folder above, \(SettingsNames.metersAbovePrompt).")
+                        .font(.caption)
+                        .foregroundStyle(Color.hex("a78bfa"))
+                    Button("Open Studio…") { model.studioOpen = true }
+                        .buttonStyle(.link)
+                        .font(.caption)
+                }
             }
             if let risk = riskLine {
                 Text(risk).font(.caption).foregroundStyle(.orange)
