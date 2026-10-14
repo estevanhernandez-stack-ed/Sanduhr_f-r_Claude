@@ -72,6 +72,9 @@ struct ModsCatalogView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
+                Button("New Mod…") { model.newModOpen = true }
+                    .controlSize(.small)
+                    .help("A prompt for Claude to build a mod in a session. Copies it to the clipboard; installs nothing.")
                 Button("Expand All") { model.expandAll(demo: demo) }
                     .buttonStyle(.link)
                     .font(.caption)
@@ -95,6 +98,7 @@ struct ModsCatalogView: View {
                 CatalogGroupView(section: section, model: model, searching: searching)
             }
         }
+        .sheet(isPresented: $model.newModOpen) { NewModSheet(close: { model.newModOpen = false }) }
     }
 
     private func countLine(shown: Int) -> String {

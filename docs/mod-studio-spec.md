@@ -98,7 +98,7 @@ Each ships on its own and is useful without the next.
 | B | Studio shell, Preview with its Show buttons, Look tab; looks saved for every statusline kind | `bandMeterStyles` only |
 | C | Folders tab (move from the page) and About tab (built 2026-10-13: the page keeps the on-line with **Folders…** and **Open Studio…**) | none new (existing installer) |
 | D | Layout tab: options per folder through a `pluginConfigs` receipt (built 2026-10-13) | folder `settings.json`, with receipt |
-| E | New Mod: Build with Claude prompt | clipboard only |
+| E | New Mod: Build with Claude prompt (built 2026-10-13: a small **New Mod** sheet from the Catalog, not the Studio, until slice F gives the Studio an empty mod to open on) | clipboard only |
 | F | Adopt a session-built mod; Try in a session | managed mod folder; consent per folder |
 | G | `propose_mod`, `propose_install`, `list_catalog` behind **Let agents propose mods** | staged proposals |
 
