@@ -91,7 +91,11 @@ final class ModsPageModel {
 
     /// Two passes: first what Sanduhr's own mod needs (the folders, its rows, `claude`), so
     /// Meters above the prompt never waits on the Catalog; then every seat's scan.
+    /// The accounts' linked folders the last read used: Turn On and Off read again with them.
+    private(set) var lastLinked: [String] = []
+
     func load(linked: [String]) async {
+        lastLinked = linked
         guard !loading else { return }
         loading = true
         defer { loading = false }

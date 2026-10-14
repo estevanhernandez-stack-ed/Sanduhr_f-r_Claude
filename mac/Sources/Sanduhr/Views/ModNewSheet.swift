@@ -100,6 +100,8 @@ extension ModsPageModel {
         }.value
         keptNote = failed
         await refreshKept()
+        // The Catalog shows the mod on or off there without Read Again.
+        await load(linked: lastLinked)
     }
 
     func shownSessionMods(demo: Bool) -> [SessionModRow] {

@@ -475,7 +475,9 @@ enum ConfigCatalog {
         } else if items.contains(where: { $0.state == .on && $0.path == nil && $0.origin != .installed(marketplace: "synced") }) {
             out.append("Turned on in \(seat.label) but not installed on this Mac.")
         }
-        let on = Set(items.filter { $0.state == .on || $0.state == .session }.map(source))
+        // A session's own copy loads in that session alone: beside a kept copy of the same mod (item
+        // 75, slice F) or the one it is a new version of, it isn't the mod on twice.
+        let on = Set(items.filter { $0.state == .on }.map(source))
         if on.count > 1 { out.append("On twice in \(seat.label): \(on.sorted().joined(separator: " and ")).") }
         return out
     }

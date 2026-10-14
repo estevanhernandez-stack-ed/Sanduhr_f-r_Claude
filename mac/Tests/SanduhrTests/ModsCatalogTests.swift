@@ -393,4 +393,18 @@ struct ModsCatalogTests {
         let yaml = YAMLEmitter.emit(DebugState.yaml(s))
         #expect(yaml.contains("mods_config:\n  tab: seat\n  seats: 2\n  cards: 9\n  available: 2\n  needs_look: 3\n  duplicates: 1\n  work_only: 4\n  shown: 5"))
     }
+
+    @Test func aSessionsOwnCopyBesideAKeptOneIsNotOnTwice() {
+        let seat = Seat(path: "/p", origin: .found, isDefault: false, account: nil, label: ".claude-personal", labelChosen: false,
+                        mark: .personal, markSource: .toggle, config: [])
+        var kept = ModItem(folder: "/p", name: "finish-line", path: "/S/mods/finish-line/0123456789ab", origin: .pluginDirs)
+        kept.state = .on
+        var dev = ModItem(folder: "/p", name: "finish-line", path: "/p/dev-mods/s/finish-line", origin: .devMods(session: "s"))
+        dev.state = .session
+        #expect(ConfigCatalog.problems([kept, dev], seat: seat).isEmpty)
+        // Two copies that both load in every session still are.
+        var other = ModItem(folder: "/p", name: "finish-line", path: "/elsewhere/finish-line", origin: .skillsDir)
+        other.state = .on
+        #expect(ConfigCatalog.problems([kept, other], seat: seat).contains { $0.contains("On twice") })
+    }
 }
