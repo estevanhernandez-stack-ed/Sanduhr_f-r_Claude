@@ -213,8 +213,11 @@ final class ModsPageModel {
     /// The Mod Studio sheet is up (item 75, slice B), and the tab it opens on (slice C).
     var studioOpen = false
     var studioTab: StudioTab = .look
-    /// New Mod, the Build with Claude prompt (slice E).
+    /// New Mod, the Build with Claude prompt (slice E), and the tab it opens on.
     var newModOpen = false
+    var newModWay: NewModWay = .build
+    /// Check's answer for each proposed mod (slice G), by proposal id.
+    var proposalChecks: [String: ModCheckOutcome] = [:]
     /// Mods made in sessions, and the ones Sanduhr kept (slice F), with each kept one's Check.
     var sessionMods: [SessionModRow] = []
     var kept: [KeptMod] = []
