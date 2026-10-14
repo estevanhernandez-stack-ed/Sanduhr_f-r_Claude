@@ -66,11 +66,11 @@ struct ModsCatalogView: View {
                 Text(note).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
             }
             if model.loaded { SessionLoadPanel(loads: model.shownLoads(demo: demo)) }
-            let proposed = ModProposalStore.shared.pending.count
+            let proposed = ModProposalStore.shared.pending.count + ModProposalStore.shared.pendingInstalls.count
             if proposed > 0 {
                 HStack(spacing: 8) {
                     Image(systemName: "shippingbox").foregroundStyle(Color.accentColor)
-                    Text(proposed == 1 ? "Claude proposed a mod for you to review." : "Claude proposed \(proposed) mods for you to review.")
+                    Text(proposed == 1 ? "Claude has a mod request for you to review." : "Claude has \(proposed) mod requests for you to review.")
                         .font(.callout)
                     Spacer()
                     Button("Review…") {
@@ -114,7 +114,7 @@ struct ModsCatalogView: View {
                 Text("Nothing matches these filters.").font(.caption).foregroundStyle(.secondary)
             }
             ForEach(model.sections(demo: demo)) { section in
-                CatalogGroupView(section: section, model: model, searching: searching)
+                CatalogGroupView(section: section, model: model, searching: searching, demo: demo)
             }
         }
         .sheet(isPresented: $model.newModOpen) { NewModSheet(model: model, demo: demo, close: { model.newModOpen = false }) }
@@ -198,6 +198,7 @@ private struct CatalogGroupView: View {
     var model: ModsPageModel
     /// A search opens every group and holds them open, so the header doesn't toggle meanwhile.
     let searching: Bool
+    let demo: Bool
 
     var body: some View {
         let open = searching || model.openGroups.contains(section.group)
@@ -223,20 +224,39 @@ private struct CatalogGroupView: View {
             .accessibilityValue(open ? "Open" : "Closed")
             if open {
                 ForEach(section.runs) { run in
+                    let key = section.group.rawValue + "/" + run.title
+                    let runOpen = searching || run.title.isEmpty || !model.closedRuns.contains(key)
                     if !run.title.isEmpty {
-                        Text(run.title + " · \(run.cards.count)")
-                            .font(.caption.weight(.semibold))
+                        Button {
+                            if model.closedRuns.contains(key) { model.closedRuns.remove(key) } else { model.closedRuns.insert(key) }
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: runOpen ? "chevron.down" : "chevron.right")
+                                    .font(.caption2.weight(.semibold))
+                                    .frame(width: 10)
+                                Text(run.title + " · \(run.cards.count)")
+                                    .font(.caption.weight(.semibold))
+                                Spacer()
+                            }
                             .foregroundStyle(.secondary)
-                            .padding(.top, 2)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(searching)
+                        .padding(.top, 2)
+                        .accessibilityLabel("\(run.title), \(run.cards.count)")
+                        .accessibilityValue(runOpen ? "Open" : "Closed")
                     }
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(run.cards) { card in
-                            if section.group == .available {
-                                AvailableRow(card: card)
-                            } else if model.isOpen(card) {
-                                CatalogCardView(card: card, model: model)
-                            } else {
-                                CatalogLine(card: card, model: model)
+                    if runOpen {
+                        LazyVStack(alignment: .leading, spacing: 4) {
+                            ForEach(run.cards) { card in
+                                if section.group == .available {
+                                    AvailableRow(card: card)
+                                } else if model.isOpen(card) {
+                                    CatalogCardView(card: card, model: model, demo: demo)
+                                } else {
+                                    CatalogLine(card: card, model: model, demo: demo)
+                                }
                             }
                         }
                     }
@@ -252,15 +272,24 @@ private struct CatalogGroupView: View {
 private struct CatalogLine: View {
     let card: CatalogCard
     var model: ModsPageModel
+    let demo: Bool
 
     var body: some View {
         HStack(spacing: 8) {
             line
             if card.isSanduhrs {
+                // Sanduhr's own mod (2026-10-14: in the list, not above it): where it's on, and its two doors.
+                if let on = model.studioOnLine(demo: demo) {
+                    Text(on).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Button("Folders…") { model.openStudio(.folders) }
+                    .buttonStyle(.link)
+                    .font(.caption)
+                    .help("Switch it on or off, update or remove it, per Claude Code folder.")
                 Button("Studio…") { model.openStudio() }
                     .buttonStyle(.link)
                     .font(.caption)
-                    .help("Open the Mod Studio")
+                    .help("Preview the band with demo numbers and style it.")
             }
         }
         .padding(.trailing, card.isSanduhrs ? 8 : 0)
@@ -367,6 +396,7 @@ private struct CatalogFilterBar: View {
 private struct CatalogCardView: View {
     let card: CatalogCard
     var model: ModsPageModel
+    let demo: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -405,13 +435,17 @@ private struct CatalogCardView: View {
             }
             if card.isSanduhrs {
                 HStack(spacing: 8) {
-                    Text("Switches per folder in the Studio's Folders tab.")
+                    Text((model.studioOnLine(demo: demo) ?? "Sanduhr's own mod") + ".")
                         .font(.caption)
                         .foregroundStyle(Color.hex("a78bfa"))
-                    Button("Open Studio…") { model.openStudio(.folders) }
+                    Button("Folders…") { model.openStudio(.folders) }
+                        .buttonStyle(.link)
+                        .font(.caption)
+                    Button("Studio…") { model.openStudio() }
                         .buttonStyle(.link)
                         .font(.caption)
                 }
+                WatchersAbovePromptLine()
             }
             if let risk = riskLine {
                 Text(risk).font(.caption).foregroundStyle(.orange)

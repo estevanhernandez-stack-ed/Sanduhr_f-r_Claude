@@ -14,6 +14,10 @@ struct ModProposal: Equatable, Sendable {
     static let requestFile = "mod-request.json"
     static let resultFile = "mod-result.json"
     static let statusFile = "mod-proposals.json"
+    /// Slice G2: the kept mods for `list_catalog`, and `propose_install`'s request and answer.
+    static let catalogFile = "mods-catalog.json"
+    static let installRequestFile = "mod-install-request.json"
+    static let installResultFile = "mod-install-result.json"
     static let maxFiles = 24
     static let maxFileBytes = 64 * 1024
     static let maxBytes = 256 * 1024
@@ -133,5 +137,33 @@ struct ModProposal: Equatable, Sendable {
         if !reasons.isEmpty { result["reasons"] = reasons }
         let root: [String: Any] = ["id": id, "completed_at": HandoffFiles.stamp(now), "result": result]
         return (try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])) ?? Data()
+    }
+
+    /// A folder as the server names it: `.claude`, `.claude-<name>`.
+    static func isFolderName(_ s: String) -> Bool {
+        s.range(of: #"^\.claude(-[A-Za-z0-9._-]{1,40})?$"#, options: .regularExpression) != nil
+    }
+
+    /// `propose_install`'s request: a kept mod's name and a folder's name, or why not.
+    enum InstallDecoded: Equatable {
+        case request(id: String, name: String, folder: String, at: Date)
+        case refused(id: String, String)
+        case discard
+    }
+
+    static func decodeInstall(_ data: Data, now: Date) -> InstallDecoded {
+        guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let id = root["id"] as? String, id.range(of: #"^[0-9a-f]{32}$"#, options: .regularExpression) != nil else {
+            return .discard
+        }
+        guard let stamp = root["requested_at"] as? String, let at = MessageProposal.parseDate(stamp) else {
+            return .refused(id: id, "requested_at is missing or not a date")
+        }
+        if now.timeIntervalSince(at) > maxAge { return .discard }
+        guard (root["schema_version"] as? Int) == 1, let name = root["name"] as? String, KeptMods.isName(name),
+              let folder = root["folder"] as? String, isFolderName(folder) else {
+            return .refused(id: id, "name must be a kept mod's and folder .claude or .claude-<name>")
+        }
+        return .request(id: id, name: name, folder: folder, at: at)
     }
 }

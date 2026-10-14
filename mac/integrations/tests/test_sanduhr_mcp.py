@@ -547,7 +547,7 @@ class ActivityLevel(Base):
                          ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
                           "get_desk_messages", "propose_desk_messages", "propose_theme",
                           "watch_start", "watch_update", "watch_end", "propose_now_playing_looks",
-                          "propose_mod", "get_mod_status"])
+                          "propose_mod", "list_catalog", "propose_install", "get_mod_status"])
         self.assertFalse(p["watchers_allowed"])
         self.assertEqual(sorted(p["tools_not_on_mac"]), ["publish_usage"])
         text = json.dumps(p)
@@ -610,7 +610,7 @@ class Protocol(Base):
         self.assertEqual(names, ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
                                  "get_desk_messages", "propose_desk_messages", "propose_theme",
                                  "watch_start", "watch_update", "watch_end", "propose_now_playing_looks",
-                                 "propose_mod", "get_mod_status"])
+                                 "propose_mod", "list_catalog", "propose_install", "get_mod_status"])
         for t in frames[1]["result"]["tools"]:
             if t["name"] == "propose_desk_messages":
                 # The one tool that asks for a change: not read-only, never destructive, no path.
@@ -647,6 +647,12 @@ class Protocol(Base):
                 self.assertEqual(sorted(t["inputSchema"]["properties"]), ["files", "name", "summary", "version"])
                 self.assertFalse(t["inputSchema"]["additionalProperties"])
                 self.assertFalse(t["inputSchema"]["properties"]["files"]["items"]["additionalProperties"])
+                continue
+            if t["name"] == "propose_install":
+                self.assertFalse(t["annotations"]["readOnlyHint"])
+                self.assertFalse(t["annotations"]["destructiveHint"])
+                self.assertEqual(sorted(t["inputSchema"]["properties"]), ["folder", "name"])
+                self.assertFalse(t["inputSchema"]["additionalProperties"])
                 continue
             if t["name"] == "get_mod_status":
                 self.assertTrue(t["annotations"]["readOnlyHint"])
@@ -1711,6 +1717,72 @@ class ProposeMod(Base):
         self.assertEqual((r["status"], r["name"], r["request_id"]), ("approved", "ci-band", rid))
         self.assertEqual(mcp.build_get_mod_status({"request_id": "b" * 32}, paths=self.paths)["status"], "unknown")
         self.assertEqual(mcp.build_get_mod_status({"request_id": "x"}, paths=self.paths)["reason"], "invalid_params")
+
+
+class ProposeInstall(Base):
+    """list_catalog and propose_install (item 75, slice G2): the app's catalog of kept mods, read
+    here; a request to turn one on in a folder, checked against it and handed over."""
+
+    CATALOG = {"schema_version": 1, "folders": [".claude", ".claude-personal", "/Users/x/.claude-bad"],
+               "mods": [{"name": "ci-band", "version": "0.1.0", "origin": "proposed", "description": "CI runs.",
+                         "folders": {".claude": "off", ".claude-personal": "on", "elsewhere": "on"}},
+                        {"name": "Bad Name", "folders": {}}]}
+
+    def switch(self, on=True):
+        self.fx.write_json("mods-agents.json", {"propose": on, "schema_version": 1})
+
+    def propose(self, args, answer=None):
+        ticks = [0.0]
+
+        def clock():
+            return ticks[0]
+
+        def sleep(seconds):
+            ticks[0] += seconds
+            if answer is None or not os.path.exists(self.paths.mod_install_request):
+                return
+            with open(self.paths.mod_install_request, encoding="utf-8") as f:
+                req = json.load(f)
+            self.fx.write_json(mcp.MOD_INSTALL_RESULT_FILE, {"id": req["id"], "completed_at": iso(NOW), "result": answer(req)})
+
+        return mcp.build_propose_install(args, now=NOW, paths=self.paths, wait=1.0, poll=0.25, sleep=sleep, clock=clock)
+
+    def test_file_names_match_the_app(self):
+        self.assertEqual((mcp.MOD_CATALOG_FILE, mcp.MOD_INSTALL_REQUEST_FILE, mcp.MOD_INSTALL_RESULT_FILE),
+                         ("mods-catalog.json", "mod-install-request.json", "mod-install-result.json"))
+
+    def test_switched_off(self):
+        self.fx.write_json(mcp.MOD_CATALOG_FILE, self.CATALOG)
+        before = sorted(os.listdir(self.fx.support))
+        self.assertEqual(mcp.build_list_catalog(paths=self.paths)["reason"], "switched_off")
+        self.assertEqual(self.propose({"name": "ci-band", "folder": ".claude"})["reason"], "switched_off")
+        self.assertEqual(sorted(os.listdir(self.fx.support)), before)
+
+    def test_the_catalog_lists_kept_mods_and_known_folders_only(self):
+        self.switch()
+        self.assertEqual(mcp.build_list_catalog(paths=self.paths)["mods"], [])
+        self.fx.write_json(mcp.MOD_CATALOG_FILE, self.CATALOG)
+        r = mcp.build_list_catalog(paths=self.paths)
+        self.assertEqual(r["folders"], [".claude", ".claude-personal"])
+        self.assertEqual(r["mods"], [{"name": "ci-band", "version": "0.1.0", "origin": "proposed", "description": "CI runs.",
+                                      "folders": {".claude": "off", ".claude-personal": "on"}}])
+
+    def test_requests_are_checked_against_the_catalog(self):
+        self.switch()
+        self.fx.write_json(mcp.MOD_CATALOG_FILE, self.CATALOG)
+        before = sorted(os.listdir(self.fx.support))
+        for args, reason in [({"name": "other", "folder": ".claude"}, "not_kept"),
+                             ({"name": "ci-band", "folder": ".claude-work"}, "unknown_folder"),
+                             ({"name": "ci-band", "folder": ".claude-personal"}, "already_on"),
+                             ({"name": "ci-band", "folder": "/Users/x/.claude"}, "invalid_params"),
+                             ({"name": "ci-band"}, "invalid_params")]:
+            self.assertEqual(self.propose(args)["reason"], reason, args)
+        self.assertEqual(sorted(os.listdir(self.fx.support)), before)
+        r = self.propose({"name": "ci-band", "folder": ".claude"},
+                         answer=lambda req: {"status": "pending_review", "name": req["name"], "folder": req["folder"]})
+        self.assertEqual((r["status"], r["folder"]), ("pending_review", ".claude"))
+        with open(self.paths.mod_install_request, encoding="utf-8") as f:
+            self.assertEqual(sorted(json.load(f)), ["folder", "id", "name", "requested_at", "schema_version"])
 
 
 class ProjectNames(unittest.TestCase):

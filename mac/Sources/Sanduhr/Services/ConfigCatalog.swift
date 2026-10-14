@@ -349,7 +349,8 @@ enum ConfigCatalog {
                 let id = card(.plugin, name)
                 let items = byName[name] ?? []
                 for item in items {
-                    addSource(id, source(item), installed: true)
+                    // A session's own copy is listed as a source, not as a second install.
+                    addSource(id, source(item), installed: item.state != .session)
                     describe(id, item.description, item.version)
                     if item.isMod { cards[id]?.isMod = true }
                     cards[id]?.itemIDs.append(item.id)
@@ -475,7 +476,9 @@ enum ConfigCatalog {
         } else if items.contains(where: { $0.state == .on && $0.path == nil && $0.origin != .installed(marketplace: "synced") }) {
             out.append("Turned on in \(seat.label) but not installed on this Mac.")
         }
-        let on = Set(items.filter { $0.state == .on || $0.state == .session }.map(source))
+        // A session's own copy loads in that session alone: beside a kept copy of the same mod (item
+        // 75, slice F) or the one it is a new version of, it isn't the mod on twice.
+        let on = Set(items.filter { $0.state == .on }.map(source))
         if on.count > 1 { out.append("On twice in \(seat.label): \(on.sorted().joined(separator: " and ")).") }
         return out
     }
@@ -495,13 +498,18 @@ enum ConfigCatalog {
     }
 
     /// Where a plugin comes from, for its run's title: the source it is installed from.
+    /// The run every mod goes in, first in Plugins and mods (2026-10-14, the owner: a mod belongs
+    /// with the mods, not under where it loads from).
+    static let modsRun = "Mods"
+
     static func runTitle(_ c: CatalogCard) -> String {
         let s = c.installedSources.first ?? c.sources.first ?? "Elsewhere"
         return s.hasPrefix("Marketplace ") ? String(s.dropFirst("Marketplace ".count)) : s
     }
 
     /// The cards the filters let through, grouped. Groups with nothing in them are left out.
-    /// Plugins run by source (Sanduhr's first), sorted by name or by the most session load.
+    /// Plugins run by source after the Mods run (Sanduhr's first in it), sorted by name or by the
+    /// most session load.
     static func sections(_ cards: [CatalogCard], failedChecks: Set<String> = [], byLoad: Bool = false) -> [CatalogSection] {
         var by: [CatalogGroup: [CatalogCard]] = [:]
         for c in cards { by[group(c, failed: failedChecks.contains(c.id)), default: []].append(c) }
@@ -523,7 +531,7 @@ enum ConfigCatalog {
             case .yours:
                 out.append(CatalogSection(group: g, runs: runs(list) { $0.kind.title }))
             case .plugins:
-                var r = runs(list, runTitle)
+                var r = runs(list) { $0.isMod ? modsRun : runTitle($0) }
                 for i in r.indices {
                     r[i].cards.sort { a, b in
                         if a.isSanduhrs != b.isSanduhrs { return a.isSanduhrs }
@@ -532,7 +540,7 @@ enum ConfigCatalog {
                     }
                 }
                 r.sort { a, b in
-                    let sa = a.cards.contains(where: \.isSanduhrs), sb = b.cards.contains(where: \.isSanduhrs)
+                    let sa = a.title == modsRun, sb = b.title == modsRun
                     if sa != sb { return sa }
                     return a.cards.count != b.cards.count ? a.cards.count > b.cards.count : a.title < b.title
                 }
