@@ -175,8 +175,9 @@ struct ModsCatalogGroupsTests {
         let yours = try #require(sections.first { $0.group == .yours })
         #expect(yours.runs.map(\.title) == ["Skills", "Agents", "Commands"])
         let plugins = try #require(sections.first { $0.group == .plugins })
-        // Sanduhr's own run first, then by source.
-        #expect(plugins.runs.map(\.title) == [ConfigCatalog.sanduhrSource, "market"])
+        // The mods first (Sanduhr's own leading it), then the plugins by source.
+        #expect(plugins.runs.map(\.title) == [ConfigCatalog.modsRun, "market"])
+        #expect(plugins.runs[0].cards.first?.isSanduhrs == true)
         #expect(plugins.runs[1].cards.map(\.name) == ["kit", "spare"])
         let available = try #require(sections.first { $0.group == .available })
         #expect(available.runs.map(\.title) == ["market"])

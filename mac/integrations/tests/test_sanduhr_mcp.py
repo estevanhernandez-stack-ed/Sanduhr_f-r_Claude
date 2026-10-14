@@ -546,7 +546,8 @@ class ActivityLevel(Base):
         self.assertEqual(p["tools_available"],
                          ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
                           "get_desk_messages", "propose_desk_messages", "propose_theme",
-                          "watch_start", "watch_update", "watch_end", "propose_now_playing_looks"])
+                          "watch_start", "watch_update", "watch_end", "propose_now_playing_looks",
+                          "propose_mod", "list_catalog", "propose_install", "get_mod_status"])
         self.assertFalse(p["watchers_allowed"])
         self.assertEqual(sorted(p["tools_not_on_mac"]), ["publish_usage"])
         text = json.dumps(p)
@@ -608,7 +609,8 @@ class Protocol(Base):
         names = [t["name"] for t in frames[1]["result"]["tools"]]
         self.assertEqual(names, ["get_usage", "get_local_burn_by_project", "get_model_usage", "get_usage_history", "ping",
                                  "get_desk_messages", "propose_desk_messages", "propose_theme",
-                                 "watch_start", "watch_update", "watch_end", "propose_now_playing_looks"])
+                                 "watch_start", "watch_update", "watch_end", "propose_now_playing_looks",
+                                 "propose_mod", "list_catalog", "propose_install", "get_mod_status"])
         for t in frames[1]["result"]["tools"]:
             if t["name"] == "propose_desk_messages":
                 # The one tool that asks for a change: not read-only, never destructive, no path.
@@ -637,6 +639,25 @@ class Protocol(Base):
                 self.assertFalse(item["additionalProperties"])
                 self.assertEqual(sorted(item["properties"]), sorted(mcp.LOOKS_FIELDS))
                 self.assertEqual(item["properties"]["font"]["enum"], mcp.FONT_STYLES.split(", "))
+                continue
+            if t["name"] == "propose_mod":
+                # Item 75, slice G: files inline, never a path to a folder; closed shapes.
+                self.assertFalse(t["annotations"]["readOnlyHint"])
+                self.assertFalse(t["annotations"]["destructiveHint"])
+                self.assertEqual(sorted(t["inputSchema"]["properties"]), ["files", "name", "summary", "version"])
+                self.assertFalse(t["inputSchema"]["additionalProperties"])
+                self.assertFalse(t["inputSchema"]["properties"]["files"]["items"]["additionalProperties"])
+                continue
+            if t["name"] == "propose_install":
+                self.assertFalse(t["annotations"]["readOnlyHint"])
+                self.assertFalse(t["annotations"]["destructiveHint"])
+                self.assertEqual(sorted(t["inputSchema"]["properties"]), ["folder", "name"])
+                self.assertFalse(t["inputSchema"]["additionalProperties"])
+                continue
+            if t["name"] == "get_mod_status":
+                self.assertTrue(t["annotations"]["readOnlyHint"])
+                self.assertEqual(sorted(t["inputSchema"]["properties"]), ["request_id"])
+                self.assertFalse(t["inputSchema"]["additionalProperties"])
                 continue
             if t["name"] == "propose_theme":
                 # The Windows tool's inputs, no path.
@@ -1587,6 +1608,181 @@ class ProposeNowPlayingLooks(Base):
                      "Style what's playing", "pending_approval", "applied", "rejected", "queued", "style_on",
                      "never writes", "eight palettes"):
             self.assertIn(word, d, word)
+
+
+MOD_FILES = [
+    {"path": ".claude-plugin/plugin.json", "text": '{"name": "ci-band", "version": "0.1.0"}'},
+    {"path": "hooks/hooks.json", "text": '{"modules": ["./register.tsx"]}'},
+    {"path": "hooks/register.tsx", "text": "export const register = (on) => {}\n"},
+]
+
+
+class ProposeMod(Base):
+    """propose_mod and get_mod_status (item 75, slice G): checked here, refused while Sanduhr's
+    switch is off, handed over in mod-request.json; the app's answer is played by a fake sleep."""
+
+    def switch(self, on=True):
+        self.fx.write_json("mods-agents.json", {"propose": on, "schema_version": 1})
+
+    def propose(self, args, answer=None, wait=1.0):
+        ticks = [0.0]
+
+        def clock():
+            return ticks[0]
+
+        def sleep(seconds):
+            ticks[0] += seconds
+            if answer is None or not os.path.exists(self.paths.mod_request):
+                return
+            with open(self.paths.mod_request, encoding="utf-8") as f:
+                req = json.load(f)
+            res = answer(req)
+            if res is not None:
+                self.fx.write_json(mcp.MOD_RESULT_FILE, {"id": req["id"], "completed_at": iso(NOW), "result": res})
+
+        return mcp.build_propose_mod(args, now=NOW, paths=self.paths, wait=wait, poll=0.25, sleep=sleep, clock=clock)
+
+    def good(self, **kw):
+        args = {"name": "ci-band", "version": "0.1.0", "summary": "CI runs above the prompt.", "files": list(MOD_FILES)}
+        args.update(kw)
+        return args
+
+    def test_file_names_and_limits_match_the_app(self):
+        self.assertEqual((mcp.MOD_SWITCH_FILE, mcp.MOD_REQUEST_FILE, mcp.MOD_RESULT_FILE, mcp.MOD_STATUS_FILE),
+                         ("mods-agents.json", "mod-request.json", "mod-result.json", "mod-proposals.json"))
+        self.assertEqual((mcp.MOD_MAX_FILES, mcp.MOD_MAX_FILE_BYTES, mcp.MOD_MAX_BYTES, mcp.MOD_MAX_SUMMARY),
+                         (24, 64 * 1024, 256 * 1024, 200))
+
+    def test_switched_off_writes_nothing(self):
+        before = sorted(os.listdir(self.fx.support))
+        for doc in (None, {"propose": False, "schema_version": 1}, {"propose": True}, {"propose": "yes", "schema_version": 1}):
+            if doc is not None:
+                self.fx.write_json("mods-agents.json", doc)
+                before = sorted(os.listdir(self.fx.support))
+            r = self.propose(self.good())
+            self.assertEqual((r["status"], r["reason"]), ("rejected", "switched_off"))
+            self.assertEqual(mcp.build_get_mod_status({"request_id": "0" * 32}, paths=self.paths)["reason"], "switched_off")
+            self.assertEqual(sorted(os.listdir(self.fx.support)), before)
+
+    def test_a_good_proposal_is_handed_over_and_answered(self):
+        self.switch()
+        r = self.propose(self.good(), answer=lambda req: {"status": "pending_review", "name": req["name"], "version": "0.1.0"})
+        self.assertEqual(r["status"], "pending_review")
+        self.assertRegex(r["request_id"], "^[0-9a-f]{32}$")
+        with open(self.paths.mod_request, encoding="utf-8") as f:
+            req = json.load(f)
+        self.assertEqual(os.stat(self.paths.mod_request).st_mode & 0o777, 0o600)
+        self.assertEqual(sorted(req), ["files", "id", "name", "requested_at", "schema_version", "summary", "version"])
+        self.assertEqual([f["path"] for f in req["files"]], [f["path"] for f in MOD_FILES])
+
+    def test_silence_is_queued(self):
+        self.switch()
+        r = self.propose(self.good())
+        self.assertEqual((r["status"], r["reason"], r["name"]), ("queued", "app_not_responding", "ci-band"))
+
+    def test_bad_proposals_are_refused_here(self):
+        self.switch()
+        before = sorted(os.listdir(self.fx.support))
+        manifest_other = [{"path": ".claude-plugin/plugin.json", "text": '{"name": "other"}'}]
+        cases = [
+            (self.good(name="CI"), "name must be"),
+            (self.good(name="sanduhr-meters", files=[{"path": ".claude-plugin/plugin.json", "text": '{"name": "sanduhr-meters"}'}]), "Sanduhr's own mod"),
+            (self.good(summary=""), "summary"),
+            (self.good(files=[]), "files must be"),
+            (self.good(files=MOD_FILES[1:]), "plugin.json is required"),
+            (self.good(files=manifest_other), "plugin.json's name"),
+            (self.good(files=MOD_FILES + [{"path": "../evil.ts", "text": ""}]), "'..'"),
+            (self.good(files=MOD_FILES + [{"path": "/etc/x.ts", "text": ""}]), "relative"),
+            (self.good(files=MOD_FILES + [{"path": ".git/config.json", "text": ""}]), "only .claude-plugin"),
+            (self.good(files=MOD_FILES + [{"path": "run.sh", "text": ""}]), "files must end in"),
+            (self.good(files=MOD_FILES + [{"path": ".claude-plugin/types/x.d.ts", "text": ""}]), "writes .claude-plugin/types"),
+            (self.good(files=MOD_FILES + [{"path": "HOOKS/hooks.json", "text": ""}][:0] + [MOD_FILES[1]]), "twice"),
+            (self.good(files=MOD_FILES + [{"path": "big.ts", "text": "x" * (64 * 1024 + 1)}]), "larger than 64 KB"),
+            (self.good(files=MOD_FILES + [{"path": "a.ts", "text": "a\x00b"}]), "NUL"),
+            (self.good(files=MOD_FILES + [{"path": "a.ts", "text": "", "mode": "755"}]), "exactly {path, text}"),
+            (dict(self.good(), folder="/Users/x"), "unknown argument"),
+        ]
+        for args, needle in cases:
+            r = self.propose(args)
+            self.assertEqual((r["status"], r["reason"]), ("rejected", "invalid_mod"), needle)
+            self.assertTrue(any(needle in x for x in r["reasons"]), (needle, r["reasons"]))
+        self.assertEqual(sorted(os.listdir(self.fx.support)), before)
+
+    def test_status_reads_the_apps_index(self):
+        self.switch()
+        rid = "a" * 32
+        self.fx.write_json(mcp.MOD_STATUS_FILE, {"schema_version": 1, "proposals": [
+            {"id": rid, "name": "ci-band", "version": "0.1.0", "status": "approved", "decided_at": iso(NOW)}]})
+        r = mcp.build_get_mod_status({"request_id": rid}, paths=self.paths)
+        self.assertEqual((r["status"], r["name"], r["request_id"]), ("approved", "ci-band", rid))
+        self.assertEqual(mcp.build_get_mod_status({"request_id": "b" * 32}, paths=self.paths)["status"], "unknown")
+        self.assertEqual(mcp.build_get_mod_status({"request_id": "x"}, paths=self.paths)["reason"], "invalid_params")
+
+
+class ProposeInstall(Base):
+    """list_catalog and propose_install (item 75, slice G2): the app's catalog of kept mods, read
+    here; a request to turn one on in a folder, checked against it and handed over."""
+
+    CATALOG = {"schema_version": 1, "folders": [".claude", ".claude-personal", "/Users/x/.claude-bad"],
+               "mods": [{"name": "ci-band", "version": "0.1.0", "origin": "proposed", "description": "CI runs.",
+                         "folders": {".claude": "off", ".claude-personal": "on", "elsewhere": "on"}},
+                        {"name": "Bad Name", "folders": {}}]}
+
+    def switch(self, on=True):
+        self.fx.write_json("mods-agents.json", {"propose": on, "schema_version": 1})
+
+    def propose(self, args, answer=None):
+        ticks = [0.0]
+
+        def clock():
+            return ticks[0]
+
+        def sleep(seconds):
+            ticks[0] += seconds
+            if answer is None or not os.path.exists(self.paths.mod_install_request):
+                return
+            with open(self.paths.mod_install_request, encoding="utf-8") as f:
+                req = json.load(f)
+            self.fx.write_json(mcp.MOD_INSTALL_RESULT_FILE, {"id": req["id"], "completed_at": iso(NOW), "result": answer(req)})
+
+        return mcp.build_propose_install(args, now=NOW, paths=self.paths, wait=1.0, poll=0.25, sleep=sleep, clock=clock)
+
+    def test_file_names_match_the_app(self):
+        self.assertEqual((mcp.MOD_CATALOG_FILE, mcp.MOD_INSTALL_REQUEST_FILE, mcp.MOD_INSTALL_RESULT_FILE),
+                         ("mods-catalog.json", "mod-install-request.json", "mod-install-result.json"))
+
+    def test_switched_off(self):
+        self.fx.write_json(mcp.MOD_CATALOG_FILE, self.CATALOG)
+        before = sorted(os.listdir(self.fx.support))
+        self.assertEqual(mcp.build_list_catalog(paths=self.paths)["reason"], "switched_off")
+        self.assertEqual(self.propose({"name": "ci-band", "folder": ".claude"})["reason"], "switched_off")
+        self.assertEqual(sorted(os.listdir(self.fx.support)), before)
+
+    def test_the_catalog_lists_kept_mods_and_known_folders_only(self):
+        self.switch()
+        self.assertEqual(mcp.build_list_catalog(paths=self.paths)["mods"], [])
+        self.fx.write_json(mcp.MOD_CATALOG_FILE, self.CATALOG)
+        r = mcp.build_list_catalog(paths=self.paths)
+        self.assertEqual(r["folders"], [".claude", ".claude-personal"])
+        self.assertEqual(r["mods"], [{"name": "ci-band", "version": "0.1.0", "origin": "proposed", "description": "CI runs.",
+                                      "folders": {".claude": "off", ".claude-personal": "on"}}])
+
+    def test_requests_are_checked_against_the_catalog(self):
+        self.switch()
+        self.fx.write_json(mcp.MOD_CATALOG_FILE, self.CATALOG)
+        before = sorted(os.listdir(self.fx.support))
+        for args, reason in [({"name": "other", "folder": ".claude"}, "not_kept"),
+                             ({"name": "ci-band", "folder": ".claude-work"}, "unknown_folder"),
+                             ({"name": "ci-band", "folder": ".claude-personal"}, "already_on"),
+                             ({"name": "ci-band", "folder": "/Users/x/.claude"}, "invalid_params"),
+                             ({"name": "ci-band"}, "invalid_params")]:
+            self.assertEqual(self.propose(args)["reason"], reason, args)
+        self.assertEqual(sorted(os.listdir(self.fx.support)), before)
+        r = self.propose({"name": "ci-band", "folder": ".claude"},
+                         answer=lambda req: {"status": "pending_review", "name": req["name"], "folder": req["folder"]})
+        self.assertEqual((r["status"], r["folder"]), ("pending_review", ".claude"))
+        with open(self.paths.mod_install_request, encoding="utf-8") as f:
+            self.assertEqual(sorted(json.load(f)), ["folder", "id", "name", "requested_at", "schema_version"])
 
 
 class ProjectNames(unittest.TestCase):
