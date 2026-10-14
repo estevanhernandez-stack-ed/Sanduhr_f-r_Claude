@@ -215,6 +215,13 @@ final class ModsPageModel {
     var studioTab: StudioTab = .look
     /// New Mod, the Build with Claude prompt (slice E).
     var newModOpen = false
+    /// Mods made in sessions, and the ones Sanduhr kept (slice F), with each kept one's Check.
+    var sessionMods: [SessionModRow] = []
+    var kept: [KeptMod] = []
+    var keptChecks: [String: ModCheckOutcome] = [:]
+    var keptBusy: Set<String> = []
+    var keptNote: String?
+    var keptStore = KeptMods.standard
     /// The About tab's Check of the mod this Sanduhr carries, and whether it is running.
     private(set) var ownCheck: ModCheckOutcome?
     private(set) var checkingOwn = false
