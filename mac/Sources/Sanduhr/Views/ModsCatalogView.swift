@@ -173,12 +173,26 @@ private struct SessionLoadRow: View {
     }
 }
 
+/// A name with the search's words marked (slice A): bold on a tint of the accent color.
+private func highlighted(_ text: String, _ search: String) -> AttributedString {
+    var out = AttributedString(text)
+    for r in ConfigCatalog.matchRanges(in: text, search: search) {
+        guard let lower = AttributedString.Index(r.lowerBound, within: out),
+              let upper = AttributedString.Index(r.upperBound, within: out) else { continue }
+        out[lower..<upper].inlinePresentationIntent = .stronglyEmphasized
+        out[lower..<upper].backgroundColor = Color.accentColor.opacity(0.25)
+    }
+    return out
+}
+
 /// One group: a header that opens and closes it, then its runs of cards.
 private struct CatalogGroupView: View {
     let section: CatalogSection
     var model: ModsPageModel
     /// A search opens every group and holds them open, so the header doesn't toggle meanwhile.
     let searching: Bool
+    /// The line or card header with keyboard focus, kept as a line opens into its card.
+    @FocusState private var focused: String?
 
     var body: some View {
         let open = searching || model.openGroups.contains(section.group)
@@ -213,11 +227,11 @@ private struct CatalogGroupView: View {
                     LazyVStack(alignment: .leading, spacing: 4) {
                         ForEach(run.cards) { card in
                             if section.group == .available {
-                                AvailableRow(card: card)
+                                AvailableRow(card: card, search: model.filter.search)
                             } else if model.isOpen(card) {
-                                CatalogCardView(card: card, model: model)
+                                CatalogCardView(card: card, model: model, focused: $focused)
                             } else {
-                                CatalogLine(card: card, model: model)
+                                CatalogLine(card: card, model: model, focused: $focused)
                             }
                         }
                     }
@@ -233,6 +247,7 @@ private struct CatalogGroupView: View {
 private struct CatalogLine: View {
     let card: CatalogCard
     var model: ModsPageModel
+    var focused: FocusState<String?>.Binding
 
     var body: some View {
         HStack(spacing: 8) {
@@ -259,7 +274,7 @@ private struct CatalogLine: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(width: 16)
-                Text(card.name).font(.callout.weight(.medium)).lineLimit(1)
+                Text(highlighted(card.name, model.filter.search)).font(.callout.weight(.medium)).lineLimit(1)
                 if card.kind == .plugin && card.isMod { CatalogBadge(text: "Mod", color: .secondary) }
                 if needsLook {
                     Image(systemName: "exclamationmark.triangle.fill").font(.caption2).foregroundStyle(.orange)
@@ -280,10 +295,16 @@ private struct CatalogLine: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .focused(focused, equals: card.id)
+        .onKeyPress(.rightArrow) {
+            model.openCard(card.id)
+            focused.wrappedValue = card.id
+            return .handled
+        }
         .help(card.description)
         .accessibilityLabel(accessibilityText)
         .accessibilityValue("Closed")
-        .accessibilityHint("Opens its card")
+        .accessibilityHint("Opens its card. Right Arrow opens it, Left Arrow folds it.")
     }
 
     private var needsLook: Bool { card.needsLook || model.failedChecks.contains(card.id) }
@@ -299,10 +320,11 @@ private struct CatalogLine: View {
 /// A marketplace's plugin installed nowhere: one line, so a list of hundreds stays short.
 private struct AvailableRow: View {
     let card: CatalogCard
+    let search: String
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text(card.name).font(.caption.weight(.semibold))
+            Text(highlighted(card.name, search)).font(.caption.weight(.semibold))
             if let v = card.version {
                 Text(v).font(.caption2.monospaced()).foregroundStyle(.secondary)
             }
@@ -348,6 +370,7 @@ private struct CatalogFilterBar: View {
 private struct CatalogCardView: View {
     let card: CatalogCard
     var model: ModsPageModel
+    var focused: FocusState<String?>.Binding
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -357,12 +380,20 @@ private struct CatalogCardView: View {
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .frame(width: 10)
-                    CatalogCardHeader(card: card)
+                    CatalogCardHeader(card: card, search: model.filter.search)
                     Spacer(minLength: 0)
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .focused(focused, equals: card.id)
+            .onKeyPress(.leftArrow) {
+                // A card the search holds open stays open.
+                guard model.openCards.contains(card.id) else { return .ignored }
+                model.foldCard(card.id)
+                focused.wrappedValue = card.id
+                return .handled
+            }
             .accessibilityLabel(card.name)
             .accessibilityValue("Open")
             .accessibilityHint("Folds it to one line")
@@ -462,10 +493,11 @@ private struct PluginContentsLine: View {
 
 private struct CatalogCardHeader: View {
     let card: CatalogCard
+    var search = ""
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text(card.name).font(.body.weight(.semibold))
+            Text(highlighted(card.name, search)).font(.body.weight(.semibold))
             if let v = card.version {
                 Text(v).font(.caption.monospaced()).foregroundStyle(.secondary)
             }

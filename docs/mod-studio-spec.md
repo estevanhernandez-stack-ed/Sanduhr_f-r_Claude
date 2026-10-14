@@ -94,7 +94,7 @@ Each ships on its own and is useful without the next.
 
 | Slice | What | Writes |
 |---|---|---|
-| A | Compact Catalog | nothing |
+| A | Compact Catalog (the highlight of matched words and Left/Right on lines built 2026-10-14) | nothing |
 | B | Studio shell, Preview with its Show buttons, Look tab; looks saved for every statusline kind | `bandMeterStyles` only |
 | C | Folders tab (move from the page) and About tab (built 2026-10-13: the page keeps the on-line with **Folders…** and **Open Studio…**) | none new (existing installer) |
 | D | Layout tab: options per folder through a `pluginConfigs` receipt (built 2026-10-13) | folder `settings.json`, with receipt |

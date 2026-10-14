@@ -613,6 +613,30 @@ enum ConfigCatalog {
         return words.contains { !outside.contains($0) && inside.contains($0) }
     }
 
+    /// Where the search's words fall in `text` (item 75, slice A's highlight): every occurrence of
+    /// each word, ignoring case and diacritics, overlaps merged, in order.
+    static func matchRanges(in text: String, search: String) -> [Range<String.Index>] {
+        let words = search.split(whereSeparator: \.isWhitespace).map(String.init)
+        var found: [Range<String.Index>] = []
+        for word in words {
+            var from = text.startIndex
+            while from < text.endIndex,
+                  let r = text.range(of: word, options: [.caseInsensitive, .diacriticInsensitive], range: from..<text.endIndex) {
+                found.append(r)
+                from = r.upperBound
+            }
+        }
+        var merged: [Range<String.Index>] = []
+        for r in found.sorted(by: { $0.lowerBound < $1.lowerBound }) {
+            if let last = merged.last, r.lowerBound <= last.upperBound {
+                merged[merged.count - 1] = last.lowerBound..<max(last.upperBound, r.upperBound)
+            } else {
+                merged.append(r)
+            }
+        }
+        return merged
+    }
+
     /// The counts state.yaml reports: never a name.
     struct Counts: Equatable, Sendable {
         var cards = 0

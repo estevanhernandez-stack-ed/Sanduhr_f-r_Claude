@@ -282,6 +282,10 @@ final class ModsPageModel {
         openContents.contains(card.id) || ConfigCatalog.matchesInsideOnly(card, search: filter.search)
     }
 
+    /// Right and Left on a Catalog line (slice A): open and fold, as a list does.
+    func openCard(_ id: String) { openCards.insert(id) }
+    func foldCard(_ id: String) { openCards.remove(id) }
+
     func toggleCard(_ id: String) {
         if openCards.contains(id) { openCards.remove(id) } else { openCards.insert(id) }
     }
