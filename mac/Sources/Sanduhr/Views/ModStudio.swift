@@ -199,14 +199,19 @@ struct BandPreview: View {
     }
 }
 
-/// The sheet: the preview and its moments on top, the looks below, Save and Revert at the foot.
+/// The sheet: the preview and its moments on top, the tabs below (Look, Folders, About; slice C),
+/// Save and Revert at the foot.
 struct ModStudioSheet: View {
     @State var model: ModStudioModel
-    /// "On in 2 of 3 folders", or nil before the folders are read.
-    let onLine: String?
+    /// The Mods page: the folders, their switches and Check.
+    var mods: ModsPageModel
+    let linked: [String]
+    let demo: Bool
+    @State var tab: StudioTab
     let close: () -> Void
     @State private var askingToClose = false
     @State private var styling: SanduhrSegment?
+    @State private var consent: MetersConsent?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -215,12 +220,31 @@ struct ModStudioSheet: View {
             moments
             terminal
             Divider()
-            look
-            Spacer(minLength: 0)
+            Picker("Tab", selection: $tab) {
+                ForEach(StudioTab.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            ScrollView {
+                tabContent
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .padding(.trailing, 8)
+            }
             footer
         }
         .padding(20)
-        .frame(minWidth: 760, idealWidth: 860, minHeight: 560, idealHeight: 620)
+        .frame(minWidth: 760, idealWidth: 860, minHeight: 640, idealHeight: 720)
+        .ownModQuestions(mods, linked: linked)
+        .sheet(item: $consent) { c in
+            MetersConsentSheet(folder: mods.display(c.folder),
+                               file: mods.display(mods.installer.configFile(.meters, folder: c.folder)),
+                               install: {
+                                   consent = nil
+                                   Task { await mods.install(folder: c.folder, updating: false, linked: linked) }
+                               },
+                               cancel: { consent = nil })
+        }
         .confirmationDialog("Save the band's new look?", isPresented: $askingToClose) {
             Button("Save") { model.save(); close() }
             Button("Discard Changes", role: .destructive) { close() }
@@ -238,7 +262,7 @@ struct ModStudioSheet: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            if let onLine { Text(onLine).font(.caption).foregroundStyle(.secondary) }
+            if let onLine = mods.studioOnLine(demo: demo) { Text(onLine).font(.caption).foregroundStyle(.secondary) }
         }
     }
 
@@ -275,9 +299,17 @@ struct ModStudioSheet: View {
         .controlSize(.small)
     }
 
+    @ViewBuilder
+    private var tabContent: some View {
+        switch tab {
+        case .look: look
+        case .folders: StudioFolders(model: mods, linked: linked, demo: demo, install: { consent = MetersConsent(folder: $0) })
+        case .about: StudioAbout(model: mods)
+        }
+    }
+
     private var look: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Look").font(.headline)
             Text("The band's looks are one setting for every folder, the same ones the statusline's Combine sheet sets. Click the brush to style a segment.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             ForEach(ModStudioModel.segments, id: \.self) { s in

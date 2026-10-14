@@ -41,6 +41,18 @@ struct OwnModRow: Identifiable, Equatable, Sendable {
         return row
     }
 
+    /// Update has something to do here: an entry naming older scripts, or an older pinned version.
+    var updateWaiting: Bool { state.listed && (status == .outdated || (updateAvailable && !missing)) }
+
+    /// "On in 2 of 3 folders, an update waiting in 1", nil without a folder (item 75, slice C).
+    static func onLine(_ rows: [OwnModRow]) -> String? {
+        guard !rows.isEmpty else { return nil }
+        var text = "On in \(rows.filter(\.state.isOn).count) of \(rows.count) folder\(rows.count == 1 ? "" : "s")"
+        let waiting = rows.filter(\.updateWaiting).count
+        if waiting > 0 { text += ", an update waiting in \(waiting)" }
+        return text
+    }
+
     /// Where it stands, in words.
     var summary: String {
         guard state.readable else { return "settings.json isn't JSON Sanduhr can edit, so it is left alone." }
@@ -91,8 +103,8 @@ struct OwnModUpdateQuestion: Identifiable, Equatable {
 }
 
 extension View {
-    /// The meters mod's two questions, on Mods & Config: On in a folder without the mod, and an
-    /// update that can do more.
+    /// The meters mod's two questions, in the Studio's Folders tab: On in a folder without the
+    /// mod, and an update that can do more.
     func ownModQuestions(_ model: ModsPageModel, linked: [String]) -> some View {
         modifier(OwnModQuestions(model: model, linked: linked))
     }
@@ -150,49 +162,46 @@ enum MetersModStatus {
         if status == .unreadable || row?.state.readable == false { return "settings.json isn't valid JSON" }
         guard let row else { return status.isOurs ? "installed" : "not installed" }
         let base = row.state.isOn ? "on" : (row.state.listed ? "off" : "not installed")
-        let waiting = row.state.listed && (status == .outdated || (row.updateAvailable && !row.missing))
-        return waiting ? base + ", update waiting" : base
+        return row.updateWaiting ? base + ", update waiting" : base
     }
 }
 
 /// Sanduhr's own mod, sanduhr-meters, at the top of Mods & Config (2026-10-08: the meters above
 /// the prompt are a mod, so their controls live with the mods; slice 2 had them on Claude Code).
-/// Per Claude Code folder: its switch, Update and Remove, through the receipts (ModSwitch).
+/// Since item 75 slice C its per-folder rows live in the Mod Studio's Folders tab; the page keeps
+/// where it is on, in one line, and the ways into the Studio.
 struct SanduhrModSection: View {
     var model: ModsPageModel
-    let linked: [String]
-    /// On in a folder whose list has no entry: the consent sheet, then the install.
-    let install: (String) -> Void
+    let demo: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             SanduhrModIntro()
             GroupBox {
-                VStack(alignment: .leading, spacing: 10) {
-                    if model.ownLoaded && model.own.isEmpty {
-                        Text("No Claude Code folder found (~/.claude or a ~/.claude-name folder).")
-                            .font(.caption).foregroundStyle(.secondary)
-                    } else if !model.ownLoaded {
-                        Text("Reading your Claude Code folders…").font(.caption).foregroundStyle(.secondary)
-                    }
-                    ForEach(model.own) { row in
-                        MetersModRow(row: row, model: model, linked: linked, install: { install(row.folder) })
-                        if row.id != model.own.last?.id { Divider() }
-                    }
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(line).font(.callout)
+                        .foregroundStyle(model.ownLoaded ? .primary : .secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Button("Folders…") { model.openStudio(.folders) }
+                        .help("Switch the mod on or off, update or remove it, per Claude Code folder.")
+                    Button("Open Studio…") { model.openStudio() }
+                        .help("Preview the band with demo numbers and style it.")
                 }
+                .controlSize(.small)
                 .padding(4)
                 .frame(maxWidth: .infinity, alignment: .leading)
             } label: {
-                HStack {
-                    Text("\(IntegrationScripts.modName), Sanduhr's own mod").font(.body.weight(.semibold))
-                    Spacer()
-                    Button("Open Studio…") { model.studioOpen = true }
-                        .controlSize(.small)
-                        .help("Preview the band with demo numbers and style it.")
-                }
+                Text("\(IntegrationScripts.modName), Sanduhr's own mod").font(.body.weight(.semibold))
             }
             WatchersAbovePromptLine()
         }
+    }
+
+    private var line: String {
+        guard model.ownLoaded else { return "Reading your Claude Code folders…" }
+        guard let on = model.studioOnLine(demo: demo) else { return "No Claude Code folder found (~/.claude or a ~/.claude-name folder)." }
+        return on + "."
     }
 }
 
@@ -200,7 +209,7 @@ private struct SanduhrModIntro: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(SettingsNames.metersAbovePrompt).font(.headline)
-            Text("Sanduhr's own mod draws the active account's session and weekly bars above Claude Code's prompt, animated, with the pace mark and reset countdowns, and the watchers as rows when you show them there. Switch it per Claude Code folder. Off switches it off for that folder (enabledPlugins false) and keeps its entry and files; Remove takes the entry out, deletes Sanduhr's record and puts settings.json back byte for byte. The looks of Sanduhr's meters in it come from the statusline's Combine sheet on Claude Code.")
+            Text("Sanduhr's own mod draws the active account's session and weekly bars above Claude Code's prompt, animated, with the pace mark and reset countdowns, and the watchers as rows when you show them there. The Mod Studio previews it with demo numbers and styles it, switches it per Claude Code folder, and shows what it can do.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -209,8 +218,8 @@ private struct SanduhrModIntro: View {
 }
 
 /// One folder's meters mod: its state, Update, Remove and the switch, then where it stands and
-/// what the last action said (a project's override included).
-private struct MetersModRow: View {
+/// what the last action said (a project's override included). The Studio's Folders tab.
+struct MetersModRow: View {
     let row: OwnModRow
     var model: ModsPageModel
     let linked: [String]
@@ -262,7 +271,7 @@ private struct MetersModButtons: View {
     let busy: Bool
 
     var body: some View {
-        if row.status == .outdated || (row.updateAvailable && !row.missing) {
+        if row.status == .outdated || row.updateWaiting {
             Button("Update") {
                 Task {
                     if row.status == .outdated {

@@ -64,4 +64,51 @@ struct ModStudioTests {
         #expect(m.sweeps(now: start + 3100, startedAt: start)[BandFrame.session] == start + 3300)
         #expect(StudioMoment.calm.sweeps(now: start, startedAt: start).isEmpty)
     }
+
+    // Slice C: the folder rows moved into the Studio's Folders tab; the page keeps one line.
+
+    private func row(_ folder: String, on: Bool, listed: Bool = true, pinned: String? = nil, waiting: Bool = false) -> OwnModRow {
+        var state = OwnModState(folder: folder)
+        state.entry = listed ? "/mods/sanduhr-meters" : nil
+        state.pinned = pinned
+        state.inline = on ? nil : false
+        var r = OwnModRow(state: state)
+        r.updateAvailable = waiting
+        return r
+    }
+
+    @Test func theOnLineCountsFoldersAndWaitingUpdates() {
+        #expect(OwnModRow.onLine([]) == nil)
+        #expect(OwnModRow.onLine([row("/a", on: true)]) == "On in 1 of 1 folder")
+        let rows = [row("/a", on: true, waiting: true), row("/b", on: false), row("/c", on: false, listed: false, waiting: true)]
+        // An unlisted folder has nothing to update.
+        #expect(OwnModRow.onLine(rows) == "On in 1 of 3 folders, an update waiting in 1")
+    }
+
+    @Test func aMissingFolderWaitsForRemoveNotUpdate() {
+        var r = row("/a", on: true, waiting: true)
+        #expect(r.updateWaiting)
+        r.missing = true
+        #expect(!r.updateWaiting)
+        var outdated = row("/b", on: true)
+        outdated.status = .outdated
+        #expect(outdated.updateWaiting)
+    }
+
+    @Test func theStudioOpensOnTheTabAsked() {
+        let model = ModsPageModel()
+        model.openStudio(.folders)
+        #expect(model.studioOpen && model.studioTab == .folders)
+        model.studioOpen = false
+        model.openStudio()
+        #expect(model.studioTab == .look)
+        #expect(StudioTab.allCases.map(\.title) == ["Look", "Folders", "About"])
+    }
+
+    @Test func checkWaitsForTheFoldersToBeRead() async {
+        let model = ModsPageModel()
+        await model.checkOwnMod()
+        // Before the read, `claude` isn't known yet: no answer rather than "unavailable".
+        #expect(model.ownCheck == nil && !model.checkingOwn)
+    }
 }

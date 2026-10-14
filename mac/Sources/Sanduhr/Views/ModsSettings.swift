@@ -210,8 +210,12 @@ final class ModsPageModel {
     /// The cards opened from their compact line (item 75, slice A), kept while the window lives.
     var openCards: Set<String> = []
     var sortByLoad = false
-    /// The Mod Studio sheet is up (item 75, slice B).
+    /// The Mod Studio sheet is up (item 75, slice B), and the tab it opens on (slice C).
     var studioOpen = false
+    var studioTab: StudioTab = .look
+    /// The About tab's Check of the mod this Sanduhr carries, and whether it is running.
+    private(set) var ownCheck: ModCheckOutcome?
+    private(set) var checkingOwn = false
     private var seatConfigs: [String: [ClaudeCodeFolders.ConfigCandidate]] = [:]
 
     /// Card ids whose Check failed or found a high risk: Needs a look.
@@ -224,10 +228,37 @@ final class ModsPageModel {
         }.map(\.id))
     }
 
-    /// The Studio's header: on in how many of the folders found, nil before they are read.
-    var studioOnLine: String? {
-        guard ownLoaded, !own.isEmpty else { return nil }
-        return "On in \(own.filter(\.state.isOn).count) of \(own.count) folder\(own.count == 1 ? "" : "s")"
+    func openStudio(_ tab: StudioTab = .look) {
+        studioTab = tab
+        studioOpen = true
+    }
+
+    /// The folders the Studio's Folders tab lists: no work folder in demo mode.
+    func studioRows(demo: Bool) -> [OwnModRow] { own.filter { !(demo && isWork($0.folder)) } }
+
+    /// The Studio's header and the page's line: on in how many of the folders found, nil before
+    /// they are read.
+    func studioOnLine(demo: Bool) -> String? {
+        guard ownLoaded else { return nil }
+        return OwnModRow.onLine(studioRows(demo: demo))
+    }
+
+    /// The folder of the mod this copy of Sanduhr carries, nil in a build without it.
+    var ownModDir: String? {
+        guard installer.scripts.hasMod else { return nil }
+        return installer.scripts.source?.appendingPathComponent(IntegrationScripts.modPath).path
+    }
+
+    /// Check for the About tab: `claude plugin validate --json` on the mod this Sanduhr carries.
+    func checkOwnMod() async {
+        guard ownLoaded, let dir = ownModDir, !checkingOwn else { return }
+        guard let claude else {
+            ownCheck = .unavailable
+            return
+        }
+        checkingOwn = true
+        defer { checkingOwn = false }
+        ownCheck = await Task.detached(priority: .userInitiated) { ModCheck.run(claude: claude, dir: dir) }.value
     }
 
     /// A card shows in full when it was opened, or when the search found it only by what it brings.
@@ -626,7 +657,6 @@ enum ModSketch {
 struct ModsSettings: View {
     var vm: UsageViewModel
     var model: ModsPageModel
-    @State private var consent: MetersConsent?
 
     private var linked: [String] { vm.realAccountLabels.compactMap { vm.dataChoices(for: $0).folder } }
 
@@ -634,7 +664,7 @@ struct ModsSettings: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    SanduhrModSection(model: model, linked: linked, install: { consent = MetersConsent(folder: $0) })
+                    SanduhrModSection(model: model, demo: vm.demo)
                         .settingsAnchor(SettingsAnchor.metersMod)
                     if model.loaded && model.claude == nil {
                         Text(ModsPageModel.cliMissing)
@@ -658,18 +688,9 @@ struct ModsSettings: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task { await model.load(linked: linked) }
-        .ownModQuestions(model, linked: linked)
         .sheet(isPresented: Binding(get: { model.studioOpen }, set: { model.studioOpen = $0 })) {
-            ModStudioSheet(model: .live(), onLine: model.studioOnLine, close: { model.studioOpen = false })
-        }
-        .sheet(item: $consent) { c in
-            MetersConsentSheet(folder: model.display(c.folder),
-                               file: model.display(model.installer.configFile(.meters, folder: c.folder)),
-                               install: {
-                                   consent = nil
-                                   Task { await model.install(folder: c.folder, updating: false, linked: linked) }
-                               },
-                               cancel: { consent = nil })
+            ModStudioSheet(model: .live(), mods: model, linked: linked, demo: vm.demo, tab: model.studioTab,
+                           close: { model.studioOpen = false })
         }
     }
 
@@ -925,8 +946,8 @@ private struct ModCheckRow: View {
     }
 }
 
-/// The validator's answer as a risk card.
-private struct ModRiskCard: View {
+/// The validator's answer as a risk card (the Check button's, and the Studio's About tab).
+struct ModRiskCard: View {
     let outcome: ModCheckOutcome
 
     var body: some View {
