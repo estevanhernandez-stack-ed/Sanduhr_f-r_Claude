@@ -217,12 +217,10 @@ private struct SeatHeader: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 Text(model.display(seat.path)).font(.body.monospaced()).textSelection(.enabled)
-                // No export control exists for a seat marked work (item 71's wall, item 76).
-                if !seat.isWork {
-                    Button("Export Config…") { Task { await model.startConfigExport(seat) } }
-                        .controlSize(.small)
-                        .help("Writes a .sanduhrpack describing this folder: its agents, skills, plugins, MCP servers and chosen settings. You pick what goes in first.")
-                }
+                // A seat marked work exports too, its pack stamped as from work (item 76).
+                Button("Export Config…") { Task { await model.startConfigExport(seat) } }
+                    .controlSize(.small)
+                    .help("Writes a .sanduhrpack describing this folder: its agents, skills, plugins, MCP servers and chosen settings. You pick what goes in first.")
                 Button("Open Config Pack…") { Task { await model.chooseConfigPack(seat: seat.path) } }
                     .controlSize(.small)
                     .help("Opens a .sanduhrpack into this folder. You choose what to bring over; only what the folder lacks can be.")

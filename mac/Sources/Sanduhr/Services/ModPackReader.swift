@@ -129,6 +129,8 @@ enum ModPackReader {
         var manifest: [String: Any]
         var files: [String: Data]
         var kind: String { manifest["kind"] as? String ?? "" }
+        /// Exported from a folder marked work (item 76: allowed, and said on import elsewhere).
+        var fromWork: Bool { manifest["from"] as? String == "work" }
     }
 
     /// Checks and unpacks the pack at `url` into a temporary folder, verifies every file it lists

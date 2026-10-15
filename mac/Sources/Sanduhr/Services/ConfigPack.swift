@@ -351,8 +351,9 @@ enum ConfigPack {
         return String(safe).split(separator: "-").joined(separator: "-") + "-config." + ModPack.fileExtension
     }
 
-    /// The manifest for the chosen rows. Names no machine, user or seat.
-    static func manifest(_ items: [Item], label: String, version: String, now: Date) -> [String: Any] {
+    /// The manifest for the chosen rows. Names no machine, user or seat; `fromWork` stamps it
+    /// `"from": "work"` so an import elsewhere can say where it came from.
+    static func manifest(_ items: [Item], label: String, version: String, now: Date, fromWork: Bool = false) -> [String: Any] {
         var files: [[String: Any]] = []
         var settings: [String: Any] = [:]
         var plugins: [Any] = []
@@ -374,15 +375,17 @@ enum ConfigPack {
             default: break
             }
         }
-        return ["schema": 1, "kind": "config", "created_at": HandoffFiles.stamp(now), "created_by": "Sanduhr " + version,
-                "label": label, "files": files, "settings": settings, "env": env, "plugins": plugins, "mcp": mcp,
-                "kept_mods": mods]
+        var doc: [String: Any] = ["schema": 1, "kind": "config", "created_at": HandoffFiles.stamp(now), "created_by": "Sanduhr " + version,
+                                  "label": label, "files": files, "settings": settings, "env": env, "plugins": plugins, "mcp": mcp,
+                                  "kept_mods": mods]
+        if fromWork { doc["from"] = "work" }
+        return doc
     }
 
     /// Writes the chosen rows (blocked ones are never written) as a pack at `destination`. Built
     /// in a temporary folder, zipped with `ditto`, moved into place.
     static func write(_ chosen: [Item], label: String, to destination: URL, version: String = ModPack.appVersion,
-                      now: Date = Date()) throws {
+                      now: Date = Date(), fromWork: Bool = false) throws {
         let items = chosen.filter(\.canTravel)
         let fm = FileManager.default
         let work = fm.temporaryDirectory.appendingPathComponent("sanduhr-config-\(UUID().uuidString)", isDirectory: true)
@@ -395,7 +398,7 @@ enum ConfigPack {
                 try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try Data(f.text.utf8).write(to: url)
             }
-            let doc = manifest(items, label: label, version: version, now: now)
+            let doc = manifest(items, label: label, version: version, now: now, fromWork: fromWork)
             var data = try JSONSerialization.data(withJSONObject: doc, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
             data.append(0x0A)
             try data.write(to: tree.appendingPathComponent(ModPack.manifestName))

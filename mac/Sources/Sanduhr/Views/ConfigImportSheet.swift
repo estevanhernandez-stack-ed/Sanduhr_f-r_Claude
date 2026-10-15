@@ -243,6 +243,10 @@ struct ConfigImportSheet: View {
                 if seat?.isWork == true {
                     Text("This is a folder marked work.").font(.caption.weight(.semibold)).foregroundStyle(.orange)
                 }
+                if crossesFromWork {
+                    Text("This pack comes from a folder marked work, and this one isn't. Check it carries nothing that names work: people, products, endpoints, internal repos.")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                }
                 if FileManager.default.fileExists(atPath: (state.seat as NSString).appendingPathComponent(".git")) {
                     Text("This folder is a git clone: its next sync commits what the import writes.")
                         .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
@@ -269,11 +273,15 @@ struct ConfigImportSheet: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Into \(seat?.label ?? "this folder"), \(model.display(state.seat))" + (seat?.isWork == true ? ", a folder marked work" : "") + ". "
+                 + (crossesFromWork ? "The pack comes from a folder marked work. " : "")
                  + "Sanduhr writes the files and settings this folder lacks"
                  + (cliCount > 0 ? ", and runs claude to put in \(cliCount == 1 ? "a plugin or MCP server" : "\(cliCount) plugins and MCP servers"), which can fetch from the network" : "")
                  + ". It records them so Undo Import can take them back.")
         }
     }
+
+    /// A pack stamped as from work, opened into a folder that isn't marked work.
+    private var crossesFromWork: Bool { state.pack.fromWork && state.hasSeat && seat?.isWork != true }
 
     private var cliCount: Int {
         state.rows.filter { row in
