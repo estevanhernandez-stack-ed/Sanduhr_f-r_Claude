@@ -225,6 +225,10 @@ final class ModsPageModel {
     /// Export Config (item 76, slice C): the sheet's rows while it's open, and the last result.
     var configExport: ConfigExportState?
     var configExportNote: String?
+    /// Open Config Pack (item 76, slice D): the sheet while open, a note, and imports not undone.
+    var configImport: ConfigImportState?
+    var configImportNote: String?
+    var imports: [ConfigImport.Record] = ConfigImport.Log.standard.list()
     var newModWay: NewModWay = .build
     /// Check's answer for each proposed mod (slice G), by proposal id.
     var proposalChecks: [String: ModCheckOutcome] = [:]
@@ -709,10 +713,8 @@ struct ModsSettings: View {
     private func openPacksIfAny() {
         let urls = PackInbox.shared.take()
         guard !urls.isEmpty else { return }
-        model.tab = .catalog
-        model.newModWay = .fromClaude
-        model.newModOpen = true
-        Task { for url in urls { await model.openPack(url, store: .shared) } }
+        // A mod pack goes to New Mod, a config pack to the Open sheet (item 76, slices B and D).
+        Task { for url in urls { await model.openAnyPack(url, store: .shared) } }
     }
 
     private func openMetersIfAsked() {
@@ -754,6 +756,9 @@ struct ModsSettings: View {
         // search that name it open the Studio's Folders tab, where it switches per folder.
         .onAppear { openMetersIfAsked(); openPacksIfAny() }
         .onChange(of: PackInbox.shared.urls) { openPacksIfAny() }
+        .sheet(item: Binding(get: { model.configImport }, set: { model.configImport = $0 })) { state in
+            ConfigImportSheet(model: model, demo: vm.demo, state: state, close: { model.configImport = nil })
+        }
         .onChange(of: navigation?.scrollRequest) { openMetersIfAsked() }
         .sheet(isPresented: Binding(get: { model.studioOpen }, set: { model.studioOpen = $0 })) {
             ModStudioSheet(model: .live(), mods: model, linked: linked, demo: vm.demo, tab: model.studioTab,

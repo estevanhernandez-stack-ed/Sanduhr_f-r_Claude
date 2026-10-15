@@ -184,6 +184,9 @@ private struct SeatHeader: View {
                         .controlSize(.small)
                         .help("Writes a .sanduhrpack describing this folder: its agents, skills, plugins, MCP servers and chosen settings. You pick what goes in first.")
                 }
+                Button("Open Config Pack…") { Task { await model.chooseConfigPack(seat: seat.path) } }
+                    .controlSize(.small)
+                    .help("Opens a .sanduhrpack into this folder. You choose what to bring over; only what the folder lacks can be.")
                 if model.addedFolders.contains(seat.path) {
                     Button("Forget Folder") { Task { await model.forgetFolder(seat.path, linked: linked) } }
                         .controlSize(.small)
@@ -191,6 +194,18 @@ private struct SeatHeader: View {
                 }
             }
             Text(facts).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            ForEach(model.imports.filter { $0.seat == AccountData.normalized(seat.path) }) { record in
+                HStack(spacing: 8) {
+                    Text("Imported \(record.label) \(record.at.formatted(date: .abbreviated, time: .shortened)), \(record.steps.filter { $0.kind == .file || $0.kind == .setting || $0.kind == .env }.count) items")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button("Undo Import") { model.configImportNote = model.undoImport(record).map { "Undone, except: " + $0 }.joined(separator: "; ") }
+                        .controlSize(.small)
+                        .help("Takes back what that import wrote. A file or setting changed since is left, and named.")
+                }
+            }
+            if let note = model.configImportNote, !note.isEmpty {
+                Text(note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             if let note = model.configExportNote {
                 Text(note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
