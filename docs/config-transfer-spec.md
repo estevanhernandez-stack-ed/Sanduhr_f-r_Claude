@@ -103,7 +103,7 @@ Each ships on its own and is useful without the next.
 
 | Slice | What | Writes |
 |---|---|---|
-| A | Mod export: a kept mod to a `.sanduhrpack`, a one-plugin marketplace inside | the pack file only |
+| A | Mod export: a kept mod to a `.sanduhrpack`, a one-plugin marketplace inside (built 2026-10-15: **Export…** in a kept mod's menu on New Mod, From Claude; `ditto` zips the tree; checked against Claude Code 2.1 in a scratch seat: `plugin validate` passes, `marketplace add` on the unzipped folder and `plugin install <mod>@<mod>-pack` install and enable it) | the pack file only |
 | B | Mod import: a pack (or a plugin folder or zip dropped on From Claude) staged as a proposal, origin From a file; the UTType and double-click | staged proposal; the rest is item 75's |
 | C | Config export: the sheet, path rewriting, the scan, the manifest | the pack file only |
 | D | Config import, files and settings: the pack as a Compare side, Bring over, `fileAdd` and `configEdit` receipts, env values typed in, Undo Import | seat files and `settings.json`, by receipt |

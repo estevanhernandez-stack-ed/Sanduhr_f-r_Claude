@@ -2,6 +2,7 @@
 
 ## Unreleased (mac)
 
+- **Share a kept mod.** A kept mod's menu on New Mod, From Claude has **Export…**: it writes one `.sanduhrpack` file with the mod's files and what Check found, and nothing from your Claude Code folders (no settings, paths, folder or session names). The pack is also a one-plugin marketplace, so on a Mac without Sanduhr, `claude plugin marketplace add` on the unzipped folder and `claude plugin install <mod>@<mod>-pack` install it. Opening a pack in Sanduhr comes next.
 - **Try a mod Claude proposed before keeping it.** A proposal waiting on New Mod, From Claude has **Try in a Session…** once Check passed on its files: Terminal opens Claude Code with the proposed files loaded for that session only, with the Claude Code folder whose session proposed it (the MCP server now sends that folder's name, such as `.claude-personal`), in a folder you choose or a new empty one, after a confirm that names the risk (a high-risk mod asks for its name typed, as Keep does). Trying keeps nothing and turns it on nowhere: the proposal keeps waiting for Keep or Dismiss, and Claude hears no decision.
 
 ## v2.20.0-mac — 2026-10-14
