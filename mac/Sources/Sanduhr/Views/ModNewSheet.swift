@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// New Mod's two ways in: the prompt, or what Claude made (in a session, or proposed).
 enum NewModWay: String, CaseIterable, Identifiable, Sendable {
@@ -173,7 +174,7 @@ extension ModsPageModel {
     /// Approve: the proposal becomes a kept mod, checked as one.
     func approve(_ r: ModProposalRecord, store: ModProposalStore) async {
         do {
-            let kept = try store.approve(r.id)
+            let kept = try store.approve(r.id, fallback: packFolder(r))
             keptNote = nil
             if let outcome = proposalChecks[r.id] { keptChecks[kept.id] = outcome }
             proposalChecks[r.id] = nil
@@ -270,12 +271,52 @@ extension ModsPageModel {
             return
         }
         do {
-            try store.trySession(r.id, claude: claude, in: folder)
+            try store.trySession(r.id, claude: claude, in: folder, fallback: packFolder(r))
             keptNote = nil
             if let folder { UserDefaults.standard.set(folder.path, forKey: Self.tryFolderKey) }
         } catch {
             keptNote = (error as? KeptMods.Failure)?.message ?? KeptMods.Failure.writeFailed.message
         }
+    }
+
+    /// A mod opened from a pack names no folder: Try and Keep use the first Claude Code folder
+    /// not marked work, so a pack from someone else never starts in a work seat unasked.
+    func packFolder(_ r: ModProposalRecord) -> String? {
+        r.fromFile ? seats.first { !$0.isWork }?.path : nil
+    }
+
+    /// Open a pack (item 76, slice B): checked, unpacked and staged for review, or why not.
+    func openPack(_ url: URL, store: ModProposalStore) async {
+        let read = await Task.detached(priority: .userInitiated) { () -> Result<ModPackReader.Opened, ModPackReader.Refusal> in
+            do { return .success(try ModPackReader.open(url)) } catch let r as ModPackReader.Refusal { return .failure(r) } catch {
+                return .failure(ModPackReader.Refusal("Sanduhr can't read that file."))
+            }
+        }.value
+        do {
+            switch try store.open(read.get()) {
+            case .staged(let r):
+                keptNote = nil
+                await checkProposal(r, store: store)
+            case .alreadyKept(let mod):
+                keptNote = "\(mod.name)\(mod.version.map { " " + $0 } ?? "") is kept already, with the same files."
+            }
+        } catch {
+            let reasons = (error as? ModPackReader.Refusal)?.reasons ?? ["Sanduhr can't read that file."]
+            keptNote = "Sanduhr can't open \(url.lastPathComponent): " + reasons.joined(separator: " ")
+        }
+    }
+
+    /// Asks for a pack, then opens it.
+    func choosePack(store: ModProposalStore) async {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        if let type = UTType(filenameExtension: ModPack.fileExtension) { panel.allowedContentTypes = [type] }
+        panel.message = "Open a .sanduhrpack. Its mod waits here for you to check, try and keep; nothing runs until you do."
+        panel.prompt = "Open"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        await openPack(url, store: store)
     }
 
     func chooseTryFolder(_ r: ModProposalRecord, store: ModProposalStore) {
@@ -461,7 +502,13 @@ struct NewModSheet: View {
     @ViewBuilder
     private var session: some View {
         @Bindable var proposals = proposals
-        Toggle("Let agents propose mods", isOn: $proposals.allowed)
+        HStack {
+            Toggle("Let agents propose mods", isOn: $proposals.allowed)
+            Spacer()
+            Button("Open Pack…") { Task { await model.choosePack(store: proposals) } }
+                .controlSize(.small)
+                .help("Opens a .sanduhrpack someone exported. Its mod waits here to be checked, tried and kept.")
+        }
             .help("Lets Claude send a mod it built to Sanduhr with the propose_mod tool. You review its files and what it can do, then keep it or dismiss it; nothing is turned on anywhere by a proposal.")
         Text("Off, Sanduhr's MCP server refuses propose_mod, propose_install and list_catalog. On, Claude can see your kept mods and where they're on, send a mod for you to review, or ask to turn a kept one on in a folder; each waits here for you.")
             .font(.caption).foregroundStyle(.secondary)
@@ -474,9 +521,14 @@ struct NewModSheet: View {
         }
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                if !proposals.pending.isEmpty {
+                if !proposals.pendingFromFiles.isEmpty {
+                    Text("Opened from a pack").font(.callout.weight(.semibold))
+                    ForEach(proposals.pendingFromFiles) { proposalRow($0) }
+                    Divider()
+                }
+                if !proposals.pendingFromClaude.isEmpty {
                     Text("Proposed by Claude").font(.callout.weight(.semibold))
-                    ForEach(proposals.pending) { proposalRow($0) }
+                    ForEach(proposals.pendingFromClaude) { proposalRow($0) }
                     Divider()
                 }
                 let asks = proposals.pendingInstalls.filter { !(demo && model.isWork($0.folder)) }
@@ -586,14 +638,15 @@ struct NewModSheet: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(r.name + (r.version.map { " " + $0 } ?? "")).font(.callout)
-                    Text("Proposed \(r.requestedAt.formatted(date: .abbreviated, time: .shortened)), \(r.files) \(r.files == 1 ? "file" : "files"), \(ByteCountFormatter.string(fromByteCount: Int64(r.bytes), countStyle: .file))")
+                    Text("\(r.fromFile ? "Opened" : "Proposed") \(r.requestedAt.formatted(date: .abbreviated, time: .shortened)), \(r.files) \(r.files == 1 ? "file" : "files"), \(ByteCountFormatter.string(fromByteCount: Int64(r.bytes), countStyle: .file))")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
                 if model.keptBusy.contains(r.id) { ProgressView().controlSize(.small) }
                 Button("Dismiss") { proposals.dismiss(r.id) }
                     .controlSize(.small)
-                    .help("Deletes the proposed files. Claude hears that you dismissed it.")
+                    .help(r.fromFile ? "Deletes Sanduhr's copy of the pack's files. The pack itself is left where it is."
+                          : "Deletes the proposed files. Claude hears that you dismissed it.")
                 Button("Try in a Session…") { tryingProposal = r }
                     .controlSize(.small)
                     .disabled(!model.canTryProposal(r, store: proposals))
@@ -692,6 +745,7 @@ struct NewModSheet: View {
     private var tryProposalMessage: String {
         guard let r = tryingProposal else { return "" }
         let seat = proposals.folderPath(r).map { "with \(($0 as NSString).lastPathComponent), the Claude Code folder whose session proposed it" }
+            ?? model.packFolder(r).map { "with \(($0 as NSString).lastPathComponent), your first Claude Code folder not marked work" }
             ?? "with Claude Code's default folder (.claude)"
         var lines = ["Opens Terminal and starts Claude Code \(seat), with \(r.name) loaded for that session only, in a folder you choose or a new empty one. The mod's code runs there with your permissions. It stays a proposal: trying keeps nothing and turns it on nowhere."]
         if case .report(let report)? = model.proposalChecks[r.id] {

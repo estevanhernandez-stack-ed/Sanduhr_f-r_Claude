@@ -702,6 +702,16 @@ struct ModsSettings: View {
     var model: ModsPageModel
     @Environment(SettingsNavigation.self) private var navigation: SettingsNavigation?
 
+    /// Packs opened from Finder: New Mod's From Claude opens and reads each (item 76, slice B).
+    private func openPacksIfAny() {
+        let urls = PackInbox.shared.take()
+        guard !urls.isEmpty else { return }
+        model.tab = .catalog
+        model.newModWay = .fromClaude
+        model.newModOpen = true
+        Task { for url in urls { await model.openPack(url, store: .shared) } }
+    }
+
     private func openMetersIfAsked() {
         guard navigation?.anchor == SettingsAnchor.metersMod else { return }
         navigation?.anchor = nil
@@ -739,7 +749,8 @@ struct ModsSettings: View {
         .task { await model.load(linked: linked) }
         // The meters mod lives in the Catalog with the other mods (2026-10-14, the owner): links and
         // search that name it open the Studio's Folders tab, where it switches per folder.
-        .onAppear { openMetersIfAsked() }
+        .onAppear { openMetersIfAsked(); openPacksIfAny() }
+        .onChange(of: PackInbox.shared.urls) { openPacksIfAny() }
         .onChange(of: navigation?.scrollRequest) { openMetersIfAsked() }
         .sheet(isPresented: Binding(get: { model.studioOpen }, set: { model.studioOpen = $0 })) {
             ModStudioSheet(model: .live(), mods: model, linked: linked, demo: vm.demo, tab: model.studioTab,

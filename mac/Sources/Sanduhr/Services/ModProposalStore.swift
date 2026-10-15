@@ -21,6 +21,11 @@ struct ModProposalRecord: Codable, Equatable, Identifiable, Sendable {
     var keptStamp: String?
     /// The folder whose session proposed it, by name (`.claude-personal`); nil from older servers.
     var folder: String?
+    /// `file` when the user opened it from a `.sanduhrpack` (item 76, slice B); nil from Claude.
+    var origin: String?
+
+    static let fileOrigin = "file"
+    var fromFile: Bool { origin == Self.fileOrigin }
 
     var isPending: Bool { status == .pendingReview }
 }
@@ -103,6 +108,9 @@ final class ModProposalStore {
     @ObservationIgnored var onProposal: ((ModProposalRecord) -> Void)?
 
     var pending: [ModProposalRecord] { records.filter(\.isPending) }
+    /// Waiting proposals Claude sent, and those opened from a pack.
+    var pendingFromClaude: [ModProposalRecord] { pending.filter { !$0.fromFile } }
+    var pendingFromFiles: [ModProposalRecord] { pending.filter(\.fromFile) }
     var pendingInstalls: [ModInstallRecord] { installs.filter(\.isPending) }
 
     init(paths: Paths = .standard, defaults: UserDefaults = .standard, now: @escaping () -> Date = Date.init,
@@ -291,20 +299,21 @@ final class ModProposalStore {
     /// Try in a Session on a waiting proposal (slice G3): Claude Code loads the staged copy for one
     /// session, with the folder whose session proposed it (Claude Code's default folder when unknown). It stays a proposal: nothing is kept, and neither
     /// its status nor the server's index changes.
+    /// `fallback` is the folder used when the proposal names none Sanduhr knows (a pack's).
     @discardableResult
-    func trySession(_ id: String, claude: String, in workingFolder: URL? = nil,
+    func trySession(_ id: String, claude: String, in workingFolder: URL? = nil, fallback: String? = nil,
                     open: Bool = true) throws -> (start: URL, script: URL) {
         guard let r = records.first(where: { $0.id == id && $0.isPending }), isStaged(r) else { throw KeptMods.Failure.gone }
-        return try KeptMods.trySession(name: r.name, dir: paths.staged(id).path, config: folderPath(r), claude: claude,
+        return try KeptMods.trySession(name: r.name, dir: paths.staged(id).path, config: folderPath(r) ?? fallback, claude: claude,
                                        in: workingFolder, open: open)
     }
 
     /// Approve: the staged files become a kept mod.
     @discardableResult
-    func approve(_ id: String) throws -> KeptMod {
+    func approve(_ id: String, fallback: String? = nil) throws -> KeptMod {
         guard let i = records.firstIndex(where: { $0.id == id && $0.isPending }) else { throw KeptMods.Failure.writeFailed }
-        let kept = try paths.kept.keep(paths.staged(id).path, session: "claude", folder: folderPath(records[i]),
-                                       proposed: true, now: now())
+        let kept = try paths.kept.keep(paths.staged(id).path, session: records[i].fromFile ? "pack" : "claude",
+                                       folder: folderPath(records[i]) ?? fallback, proposed: true, now: now())
         records[i].status = .approved
         records[i].decidedAt = now()
         records[i].keptStamp = kept.stamp
@@ -312,6 +321,35 @@ final class ModProposalStore {
         save()
         publishCatalog()
         return kept
+    }
+
+    /// What opening a pack did.
+    enum Opened: Equatable {
+        case staged(ModProposalRecord)
+        /// The same files are kept already.
+        case alreadyKept(KeptMod)
+    }
+
+    /// Stages a mod opened from a pack (item 76, slice B) to be reviewed like a proposal: files,
+    /// Check, Try, Keep or Dismiss. The agents switch has no say (the user opened the file), the
+    /// server never hears of it, and a waiting proposal of the same name is replaced.
+    func open(_ pack: ModPackReader.Opened) throws -> Opened {
+        let p = pack.proposal
+        if let stamp = pack.stamp, let kept = paths.kept.list().first(where: { $0.name == p.name && $0.stamp == stamp }) {
+            return .alreadyKept(kept)
+        }
+        do { try stage(p) } catch { throw ModPackReader.Refusal("Sanduhr couldn't save the files for review.") }
+        for i in records.indices where records[i].isPending && records[i].name == p.name {
+            records[i].status = .replaced
+            records[i].decidedAt = now()
+            removeStage(records[i].id)
+        }
+        let record = ModProposalRecord(id: p.id, name: p.name, version: p.version, summary: p.summary,
+                                       files: p.files.count, bytes: p.bytes, requestedAt: now(), status: .pendingReview,
+                                       origin: ModProposalRecord.fileOrigin)
+        records.append(record)
+        save()
+        return .staged(record)
     }
 
     func dismiss(_ id: String) {
@@ -374,7 +412,8 @@ final class ModProposalStore {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         if let data = try? encoder.encode(records) { HandoffFiles.writeOwnerOnly(data, to: paths.records) }
         if let data = try? encoder.encode(installs) { HandoffFiles.writeOwnerOnly(data, to: paths.installRecords) }
-        var index: [[String: Any]] = records.map { r in
+        // A pack the user opened is theirs: the server's index lists Claude's proposals only.
+        var index: [[String: Any]] = records.filter { !$0.fromFile }.map { r in
             var o: [String: Any] = ["id": r.id, "kind": "mod", "name": r.name, "status": r.status.rawValue]
             if let v = r.version { o["version"] = v }
             if let d = r.decidedAt { o["decided_at"] = HandoffFiles.stamp(d) }
