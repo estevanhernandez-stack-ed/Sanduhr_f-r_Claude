@@ -16,6 +16,12 @@ struct ConfigImportState: Identifiable {
     var done: ConfigImport.Record?
     var failure: String?
     var staged = 0
+    /// Whether plugin and MCP rows run through `claude` here (slice E).
+    var cli: ConfigImport.CLIState = .missing
+    /// Import pressed: the CLI is running.
+    var working = false
+    /// A line per plugin or server `claude` didn't put in.
+    var cliFailures: [String] = []
 
     var label: String { pack.manifest["label"] as? String ?? "Config" }
 
@@ -24,12 +30,23 @@ struct ConfigImportState: Identifiable {
 
     mutating func plan(home: String = NSHomeDirectory()) {
         guard hasSeat else { rows = []; chosen = []; return }
-        rows = ConfigImport.plan(pack, seat: seat, home: home)
+        rows = ConfigImport.plan(pack, seat: seat, home: home, cli: cli)
         chosen = Set(rows.filter { $0.choosable && $0.kind != .instructions }.map(\.id))
     }
 }
 
 extension ModsPageModel {
+    /// Whether `claude` can put plugins and MCP servers into `seat` now.
+    func cliState(for seat: String) -> ConfigImport.CLIState {
+        guard claude != nil else { return .missing }
+        return running.contains(AccountData.normalized(seat)) ? .running : .ready
+    }
+
+    /// Seats Claude Code runs in right now, read fresh (the page's list can be minutes old).
+    nonisolated static func runningSeats(home: String) -> Set<String> {
+        Set(ClaudeProcesses.running(home: home).sessions.map { AccountData.normalized($0.seat) })
+    }
+
     /// Opens a pack from Finder or a panel: a config pack opens the Open sheet on `seat`, or with
     /// no folder chosen when none is given, so a pack never lands in a real folder by default
     /// (the 2026-10-15 check: a double-clicked pack went into the first personal folder); a mod
@@ -48,6 +65,7 @@ extension ModsPageModel {
         case .success((let pack, let sha)) where pack.kind == "config":
             // No wait for the folders: none is chosen for you, and the picker fills once they're read.
             var state = ConfigImportState(pack: pack, packSHA256: sha, fileName: url.lastPathComponent, seat: seat ?? "")
+            state.cli = cliState(for: seat ?? "")
             state.plan()
             tab = .bySeat
             if let seat { selectedSeat = seat }
@@ -77,11 +95,29 @@ extension ModsPageModel {
         await openAnyPack(url, store: .shared, seat: seat)
     }
 
-    /// Writes the chosen rows, records the import, and stages chosen kept mods for review.
-    func finishConfigImport(_ state: inout ConfigImportState) {
+    /// Writes the chosen rows, records the import, and stages chosen kept mods for review. Files
+    /// and settings first; then plugins and MCP servers through `claude`, off the main thread,
+    /// refused when a session runs in the seat by now.
+    func finishConfigImport(_ given: ConfigImportState) async -> ConfigImportState {
+        var state = given
         let chosen = state.rows.filter { state.chosen.contains($0.id) }
-        let (record, failure) = ConfigImport.apply(chosen.filter { $0.kind != .keptMod }, env: state.env, seat: state.seat,
+        var (record, failure) = ConfigImport.apply(chosen.filter { $0.kind != .keptMod }, env: state.env, seat: state.seat,
                                                    label: state.label, packSHA256: state.packSHA256)
+        let jobs = chosen.compactMap { row -> ConfigImport.Job? in
+            if case .install = row.status { return row.job }
+            return nil
+        }
+        if !jobs.isEmpty, let claude {
+            let seat = record.seat, home = self.home
+            let ran = await Task.detached(priority: .userInitiated) { () -> (steps: [ConfigImport.Step], failures: [String]) in
+                guard !Self.runningSeats(home: home).contains(seat) else {
+                    return ([], ["Claude Code started in this folder, so no plugin or MCP server was put in. Quit it, then open the pack again."])
+                }
+                return ConfigImport.run(jobs, seat: seat, cli: ClaudeCLI(claude: claude, home: home))
+            }.value
+            record.steps += ran.steps
+            state.cliFailures = ran.failures
+        }
         if !record.steps.isEmpty { ConfigImport.Log.standard.add(record) }
         state.done = record
         state.failure = failure?.message
@@ -97,15 +133,51 @@ extension ModsPageModel {
             }
         }
         state.staged = staged
+        state.working = false
         imports = ConfigImport.Log.standard.list()
+        if state.done?.steps.contains(where: \.throughCLI) == true { Task { await load(linked: lastLinked) } }
+        return state
     }
 
-    /// Undo Import: last write first; anything changed since is left and named.
-    func undoImport(_ record: ConfigImport.Record) -> [String] {
+    /// Undo Import: last write first, plugins and servers through `claude`; anything changed since
+    /// is left and named. Refused, with nothing undone, while a session runs in the seat.
+    func undoImport(_ record: ConfigImport.Record) async -> UndoOutcome {
+        if record.steps.contains(where: \.throughCLI) {
+            let claude = self.claude, home = self.home
+            let cliLeft = await Task.detached(priority: .userInitiated) { () -> [String]? in
+                guard !Self.runningSeats(home: home).contains(record.seat) else { return nil }
+                return ConfigImport.undoCLI(record, cli: claude.map { ClaudeCLI(claude: $0, home: home) }, home: home)
+            }.value
+            guard let cliLeft else {
+                return .refused("Nothing was undone: Claude Code is running in \(display(record.seat)). Quit it, then Undo Import again.")
+            }
+            let left = cliLeft + ConfigImport.undo(record)
+            ConfigImport.Log.standard.remove(record.id)
+            imports = ConfigImport.Log.standard.list()
+            Task { await load(linked: lastLinked) }
+            return .done(left)
+        }
         let left = ConfigImport.undo(record)
         ConfigImport.Log.standard.remove(record.id)
         imports = ConfigImport.Log.standard.list()
-        return left
+        return .done(left)
+    }
+
+    enum UndoOutcome {
+        /// Undone, except what's named.
+        case done([String])
+        /// Nothing undone, and why.
+        case refused(String)
+
+        var isClean: Bool { if case .done(let l) = self { l.isEmpty } else { false } }
+        var isRefused: Bool { if case .refused = self { true } else { false } }
+
+        var note: String {
+            switch self {
+            case .done(let left): left.isEmpty ? "Undone: the folder is as it was." : "Undone, except: " + left.joined(separator: "; ") + "."
+            case .refused(let why): why
+            }
+        }
     }
 }
 
@@ -117,7 +189,8 @@ struct ConfigImportSheet: View {
     @State var state: ConfigImportState
     let close: () -> Void
     @State private var confirming = false
-    @State private var undone: [String]?
+    @State private var undone: ModsPageModel.UndoOutcome?
+    @State private var undoing = false
 
     /// A folder chosen by Other Folder…: a new seat Claude Code hasn't used yet isn't found, and
     /// a new machine's seat is what a pack is most often opened into.
@@ -127,7 +200,7 @@ struct ConfigImportSheet: View {
     private var seat: Seat? { model.seats.first { $0.path == state.seat } }
 
     private func pick(_ tag: String) {
-        guard tag == Self.otherTag else { state.seat = tag; state.plan(); return }
+        guard tag == Self.otherTag else { state.seat = tag; state.cli = model.cliState(for: tag); state.plan(); return }
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -141,6 +214,7 @@ struct ConfigImportSheet: View {
         let path = AccountData.normalized(url.path)
         if !model.seats.contains(where: { $0.path == path }) { other = path }
         state.seat = path
+        state.cli = model.cliState(for: path)
         state.plan()
     }
 
@@ -183,12 +257,25 @@ struct ConfigImportSheet: View {
         .padding(20)
         .frame(width: 640)
         .alert("Bring \(chosenCount) \(chosenCount == 1 ? "item" : "items") into \(model.display(state.seat))?", isPresented: $confirming) {
-            Button("Import") { model.finishConfigImport(&state) }
+            Button("Import") {
+                state.working = true
+                let given = state
+                Task { state = await model.finishConfigImport(given) }
+            }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Into \(seat?.label ?? "this folder"), \(model.display(state.seat))" + (seat?.isWork == true ? ", a folder marked work" : "") + ". "
-                 + "Sanduhr writes the files and settings this folder lacks, and records them so Undo Import can take them back.")
+                 + "Sanduhr writes the files and settings this folder lacks"
+                 + (cliCount > 0 ? ", and runs claude to put in \(cliCount == 1 ? "a plugin or MCP server" : "\(cliCount) plugins and MCP servers"), which can fetch from the network" : "")
+                 + ". It records them so Undo Import can take them back.")
         }
+    }
+
+    private var cliCount: Int {
+        state.rows.filter { row in
+            guard state.chosen.contains(row.id), case .install = row.status else { return false }
+            return true
+        }.count
     }
 
     private var chosenCount: Int {
@@ -240,7 +327,13 @@ struct ConfigImportSheet: View {
                     .textFieldStyle(.roundedBorder).frame(maxWidth: 320).padding(.leading, 20)
             case .review:
                 Text("Waits in New Mod for Check, Try and Keep; nothing runs before.").font(.caption).foregroundStyle(.secondary).padding(.leading, 20)
+            case .install(let cmd):
+                Text("Sanduhr runs: " + cmd).font(.caption.monospaced()).foregroundStyle(.secondary)
+                    .textSelection(.enabled).lineLimit(3).padding(.leading, 20)
             case .command(let cmd):
+                if state.hasSeat && state.cli == .missing {
+                    Text("Claude Code's claude wasn't found, so run this yourself:").font(.caption).foregroundStyle(.secondary).padding(.leading, 20)
+                }
                 HStack(alignment: .top, spacing: 6) {
                     Text(cmd).font(.caption.monospaced()).textSelection(.enabled).lineLimit(3)
                     Button("Copy") {
@@ -263,9 +356,13 @@ struct ConfigImportSheet: View {
             Text("\(chosenCount) chosen").font(.caption).foregroundStyle(.secondary)
             Spacer()
             Button("Cancel", role: .cancel) { close() }
+            if state.working {
+                ProgressView().controlSize(.small)
+                Text(cliCount > 0 ? "Installing with claude…" : "Importing…").font(.caption).foregroundStyle(.secondary)
+            }
             Button("Import…") { confirming = true }
                 .keyboardShortcut(.defaultAction)
-                .disabled(!state.hasSeat || chosenCount == 0)
+                .disabled(!state.hasSeat || chosenCount == 0 || state.working)
         }
     }
 
@@ -273,20 +370,29 @@ struct ConfigImportSheet: View {
     private var result: some View {
         let files = state.done?.steps.filter { $0.kind == .file }.count ?? 0
         let settings = state.done?.steps.filter { $0.kind == .setting || $0.kind == .env }.count ?? 0
+        let plugins = state.done?.steps.filter { $0.kind == .plugin }.count ?? 0
+        let servers = state.done?.steps.filter { $0.kind == .mcpServer }.count ?? 0
         Text("Brought \(files) \(files == 1 ? "file" : "files") and \(settings) \(settings == 1 ? "setting" : "settings") into \(seat?.label ?? "the folder")."
+             + (plugins + servers > 0 ? " Installed \(plugins) \(plugins == 1 ? "plugin" : "plugins") and added \(servers) MCP \(servers == 1 ? "server" : "servers") with claude." : "")
              + (state.staged > 0 ? " \(state.staged) kept \(state.staged == 1 ? "mod waits" : "mods wait") in New Mod for review." : ""))
             .font(.callout).fixedSize(horizontal: false, vertical: true)
         if let f = state.failure {
             Text(f).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
         }
+        ForEach(state.cliFailures, id: \.self) { line in
+            Text("Not put in: " + line).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+        }
         if let undone {
-            Text(undone.isEmpty ? "Undone: the folder is as it was." : "Undone, except: " + undone.joined(separator: "; ") + ".")
-                .font(.caption).foregroundStyle(undone.isEmpty ? Color.secondary : Color.orange).fixedSize(horizontal: false, vertical: true)
+            Text(undone.note).font(.caption).foregroundStyle(undone.isClean ? Color.secondary : Color.orange).fixedSize(horizontal: false, vertical: true)
         }
         HStack {
             Spacer()
-            if let record = state.done, !record.steps.isEmpty, undone == nil {
-                Button("Undo Import") { undone = model.undoImport(record) }
+            if let record = state.done, !record.steps.isEmpty, undone == nil || undone?.isRefused == true {
+                Button("Undo Import") {
+                    undoing = true
+                    Task { undone = await model.undoImport(record); undoing = false }
+                }
+                .disabled(undoing)
             }
             Button("Done") { close() }.keyboardShortcut(.defaultAction)
         }

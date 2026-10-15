@@ -137,9 +137,11 @@ private struct ImportRecordRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Text("Imported \(record.label)" + (folder.map { " into \($0)" } ?? "") + " \(record.at.formatted(date: .abbreviated, time: .shortened)), \(record.steps.filter { $0.kind == .file || $0.kind == .setting || $0.kind == .env }.count) items")
+            Text("Imported \(record.label)" + (folder.map { " into \($0)" } ?? "") + " \(record.at.formatted(date: .abbreviated, time: .shortened)), \(record.steps.filter { $0.kind != .folder && $0.kind != .settingsFile && $0.kind != .envObject && $0.kind != .marketplace }.count) items")
                 .font(.caption).foregroundStyle(.secondary)
-            Button("Undo Import") { model.configImportNote = model.undoImport(record).map { "Undone, except: " + $0 }.joined(separator: "; ") }
+            Button("Undo Import") {
+                Task { model.configImportNote = await model.undoImport(record).note }
+            }
                 .controlSize(.small)
                 .help("Takes back what that import wrote. A file or setting changed since is left, and named.")
         }

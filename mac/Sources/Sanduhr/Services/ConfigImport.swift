@@ -6,8 +6,19 @@ import Foundation
 /// has the same is shown, what it has differently stays the seat's own (this slice never
 /// replaces anything, so no receipt holds an old value). Files, settings keys and env values the
 /// user types are written by receipts, grouped as one import with one Undo Import. Kept mods go
-/// to New Mod as proposals; plugins and MCP servers are shown as the `claude` commands to run.
+/// to New Mod as proposals. Plugins and MCP servers go in through Claude Code's CLI (slice E)
+/// when `claude` is found and no session runs in the seat; otherwise they are shown as the
+/// commands to run.
 enum ConfigImport {
+    /// Whether plugin and MCP rows can be run here, or only shown.
+    enum CLIState: Equatable, Sendable {
+        case ready
+        /// No `claude` found: the commands are shown to copy.
+        case missing
+        /// Claude Code runs in the seat: nothing is installed under a live session.
+        case running
+    }
+
     struct Row: Identifiable {
         enum Status: Equatable {
             /// The seat lacks it: it can be brought over.
@@ -22,6 +33,8 @@ enum ConfigImport {
             case review
             /// A plugin or MCP server: the command to run, shown for copying.
             case command(String)
+            /// A plugin or MCP server Sanduhr runs `claude` for once chosen: the command, shown.
+            case install(String)
             /// It can't be brought over, and why.
             case refused(String)
         }
@@ -34,15 +47,30 @@ enum ConfigImport {
         var files: [(path: String, data: Data)] = []
         /// A settings key's value as it will be written (home folder put back for `~/`).
         var value: Any?
+        /// What `claude` runs for a plugin or MCP server row.
+        var job: Job?
 
         var id: String { kind.rawValue + "/" + name }
-        var choosable: Bool { status == .new || status == .needsValue || status == .review }
+        var choosable: Bool {
+            switch status {
+            case .new, .needsValue, .review, .install: true
+            default: false
+            }
+        }
+    }
+
+    /// A plugin or MCP server to put in through the CLI. Only names and the JSON that travels.
+    enum Job: Equatable, Sendable {
+        /// `claude plugin install <id>`, after `marketplace add <source>` when the seat lacks `marketplace`.
+        case plugin(id: String, marketplace: String, source: String)
+        /// `claude mcp add-json -s user <name> <json>`; `sha256` is the config's canonical hash.
+        case mcp(name: String, json: String, sha256: String)
     }
 
     // MARK: Planning
 
     /// The rows of `pack` against `seat`. Reads the seat; writes nothing.
-    static func plan(_ pack: ModPackReader.Unpacked, seat: String, home: String = NSHomeDirectory()) -> [Row] {
+    static func plan(_ pack: ModPackReader.Unpacked, seat: String, home: String = NSHomeDirectory(), cli: CLIState = .missing) -> [Row] {
         let root = AccountData.normalized(seat)
         let fm = FileManager.default
         var rows: [Row] = []
@@ -113,8 +141,17 @@ enum ConfigImport {
             rows.append(Row(kind: .keptMod, name: name, detail: (m["version"] as? String).map { "\($0), " } ?? "" + "\(n) files, reviewed in New Mod", status: .review))
         }
 
-        // Plugins and MCP servers: the command to run in this folder.
+        // Plugins and MCP servers: run through `claude` when it can be, else the command to copy.
         let prefix = configPrefix(root, home: home)
+        let installed = Set(((readObject((root as NSString).appendingPathComponent("plugins/installed_plugins.json"))?["plugins"]) as? [String: Any] ?? [:]).keys)
+        let servers = readObject(ClaudeCodeFolders.configFile(for: root, home: home))?["mcpServers"] as? [String: Any] ?? [:]
+        func status(_ cmd: String) -> Row.Status {
+            switch cli {
+            case .ready: .install(cmd)
+            case .missing: .command(cmd)
+            case .running: .refused("Claude Code is running in this folder. Quit it, then open the pack again to install this.")
+            }
+        }
         for p in pack.manifest["plugins"] as? [[String: Any]] ?? [] {
             guard let name = p["name"] as? String, let market = p["marketplace"] as? [String: Any],
                   let mname = market["name"] as? String, let source = market["source"] as? [String: Any] else { continue }
@@ -122,8 +159,11 @@ enum ConfigImport {
                 rows.append(Row(kind: .plugin, name: name, status: .refused("Its marketplace's source isn't one Sanduhr can name.")))
                 continue
             }
-            let cmd = "\(prefix)claude plugin marketplace add \(shellQuoted(arg)) && \(prefix)claude plugin install \(shellQuoted(name + "@" + mname)) --scope user"
-            rows.append(Row(kind: .plugin, name: name, detail: "from \(mname)", status: .command(cmd)))
+            let id = name + "@" + mname
+            let cmd = "\(prefix)claude plugin marketplace add \(shellQuoted(arg)) && \(prefix)claude plugin install \(shellQuoted(id)) --scope user"
+            var row = Row(kind: .plugin, name: name, detail: "from \(mname)", status: installed.contains(id) ? .same : status(cmd))
+            row.job = .plugin(id: id, marketplace: mname, source: arg)
+            rows.append(row)
         }
         for s in pack.manifest["mcp"] as? [[String: Any]] ?? [] {
             guard let name = s["name"] as? String, let config = s["config"] as? [String: Any],
@@ -131,7 +171,10 @@ enum ConfigImport {
                   let text = String(data: json, encoding: .utf8) else { continue }
             let refs = Set((config["env"] as? [String: String] ?? [:]).keys).union((config["headers"] as? [String: String] ?? [:]).values.map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "${}")) })
             let cmd = "\(prefix)claude mcp add-json -s user \(shellQuoted(name)) \(shellQuoted(text))"
-            rows.append(Row(kind: .mcpServer, name: name, detail: refs.isEmpty ? (config["type"] as? String ?? "") : "needs " + refs.sorted().joined(separator: ", ") + " set where Claude Code starts", status: .command(cmd)))
+            let st: Row.Status = servers[name].map { canonicalSHA($0) == canonicalSHA(config) ? .same : .differs } ?? status(cmd)
+            var row = Row(kind: .mcpServer, name: name, detail: refs.isEmpty ? (config["type"] as? String ?? "") : "needs " + refs.sorted().joined(separator: ", ") + " set where Claude Code starts", status: st)
+            row.job = .mcp(name: name, json: text, sha256: canonicalSHA(config))
+            rows.append(row)
         }
         return rows
     }
@@ -208,9 +251,12 @@ enum ConfigImport {
     /// One write an import made, enough to undo it and nothing more: never a value it replaced
     /// (it replaces none) and never an env value.
     struct Step: Codable, Equatable {
-        enum Kind: String, Codable { case file, folder, setting, env, settingsFile, envObject }
+        enum Kind: String, Codable { case file, folder, setting, env, settingsFile, envObject, marketplace, plugin, mcpServer }
+
+        /// Written through `claude`, and taken back the same way.
+        var throughCLI: Bool { [.marketplace, .plugin, .mcpServer].contains(kind) }
         var kind: Kind
-        /// A file or folder path, a settings key, or an env name.
+        /// A file or folder path, a settings key, an env name, a marketplace, a plugin id or a server name.
         var name: String
         /// A file's SHA-256, or the canonical JSON SHA-256 of a settings value: undo leaves it
         /// when it changed since.
@@ -320,6 +366,75 @@ enum ConfigImport {
             }
         }
         return (record, .settingsChanged)
+    }
+
+    // MARK: Through the CLI (slice E)
+
+    /// Runs `jobs` in `seat` in order: a plugin's marketplace is added first when the seat lacks it.
+    /// Returns the steps that wrote something, and a line per job that failed. Blocking: run off
+    /// the main thread.
+    static func run(_ jobs: [Job], seat: String, cli: ClaudeCLI) -> (steps: [Step], failures: [String]) {
+        var steps: [Step] = [], failures: [String] = []
+        var markets: Set<String>?
+        for job in jobs {
+            switch job {
+            case .plugin(let id, let marketplace, let source):
+                if markets == nil {
+                    let r = cli.run(.marketplaceList, seat: seat)
+                    let list = (try? JSONSerialization.jsonObject(with: Data(r.out.utf8))) as? [[String: Any]]
+                    markets = Set((list ?? []).compactMap { $0["name"] as? String })
+                }
+                if markets?.contains(marketplace) != true {
+                    let r = cli.run(.marketplaceAdd(source: source), seat: seat)
+                    guard r.ok else { failures.append("\(id): adding its marketplace failed: \(r.reason)"); continue }
+                    let added = r.json?["marketplace"] as? String ?? marketplace
+                    markets?.insert(added)
+                    steps.append(Step(kind: .marketplace, name: added))
+                }
+                let r = cli.run(.pluginInstall(id: id), seat: seat)
+                guard r.ok, r.json?["outcome"] as? String == "ok" else { failures.append("\(id): \(r.reason)"); continue }
+                if r.json?["installedVersion"] == nil { steps.append(Step(kind: .plugin, name: id)) }
+            case .mcp(let name, let json, let sha256):
+                let r = cli.run(.mcpAddJSON(name: name, json: json), seat: seat)
+                guard r.ok else { failures.append("MCP server \(name): \(r.reason)"); continue }
+                steps.append(Step(kind: .mcpServer, name: name, sha256: sha256))
+            }
+        }
+        return (steps, failures)
+    }
+
+    /// Takes back an import's CLI steps, last first, through `claude`: a server changed since, or
+    /// a marketplace another plugin now comes from, is left and named. Blocking: run off the main
+    /// thread. Without `cli`, each is left and named.
+    static func undoCLI(_ record: Record, cli: ClaudeCLI?, home: String = NSHomeDirectory()) -> [String] {
+        let steps = record.steps.filter(\.throughCLI)
+        guard !steps.isEmpty else { return [] }
+        guard let cli else { return steps.map { "\($0.name), since claude wasn't found to take it back" } }
+        var left: [String] = []
+        for step in steps.reversed() {
+            switch step.kind {
+            case .plugin:
+                let r = cli.run(.pluginUninstall(id: step.name), seat: record.seat)
+                if !r.ok, !r.reason.localizedCaseInsensitiveContains("not installed") { left.append("plugin \(step.name): \(r.reason)") }
+            case .marketplace:
+                let r = cli.run(.pluginList, seat: record.seat)
+                let ids = ((try? JSONSerialization.jsonObject(with: Data(r.out.utf8))) as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }
+                if ids.contains(where: { $0.hasSuffix("@" + step.name) }) {
+                    left.append("marketplace \(step.name), which a plugin now comes from")
+                    continue
+                }
+                let rm = cli.run(.marketplaceRemove(name: step.name), seat: record.seat)
+                if !rm.ok { left.append("marketplace \(step.name): \(rm.reason)") }
+            case .mcpServer:
+                let servers = readObject(ClaudeCodeFolders.configFile(for: record.seat, home: home))?["mcpServers"] as? [String: Any] ?? [:]
+                guard let current = servers[step.name] else { continue }
+                guard canonicalSHA(current) == step.sha256 else { left.append("MCP server \(step.name), changed since"); continue }
+                let r = cli.run(.mcpRemove(name: step.name), seat: record.seat)
+                if !r.ok { left.append("MCP server \(step.name): \(r.reason)") }
+            default: break
+            }
+        }
+        return left
     }
 
     /// Takes an import back, last step first. A file, value or folder that changed since is left,
