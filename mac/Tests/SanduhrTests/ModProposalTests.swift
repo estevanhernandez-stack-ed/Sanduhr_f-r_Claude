@@ -131,6 +131,53 @@ struct ModProposalTests {
         #expect(Set(index(h).compactMap { $0["status"] as? String }) == ["replaced", "dismissed"])
     }
 
+    // Slice G3: Try in a Session on a waiting proposal.
+
+    @Test func tryIsOfferedOnlyAfterAPassingCheckOnStagedFiles() {
+        let passed = ModCheckOutcome.report(ModCheckReport())
+        var failing = ModCheckReport()
+        failing.passed = false
+        #expect(ModsPageModel.canTryProposal(claude: "/c", staged: true, check: passed))
+        #expect(!ModsPageModel.canTryProposal(claude: "/c", staged: true, check: nil))
+        #expect(!ModsPageModel.canTryProposal(claude: "/c", staged: true, check: .report(failing)))
+        #expect(!ModsPageModel.canTryProposal(claude: "/c", staged: true, check: .timedOut))
+        #expect(!ModsPageModel.canTryProposal(claude: "/c", staged: false, check: passed))
+        #expect(!ModsPageModel.canTryProposal(claude: nil, staged: true, check: passed))
+    }
+
+    @Test func tryLoadsTheStagedCopyAndLeavesItAProposal() throws {
+        let (h, store, _) = rig()
+        defer { h.cleanUp() }
+        store.receive(request())
+        let r = try #require(store.pending.first)
+        #expect(store.isStaged(r))
+        let before = FileManager.default.contents(atPath: h.at("Support/mod-proposals.json"))
+        let tried = try store.trySession(r.id, claude: "/opt/homebrew/bin/claude", open: false)
+        defer { try? FileManager.default.removeItem(at: tried.script.deletingLastPathComponent()) }
+        let script = try String(contentsOf: tried.script, encoding: .utf8)
+        #expect(script.contains("--plugin-dir " + IntegrationInstaller.shellQuoted(store.stagedPath(r))))
+        #expect(!script.contains("CLAUDE_CONFIG_DIR"))
+        #expect(tried.start == tried.script.deletingLastPathComponent())
+        // Still waiting, still staged, nothing kept, the server's index untouched.
+        #expect(store.pending.map(\.id) == [r.id] && store.isStaged(r))
+        #expect(store.paths.kept.list().isEmpty)
+        #expect(FileManager.default.contents(atPath: h.at("Support/mod-proposals.json")) == before)
+    }
+
+    @Test func tryRefusesWhenTheStagedFilesAreGone() throws {
+        let (h, store, _) = rig()
+        defer { h.cleanUp() }
+        store.receive(request())
+        let r = try #require(store.pending.first)
+        let dir = URL(fileURLWithPath: store.stagedPath(r))
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: dir.appendingPathComponent(".claude-plugin/plugin.json").path)
+        try FileManager.default.removeItem(at: dir.appendingPathComponent(".claude-plugin/plugin.json"))
+        #expect(!store.isStaged(r))
+        #expect(throws: KeptMods.Failure.gone) { try store.trySession(r.id, claude: "/c", open: false) }
+        store.dismiss(r.id)
+        #expect(throws: KeptMods.Failure.gone) { try store.trySession(r.id, claude: "/c", open: false) }
+    }
+
     // Slice G2: list_catalog's file and propose_install's requests.
 
     private func installRig() throws -> (IntegrationRig, ModProposalStore, KeptMod) {

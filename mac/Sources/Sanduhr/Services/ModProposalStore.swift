@@ -274,6 +274,22 @@ final class ModProposalStore {
         return names.map { ModProposal.File(path: $0, text: (try? String(contentsOf: dir.appendingPathComponent($0), encoding: .utf8)) ?? "") }
     }
 
+    /// Whether a waiting proposal's staged copy is still there to try: its manifest is on disk.
+    func isStaged(_ r: ModProposalRecord) -> Bool {
+        r.isPending && FileManager.default.fileExists(atPath: paths.staged(r.id).appendingPathComponent(".claude-plugin/plugin.json").path)
+    }
+
+    /// Try in a Session on a waiting proposal (slice G3): Claude Code loads the staged copy for one
+    /// session, in Claude Code's default folder. It stays a proposal: nothing is kept, and neither
+    /// its status nor the server's index changes.
+    @discardableResult
+    func trySession(_ id: String, claude: String, in workingFolder: URL? = nil,
+                    open: Bool = true) throws -> (start: URL, script: URL) {
+        guard let r = records.first(where: { $0.id == id && $0.isPending }), isStaged(r) else { throw KeptMods.Failure.gone }
+        return try KeptMods.trySession(name: r.name, dir: paths.staged(id).path, config: nil, claude: claude,
+                                       in: workingFolder, open: open)
+    }
+
     /// Approve: the staged files become a kept mod.
     @discardableResult
     func approve(_ id: String) throws -> KeptMod {

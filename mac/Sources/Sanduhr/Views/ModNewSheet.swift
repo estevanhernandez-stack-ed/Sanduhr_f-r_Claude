@@ -213,16 +213,51 @@ extension ModsPageModel {
 
     /// Asks for the folder Try starts in, then tries there.
     func chooseTryFolder(_ mod: KeptMod) {
+        guard let url = askTryFolder(mod.name) else { return }
+        trySession(mod, in: url)
+    }
+
+    private func askTryFolder(_ name: String) -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = true
         panel.prompt = "Try Here"
-        panel.message = "Claude Code starts in this folder with \(mod.name) loaded for that session only."
+        panel.message = "Claude Code starts in this folder with \(name) loaded for that session only."
         panel.directoryURL = lastTryFolder ?? FileManager.default.homeDirectoryForCurrentUser
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        trySession(mod, in: url)
+        guard panel.runModal() == .OK else { return nil }
+        return panel.url
+    }
+
+    /// Try in a Session on a waiting proposal (slice G3): offered once Check passed on its staged
+    /// copy and while that copy is there. Trying keeps nothing and leaves the proposal waiting.
+    func canTryProposal(_ r: ModProposalRecord, store: ModProposalStore) -> Bool {
+        Self.canTryProposal(claude: claude, staged: store.isStaged(r), check: proposalChecks[r.id])
+    }
+
+    nonisolated static func canTryProposal(claude: String?, staged: Bool, check: ModCheckOutcome?) -> Bool {
+        guard claude != nil, staged, case .report(let report)? = check else { return false }
+        return report.passed
+    }
+
+    func tryProposal(_ r: ModProposalRecord, store: ModProposalStore, in folder: URL? = nil) {
+        guard let claude, canTryProposal(r, store: store) else {
+            if !store.isStaged(r) { keptNote = KeptMods.Failure.gone.message }
+            return
+        }
+        do {
+            try store.trySession(r.id, claude: claude, in: folder)
+            keptNote = nil
+            if let folder { UserDefaults.standard.set(folder.path, forKey: Self.tryFolderKey) }
+        } catch {
+            keptNote = (error as? KeptMods.Failure)?.message ?? KeptMods.Failure.writeFailed.message
+        }
+    }
+
+    func chooseTryFolder(_ r: ModProposalRecord, store: ModProposalStore) {
+        guard let url = askTryFolder(r.name) else { return }
+        tryProposal(r, store: store, in: url)
     }
 }
 
@@ -241,6 +276,8 @@ struct NewModSheet: View {
     @State private var showPrompt = false
     @State private var copied = false
     @State private var trying: KeptMod?
+    @State private var tryingProposal: ModProposalRecord?
+    @State private var tryTypedName = ""
     @State private var forgetting: KeptMod?
     @State private var consent: KeptConsent?
 
@@ -292,6 +329,24 @@ struct NewModSheet: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(tryMessage)
+        }
+        .alert("Try \(tryingProposal?.name ?? "the mod") before keeping it?",
+               isPresented: Binding(get: { tryingProposal != nil }, set: { if !$0 { tryingProposal = nil; tryTypedName = "" } })) {
+            let blocked = tryNeedsTypedName && tryTypedName != tryingProposal?.name
+            if tryNeedsTypedName { TextField("The mod's name", text: $tryTypedName) }
+            if let last = model.lastTryFolder {
+                Button("Try in \(last.lastPathComponent)") { if let r = tryingProposal { model.tryProposal(r, store: proposals, in: last) } }
+                    .disabled(blocked)
+            }
+            Button("Choose Folder…") {
+                if let r = tryingProposal { DispatchQueue.main.async { model.chooseTryFolder(r, store: proposals) } }
+            }
+            .disabled(blocked)
+            Button("Try in an Empty Folder") { if let r = tryingProposal { model.tryProposal(r, store: proposals) } }
+                .disabled(blocked)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(tryProposalMessage)
         }
         .alert(consentTitle, isPresented: Binding(get: { consent != nil }, set: { if !$0 { consent = nil } })) {
             Button("Turn On") {
@@ -501,12 +556,22 @@ struct NewModSheet: View {
                 Button("Dismiss") { proposals.dismiss(r.id) }
                     .controlSize(.small)
                     .help("Deletes the proposed files. Claude hears that you dismissed it.")
+                Button("Try in a Session…") { tryingProposal = r }
+                    .controlSize(.small)
+                    .disabled(!model.canTryProposal(r, store: proposals))
+                    .help(!proposals.isStaged(r) ? KeptMods.Failure.gone.message
+                          : model.canTryProposal(r, store: proposals)
+                          ? "Opens Terminal with Claude Code and the proposed files loaded for that session only. Runs its code. It stays a proposal."
+                          : "Check has to read a report Claude Code would load first.")
                 Button("Keep…") { approving = r }
                     .controlSize(.small)
                     .disabled(!proposalPassed(r))
                     .help(proposalPassed(r) ? "Keeps it with your kept mods. Turning it on in a folder asks again." : "Check has to read a report Claude Code would load first.")
             }
             Text(r.summary).font(.caption).fixedSize(horizontal: false, vertical: true)
+            if !proposals.isStaged(r) {
+                Text(KeptMods.Failure.gone.message).font(.caption).foregroundStyle(.orange)
+            }
             if let outcome = model.proposalChecks[r.id] {
                 ModRiskCard(outcome: outcome)
             } else {
@@ -578,6 +643,22 @@ struct NewModSheet: View {
     private var needsTypedName: Bool {
         guard let r = approving, case .report(let report)? = model.proposalChecks[r.id] else { return false }
         return report.risk == .high
+    }
+
+    /// Trying a high-risk proposal asks for its name typed out, as keeping it does.
+    private var tryNeedsTypedName: Bool {
+        guard let r = tryingProposal, case .report(let report)? = model.proposalChecks[r.id] else { return false }
+        return report.risk == .high
+    }
+
+    private var tryProposalMessage: String {
+        guard let r = tryingProposal else { return "" }
+        var lines = ["Opens Terminal and starts Claude Code with \(r.name) loaded for that session only, in a folder you choose or a new empty one. The mod's code runs there with your permissions. It stays a proposal: trying keeps nothing and turns it on nowhere."]
+        if case .report(let report)? = model.proposalChecks[r.id] {
+            lines.append("\(report.risk.title): \(report.reasons.joined(separator: " "))")
+        }
+        if tryNeedsTypedName { lines.append("Type \(r.name) to try it.") }
+        return lines.joined(separator: "\n\n")
     }
 
     private var approveTitle: String { "Keep \(approving?.name ?? "the mod")?" }
