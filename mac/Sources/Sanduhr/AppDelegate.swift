@@ -242,7 +242,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// is dropped.
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
-            if DebugLink.isDebug(url) {
+            if url.isFileURL, url.pathExtension.lowercased() == ModPack.fileExtension {
+                // A .sanduhrpack (item 76, slice B): New Mod opens it for review.
+                PackInbox.shared.urls.append(url)
+                SettingsWindowController.shared.show(.mods)
+            } else if DebugLink.isDebug(url) {
                 DebugHooks.handle(url, app: self)
             } else if ClaudeCodeLink.isClaudeCode(url) {
                 if let event = ClaudeCodeLink.event(url) { NotchGlowController.shared.claudeCode(event) }

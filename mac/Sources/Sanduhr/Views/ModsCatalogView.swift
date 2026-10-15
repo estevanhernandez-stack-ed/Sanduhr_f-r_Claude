@@ -66,7 +66,7 @@ struct ModsCatalogView: View {
                 Text(note).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
             }
             if model.loaded { SessionLoadPanel(loads: model.shownLoads(demo: demo)) }
-            let proposed = ModProposalStore.shared.pending.count + ModProposalStore.shared.pendingInstalls.count
+            let proposed = ModProposalStore.shared.pendingFromClaude.count + ModProposalStore.shared.pendingInstalls.count
             if proposed > 0 {
                 HStack(spacing: 8) {
                     Image(systemName: "shippingbox").foregroundStyle(Color.accentColor)
