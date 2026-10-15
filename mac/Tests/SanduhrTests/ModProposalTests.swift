@@ -164,6 +164,37 @@ struct ModProposalTests {
         #expect(FileManager.default.contents(atPath: h.at("Support/mod-proposals.json")) == before)
     }
 
+    @Test func tryAndKeepUseTheFolderWhoseSessionProposedIt() throws {
+        let h = TempHome()
+        defer { h.cleanUp() }
+        let personal = h.at(".claude-personal")
+        let defaults = UserDefaults(suiteName: "proposals-\(UUID().uuidString)")!
+        defaults.set(true, forKey: ModProposalStore.switchKey)
+        let paths = ModProposalStore.Paths(support: URL(fileURLWithPath: h.at("Support")),
+                                           kept: KeptMods(dir: URL(fileURLWithPath: h.at("Support/mods"))))
+        let store = ModProposalStore(paths: paths, defaults: defaults, now: { Self.at.addingTimeInterval(5) },
+                                     folders: { [h.at(".claude"), personal] })
+        store.receive(request(extra: ["folder": ".claude-personal"]))
+        let r = try #require(store.pending.first)
+        #expect(r.folder == ".claude-personal")
+        #expect(store.folderPath(r) == personal)
+        let tried = try store.trySession(r.id, claude: "/c", open: false)
+        defer { try? FileManager.default.removeItem(at: tried.script.deletingLastPathComponent()) }
+        #expect(try String(contentsOf: tried.script, encoding: .utf8).contains("CLAUDE_CONFIG_DIR=" + IntegrationInstaller.shellQuoted(AccountData.normalized(personal))))
+        let kept = try store.approve(r.id)
+        #expect(kept.folder == personal)
+
+        // A folder Sanduhr doesn't know, or a name that isn't a folder's: Claude Code's default.
+        store.receive(request(id: String(repeating: "b", count: 32), name: "other-band", extra: ["folder": ".claude-elsewhere"]))
+        let unknown = try #require(store.pending.first)
+        #expect(store.folderPath(unknown) == nil)
+        if case .proposal(let p) = ModProposal.decode(request(extra: ["folder": "../x"]), now: Self.at) {
+            #expect(p.folder == nil)
+        } else {
+            Issue.record("a bad folder name must not refuse the proposal")
+        }
+    }
+
     @Test func tryRefusesWhenTheStagedFilesAreGone() throws {
         let (h, store, _) = rig()
         defer { h.cleanUp() }

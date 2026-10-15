@@ -1624,7 +1624,7 @@ class ProposeMod(Base):
     def switch(self, on=True):
         self.fx.write_json("mods-agents.json", {"propose": on, "schema_version": 1})
 
-    def propose(self, args, answer=None, wait=1.0):
+    def propose(self, args, answer=None, wait=1.0, env=None):
         ticks = [0.0]
 
         def clock():
@@ -1640,7 +1640,8 @@ class ProposeMod(Base):
             if res is not None:
                 self.fx.write_json(mcp.MOD_RESULT_FILE, {"id": req["id"], "completed_at": iso(NOW), "result": res})
 
-        return mcp.build_propose_mod(args, now=NOW, paths=self.paths, wait=wait, poll=0.25, sleep=sleep, clock=clock)
+        return mcp.build_propose_mod(args, now=NOW, paths=self.paths, wait=wait, poll=0.25, sleep=sleep, clock=clock,
+                                     env={} if env is None else env)
 
     def good(self, **kw):
         args = {"name": "ci-band", "version": "0.1.0", "summary": "CI runs above the prompt.", "files": list(MOD_FILES)}
@@ -1672,8 +1673,20 @@ class ProposeMod(Base):
         with open(self.paths.mod_request, encoding="utf-8") as f:
             req = json.load(f)
         self.assertEqual(os.stat(self.paths.mod_request).st_mode & 0o777, 0o600)
-        self.assertEqual(sorted(req), ["files", "id", "name", "requested_at", "schema_version", "summary", "version"])
+        self.assertEqual(sorted(req), ["files", "folder", "id", "name", "requested_at", "schema_version", "summary", "version"])
+        self.assertEqual(req["folder"], ".claude")
         self.assertEqual([f["path"] for f in req["files"]], [f["path"] for f in MOD_FILES])
+
+    def test_the_request_names_the_proposing_folder_by_name_only(self):
+        self.switch()
+        for env, want in (({"CLAUDE_CONFIG_DIR": "~/.claude-personal"}, ".claude-personal"),
+                          ({"CLAUDE_CONFIG_DIR": "/tmp/seats/.claude-work/"}, ".claude-work"),
+                          ({"CLAUDE_CONFIG_DIR": ""}, ".claude"),
+                          ({"CLAUDE_CONFIG_DIR": "/tmp/somewhere-else"}, None)):
+            self.propose(self.good(), env=env)
+            with open(self.paths.mod_request, encoding="utf-8") as f:
+                req = json.load(f)
+            self.assertEqual(req.get("folder"), want)
 
     def test_silence_is_queued(self):
         self.switch()

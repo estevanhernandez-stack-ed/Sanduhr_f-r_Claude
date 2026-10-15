@@ -653,7 +653,9 @@ struct NewModSheet: View {
 
     private var tryProposalMessage: String {
         guard let r = tryingProposal else { return "" }
-        var lines = ["Opens Terminal and starts Claude Code with \(r.name) loaded for that session only, in a folder you choose or a new empty one. The mod's code runs there with your permissions. It stays a proposal: trying keeps nothing and turns it on nowhere."]
+        let seat = proposals.folderPath(r).map { "with \(($0 as NSString).lastPathComponent), the Claude Code folder whose session proposed it" }
+            ?? "with Claude Code's default folder (.claude)"
+        var lines = ["Opens Terminal and starts Claude Code \(seat), with \(r.name) loaded for that session only, in a folder you choose or a new empty one. The mod's code runs there with your permissions. It stays a proposal: trying keeps nothing and turns it on nowhere."]
         if case .report(let report)? = model.proposalChecks[r.id] {
             lines.append("\(report.risk.title): \(report.reasons.joined(separator: " "))")
         }
