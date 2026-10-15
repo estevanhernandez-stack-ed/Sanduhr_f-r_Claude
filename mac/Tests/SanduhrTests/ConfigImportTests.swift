@@ -125,6 +125,19 @@ struct ConfigImportTests {
         #expect(!FileManager.default.fileExists(atPath: h.at("\(target)/skills")))
     }
 
+    @Test func noFolderChosenPlansNothing() throws {
+        let h = TempHome()
+        defer { h.cleanUp() }
+        let (p, home) = try pack(h)
+        var state = ConfigImportState(pack: p, packSHA256: "x", fileName: "p.sanduhrpack", seat: "")
+        state.plan(home: home)
+        #expect(!state.hasSeat && state.rows.isEmpty && state.chosen.isEmpty)
+        h.dir("fresh/.claude-new")
+        state.seat = h.at("fresh/.claude-new")
+        state.plan(home: home)
+        #expect(state.hasSeat && !state.chosen.isEmpty)
+    }
+
     @Test func theLogKeepsImportsUntilUndone() {
         let h = TempHome()
         defer { h.cleanUp() }

@@ -19,15 +19,21 @@ struct ConfigImportState: Identifiable {
 
     var label: String { pack.manifest["label"] as? String ?? "Config" }
 
+    /// No folder chosen yet: nothing is planned, and Import waits.
+    var hasSeat: Bool { !seat.isEmpty }
+
     mutating func plan(home: String = NSHomeDirectory()) {
+        guard hasSeat else { rows = []; chosen = []; return }
         rows = ConfigImport.plan(pack, seat: seat, home: home)
         chosen = Set(rows.filter { $0.choosable && $0.kind != .instructions }.map(\.id))
     }
 }
 
 extension ModsPageModel {
-    /// Opens a pack from Finder or a panel: a config pack opens the Open sheet on `seat` (the
-    /// first folder not marked work when none is given); a mod pack goes to New Mod as before.
+    /// Opens a pack from Finder or a panel: a config pack opens the Open sheet on `seat`, or with
+    /// no folder chosen when none is given, so a pack never lands in a real folder by default
+    /// (the 2026-10-15 check: a double-clicked pack went into the first personal folder); a mod
+    /// pack goes to New Mod as before.
     func openAnyPack(_ url: URL, store: ModProposalStore, seat: String? = nil) async {
         let read = await Task.detached(priority: .userInitiated) { () -> Result<(ModPackReader.Unpacked, String), ModPackReader.Refusal> in
             do {
@@ -40,14 +46,11 @@ extension ModsPageModel {
         }.value
         switch read {
         case .success((let pack, let sha)) where pack.kind == "config":
-            guard let target = seat ?? seats.first(where: { !$0.isWork })?.path ?? seats.first?.path else {
-                configImportNote = "Sanduhr found no Claude Code folder to open \(url.lastPathComponent) into."
-                return
-            }
-            var state = ConfigImportState(pack: pack, packSHA256: sha, fileName: url.lastPathComponent, seat: target)
+            // No wait for the folders: none is chosen for you, and the picker fills once they're read.
+            var state = ConfigImportState(pack: pack, packSHA256: sha, fileName: url.lastPathComponent, seat: seat ?? "")
             state.plan()
             tab = .bySeat
-            selectedSeat = target
+            if let seat { selectedSeat = seat }
             configImport = state
         case .success((let pack, _)) where pack.kind == "mod":
             newModWay = .fromClaude
@@ -116,7 +119,30 @@ struct ConfigImportSheet: View {
     @State private var confirming = false
     @State private var undone: [String]?
 
+    /// A folder chosen by Other Folder…: a new seat Claude Code hasn't used yet isn't found, and
+    /// a new machine's seat is what a pack is most often opened into.
+    @State private var other: String?
+    private static let otherTag = "\u{0}other"
+
     private var seat: Seat? { model.seats.first { $0.path == state.seat } }
+
+    private func pick(_ tag: String) {
+        guard tag == Self.otherTag else { state.seat = tag; state.plan(); return }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.showsHiddenFiles = true
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = URL(fileURLWithPath: NSHomeDirectory())
+        panel.message = "Choose the Claude Code folder to open the pack into, such as ~/.claude or a CLAUDE_CONFIG_DIR folder."
+        panel.prompt = "Choose"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let path = AccountData.normalized(url.path)
+        if !model.seats.contains(where: { $0.path == path }) { other = path }
+        state.seat = path
+        state.plan()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -124,10 +150,14 @@ struct ConfigImportSheet: View {
             Text("\(state.fileName), made by \(state.pack.manifest["created_by"] as? String ?? "Sanduhr").")
                 .font(.caption).foregroundStyle(.secondary)
             if state.done == nil {
-                Picker("Into", selection: Binding(get: { state.seat }, set: { state.seat = $0; state.plan() })) {
+                Picker("Into", selection: Binding(get: { state.seat }, set: { pick($0) })) {
+                    if !state.hasSeat { Text("Choose a folder…").tag("") }
                     ForEach(model.pickerSeats(demo: demo)) { s in
                         Text(s.label + (s.isWork ? " (work)" : "") + "  " + model.display(s.path)).tag(s.path)
                     }
+                    if let other { Text(model.display(other)).tag(other) }
+                    Divider()
+                    Text("Other Folder…").tag(Self.otherTag)
                 }
                 .frame(maxWidth: 420)
                 Text("Only what this folder doesn't have yet can be brought over. What it has, the same or its own, stays as it is. Plugins and MCP servers are shown as the commands to run.")
@@ -139,7 +169,12 @@ struct ConfigImportSheet: View {
                     Text("This folder is a git clone: its next sync commits what the import writes.")
                         .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
                 }
-                rowList
+                if state.hasSeat {
+                    rowList
+                } else {
+                    Text("Choose the folder to open it into. Nothing is written until you press Import and confirm.")
+                        .font(.callout).frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
+                }
                 footer
             } else {
                 result
@@ -147,11 +182,11 @@ struct ConfigImportSheet: View {
         }
         .padding(20)
         .frame(width: 640)
-        .alert("Bring \(chosenCount) \(chosenCount == 1 ? "item" : "items") into \(seat?.label ?? "this folder")?", isPresented: $confirming) {
+        .alert("Bring \(chosenCount) \(chosenCount == 1 ? "item" : "items") into \(model.display(state.seat))?", isPresented: $confirming) {
             Button("Import") { model.finishConfigImport(&state) }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text((seat?.isWork == true ? "\(model.display(state.seat)) is marked work. " : "")
+            Text("Into \(seat?.label ?? "this folder"), \(model.display(state.seat))" + (seat?.isWork == true ? ", a folder marked work" : "") + ". "
                  + "Sanduhr writes the files and settings this folder lacks, and records them so Undo Import can take them back.")
         }
     }
@@ -230,7 +265,7 @@ struct ConfigImportSheet: View {
             Button("Cancel", role: .cancel) { close() }
             Button("Import…") { confirming = true }
                 .keyboardShortcut(.defaultAction)
-                .disabled(chosenCount == 0)
+                .disabled(!state.hasSeat || chosenCount == 0)
         }
     }
 
