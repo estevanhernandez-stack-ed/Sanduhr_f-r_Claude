@@ -108,6 +108,7 @@ struct ModsBySeatView: View {
                 Text("Reading your Claude Code folders…").font(.caption).foregroundStyle(.secondary)
             } else if let seat = model.shownSeat(demo: demo) {
                 SeatPicker(model: model, demo: demo)
+                OtherFolderImports(model: model)
                 SeatHeader(seat: seat, model: model, linked: linked)
                     .id(ModsPageModel.seatAnchor(seat.path))
                 if let report = model.report(for: seat.path) {
@@ -122,6 +123,41 @@ struct ModsBySeatView: View {
                 Text("No Claude Code folder found (~/.claude or a ~/.claude-name folder).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+/// One import not undone yet, with its Undo Import. `folder` names the folder when it isn't
+/// the seat shown around it.
+private struct ImportRecordRow: View {
+    let record: ConfigImport.Record
+    var model: ModsPageModel
+    let folder: String?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("Imported \(record.label)" + (folder.map { " into \($0)" } ?? "") + " \(record.at.formatted(date: .abbreviated, time: .shortened)), \(record.steps.filter { $0.kind == .file || $0.kind == .setting || $0.kind == .env }.count) items")
+                .font(.caption).foregroundStyle(.secondary)
+            Button("Undo Import") { model.configImportNote = model.undoImport(record).map { "Undone, except: " + $0 }.joined(separator: "; ") }
+                .controlSize(.small)
+                .help("Takes back what that import wrote. A file or setting changed since is left, and named.")
+        }
+    }
+}
+
+/// Imports into a folder chosen by Other Folder… that isn't listed as a seat: their Undo has no
+/// seat to sit under, so they sit above the seats.
+private struct OtherFolderImports: View {
+    var model: ModsPageModel
+
+    var body: some View {
+        let listed = Set(model.seats.map { AccountData.normalized($0.path) })
+        let others = model.imports.filter { !listed.contains($0.seat) }
+        if !others.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Imports into folders not listed here").font(.callout.weight(.semibold))
+                ForEach(others) { ImportRecordRow(record: $0, model: model, folder: model.display($0.seat)) }
             }
         }
     }
@@ -195,13 +231,7 @@ private struct SeatHeader: View {
             }
             Text(facts).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             ForEach(model.imports.filter { $0.seat == AccountData.normalized(seat.path) }) { record in
-                HStack(spacing: 8) {
-                    Text("Imported \(record.label) \(record.at.formatted(date: .abbreviated, time: .shortened)), \(record.steps.filter { $0.kind == .file || $0.kind == .setting || $0.kind == .env }.count) items")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Button("Undo Import") { model.configImportNote = model.undoImport(record).map { "Undone, except: " + $0 }.joined(separator: "; ") }
-                        .controlSize(.small)
-                        .help("Takes back what that import wrote. A file or setting changed since is left, and named.")
-                }
+                ImportRecordRow(record: record, model: model, folder: nil)
             }
             if let note = model.configImportNote, !note.isEmpty {
                 Text(note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
