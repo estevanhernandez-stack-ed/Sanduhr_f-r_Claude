@@ -142,6 +142,10 @@ extension ModsPageModel {
     /// Undo Import: last write first, plugins and servers through `claude`; anything changed since
     /// is left and named. Refused, with nothing undone, while a session runs in the seat.
     func undoImport(_ record: ConfigImport.Record) async -> UndoOutcome {
+        // A second press while the first runs: the first one answers.
+        guard !undoingImports.contains(record.id) else { return .done([]) }
+        undoingImports.insert(record.id)
+        defer { undoingImports.remove(record.id) }
         if record.steps.contains(where: \.throughCLI) {
             let claude = self.claude, home = self.home
             let cliLeft = await Task.detached(priority: .userInitiated) { () -> [String]? in

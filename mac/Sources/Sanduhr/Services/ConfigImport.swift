@@ -251,7 +251,7 @@ enum ConfigImport {
     /// One write an import made, enough to undo it and nothing more: never a value it replaced
     /// (it replaces none) and never an env value.
     struct Step: Codable, Equatable {
-        enum Kind: String, Codable { case file, folder, setting, env, settingsFile, envObject, marketplace, plugin, mcpServer }
+        enum Kind: String, Codable { case file, folder, setting, env, settingsFile, envObject, marketplace, plugin, mcpServer, cliKey }
 
         /// Written through `claude`, and taken back the same way.
         var throughCLI: Bool { [.marketplace, .plugin, .mcpServer].contains(kind) }
@@ -375,6 +375,9 @@ enum ConfigImport {
     /// the main thread.
     static func run(_ jobs: [Job], seat: String, cli: ClaudeCLI) -> (steps: [Step], failures: [String]) {
         var steps: [Step] = [], failures: [String] = []
+        let settingsFile = (AccountData.normalized(seat) as NSString).appendingPathComponent("settings.json")
+        let keysBefore = Set(readObject(settingsFile)?.keys.map { $0 } ?? [])
+
         var markets: Set<String>?
         for job in jobs {
             switch job {
@@ -400,8 +403,14 @@ enum ConfigImport {
                 steps.append(Step(kind: .mcpServer, name: name, sha256: sha256))
             }
         }
+        // Keys claude made for them, recorded so Undo can drop them once they're empty again.
+        let made = Set(readObject(settingsFile)?.keys.map { $0 } ?? []).subtracting(keysBefore).intersection(cliKeys)
+        if !steps.isEmpty { steps.insert(contentsOf: made.sorted().map { Step(kind: .cliKey, name: $0) }, at: 0) }
         return (steps, failures)
     }
+
+    /// The settings keys `claude plugin` writes into a folder's settings.json.
+    static let cliKeys: Set<String> = ["enabledPlugins", "extraKnownMarketplaces"]
 
     /// Takes back an import's CLI steps, last first, through `claude`: a server changed since, or
     /// a marketplace another plugin now comes from, is left and named. Blocking: run off the main
@@ -443,7 +452,7 @@ enum ConfigImport {
         let fm = FileManager.default
         var left: [String] = []
         let file = (record.seat as NSString).appendingPathComponent("settings.json")
-        let settingSteps = record.steps.filter { [.setting, .env, .envObject, .settingsFile].contains($0.kind) }
+        let settingSteps = record.steps.filter { [.setting, .env, .envObject, .settingsFile, .cliKey].contains($0.kind) }
         if !settingSteps.isEmpty {
             var done = false
             for _ in 0..<3 where !done {
@@ -467,6 +476,10 @@ enum ConfigImport {
                         if obj.members.isEmpty {
                             b = JSONEdit.remove(b, in: top, key: "env", emptyInner: step.emptyInner.map { Array($0.utf8) })
                         }
+                    case .cliKey:
+                        // Left by claude's install: dropped only once it holds nothing again.
+                        guard let m = top.member(step.name), let obj = try? JSONEdit.object(b, at: m.valueStart), obj.members.isEmpty else { continue }
+                        b = JSONEdit.remove(b, in: top, key: step.name)
                     case .settingsFile:
                         deleteFile = (try? JSONEdit.topObject(b))?.members.isEmpty == true
                         if !deleteFile { stepLeft.append("settings.json, which now holds other settings") }

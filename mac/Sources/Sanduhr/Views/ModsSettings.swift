@@ -229,6 +229,8 @@ final class ModsPageModel {
     var configImport: ConfigImportState?
     var configImportNote: String?
     var imports: [ConfigImport.Record] = ConfigImport.Log.standard.list()
+    /// Imports whose Undo is running now.
+    var undoingImports: Set<String> = []
     var newModWay: NewModWay = .build
     /// Check's answer for each proposed mod (slice G), by proposal id.
     var proposalChecks: [String: ModCheckOutcome] = [:]

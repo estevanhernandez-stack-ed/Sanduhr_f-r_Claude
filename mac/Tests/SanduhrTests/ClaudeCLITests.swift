@@ -20,6 +20,7 @@ struct ClaudeCLITests {
           "plugin marketplace remove") echo '{"command":"marketplace-remove","outcome":"ok"}' ;;
           "plugin list --json") echo '[]' ;;
           "plugin install bad"*) echo '{"command":"install","outcome":"failed","message":"Plugin \\"bad\\" not found in marketplace"}'; exit 1 ;;
+          "plugin install keys"*) printf '{\\n  "model": "x",\\n  "enabledPlugins": {}\\n}\\n' > "$CLAUDE_CONFIG_DIR/settings.json"; echo '{"command":"install","outcome":"ok"}' ;;
           "plugin install"*) echo "{\\"command\\":\\"install\\",\\"outcome\\":\\"ok\\",\\"plugin\\":\\"$3\\"}" ;;
           "plugin uninstall"*) echo '{"command":"uninstall","outcome":"ok"}' ;;
           "mcp add-json"*) echo "Added MCP server $5 to user config" ;;
@@ -81,6 +82,22 @@ struct ClaudeCLITests {
         let undone = calls().dropFirst(before).map { $0.split(separator: "|", maxSplits: 1)[1] }
         #expect(undone == ["mcp remove -s user docs", "plugin uninstall swift-lsp@demo-market --scope user --json",
                            "plugin list --json", "plugin marketplace remove demo-market --scope user --json"])
+    }
+
+    @Test func settingsKeysClaudeAddedGoOnceEmpty() throws {
+        let h = TempHome()
+        defer { h.cleanUp() }
+        let (cli, _) = try fake(h)
+        h.dir(".claude-new")
+        let original = "{\n  \"model\": \"x\"\n}\n"
+        h.file(".claude-new/settings.json", original)
+        let seat = h.at(".claude-new")
+        let (steps, failures) = ConfigImport.run([.plugin(id: "keys@m", marketplace: "m", source: "o/m")], seat: seat, cli: cli)
+        #expect(failures.isEmpty)
+        #expect(steps.map(\.kind) == [.cliKey, .marketplace, .plugin] && steps.first?.name == "enabledPlugins")
+        let record = ConfigImport.Record(id: "r", seat: seat, label: "Demo", packSHA256: "x", at: Date(), steps: steps)
+        #expect(ConfigImport.undo(record).isEmpty)
+        #expect(try String(contentsOfFile: h.at(".claude-new/settings.json"), encoding: .utf8) == original)
     }
 
     @Test func aServerChangedSinceIsLeftAndNamed() throws {

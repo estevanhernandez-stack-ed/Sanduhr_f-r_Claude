@@ -142,6 +142,7 @@ private struct ImportRecordRow: View {
             Button("Undo Import") {
                 Task { model.configImportNote = await model.undoImport(record).note }
             }
+            .disabled(model.undoingImports.contains(record.id))
                 .controlSize(.small)
                 .help("Takes back what that import wrote. A file or setting changed since is left, and named.")
         }
