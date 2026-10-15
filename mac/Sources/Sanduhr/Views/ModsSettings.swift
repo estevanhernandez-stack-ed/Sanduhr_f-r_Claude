@@ -222,6 +222,9 @@ final class ModsPageModel {
     var studioTab: StudioTab = .look
     /// New Mod, the Build with Claude prompt (slice E), and the tab it opens on.
     var newModOpen = false
+    /// Export Config (item 76, slice C): the sheet's rows while it's open, and the last result.
+    var configExport: ConfigExportState?
+    var configExportNote: String?
     var newModWay: NewModWay = .build
     /// Check's answer for each proposed mod (slice G), by proposal id.
     var proposalChecks: [String: ModCheckOutcome] = [:]
