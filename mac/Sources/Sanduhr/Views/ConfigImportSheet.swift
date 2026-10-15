@@ -394,7 +394,13 @@ struct ConfigImportSheet: View {
             if let record = state.done, !record.steps.isEmpty, undone == nil || undone?.isRefused == true {
                 Button("Undo Import") {
                     undoing = true
-                    Task { undone = await model.undoImport(record); undoing = false }
+                    Task {
+                        let outcome = await model.undoImport(record)
+                        undone = outcome
+                        // Kept on By Seat after the sheet closes.
+                        model.configImportNote = outcome.note
+                        undoing = false
+                    }
                 }
                 .disabled(undoing)
             }
