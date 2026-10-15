@@ -316,7 +316,9 @@ extension ModsPageModel {
         panel.message = "Open a .sanduhrpack. Its mod waits here for you to check, try and keep; nothing runs until you do."
         panel.prompt = "Open"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        await openPack(url, store: store)
+        // A config pack picked here closes New Mod and opens the Open sheet instead.
+        await openAnyPack(url, store: store)
+        if configImport != nil { newModOpen = false }
     }
 
     func chooseTryFolder(_ r: ModProposalRecord, store: ModProposalStore) {

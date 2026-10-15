@@ -123,9 +123,18 @@ enum ModPackReader {
         var stamp: String?
     }
 
-    /// Checks and unpacks the pack at `url` into a temporary folder, verifies it against its
-    /// manifest and returns the mod, or the reasons it can't be opened. Leaves nothing behind.
-    static func open(_ url: URL, now: Date = Date()) throws -> Opened {
+    /// A pack read and verified: its manifest, and every file it lists with its bytes. Packs are
+    /// small (20 MB at most), so the files are held in memory and nothing stays on disk.
+    struct Unpacked: @unchecked Sendable {
+        var manifest: [String: Any]
+        var files: [String: Data]
+        var kind: String { manifest["kind"] as? String ?? "" }
+    }
+
+    /// Checks and unpacks the pack at `url` into a temporary folder, verifies every file it lists
+    /// against its size and SHA-256, refuses files it doesn't list, and returns them. Leaves
+    /// nothing behind.
+    static func read(_ url: URL) throws -> Unpacked {
         let fm = FileManager.default
         let attrs = try? fm.attributesOfItem(atPath: url.path)
         guard let attrs, attrs[.type] as? FileAttributeType == .typeRegular else { throw Refusal("Sanduhr can't read that file.") }
@@ -150,34 +159,28 @@ enum ModPackReader {
             throw Refusal("Sanduhr couldn't unpack it.")
         }
         // What's on disk is what the directory listed: plain files, no more, no larger.
-        let files = try unpacked(root)
+        let found = try unpacked(root)
         let expected = Set(listed.filter { !$0.isDirectory }.map(\.name))
-        guard Set(files.keys) == expected else { throw Refusal("It unpacked to other files than it lists.") }
+        guard Set(found.keys) == expected else { throw Refusal("It unpacked to other files than it lists.") }
 
         guard let manifestData = fm.contents(atPath: root.appendingPathComponent(ModPack.manifestName).path),
               let manifest = (try? JSONSerialization.jsonObject(with: manifestData)) as? [String: Any] else {
             throw Refusal("It has no \(ModPack.manifestName), so it isn't a Sanduhr pack.")
         }
         guard manifest["schema"] as? Int == 1 else { throw Refusal("It's a pack of a newer kind. Update Sanduhr to open it.") }
-        guard manifest["kind"] as? String == "mod" else { throw Refusal("It's a config pack. This Sanduhr opens mod packs only.") }
-        guard let modDoc = manifest["mod"] as? [String: Any], let listedFiles = manifest["files"] as? [[String: Any]] else {
+        guard let listedFiles = manifest["files"] as? [[String: Any]] else {
             throw Refusal("Its \(ModPack.manifestName) is damaged.")
         }
 
         var reasons: [String] = []
-        var named = Set<String>()
-        var modFiles: [[String: String]] = []
+        var files: [String: Data] = [:]
         for f in listedFiles {
             guard let path = f["path"] as? String, let bytes = f["bytes"] as? Int, let sha = f["sha256"] as? String else {
                 reasons.append("A file in its manifest is missing its path, size or hash.")
                 continue
             }
-            named.insert(path)
-            guard path.hasPrefix(ModPack.modFolder + "/") else {
-                reasons.append("\(path) isn't under \(ModPack.modFolder)/.")
-                continue
-            }
-            guard let content = fm.contents(atPath: root.appendingPathComponent(path).path) else {
+            guard pathProblem(path) == nil, path != ModPack.manifestName,
+                  let content = fm.contents(atPath: root.appendingPathComponent(path).path) else {
                 reasons.append("\(path) is listed but missing.")
                 continue
             }
@@ -186,19 +189,42 @@ enum ModPackReader {
                 reasons.append("\(path) doesn't match its manifest: the pack was changed or damaged.")
                 continue
             }
-            guard let text = String(data: content, encoding: .utf8) else {
-                reasons.append("\(path) isn't text.")
-                continue
-            }
-            modFiles.append(["path": String(path.dropFirst(ModPack.modFolder.count + 1)), "text": text])
+            files[path] = content
         }
-        let extra = expected.subtracting(named).subtracting([ModPack.manifestName, ModPack.marketplacePath])
-        if !extra.isEmpty { reasons.append("It holds files its manifest doesn't list: \(extra.sorted().prefix(5).joined(separator: ", ")).") }
+        let extra = expected.subtracting(files.keys).subtracting([ModPack.manifestName, ModPack.marketplacePath])
+        if reasons.isEmpty, !extra.isEmpty {
+            reasons.append("It holds files its manifest doesn't list: \(extra.sorted().prefix(5).joined(separator: ", ")).")
+        }
         guard reasons.isEmpty else { throw Refusal(Array(reasons.prefix(20))) }
+        return Unpacked(manifest: manifest, files: files)
+    }
 
-        // The mod, held to propose_mod's rules by the same decoder.
-        let name = modDoc["name"] as? String ?? ""
-        var summary = (modDoc["description"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Keep's stamp for files held in memory: the first 12 hex digits of a SHA-256 over each
+    /// name, a zero byte and its bytes, in name order, as `IntegrationScripts.stamp` hashes a folder.
+    static func stamp(_ files: [String: Data]) -> String {
+        var hasher = SHA256()
+        for name in files.keys.sorted() {
+            hasher.update(data: Data(name.utf8))
+            hasher.update(data: Data([0]))
+            hasher.update(data: files[name] ?? Data())
+        }
+        return String(hasher.finalize().map { String(format: "%02x", $0) }.joined().prefix(12))
+    }
+
+    /// The mod under `prefix` (`mod/` in a mod pack, `mods/<name>/` in a config pack) as
+    /// `propose_mod` would send it, held to its rules by the same decoder.
+    static func mod(in files: [String: Data], prefix: String, doc: [String: Any], now: Date) throws -> Opened {
+        var modFiles: [[String: String]] = []
+        var raw: [String: Data] = [:]
+        for (path, content) in files where path.hasPrefix(prefix) {
+            guard let text = String(data: content, encoding: .utf8) else { throw Refusal("\(path) isn't text.") }
+            let rel = String(path.dropFirst(prefix.count))
+            modFiles.append(["path": rel, "text": text])
+            raw[rel] = content
+        }
+        modFiles.sort { $0["path"]! < $1["path"]! }
+        let name = doc["name"] as? String ?? ""
+        var summary = (doc["description"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         summary = summary.components(separatedBy: .newlines).first ?? ""
         if summary.isEmpty { summary = "Opened from a pack." }
         if summary.count > ModProposal.maxSummary { summary = String(summary.prefix(ModProposal.maxSummary - 1)) + "…" }
@@ -206,16 +232,26 @@ enum ModPackReader {
             "schema_version": 1, "id": UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased(),
             "requested_at": HandoffFiles.stamp(now), "name": name, "summary": summary, "files": modFiles,
         ]
-        if let v = modDoc["version"] as? String { request["version"] = v }
+        if let v = doc["version"] as? String { request["version"] = v }
         guard let requestData = try? JSONSerialization.data(withJSONObject: request) else { throw Refusal("Sanduhr couldn't read the mod.") }
         switch ModProposal.decode(requestData, now: now) {
-        case .proposal(let p):
-            return Opened(proposal: p, stamp: KeptMods.stamp(of: root.appendingPathComponent(ModPack.modFolder)))
-        case .refused(_, let why):
-            throw Refusal(why)
-        case .discard:
-            throw Refusal("Sanduhr couldn't read the mod.")
+        case .proposal(let p): return Opened(proposal: p, stamp: stamp(raw))
+        case .refused(_, let why): throw Refusal(why)
+        case .discard: throw Refusal("Sanduhr couldn't read the mod.")
         }
+    }
+
+    /// Opens a mod pack: read and verified, then its mod under `mod/`.
+    static func open(_ url: URL, now: Date = Date()) throws -> Opened {
+        let pack = try read(url)
+        guard pack.kind == "mod" else {
+            throw Refusal(pack.kind == "config" ? "It's a config pack: open it from By Seat's Open Config Pack…, or double-click it."
+                                                : "It isn't a kind of pack this Sanduhr opens.")
+        }
+        guard let doc = pack.manifest["mod"] as? [String: Any] else { throw Refusal("Its \(ModPack.manifestName) is damaged.") }
+        let outside = pack.files.keys.filter { !$0.hasPrefix(ModPack.modFolder + "/") }
+        guard outside.isEmpty else { throw Refusal("\(outside.sorted()[0]) isn't under \(ModPack.modFolder)/.") }
+        return try mod(in: pack.files, prefix: ModPack.modFolder + "/", doc: doc, now: now)
     }
 
     /// Every regular file under `root`, relative, with its size. A link or special file refuses.
