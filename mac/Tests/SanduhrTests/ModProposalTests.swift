@@ -131,6 +131,84 @@ struct ModProposalTests {
         #expect(Set(index(h).compactMap { $0["status"] as? String }) == ["replaced", "dismissed"])
     }
 
+    // Slice G3: Try in a Session on a waiting proposal.
+
+    @Test func tryIsOfferedOnlyAfterAPassingCheckOnStagedFiles() {
+        let passed = ModCheckOutcome.report(ModCheckReport())
+        var failing = ModCheckReport()
+        failing.passed = false
+        #expect(ModsPageModel.canTryProposal(claude: "/c", staged: true, check: passed))
+        #expect(!ModsPageModel.canTryProposal(claude: "/c", staged: true, check: nil))
+        #expect(!ModsPageModel.canTryProposal(claude: "/c", staged: true, check: .report(failing)))
+        #expect(!ModsPageModel.canTryProposal(claude: "/c", staged: true, check: .timedOut))
+        #expect(!ModsPageModel.canTryProposal(claude: "/c", staged: false, check: passed))
+        #expect(!ModsPageModel.canTryProposal(claude: nil, staged: true, check: passed))
+    }
+
+    @Test func tryLoadsTheStagedCopyAndLeavesItAProposal() throws {
+        let (h, store, _) = rig()
+        defer { h.cleanUp() }
+        store.receive(request())
+        let r = try #require(store.pending.first)
+        #expect(store.isStaged(r))
+        let before = FileManager.default.contents(atPath: h.at("Support/mod-proposals.json"))
+        let tried = try store.trySession(r.id, claude: "/opt/homebrew/bin/claude", open: false)
+        defer { try? FileManager.default.removeItem(at: tried.script.deletingLastPathComponent()) }
+        let script = try String(contentsOf: tried.script, encoding: .utf8)
+        #expect(script.contains("--plugin-dir " + IntegrationInstaller.shellQuoted(store.stagedPath(r))))
+        #expect(!script.contains("CLAUDE_CONFIG_DIR"))
+        #expect(tried.start == tried.script.deletingLastPathComponent())
+        // Still waiting, still staged, nothing kept, the server's index untouched.
+        #expect(store.pending.map(\.id) == [r.id] && store.isStaged(r))
+        #expect(store.paths.kept.list().isEmpty)
+        #expect(FileManager.default.contents(atPath: h.at("Support/mod-proposals.json")) == before)
+    }
+
+    @Test func tryAndKeepUseTheFolderWhoseSessionProposedIt() throws {
+        let h = TempHome()
+        defer { h.cleanUp() }
+        let personal = h.at(".claude-personal")
+        let defaults = UserDefaults(suiteName: "proposals-\(UUID().uuidString)")!
+        defaults.set(true, forKey: ModProposalStore.switchKey)
+        let paths = ModProposalStore.Paths(support: URL(fileURLWithPath: h.at("Support")),
+                                           kept: KeptMods(dir: URL(fileURLWithPath: h.at("Support/mods"))))
+        let store = ModProposalStore(paths: paths, defaults: defaults, now: { Self.at.addingTimeInterval(5) },
+                                     folders: { [h.at(".claude"), personal] })
+        store.receive(request(extra: ["folder": ".claude-personal"]))
+        let r = try #require(store.pending.first)
+        #expect(r.folder == ".claude-personal")
+        #expect(store.folderPath(r) == personal)
+        let tried = try store.trySession(r.id, claude: "/c", open: false)
+        defer { try? FileManager.default.removeItem(at: tried.script.deletingLastPathComponent()) }
+        #expect(try String(contentsOf: tried.script, encoding: .utf8).contains("CLAUDE_CONFIG_DIR=" + IntegrationInstaller.shellQuoted(AccountData.normalized(personal))))
+        let kept = try store.approve(r.id)
+        #expect(kept.folder == personal)
+
+        // A folder Sanduhr doesn't know, or a name that isn't a folder's: Claude Code's default.
+        store.receive(request(id: String(repeating: "b", count: 32), name: "other-band", extra: ["folder": ".claude-elsewhere"]))
+        let unknown = try #require(store.pending.first)
+        #expect(store.folderPath(unknown) == nil)
+        if case .proposal(let p) = ModProposal.decode(request(extra: ["folder": "../x"]), now: Self.at) {
+            #expect(p.folder == nil)
+        } else {
+            Issue.record("a bad folder name must not refuse the proposal")
+        }
+    }
+
+    @Test func tryRefusesWhenTheStagedFilesAreGone() throws {
+        let (h, store, _) = rig()
+        defer { h.cleanUp() }
+        store.receive(request())
+        let r = try #require(store.pending.first)
+        let dir = URL(fileURLWithPath: store.stagedPath(r))
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: dir.appendingPathComponent(".claude-plugin/plugin.json").path)
+        try FileManager.default.removeItem(at: dir.appendingPathComponent(".claude-plugin/plugin.json"))
+        #expect(!store.isStaged(r))
+        #expect(throws: KeptMods.Failure.gone) { try store.trySession(r.id, claude: "/c", open: false) }
+        store.dismiss(r.id)
+        #expect(throws: KeptMods.Failure.gone) { try store.trySession(r.id, claude: "/c", open: false) }
+    }
+
     // Slice G2: list_catalog's file and propose_install's requests.
 
     private func installRig() throws -> (IntegrationRig, ModProposalStore, KeptMod) {

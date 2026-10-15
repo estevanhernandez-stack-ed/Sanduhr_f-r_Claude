@@ -51,6 +51,8 @@ struct KeptMods: Sendable {
         case hasLink(String)
         case tooBig
         case writeFailed
+        /// A proposal's staged files are no longer there to try (slice G3).
+        case gone
 
         var message: String {
             switch self {
@@ -60,6 +62,7 @@ struct KeptMods: Sendable {
             case .hasLink(let p): "It holds a link (\(p)). Sanduhr keeps plain files only."
             case .tooBig: "It's larger than Sanduhr keeps: \(KeptMods.maxFiles) files, 1 MB each, 4 MB in all."
             case .writeFailed: "Sanduhr couldn't write the copy."
+            case .gone: "Its proposed files aren't there any more. Ask Claude to propose it again."
             }
         }
     }
@@ -238,25 +241,35 @@ struct KeptMods: Sendable {
     /// folder it starts in.
     @discardableResult
     func trySession(_ mod: KeptMod, claude: String, in workingFolder: URL? = nil) throws -> URL {
+        try Self.trySession(name: mod.name, dir: path(mod), config: mod.folder, claude: claude, in: workingFolder).start
+    }
+
+    /// Try in a Session for any mod folder: a kept copy, or a proposal's staged copy (slice G3).
+    /// Writes `try.command` into a new folder under the temporary folder and, with `open`, opens it
+    /// in Terminal. Returns the folder Claude Code starts in and the script.
+    @discardableResult
+    static func trySession(name: String, dir: String, config: String?, claude: String, in workingFolder: URL? = nil,
+                           open: Bool = true) throws -> (start: URL, script: URL) {
         let fm = FileManager.default
-        let scratch = fm.temporaryDirectory.appendingPathComponent("sanduhr-try-\(mod.name)-\(UUID().uuidString.prefix(8))",
+        let scratch = fm.temporaryDirectory.appendingPathComponent("sanduhr-try-\(name)-\(UUID().uuidString.prefix(8))",
                                                                    isDirectory: true)
         let start = workingFolder ?? scratch
         let script = scratch.appendingPathComponent("try.command")
         do {
             try fm.createDirectory(at: scratch, withIntermediateDirectories: true)
-            try Self.tryScript(claude: claude, mod: path(mod), folder: start.path, config: mod.folder)
+            try tryScript(claude: claude, mod: dir, folder: start.path, config: config)
                 .write(to: script, atomically: true, encoding: .utf8)
             try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: script.path)
         } catch {
             throw Failure.writeFailed
         }
-        let config = NSWorkspace.OpenConfiguration()
+        guard open else { return (start, script) }
+        let configuration = NSWorkspace.OpenConfiguration()
         if let terminal = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
-            NSWorkspace.shared.open([script], withApplicationAt: terminal, configuration: config)
+            NSWorkspace.shared.open([script], withApplicationAt: terminal, configuration: configuration)
         } else {
             NSWorkspace.shared.open(script)
         }
-        return start
+        return (start, script)
     }
 }

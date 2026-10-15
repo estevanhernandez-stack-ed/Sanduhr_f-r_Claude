@@ -35,6 +35,9 @@ struct ModProposal: Equatable, Sendable {
     var summary: String
     var files: [File]
     var requestedAt: Date
+    /// The Claude Code folder whose session proposed it, by the server's name (`.claude-personal`),
+    /// when the request names one. Try in a Session starts Claude Code with it (slice G3).
+    var folder: String? = nil
 
     var bytes: Int { files.reduce(0) { $0 + $1.text.utf8.count } }
 
@@ -126,7 +129,10 @@ struct ModProposal: Equatable, Sendable {
             reasons.append(".claude-plugin/plugin.json is required")
         }
         guard reasons.isEmpty else { return .refused(id: id, Array(reasons.prefix(20))) }
-        return .proposal(ModProposal(id: id, name: name, version: version, summary: summary, files: files, requestedAt: at))
+        // Only where it came from: a name that isn't a folder's is left out, not refused.
+        let folder = (root["folder"] as? String).flatMap { isFolderName($0) ? $0 : nil }
+        return .proposal(ModProposal(id: id, name: name, version: version, summary: summary, files: files, requestedAt: at,
+                                     folder: folder))
     }
 
     /// The answer the server waits for: `pending_review`, or `rejected` with reasons.

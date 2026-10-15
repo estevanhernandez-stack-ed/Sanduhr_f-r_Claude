@@ -19,6 +19,8 @@ struct ModProposalRecord: Codable, Equatable, Identifiable, Sendable {
     var decidedAt: Date?
     /// The kept copy Approve made.
     var keptStamp: String?
+    /// The folder whose session proposed it, by name (`.claude-personal`); nil from older servers.
+    var folder: String?
 
     var isPending: Bool { status == .pendingReview }
 }
@@ -255,7 +257,8 @@ final class ModProposalStore {
                 removeStage(records[i].id)
             }
             let record = ModProposalRecord(id: p.id, name: p.name, version: p.version, summary: p.summary,
-                                           files: p.files.count, bytes: p.bytes, requestedAt: p.requestedAt, status: .pendingReview)
+                                           files: p.files.count, bytes: p.bytes, requestedAt: p.requestedAt, status: .pendingReview,
+                                           folder: p.folder)
             records.append(record)
             save()
             answer(p.id, status: "pending_review", name: p.name, version: p.version,
@@ -274,11 +277,34 @@ final class ModProposalStore {
         return names.map { ModProposal.File(path: $0, text: (try? String(contentsOf: dir.appendingPathComponent($0), encoding: .utf8)) ?? "") }
     }
 
+    /// Whether a waiting proposal's staged copy is still there to try: its manifest is on disk.
+    func isStaged(_ r: ModProposalRecord) -> Bool {
+        r.isPending && FileManager.default.fileExists(atPath: paths.staged(r.id).appendingPathComponent(".claude-plugin/plugin.json").path)
+    }
+
+    /// The Claude Code folder whose session proposed it, when Sanduhr knows a folder by that name.
+    func folderPath(_ r: ModProposalRecord) -> String? {
+        guard let name = r.folder else { return nil }
+        return namedFolders().first { $0.name == name }?.path
+    }
+
+    /// Try in a Session on a waiting proposal (slice G3): Claude Code loads the staged copy for one
+    /// session, with the folder whose session proposed it (Claude Code's default folder when unknown). It stays a proposal: nothing is kept, and neither
+    /// its status nor the server's index changes.
+    @discardableResult
+    func trySession(_ id: String, claude: String, in workingFolder: URL? = nil,
+                    open: Bool = true) throws -> (start: URL, script: URL) {
+        guard let r = records.first(where: { $0.id == id && $0.isPending }), isStaged(r) else { throw KeptMods.Failure.gone }
+        return try KeptMods.trySession(name: r.name, dir: paths.staged(id).path, config: folderPath(r), claude: claude,
+                                       in: workingFolder, open: open)
+    }
+
     /// Approve: the staged files become a kept mod.
     @discardableResult
     func approve(_ id: String) throws -> KeptMod {
         guard let i = records.firstIndex(where: { $0.id == id && $0.isPending }) else { throw KeptMods.Failure.writeFailed }
-        let kept = try paths.kept.keep(paths.staged(id).path, session: "claude", proposed: true, now: now())
+        let kept = try paths.kept.keep(paths.staged(id).path, session: "claude", folder: folderPath(records[i]),
+                                       proposed: true, now: now())
         records[i].status = .approved
         records[i].decidedAt = now()
         records[i].keptStamp = kept.stamp

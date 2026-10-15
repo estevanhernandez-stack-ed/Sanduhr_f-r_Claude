@@ -2652,7 +2652,7 @@ def check_mod(args):
 
 
 def build_propose_mod(args, now=None, paths=None, wait=MOD_WAIT_SECONDS, poll=DESK_POLL_SECONDS,
-                      sleep=time.sleep, clock=time.monotonic):
+                      sleep=time.sleep, clock=time.monotonic, env=None):
     """Checks the proposal here, then hands it to the app through mod-request.json and waits
     briefly for mod-result.json. Never writes a mod's files."""
     now = now or datetime.now(timezone.utc)
@@ -2667,6 +2667,10 @@ def build_propose_mod(args, now=None, paths=None, wait=MOD_WAIT_SECONDS, poll=DE
     request_id = uuid.uuid4().hex
     request = {"schema_version": 1, "id": request_id, "requested_at": iso_o(now)}
     request.update(mod)
+    # The folder whose session proposes it, by name only, so Try in a Session starts Claude Code there.
+    folder = os.path.basename(claude_folder(env).rstrip("/"))
+    if MOD_FOLDER_RE.match(folder):
+        request["folder"] = folder
     try:
         os.makedirs(paths.support_dir, mode=0o700, exist_ok=True)
         tmp = paths.mod_request + ".tmp"
