@@ -115,6 +115,9 @@ struct ModsBySeatView: View {
                 }
                 SeatStatuslineBox(folder: seat.path, folderName: model.display(seat.path))
                     .id(seat.path)
+                    .sheet(item: Binding(get: { model.configExport }, set: { model.configExport = $0 })) { state in
+                        ConfigExportSheet(model: model, state: state, close: { model.configExport = nil })
+                    }
             } else {
                 Text("No Claude Code folder found (~/.claude or a ~/.claude-name folder).")
                     .font(.caption)
@@ -175,6 +178,12 @@ private struct SeatHeader: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 Text(model.display(seat.path)).font(.body.monospaced()).textSelection(.enabled)
+                // No export control exists for a seat marked work (item 71's wall, item 76).
+                if !seat.isWork {
+                    Button("Export Config…") { Task { await model.startConfigExport(seat) } }
+                        .controlSize(.small)
+                        .help("Writes a .sanduhrpack describing this folder: its agents, skills, plugins, MCP servers and chosen settings. You pick what goes in first.")
+                }
                 if model.addedFolders.contains(seat.path) {
                     Button("Forget Folder") { Task { await model.forgetFolder(seat.path, linked: linked) } }
                         .controlSize(.small)
@@ -182,6 +191,9 @@ private struct SeatHeader: View {
                 }
             }
             Text(facts).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if let note = model.configExportNote {
+                Text(note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             if let note = model.configNotes[seat.path] {
                 Text(note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
