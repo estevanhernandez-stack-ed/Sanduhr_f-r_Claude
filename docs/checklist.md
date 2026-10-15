@@ -518,3 +518,9 @@ New options keep today's behavior by default; the camera light and the glow star
   Wall: the preview uses demo numbers only; demo mode hides work folders; the prompt names no path and no setting value.
   Acceptance: the spec's Acceptance section.
   Verify: golden fixtures written by the mod's `claude plugin test` run and checked by swift-testing against the port; the options receipt's byte-exact undo; by hand on the owner's two seats.
+- [ ] **76. Packs: share a mod, carry a Claude Code config to another seat, machine or person**
+  Spec ref: `docs/config-transfer-spec.md` (2026-10-15, the owner, after keeping finish-line in the personal seat: "is the next step to be able to share mods as well", and "import/export claude config planning. This is what we have been building towards"). Follows items 71 and 75.
+  What to build, in slices that each ship: (A) mod export, a kept mod to a `.sanduhrpack` that is also a one-plugin marketplace; (B) mod import, staged as a proposal with origin From a file and reviewed as item 75 slice G reviews; (C) config export from a personal seat: chosen files, plugins by marketplace source, MCP servers with `${VAR}` references, settings keys, env by name, paths under home rewritten, a secret scan that blocks a file; (D) config import of files and settings as one side of Compare, by `fileAdd` and `configEdit` receipts with one Undo Import; (E) plugins and MCP servers replayed through Claude Code's CLI (needs item 71 slice 3); (F) publish kept mods to a marketplace repo the user names.
+  Wall: no export control exists for a seat marked work; import into a work seat asks once naming it; demo mode hides work seats. No env value, MCP header value, credential, transcript, memory or `.claude.json` ever goes in a pack.
+  Acceptance: the spec's Acceptance section.
+  Verify: the spec's Verify section.
