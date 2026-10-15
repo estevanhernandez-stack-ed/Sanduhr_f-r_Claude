@@ -108,5 +108,10 @@ struct ModPackTests {
         #expect(ModPack.fileName(mod) == "ci-band-1.0-beta.sanduhrpack")
         mod.version = nil
         #expect(ModPack.fileName(mod) == "ci-band.sanduhrpack")
+        let dir = URL(fileURLWithPath: "/tmp/out")
+        #expect(ModPack.destination(dir.appendingPathComponent("a.sanduhrpack")).lastPathComponent == "a.sanduhrpack")
+        #expect(ModPack.destination(dir.appendingPathComponent("a.sanduhrpack.sanduhrpack")).lastPathComponent == "a.sanduhrpack")
+        #expect(ModPack.destination(dir.appendingPathComponent("a")).lastPathComponent == "a.sanduhrpack")
+        #expect(ModPack.destination(dir.appendingPathComponent("a.zip")).lastPathComponent == "a.zip.sanduhrpack")
     }
 }

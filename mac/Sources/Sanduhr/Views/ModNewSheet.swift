@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// New Mod's two ways in: the prompt, or what Claude made (in a session, or proposed).
 enum NewModWay: String, CaseIterable, Identifiable, Sendable {
@@ -213,14 +212,18 @@ extension ModsPageModel {
     }
 
     /// Export (item 76, slice A): asks where, then writes the kept copy as a `.sanduhrpack`.
-    func exportKept(_ mod: KeptMod) {
+    func exportKept(_ mod: KeptMod) async {
         let panel = NSSavePanel()
+        // No allowedContentTypes: until Sanduhr declares the type, the panel adds the extension
+        // a second time. ModPack.destination puts it on when the name lacks it.
         panel.nameFieldStringValue = ModPack.fileName(mod)
-        if let type = UTType(filenameExtension: ModPack.fileExtension) { panel.allowedContentTypes = [type] }
         panel.canCreateDirectories = true
         panel.message = "A pack anyone can read and add, with Sanduhr or with Claude Code."
         panel.prompt = "Export"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard panel.runModal() == .OK, let picked = panel.url else { return }
+        let url = ModPack.destination(picked)
+        // The pack says what Check found: check first when it hasn't run this session.
+        if keptChecks[mod.id] == nil { await checkKept(mod) }
         var report: ModCheckReport?
         if case .report(let r)? = keptChecks[mod.id] { report = r }
         do {
@@ -391,7 +394,7 @@ struct NewModSheet: View {
             Text("Deletes Sanduhr's copy. The session's own folder is left as it is, until Claude Code cleans it up.")
         }
         .alert("Export \(exporting?.name ?? "the mod")?", isPresented: Binding(get: { exporting != nil }, set: { if !$0 { exporting = nil } })) {
-            Button("Export…") { if let m = exporting { DispatchQueue.main.async { model.exportKept(m) } } }
+            Button("Export…") { if let m = exporting { DispatchQueue.main.async { Task { await model.exportKept(m) } } } }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(exportMessage)

@@ -37,6 +37,15 @@ enum ModPack {
         return mod.name + version + "." + fileExtension
     }
 
+    /// Where a save panel's pick is written: with the extension once, whatever was typed.
+    static func destination(_ picked: URL) -> URL {
+        var url = picked
+        while url.pathExtension == fileExtension, url.deletingPathExtension().pathExtension == fileExtension {
+            url = url.deletingPathExtension()
+        }
+        return url.pathExtension == fileExtension ? url : url.appendingPathExtension(fileExtension)
+    }
+
     /// The marketplace name inside the pack. Claude Code names an install `<plugin>@<marketplace>`.
     static func marketplaceName(_ mod: KeptMod) -> String { mod.name + "-pack" }
 
