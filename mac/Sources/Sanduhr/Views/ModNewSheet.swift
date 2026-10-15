@@ -211,6 +211,29 @@ extension ModsPageModel {
         }
     }
 
+    /// Export (item 76, slice A): asks where, then writes the kept copy as a `.sanduhrpack`.
+    func exportKept(_ mod: KeptMod) async {
+        let panel = NSSavePanel()
+        // No allowedContentTypes: until Sanduhr declares the type, the panel adds the extension
+        // a second time. ModPack.destination puts it on when the name lacks it.
+        panel.nameFieldStringValue = ModPack.fileName(mod)
+        panel.canCreateDirectories = true
+        panel.message = "A pack anyone can read and add, with Sanduhr or with Claude Code."
+        panel.prompt = "Export"
+        guard panel.runModal() == .OK, let picked = panel.url else { return }
+        let url = ModPack.destination(picked)
+        // The pack says what Check found: check first when it hasn't run this session.
+        if keptChecks[mod.id] == nil { await checkKept(mod) }
+        var report: ModCheckReport?
+        if case .report(let r)? = keptChecks[mod.id] { report = r }
+        do {
+            try ModPack.write(mod, from: URL(fileURLWithPath: keptStore.path(mod)), to: url, check: report)
+            keptNote = "Exported \(mod.name) to \(url.lastPathComponent)."
+        } catch {
+            keptNote = (error as? ModPack.Failure)?.message ?? ModPack.Failure.writeFailed.message
+        }
+    }
+
     /// Asks for the folder Try starts in, then tries there.
     func chooseTryFolder(_ mod: KeptMod) {
         guard let url = askTryFolder(mod.name) else { return }
@@ -279,6 +302,7 @@ struct NewModSheet: View {
     @State private var tryingProposal: ModProposalRecord?
     @State private var tryTypedName = ""
     @State private var forgetting: KeptMod?
+    @State private var exporting: KeptMod?
     @State private var consent: KeptConsent?
 
     struct KeptConsent: Identifiable {
@@ -369,6 +393,18 @@ struct NewModSheet: View {
         } message: {
             Text("Deletes Sanduhr's copy. The session's own folder is left as it is, until Claude Code cleans it up.")
         }
+        .alert("Export \(exporting?.name ?? "the mod")?", isPresented: Binding(get: { exporting != nil }, set: { if !$0 { exporting = nil } })) {
+            Button("Export…") { if let m = exporting { DispatchQueue.main.async { Task { await model.exportKept(m) } } } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(exportMessage)
+        }
+    }
+
+    private var exportMessage: String {
+        guard let m = exporting else { return "" }
+        let size = ByteCountFormatter.string(fromByteCount: Int64(m.bytes), countStyle: .file)
+        return "Writes one .sanduhrpack file with its \(m.files) \(m.files == 1 ? "file" : "files") (\(size)) and what Check found. Nothing from your Claude Code folders travels: no settings, no paths, no names of folders. Anyone you give it to can read every file, and can add it with Sanduhr or with claude plugin marketplace add on the unzipped folder."
     }
 
     // MARK: Build with Claude
@@ -520,6 +556,8 @@ struct NewModSheet: View {
                     Button("Show in Finder") {
                         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: model.keptStore.path(mod))])
                     }
+                    Button("Export…") { exporting = mod }
+                        .help("Writes a .sanduhrpack to share it with another Mac or person.")
                     Divider()
                     Button("Forget…", role: .destructive) { forgetting = mod }
                 } label: {
