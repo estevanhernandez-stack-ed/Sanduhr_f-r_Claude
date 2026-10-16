@@ -40,18 +40,25 @@ extension ModsPageModel {
         for item in state.items where !item.watched.isEmpty && !before.contains(item.id) { state.chosen.remove(item.id) }
     }
 
-    /// Asks where, then writes the chosen rows.
-    func finishConfigExport(_ state: ConfigExportState) {
+    /// Asks where the pack goes; nil when cancelled.
+    func configExportDestination(_ state: ConfigExportState) -> URL? {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = ConfigPack.fileName(label: state.label)
         panel.canCreateDirectories = true
         panel.message = state.isWork ? "A pack from a folder marked work. Anyone you give it to can read it." : "A pack anyone you give it to can read."
         panel.prompt = "Export"
-        guard panel.runModal() == .OK, let picked = panel.url else { return }
-        let url = ModPack.destination(picked)
+        guard panel.runModal() == .OK, let picked = panel.url else { return nil }
+        return ModPack.destination(picked)
+    }
+
+    /// Writes the chosen rows to `url` off the main thread (any-agent/ and the zip take a moment).
+    func finishConfigExport(_ state: ConfigExportState, to url: URL) async {
+        let chosen = state.items.filter { state.chosen.contains($0.id) }
+        let (label, work, anyAgent) = (state.label, state.isWork, state.forOtherAgents)
         do {
-            try ConfigPack.write(state.items.filter { state.chosen.contains($0.id) }, label: state.label, to: url, fromWork: state.isWork,
-                                 anyAgent: state.forOtherAgents)
+            try await Task.detached(priority: .userInitiated) {
+                try ConfigPack.write(chosen, label: label, to: url, fromWork: work, anyAgent: anyAgent)
+            }.value
             configExportNote = "Exported \(state.chosen.count) \(state.chosen.count == 1 ? "item" : "items") from \(state.label) to \(url.lastPathComponent)."
             configExport = nil
         } catch {
@@ -67,6 +74,7 @@ struct ConfigExportSheet: View {
     @State var state: ConfigExportState
     let close: () -> Void
     @State private var editingWords = false
+    @State private var writing = false
     @State private var draft = ""
 
     var body: some View {
@@ -106,10 +114,25 @@ struct ConfigExportSheet: View {
                 Text("\(state.chosen.count) chosen" + (blocked > 0 ? ", \(blocked) can't travel" : ""))
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
+                if writing {
+                    ProgressView().controlSize(.small)
+                    Text("Writing the pack…").font(.caption).foregroundStyle(.secondary)
+                } else if editingWords {
+                    Text("Click Done to keep the watch words first.").font(.caption).foregroundStyle(.secondary)
+                }
                 Button("Cancel", role: .cancel) { close() }
-                Button("Export…") { model.finishConfigExport(state) }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(state.chosen.isEmpty)
+                    .disabled(writing)
+                Button("Export…") {
+                    guard let url = model.configExportDestination(state) else { return }
+                    writing = true
+                    let given = state
+                    Task {
+                        await model.finishConfigExport(given, to: url)
+                        writing = false
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(state.chosen.isEmpty || writing || editingWords)
             }
         }
         .padding(20)
