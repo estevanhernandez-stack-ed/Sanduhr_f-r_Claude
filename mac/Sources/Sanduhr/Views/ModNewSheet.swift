@@ -409,13 +409,11 @@ struct NewModSheet: View {
     var proposals = ModProposalStore.shared
     @State private var way: NewModWay = .build
     @State private var approving: ModProposalRecord?
-    @State private var typedName = ""
     @State private var idea = ""
     @State private var showPrompt = false
     @State private var copied = false
     @State private var trying: KeptMod?
     @State private var tryingProposal: ModProposalRecord?
-    @State private var tryTypedName = ""
     @State private var forgetting: KeptMod?
     @State private var exporting: KeptMod?
     @State private var consent: KeptConsent?
@@ -446,16 +444,20 @@ struct NewModSheet: View {
         .frame(width: 600)
         .onAppear { way = model.newModWay }
         .task { await model.refreshKept() }
-        .alert(approveTitle, isPresented: Binding(get: { approving != nil }, set: { if !$0 { approving = nil; typedName = "" } })) {
-            if needsTypedName { TextField("The mod's name", text: $typedName) }
-            Button("Keep It") {
-                if let r = approving { Task { await model.approve(r, store: proposals) } }
-                typedName = ""
-            }
-            .disabled(needsTypedName && typedName != approving?.name)
-            Button("Cancel", role: .cancel) { typedName = "" }
+        .alert(approveTitle, isPresented: Binding(get: { approving != nil && !needsTypedName }, set: { if !$0 { approving = nil } })) {
+            Button("Keep It") { if let r = approving { Task { await model.approve(r, store: proposals) } } }
+            Button("Cancel", role: .cancel) {}
         } message: {
             Text(approveMessage)
+        }
+        // A high-risk mod asks for its name typed, in a sheet that can show the name in blue.
+        .sheet(isPresented: Binding(get: { approving != nil && needsTypedName }, set: { if !$0 { approving = nil } })) {
+            TypedNameConfirm(title: approveTitle, verb: "keep", name: approving?.name ?? "", message: approveMessage, actions: [
+                .init(title: "Keep It") {
+                    if let r = approving { Task { await model.approve(r, store: proposals) } }
+                    approving = nil
+                },
+            ], cancel: { approving = nil })
         }
         .alert("Try \(trying?.name ?? "the mod") in a session?", isPresented: Binding(get: { trying != nil }, set: { if !$0 { trying = nil } })) {
             if let last = model.lastTryFolder {
@@ -469,23 +471,22 @@ struct NewModSheet: View {
         } message: {
             Text(tryMessage)
         }
-        .alert("Try \(tryingProposal?.name ?? "the mod") before keeping it?",
-               isPresented: Binding(get: { tryingProposal != nil }, set: { if !$0 { tryingProposal = nil; tryTypedName = "" } })) {
-            let blocked = tryNeedsTypedName && tryTypedName != tryingProposal?.name
-            if tryNeedsTypedName { TextField("The mod's name", text: $tryTypedName) }
+        .alert(tryProposalTitle,
+               isPresented: Binding(get: { tryingProposal != nil && !tryNeedsTypedName }, set: { if !$0 { tryingProposal = nil } })) {
             if let last = model.lastTryFolder {
                 Button("Try in \(last.lastPathComponent)") { if let r = tryingProposal { model.tryProposal(r, store: proposals, in: last) } }
-                    .disabled(blocked)
             }
             Button("Choose Folder…") {
                 if let r = tryingProposal { DispatchQueue.main.async { model.chooseTryFolder(r, store: proposals) } }
             }
-            .disabled(blocked)
             Button("Try in an Empty Folder") { if let r = tryingProposal { model.tryProposal(r, store: proposals) } }
-                .disabled(blocked)
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(tryProposalMessage)
+        }
+        .sheet(isPresented: Binding(get: { tryingProposal != nil && tryNeedsTypedName }, set: { if !$0 { tryingProposal = nil } })) {
+            TypedNameConfirm(title: tryProposalTitle, verb: "try", name: tryingProposal?.name ?? "", message: tryProposalMessage,
+                             actions: tryProposalActions, cancel: { tryingProposal = nil })
         }
         .alert(consentTitle, isPresented: Binding(get: { consent != nil }, set: { if !$0 { consent = nil } })) {
             Button("Turn On") {
@@ -868,8 +869,24 @@ struct NewModSheet: View {
         if case .report(let report)? = model.proposalChecks[r.id] {
             lines.append("\(report.risk.title): \(report.reasons.joined(separator: " "))")
         }
-        if tryNeedsTypedName { lines.append("Type \(r.name) to try it.") }
         return lines.joined(separator: "\n\n")
+    }
+
+    private var tryProposalTitle: String { "Try \(tryingProposal?.name ?? "the mod") before keeping it?" }
+
+    /// The typed-name sheet's Try buttons, as the alert's: each closes the sheet first.
+    private var tryProposalActions: [TypedNameConfirm.Action] {
+        guard let r = tryingProposal else { return [] }
+        var out: [TypedNameConfirm.Action] = []
+        if let last = model.lastTryFolder {
+            out.append(.init(title: "Try in \(last.lastPathComponent)") { tryingProposal = nil; model.tryProposal(r, store: proposals, in: last) })
+        }
+        out.append(.init(title: "Choose Folder…") {
+            tryingProposal = nil
+            DispatchQueue.main.async { model.chooseTryFolder(r, store: proposals) }
+        })
+        out.append(.init(title: "Try in an Empty Folder") { tryingProposal = nil; model.tryProposal(r, store: proposals) })
+        return out
     }
 
     private var approveTitle: String { "Keep \(approving?.name ?? "the mod")?" }
@@ -880,7 +897,6 @@ struct NewModSheet: View {
         if case .report(let report)? = model.proposalChecks[r.id] {
             lines.append("\(report.risk.title): \(report.reasons.joined(separator: " "))")
         }
-        if needsTypedName { lines.append("Type \(r.name) to keep it.") }
         return lines.joined(separator: "\n\n")
     }
 
