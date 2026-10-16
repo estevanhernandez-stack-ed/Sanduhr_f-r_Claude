@@ -17,7 +17,7 @@ Skills are the one piece that is already the same file everywhere: a Claude Code
 ```
 any-agent/
   README.md                  where each file goes, per agent, as copyable commands
-  AGENTS.md                  CLAUDE.md, when its row is checked
+  AGENTS.md                  CLAUDE.md when checked, then an index of the skills and env names
   skills/<name>/SKILL.md     every skill, then every agent and command as a skill
   mcp/mcp.json               mcpServers, ${NAME} (Claude Code, .mcp.json, Copilot CLI)
   mcp/cursor.json            mcpServers, ${env:NAME}
@@ -29,10 +29,11 @@ any-agent/
 
 - **Built from the same checked rows.** Nothing reaches `any-agent/` that isn't in `files/` or the manifest already, so the secret scan, path rewriting and the work stamp cover it unchanged.
 - **Listed in the manifest** under `files` with sizes and hashes, so 2.21.0 verifies it and its import (which reads only `files/`) ignores it. The schema stays 1.
-- **Skills** are copied as they are, plus `metadata: {source: claude-code}`. A name that breaks the standard (capitals, `--`, over 64 characters) is rewritten to fit and the folder renamed with it; the README lists each rename.
+- **Skills** are copied as they are. A name that breaks the standard (capitals, `--`, over 64 characters) is rewritten to fit and the folder renamed with it; the README lists each rename.
 - **Agents become skills.** A subagent's prompt becomes a skill body, its description the skill's, with `compatibility: Written as a Claude Code subagent; runs inline here.` Tools and model lines are dropped and listed in `LEFT-OUT.md`.
 - **Commands become skills.** The description says to use it when the user asks for `/<name>`; `$ARGUMENTS` stays, with a line saying what it stands for.
-- **MCP servers** keep the pack's `${NAME}` references; each file spells them as its agent expands them. Codex can't put a reference inside a literal header, so a `Bearer ${NAME}` header becomes `bearer_token_env_var` and any other referenced header `env_http_headers`.
+- **MCP servers** keep the pack's `${NAME}` references; each file spells them as its agent expands them: `${env:NAME}` for Cursor and VS Code [unverified for VS Code], `${NAME}` for Gemini CLI and `.mcp.json`, and `${HOME}` as `${userHome}` where that is the spelling. A pack already writes every header as a whole `${NAME}`, so Codex reads each through `env_http_headers` and each env value through `env_vars`; Codex has no SSE transport, so an SSE server is left out of `codex.toml` and named.
+- **AGENTS.md** is CLAUDE.md when its row is checked, followed by an index: each skill with its description, and the environment variables the setup expects. Without CLAUDE.md it is the index alone (the owner, 2026-10-15).
 - **Left out, and said:** plugins (a Claude Code marketplace; each one's skills could come later), hooks, permissions, output styles, the statusline, settings keys, and env names (listed in the README as variables to set).
 
 ## Export and import
@@ -41,11 +42,15 @@ any-agent/
 - The 256-entry and 20 MB caps count both folders. When `any-agent/` would pass them, the sheet says so and the switch turns off for that export.
 - Opening a pack ignores `any-agent/` (it has its own README). A future slice could offer to put it into another agent's folder; not this one.
 
-## Open questions
+## Decided (the owner, 2026-10-15)
 
-1. Which agents get an MCP file? The proposal is the five above. Windsurf, Zed and goose could follow when someone asks.
-2. Agents and commands as skills, or left out? The proposal is skills, because an agent's prompt is the useful part, and most agents only have skills.
-3. Should `AGENTS.md` be written even when CLAUDE.md isn't checked, as an index of the skills? The proposal is no: CLAUDE.md stays off by default, and the README covers it.
+1. MCP files for Codex, Gemini CLI, Cursor and VS Code, plus `.mcp.json`. Windsurf, Zed and goose when someone asks.
+2. Agents and commands travel as skills.
+3. `AGENTS.md` is always written; without CLAUDE.md it is the index alone.
+
+## Built (2026-10-15)
+
+`AnyAgent` builds the folder from the chosen rows; `ConfigPack.write(anyAgent:)` adds it and lists it in the manifest; `ConfigPack.anyAgentFiles` returns nil past the caps; the export sheet's switch says how many files it adds. `AnyAgentTests` covers the Verify list but the hand check.
 
 ## Verify
 

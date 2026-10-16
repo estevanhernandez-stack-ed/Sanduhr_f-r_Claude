@@ -353,7 +353,8 @@ enum ConfigPack {
 
     /// The manifest for the chosen rows. Names no machine, user or seat; `fromWork` stamps it
     /// `"from": "work"` so an import elsewhere can say where it came from.
-    static func manifest(_ items: [Item], label: String, version: String, now: Date, fromWork: Bool = false) -> [String: Any] {
+    static func manifest(_ items: [Item], label: String, version: String, now: Date, fromWork: Bool = false,
+                         extra: [File] = []) -> [String: Any] {
         var files: [[String: Any]] = []
         var settings: [String: Any] = [:]
         var plugins: [Any] = []
@@ -375,6 +376,11 @@ enum ConfigPack {
             default: break
             }
         }
+        // any-agent/ is listed like every file, so a reader verifies it; import reads only files/.
+        for f in extra {
+            let data = Data(f.text.utf8)
+            files.append(["path": f.path, "bytes": data.count, "sha256": SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()])
+        }
         var doc: [String: Any] = ["schema": 1, "kind": "config", "created_at": HandoffFiles.stamp(now), "created_by": "Sanduhr " + version,
                                   "label": label, "files": files, "settings": settings, "env": env, "plugins": plugins, "mcp": mcp,
                                   "kept_mods": mods]
@@ -382,23 +388,36 @@ enum ConfigPack {
         return doc
     }
 
+    /// `any-agent/` for the chosen rows (item 76, slice H), or nil when the pack would then pass
+    /// a reader's caps (256 entries, 20 MB), counting the folders `ditto` writes.
+    static func anyAgentFiles(_ chosen: [Item]) -> [File]? {
+        let items = chosen.filter(\.canTravel)
+        let extra = AnyAgent.files(items)
+        let all = items.flatMap(\.files) + extra
+        let bytes = all.reduce(0) { $0 + $1.text.utf8.count }
+        guard AnyAgent.entryCount(all.map(\.path) + [ModPack.manifestName]) <= ModPackReader.maxEntries,
+              bytes <= ModPackReader.maxBytes - (1 << 20) else { return nil }
+        return extra
+    }
+
     /// Writes the chosen rows (blocked ones are never written) as a pack at `destination`. Built
     /// in a temporary folder, zipped with `ditto`, moved into place.
     static func write(_ chosen: [Item], label: String, to destination: URL, version: String = ModPack.appVersion,
-                      now: Date = Date(), fromWork: Bool = false) throws {
+                      now: Date = Date(), fromWork: Bool = false, anyAgent: Bool = false) throws {
         let items = chosen.filter(\.canTravel)
+        let extra = anyAgent ? anyAgentFiles(items) ?? [] : []
         let fm = FileManager.default
         let work = fm.temporaryDirectory.appendingPathComponent("sanduhr-config-\(UUID().uuidString)", isDirectory: true)
         defer { try? fm.removeItem(at: work) }
         let tree = work.appendingPathComponent("pack", isDirectory: true)
         do {
             try fm.createDirectory(at: tree, withIntermediateDirectories: true)
-            for f in items.flatMap(\.files) {
+            for f in items.flatMap(\.files) + extra {
                 let url = tree.appendingPathComponent(f.path)
                 try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try Data(f.text.utf8).write(to: url)
             }
-            let doc = manifest(items, label: label, version: version, now: now, fromWork: fromWork)
+            let doc = manifest(items, label: label, version: version, now: now, fromWork: fromWork, extra: extra)
             var data = try JSONSerialization.data(withJSONObject: doc, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
             data.append(0x0A)
             try data.write(to: tree.appendingPathComponent(ModPack.manifestName))
