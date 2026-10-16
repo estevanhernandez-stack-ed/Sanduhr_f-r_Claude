@@ -7,6 +7,8 @@ struct ConfigExportState: Identifiable {
     let label: String
     /// A folder marked work: the pack is stamped so, and the sheet says who can read it.
     var isWork = false
+    /// Adds `any-agent/`, the same rows for other coding agents (slice H). On by default.
+    var forOtherAgents = true
     var items: [ConfigPack.Item]
     var chosen: Set<String>
     var id: String { seat }
@@ -36,7 +38,8 @@ extension ModsPageModel {
         guard panel.runModal() == .OK, let picked = panel.url else { return }
         let url = ModPack.destination(picked)
         do {
-            try ConfigPack.write(state.items.filter { state.chosen.contains($0.id) }, label: state.label, to: url, fromWork: state.isWork)
+            try ConfigPack.write(state.items.filter { state.chosen.contains($0.id) }, label: state.label, to: url, fromWork: state.isWork,
+                                 anyAgent: state.forOtherAgents)
             configExportNote = "Exported \(state.chosen.count) \(state.chosen.count == 1 ? "item" : "items") from \(state.label) to \(url.lastPathComponent)."
             configExport = nil
         } catch {
@@ -82,6 +85,7 @@ struct ConfigExportSheet: View {
                 .padding(.trailing, 8)
             }
             .frame(height: 380)
+            otherAgents
             HStack {
                 let blocked = state.items.filter { !$0.canTravel }.count
                 Text("\(state.chosen.count) chosen" + (blocked > 0 ? ", \(blocked) can't travel" : ""))
@@ -95,6 +99,20 @@ struct ConfigExportSheet: View {
         }
         .padding(20)
         .frame(width: 620)
+    }
+
+    /// The any-agent/ switch and what it adds, or why it can't this time.
+    @ViewBuilder private var otherAgents: some View {
+        let extra = ConfigPack.anyAgentFiles(state.items.filter { state.chosen.contains($0.id) })
+        Toggle(isOn: Binding(get: { state.forOtherAgents && extra != nil }, set: { state.forOtherAgents = $0 })) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Also for other agents (any-agent/)").font(.callout)
+                Text(extra.map { "Adds \($0.count) files: skills, AGENTS.md and MCP server files for Codex, Gemini CLI, Cursor and VS Code." }
+                     ?? "Too big with it: the pack would pass 256 files or 20 MB. Uncheck some rows to add it.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .disabled(extra == nil)
     }
 
     private func row(_ item: ConfigPack.Item) -> some View {
