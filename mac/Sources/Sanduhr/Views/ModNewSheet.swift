@@ -509,15 +509,22 @@ struct NewModSheet: View {
         } message: {
             Text("Deletes Sanduhr's copy. The session's own folder is left as it is, until Claude Code cleans it up.")
         }
-        .alert("Publish \(model.publishing?.mod.name ?? "the mod") to \(model.publishing?.plan.repo.source ?? "your marketplace")?",
-               isPresented: Binding(get: { model.publishing != nil }, set: { if !$0 { model.publishing = nil } })) {
+        .alert(publishTitle, isPresented: Binding(get: { model.publishing != nil }, set: { if !$0 { model.publishing = nil } })) {
+            let same = model.publishing?.plan.change == .same
             if model.publishing?.plan.canPublish == true {
                 Button("Publish") { if let r = model.publishing { Task { await model.publish(r) } } }
+            }
+            if same, let commands = model.publishing?.plan.commands {
+                Button("Copy Commands") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(commands, forType: .string)
+                    model.publishedCommands = commands
+                }
             }
             Button("Choose Another Clone…") {
                 if let m = model.publishing?.mod { DispatchQueue.main.async { Task { await model.preparePublish(m, choose: true) } } }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(same ? "Done" : "Cancel", role: .cancel) {}
         } message: {
             Text(publishMessage)
         }
@@ -541,13 +548,19 @@ struct NewModSheet: View {
         }
     }
 
+    private var publishTitle: String {
+        guard let r = model.publishing else { return "Publish the mod?" }
+        let what = r.plan.mod + (r.plan.version.map { " " + $0 } ?? "")
+        return r.plan.change == .same ? "\(what) is already published" : "Publish \(what) to \(r.plan.repo.source)?"
+    }
+
     private var publishMessage: String {
         guard let p = model.publishing?.plan else { return "" }
         let size = ByteCountFormatter.string(fromByteCount: Int64(p.bytes), countStyle: .file)
         let what = "\(p.mod)\(p.version.map { " " + $0 } ?? "")"
         var lines: [String] = []
         switch p.change {
-        case .same: lines.append("The marketplace already has these files for \(p.mod). Nothing to publish.")
+        case .same: lines.append("\(p.repo.source) has this copy of \(p.mod) on \(p.repo.branch) already. On another machine, add it with:\n\n\(p.commands)")
         case .add: lines.append("Adds \(what) as plugins/\(p.mod) (\(p.files) \(p.files == 1 ? "file" : "files"), \(size)) to the \(p.repo.name) marketplace, commits on \(p.repo.branch), and pushes to \(p.repo.source).")
         case .update(let old): lines.append("Replaces plugins/\(p.mod)\(old.map { " (" + $0 + ")" } ?? "") with \(what) (\(p.files) \(p.files == 1 ? "file" : "files"), \(size)), commits on \(p.repo.branch), and pushes to \(p.repo.source).")
         }

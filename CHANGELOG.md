@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **Fixed: publishing a mod that's already published.** The confirm asked "Publish …?" with nothing to do. It now says the mod is already published, shows the commands that add it on another machine, and has **Copy Commands**.
+
 - **The name to type, in blue.** Keeping or trying a high-risk mod asks for its name typed out. That confirm is now a small sheet that opens with "To keep it, type **name** below.", the name in blue, the field ready with the name as its placeholder, and Keep enabled once it matches. Other confirms are unchanged.
 
 - **Fixed: a mod's `key` props read as secrets.** Publishing or exporting a mod refused any `.tsx` file using React's `key` prop (`<Box key={id}>`) as a line that looks like a secret. The prop now counts as a name; a token-shaped value is still caught.
