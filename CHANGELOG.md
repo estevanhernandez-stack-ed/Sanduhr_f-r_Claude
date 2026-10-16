@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **Fixed: a mod's `key` props read as secrets.** Publishing or exporting a mod refused any `.tsx` file using React's `key` prop (`<Box key={id}>`) as a line that looks like a secret. The prop now counts as a name; a token-shaped value is still caught.
+
 - **A marketplace of your own.** A kept mod's menu on New Mod, From Claude has **Publish to Marketplace…**: pick a git clone of your own marketplace repo once, and Sanduhr writes the mod under `plugins/`, adds it to `.claude-plugin/marketplace.json` and the README's plugin list, then commits and pushes after a confirm that says what changes and where. Any machine adds the repo once with `claude plugin marketplace add owner/repo` and installs each mod by name. A clone with changes not committed, off a branch or without an origin is refused; a file that looks like a secret refuses the publish, and a watch word is named in the confirm. A push that fails keeps the commit and says why.
 
 - **Watch words for a work folder.** Export Config on a folder marked work has **Watch Words…**: the names that mean work (the company, products, people). A row holding one, as a whole word in any case, says which and starts unchecked, so it stays out of the pack and its any-agent/ folder unless you check it. **Watch Words…** suggests names the folder's own rows use that aren't ordinary words. The list is kept on this Mac only, per folder, and never goes in a pack.

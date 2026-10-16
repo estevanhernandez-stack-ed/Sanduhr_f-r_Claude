@@ -69,7 +69,10 @@ enum ConfigPack {
     /// The first line (from 1) of `text` that looks like a secret, nil when none does: what the
     /// one mask matches (`ConfigMask.maskString`), or a long high-entropy word.
     static func secretLine(in text: String) -> Int? {
-        for (i, line) in text.components(separatedBy: "\n").enumerated() {
+        for (i, raw) in text.components(separatedBy: "\n").enumerated() {
+            // React's `key` prop (`<Box key={id}>`, `<Text key="row">`) is a name, not a secret;
+            // a real token there is still caught by its shape below.
+            let line = raw.replacingOccurrences(of: #"(?<=\s)key=(?=[{"'])"#, with: "", options: .regularExpression)
             if ConfigMask.maskString(line) != line || line.split(whereSeparator: { !isTokenChar($0) }).contains(where: { looksRandom(String($0)) }) {
                 return i + 1
             }
