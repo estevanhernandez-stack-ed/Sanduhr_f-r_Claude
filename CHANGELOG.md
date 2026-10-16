@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **The name to type, in blue.** Keeping or trying a high-risk mod asks for its name typed out. That confirm is now a small sheet that opens with "To keep it, type **name** below.", the name in blue, the field ready with the name as its placeholder, and Keep enabled once it matches. Other confirms are unchanged.
+
 - **Fixed: a mod's `key` props read as secrets.** Publishing or exporting a mod refused any `.tsx` file using React's `key` prop (`<Box key={id}>`) as a line that looks like a secret. The prop now counts as a name; a token-shaped value is still caught.
 
 - **A marketplace of your own.** A kept mod's menu on New Mod, From Claude has **Publish to Marketplace…**: pick a git clone of your own marketplace repo once, and Sanduhr writes the mod under `plugins/`, adds it to `.claude-plugin/marketplace.json` and the README's plugin list, then commits and pushes after a confirm that says what changes and where. Any machine adds the repo once with `claude plugin marketplace add owner/repo` and installs each mod by name. A clone with changes not committed, off a branch or without an origin is refused; a file that looks like a secret refuses the publish, and a watch word is named in the confirm. A push that fails keeps the commit and says why.
