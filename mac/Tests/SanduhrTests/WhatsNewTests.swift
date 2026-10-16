@@ -156,9 +156,10 @@ struct WhatsNewTableTests {
     }
 
     @Test func releasesSinceTwoFour() {
-        let releases: Set<String> = ["2.4.0", "2.5.0", "2.6.0", "2.7.0", "2.8.0", "2.9.0", "2.10.0", "2.11.0", "2.12.0", "2.13.0", "2.14.0", "2.15.0", "2.16.0", "2.17.0", "2.18.0", "2.19.0", "2.20.0", "2.21.0", "2.22.0"]
+        let releases: Set<String> = ["2.4.0", "2.5.0", "2.6.0", "2.7.0", "2.8.0", "2.9.0", "2.10.0", "2.11.0", "2.12.0", "2.13.0", "2.14.0", "2.15.0", "2.16.0", "2.17.0", "2.18.0", "2.19.0", "2.20.0", "2.21.0", "2.22.0", "2.23.0"]
         #expect(Set(table.map(\.version)) == releases)
-        #expect(table.count == 50)
+        #expect(table.count == 51)
+        #expect(table.filter { $0.version == "2.23.0" }.map(\.id) == ["watch-words"])
         #expect(table.filter { $0.version == "2.22.0" }.map(\.id) == ["any-agent"])
         #expect(table.filter { $0.version == "2.21.0" }.map(\.id) == ["share-mod", "config-pack", "try-proposal"])
         #expect(table.filter { $0.version == "2.20.0" }.map(\.id) == ["new-mod", "mod-studio", "compact-catalog", "notch-keeps-settings"])
@@ -208,7 +209,7 @@ struct WhatsNewTableTests {
     @Test func showMeLandsOnTheRightPage() {
         let dest = Dictionary(uniqueKeysWithValues: table.map { ($0.id, $0.destination) })
         #expect(dest == [
-            "any-agent": .mods,
+            "watch-words": .mods, "any-agent": .mods,
             "share-mod": .mods, "config-pack": .mods, "try-proposal": .mods,
             "new-mod": .mods, "mod-studio": .mods, "compact-catalog": .mods, "notch-keeps-settings": .notch,
             "account-folder": .credentials, "seat-statusline": .mods, "hide-hourglass": .general,
@@ -338,5 +339,11 @@ struct WhatsNewTableTests {
         let fromTwoTwentyOne = WhatsNew.cards(lastSeen: "2.21.0", current: "2.22.0")
         #expect(fromTwoTwentyOne.map(\.id) == ["any-agent"])
         #expect(WhatsNew.rangeLabel(fromTwoTwentyOne, lastSeen: "2.21.0", current: "2.22.0") == "New in 2.22.0")
+    }
+
+    @Test func updatingToTwoTwentyThree() {
+        let fromTwoTwentyTwo = WhatsNew.cards(lastSeen: "2.22.0", current: "2.23.0")
+        #expect(fromTwoTwentyTwo.map(\.id) == ["watch-words"])
+        #expect(WhatsNew.rangeLabel(fromTwoTwentyTwo, lastSeen: "2.22.0", current: "2.23.0") == "New in 2.23.0")
     }
 }

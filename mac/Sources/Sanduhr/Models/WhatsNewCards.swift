@@ -7,8 +7,16 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2230: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.23.0", id: "watch-words",
+            title: "Watch words for work",
+            body: "List the names that mean work. Export Config flags a work folder's rows that hold one and leaves them out unless you check them.",
+            art: .symbol("eye.trianglebadge.exclamationmark"), destination: .mods),
+    ]
 
     static let release2220: [WhatsNewCard] = [
         WhatsNewCard(
