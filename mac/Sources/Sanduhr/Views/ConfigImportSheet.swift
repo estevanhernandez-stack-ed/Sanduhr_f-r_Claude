@@ -228,36 +228,7 @@ struct ConfigImportSheet: View {
             Text("\(state.fileName), made by \(state.pack.manifest["created_by"] as? String ?? "Sanduhr").")
                 .font(.caption).foregroundStyle(.secondary)
             if state.done == nil {
-                Picker("Into", selection: Binding(get: { state.seat }, set: { pick($0) })) {
-                    if !state.hasSeat { Text("Choose a folder…").tag("") }
-                    ForEach(model.pickerSeats(demo: demo)) { s in
-                        Text(s.label + (s.isWork ? " (work)" : "") + "  " + model.display(s.path)).tag(s.path)
-                    }
-                    if let other { Text(model.display(other)).tag(other) }
-                    Divider()
-                    Text("Other Folder…").tag(Self.otherTag)
-                }
-                .frame(maxWidth: 420)
-                Text("Only what this folder doesn't have yet can be brought over. What it has, the same or its own, stays as it is. Plugins and MCP servers are shown as the commands to run.")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                if seat?.isWork == true {
-                    Text("This is a folder marked work.").font(.caption.weight(.semibold)).foregroundStyle(.orange)
-                }
-                if crossesFromWork {
-                    Text("This pack comes from a folder marked work, and this one isn't. Check it carries nothing that names work: people, products, endpoints, internal repos.")
-                        .font(.caption.weight(.semibold)).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
-                }
-                if FileManager.default.fileExists(atPath: (state.seat as NSString).appendingPathComponent(".git")) {
-                    Text("This folder is a git clone: its next sync commits what the import writes.")
-                        .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
-                }
-                if state.hasSeat {
-                    rowList
-                } else {
-                    Text("Choose the folder to open it into. Nothing is written until you press Import and confirm.")
-                        .font(.callout).frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
-                }
-                footer
+                choosing
             } else {
                 result
             }
@@ -272,12 +243,55 @@ struct ConfigImportSheet: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Into \(seat?.label ?? "this folder"), \(model.display(state.seat))" + (seat?.isWork == true ? ", a folder marked work" : "") + ". "
-                 + (crossesFromWork ? "The pack comes from a folder marked work. " : "")
-                 + "Sanduhr writes the files and settings this folder lacks"
-                 + (cliCount > 0 ? ", and runs claude to put in \(cliCount == 1 ? "a plugin or MCP server" : "\(cliCount) plugins and MCP servers"), which can fetch from the network" : "")
-                 + ". It records them so Undo Import can take them back.")
+            Text(confirmMessage)
         }
+    }
+
+    /// Before Import: the folder picker, its notes, the rows and the footer. Apart from `body`
+    /// so the compiler checks each in reasonable time.
+    @ViewBuilder private var choosing: some View {
+        Picker("Into", selection: Binding(get: { state.seat }, set: { pick($0) })) {
+            if !state.hasSeat { Text("Choose a folder…").tag("") }
+            ForEach(model.pickerSeats(demo: demo)) { s in
+                Text(s.label + (s.isWork ? " (work)" : "") + "  " + model.display(s.path)).tag(s.path)
+            }
+            if let other { Text(model.display(other)).tag(other) }
+            Divider()
+            Text("Other Folder…").tag(Self.otherTag)
+        }
+        .frame(maxWidth: 420)
+        Text("Only what this folder doesn't have yet can be brought over. What it has, the same or its own, stays as it is. Plugins and MCP servers are shown as the commands to run.")
+            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        if seat?.isWork == true {
+            Text("This is a folder marked work.").font(.caption.weight(.semibold)).foregroundStyle(.orange)
+        }
+        if crossesFromWork {
+            Text("This pack comes from a folder marked work, and this one isn't. Check it carries nothing that names work: people, products, endpoints, internal repos.")
+                .font(.caption.weight(.semibold)).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+        }
+        if FileManager.default.fileExists(atPath: (state.seat as NSString).appendingPathComponent(".git")) {
+            Text("This folder is a git clone: its next sync commits what the import writes.")
+                .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+        }
+        if state.hasSeat {
+            rowList
+        } else {
+            Text("Choose the folder to open it into. Nothing is written until you press Import and confirm.")
+                .font(.callout).frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
+        }
+        footer
+    }
+
+    private var confirmMessage: String {
+        var text = "Into \(seat?.label ?? "this folder"), \(model.display(state.seat))"
+        if seat?.isWork == true { text += ", a folder marked work" }
+        text += ". "
+        if crossesFromWork { text += "The pack comes from a folder marked work. " }
+        text += "Sanduhr writes the files and settings this folder lacks"
+        if cliCount > 0 {
+            text += ", and runs claude to put in " + (cliCount == 1 ? "a plugin or MCP server" : "\(cliCount) plugins and MCP servers") + ", which can fetch from the network"
+        }
+        return text + ". It records them so Undo Import can take them back."
     }
 
     /// A pack stamped as from work, opened into a folder that isn't marked work.
