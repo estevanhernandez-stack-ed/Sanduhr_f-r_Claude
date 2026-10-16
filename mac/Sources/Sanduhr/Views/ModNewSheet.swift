@@ -22,6 +22,16 @@ struct SessionModRow: Identifiable, Equatable, Sendable {
     var id: String { item.id }
 }
 
+/// A publish waiting on its confirm (item 76, slice F).
+struct MarketplacePublish: Identifiable, Equatable {
+    let mod: KeptMod
+    let folder: URL
+    let gitPath: String
+    let plan: ModMarketplace.Plan
+
+    var id: String { mod.id }
+}
+
 /// Slice F: finding mods made in sessions, keeping them, checking and trying the kept copies.
 extension ModsPageModel {
     /// Every folder's session mods, read again with what is kept. In demo mode no work folder's.
@@ -235,6 +245,68 @@ extension ModsPageModel {
         }
     }
 
+    /// Publish (item 76, slice F): reads the remembered clone (asking for one the first time, or
+    /// when `choose`), then plans publishing `mod` into it. The confirm shows the plan.
+    func preparePublish(_ mod: KeptMod, choose: Bool = false) async {
+        publishedCommands = nil
+        guard let gitPath = ModMarketplace.findGit() else { keptNote = ModMarketplace.Failure.noGit.message; return }
+        var folder = UserDefaults.standard.string(forKey: ModMarketplace.folderKey).map { URL(fileURLWithPath: $0) }
+        var isDir: ObjCBool = false
+        if choose || folder.map({ !FileManager.default.fileExists(atPath: $0.path, isDirectory: &isDir) || !isDir.boolValue }) ?? true {
+            guard let picked = askMarketplaceFolder(folder) else { return }
+            folder = picked
+        }
+        guard let folder else { return }
+        let market = ModMarketplace(folder: folder, gitPath: gitPath)
+        let kept = URL(fileURLWithPath: keptStore.path(mod))
+        let words = WatchWords.standard.all()
+        keptBusy.insert(mod.id)
+        let result = await Task.detached(priority: .userInitiated) {
+            Result { try market.plan(mod, kept: kept, repo: try market.inspect(), watchWords: words) }
+        }.value
+        keptBusy.remove(mod.id)
+        switch result {
+        case .success(let plan):
+            UserDefaults.standard.set(folder.path, forKey: ModMarketplace.folderKey)
+            publishing = MarketplacePublish(mod: mod, folder: folder, gitPath: gitPath, plan: plan)
+        case .failure(let error):
+            keptNote = (error as? ModMarketplace.Failure)?.message ?? ModMarketplace.Failure.notAClone.message
+        }
+    }
+
+    /// Writes, commits and pushes what the confirm showed.
+    func publish(_ request: MarketplacePublish) async {
+        let market = ModMarketplace(folder: request.folder, gitPath: request.gitPath)
+        let kept = URL(fileURLWithPath: keptStore.path(request.mod))
+        let (mod, plan) = (request.mod, request.plan)
+        keptBusy.insert(mod.id)
+        let result = await Task.detached(priority: .userInitiated) {
+            Result { try market.publish(mod, kept: kept, plan: plan) }
+        }.value
+        keptBusy.remove(mod.id)
+        switch result {
+        case .success(let outcome) where outcome.pushFailure == nil:
+            keptNote = "Published \(mod.name) to \(plan.repo.source) (\(plan.repo.branch), \(outcome.commit)). On another machine, add it with the commands below."
+            publishedCommands = plan.commands
+        case .success(let outcome):
+            keptNote = "Committed \(mod.name) as \(outcome.commit) in \(request.folder.lastPathComponent), but the push didn't go through: \(outcome.pushFailure ?? ""). Push from Terminal with git push."
+        case .failure(let error):
+            keptNote = (error as? ModMarketplace.Failure)?.message ?? ModMarketplace.Failure.writeFailed.message
+        }
+    }
+
+    private func askMarketplaceFolder(_ current: URL?) -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Use This Clone"
+        panel.message = "Choose the folder of a git clone of your marketplace repo. Sanduhr writes plugins/ and .claude-plugin/marketplace.json in it, commits, and pushes when you confirm."
+        panel.directoryURL = current ?? FileManager.default.homeDirectoryForCurrentUser
+        guard panel.runModal() == .OK else { return nil }
+        return panel.url
+    }
+
     /// Asks for the folder Try starts in, then tries there.
     func chooseTryFolder(_ mod: KeptMod) {
         guard let url = askTryFolder(mod.name) else { return }
@@ -436,12 +508,52 @@ struct NewModSheet: View {
         } message: {
             Text("Deletes Sanduhr's copy. The session's own folder is left as it is, until Claude Code cleans it up.")
         }
+        .alert("Publish \(model.publishing?.mod.name ?? "the mod") to \(model.publishing?.plan.repo.source ?? "your marketplace")?",
+               isPresented: Binding(get: { model.publishing != nil }, set: { if !$0 { model.publishing = nil } })) {
+            if model.publishing?.plan.canPublish == true {
+                Button("Publish") { if let r = model.publishing { Task { await model.publish(r) } } }
+            }
+            Button("Choose Another Clone…") {
+                if let m = model.publishing?.mod { DispatchQueue.main.async { Task { await model.preparePublish(m, choose: true) } } }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(publishMessage)
+        }
         .alert("Export \(exporting?.name ?? "the mod")?", isPresented: Binding(get: { exporting != nil }, set: { if !$0 { exporting = nil } })) {
             Button("Export…") { if let m = exporting { DispatchQueue.main.async { Task { await model.exportKept(m) } } } }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(exportMessage)
         }
+    }
+
+    private func publishedLine(_ commands: String) -> some View {
+        HStack(alignment: .top) {
+            Text(commands).font(.caption.monospaced()).textSelection(.enabled)
+            Spacer()
+            Button("Copy") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(commands, forType: .string)
+            }
+            .controlSize(.small)
+        }
+    }
+
+    private var publishMessage: String {
+        guard let p = model.publishing?.plan else { return "" }
+        let size = ByteCountFormatter.string(fromByteCount: Int64(p.bytes), countStyle: .file)
+        let what = "\(p.mod)\(p.version.map { " " + $0 } ?? "")"
+        var lines: [String] = []
+        switch p.change {
+        case .same: lines.append("The marketplace already has these files for \(p.mod). Nothing to publish.")
+        case .add: lines.append("Adds \(what) as plugins/\(p.mod) (\(p.files) \(p.files == 1 ? "file" : "files"), \(size)) to the \(p.repo.name) marketplace, commits on \(p.repo.branch), and pushes to \(p.repo.source).")
+        case .update(let old): lines.append("Replaces plugins/\(p.mod)\(old.map { " (" + $0 + ")" } ?? "") with \(what) (\(p.files) \(p.files == 1 ? "file" : "files"), \(size)), commits on \(p.repo.branch), and pushes to \(p.repo.source).")
+        }
+        if let s = p.secret { lines.append("Refused: \(s) looks like a secret. Edit the mod and keep it again.") }
+        if !p.watched.isEmpty { lines.append("It holds a watch word: \(p.watched.joined(separator: ", ")). Anyone who can read the repo reads it.") }
+        if p.canPublish { lines.append("The marketplace's list and the README's plugin list change with it. Everyone who can read the repo can read every file. Nothing from your Claude Code folders goes: no settings, no paths.") }
+        return lines.joined(separator: "\n\n")
     }
 
     private var exportMessage: String {
@@ -521,6 +633,7 @@ struct NewModSheet: View {
         if let note = model.keptNote {
             Text(note).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
         }
+        if let commands = model.publishedCommands { publishedLine(commands) }
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 if !proposals.pendingFromFiles.isEmpty {
@@ -612,6 +725,8 @@ struct NewModSheet: View {
                     }
                     Button("Export…") { exporting = mod }
                         .help("Writes a .sanduhrpack to share it with another Mac or person.")
+                    Button("Publish to Marketplace…") { Task { await model.preparePublish(mod) } }
+                        .help("Commits it to a git clone of your own marketplace repo and pushes, after you confirm. Any machine adds the repo once with claude plugin marketplace add.")
                     Divider()
                     Button("Forget…", role: .destructive) { forgetting = mod }
                 } label: {

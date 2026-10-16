@@ -17,6 +17,11 @@ struct WatchWords {
         load().seats[AccountData.normalized(seat)] ?? []
     }
 
+    /// Every seat's words, once each: a kept mod belongs to no seat, so all of them apply.
+    func all() -> [String] {
+        Self.parse(load().seats.keys.sorted().flatMap { load().seats[$0] ?? [] }.joined(separator: "\n"))
+    }
+
     func set(_ words: [String], for seat: String) {
         var file = load()
         let clean = Self.parse(words.joined(separator: "\n"))
