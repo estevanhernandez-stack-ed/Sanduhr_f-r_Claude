@@ -447,7 +447,7 @@ struct NewModSheet: View {
         .onAppear { way = model.newModWay }
         .task { await model.refreshKept() }
         .alert(approveTitle, isPresented: Binding(get: { approving != nil }, set: { if !$0 { approving = nil; typedName = "" } })) {
-            if needsTypedName { TextField("The mod's name", text: $typedName) }
+            if needsTypedName { TextField(approving?.name ?? "The mod's name", text: $typedName) }
             Button("Keep It") {
                 if let r = approving { Task { await model.approve(r, store: proposals) } }
                 typedName = ""
@@ -472,7 +472,7 @@ struct NewModSheet: View {
         .alert("Try \(tryingProposal?.name ?? "the mod") before keeping it?",
                isPresented: Binding(get: { tryingProposal != nil }, set: { if !$0 { tryingProposal = nil; tryTypedName = "" } })) {
             let blocked = tryNeedsTypedName && tryTypedName != tryingProposal?.name
-            if tryNeedsTypedName { TextField("The mod's name", text: $tryTypedName) }
+            if tryNeedsTypedName { TextField(tryingProposal?.name ?? "The mod's name", text: $tryTypedName) }
             if let last = model.lastTryFolder {
                 Button("Try in \(last.lastPathComponent)") { if let r = tryingProposal { model.tryProposal(r, store: proposals, in: last) } }
                     .disabled(blocked)
@@ -864,11 +864,11 @@ struct NewModSheet: View {
         let seat = proposals.folderPath(r).map { "with \(($0 as NSString).lastPathComponent), the Claude Code folder whose session proposed it" }
             ?? model.packFolder(r).map { "with \(($0 as NSString).lastPathComponent), your first Claude Code folder not marked work" }
             ?? "with Claude Code's default folder (.claude)"
-        var lines = ["Opens Terminal and starts Claude Code \(seat), with \(r.name) loaded for that session only, in a folder you choose or a new empty one. The mod's code runs there with your permissions. It stays a proposal: trying keeps nothing and turns it on nowhere."]
+        var lines = tryNeedsTypedName ? ["To try it, type \(r.name) below."] : []
+        lines.append("Opens Terminal and starts Claude Code \(seat), with \(r.name) loaded for that session only, in a folder you choose or a new empty one. The mod's code runs there with your permissions. It stays a proposal: trying keeps nothing and turns it on nowhere.")
         if case .report(let report)? = model.proposalChecks[r.id] {
             lines.append("\(report.risk.title): \(report.reasons.joined(separator: " "))")
         }
-        if tryNeedsTypedName { lines.append("Type \(r.name) to try it.") }
         return lines.joined(separator: "\n\n")
     }
 
@@ -876,11 +876,11 @@ struct NewModSheet: View {
 
     private var approveMessage: String {
         guard let r = approving else { return "" }
-        var lines = ["It joins your kept mods. No Claude Code folder loads it until you turn it on there, which asks again."]
+        var lines = needsTypedName ? ["To keep it, type \(r.name) below."] : []
+        lines.append("It joins your kept mods. No Claude Code folder loads it until you turn it on there, which asks again.")
         if case .report(let report)? = model.proposalChecks[r.id] {
             lines.append("\(report.risk.title): \(report.reasons.joined(separator: " "))")
         }
-        if needsTypedName { lines.append("Type \(r.name) to keep it.") }
         return lines.joined(separator: "\n\n")
     }
 
