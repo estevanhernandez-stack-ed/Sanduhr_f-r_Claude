@@ -7,8 +7,26 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2210: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.21.0", id: "share-mod",
+            title: "Share a mod",
+            body: "Export a kept mod to one pack file. Opened on another Mac, it waits for Check and Try before it runs.",
+            art: .symbol("shippingbox"), destination: .mods),
+        WhatsNewCard(
+            version: "2.21.0", id: "config-pack",
+            title: "Carry a Claude Code config",
+            body: "Export Config on By Seat packs a folder's agents, skills, plugins, MCP servers and settings, never a secret value. Open it into another folder, with Undo Import to take it back.",
+            art: .symbol("square.and.arrow.up.on.square"), destination: .mods),
+        WhatsNewCard(
+            version: "2.21.0", id: "try-proposal",
+            title: "Try a proposed mod",
+            body: "A mod Claude proposed can run in one session once Check passes, before you keep it.",
+            art: .symbol("play.rectangle"), destination: .mods),
+    ]
 
     static let release2200: [WhatsNewCard] = [
         WhatsNewCard(
