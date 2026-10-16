@@ -7,8 +7,16 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2220: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.22.0", id: "any-agent",
+            title: "A config for any coding agent",
+            body: "Export Config can add a folder for Codex, Gemini CLI, Cursor and VS Code: your skills, agents and commands as skills, an AGENTS.md, and MCP servers in each one's format.",
+            art: .symbol("person.2.badge.gearshape"), destination: .mods),
+    ]
 
     static let release2210: [WhatsNewCard] = [
         WhatsNewCard(
