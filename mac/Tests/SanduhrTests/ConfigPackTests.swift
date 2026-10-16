@@ -67,6 +67,10 @@ struct ConfigPackTests {
         // A sha256 is hex: long, but not random enough to be a secret here.
         #expect(ConfigPack.secretLine(in: "sha256 9a7ab340200de9091165f11bd8d6a285f8ddc8fc227ab03a6d5b52a132ab2215") == nil)
         #expect(ConfigPack.secretLine(in: "Read the diff and say what changed.\nKeep it short.") == nil)
+        // React's key prop is a name, in a mod's .tsx; a token-shaped value there still counts.
+        #expect(ConfigPack.secretLine(in: "<Box key={`l${i}`} flexDirection=\"row\">\n<Text key=\"below\">x</Text>") == nil)
+        #expect(ConfigPack.secretLine(in: "<Box key=\"sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123\">") == 1)
+        #expect(ConfigPack.secretLine(in: "export key=hunter2") == 1)
     }
 
     @Test func pathsUnderHomeTravelAndOthersDont() {
