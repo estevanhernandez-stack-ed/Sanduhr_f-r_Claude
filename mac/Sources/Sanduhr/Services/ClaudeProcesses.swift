@@ -95,11 +95,12 @@ enum ClaudeProcesses {
 
     /// The running Claude Code processes of this user, with their seats, and how many processes
     /// couldn't be read (a careful caller treats any of those as "a session may be running").
+    /// A `claude` Sanduhr started itself (the CLI runner's) is not a session.
     static func running(home: String = NSHomeDirectory()) -> (sessions: [Running], unreadable: Int) {
         var sessions: [Running] = []
         var unreadable = 0
         let me = getpid()
-        for pid in allPIDs() where pid > 0 && pid != me {
+        for pid in allPIDs() where pid > 0 && pid != me && parent(of: pid) != me {
             guard let buffer = procargs(pid) else {
                 if ownedByMe(pid) { unreadable += 1 }
                 continue
@@ -132,6 +133,13 @@ enum ClaudeProcesses {
         let ok = buffer.withUnsafeMutableBytes { sysctl(&mib, 3, $0.baseAddress, &length, nil, 0) } == 0
         guard ok, length > 0 else { return nil }
         return Array(buffer.prefix(length))
+    }
+
+    private static func parent(of pid: Int32) -> Int32? {
+        var info = proc_bsdshortinfo()
+        let size = Int32(MemoryLayout<proc_bsdshortinfo>.size)
+        guard proc_pidinfo(pid, PROC_PIDT_SHORTBSDINFO, 0, &info, size) == size else { return nil }
+        return Int32(bitPattern: info.pbsi_ppid)
     }
 
     private static func ownedByMe(_ pid: Int32) -> Bool {

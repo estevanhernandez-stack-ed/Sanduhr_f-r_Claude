@@ -148,5 +148,18 @@ struct ConfigPackTests {
         for leak in [h.at(""), "ghp_secret", "s3cr3t", "Bearer abc123", "sk-ant-api03", "someone@example.com", "/Volumes/Work", "sanduhr_mcp", ".claude-personal"] {
             #expect(!everything.contains(leak), "the pack holds \(leak)")
         }
+        #expect(manifest["from"] == nil)
+    }
+
+    @Test func aPackFromAWorkFolderSaysSo() throws {
+        let h = TempHome()
+        defer { h.cleanUp() }
+        let (root, scan) = seat(h)
+        let items = ConfigPack.plan(seat: root, scan: scan, keptOn: [], kept: KeptMods(dir: URL(fileURLWithPath: h.at("support/mods"))), home: h.at(""))
+        let work = URL(fileURLWithPath: h.at("work.sanduhrpack")), personal = URL(fileURLWithPath: h.at("personal.sanduhrpack"))
+        try ConfigPack.write(items, label: "Work", to: work, version: "2.21.0", now: Self.at, fromWork: true)
+        try ConfigPack.write(items, label: "Personal", to: personal, version: "2.21.0", now: Self.at)
+        #expect(try ModPackReader.read(work).fromWork)
+        #expect(try !ModPackReader.read(personal).fromWork)
     }
 }
