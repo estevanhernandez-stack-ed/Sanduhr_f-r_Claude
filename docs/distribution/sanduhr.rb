@@ -1,6 +1,6 @@
 cask "sanduhr" do
-  version "2.20.0"
-  sha256 "7f0de9db5139e4214052babe4bf415597109e1bedb6607bc81fd0d90d7884888"
+  version "2.21.0"
+  sha256 "f2de5f57fca240c3628679b80382885619a8f71c3151ff4133e64f858206719a"
 
   url "https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/download/v#{version}-mac/Sanduhr-#{version}.dmg"
   name "Sanduhr für Claude"

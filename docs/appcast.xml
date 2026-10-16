@@ -6,6 +6,14 @@
         <description>Updates for Sanduhr für Claude</description>
         <language>en</language>
         <item>
+            <title>2.21.0</title>
+            <pubDate>Fri, 16 Oct 2026 01:24:25 -0000</pubDate>
+            <sparkle:version>29</sparkle:version>
+            <sparkle:shortVersionString>2.21.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/download/v2.21.0-mac/Sanduhr-2.21.0.dmg" length="13682674" type="application/octet-stream" sparkle:edSignature="Fd4FKnq3U3OQKcC90LsSBNGW4D3B+vbzrUtlEEDO9PScUSSRWqiOe7uLV525iEpWzhh8rhQSgkBIHGLMRlgVBw=="/>
+        </item>
+        <item>
             <title>2.20.0</title>
             <pubDate>Wed, 14 Oct 2026 21:43:28 -0000</pubDate>
             <sparkle:version>28</sparkle:version>
