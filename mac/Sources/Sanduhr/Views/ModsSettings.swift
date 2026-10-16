@@ -240,6 +240,10 @@ final class ModsPageModel {
     var keptChecks: [String: ModCheckOutcome] = [:]
     var keptBusy: Set<String> = []
     var keptNote: String?
+    /// Publish to a marketplace of your own (item 76, slice F): the confirm while open, and the
+    /// commands that add the last one published on another machine.
+    var publishing: MarketplacePublish?
+    var publishedCommands: String?
     var keptStore = KeptMods.standard
     /// Each kept mod's state per folder (slice F2), by mod id then folder.
     var keptStates: [String: [String: KeptModState]] = [:]
