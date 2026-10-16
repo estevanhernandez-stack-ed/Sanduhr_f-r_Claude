@@ -41,6 +41,8 @@ enum ConfigPack {
         var blocked: String?
         /// Checked when the sheet opens.
         var onByDefault = true
+        /// The seat's watch words it holds (a work seat's, `WatchWords`): shown, and unchecked.
+        var watched: [String] = []
 
         var id: String { kind.rawValue + "/" + name }
         var canTravel: Bool { blocked == nil }

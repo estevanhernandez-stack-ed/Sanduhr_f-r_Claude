@@ -7,6 +7,8 @@ struct ConfigExportState: Identifiable {
     let label: String
     /// A folder marked work: the pack is stamped so, and the sheet says who can read it.
     var isWork = false
+    /// A work seat's watch words, on this Mac only (`WatchWords`).
+    var words: [String] = []
     /// Adds `any-agent/`, the same rows for other coding agents (slice H). On by default.
     var forOtherAgents = true
     var items: [ConfigPack.Item]
@@ -21,11 +23,21 @@ extension ModsPageModel {
         await refreshKept()
         let on = kept.filter { keptState($0, folder: seat.path) == .on }
         let store = keptStore
+        let words = seat.isWork ? WatchWords.standard.words(for: seat.path) : []
         let items = await Task.detached(priority: .userInitiated) {
-            ConfigPack.plan(seat: seat.path, scan: scan, keptOn: on, kept: store)
+            WatchWords.flag(ConfigPack.plan(seat: seat.path, scan: scan, keptOn: on, kept: store), words: words)
         }.value
-        configExport = ConfigExportState(seat: seat.path, label: seat.label, isWork: seat.isWork, items: items,
+        configExport = ConfigExportState(seat: seat.path, label: seat.label, isWork: seat.isWork, words: words, items: items,
                                          chosen: Set(items.filter { $0.canTravel && $0.onByDefault }.map(\.id)))
+    }
+
+    /// Keeps `words` for the seat and flags its rows again: a row newly holding one is unchecked.
+    func saveWatchWords(_ words: [String], state: inout ConfigExportState) {
+        WatchWords.standard.set(words, for: state.seat)
+        state.words = WatchWords.parse(words.joined(separator: "\n"))
+        let before = Set(state.items.filter { !$0.watched.isEmpty }.map(\.id))
+        state.items = WatchWords.flag(state.items, words: state.words)
+        for item in state.items where !item.watched.isEmpty && !before.contains(item.id) { state.chosen.remove(item.id) }
     }
 
     /// Asks where, then writes the chosen rows.
@@ -54,6 +66,8 @@ struct ConfigExportSheet: View {
     var model: ModsPageModel
     @State var state: ConfigExportState
     let close: () -> Void
+    @State private var editingWords = false
+    @State private var draft = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -64,6 +78,7 @@ struct ConfigExportSheet: View {
                 Text("This folder is marked work. The pack is stamped as from work, and opening it into a folder not marked work warns first. Leave out anything that names work: people, products, endpoints, internal repos.")
                     .font(.caption.weight(.semibold)).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
             }
+            if state.isWork { watchWords }
             Text("Never in a pack: environment variable values, MCP header and env values, sign-in, .claude.json, transcripts, memory, plugin caches, or Sanduhr's own statusline, hooks, MCP server and meters mod.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             ScrollView {
@@ -101,6 +116,40 @@ struct ConfigExportSheet: View {
         .frame(width: 620)
     }
 
+    /// A work seat's watch words: how many rows hold one, and the list to edit, with names
+    /// suggested from the seat's own rows. All of it stays on this Mac.
+    @ViewBuilder private var watchWords: some View {
+        let flagged = state.items.filter { !$0.watched.isEmpty }.count
+        HStack(spacing: 8) {
+            Text(state.words.isEmpty ? "No watch words yet." : "Watch words: \(state.words.count), held by \(flagged) \(flagged == 1 ? "row" : "rows").")
+                .font(.caption)
+            Button(editingWords ? "Done" : "Watch Words…") {
+                if editingWords { model.saveWatchWords(WatchWords.parse(draft), state: &state) } else { draft = state.words.joined(separator: ", ") }
+                editingWords.toggle()
+            }
+            .controlSize(.small)
+            .help("Names that mean work: the company, products, people. A row holding one is flagged and unchecked. Kept on this Mac only, never in a pack.")
+        }
+        if editingWords {
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("Names, separated by commas", text: $draft, axis: .vertical)
+                    .lineLimit(2...4)
+                let had = WatchWords.parse(draft)
+                let ideas = WatchWords.suggest(state.items, known: had)
+                if !ideas.isEmpty {
+                    Text("Names this folder uses that aren't ordinary words. Click to add.").font(.caption).foregroundStyle(.secondary)
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 4) {
+                            ForEach(ideas, id: \.self) { word in
+                                Button(word) { draft = (had + [word]).joined(separator: ", ") }.controlSize(.small)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// The any-agent/ switch and what it adds, or why it can't this time.
     @ViewBuilder private var otherAgents: some View {
         let extra = ConfigPack.anyAgentFiles(state.items.filter { state.chosen.contains($0.id) })
@@ -128,6 +177,10 @@ struct ConfigExportSheet: View {
                 }
             }
             .disabled(!item.canTravel)
+            if !item.watched.isEmpty {
+                Text("Names work: " + item.watched.joined(separator: ", ")).font(.caption).foregroundStyle(.orange).padding(.leading, 20)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let why = item.blocked {
                 Text(why).font(.caption).foregroundStyle(.orange).padding(.leading, 20)
                     .fixedSize(horizontal: false, vertical: true)
