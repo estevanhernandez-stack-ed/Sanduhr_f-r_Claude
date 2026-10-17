@@ -131,6 +131,9 @@ private struct NowPlayingAppsSection: View {
 private struct NowPlayingAskSection: View {
     @AppStorage(NowPlayingPrefs.askAppsKey, store: .desk) private var askApps = false
 
+    /// System Settings, Privacy & Security, Automation.
+    static let automationSettings = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!
+
     var body: some View {
         Section("When the system now playing is unavailable") {
             Toggle("Ask Music and Spotify directly", isOn: $askApps)
@@ -138,6 +141,21 @@ private struct NowPlayingAskSection: View {
             Text("If macOS stops sharing what plays, Sanduhr falls back to the notices Music and Spotify send on each change (no browsers, no permission needed). This switch also asks them for their track when the fallback starts, so it shows before the next change. macOS asks once per app whether Sanduhr may control Music or Spotify; Sanduhr only reads what's playing, and only from an app that is already open.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if NowPlayingController.shared.automationDenied { deniedRow }
+        }
+    }
+
+    /// The Automation permission was declined or reset (NowPlayingController.automationDenied),
+    /// in the Accessibility row's shape.
+    private var deniedRow: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("macOS is not letting Sanduhr ask Music or Spotify. Allow Sanduhr under Automation in System Settings, then try again.")
+                .font(.caption).foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button("Open System Settings…") { NSWorkspace.shared.open(Self.automationSettings) }
+                .controlSize(.small)
+                .accessibilityLabel("Open Automation in System Settings, to let Sanduhr ask Music and Spotify")
         }
     }
 }

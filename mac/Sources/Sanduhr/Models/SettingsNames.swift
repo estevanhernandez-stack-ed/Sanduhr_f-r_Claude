@@ -115,8 +115,8 @@ enum SettingsNames {
 
     /// Every "<Page> Settings…" in `text` whose page is not a sidebar title, empty when each one
     /// names a real page. The page is the run of capitalized words (and "&") right before
-    /// " Settings…"; "Settings…" alone, "All Settings…", macOS's "System Settings…" and a
-    /// placeholder such as "<Page>" pass.
+    /// " Settings…"; "Settings…" alone, "All Settings…", macOS's "System Settings…" (with a verb
+    /// before it, "Open System Settings…") and a placeholder such as "<Page>" pass.
     static func unknownLinks(in text: String) -> [String] {
         let suffix = " Settings…"
         var out: [String] = []
@@ -131,7 +131,7 @@ enum SettingsNames {
                 if core.count != word.count { break }
             }
             let title = words.joined(separator: " ") + suffix
-            if !words.isEmpty, words != ["All"], words != ["System"], SettingsSection.linked(title) == nil { out.append(title) }
+            if !words.isEmpty, words != ["All"], words.last != "System", SettingsSection.linked(title) == nil { out.append(title) }
             rest = rest[r.upperBound...]
         }
         return out

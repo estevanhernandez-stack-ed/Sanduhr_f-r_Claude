@@ -438,6 +438,19 @@ enum NowPlayingFallback {
     }
 }
 
+/// macOS declining "Sanduhr wants to control Music" (or the permission reset): osascript exits 1
+/// and says so on stderr. Only the verdict leaves here; the text itself is never kept or logged.
+enum AutomationDenial {
+    static let phrase = "Not authorized to send Apple events"
+    /// errAEEventNotPermitted, as osascript prints it.
+    static let errorNumber = "-1743"
+
+    static func detect(exitCode: Int32, stderr: String) -> Bool {
+        guard exitCode == 1 else { return false }
+        return stderr.contains(phrase) || stderr.contains(errorNumber)
+    }
+}
+
 /// Settings' source line and state.yaml's `source`, from what the controller knows.
 enum NowPlayingStatus {
     static let notPlaced = "Not placed anywhere"

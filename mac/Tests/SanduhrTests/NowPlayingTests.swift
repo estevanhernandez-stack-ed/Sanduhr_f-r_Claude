@@ -269,6 +269,19 @@ struct NowPlayingFallbackTests {
         #expect(!NowPlayingFallback.script(for: NowPlayingFallback.music).contains("/ 1000"))
     }
 
+    /// A declined or reset Automation permission, as osascript reports it: exit 1 with the
+    /// phrase or the error number on stderr. Anything else is not a denial.
+    @Test func automationDenialIsExit1WithThePhraseOrTheNumber() {
+        let full = "execution error: Not authorized to send Apple events to Music. (-1743)\n"
+        #expect(AutomationDenial.detect(exitCode: 1, stderr: full))
+        #expect(AutomationDenial.detect(exitCode: 1, stderr: "Not authorized to send Apple events to Spotify."))
+        #expect(AutomationDenial.detect(exitCode: 1, stderr: "execution error: An error occurred. (-1743)"))
+        #expect(!AutomationDenial.detect(exitCode: 1, stderr: "execution error: Music got an error: Can\u{2019}t get current track. (-1728)"))
+        #expect(!AutomationDenial.detect(exitCode: 1, stderr: ""))
+        #expect(!AutomationDenial.detect(exitCode: 0, stderr: full))
+        #expect(!AutomationDenial.detect(exitCode: 2, stderr: full))
+    }
+
     @Test func statusLines() {
         func text(_ s: NowPlayingSource, placed: Bool = true, desk: Bool = true, checking: Bool = false,
                   failed: Bool = false) -> String {
