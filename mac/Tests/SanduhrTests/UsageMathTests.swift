@@ -107,4 +107,33 @@ struct UsageMathTests {
         #expect(info.text.lowercased().contains("under"),
                 "expected 'under' in \(info.text)")
     }
+
+    // MARK: - calculateCooldown
+
+    @Test func cooldownIsNilWhenExactlyOnPace() {
+        // 2.5h remaining on a 5h window → 50% elapsed; 50% used → wait fraction 0 → nothing to cool.
+        let reset = now.addingTimeInterval(2.5 * 3600)
+        let iso = ISO8601DateFormatter().string(from: reset)
+        #expect(calculateCooldown(util: 50, iso: iso, tier: .fiveHour, now: now) == nil)
+        #expect(calculateCooldown(util: nil, iso: iso, tier: .fiveHour, now: now) == nil)
+    }
+
+    @Test func cooldownIsTheTimeUntilPaceCatchesUp() {
+        // 3.75h remaining on a 5h window → 25% elapsed; 75% used → 0.5 × 18000s = 9000s = 2h 30m.
+        let reset = now.addingTimeInterval(3.75 * 3600)
+        let iso = ISO8601DateFormatter().string(from: reset)
+        #expect(calculateCooldown(util: 75, iso: iso, tier: .fiveHour, now: now) == "2h 30m")
+
+        // Same fractions on the 7-day window → 0.5 × 604800s = 302400s = 3d 12h; a zero minute is left out.
+        let weeklyReset = now.addingTimeInterval(5.25 * 86400)
+        let weeklyISO = ISO8601DateFormatter().string(from: weeklyReset)
+        #expect(calculateCooldown(util: 75, iso: weeklyISO, tier: .sevenDay, now: now) == "3d 12h")
+    }
+
+    @Test func cooldownIsNilOncePastTheReset() {
+        // Reset an hour ago → elapsed clamps to 100%; even a full limit has nothing left to wait out.
+        let reset = now.addingTimeInterval(-3600)
+        let iso = ISO8601DateFormatter().string(from: reset)
+        #expect(calculateCooldown(util: 100, iso: iso, tier: .fiveHour, now: now) == nil)
+    }
 }

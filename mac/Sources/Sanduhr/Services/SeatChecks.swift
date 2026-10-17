@@ -418,20 +418,3 @@ enum SeatDriftCheck {
         return out
     }
 }
-
-/// Modification dates of every file under some folders, to prove a read changed nothing
-/// (item 71, slice 1b). Capped, so a huge seat stays quick.
-enum SeatMtimes {
-    static func snapshot(_ folders: [String], limit: Int = 50_000, fileManager fm: FileManager = .default) -> [String: Date] {
-        var out: [String: Date] = [:]
-        for folder in folders {
-            out[folder] = (try? fm.attributesOfItem(atPath: folder))?[.modificationDate] as? Date
-            guard let e = fm.enumerator(atPath: folder) else { continue }
-            while let rel = e.nextObject() as? String, out.count < limit {
-                let p = (folder as NSString).appendingPathComponent(rel)
-                out[p] = (try? fm.attributesOfItem(atPath: p))?[.modificationDate] as? Date
-            }
-        }
-        return out
-    }
-}
