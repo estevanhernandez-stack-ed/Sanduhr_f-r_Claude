@@ -191,7 +191,7 @@ enum SettingsPrecedence {
             return "\(path[1]) in a project's env is ignored."
         }
         if notFromSharedProject.contains(top), source == .projectShared {
-            return "\(top) in a shared project file is ignored; set it in the seat's own settings.json or settings.local.json."
+            return "\(top) in a shared project file is ignored; set it in the folder's own settings.json or settings.local.json."
         }
         if top == "remoteControlAtStartup", IntegrationInstaller.boolValue(value) == true {
             return "remoteControlAtStartup: true in a project file is ignored."
@@ -450,7 +450,7 @@ enum SettingsPrecedence {
             out.append("\(writes.count) Write(path) allow rule\(writes.count == 1 ? "" : "s") never match: only Edit(path) rules do.")
         }
         if fm.fileExists(atPath: (seat as NSString).appendingPathComponent("settings.local.json")) {
-            out.append("settings.local.json in the seat folder isn't read as user settings, so its hooks and permissions do nothing"
+            out.append("settings.local.json in the folder itself isn't read as user settings, so its hooks and permissions do nothing"
                        + (isDefault ? " (except in a session started in the home folder, where it may read as that folder's project file)." : "."))
         }
         let windows = windowsPaths(settings, path: [])
@@ -499,7 +499,7 @@ enum SettingsPrecedence {
 /// seat (a project folder in a permission rule, `additionalDirectories`, a hook command) is
 /// replaced, because a folder's name can name the work. Paths inside the seat stay.
 enum WallMask {
-    static let placeholder = "‹path outside the seat›"
+    static let placeholder = "‹path outside the folder›"
 
     static func redactPaths(_ value: Any, seat: String, home: String) -> Any {
         if let s = value as? String { return redact(s, seat: seat, home: home) }

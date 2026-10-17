@@ -198,7 +198,7 @@ enum SettingsAnchor {
                       synonyms: [IntegrationScripts.modName, "Sanduhr's own mod", "mod", "band", "bars", "animated",
                                  "Update", "Remove", "enabledPlugins"]),
         SettingsEntry(title: "Mods and plugins", page: .mods, anchor: inventory,
-                      synonyms: ["mods", "plugins", "Check", "risk", "Catalog", "By Seat", "marketplace", "skills", "agents",
+                      synonyms: ["mods", "plugins", "Check", "risk", "Catalog", SettingsNames.byFolder, "seat", "marketplace", "skills", "agents",
                                  "commands", "output styles", "MCP servers", "work", "personal", "label"]),
     ]
 
@@ -246,6 +246,7 @@ extension SettingsNames {
         deskSwitch: SettingsAnchor.desk, notchSwitch: SettingsAnchor.notch, notchGlow: SettingsAnchor.glow,
         cameraMicPlace: SettingsAnchor.cameraMic,
         claudeCodeGlowHook: SettingsAnchor.folders, metersAbovePrompt: SettingsAnchor.metersMod,
+        byFolder: SettingsAnchor.inventory,
         claudeMetersLine: SettingsAnchor.pieces, claudeMetersBars: SettingsAnchor.pieces,
         watchersOnNotch: SettingsAnchor.whereTheyShow, watchersOnDesk: SettingsAnchor.whereTheyShow,
         showWidget: SettingsAnchor.show, checkForUpdates: SettingsAnchor.check, saveAndApply: SettingsAnchor.ownThemes,

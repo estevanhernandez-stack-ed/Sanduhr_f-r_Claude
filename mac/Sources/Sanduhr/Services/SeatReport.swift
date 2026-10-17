@@ -170,7 +170,7 @@ struct SeatReport: Equatable, Sendable {
             switch self {
             case .gitClone: "Git clone"
             case .copyInstalled: "Copy-installed from a repo elsewhere"
-            case .plain: "Plain folder (unsynced seat)"
+            case .plain: "Plain folder (unsynced)"
             }
         }
     }
@@ -576,7 +576,7 @@ enum SeatInstructions {
         }
         let homeClaude = (home as NSString).appendingPathComponent(".claude/CLAUDE.md")
         if !isDefault, fm.fileExists(atPath: homeClaude), !excludes.contains(where: { matches($0, homeClaude, home: home) }) {
-            part.leak = "~/.claude/CLAUDE.md loads as an ancestor file into this seat's sessions started under your home folder. Add it to this seat's claudeMdExcludes to keep it out."
+            part.leak = "~/.claude/CLAUDE.md loads as an ancestor file into this folder's sessions started under your home folder. Add it to this folder's claudeMdExcludes to keep it out."
         }
         part.memory = memory(seat, fm)
         return part

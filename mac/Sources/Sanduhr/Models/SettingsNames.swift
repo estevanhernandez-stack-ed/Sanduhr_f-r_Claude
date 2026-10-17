@@ -29,6 +29,9 @@ enum SettingsNames {
     /// Mods & Config, Sanduhr's own mod at the top: the meters mod's switch, Update and Remove per
     /// folder (was Claude Code's folder row in slice 2, and Mods' "Sanduhr's mod" before that).
     static let metersAbovePrompt = "Meters above the prompt"
+    /// Mods & Config, the second tab: one Claude Code folder's report. The page says "folder"
+    /// for a Claude Code folder everywhere (was "By Seat" until 2026-10-17; "seat" stays in code).
+    static let byFolder = "By Folder"
     /// Notch's one glow section: Sanduhr alerts, meetings, the camera light and Claude Code.
     static let notchGlow = "Notch glow"
     /// The hooks Claude Code runs to tell Sanduhr it waits or finished (IntegrationKind.hooks).
@@ -56,7 +59,7 @@ enum SettingsNames {
         (checkAppMenus, .general),
         (deskSwitch, .deskLayout),
         (notchSwitch, .notch), (notchGlow, .notch), (cameraMicPlace, .notch),
-        (claudeCodeGlowHook, .integrations), (metersAbovePrompt, .mods),
+        (claudeCodeGlowHook, .integrations), (metersAbovePrompt, .mods), (byFolder, .mods),
         (claudeMetersLine, .deskLayout), (claudeMetersBars, .deskLayout),
         (watchersOnNotch, .watchers), (watchersOnDesk, .watchers),
         (showWidget, .widgetLook), (checkForUpdates, .updates), (saveAndApply, .themes),
@@ -101,6 +104,8 @@ enum SettingsNames {
         ("Option+S opens Settings", SanduhrHotKeys.Shortcut.settings.name),
         ("Option+J joins the next meeting", SanduhrHotKeys.Shortcut.join.name),
         ("Sanduhr's mod: ", metersAbovePrompt),
+        // 2026-10-17: one word per concept on Mods & Config; a Claude Code folder is a folder.
+        ("By Seat", byFolder),
     ]
 
     /// The retired names `text` still uses, empty when it uses none.

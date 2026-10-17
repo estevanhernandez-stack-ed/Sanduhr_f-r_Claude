@@ -59,7 +59,7 @@ extension WhatsNew {
         WhatsNewCard(
             version: "2.21.0", id: "config-pack",
             title: "Carry a Claude Code config",
-            body: "Export Config on By Seat packs a folder's agents, skills, plugins, MCP servers and settings, never a secret value. Open it into another folder, with Undo Import to take it back.",
+            body: "Export Config on By Folder packs a folder's agents, skills, plugins, MCP servers and settings, never a secret value. Open it into another folder, with Undo Import to take it back.",
             art: .symbol("square.and.arrow.up.on.square"), destination: .mods),
         WhatsNewCard(
             version: "2.21.0", id: "try-proposal",
@@ -82,7 +82,7 @@ extension WhatsNew {
         WhatsNewCard(
             version: "2.20.0", id: "compact-catalog",
             title: "A shorter Catalog",
-            body: "One line per item with a dot per folder. Search marks what matched, groups and runs fold, and By Seat opens on your mods and plugins.",
+            body: "One line per item with a dot per folder. Search marks what matched, groups and runs fold, and By Folder opens on your mods and plugins.",
             art: .symbol("list.bullet.rectangle"), destination: .mods),
         WhatsNewCard(
             version: "2.20.0", id: "notch-keeps-settings",
@@ -100,7 +100,7 @@ extension WhatsNew {
         WhatsNewCard(
             version: "2.19.0", id: "seat-statusline",
             title: "Every folder's statusline",
-            body: "By Seat shows each folder's statusline, led by its account's name, with segments to pick and style and a live preview.",
+            body: "By Folder shows each folder's statusline, led by its account's name, with segments to pick and style and a live preview.",
             art: .symbol("terminal"), destination: .mods),
         WhatsNewCard(
             version: "2.19.0", id: "hide-hourglass",

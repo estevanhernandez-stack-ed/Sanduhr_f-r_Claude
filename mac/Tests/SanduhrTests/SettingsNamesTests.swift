@@ -188,10 +188,10 @@ struct SettingsCopyTests {
     @Test func modsTilesSayWhatTheyCount() {
         // F21: "27 on" didn't say what was on.
         let c = ModCounts(folders: 2, mods: 1, plugins: 27, on: 27, missing: 0)
-        #expect(c.tiles.map { "\($0.number) \($0.title)" } == ["1 mod", "27 plugins", "27 enabled plugins", "2 folders"])
+        #expect(c.tiles.map { "\($0.number) \($0.title)" } == ["1 mod", "27 plugins", "27 on in a folder", "2 folders"])
         let one = ModCounts(folders: 1, mods: 2, plugins: 1, on: 1, missing: 1)
-        #expect(one.tiles.map { "\($0.number) \($0.title)" } == ["2 mods", "1 plugin", "1 enabled plugin", "1 folder", "1 missing"])
-        #expect(c.summary == "1 mod, 27 plugins, 27 enabled plugins, 2 folders.")
+        #expect(one.tiles.map { "\($0.number) \($0.title)" } == ["2 mods", "1 plugin", "1 on in a folder", "1 folder", "1 missing"])
+        #expect(c.summary == "1 mod, 27 plugins, 27 on in a folder, 2 folders.")
     }
 }
 

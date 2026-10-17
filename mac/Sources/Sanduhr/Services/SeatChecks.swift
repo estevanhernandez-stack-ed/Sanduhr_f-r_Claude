@@ -40,7 +40,7 @@ enum SeatExtensionsCheck {
         case .agent:
             return e.scope == .project ? nil : "A project's agent of this name wins in that project."
         case .skill:
-            return e.scope == .project ? "The seat's skill of this name wins over this one." : nil
+            return e.scope == .project ? "The folder's skill of this name wins over this one." : nil
         default:
             return "Also defined at another scope."
         }
@@ -72,7 +72,7 @@ enum SeatExtensionsCheck {
         for item in scan.plugins {
             if case .installed(let m) = item.origin, m != "synced", !markets.contains(m) { unknown.insert(m) }
         }
-        for m in unknown.sorted() { out.append("Marketplace \(m) isn't added in this seat (no source declared).") }
+        for m in unknown.sorted() { out.append("Marketplace \(m) isn't added in this folder (no source declared).") }
         for m in scan.marketplaces {
             if m.source == "no source declared" { out.append("Marketplace \(m.name) has no source.") }
             if m.source == "directory", !m.present { out.append("Marketplace \(m.name) is a folder that isn't on this Mac.") }
@@ -227,8 +227,8 @@ enum SeatHousekeeping {
         for name in ((try? fm.contentsOfDirectory(atPath: home)) ?? []).sorted() where ClaudeCodeFolders.isBackup(name) {
             let mine = name.hasPrefix(ClaudeCodeFolders.backupPrefix) ? isDefault : name.hasPrefix(seatName + ClaudeCodeFolders.backupMarker)
             guard mine else { continue }
-            item((home as NSString).appendingPathComponent(name), kind: "A copy of the seat",
-                 origin: name.hasPrefix(ClaudeCodeFolders.backupPrefix) ? "A seat migration" : "A config tool", ifLeft: kept)
+            item((home as NSString).appendingPathComponent(name), kind: "A copy of the folder",
+                 origin: name.hasPrefix(ClaudeCodeFolders.backupPrefix) ? "A folder migration" : "A config tool", ifLeft: kept)
         }
         if candidates.filter(\.exists).count > 1, let stub = candidates.first(where: { $0.exists && !$0.inUse && !$0.signedIn }) {
             item(stub.path, kind: "A stub .claude.json beside the live one", origin: "A start with CLAUDE_CONFIG_DIR set to this folder",

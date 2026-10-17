@@ -184,7 +184,7 @@ final class ModProposalStore {
                                                 requestedAt: p.requestedAt, status: .pendingReview))
             save()
             answerConfig(p.id, status: "pending_review", folder: p.folder,
-                         remedy: "The user reviews it in Sanduhr, Mods & Config, By Seat. Call get_mod_status with request_id for the decision.")
+                         remedy: "The user reviews it in Sanduhr, Mods & Config, By Folder. Call get_mod_status with request_id for the decision.")
         }
     }
 

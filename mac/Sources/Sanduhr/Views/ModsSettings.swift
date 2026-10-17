@@ -711,7 +711,7 @@ enum ModsTab: String, CaseIterable, Sendable {
     var title: String {
         switch self {
         case .catalog: "Catalog"
-        case .bySeat: "By Seat"
+        case .bySeat: SettingsNames.byFolder
         case .compare: "Compare"
         }
     }

@@ -245,7 +245,7 @@ enum ModPackReader {
     static func open(_ url: URL, now: Date = Date()) throws -> Opened {
         let pack = try read(url)
         guard pack.kind == "mod" else {
-            throw Refusal(pack.kind == "config" ? "It's a config pack: open it from By Seat's Open Config Pack…, or double-click it."
+            throw Refusal(pack.kind == "config" ? "It's a config pack: open it from By Folder's Open Config Pack…, or double-click it."
                                                 : "It isn't a kind of pack this Sanduhr opens.")
         }
         guard let doc = pack.manifest["mod"] as? [String: Any] else { throw Refusal("Its \(ModPack.manifestName) is damaged.") }

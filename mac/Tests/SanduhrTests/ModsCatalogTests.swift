@@ -354,7 +354,7 @@ struct ModsCatalogTests {
         #expect(scan.unreadableFiles == ["settings.json", "plugins/known_marketplaces.json"])
         #expect(scan.settingsUnreadable?.contains("trailing comma") == true)
         let notes = ConfigCatalog.unreadableNotes([(Self.seat(h.at(".claude-u"), .work, label: "U"), scan)], demo: false)
-        #expect(notes == ["U: some files couldn't be read. See By Seat."])
+        #expect(notes == ["U: some files couldn't be read. See By Folder."])
         #expect(ConfigCatalog.unreadableNotes([(Self.seat(h.at(".claude-u"), .work, label: "U"), scan)], demo: true).isEmpty)
     }
 
