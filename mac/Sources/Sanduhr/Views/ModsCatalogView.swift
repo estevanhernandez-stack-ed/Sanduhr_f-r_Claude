@@ -84,7 +84,7 @@ struct ModsCatalogView: View {
         let cards = model.shownCards(demo: demo)
         let searching = !model.filter.search.trimmingCharacters(in: .whitespaces).isEmpty
         VStack(alignment: .leading, spacing: 10) {
-            Text("Everything your Claude Code folders hold or a marketplace they added lists, one line each, with a dot for every folder that has it. Click a line for its card, and a chip on the card to open that folder on By Folder. Read from files only: nothing is fetched, run or changed.")
+            Text("Everything your Claude Code folders hold or a marketplace they added lists, one line each, with a dot for every folder that has it. Click a line for its card, and a chip on the card to open that folder on By Folder. The cards are read from files: nothing is fetched, run or changed until you use a button.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

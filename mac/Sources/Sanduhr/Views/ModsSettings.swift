@@ -269,6 +269,8 @@ final class ModsPageModel {
     var kept: [KeptMod] = []
     var keptChecks: [String: ModCheckOutcome] = [:]
     var keptBusy: Set<String> = []
+    /// The kept mod whose pack Export… is writing (polish 2026-10-17, #22), nil between exports.
+    var exportingKept: String?
     /// What From Claude's last action said (polish 2026-10-17, #9): orange only when it failed.
     /// Cleared when New Mod closes, so each open starts clean.
     var keptNote: KeptNote?

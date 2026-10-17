@@ -232,8 +232,10 @@ extension ModsPageModel {
         }
     }
 
-    /// Export (item 76, slice A): asks where, then writes the kept copy as a `.sanduhrpack`.
+    /// Export (item 76, slice A): asks where, then writes the kept copy as a `.sanduhrpack`, off
+    /// the main actor with `exportingKept` set meanwhile (polish 2026-10-17, #22).
     func exportKept(_ mod: KeptMod) async {
+        guard exportingKept == nil else { return }
         let panel = NSSavePanel()
         // No allowedContentTypes: until Sanduhr declares the type, the panel adds the extension
         // a second time. ModPack.destination puts it on when the name lacks it.
@@ -243,12 +245,17 @@ extension ModsPageModel {
         panel.prompt = "Export"
         guard panel.runModal() == .OK, let picked = panel.url else { return }
         let url = ModPack.destination(picked)
+        exportingKept = mod.id
+        defer { exportingKept = nil }
         // The pack says what Check found: check first when it hasn't run this session.
         if keptChecks[mod.id] == nil { await checkKept(mod) }
         var report: ModCheckReport?
         if case .report(let r)? = keptChecks[mod.id] { report = r }
+        let from = URL(fileURLWithPath: keptStore.path(mod))
         do {
-            try ModPack.write(mod, from: URL(fileURLWithPath: keptStore.path(mod)), to: url, check: report)
+            try await Task.detached(priority: .userInitiated) {
+                try ModPack.write(mod, from: from, to: url, check: report)
+            }.value
             keptNote = .done("Exported \(mod.name) to \(url.lastPathComponent).")
         } catch {
             keptNote = .failed((error as? ModPack.Failure)?.message ?? ModPack.Failure.writeFailed.message)
@@ -750,7 +757,10 @@ struct NewModSheet: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                if model.keptBusy.contains(mod.id) { ProgressView().controlSize(.small) }
+                if model.exportingKept == mod.id {
+                    ProgressView().controlSize(.small)
+                    Text("Writing the pack…").font(.caption).foregroundStyle(.secondary)
+                } else if model.keptBusy.contains(mod.id) { ProgressView().controlSize(.small) }
                 Button("Try in a Session…") { trying = mod }
                     .controlSize(.small)
                     .disabled(!model.canTry(mod))
@@ -763,6 +773,7 @@ struct NewModSheet: View {
                         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: model.keptStore.path(mod))])
                     }
                     Button("Export…") { exporting = mod }
+                        .disabled(model.exportingKept != nil)
                         .help("Writes a .sanduhrpack to share it with another Mac or person.")
                     Button("Publish to Marketplace…") { Task { await model.preparePublish(mod) } }
                         .help("Commits it to a git clone of your own marketplace repo and pushes, after you confirm. Any machine adds the repo once with claude plugin marketplace add.")
