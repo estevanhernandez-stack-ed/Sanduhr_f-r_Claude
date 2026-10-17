@@ -179,9 +179,8 @@ enum SurfacePreviewData {
     /// A session at 42%, the weekly limit at 91% four days out (a warning with the default Meters
     /// settings) and a model limit at 18%.
     static func sampleUsage(now: Date = Date()) -> UsageResponse {
-        let f = ISO8601DateFormatter()
         func tier(_ util: Double, in seconds: TimeInterval) -> TierUsage {
-            TierUsage(utilization: util, resetsAt: f.string(from: now.addingTimeInterval(seconds)))
+            TierUsage(utilization: util, resetsAt: ISO8601.stamp(now.addingTimeInterval(seconds), fractional: false))
         }
         return UsageResponse(tiers: [
             .fiveHour: tier(42, in: 2 * 3600),

@@ -3,25 +3,9 @@ import Foundation
 /// Pure port of `time_until`, `reset_datetime_str`, `pace_frac`, `pace_info`,
 /// and `burn_projection` from sanduhr.py:157-228.
 
-private let isoFormatter: ISO8601DateFormatter = {
-    let f = ISO8601DateFormatter()
-    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return f
-}()
-
-private let isoFallback: ISO8601DateFormatter = {
-    let f = ISO8601DateFormatter()
-    f.formatOptions = [.withInternetDateTime]
-    return f
-}()
-
+/// The usage API's `resets_at`, or nil when it is missing or not a date.
 func parseISO(_ s: String?) -> Date? {
-    guard let s = s, !s.isEmpty else { return nil }
-    // Normalize "Z" suffix and strip trailing whitespace.
-    let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
-    if let d = isoFormatter.date(from: trimmed) { return d }
-    if let d = isoFallback.date(from: trimmed) { return d }
-    return nil
+    s.flatMap(ISO8601.parse)
 }
 
 /// Human-friendly countdown ("2d 3h 15m"). sanduhr.py:157-168.

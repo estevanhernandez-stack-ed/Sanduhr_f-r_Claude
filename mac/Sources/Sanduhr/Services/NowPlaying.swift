@@ -150,7 +150,7 @@ struct NowPlayingInfo: Equatable {
             case "durationMicros": duration = value.number.map { $0 / 1_000_000 }
             case "elapsedTime": elapsed = value.number; elapsedChanged = true
             case "elapsedTimeMicros": elapsed = value.number.map { $0 / 1_000_000 }; elapsedChanged = true
-            case "timestamp": stamp = value.string.flatMap(Self.isoDate)
+            case "timestamp": stamp = value.string.flatMap(ISO8601.parse)
             case "timestampEpochMicros": stamp = value.number.map { Date(timeIntervalSince1970: $0 / 1_000_000) }
             case "playbackRate": rate = value.number
             case "playing": playing = value.bool
@@ -168,13 +168,6 @@ struct NowPlayingInfo: Equatable {
             elapsed = before
             elapsedAt = receivedAt
         }
-    }
-
-    private static func isoDate(_ s: String) -> Date? {
-        let f = ISO8601DateFormatter()
-        if let d = f.date(from: s) { return d }
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f.date(from: s)
     }
 }
 
