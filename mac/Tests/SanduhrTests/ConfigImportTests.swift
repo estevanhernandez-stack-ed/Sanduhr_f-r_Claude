@@ -109,6 +109,28 @@ struct ConfigImportTests {
         #expect(FileManager.default.fileExists(atPath: h.at("\(target)/agents/mine.md")))
     }
 
+    @Test func theCarryListComesWithThePackAndGrowsWithWhatTheImportLeft() throws {
+        let h = TempHome()
+        defer { h.cleanUp() }
+        let (p, home) = try pack(h)
+        let target = "target/.claude-personal"
+        h.dir(target)
+        let rows = ConfigImport.plan(p, seat: h.at(target), home: home)
+        let fromPack = ConfigImport.packCarry(p, rows: rows)
+        // The header's variable is still to bring; API_TOKEN is a row here, so not said twice.
+        #expect(fromPack.contains { $0.kind == "Values" && $0.name == "X_API_KEY" })
+        #expect(!fromPack.contains { $0.name == "API_TOKEN" })
+        #expect(fromPack.contains { $0.kind == "Never in a pack" && $0.name == "Sign-in" })
+
+        let skill = try row(rows, .skill, "notes"), token = try row(rows, .env, "API_TOKEN"), telemetry = try row(rows, .env, "DISABLE_TELEMETRY")
+        let left = ConfigImport.leftOver(rows, chosen: [token.id, telemetry.id], env: [:])
+        #expect(left.contains(ConfigPack.Carry(kind: "Skills", name: "notes", why: "Not brought over.")))
+        #expect(left.contains(ConfigPack.Carry(kind: "Environment variables", name: "API_TOKEN", why: "No value was typed: set it in settings.json by hand.")))
+        #expect(!left.contains { $0.name == "DISABLE_TELEMETRY" })   // its value came with the pack
+        #expect(left.contains { $0.kind == "MCP servers" && $0.name == "docs" && $0.why.hasPrefix("Run it yourself: ") })
+        #expect(!ConfigImport.leftOver(rows, chosen: [skill.id], env: [:]).contains { $0.name == "notes" })
+    }
+
     @Test func undoLeavesWhatChangedSinceAndASeatWithoutSettingsGetsItsFileBackToNone() throws {
         let h = TempHome()
         defer { h.cleanUp() }

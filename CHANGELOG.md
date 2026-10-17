@@ -2,6 +2,8 @@
 
 ## Unreleased (mac)
 
+- **What to carry by hand.** Every config pack now holds `CARRY.md`, a checklist of what it doesn't bring: rows that couldn't travel and why, rows you left unchecked, the env values and `${VAR}` references still to set, and what no pack holds (the sign-in, `settings.local.json`, a repo's own config, memory, credentials). The list never names a path of your Mac or a watch word. The export sheet counts it; Open shows it under **Carry by hand**, and after an import adds what the import left, with **Copy List**.
+
 - **Switches travel with their values.** A config pack still carries env variables by name, but Claude Code's documented switches (`DISABLE_TELEMETRY`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, `BASH_MAX_TIMEOUT_MS`, model names and the like) now bring their value when it's short and plain. On import their field is filled in and shown, to change if you like; every other value is still typed in and hidden.
 
 - **Published mods name their author.** Publish to Marketplace gives each entry in `marketplace.json` an `author`: the mod's own `plugin.json` author when it has one, else the GitHub owner. A name only, never an email; an author you wrote into the entry yourself stays.

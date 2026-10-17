@@ -167,6 +167,33 @@ struct ConfigPackTests {
             #expect(!everything.contains(leak), "the pack holds \(leak)")
         }
         #expect(manifest["from"] == nil)
+
+        // The carry list: in the manifest and as CARRY.md, naming what stayed and never a match.
+        let carry = try #require(manifest["carry"] as? [[String: String]])
+        #expect(carry.contains { $0["kind"] == "Agents" && $0["name"] == "leaky" && $0["why"] == "agents/leaky.md line 4 looks like a secret." })
+        #expect(carry.contains { $0["kind"] == "Settings" && $0["name"] == "hooks" && $0["why"] == "It names a path on this Mac only." })
+        #expect(carry.contains { $0["kind"] == "Values" && $0["name"] == "GITHUB_TOKEN" })
+        #expect(!carry.contains { $0["kind"] == "Values" && $0["name"] == "DISABLE_TELEMETRY" })   // its value travelled
+        #expect(carry.contains { $0["kind"] == "Values" && $0["name"] == "FILES_KEY" && $0["why"]?.contains("files") == true })
+        #expect(carry.suffix(ConfigPack.neverCarried.count).map { $0["name"] } == ConfigPack.neverCarried.map(\.name))
+        let md = try String(contentsOf: out.appendingPathComponent("CARRY.md"), encoding: .utf8)
+        #expect(md.hasPrefix("# To carry by hand\n") && md.contains("## Values\n\n- [ ] **GITHUB_TOKEN**") && md.contains("## Never in a pack"))
+    }
+
+    @Test func aRowLeftUncheckedIsOnTheCarryList() throws {
+        let h = TempHome()
+        defer { h.cleanUp() }
+        let (root, scan) = seat(h)
+        var items = ConfigPack.plan(seat: root, scan: scan, keptOn: [], kept: KeptMods(dir: URL(fileURLWithPath: h.at("support/mods"))), home: h.at(""))
+        items[items.firstIndex { $0.kind == .agent && $0.name == "reviewer" }!].watched = ["Initech"]
+        let chosen = Set(items.filter { $0.canTravel && $0.kind != .agent && $0.kind != .command }.map(\.id))
+        let carry = ConfigPack.carry(items, chosen: chosen)
+        #expect(carry.contains(ConfigPack.Carry(kind: "Commands", name: "ship", why: "Left out when the pack was made.")))
+        #expect(carry.contains(ConfigPack.Carry(kind: "Agents", name: "reviewer", why: "Left out: it names work.")))
+        #expect(!carry.contains { $0.why.contains("Initech") })
+        // A row left out isn't also asked a value for.
+        let none = ConfigPack.carry(items, chosen: [])
+        #expect(!none.contains { $0.kind == "Values" })
     }
 
     @Test func aPackFromAWorkFolderSaysSo() throws {
