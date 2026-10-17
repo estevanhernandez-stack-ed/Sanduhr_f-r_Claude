@@ -175,7 +175,7 @@ struct ModFolderInventory: Identifiable, Equatable, Sendable {
 enum ModInventory {
     static func scan(folder: String, home: String = NSHomeDirectory()) -> [ModItem] {
         let root = URL(fileURLWithPath: AccountData.normalized(folder))
-        let settings = readJSON(root.appendingPathComponent("settings.json")) ?? [:]
+        let settings = JSONFiles.object(at: root.appendingPathComponent("settings.json").path, maxBytes: JSONFiles.Cap.settings) ?? [:]
         let enabled = settings["enabledPlugins"] as? [String: Any] ?? [:]
         var out: [ModItem] = []
         func add(_ item: ModItem) {
@@ -351,10 +351,5 @@ enum ModInventory {
 
     static func matches(_ pattern: String, _ text: String) -> Bool {
         text.range(of: pattern, options: .regularExpression) != nil
-    }
-
-    private static func readJSON(_ url: URL) -> [String: Any]? {
-        guard let data = FileManager.default.contents(atPath: url.path) else { return nil }
-        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 }
