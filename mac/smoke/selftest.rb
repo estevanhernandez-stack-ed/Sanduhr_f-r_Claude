@@ -242,6 +242,8 @@ eq('desk frame kinds', state['desk_frames'].map { |f| f['kind'] }, %w[meters met
 # "Clock and message take clicks": on in the fixture; desk-layout.yaml's check that, off, neither
 # the clock nor the message is a click area.
 eq('piece clicks on in the fixture', state['desk_piece_clicks'], true)
+# "Plate behind the text": off in the fixture, what an absent key reads as; a new install writes it on.
+eq('plate off in the fixture', state['desk_plate'], false)
 no_pieces = { 'desk_frames' => '/\A(?!.*(clock|message))/m' }
 check('the clock and message are click areas in the fixture', State.check(state, no_pieces).length == 1)
 check('off, neither is a click area',

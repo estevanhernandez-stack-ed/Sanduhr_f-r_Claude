@@ -105,6 +105,9 @@ enum DeskFirstRun {
         d.set(layout, forKey: "layout")
         d.set(false, forKey: "showMeetings")
         d.set(false, forKey: DeskController.notchKey)
+        // The plate behind each piece (DeskPlate): on for a new install, whose desktop may be
+        // full of files; an absent key is off, so a Desk from before it looks as it did.
+        d.set(true, forKey: "plate")
         w.set(WidgetVisibility.whileDeskOff.rawValue, forKey: WidgetVisibility.key)
         return .fresh
     }

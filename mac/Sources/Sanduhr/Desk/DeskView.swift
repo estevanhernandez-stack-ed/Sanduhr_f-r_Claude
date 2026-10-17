@@ -29,6 +29,9 @@ import AppKit
 ///   defaults write com.626labs.sanduhr.desk top -float 40
 ///   defaults write com.626labs.sanduhr.desk bottom -float 60
 ///   defaults write com.626labs.sanduhr.desk menuIcon -bool true    (bring back the clock menu)
+///   defaults write com.626labs.sanduhr.desk plate -bool true       (a soft dark plate behind each piece, for a
+///                                                                   desktop with files under it; a new install
+///                                                                   writes it on, an absent key is off)
 /// showMeetings (Read today's meetings) still hides the meetings. 2.10.0's showClaude is retired:
 /// SettingsMigrations moved it into the layout (both Claude meters pieces Hidden).
 /// Then quit and reopen Desk. Messages themselves: edit
@@ -225,7 +228,13 @@ struct DeskPiece: View {
     @AppStorage("inkColor", store: .desk) private var ink = "ffffff"
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Every piece, the message included, over its plate (DeskPlate) when the plate is on.
     var body: some View {
+        piece.deskPlate()
+    }
+
+    @ViewBuilder
+    private var piece: some View {
         switch widget {
         case .clock: clock.deskPieceClickArea(.clock) { model.clockFrame = $0 }.deskInk()
         case .claude: claude.deskPieceClickArea(.claudeLine) { model.claudeLineFrame = $0 }.deskInk()
@@ -468,6 +477,75 @@ enum DeskPulse {
     static let phases = Array(0..<7)
     static func intensity(_ phase: Int) -> Double { phase % 2 == 1 ? 1 : 0 }
     static let animation = Animation.easeInOut(duration: 0.42)
+}
+
+extension View {
+    /// A soft dark plate behind a Desk piece (Settings, Desk Look's "Plate behind the text"),
+    /// for a desktop with files under it: the text reads over file names instead of landing
+    /// on them. Off, nothing is drawn at all.
+    func deskPlate() -> some View {
+        modifier(DeskPlateModifier())
+    }
+}
+
+/// "Plate behind the text" (Settings, Desk Look). Off when the key is absent, so every Desk
+/// from before the plate looks exactly as it did; DeskFirstRun writes it on for a new install.
+/// The plate is still, so Reduce Motion has nothing to take away; Reduce Transparency trades
+/// the blur for a solid.
+enum DeskPlate {
+    /// Desk suite key (com.626labs.sanduhr.desk).
+    static let key = "plate"
+    static let defaultOn = false
+
+    static let title = "Plate behind the text"
+    static let caption = "A soft dark plate behind each piece, for desktops with files under it."
+
+    static let cornerRadius: CGFloat = 18
+    /// How far the plate reaches past the piece's own bounds, each side.
+    static let reach: CGFloat = 14
+
+    /// The fill's opacity and blur: soft by default, solid with Reduce Transparency on.
+    struct Style: Equatable {
+        let opacity: Double
+        let blur: CGFloat
+    }
+    static let soft = Style(opacity: 0.30, blur: 10)
+    static let solid = Style(opacity: 0.55, blur: 0)
+
+    static func style(reduceTransparency: Bool) -> Style {
+        reduceTransparency ? solid : soft
+    }
+
+    static func isOn(in store: DefaultsStore) -> Bool {
+        store.object(forKey: key) as? Bool ?? defaultOn
+    }
+
+    static func set(_ on: Bool, in store: DefaultsStore) {
+        store.set(on, forKey: key)
+    }
+}
+
+/// The plate behind one piece: a rounded rectangle in black, past the piece by `reach`, blurred
+/// soft (the pulse's shape, deskPulse), under whatever opacity the column gives the piece and
+/// outside the ink's own, so the fill is what the style says. Never a click area: the window
+/// takes the pointer over reported frames only (DeskController), and the plate reports none.
+private struct DeskPlateModifier: ViewModifier {
+    @AppStorage(DeskPlate.key, store: .desk) private var on = DeskPlate.defaultOn
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    func body(content: Content) -> some View {
+        content.background {
+            if on {
+                let style = DeskPlate.style(reduceTransparency: reduceTransparency)
+                RoundedRectangle(cornerRadius: DeskPlate.cornerRadius)
+                    .fill(Color.black.opacity(style.opacity))
+                    .padding(-DeskPlate.reach)
+                    .blur(radius: style.blur)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
 }
 
 private struct DeskInk: ViewModifier {

@@ -93,6 +93,7 @@ desk_frames:
 desk_frames_ok: true
 desk_frames_problem: null
 desk_piece_clicks: true
+desk_plate: false
 dock:
   side: bottom
   autohide: false
