@@ -85,6 +85,7 @@ struct SettingsNamesTests {
         #expect(SettingsNames.unknownLinks(in: "arg=<Page> Settings…").isEmpty)
         // macOS's own app is not a Sanduhr page (item 73 b's Allow button).
         #expect(SettingsNames.unknownLinks(in: "Allow in System Settings…").isEmpty)
+        #expect(SettingsNames.unknownLinks(in: "Open System Settings…").isEmpty)
     }
 }
 
