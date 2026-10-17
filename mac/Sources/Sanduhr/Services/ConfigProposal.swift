@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// Config an agent proposed through the MCP server's `propose_config` (item 76, slice K): files
@@ -135,7 +134,7 @@ struct ConfigProposal: @unchecked Sendable {
             let data = Data(f.text.utf8)
             out["files/" + f.path] = data
             manifestFiles.append(["path": "files/" + f.path, "bytes": data.count,
-                                  "sha256": SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()])
+                                  "sha256": Digest.sha256Hex(data)])
         }
         let manifest: [String: Any] = [
             "schema": 1, "kind": "config", "label": "Claude's proposal", "created_by": "Claude, through propose_config",

@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// A `.sanduhrpack` (item 76, `docs/config-transfer-spec.md`): one zip that carries a kept mod to
@@ -56,7 +55,7 @@ enum ModPack {
             guard let data = FileManager.default.contents(atPath: folder.appendingPathComponent(rel).path) else {
                 throw Failure.unreadable
             }
-            let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            let hash = Digest.sha256Hex(data)
             return Entry(path: modFolder + "/" + rel, bytes: data.count, sha256: hash)
         }
     }

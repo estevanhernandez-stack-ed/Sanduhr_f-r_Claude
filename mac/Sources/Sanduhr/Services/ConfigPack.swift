@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// A config pack (item 76, slice C, `docs/config-transfer-spec.md`): what a personal seat holds,
@@ -499,7 +498,7 @@ enum ConfigPack {
         for item in items {
             for f in item.files {
                 let data = Data(f.text.utf8)
-                files.append(["path": f.path, "bytes": data.count, "sha256": SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()])
+                files.append(["path": f.path, "bytes": data.count, "sha256": Digest.sha256Hex(data)])
             }
             let doc = item.json.flatMap { try? JSONSerialization.jsonObject(with: $0) }
             switch item.kind {
@@ -514,7 +513,7 @@ enum ConfigPack {
         // any-agent/ and CARRY.md are listed like every file, so a reader verifies them; import reads only files/.
         for f in extra {
             let data = Data(f.text.utf8)
-            files.append(["path": f.path, "bytes": data.count, "sha256": SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()])
+            files.append(["path": f.path, "bytes": data.count, "sha256": Digest.sha256Hex(data)])
         }
         var doc: [String: Any] = ["schema": 1, "kind": "config", "created_at": HandoffFiles.stamp(now), "created_by": "Sanduhr " + version,
                                   "label": label, "files": files, "settings": settings, "env": env, "plugins": plugins, "mcp": mcp,
