@@ -1112,7 +1112,8 @@ struct IntegrationInstaller {
         return true
     }
 
-    /// A temporary sibling, given the file's permissions, renamed over it.
+    /// A temporary sibling, given the file's permissions, renamed over it. Not `HandoffFiles`':
+    /// the mode follows the file (0644 for a settings.json), and the reset's own steps write here.
     private func atomicWrite(_ data: Data, to path: String, newFilePermissions: Int) throws {
         let fm = FileManager.default
         let dir = (path as NSString).deletingLastPathComponent

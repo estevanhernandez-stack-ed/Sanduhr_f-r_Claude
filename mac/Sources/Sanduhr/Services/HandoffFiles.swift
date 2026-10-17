@@ -23,13 +23,32 @@ enum HandoffFiles {
         return data
     }
 
-    /// Atomic, readable by this user only.
-    static func writeOwnerOnly(_ data: Data, to url: URL) {
+    /// Atomic, readable by this user only: a temporary sibling created with mode 0600 and renamed
+    /// over `url`, so a reader never sees half of it and the bytes are never wider than 0600, not
+    /// even between write and chmod. The parent folder is made when missing. After Reset Sanduhr…
+    /// ran it silently writes nothing and doesn't throw; there is no opt-out, so a writer that is
+    /// part of the reset itself (the credential stores, the installer) keeps its own write.
+    static func writeOwnerOnlyOrThrow(_ data: Data, to url: URL) throws {
         // Reset Sanduhr… ran: nothing goes back into the folders it emptied.
         guard !ResetGate.isOn else { return }
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        guard (try? data.write(to: url, options: .atomic)) != nil else { return }
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        let fm = FileManager.default
+        let dir = url.deletingLastPathComponent()
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let tmp = dir.appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
+        guard fm.createFile(atPath: tmp.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        guard Darwin.rename(tmp.path, url.path) == 0 else {
+            let code = errno
+            unlink(tmp.path)
+            throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO)
+        }
+    }
+
+    /// `writeOwnerOnlyOrThrow` with the failure dropped: for the handoffs, where a result the
+    /// server can't read is the same as none.
+    static func writeOwnerOnly(_ data: Data, to url: URL) {
+        try? writeOwnerOnlyOrThrow(data, to: url)
     }
 
     /// An ISO 8601 stamp with milliseconds, as the result files carry.

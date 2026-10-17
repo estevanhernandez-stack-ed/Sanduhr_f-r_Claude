@@ -247,6 +247,8 @@ struct FileBackend: CredentialBackend {
             return
         }
         let data = try JSONEncoder().encode(dict)
+        // Its own write, not HandoffFiles': Remove Account is a reset step, so this must still
+        // write (a key taken out of the file) after ResetGate turns the other writers off.
         try data.write(to: url, options: [.atomic])
         // Lock it down: owner read/write only, no group or other access.
         try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)

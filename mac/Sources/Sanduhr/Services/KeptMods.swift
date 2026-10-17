@@ -89,9 +89,7 @@ struct KeptMods: Sendable {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let data = try? encoder.encode(mods) else { throw Failure.writeFailed }
         do {
-            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            try data.write(to: record, options: .atomic)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: record.path)
+            try HandoffFiles.writeOwnerOnlyOrThrow(data, to: record)
         } catch {
             throw Failure.writeFailed
         }

@@ -49,8 +49,7 @@ extension KeptMods {
                 if FileManager.default.fileExists(atPath: ledger.path) { try FileManager.default.removeItem(at: ledger) }
                 return
             }
-            try encoder.encode(receipts).write(to: ledger, options: .atomic)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: ledger.path)
+            try HandoffFiles.writeOwnerOnlyOrThrow(encoder.encode(receipts), to: ledger)
         } catch {
             throw Failure.writeFailed
         }
