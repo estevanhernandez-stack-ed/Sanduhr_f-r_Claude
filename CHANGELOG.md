@@ -2,6 +2,18 @@
 
 ## Unreleased (mac)
 
+- **Settings read the way Claude Code reads them.** Export Config and the mod inventory now refuse a `settings.json` or `.claude.json` with a trailing comma, as By Seat already showed it; a well-formed file reads exactly as before.
+
+- **No more waiting on a stuck command.** Publishing to a marketplace stops a hung `git` after its timeout instead of waiting forever, and packing or opening a `.sanduhrpack` gives `ditto` a minute.
+
+- **One helper where there were copies.** Hashes, timestamps, JSON file reads, owner-only file writes, the MCP server's answer files and running commands each go through a single helper now. No behaviour change; the kept-mod stamps, pack hashes and answer files are byte for byte the same.
+
+- **Docs caught up.** PRIVACY covers Watchers and signing in inside Sanduhr; the release doc gained rollback, bad-update and after-release sections; `docs/spec.md` points at the Mac app's per-item specs; the checklist and ADRs say what the code says; dead links are gone.
+
+- **CI hardened.** The Mac, docs, vscode and release workflows run with a read-only token (write only on the one job that releases) and every action is pinned to a commit. The vscode extension's tests moved to vitest 4, closing the tinypool advisory in its dev dependencies.
+
+## v2.26.0-mac — 2026-10-16
+
 - **Claude can propose config.** With **Let agents propose mods** on, Claude can send agents, skills, commands, output styles, settings keys and MCP servers for one of your Claude Code folders through `propose_config`. Sanduhr checks it again and scans every file and value for secrets, then lists it on that folder in By Seat: **Review…** opens it like a config pack, where only what the folder lacks can be brought over and Undo Import takes it back; **Dismiss** drops it. A proposal that sets hooks asks for "hooks" typed out. `get_mod_status` tells Claude what you decided.
 
 - **Plugins from a folder travel too.** A plugin from a folder on this Mac (a directory marketplace, or one listed in `CLAUDE_CODE_PLUGIN_DIRS`) used to stay behind. A config pack now carries its files, shell and Python hooks included, each scanned like every other file; a binary or a line that looks like a secret keeps it home and on the carry list. Open writes it under the folder's `carried-plugins/` as a marketplace of its own, then adds and installs it with `claude`, its row naming every hook command it runs. Scripts stay runnable, and Undo Import uninstalls it and removes the files.
@@ -12,20 +24,36 @@
 
 - **Published mods name their author.** Publish to Marketplace gives each entry in `marketplace.json` an `author`: the mod's own `plugin.json` author when it has one, else the GitHub owner. A name only, never an email; an author you wrote into the entry yourself stays.
 
+## v2.25.1-mac — 2026-10-16
+
 - **Fixed: publishing a mod that's already published.** The confirm asked "Publish …?" with nothing to do. It now says the mod is already published, shows the commands that add it on another machine, and has **Copy Commands**.
+
+## v2.25.0-mac — 2026-10-16
 
 - **The name to type, in blue.** Keeping or trying a high-risk mod asks for its name typed out. That confirm is now a small sheet that opens with "To keep it, type **name** below.", the name in blue, the field ready with the name as its placeholder, and Keep enabled once it matches. Other confirms are unchanged.
 
+## v2.24.1-mac — 2026-10-16
+
 - **Fixed: a mod's `key` props read as secrets.** Publishing or exporting a mod refused any `.tsx` file using React's `key` prop (`<Box key={id}>`) as a line that looks like a secret. The prop now counts as a name; a token-shaped value is still caught.
+
+## v2.24.0-mac — 2026-10-16
 
 - **A marketplace of your own.** A kept mod's menu on New Mod, From Claude has **Publish to Marketplace…**: pick a git clone of your own marketplace repo once, and Sanduhr writes the mod under `plugins/`, adds it to `.claude-plugin/marketplace.json` and the README's plugin list, then commits and pushes after a confirm that says what changes and where. Any machine adds the repo once with `claude plugin marketplace add owner/repo` and installs each mod by name. A clone with changes not committed, off a branch or without an origin is refused; a file that looks like a secret refuses the publish, and a watch word is named in the confirm. A push that fails keeps the commit and says why.
 
+## v2.23.0-mac — 2026-10-15
+
 - **Watch words for a work folder.** Export Config on a folder marked work has **Watch Words…**: the names that mean work (the company, products, people). A row holding one, as a whole word in any case, says which and starts unchecked, so it stays out of the pack and its any-agent/ folder unless you check it. **Watch Words…** suggests names the folder's own rows use that aren't ordinary words. The list is kept on this Mac only, per folder, and never goes in a pack.
+
+## v2.22.0-mac — 2026-10-15
 
 - **A config pack for any coding agent.** Export Config has **Also for other agents (any-agent/)**, on by default: the pack gains a second folder with the same rows for Codex, Gemini CLI, Cursor, VS Code and others. Skills as Agent Skills (a name the standard doesn't allow is renamed and listed), agents and commands turned into skills, an `AGENTS.md` (CLAUDE.md when checked, and an index of the skills and the environment variables to set), one MCP server file per agent with secrets left as references, a README saying where each file goes, and `LEFT-OUT.md` naming what has no equivalent (plugins, output styles, settings, mods). Opening a pack ignores the folder; 2.21.0 opens these packs too. When the folder would make the pack too big, the switch says so.
 
+## v2.21.0-mac — 2026-10-15
+
 - **Export a Claude Code folder's config.** By Seat has **Export Config…** for every folder. A folder marked work exports too: its pack is stamped as from work, the sheet asks you to leave out anything that names work, and opening it into a folder not marked work warns first. The sheet lists what the folder could carry, grouped, each with a checkbox: CLAUDE.md (off by default), its own agents, skills, commands and output styles, kept mods that are on there, marketplace plugins by where they come from, MCP servers with `${NAME}` in place of every env and header value, the settings Claude Code documents as shareable (permissions, model, output style, hooks, extra marketplaces, the claude.ai sync switches, cleanup period) and environment variables by name only. Your home folder is written as `~`. A row that names a path only this Mac has, or a file with a line that looks like a secret, says which and can't be checked. Sanduhr's own statusline, hooks, MCP server and meters mod never go in, nor any value of an environment variable, sign-in, `.claude.json`, transcripts or memory. **Open Config Pack…** on By Seat (or a double-click on a config pack) opens one into the folder you pick (nothing is chosen for you; **Other Folder…** reaches one Claude Code hasn't used yet), row by row: what the folder lacks can be brought over, what it has the same or its own stays as it is, environment variables it lacks wait for a value you type, kept mods go to New Mod for review, and plugins and MCP servers are shown as the `claude` commands to run, with Copy. Import asks once (naming a folder marked work, and saying when the folder is a git clone whose next sync commits it), writes by receipts, and **Undo Import** takes it back, leaving and naming any file or setting changed since. An import into a folder not listed as a seat keeps its Undo at the top of By Seat. Plugins and MCP servers can be checked too: Sanduhr runs Claude Code's own `claude plugin marketplace add`, `claude plugin install` and `claude mcp add-json` in that folder (never with `-y`, never while a Claude Code session runs there, each command shown first), skips what the folder already has, names any that didn't go in, and Undo Import uninstalls them, removes a marketplace the import added unless a plugin now comes from it, and leaves an MCP server changed since. Without `claude` found they stay as commands to copy.
+
 - **Share a kept mod.** A kept mod's menu on New Mod, From Claude has **Export…**: it writes one `.sanduhrpack` file with the mod's files and what Check found, and nothing from your Claude Code folders (no settings, paths, folder or session names). The pack is also a one-plugin marketplace, so on a Mac without Sanduhr, `claude plugin marketplace add` on the unzipped folder and `claude plugin install <mod>@<mod>-pack` install it. **Open Pack…** on the same tab, or a double-click on a `.sanduhrpack` in Finder, opens one: Sanduhr checks the zip before unpacking anything (no links, no paths outside it, no file over 2 MB or 20 MB in all) and every file against the pack's own list and hashes, then holds the mod to the same rules as a mod Claude proposes. It waits under **Opened from a pack** for Check, **Try in a Session…** and **Keep…**, whether or not agents may propose mods, and Claude's MCP server never hears of it. Try and Keep use your first Claude Code folder not marked work. A pack whose files are kept already says so.
+
 - **Try a mod Claude proposed before keeping it.** A proposal waiting on New Mod, From Claude has **Try in a Session…** once Check passed on its files: Terminal opens Claude Code with the proposed files loaded for that session only, with the Claude Code folder whose session proposed it (the MCP server now sends that folder's name, such as `.claude-personal`), in a folder you choose or a new empty one, after a confirm that names the risk (a high-risk mod asks for its name typed, as Keep does). Trying keeps nothing and turns it on nowhere: the proposal keeps waiting for Keep or Dismiss, and Claude hears no decision.
 
 ## v2.20.0-mac — 2026-10-14

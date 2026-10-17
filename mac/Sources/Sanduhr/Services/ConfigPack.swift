@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// A config pack (item 76, slice C, `docs/config-transfer-spec.md`): what a personal seat holds,
@@ -120,6 +119,9 @@ enum ConfigPack {
     }
 
     static let maxFileBytes = ModPackReader.maxFileBytes
+    /// The seat's own JSON files (`.claude.json`, `settings.json`, the marketplace list) are
+    /// read up to this size; a bigger one reads as absent.
+    static let readCap = 8 << 20
     /// Settings keys a pack may carry: the ones Claude Code documents as shareable, and the wall
     /// switches. Plugins travel as rows of their own, so `enabledPlugins` isn't one of them.
     static let settingsKeys = ["permissions", "model", "outputStyle", "hooks", "extraKnownMarketplaces",
@@ -280,7 +282,7 @@ enum ConfigPack {
         }
 
         // Plugins from marketplaces, by their marketplace's source.
-        let known = readObject((root as NSString).appendingPathComponent("plugins/known_marketplaces.json")) ?? [:]
+        let known = JSONFiles.object(at: (root as NSString).appendingPathComponent("plugins/known_marketplaces.json"), maxBytes: readCap) ?? [:]
         for p in scan.plugins {
             // A plugin from a folder on this Mac (a directory marketplace, or one listed in
             // CLAUDE_CODE_PLUGIN_DIRS) travels as its files (slice J). Sanduhr's own folder is left:
@@ -310,7 +312,7 @@ enum ConfigPack {
         }
 
         // MCP servers from the seat's .claude.json, user scope, values turned into references.
-        let config = readObject(ClaudeCodeFolders.configFile(for: root, home: home)) ?? [:]
+        let config = JSONFiles.object(at: ClaudeCodeFolders.configFile(for: root, home: home), maxBytes: readCap) ?? [:]
         for (name, value) in (config["mcpServers"] as? [String: Any] ?? [:]).sorted(by: { $0.key < $1.key }) {
             guard let server = value as? [String: Any] else { continue }
             if name == "sanduhr" || "\(server)".contains("sanduhr_mcp.py") { continue }   // the importing Sanduhr installs its own
@@ -318,7 +320,7 @@ enum ConfigPack {
         }
 
         // Settings keys, and env names.
-        let settings = readObject((root as NSString).appendingPathComponent("settings.json")) ?? [:]
+        let settings = JSONFiles.object(at: (root as NSString).appendingPathComponent("settings.json"), maxBytes: readCap) ?? [:]
         for key in settingsKeys {
             guard var value = settings[key] else { continue }
             if key == "hooks" { value = withoutSanduhrHooks(value) }
@@ -474,11 +476,6 @@ enum ConfigPack {
         return out.sorted()
     }
 
-    private static func readObject(_ path: String) -> [String: Any]? {
-        guard let data = FileManager.default.contents(atPath: path), data.count < 8 << 20 else { return nil }
-        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-    }
-
     // MARK: Writing
 
     static func fileName(label: String) -> String {
@@ -499,7 +496,7 @@ enum ConfigPack {
         for item in items {
             for f in item.files {
                 let data = Data(f.text.utf8)
-                files.append(["path": f.path, "bytes": data.count, "sha256": SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()])
+                files.append(["path": f.path, "bytes": data.count, "sha256": Digest.sha256Hex(data)])
             }
             let doc = item.json.flatMap { try? JSONSerialization.jsonObject(with: $0) }
             switch item.kind {
@@ -514,7 +511,7 @@ enum ConfigPack {
         // any-agent/ and CARRY.md are listed like every file, so a reader verifies them; import reads only files/.
         for f in extra {
             let data = Data(f.text.utf8)
-            files.append(["path": f.path, "bytes": data.count, "sha256": SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()])
+            files.append(["path": f.path, "bytes": data.count, "sha256": Digest.sha256Hex(data)])
         }
         var doc: [String: Any] = ["schema": 1, "kind": "config", "created_at": HandoffFiles.stamp(now), "created_by": "Sanduhr " + version,
                                   "label": label, "files": files, "settings": settings, "env": env, "plugins": plugins, "mcp": mcp,

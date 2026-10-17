@@ -104,6 +104,13 @@ enum JSONEdit {
         return dict
     }
 
+    /// The top-level object of the file at `path`, its bytes through `JSONFiles`' capped read
+    /// and parsed as `root(_:)` reads them; nil when the file is missing, isn't a regular file,
+    /// is over `maxBytes` or is malformed.
+    static func root(at path: String, maxBytes: Int) -> [String: Any]? {
+        JSONFiles.bytes(at: path, maxBytes: maxBytes).data.flatMap { try? root($0) }
+    }
+
     /// The object whose `{` is the first non-space byte at or after `start`.
     static func object(_ b: [UInt8], at start: Int) throws -> Object {
         var s = Scanner(b: b, i: start)

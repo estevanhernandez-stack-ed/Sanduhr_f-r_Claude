@@ -35,9 +35,8 @@ enum DemoMode {
     /// Made-up numbers for a sample account: Work busy, Personal light. Reset times count from
     /// `now`, so pace ticks and countdowns look alive.
     static func usage(for account: String, now: Date = Date()) -> UsageResponse {
-        let f = ISO8601DateFormatter()
         func tier(_ util: Double, resetsIn seconds: TimeInterval) -> TierUsage {
-            TierUsage(utilization: util, resetsAt: f.string(from: now.addingTimeInterval(seconds)))
+            TierUsage(utilization: util, resetsAt: ISO8601.stamp(now.addingTimeInterval(seconds), fractional: false))
         }
         if account == accounts[1] {
             return UsageResponse(tiers: [.fiveHour: tier(12, resetsIn: 4 * 3600),
@@ -57,7 +56,6 @@ enum DemoMode {
     /// A made-up meter history for a sample account: a reading every 3 hours over 30 days, each
     /// limit rising through its window and dropping at the reset, ending at the sample numbers.
     static func history(for account: String, now: Date = Date()) -> HistoryStore.History {
-        let iso = ISO8601DateFormatter()
         let latest = usage(for: account, now: now)
         let step: TimeInterval = 3 * 3600
         let count = Int(TimeInterval(MeterHistory.days) * 86_400 / step)
@@ -72,7 +70,7 @@ enum DemoMode {
                 // A small wiggle, nothing at the latest reading.
                 let wiggle = (account == accounts[0] ? 6 : 2) * sin(age / step / 3)
                 let value = min(100, max(0, end * (1 - phase) + wiggle))
-                return HistoryStore.Point(t: iso.string(from: now.addingTimeInterval(-age)), v: (value * 10).rounded() / 10)
+                return HistoryStore.Point(t: ISO8601.stamp(now.addingTimeInterval(-age), fractional: false), v: (value * 10).rounded() / 10)
             }
             out[tier.rawValue] = points
         }

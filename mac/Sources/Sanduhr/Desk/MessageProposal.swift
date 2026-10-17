@@ -81,21 +81,7 @@ struct MessageProposal: Equatable, Identifiable {
     }
 
     /// The request stamp: ISO 8601 with or without a fraction (also .NET's seven digits).
-    static func parseDate(_ s: String) -> Date? {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = f.date(from: s) { return d }
-        f.formatOptions = [.withInternetDateTime]
-        if let d = f.date(from: s) { return d }
-        // .NET-style seven fraction digits ("…:00.1234560+00:00"): keep three.
-        if let r = s.range(of: #"\.(\d{3})\d+"#, options: .regularExpression) {
-            var t = s
-            t.replaceSubrange(r, with: "." + s[r].dropFirst().prefix(3))
-            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            return f.date(from: t)
-        }
-        return nil
-    }
+    static func parseDate(_ s: String) -> Date? { ISO8601.parse(s) }
 
     // MARK: - The checks
 
@@ -202,17 +188,9 @@ struct MessageProposal: Equatable, Identifiable {
     /// lines_added?, lines_skipped?}}`.
     static func resultJSON(id: String, status: Status, mode: Mode?, reasons: [String] = [],
                            applied: Applied? = nil, now: Date = Date()) -> Data {
-        var result: [String: Any] = ["status": status.rawValue]
-        if let mode { result["mode"] = mode.rawValue }
-        if !reasons.isEmpty { result["reasons"] = reasons }
-        if let applied {
-            result["lines_added"] = applied.added
-            result["lines_skipped"] = applied.skipped
-        }
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let root: [String: Any] = ["id": id, "completed_at": f.string(from: now), "result": result]
-        return (try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])) ?? Data()
+        HandoffFiles.resultJSON(id: id, status: status.rawValue, fields: [
+            ("mode", mode?.rawValue), ("lines_added", applied?.added), ("lines_skipped", applied?.skipped),
+        ], reasons: reasons, now: now)
     }
 
     /// desk-messages-state.json: what get_desk_messages reports about the user's settings. The

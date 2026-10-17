@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// A `.sanduhrpack` (item 76, `docs/config-transfer-spec.md`): one zip that carries a kept mod to
@@ -56,7 +55,7 @@ enum ModPack {
             guard let data = FileManager.default.contents(atPath: folder.appendingPathComponent(rel).path) else {
                 throw Failure.unreadable
             }
-            let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            let hash = Digest.sha256Hex(data)
             return Entry(path: modFolder + "/" + rel, bytes: data.count, sha256: hash)
         }
     }
@@ -120,7 +119,8 @@ enum ModPack {
             throw Failure.writeFailed
         }
         let zip = work.appendingPathComponent("pack.zip")
-        guard run("/usr/bin/ditto", ["-c", "-k", "--norsrc", "--noextattr", "--noacl", tree.path, zip.path]) else {
+        guard ProcessRunner.run("/usr/bin/ditto", ["-c", "-k", "--norsrc", "--noextattr", "--noacl", tree.path, zip.path],
+                                timeout: dittoTimeout).ok else {
             throw Failure.writeFailed
         }
         do {
@@ -145,14 +145,6 @@ enum ModPack {
         return data
     }
 
-    private static func run(_ tool: String, _ args: [String]) -> Bool {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: tool)
-        p.arguments = args
-        p.standardOutput = FileHandle.nullDevice
-        p.standardError = FileHandle.nullDevice
-        do { try p.run() } catch { return false }
-        p.waitUntilExit()
-        return p.terminationStatus == 0
-    }
+    /// How long ditto gets to zip or unzip a pack: a mod folder, so seconds at most.
+    static let dittoTimeout: TimeInterval = 60
 }

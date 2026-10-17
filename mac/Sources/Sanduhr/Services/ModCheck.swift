@@ -208,47 +208,16 @@ enum ModCheck {
     /// `claude` that is a node script finds node.
     static func run(claude: String?, dir: String, timeout: TimeInterval = timeout) -> ModCheckOutcome {
         guard let claude else { return .unavailable }
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: claude)
-        p.arguments = arguments(dir: dir)
         var env = ProcessInfo.processInfo.environment
         let bins = [(claude as NSString).deletingLastPathComponent, "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
         env["PATH"] = (bins + [env["PATH"] ?? ""]).filter { !$0.isEmpty }.joined(separator: ":")
         env["NO_COLOR"] = "1"
-        p.environment = env
-        p.currentDirectoryURL = URL(fileURLWithPath: NSTemporaryDirectory())
-        let output = Pipe(), errors = Pipe()
-        p.standardInput = FileHandle.nullDevice
-        p.standardOutput = output
-        p.standardError = errors
-        let box = Box()
-        let done = DispatchGroup()
-        do { try p.run() } catch { return .failed("Couldn't start \(claude).") }
-        done.enter()
-        DispatchQueue.global(qos: .userInitiated).async {
-            box.err = errors.fileHandleForReading.readDataToEndOfFile()
-            done.leave()
-        }
-        done.enter()
-        DispatchQueue.global(qos: .userInitiated).async {
-            box.out = output.fileHandleForReading.readDataToEndOfFile()
-            done.leave()
-        }
-        if done.wait(timeout: .now() + timeout) == .timedOut {
-            p.terminate()
-            if done.wait(timeout: .now() + 1) == .timedOut { kill(p.processIdentifier, SIGKILL) }
-            p.waitUntilExit()
-            return .timedOut
-        }
-        p.waitUntilExit()
-        if let report = ModCheckReport.parse(box.out, dir: dir) { return .report(report) }
-        let reason = String(decoding: box.err.prefix(300), as: UTF8.self)
-            .split(separator: "\n").first.map(String.init) ?? ""
-        return .failed(reason.isEmpty ? "It gave no report (exit \(p.terminationStatus))." : reason)
-    }
-
-    private final class Box: @unchecked Sendable {
-        var out = Data()
-        var err = Data()
+        let r = ProcessRunner.run(claude, arguments(dir: dir), cwd: URL(fileURLWithPath: NSTemporaryDirectory()),
+                                  environment: env, timeout: timeout)
+        if r.launchFailed { return .failed("Couldn't start \(claude).") }
+        if r.timedOut { return .timedOut }
+        if let report = ModCheckReport.parse(Data(r.stdout.utf8), dir: dir) { return .report(report) }
+        let reason = String(r.stderr.prefix(300)).split(separator: "\n").first.map(String.init) ?? ""
+        return .failed(reason.isEmpty ? "It gave no report (exit \(r.status))." : reason)
     }
 }

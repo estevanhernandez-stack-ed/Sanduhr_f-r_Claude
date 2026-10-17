@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// Config an agent proposed through the MCP server's `propose_config` (item 76, slice K): files
@@ -135,7 +134,7 @@ struct ConfigProposal: @unchecked Sendable {
             let data = Data(f.text.utf8)
             out["files/" + f.path] = data
             manifestFiles.append(["path": "files/" + f.path, "bytes": data.count,
-                                  "sha256": SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()])
+                                  "sha256": Digest.sha256Hex(data)])
         }
         let manifest: [String: Any] = [
             "schema": 1, "kind": "config", "label": "Claude's proposal", "created_by": "Claude, through propose_config",
@@ -157,11 +156,8 @@ struct ConfigProposal: @unchecked Sendable {
     /// The answer the server waits for.
     static func resultJSON(id: String, status: String, folder: String? = nil, reason: String? = nil, reasons: [String] = [],
                            remedy: String? = nil, now: Date = Date()) -> Data {
-        var result: [String: Any] = ["status": status]
-        for (k, v) in [("folder", folder), ("reason", reason), ("remedy", remedy)] { if let v { result[k] = v } }
-        if !reasons.isEmpty { result["reasons"] = reasons }
-        let root: [String: Any] = ["id": id, "completed_at": HandoffFiles.stamp(now), "result": result]
-        return (try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])) ?? Data()
+        HandoffFiles.resultJSON(id: id, status: status, fields: [("folder", folder), ("reason", reason), ("remedy", remedy)],
+                                reasons: reasons, now: now)
     }
 }
 

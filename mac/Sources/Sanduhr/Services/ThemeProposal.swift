@@ -177,13 +177,9 @@ struct ThemeProposal: Equatable, Identifiable {
     /// The result file: `{id, completed_at, result: {status, reason, remedy, key, name,
     /// previous_key, saved_path, renamed_from, findings}}`, absent fields left out.
     static func resultJSON(id: String, _ o: Outcome, now: Date = Date()) -> Data {
-        var result: [String: Any] = ["status": o.status.rawValue, "findings": ThemeLint.json(o.findings)]
-        let optional: [(String, String?)] = [
-            ("reason", o.reason), ("remedy", o.remedy), ("key", o.key), ("name", o.name),
-            ("previous_key", o.previousKey), ("saved_path", o.savedPath), ("renamed_from", o.renamedFrom),
-        ]
-        for (k, v) in optional { if let v { result[k] = v } }
-        let root: [String: Any] = ["id": id, "completed_at": HandoffFiles.stamp(now), "result": result]
-        return (try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])) ?? Data()
+        HandoffFiles.resultJSON(id: id, status: o.status.rawValue, fields: [
+            ("findings", ThemeLint.json(o.findings)), ("reason", o.reason), ("remedy", o.remedy), ("key", o.key),
+            ("name", o.name), ("previous_key", o.previousKey), ("saved_path", o.savedPath), ("renamed_from", o.renamedFrom),
+        ], now: now)
     }
 }

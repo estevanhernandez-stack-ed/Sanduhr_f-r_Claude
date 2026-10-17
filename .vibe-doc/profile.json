@@ -1,31 +1,32 @@
 {
   "projectName": "Sanduhr für Claude",
-  "projectDescription": "Native Windows desktop widget that tracks Claude.ai subscription usage with burn-rate projections, pace markers, and sparklines. Also ships a native macOS SwiftUI version and a legacy cross-platform Python/tkinter v1.",
-  "mainPurpose": "Desktop application — always-on-top frameless widget rendering usage telemetry from claude.ai",
-  "primaryUsers": "Individual Claude Pro/Team/Enterprise subscribers (solo devs, power users). Not an internal tool, not a customer-facing SaaS.",
+  "projectDescription": "Native desktop widget that turns a claude.ai subscription's usage into pacing: burn-rate projection, pace markers, sparkline trends and themes. Two apps share the repo: a macOS SwiftUI app (Sparkle updates, Homebrew cask, GitHub Releases) with the Desk layer (desktop line, notch island, watchers, now playing), and a Windows .NET 10 / WPF app (Microsoft Store and Velopack). Both ship Claude Code integrations: a statusline, the network-free stdio MCP server, the sanduhr-meters mod, a usage vault, and Mods & Config with config packs and a marketplace publisher.",
+  "mainPurpose": "Desktop application: an always-on-top glass widget that reads a claude.ai subscription's usage and local Claude Code token burn, and shows where you stand against pace before the reset",
+  "primaryUsers": "Individual Claude Pro/Max/Team/Enterprise subscribers (solo devs, power users) who also run Claude Code. Public open source under MIT. Not an internal tool, not a customer-facing SaaS.",
   "coreFeatures": [
-    "Real-time usage bars per subscription tier (session, weekly, per-model)",
-    "Pace markers and burn-rate projections",
-    "2-hour sparkline history",
-    "5 built-in themes plus user-droppable theme JSONs",
-    "Win11 Mica glass backdrop with Win10 solid fallback",
-    "Windows Credential Manager storage via keyring",
-    "cf_clearance fallback for Cloudflare-blocked accounts",
-    "Silent v1->v2 migration",
-    "Inno Setup installer shipped from GitHub Releases"
+    "Burn-rate projection (\"At current pace, expires in 3d 21h\") and an always-on pace ghost on every bar, with Cooldown required and Surplus on hover",
+    "Horizon sparkline over the last 2 hours and breathing glass",
+    "Five hand-tuned themes plus user-authored JSON themes, Theme Studio with lint, and themes proposed from Claude Code through propose_theme",
+    "Claude Code integrations: a statusline segment, the sanduhr stdio MCP server (get_usage, get_local_burn_by_project, get_model_usage, get_usage_history, ping, publish_usage, propose_theme, propose_mod, propose_config) and the sanduhr-meters mod, the meters band above the prompt; standard library only, reading snapshot.json and nothing that could hold a credential",
+    "The usage vault: a local per-account record of Claude Code sessions, read by day, week, project, model, tier and skill, with a CSV ledger",
+    "Mods & Config: a Catalog, By Seat and Compare for every Claude Code folder; Mod Studio; config packs (.sanduhrpack) to export, open and undo a folder's config, including an any-agent folder; Publish to Marketplace for kept mods",
+    "Desk (Mac): the desktop layer and notch island with the handwritten message line, meeting list, now playing, and camera and mic indicators",
+    "Watchers (Mac): live cards for work in flight, on a notch place or in a Desk corner",
+    "Multi-account support with per-account credentials and 30-day local history, stacked per-tier charts and CSV export",
+    "Deep-work focus timer with a digitised falling-sand hourglass, and the cooldown snake game",
+    "Sign in through claude.ai's own login in an in-app window; credentials in the macOS Keychain or Windows Credential Manager; no telemetry, one network destination"
   ],
   "technologies": [
-    "Python 3.11",
-    "PySide6 / Qt 6",
-    "cloudscraper",
-    "keyring (Windows Credential Manager)",
-    "ctypes (DWM API for Mica)",
-    "PyInstaller (one-folder build)",
-    "Inno Setup 6 (installer)",
-    "pytest + pytest-qt",
-    "GitHub Actions (Windows CI + tag-triggered release)",
-    "Swift / SwiftUI (mac companion, separate branch)"
+    "Swift / SwiftUI (macOS 14+, SwiftPM, swift-testing)",
+    "Sparkle (Mac auto-updates, appcast on GitHub Pages)",
+    "Python 3 standard library, 3.9+ (sanduhr_mcp.py MCP server, sanduhr_statusline.py, their tests)",
+    ".NET 10 / WPF with WebView2 (Windows app; Sanduhr.Core logic, Sanduhr.Mcp server, xUnit)",
+    "GitHub Actions (signed, notarized Mac releases; Windows CI and tag-triggered release)",
+    "Homebrew tap (cask) and DMG for macOS",
+    "Microsoft Store (MSIX) and Velopack (Setup.exe + delta feed) for Windows",
+    "Ruby smoke CLI for the running Mac app",
+    "Model Context Protocol (stdio) as the tool contract shared by both apps"
   ],
-  "deploymentModel": "End-user desktop install. Downloaded as a signed-ready .exe installer from GitHub Releases and run locally on the user's Windows machine. No server, no SaaS. Credentials stored in Windows Credential Manager.",
-  "architectureStyle": "Native desktop application — single frameless Qt widget, threaded QObject for async HTTP to claude.ai, local JSON + keyring for persistence. No backend service. Client-of-API, not a server."
+  "deploymentModel": "End-user desktop install, no server, no SaaS. macOS: Homebrew cask or a signed, notarized DMG from GitHub Releases, updated by Sparkle (24h check) or brew upgrade. Windows: Microsoft Store (signed MSIX, Store updates) or the Velopack installer from GitHub Releases, which updates itself from the release feed. Credentials stay in the OS credential store; the MCP server and statusline are installed from Settings into the user's Claude Code folders.",
+  "architectureStyle": "Two native desktop apps sharing the docs, the release process and the MCP tool contract. Each is a frameless always-on-top widget that fetches usage from claude.ai with the user's own session cookie, keeps JSON history and a usage vault locally, and writes a snapshot file that the statusline, the MCP server and the meters mod read. Pure, tested core logic (Sanduhr.Core on Windows, Services and Helpers on the Mac) under a thin UI shell. No backend service: client-of-API, not a server."
 }

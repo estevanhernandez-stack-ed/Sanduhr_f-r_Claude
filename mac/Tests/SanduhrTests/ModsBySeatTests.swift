@@ -523,3 +523,20 @@ struct ModsBySeatTests {
         #expect(yaml.contains("  selected: 1\n  by_seat:\n    - settings: 3\n      warnings: 1\n      unreadable: false\n      instructions: 2\n      extensions: 4\n      parity: 0\n      hooks: 1\n      mcp: 2\n      history_warning: true\n      leftovers: 1\n      drift: 0\n      running: true\n"))
     }
 }
+
+/// Modification dates of every file under some folders, to prove a read changed nothing
+/// (item 71, slice 1b). Capped, so a huge seat stays quick.
+enum SeatMtimes {
+    static func snapshot(_ folders: [String], limit: Int = 50_000, fileManager fm: FileManager = .default) -> [String: Date] {
+        var out: [String: Date] = [:]
+        for folder in folders {
+            out[folder] = (try? fm.attributesOfItem(atPath: folder))?[.modificationDate] as? Date
+            guard let e = fm.enumerator(atPath: folder) else { continue }
+            while let rel = e.nextObject() as? String, out.count < limit {
+                let p = (folder as NSString).appendingPathComponent(rel)
+                out[p] = (try? fm.attributesOfItem(atPath: p))?[.modificationDate] as? Date
+            }
+        }
+        return out
+    }
+}

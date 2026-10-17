@@ -1,5 +1,4 @@
 import Foundation
-import CryptoKit
 
 /// Writes ~/Library/Application Support/Sanduhr/snapshot.json after every fetch: the same
 /// rendezvous file the Windows widget writes (schema_version 1), so other tools on this Mac
@@ -78,12 +77,10 @@ enum SnapshotWriter {
                               now: Date, to target: URL = url) {
         // Reset Sanduhr… ran: no snapshot comes back.
         guard !ResetGate.isOn else { return }
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let root: [String: Any] = [
             "schema_version": schemaVersion,
             "writer_version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown",
-            "captured_at": iso.string(from: now),
+            "captured_at": ISO8601.stamp(now),
             "account_ref": accountRef ?? NSNull(),
             "plan": NSNull(),
             "status": status,
@@ -107,7 +104,6 @@ enum SnapshotWriter {
 enum AccountRef {
     static func of(_ label: String?) -> String? {
         guard let label, !label.isEmpty else { return nil }
-        let digest = SHA256.hash(data: Data(label.utf8))
-        return digest.prefix(4).map { String(format: "%02x", $0) }.joined()
+        return Digest.sha256Hex(Data(label.utf8), prefix: 8)
     }
 }

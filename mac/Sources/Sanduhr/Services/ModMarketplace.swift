@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// A marketplace of the user's own (item 76, slice F): kept mods published into a git clone the
@@ -195,7 +194,7 @@ struct ModMarketplace {
         var parts: [String] = []
         for rel in rels {
             guard let data = FileManager.default.contents(atPath: folder.appendingPathComponent(rel).path) else { return nil }
-            parts.append(rel + ":" + SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined())
+            parts.append(rel + ":" + Digest.sha256Hex(data))
         }
         return parts.sorted().joined(separator: "\n")
     }
@@ -340,11 +339,9 @@ struct ModMarketplace {
         return line.isEmpty ? "git stopped with exit \(r.status)." : String(line.prefix(300))
     }
 
-    /// Runs git in the clone: never a prompt (no terminal, no askpass), stopped after `timeout`.
+    /// Runs git in the clone: never a prompt (no terminal, no askpass); nil when it ran past
+    /// `timeout` and was stopped.
     func git(_ args: [String], timeout: TimeInterval = 20) -> Run? {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: gitPath)
-        p.arguments = ["-C", folder.path] + args
         var env = ProcessInfo.processInfo.environment
         env["GIT_TERMINAL_PROMPT"] = "0"
         env["GIT_ASKPASS"] = "/usr/bin/false"
@@ -352,26 +349,9 @@ struct ModMarketplace {
         env["GIT_SSH_COMMAND"] = "ssh -o BatchMode=yes"
         env["LC_ALL"] = "C"
         env["PATH"] = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", env["PATH"] ?? ""].joined(separator: ":")
-        p.environment = env
-        let out = Pipe(), err = Pipe()
-        p.standardInput = FileHandle.nullDevice
-        p.standardOutput = out
-        p.standardError = err
-        final class Box: @unchecked Sendable { var out = Data(); var err = Data() }
-        let box = Box()
-        let done = DispatchGroup()
-        do { try p.run() } catch { return Run(status: -1, out: "", err: "Couldn't start git.") }
-        done.enter()
-        DispatchQueue.global(qos: .userInitiated).async { box.out = out.fileHandleForReading.readDataToEndOfFile(); done.leave() }
-        done.enter()
-        DispatchQueue.global(qos: .userInitiated).async { box.err = err.fileHandleForReading.readDataToEndOfFile(); done.leave() }
-        if done.wait(timeout: .now() + timeout) == .timedOut {
-            p.terminate()
-            p.waitUntilExit()
-            return nil
-        }
-        p.waitUntilExit()
-        return Run(status: p.terminationStatus, out: String(decoding: box.out, as: UTF8.self),
-                   err: String(decoding: box.err, as: UTF8.self))
+        let r = ProcessRunner.run(gitPath, ["-C", folder.path] + args, environment: env, timeout: timeout)
+        if r.launchFailed { return Run(status: -1, out: "", err: "Couldn't start git.") }
+        if r.timedOut { return nil }
+        return Run(status: r.status, out: r.stdout, err: r.stderr)
     }
 }

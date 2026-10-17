@@ -219,3 +219,225 @@ that is still a 404.
   matching 1Password item in the same sitting.
 - **Local fallback:** `mac/release.sh <version>` on the old Mac does the same with its Keychain
   (see the script header), then the release and appcast steps by hand.
+
+## Rolling back a release
+
+Rollback means something different on each channel, and none of them moves a Mac backwards:
+
+- **Sparkle** orders updates by build number and never offers a lower one (`mac/scripts/appcast_add.py`
+  refuses a lower build for the same reason). A Mac that installed 2.26.0 stays on 2.26.0 until a
+  higher build ships. For those users the only rollback is a patch release (next section).
+- **The DMG** is one file at one URL, named by the appcast's `<enclosure>` and by the cask's `url`.
+  Remove it and both channels stop installing at once.
+- **Homebrew** installs whatever `Casks/sanduhr.rb` in the tap says at install time, so the tap
+  needs its own revert.
+
+Steps, in the order that stops new installs fastest. Example: pulling 2.26.0 (build 36), the
+previous release being 2.25.1.
+
+1. **Pull the DMG off the release.** Instant. A Sparkle client that is offered 2.26.0 now fails
+   at download instead of installing it; `brew install` fails on the 404 the same way. The run's
+   artifact keeps a copy of the DMG for the investigation (`gh run download <run id>`).
+
+   ```
+   gh release delete-asset v2.26.0-mac Sanduhr-2.26.0.dmg --yes
+   ```
+
+2. **Mark the release.** Pre-release keeps the page and the notes and takes the release out of
+   the Latest slot and out of the cask's `livecheck` (`strategy :github_latest`):
+
+   ```
+   gh release edit v2.26.0-mac --prerelease
+   gh release edit v2.25.1-mac --latest
+   ```
+
+   Or delete it, without `--cleanup-tag`:
+
+   ```
+   gh release delete v2.26.0-mac --yes
+   gh release edit v2.25.1-mac --latest
+   ```
+
+   Re-mark the previous Mac release Latest either way. Left to itself GitHub picks Latest by
+   version number, and a Windows `v3.x` release takes the slot (`docs/release-runbook.md`,
+   gotcha log).
+
+3. **Take the item out of the appcast.** By hand: delete the whole `<item>` block for 2.26.0 from
+   `docs/appcast.xml` (nothing in the repo removes an item; `mac/scripts/appcast_add.py` only
+   adds), then a pull request to `main`:
+
+   ```
+   git checkout -b release/mac-pull-2.26.0
+   git add docs/appcast.xml
+   git commit -m "release(mac): pull 2.26.0 from the appcast"
+   git push -u origin release/mac-pull-2.26.0
+   gh pr create --base main --title "release(mac): pull 2.26.0 from the appcast" --body "Removes the 2.26.0 item. The DMG is already off the release."
+   ```
+
+   GitHub Pages republishes the feed after the merge. Sparkle checks once a day
+   (`SUScheduledCheckInterval` is 86400 in `mac/Info.plist`), so a Mac that checked just before
+   the merge can still be offered 2.26.0 for up to 24 hours; with step 1 done that offer fails at
+   download. Check for Updates… reads the feed at once.
+
+   The pulled build number stays burnt: the next release's `CFBundleVersion` must be above 36,
+   not above the feed's new highest (35). The workflow only checks against the feed, so it would
+   let 36 through, and Sparkle on every 2.26.0 Mac would never offer it.
+
+4. **Revert the tap.** In a clone of `estevanhernandez-stack-ed/homebrew-tap` (the tap repo, not
+   this one):
+
+   ```
+   git log --oneline -3                    # find the "sanduhr 2.26.0" commit
+   git revert <that sha>
+   brew style Casks/sanduhr.rb
+   git push
+   brew update
+   brew fetch --cask estevanhernandez-stack-ed/tap/sanduhr    # downloads 2.25.1 again
+   ```
+
+5. **Leave the tag.** `v2.26.0-mac` names the commit the bad DMG was built from (the workflow's
+   `--target`); the investigation and the patch start there, and the Macs still running 2.26.0
+   report that version. Never force-push or delete a published tag, and never reuse the version:
+   a second 2.26.0 would be two different builds under one number, and build 36 is gone from the
+   Macs that have it anyway. The fix is 2.26.1.
+
+6. **Write it down.** A line under "Unreleased (mac)" in `CHANGELOG.md` saying 2.26.0 was pulled
+   and why; it ships in the patch's notes.
+
+## A bad update in the wild
+
+**Who notices.** Nothing phones home: the app sends no telemetry and Sparkle reports nothing
+back, so there is no crash count and no install count. The first signal is one of three: your
+own Macs (they take the same update at their next daily check, so keep one on the normal
+cadence), a GitHub issue, or someone telling you. For the day after a release:
+
+```
+gh issue list --state open
+```
+
+**The first ten minutes.**
+
+1. **Which build.** About shows the version and build; confirm it is the release build, not a
+   local one (by hand). A Sparkle-updated app, a dragged DMG and a `brew` install all end up as
+   `/Applications/Sanduhr.app`.
+2. **Reproduce with what users got.** The DMG on the release page, not a local build:
+
+   ```
+   gh release download v2.26.0-mac --pattern 'Sanduhr-2.26.0.dmg' --dir <an empty folder>
+   open <that folder>/Sanduhr-2.26.0.dmg
+   ```
+
+   If the asset is already pulled, the run artifact has it: `gh run download <run id>`.
+3. **Read the crash.** A crash of a Sparkle-updated app lands where every crash lands:
+
+   ```
+   open ~/Library/Logs/DiagnosticReports
+   ```
+
+   The file is `Sanduhr-<date>.ips` (Console, Crash Reports, shows the same). For a misbehaviour
+   without a crash, `open -a Console` and filter on subsystem `com.626labs.sanduhr`, as
+   `docs/mac-smoke-test.md` does. From a reporter, ask for the `.ips` file, their macOS version
+   and whether the update came from Sparkle, the DMG or `brew`.
+4. **Decide: pull or hotfix.** Pull (previous section) when the app does not launch, loses or
+   corrupts the vault or settings, or the fix is not obvious within the hour. Hotfix when the
+   bug is contained and you can ship today. Pulling first and hotfixing after is the usual
+   shape: pulling costs nothing (nobody is downgraded), the hotfix takes the notary's 10 to 20
+   minutes plus your review.
+
+**The hotfix path** is the normal release with a patch version.
+
+1. Fix on a branch off `main`; `mac/test.sh` passes.
+2. `CHANGELOG.md`, under "Unreleased (mac)": a `**Fixed: …**` line that names the bug and the
+   version that introduced it.
+3. `mac/Info.plist`: `CFBundleShortVersionString` 2.26.1, `CFBundleVersion` 37 (above the
+   pulled build, see the previous section).
+4. Merge to `main`, then Part B steps 3 to 10 with the patch version:
+
+   ```
+   gh workflow run mac-release.yml --ref main -f version=2.26.1
+   ```
+
+5. Release notes: the workflow drafts them from the CHANGELOG section. Before publishing, edit
+   the draft so the fix is the first line and names the bad version ("2.26.0 crashed at launch
+   when …").
+6. Macs on 2.26.0 get 2.26.1 at their next daily check, or at once from Check for Updates….
+
+**What to tell users.**
+
+- The patch's release notes: first line, the bug, the version it was in.
+- The GitHub issue: reply when it reproduces, reply again with the patch version when the draft
+  is published and the appcast is merged, then close it.
+- If 2.26.0's page stays up as a pre-release, its notes say so (this replaces the notes, so
+  keep the old text in the command):
+
+  ```
+  gh release edit v2.26.0-mac --notes "Pulled: <the bug>. Update to 2.26.1."
+  ```
+
+## After a release
+
+Nothing in the workflow runs after the draft and the pull request; every check here is by hand.
+Example: 2.26.0.
+
+- [ ] **The run is green** (by hand):
+
+  ```
+  gh run list --workflow mac-release.yml --limit 1
+  gh run view <run id>
+  ```
+
+- [ ] **The draft is published** and holds the Latest slot (by hand):
+
+  ```
+  gh release view v2.26.0-mac --json isDraft,isPrerelease,isLatest,assets
+  ```
+
+  `isDraft` false, `isPrerelease` false, `isLatest` true, one asset `Sanduhr-2.26.0.dmg`. Note
+  its `size`.
+
+- [ ] **The appcast pull request is merged** and `docs/appcast.xml` on `main` carries the version
+  (by hand):
+
+  ```
+  gh pr list --state merged --head release/mac-2.26.0
+  git fetch origin
+  git grep -n -A 6 '<title>2.26.0</title>' origin/main -- docs/appcast.xml
+  ```
+
+  The item is first in the feed, `sparkle:version` is the build from `mac/Info.plist`,
+  `sparkle:edSignature` is non-empty and `length` equals the asset `size` above. Nothing prints
+  the signature for comparison; only Sparkle checks it, two items down.
+
+- [ ] **The tap commit `sanduhr 2.26.0` is pushed** (by hand, in the tap clone: `git log -1`),
+  and Homebrew serves the new DMG:
+
+  ```
+  brew update
+  brew fetch --cask estevanhernandez-stack-ed/tap/sanduhr
+  ```
+
+  `brew fetch` prints the path of the downloaded `Sanduhr-2.26.0.dmg` and verifies the cask's
+  `sha256` itself; a mismatch fails here.
+
+- [ ] **The DMG's SHA-256 equals the cask's** (by hand), for the DMG from the release page as well
+  as the one `brew fetch` downloaded:
+
+  ```
+  gh release download v2.26.0-mac --pattern 'Sanduhr-2.26.0.dmg' --dir <an empty folder>
+  shasum -a 256 <that folder>/Sanduhr-2.26.0.dmg
+  ```
+
+  The hash is the `sha256` line of `docs/distribution/sanduhr.rb` on `main` and of
+  `Casks/sanduhr.rb` in the tap, and the pull request body's "DMG SHA-256".
+
+- [ ] **A Sparkle-updated Mac shows What's New** (by hand): on a Mac running the previous
+  version, Check for Updates… offers 2.26.0, installs and relaunches (Sparkle verified the
+  EdDSA signature, or it would have refused). After the relaunch the What's New window opens
+  with "New in 2.26.0" when the release has a card in
+  `mac/Sources/Sanduhr/Models/WhatsNewCards.swift`; a release without a card of its own shows
+  nothing automatically, and About's What's New… lists every card.
+
+- [ ] **CHANGELOG.md** has "Unreleased (mac)" renamed to `v2.26.0-mac — <date>` and a new empty
+  one above it (by hand, Part B step 10). Skipping this is the common miss: the next run's draft
+  notes are cut from "Unreleased (mac)" by the workflow, so a stale heading ships the previous
+  release's notes again.

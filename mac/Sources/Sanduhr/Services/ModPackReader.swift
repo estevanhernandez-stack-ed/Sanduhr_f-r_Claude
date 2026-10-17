@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 import Observation
 
@@ -157,7 +156,8 @@ enum ModPackReader {
         } catch {
             throw Refusal("Sanduhr couldn't unpack it.")
         }
-        guard run("/usr/bin/ditto", ["-x", "-k", "--norsrc", "--noextattr", "--noacl", copy.path, root.path]) else {
+        guard ProcessRunner.run("/usr/bin/ditto", ["-x", "-k", "--norsrc", "--noextattr", "--noacl", copy.path, root.path],
+                                timeout: ModPack.dittoTimeout).ok else {
             throw Refusal("Sanduhr couldn't unpack it.")
         }
         // What's on disk is what the directory listed: plain files, no more, no larger.
@@ -186,7 +186,7 @@ enum ModPackReader {
                 reasons.append("\(path) is listed but missing.")
                 continue
             }
-            let hash = SHA256.hash(data: content).map { String(format: "%02x", $0) }.joined()
+            let hash = Digest.sha256Hex(content)
             guard content.count == bytes, hash == sha else {
                 reasons.append("\(path) doesn't match its manifest: the pack was changed or damaged.")
                 continue
@@ -204,13 +204,11 @@ enum ModPackReader {
     /// Keep's stamp for files held in memory: the first 12 hex digits of a SHA-256 over each
     /// name, a zero byte and its bytes, in name order, as `IntegrationScripts.stamp` hashes a folder.
     static func stamp(_ files: [String: Data]) -> String {
-        var hasher = SHA256()
+        var parts: [Data] = []
         for name in files.keys.sorted() {
-            hasher.update(data: Data(name.utf8))
-            hasher.update(data: Data([0]))
-            hasher.update(data: files[name] ?? Data())
+            parts += [Data(name.utf8), Data([0]), files[name] ?? Data()]
         }
-        return String(hasher.finalize().map { String(format: "%02x", $0) }.joined().prefix(12))
+        return Digest.sha256Hex(parts, prefix: 12)
     }
 
     /// The mod under `prefix` (`mod/` in a mod pack, `mods/<name>/` in a config pack) as
@@ -270,17 +268,6 @@ enum ModPackReader {
             }
         }
         return out
-    }
-
-    private static func run(_ tool: String, _ args: [String]) -> Bool {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: tool)
-        p.arguments = args
-        p.standardOutput = FileHandle.nullDevice
-        p.standardError = FileHandle.nullDevice
-        do { try p.run() } catch { return false }
-        p.waitUntilExit()
-        return p.terminationStatus == 0
     }
 }
 

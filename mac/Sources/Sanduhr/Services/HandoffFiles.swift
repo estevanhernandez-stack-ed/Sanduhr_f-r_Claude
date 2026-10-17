@@ -3,8 +3,8 @@ import Foundation
 /// The request/result handoffs between the Sanduhr MCP server and the app (item 54's Desk
 /// messages, item 55's themes): the server drops a request file into Sanduhr's Application
 /// Support folder, the app reads and removes it, checks it, and answers in a result file the
-/// server waits for. This is the part they share: one watch on the folder for every request, and
-/// the owner-only atomic writes.
+/// server waits for. This is the part they share: one watch on the folder for every request, the
+/// owner-only atomic writes, and the result file's shape.
 enum HandoffFiles {
     /// ~/Library/Application Support/Sanduhr.
     static var support: URL {
@@ -23,20 +23,47 @@ enum HandoffFiles {
         return data
     }
 
-    /// Atomic, readable by this user only.
-    static func writeOwnerOnly(_ data: Data, to url: URL) {
+    /// Atomic, readable by this user only: a temporary sibling created with mode 0600 and renamed
+    /// over `url`, so a reader never sees half of it and the bytes are never wider than 0600, not
+    /// even between write and chmod. The parent folder is made when missing. After Reset Sanduhr…
+    /// ran it silently writes nothing and doesn't throw; there is no opt-out, so a writer that is
+    /// part of the reset itself (the credential stores, the installer) keeps its own write.
+    static func writeOwnerOnlyOrThrow(_ data: Data, to url: URL) throws {
         // Reset Sanduhr… ran: nothing goes back into the folders it emptied.
         guard !ResetGate.isOn else { return }
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        guard (try? data.write(to: url, options: .atomic)) != nil else { return }
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        let fm = FileManager.default
+        let dir = url.deletingLastPathComponent()
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let tmp = dir.appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
+        guard fm.createFile(atPath: tmp.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        guard Darwin.rename(tmp.path, url.path) == 0 else {
+            let code = errno
+            unlink(tmp.path)
+            throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO)
+        }
+    }
+
+    /// `writeOwnerOnlyOrThrow` with the failure dropped: for the handoffs, where a result the
+    /// server can't read is the same as none.
+    static func writeOwnerOnly(_ data: Data, to url: URL) {
+        try? writeOwnerOnlyOrThrow(data, to: url)
     }
 
     /// An ISO 8601 stamp with milliseconds, as the result files carry.
-    static func stamp(_ date: Date) -> String {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f.string(from: date)
+    static func stamp(_ date: Date) -> String { ISO8601.stamp(date) }
+
+    /// The answer every handoff writes and the server reads back: `{id, completed_at, result:
+    /// {status, …}}`, keys sorted. `fields` are the result's own keys in the caller's order, a
+    /// nil value left out; `reasons` is written only when there are any.
+    static func resultJSON(id: String, status: String, fields: [(String, Any?)] = [], reasons: [String] = [],
+                           now: Date) -> Data {
+        var result: [String: Any] = ["status": status]
+        for (k, v) in fields { if let v { result[k] = v } }
+        if !reasons.isEmpty { result["reasons"] = reasons }
+        let root: [String: Any] = ["id": id, "completed_at": stamp(now), "result": result]
+        return (try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])) ?? Data()
     }
 }
 

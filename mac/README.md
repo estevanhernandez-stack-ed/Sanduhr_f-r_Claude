@@ -1,6 +1,7 @@
 # Sanduhr für Claude — macOS (SwiftUI)
 
-Native Mac rewrite of the [Python/tkinter widget](../sanduhr.py). Feature parity
+Native Mac rewrite of the legacy Python/tkinter widget (`sanduhr.py`, removed from the tree on
+2026-09-13 and kept at git tag `legacy/python-v2.3.0`). Feature parity
 plus real vibrancy, SF Pro, and no dock icon.
 
 New to Sanduhr? The [setup guide](../docs/setup-guide.md) walks through signing in, the Desk, the notch,
@@ -644,7 +645,11 @@ that is read (Live only or Keep a record), `vault_id` with `activity` and Keep a
 No access file, an unreadable one or another `schema_version` shares nothing (`not_shared`, and
 `ping.sharing.access_file` says why). Hidden returns the record's `p-` code for every project,
 full paths only for Full paths. The server never takes a path argument, never logs and makes no
-network request; the files it writes are a Desk message request and a theme request (below). `SANDUHR_SUPPORT_DIR`
+network request; the files it writes are the request files it hands Sanduhr: `desk-messages-request.json`,
+`theme-request.json`, `now-playing-looks-request.json`, `watch-request-<ms>-<seq>-<id>.json` (only while
+`watchers.json`, written by Sanduhr, says agents may show watchers), and `mod-request.json`,
+`mod-install-request.json` and `config-request.json` (only while `mods-agents.json` says agents may
+propose mods); the Desk message, theme, now playing and watcher requests are described below. `SANDUHR_SUPPORT_DIR`
 points it at a test folder (and Desk's folder beside it).
 
 **Desk messages from Claude (item 54).** `get_desk_messages` returns `{status, file_found, lines,

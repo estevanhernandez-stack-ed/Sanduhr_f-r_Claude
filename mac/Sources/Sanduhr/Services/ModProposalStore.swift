@@ -303,12 +303,10 @@ final class ModProposalStore {
 
     private func answerInstall(_ id: String, status: String, name: String? = nil, folder: String? = nil,
                                reason: String? = nil, remedy: String? = nil) {
-        var result: [String: Any] = ["status": status]
-        for (k, v) in [("name", name), ("folder", folder), ("reason", reason), ("remedy", remedy)] { if let v { result[k] = v } }
-        let root: [String: Any] = ["id": id, "completed_at": HandoffFiles.stamp(now()), "result": result]
-        if let data = try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys]) {
-            HandoffFiles.writeOwnerOnly(data, to: paths.installResult)
-        }
+        let data = HandoffFiles.resultJSON(id: id, status: status,
+                                           fields: [("name", name), ("folder", folder), ("reason", reason), ("remedy", remedy)],
+                                           now: now())
+        HandoffFiles.writeOwnerOnly(data, to: paths.installResult)
     }
 
     func receive(_ data: Data) {

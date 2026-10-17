@@ -168,11 +168,7 @@ enum SeatSnapshots {
     /// When a snapshot file's reading was taken, nil when it is missing or unreadable.
     static func capturedAt(_ url: URL) -> Date? {
         guard let s = json(url)?["captured_at"] as? String else { return nil }
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = iso.date(from: s) { return d }
-        iso.formatOptions = [.withInternetDateTime]
-        return iso.date(from: s)
+        return ISO8601.parse(s)
     }
 
     /// The file `writeSignedOut` writes: an auth error with no tiers.
@@ -194,25 +190,18 @@ enum SeatSnapshots {
         return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 
-    /// Written whole, a temporary sibling renamed over the file, so a reader never sees half;
-    /// owner-only, put back to 0600 even when the bytes are unchanged.
+    /// Written whole and owner-only through `HandoffFiles`, so a reader never sees half; put
+    /// back to 0600 even when the bytes are unchanged.
     static func write(_ data: Data, to url: URL) {
         // Reset Sanduhr… ran: seats.json and the seat files stay gone.
         guard !ResetGate.isOn else { return }
-        let fm = FileManager.default
         if let current = try? Data(contentsOf: url), current == data {
-            try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
             return
         }
-        let tmp = url.deletingLastPathComponent().appendingPathComponent(".\(seatsName).\(UUID().uuidString).tmp")
         do {
-            try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            guard fm.createFile(atPath: tmp.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
-                throw CocoaError(.fileWriteUnknown)
-            }
-            guard Darwin.rename(tmp.path, url.path) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            try HandoffFiles.writeOwnerOnlyOrThrow(data, to: url)
         } catch {
-            unlink(tmp.path)
             NSLog("Sanduhr seats write failed (\(type(of: error)))")
         }
     }

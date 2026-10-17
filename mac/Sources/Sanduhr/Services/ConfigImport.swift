@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// Opening a config pack into a seat (item 76, slice D, `docs/config-transfer-spec.md`). Each
@@ -146,7 +145,7 @@ enum ConfigImport {
         }
 
         // Settings keys: only ones the pack may carry, the home folder put back.
-        let settings = readObject((root as NSString).appendingPathComponent("settings.json"))
+        let settings = JSONEdit.root(at: (root as NSString).appendingPathComponent("settings.json"), maxBytes: JSONFiles.Cap.settings)
         for (key, packed) in (pack.manifest["settings"] as? [String: Any] ?? [:]).sorted(by: { $0.key < $1.key }) {
             guard ConfigPack.settingsKeys.contains(key) else { continue }
             let local = ConfigPack.walk(packed, rewrite: { atHome($0, home: home) }, check: { _ in nil }).0
@@ -184,8 +183,10 @@ enum ConfigImport {
 
         // Plugins and MCP servers: run through `claude` when it can be, else the command to copy.
         let prefix = configPrefix(root, home: home)
-        let installed = Set(((readObject((root as NSString).appendingPathComponent("plugins/installed_plugins.json"))?["plugins"]) as? [String: Any] ?? [:]).keys)
-        let servers = readObject(ClaudeCodeFolders.configFile(for: root, home: home))?["mcpServers"] as? [String: Any] ?? [:]
+        let installed = Set(((JSONEdit.root(at: (root as NSString).appendingPathComponent("plugins/installed_plugins.json"),
+                                            maxBytes: JSONFiles.Cap.manifest)?["plugins"]) as? [String: Any] ?? [:]).keys)
+        let servers = JSONEdit.root(at: ClaudeCodeFolders.configFile(for: root, home: home),
+                                    maxBytes: JSONFiles.Cap.claudeJSON)?["mcpServers"] as? [String: Any] ?? [:]
         func status(_ cmd: String) -> Row.Status {
             switch cli {
             case .ready: .install(cmd)
@@ -337,11 +338,6 @@ enum ConfigImport {
         case let v?: "\(v)"
         case nil: ""
         }
-    }
-
-    private static func readObject(_ path: String) -> [String: Any]? {
-        guard let data = FileManager.default.contents(atPath: path) else { return nil }
-        return try? JSONEdit.root(data)
     }
 
     /// A JSON value as JSONEdit writes it; nil for numbers it doesn't (fractions) or null.
@@ -497,7 +493,7 @@ enum ConfigImport {
     static func run(_ jobs: [Job], seat: String, cli: ClaudeCLI) -> (steps: [Step], failures: [String]) {
         var steps: [Step] = [], failures: [String] = []
         let settingsFile = (AccountData.normalized(seat) as NSString).appendingPathComponent("settings.json")
-        let keysBefore = Set(readObject(settingsFile)?.keys.map { $0 } ?? [])
+        let keysBefore = Set(JSONEdit.root(at: settingsFile, maxBytes: JSONFiles.Cap.settings)?.keys.map { $0 } ?? [])
 
         var markets: Set<String>?
         for job in jobs {
@@ -525,7 +521,8 @@ enum ConfigImport {
             }
         }
         // Keys claude made for them, recorded so Undo can drop them once they're empty again.
-        let made = Set(readObject(settingsFile)?.keys.map { $0 } ?? []).subtracting(keysBefore).intersection(cliKeys)
+        let made = Set(JSONEdit.root(at: settingsFile, maxBytes: JSONFiles.Cap.settings)?.keys.map { $0 } ?? [])
+            .subtracting(keysBefore).intersection(cliKeys)
         if !steps.isEmpty { steps.insert(contentsOf: made.sorted().map { Step(kind: .cliKey, name: $0) }, at: 0) }
         return (steps, failures)
     }
@@ -556,7 +553,8 @@ enum ConfigImport {
                 let rm = cli.run(.marketplaceRemove(name: step.name), seat: record.seat)
                 if !rm.ok { left.append("marketplace \(step.name): \(rm.reason)") }
             case .mcpServer:
-                let servers = readObject(ClaudeCodeFolders.configFile(for: record.seat, home: home))?["mcpServers"] as? [String: Any] ?? [:]
+                let servers = JSONEdit.root(at: ClaudeCodeFolders.configFile(for: record.seat, home: home),
+                                            maxBytes: JSONFiles.Cap.claudeJSON)?["mcpServers"] as? [String: Any] ?? [:]
                 guard let current = servers[step.name] else { continue }
                 guard canonicalSHA(current) == step.sha256 else { left.append("MCP server \(step.name), changed since"); continue }
                 let r = cli.run(.mcpRemove(name: step.name), seat: record.seat)
@@ -627,7 +625,7 @@ enum ConfigImport {
         return left
     }
 
-    static func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
+    static func sha(_ data: Data) -> String { Digest.sha256Hex(data) }
 
     static func canonicalSHA(_ value: Any) -> String {
         let data = (try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys, .fragmentsAllowed, .withoutEscapingSlashes])) ?? Data()
