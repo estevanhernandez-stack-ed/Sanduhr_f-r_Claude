@@ -29,7 +29,7 @@ offers to quit for it.
 ### 2. GitHub Release (Setup.exe)
 
 Download **`626Labs.Sanduhr-win-Setup.exe`** from the
-[latest release](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases/latest)
+[newest Windows release](https://github.com/estevanhernandez-stack-ed/Sanduhr_f-r_Claude/releases?q=v3&expanded=true)
 and run it.
 
 - The installer is not code-signed, so SmartScreen shows "Windows protected your PC": click
