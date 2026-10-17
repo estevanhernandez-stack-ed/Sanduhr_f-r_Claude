@@ -415,6 +415,7 @@ struct NewModSheet: View {
     @State private var trying: KeptMod?
     @State private var tryingProposal: ModProposalRecord?
     @State private var forgetting: KeptMod?
+    @State private var dismissing: ModProposalRecord?
     @State private var exporting: KeptMod?
     @State private var consent: KeptConsent?
 
@@ -508,6 +509,14 @@ struct NewModSheet: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Deletes Sanduhr's copy. The session's own folder is left as it is, until Claude Code cleans it up.")
+        }
+        .confirmationDialog("Dismiss \(dismissing?.name ?? "the proposal")?", isPresented: Binding(get: { dismissing != nil }, set: { if !$0 { dismissing = nil } })) {
+            Button("Dismiss", role: .destructive) { if let r = dismissing { proposals.dismiss(r.id) } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(dismissing?.fromFile == true
+                 ? "Sanduhr's copy of the pack's files is deleted. The pack itself is left where it is."
+                 : "Its staged files are deleted. Ask Claude again to get it back.")
         }
         .alert(publishTitle, isPresented: Binding(get: { model.publishing != nil }, set: { if !$0 { model.publishing = nil } })) {
             let same = model.publishing?.plan.change == .same
@@ -774,7 +783,7 @@ struct NewModSheet: View {
                 }
                 Spacer()
                 if model.keptBusy.contains(r.id) { ProgressView().controlSize(.small) }
-                Button("Dismiss") { proposals.dismiss(r.id) }
+                Button("Dismiss…") { dismissing = r }
                     .controlSize(.small)
                     .help(r.fromFile ? "Deletes Sanduhr's copy of the pack's files. The pack itself is left where it is."
                           : "Deletes the proposed files. Claude hears that you dismissed it.")
