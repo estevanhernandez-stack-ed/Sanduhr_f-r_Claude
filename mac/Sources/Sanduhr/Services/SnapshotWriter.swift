@@ -77,12 +77,10 @@ enum SnapshotWriter {
                               now: Date, to target: URL = url) {
         // Reset Sanduhr… ran: no snapshot comes back.
         guard !ResetGate.isOn else { return }
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let root: [String: Any] = [
             "schema_version": schemaVersion,
             "writer_version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown",
-            "captured_at": iso.string(from: now),
+            "captured_at": ISO8601.stamp(now),
             "account_ref": accountRef ?? NSNull(),
             "plan": NSNull(),
             "status": status,

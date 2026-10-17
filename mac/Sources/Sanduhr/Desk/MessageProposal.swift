@@ -81,21 +81,7 @@ struct MessageProposal: Equatable, Identifiable {
     }
 
     /// The request stamp: ISO 8601 with or without a fraction (also .NET's seven digits).
-    static func parseDate(_ s: String) -> Date? {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = f.date(from: s) { return d }
-        f.formatOptions = [.withInternetDateTime]
-        if let d = f.date(from: s) { return d }
-        // .NET-style seven fraction digits ("…:00.1234560+00:00"): keep three.
-        if let r = s.range(of: #"\.(\d{3})\d+"#, options: .regularExpression) {
-            var t = s
-            t.replaceSubrange(r, with: "." + s[r].dropFirst().prefix(3))
-            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            return f.date(from: t)
-        }
-        return nil
-    }
+    static func parseDate(_ s: String) -> Date? { ISO8601.parse(s) }
 
     // MARK: - The checks
 
@@ -209,9 +195,7 @@ struct MessageProposal: Equatable, Identifiable {
             result["lines_added"] = applied.added
             result["lines_skipped"] = applied.skipped
         }
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let root: [String: Any] = ["id": id, "completed_at": f.string(from: now), "result": result]
+        let root: [String: Any] = ["id": id, "completed_at": ISO8601.stamp(now), "result": result]
         return (try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])) ?? Data()
     }
 

@@ -152,18 +152,8 @@ enum BandFrame {
 
     /// An ISO-8601 time in ms, or nil. Fractions are cut to milliseconds (.NET writes seven digits).
     static func parseTime(_ v: Any?) -> Double? {
-        guard let s0 = v as? String else { return nil }
-        var s = s0.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !s.isEmpty else { return nil }
-        if let r = s.range(of: #"(\.\d{3})\d+"#, options: .regularExpression) {
-            s.replaceSubrange(r, with: String(s[r].prefix(4)))
-        }
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = iso.date(from: s) { return (d.timeIntervalSince1970 * 1000).rounded() }
-        iso.formatOptions = [.withInternetDateTime]
-        if let d = iso.date(from: s) { return d.timeIntervalSince1970 * 1000 }
-        return nil
+        guard let s = v as? String, let d = ISO8601.parse(s) else { return nil }
+        return (d.timeIntervalSince1970 * 1000).rounded()
     }
 
     // MARK: snapshot.json (meters.ts)

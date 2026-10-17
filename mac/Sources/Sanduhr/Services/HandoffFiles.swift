@@ -33,11 +33,7 @@ enum HandoffFiles {
     }
 
     /// An ISO 8601 stamp with milliseconds, as the result files carry.
-    static func stamp(_ date: Date) -> String {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f.string(from: date)
-    }
+    static func stamp(_ date: Date) -> String { ISO8601.stamp(date) }
 }
 
 /// One kernel watch on Sanduhr's folder (the themes folder's watcher, no polling) for every

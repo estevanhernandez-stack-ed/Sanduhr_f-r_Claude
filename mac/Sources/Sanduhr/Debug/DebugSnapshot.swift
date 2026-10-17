@@ -494,7 +494,6 @@ enum DebugState {
     static func yaml(_ s: DebugStateInput) -> YAMLNode {
         // Built in typed steps: one literal holding the whole map is more than Swift 6.0 and 6.1
         // will type-check in reasonable time.
-        let iso = ISO8601DateFormatter()
         let meters: [YAMLNode] = s.meters.map(meter)
         let menu: [YAMLNode] = s.menu.map(menuGroup)
         var pairs: [(String, YAMLNode?)] = []
@@ -540,7 +539,7 @@ enum DebugState {
         pairs.append(("desk_piece_clicks", .bool(s.deskPieceClicks)))
         pairs.append(("dock", dockYAML(s.dock)))
         pairs.append(("alerts", alerts(s.alerts)))
-        let fetched: YAMLNode = s.lastFetch.map { .string(iso.string(from: $0)) } ?? .null
+        let fetched: YAMLNode = s.lastFetch.map { .string(ISO8601.stamp($0, fractional: false)) } ?? .null
         pairs.append(("last_fetch", fetched))
         pairs.append(("active_tool", s.activeTool.map(YAMLNode.string) ?? .null))
         pairs.append(("pacing_pinned", .bool(s.pacingPinned)))

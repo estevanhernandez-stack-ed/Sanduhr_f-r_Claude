@@ -116,13 +116,7 @@ enum WatcherRequest {
         return Int(d)
     }
 
-    static func parseDate(_ s: String) -> Date? {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = f.date(from: s) { return d }
-        f.formatOptions = [.withInternetDateTime]
-        return f.date(from: s)
-    }
+    static func parseDate(_ s: String) -> Date? { ISO8601.parse(s) }
 
     /// An agent request's JSON, as the server writes it (the debug actions and the tests).
     static func json(_ command: WatcherCommand, folder: String? = nil, at: Date) -> Data {

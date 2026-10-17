@@ -80,7 +80,7 @@ enum HistoryStore {
         func append(_ readings: [(Tier, Double)], account: String?, now: Date = Date()) -> History {
             var h = load(account)
             guard !readings.isEmpty else { return h }
-            let iso = ISO8601DateFormatter().string(from: now)
+            let iso = ISO8601.stamp(now, fractional: false)
             let cutoff = now.addingTimeInterval(-retention)
             for (tier, utilization) in readings {
                 var series = h[tier.rawValue] ?? []
@@ -144,19 +144,8 @@ enum HistoryStore {
         return drop > 0 ? Array(series.dropFirst(drop)) : series
     }
 
-    /// The Mac's own timestamps (whole seconds, `Z`) and Windows' (`.ffffff+00:00`). The two
-    /// formatters are made once: ISO8601DateFormatter is thread safe, and a chart parses
-    /// thousands of points.
-    static func date(_ s: String) -> Date? {
-        plainFormatter.date(from: s) ?? fractionalFormatter.date(from: s)
-    }
-
-    nonisolated(unsafe) private static let plainFormatter = ISO8601DateFormatter()
-    nonisolated(unsafe) private static let fractionalFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    /// The Mac's own timestamps (whole seconds, `Z`) and Windows' (`.ffffff+00:00`).
+    static func date(_ s: String) -> Date? { ISO8601.parse(s) }
 
     /// What the sparklines draw: each tier's last `sparklinePoints` points.
     static func sparklines(_ h: History) -> History {
@@ -167,7 +156,7 @@ enum HistoryStore {
     /// gains, so nothing is read back.
     static func sparklines(_ h: History, adding readings: [(Tier, Double)], at now: Date) -> History {
         var out = h
-        let iso = ISO8601DateFormatter().string(from: now)
+        let iso = ISO8601.stamp(now, fractional: false)
         for (tier, utilization) in readings {
             out[tier.rawValue, default: []].append(.init(t: iso, v: utilization))
         }

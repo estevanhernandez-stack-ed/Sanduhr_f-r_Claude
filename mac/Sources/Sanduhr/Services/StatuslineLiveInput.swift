@@ -49,20 +49,12 @@ enum StatuslineLiveInput {
             guard let key = tier["key"] as? String, key == "five_hour" || key == "seven_day",
                   let util = (tier["utilization"] as? NSNumber)?.doubleValue else { continue }
             var window: [String: Any] = ["used_percentage": util]
-            if let reset = (tier["resets_at"] as? String).flatMap(parseDate), reset > now {
+            if let reset = (tier["resets_at"] as? String).flatMap(ISO8601.parse), reset > now {
                 window["resets_at"] = Int(reset.timeIntervalSince1970)
             }
             out[key] = window
         }
         return out.isEmpty ? nil : out
-    }
-
-    private static func parseDate(_ s: String) -> Date? {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = f.date(from: s) { return d }
-        f.formatOptions = [.withInternetDateTime]
-        return f.date(from: s)
     }
 
     struct Session: Equatable, Sendable {
