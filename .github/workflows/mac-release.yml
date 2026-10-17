@@ -13,14 +13,16 @@ on:
         required: true
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency: mac-release
 
 jobs:
   release:
     runs-on: macos-15
+    permissions:
+      contents: write
+      pull-requests: write
     # Signing secrets live in this environment, so no other workflow can read them.
     environment: mac-release
     defaults:
@@ -32,7 +34,7 @@ jobs:
       SIGN_IDENTITY: "Developer ID Application: Estevan Hernandez (82BSR56X5J)"
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Check branch, version and tag
         run: |
@@ -147,7 +149,7 @@ jobs:
             || echo "::warning::Could not open the pull request (Settings, Actions, allow GitHub Actions to create pull requests). Branch $BRANCH is pushed; open it by hand."
 
       - name: Keep the DMG as a run artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Sanduhr-${{ inputs.version }}-dmg
           path: mac/Sanduhr-${{ inputs.version }}.dmg
