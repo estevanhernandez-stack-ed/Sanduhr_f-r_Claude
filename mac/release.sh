@@ -90,7 +90,7 @@ Next (do these manually — one-time steps per release):
 
 1. Tag + upload the DMG to GitHub Releases:
      cd "$REPO_ROOT"
-     gh release create "v$VERSION-mac" "$DMG_OUT" --title "Sanduhr for Mac $VERSION" --generate-notes
+     gh release create "v$VERSION-mac" "$DMG_OUT" --title "Sanduhr for Mac $VERSION" --generate-notes --latest
 
 2. Commit + push the updated appcast:
      git add docs/appcast.xml

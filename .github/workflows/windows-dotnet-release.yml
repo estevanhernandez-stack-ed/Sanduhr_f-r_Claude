@@ -44,6 +44,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           draft: true
+          # Latest belongs to the Mac app (docs/release-runbook.md Phase 6). Set it
+          # here too so a draft published from the web UI can't take the slot.
+          make_latest: false
           files: windows-dotnet/dist/Sanduhr-Store-v${{ steps.ver.outputs.version }}.msix
           fail_on_unmatched_files: true
           body: |
