@@ -350,7 +350,24 @@ struct DeskPieceClicksTests {
         DeskPieceClicks.set(true, in: store)
         #expect(DeskPieceClicks.isOn(in: store))
         #expect(DeskPieceClicks.title == "Clock and message take clicks")
-        #expect(DeskPieceClicks.caption == "On: two-finger click them for Sanduhr's menu. Desktop icons right beneath them can't be clicked there while it's on.")
+        #expect(DeskPieceClicks.caption == "Desktop icons under the clock or message can't be clicked while this is on. On: two-finger click them for Sanduhr's menu.")
+    }
+
+    @Test func anExistingProfileWithoutTheKeyKeepsItsClicks() {
+        // An install from before the first-run write never gets the key: today's reading, on.
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        widget.set("obsidian", forKey: "theme")
+        #expect(s.firstRun(widget: widget) == .existing)
+        #expect(s.defaults.object(forKey: DeskPieceClicks.key) == nil)
+        #expect(DeskPieceClicks.isOn(in: s.defaults))
+        #expect(DeskPieceClicks.defaultOn)
+    }
+
+    @Test func aFreshInstallStartsWithTheSwitchOff() {
+        let s = ScratchDefaults(), widget = MemoryDefaults()
+        #expect(s.firstRun(widget: widget) == .fresh)
+        #expect(s.defaults.object(forKey: DeskPieceClicks.key) as? Bool == false)
+        #expect(!DeskPieceClicks.isOn(in: s.defaults))
     }
 
     @Test func aDragFromElsewhereNeverTurnsThePlatesOn() {

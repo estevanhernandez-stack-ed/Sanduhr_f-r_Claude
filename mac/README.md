@@ -1340,7 +1340,8 @@ takes the mouse only over its click areas (`DeskHitTest`, from the frames the pi
 alpha 3 of 255) makes the gaps between letters count. Everywhere else clicks go to the desktop.
 
 **Clock and message take clicks** (Settings, Desk, Clicks; desk suite key
-`piecesTakeClicks`, on by default) adds the clock (time and date), the message (the day's line, a
+`piecesTakeClicks`; on when the key is absent, so an existing Desk keeps its clicks, and written off
+for a new install by `DeskFirstRun`) adds the clock (time and date), the message (the day's line, a
 special day's stack, or the line taking its turn with Take turns or Scroll) and the claude line to
 those areas (`DeskPieceClicks`; kinds `clock`, `message` and `claude_line`). A two-finger click on
 any of them opens the shared Sanduhr menu (Arrange Desk…, Settings… and the rest) instead of the

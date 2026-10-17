@@ -149,7 +149,7 @@ enum SettingsAnchor {
         SettingsEntry(title: "Fonts", page: .deskLook, anchor: fonts, synonyms: ["Desk font", "Message font", "typeface"]),
         SettingsEntry(title: "Sizes", page: .deskLook, anchor: sizes, synonyms: ["clock size", "message size"]),
         SettingsEntry(title: "Colors", page: .deskLook, anchor: colors,
-                      synonyms: ["color", "gradient", "preset", "Glow around the message", "Drop shadow under the clock text",
+                      synonyms: ["color", "gradient", "preset", "Glow around the message", DeskInkShadow.title,
                                  DeskPlate.title]),
         SettingsEntry(title: "Hex colors", page: .deskLook, anchor: hex, synonyms: ["hex", "custom color"], advanced: true),
         SettingsEntry(title: "Add Line", page: .message, anchor: editor,

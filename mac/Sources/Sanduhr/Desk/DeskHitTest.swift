@@ -321,14 +321,15 @@ enum DeskPointerWatch {
 /// claude line draw the faint hit plate (DeskPointerMenu) and become click areas, so a two-finger
 /// click there opens Sanduhr's menu instead of the Finder's. The price is the desktop icons right
 /// beneath them, which the window covers while the pointer is there. Off, all three let every
-/// click through, exactly as before.
+/// click through, exactly as before. An absent key reads on, so a Desk from before the switch
+/// keeps its clicks; DeskFirstRun writes it off for a new install.
 enum DeskPieceClicks {
     /// Desk suite key (com.626labs.sanduhr.desk).
     static let key = "piecesTakeClicks"
     static let defaultOn = true
 
     static let title = "Clock and message take clicks"
-    static let caption = "On: two-finger click them for Sanduhr's menu. Desktop icons right beneath them can't be clicked there while it's on."
+    static let caption = "Desktop icons under the clock or message can't be clicked while this is on. On: two-finger click them for Sanduhr's menu."
 
     static func isOn(in store: DefaultsStore) -> Bool {
         store.object(forKey: key) as? Bool ?? defaultOn

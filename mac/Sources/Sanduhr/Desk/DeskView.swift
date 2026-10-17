@@ -548,6 +548,13 @@ private struct DeskPlateModifier: ViewModifier {
     }
 }
 
+/// "Drop shadow under the text" (Settings, Desk Look): the DeskInk shadow, under every piece but
+/// the message, which has its glow (DeskMessageLine). Desk suite key `inkShadow`, on when absent.
+enum DeskInkShadow {
+    static let title = "Drop shadow under the text"
+    static let caption = "Under every piece but the message, which has its glow."
+}
+
 private struct DeskInk: ViewModifier {
     @AppStorage("inkColor", store: .desk) private var ink = "ffffff"
     @AppStorage("inkShadow", store: .desk) private var shadow = true
