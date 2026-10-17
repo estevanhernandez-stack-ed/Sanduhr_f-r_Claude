@@ -144,7 +144,7 @@ enum SettingsAnchor {
         SettingsEntry(title: "Where each piece sits", page: .deskLayout, anchor: pieces,
                       synonyms: ["corner", "position", "place", "hidden", "clock", "meetings", "Read today's meetings"]),
         SettingsEntry(title: "Order", page: .deskLayout, anchor: order, synonyms: ["stack", "reorder"]),
-        SettingsEntry(title: "Clicks", page: .deskLayout, anchor: clicks, synonyms: [DeskPieceClicks.title, "click"]),
+        SettingsEntry(title: "Clicks", page: .deskLayout, anchor: clicks, synonyms: [DeskPieceClicks.title, "click", DeskLayer.title, "under desktop icons", "bottom", "behind files"]),
         SettingsEntry(title: "Margins", page: .deskLayout, anchor: margins, synonyms: ["padding", "edge", "inset"], advanced: true),
         SettingsEntry(title: "Fonts", page: .deskLook, anchor: fonts, synonyms: ["Desk font", "Message font", "typeface"]),
         SettingsEntry(title: "Sizes", page: .deskLook, anchor: sizes, synonyms: ["clock size", "message size"]),

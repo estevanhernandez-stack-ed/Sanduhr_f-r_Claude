@@ -70,11 +70,17 @@ private struct FirstPieceAnchor: ViewModifier {
 /// Desk, Clicks (moved from Desk Look in slice 2: it is behavior, not look).
 private struct DeskClicksSection: View {
     @AppStorage(DeskPieceClicks.key, store: .desk) private var piecesTakeClicks = DeskPieceClicks.defaultOn
+    @AppStorage(DeskLayer.key, store: .desk) private var underIcons = DeskLayer.defaultOn
 
     var body: some View {
         Section("Clicks") {
+            Toggle(DeskLayer.title, isOn: $underIcons)
+                .onChange(of: underIcons) { _, _ in DeskController.shared.applyLayer() }
+            Text(DeskLayer.caption)
+                .font(.caption).foregroundStyle(.secondary)
             Toggle(DeskPieceClicks.title, isOn: $piecesTakeClicks)
                 .settingsAnchor(SettingsAnchor.clicks)
+                .disabled(underIcons)
             Text(DeskPieceClicks.caption)
                 .font(.caption).foregroundStyle(.secondary)
         }

@@ -29,6 +29,7 @@ import AppKit
 ///   defaults write com.626labs.sanduhr.desk top -float 40
 ///   defaults write com.626labs.sanduhr.desk bottom -float 60
 ///   defaults write com.626labs.sanduhr.desk menuIcon -bool true    (bring back the clock menu)
+///   defaults write com.626labs.sanduhr.desk underIcons -bool true (the Desk window under Finder's desktop icons; it takes no clicks there)
 ///   defaults write com.626labs.sanduhr.desk plate -bool true       (a soft dark plate behind each piece, for a
 ///                                                                   desktop with files under it; a new install
 ///                                                                   writes it on, an absent key is off)

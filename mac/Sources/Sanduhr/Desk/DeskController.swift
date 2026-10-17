@@ -261,6 +261,15 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     @objc private func screensChanged() { if running { buildWindow() } }
 
+    /// "Keep the Desk under desktop icons" flipped: move the window to its layer at once. Under
+    /// the icons the window never takes the mouse, so a plate left taking it is let go.
+    func applyLayer() {
+        guard let w = window else { return }
+        let under = DeskLayer.isOn(in: UserDefaults.desk)
+        w.level = DeskLayer.level(underIcons: under)
+        if under, !w.ignoresMouseEvents { w.ignoresMouseEvents = true }
+    }
+
     /// One transparent, click-through window covering the main screen, above the desktop
     /// icons and below every app window.
     private func buildWindow() {
@@ -274,10 +283,11 @@ final class DeskController: NSObject, NSMenuDelegate {
         w.isReleasedWhenClosed = false
         // Arrange mode carries over a rebuild (a display change): the window can still take the key.
         w.takesKey = model.arrange.active
-        // Just below normal windows, not in the desktop layer: on newer macOS a click on the
-        // desktop layer counts as clicking the wallpaper, which sweeps the windows away
-        // instead of reaching the meeting row.
-        w.level = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
+        // Just below normal windows by default, not in the desktop layer: on newer macOS a click
+        // on the desktop layer counts as clicking the wallpaper, which sweeps the windows away
+        // instead of reaching the meeting row. Under the icons when the user chose that
+        // (DeskLayer): then the Desk takes no clicks at all.
+        w.level = DeskLayer.level(underIcons: DeskLayer.isOn(in: UserDefaults.desk))
         w.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         w.isOpaque = false
         w.backgroundColor = .clear
@@ -631,7 +641,10 @@ final class DeskController: NSObject, NSMenuDelegate {
         // Outside Arrange mode, a button held down (a file dragged from the desktop) keeps the
         // window as it was, so a drag that started elsewhere crosses the plates to the Finder
         // (DeskPointerDrag); the button coming up runs this again.
+        // Under the desktop icons (DeskLayer) the window can't be clicked anyway: Finder's icon
+        // window covers it, so it never takes the mouse outside Arrange mode.
         let over = arranging ? wanted
+            : DeskLayer.isOn(in: UserDefaults.desk) ? false
             : DeskPointerDrag.takesMouse(wanted: wanted, buttonDown: NSEvent.pressedMouseButtons != 0,
                                          takingNow: !w.ignoresMouseEvents)
         if w.ignoresMouseEvents == over { w.ignoresMouseEvents = !over }

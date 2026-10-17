@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import CoreGraphics
 
@@ -323,6 +324,36 @@ enum DeskPointerWatch {
 /// beneath them, which the window covers while the pointer is there. Off, all three let every
 /// click through, exactly as before. An absent key reads on, so a Desk from before the switch
 /// keeps its clicks; DeskFirstRun writes it off for a new install.
+/// Where the Desk window sits (Settings, Desk, Clicks's "Keep the Desk under desktop icons"):
+/// just below normal windows, as it always has, or in the desktop layer under Finder's icons,
+/// so files on the desktop sit on top of the Desk's text instead of under it. Under the icons
+/// the Desk takes no clicks: Finder's icon window covers the whole screen above it, and on
+/// recent macOS a click there counts as clicking the wallpaper.
+enum DeskLayer {
+    /// Desk suite key (com.626labs.sanduhr.desk).
+    static let key = "underIcons"
+    static let defaultOn = false
+
+    static let title = "Keep the Desk under desktop icons"
+    static let caption = "Files on the desktop sit on top of the Desk's text. While this is on, the Desk takes no clicks: the clock's menu, meeting rows and watchers don't respond, and a click on the Desk counts as a click on the wallpaper."
+
+    static func isOn(in store: DefaultsStore) -> Bool {
+        store.object(forKey: key) as? Bool ?? defaultOn
+    }
+
+    static func set(_ on: Bool, in store: DefaultsStore) {
+        store.set(on, forKey: key)
+    }
+
+    /// The window level for the choice: one above the desktop (under Finder's icons, which sit
+    /// twenty above it) when under the icons, else one below normal windows.
+    static func level(underIcons: Bool) -> NSWindow.Level {
+        underIcons
+            ? NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)) + 1)
+            : NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
+    }
+}
+
 enum DeskPieceClicks {
     /// Desk suite key (com.626labs.sanduhr.desk).
     static let key = "piecesTakeClicks"
