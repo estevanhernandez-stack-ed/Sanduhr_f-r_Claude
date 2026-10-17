@@ -87,41 +87,10 @@ struct ClaudeCLI: Sendable {
 
     /// Runs `command` for `seat`, stdin closed, stopped after its timeout.
     func run(_ command: Command, seat: String) -> Result {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: claude)
-        p.arguments = command.arguments
-        p.environment = environment(seat: seat)
-        p.currentDirectoryURL = URL(fileURLWithPath: NSTemporaryDirectory())
-        let output = Pipe(), errors = Pipe()
-        p.standardInput = FileHandle.nullDevice
-        p.standardOutput = output
-        p.standardError = errors
-        let box = Box()
-        let done = DispatchGroup()
-        do { try p.run() } catch { return Result(status: -1, out: "", err: "Couldn't start \(claude).") }
-        done.enter()
-        DispatchQueue.global(qos: .userInitiated).async {
-            box.err = errors.fileHandleForReading.readDataToEndOfFile()
-            done.leave()
-        }
-        done.enter()
-        DispatchQueue.global(qos: .userInitiated).async {
-            box.out = output.fileHandleForReading.readDataToEndOfFile()
-            done.leave()
-        }
-        if done.wait(timeout: .now() + command.timeout) == .timedOut {
-            p.terminate()
-            if done.wait(timeout: .now() + 1) == .timedOut { kill(p.processIdentifier, SIGKILL) }
-            p.waitUntilExit()
-            return Result(status: -1, out: "", err: "", timedOut: true)
-        }
-        p.waitUntilExit()
-        return Result(status: p.terminationStatus, out: String(decoding: box.out, as: UTF8.self),
-                      err: String(decoding: box.err, as: UTF8.self))
-    }
-
-    private final class Box: @unchecked Sendable {
-        var out = Data()
-        var err = Data()
+        let r = ProcessRunner.run(claude, command.arguments, cwd: URL(fileURLWithPath: NSTemporaryDirectory()),
+                                  environment: environment(seat: seat), timeout: command.timeout)
+        if r.launchFailed { return Result(status: -1, out: "", err: "Couldn't start \(claude).") }
+        if r.timedOut { return Result(status: -1, out: "", err: "", timedOut: true) }
+        return Result(status: r.status, out: r.stdout, err: r.stderr)
     }
 }

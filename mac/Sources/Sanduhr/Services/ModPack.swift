@@ -119,7 +119,8 @@ enum ModPack {
             throw Failure.writeFailed
         }
         let zip = work.appendingPathComponent("pack.zip")
-        guard run("/usr/bin/ditto", ["-c", "-k", "--norsrc", "--noextattr", "--noacl", tree.path, zip.path]) else {
+        guard ProcessRunner.run("/usr/bin/ditto", ["-c", "-k", "--norsrc", "--noextattr", "--noacl", tree.path, zip.path],
+                                timeout: dittoTimeout).ok else {
             throw Failure.writeFailed
         }
         do {
@@ -144,14 +145,6 @@ enum ModPack {
         return data
     }
 
-    private static func run(_ tool: String, _ args: [String]) -> Bool {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: tool)
-        p.arguments = args
-        p.standardOutput = FileHandle.nullDevice
-        p.standardError = FileHandle.nullDevice
-        do { try p.run() } catch { return false }
-        p.waitUntilExit()
-        return p.terminationStatus == 0
-    }
+    /// How long ditto gets to zip or unzip a pack: a mod folder, so seconds at most.
+    static let dittoTimeout: TimeInterval = 60
 }

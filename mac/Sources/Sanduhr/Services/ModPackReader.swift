@@ -156,7 +156,8 @@ enum ModPackReader {
         } catch {
             throw Refusal("Sanduhr couldn't unpack it.")
         }
-        guard run("/usr/bin/ditto", ["-x", "-k", "--norsrc", "--noextattr", "--noacl", copy.path, root.path]) else {
+        guard ProcessRunner.run("/usr/bin/ditto", ["-x", "-k", "--norsrc", "--noextattr", "--noacl", copy.path, root.path],
+                                timeout: ModPack.dittoTimeout).ok else {
             throw Refusal("Sanduhr couldn't unpack it.")
         }
         // What's on disk is what the directory listed: plain files, no more, no larger.
@@ -267,17 +268,6 @@ enum ModPackReader {
             }
         }
         return out
-    }
-
-    private static func run(_ tool: String, _ args: [String]) -> Bool {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: tool)
-        p.arguments = args
-        p.standardOutput = FileHandle.nullDevice
-        p.standardError = FileHandle.nullDevice
-        do { try p.run() } catch { return false }
-        p.waitUntilExit()
-        return p.terminationStatus == 0
     }
 }
 
