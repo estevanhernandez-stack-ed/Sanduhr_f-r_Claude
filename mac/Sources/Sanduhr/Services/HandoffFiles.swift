@@ -3,8 +3,8 @@ import Foundation
 /// The request/result handoffs between the Sanduhr MCP server and the app (item 54's Desk
 /// messages, item 55's themes): the server drops a request file into Sanduhr's Application
 /// Support folder, the app reads and removes it, checks it, and answers in a result file the
-/// server waits for. This is the part they share: one watch on the folder for every request, and
-/// the owner-only atomic writes.
+/// server waits for. This is the part they share: one watch on the folder for every request, the
+/// owner-only atomic writes, and the result file's shape.
 enum HandoffFiles {
     /// ~/Library/Application Support/Sanduhr.
     static var support: URL {
@@ -53,6 +53,18 @@ enum HandoffFiles {
 
     /// An ISO 8601 stamp with milliseconds, as the result files carry.
     static func stamp(_ date: Date) -> String { ISO8601.stamp(date) }
+
+    /// The answer every handoff writes and the server reads back: `{id, completed_at, result:
+    /// {status, …}}`, keys sorted. `fields` are the result's own keys in the caller's order, a
+    /// nil value left out; `reasons` is written only when there are any.
+    static func resultJSON(id: String, status: String, fields: [(String, Any?)] = [], reasons: [String] = [],
+                           now: Date) -> Data {
+        var result: [String: Any] = ["status": status]
+        for (k, v) in fields { if let v { result[k] = v } }
+        if !reasons.isEmpty { result["reasons"] = reasons }
+        let root: [String: Any] = ["id": id, "completed_at": stamp(now), "result": result]
+        return (try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])) ?? Data()
+    }
 }
 
 /// One kernel watch on Sanduhr's folder (the themes folder's watcher, no polling) for every

@@ -268,10 +268,7 @@ struct NowPlayingLookProposal: Equatable, Identifiable {
     /// whether Style what's playing is on, so the agent can tell the user where to switch it on.
     static func resultJSON(id: String, status: Status, reasons: [String] = [], saved: Int? = nil,
                            styleOn: Bool, now: Date = Date()) -> Data {
-        var result: [String: Any] = ["status": status.rawValue, "style_on": styleOn]
-        if !reasons.isEmpty { result["reasons"] = reasons }
-        if let saved { result["looks_saved"] = saved }
-        let root: [String: Any] = ["id": id, "completed_at": HandoffFiles.stamp(now), "result": result]
-        return (try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])) ?? Data()
+        HandoffFiles.resultJSON(id: id, status: status.rawValue, fields: [("style_on", styleOn), ("looks_saved", saved)],
+                                reasons: reasons, now: now)
     }
 }
