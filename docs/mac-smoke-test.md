@@ -1591,8 +1591,18 @@ the end.
     the account name, now playing and the watchers, which work as before. Started from a menu with
     Settings closed, Settings stays closed.
 13. **Reduce Motion.** With Reduce Motion on, a drop moves the piece without the snap.
-14. **VoiceOver.** While arranging, each piece offers Move Up, Move Down, Bigger and Smaller, and the
-    bar reads as "Arrange Desk" with Cancel and Done.
+14. **VoiceOver.** While arranging, each piece offers Move Up, Move Down, Bigger, Smaller and Hide,
+    and the bar reads as "Arrange Desk" with Cancel and Done.
+14a. **Hide and Show.** Each piece's name tag has a small × (Hide): click the clock's and the clock
+    goes; a strip at the bottom of the screen, above the Dock, reads "Hidden:" with the clock and
+    every piece the layout leaves out, each with a **Show** button. Show puts the clock back at
+    Bottom left at 100% (the message comes back at Top left), exactly where Settings' place picker
+    would. Cancel puts hidden pieces back and shown ones away; Done writes the string without the
+    hidden piece's word (its size part included) and with the shown one's.
+14b. **The Desk page waits.** While arranging, Settings, Desk's Margins under Advanced and the
+    Meetings row's "Read today's meetings" are off, as Where each piece sits and Order are. With
+    every piece Hidden in Settings, the Order list reads "Nothing is placed on the Desk." and
+    **Arrange Desk…** is off with "Place a piece first." beside it; placing one piece turns it on.
 15. `smoke/smoke run scenarios/desk-arrange.yaml` passes: it opens Settings, Desk, Layout first;
     while arranging `desk_arrange.click_through` is `whole`, `desk_arrange.bar_visible` is true and
     `settings_open` is false; after, `drawn`, false and true again. The smoke's edit (the clock to

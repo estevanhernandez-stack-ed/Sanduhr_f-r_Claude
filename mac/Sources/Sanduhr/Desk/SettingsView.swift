@@ -21,7 +21,8 @@ struct DeskLayoutSection: View {
                 Toggle(SettingsNames.deskSwitch, isOn: $deskOn)
                     .onChange(of: deskOn) { _, _ in DeskController.shared.apply() }
                     .settingsAnchor(SettingsAnchor.desk)
-                DeskArrangeRow(deskOn: deskOn, arranging: arranging)
+                DeskArrangeRow(deskOn: deskOn, arranging: arranging,
+                               placesNothing: DeskArrangement(layout).placesNothing)
                     .settingsAnchor(SettingsAnchor.arrange)
             }
             Section("Where each piece sits") {
@@ -29,7 +30,7 @@ struct DeskLayoutSection: View {
                     DeskPlaceRow(widget: w.key, name: w.name, layout: $layout)
                         .disabled(arranging)
                         .modifier(FirstPieceAnchor(widget: w.key))
-                    DeskPieceExtra(widget: w.key)
+                    DeskPieceExtra(widget: w.key, arranging: arranging)
                 }
                 Text(DeskLayout.placesCaption)
                     .font(.caption).foregroundStyle(.secondary)
@@ -44,7 +45,8 @@ struct DeskLayoutSection: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             DeskClicksSection()
-            AdvancedSection(page: .deskLayout) { DeskMarginsRows() }
+            // The margins move every piece, so they wait while arranging as the places and the order do.
+            AdvancedSection(page: .deskLayout) { DeskMarginsRows().disabled(arranging) }
         }
         .formStyle(.grouped)
     }
@@ -95,9 +97,11 @@ private struct DeskMarginsRows: View {
 }
 
 /// What a piece's row carries under it on the Desk page: Meetings has Read today's meetings (was
-/// General), Now playing and Watchers link to their own pages.
+/// General), Now playing and Watchers link to their own pages. Read today's meetings takes the
+/// meetings off the Desk, so it waits while arranging as the places do.
 private struct DeskPieceExtra: View {
     let widget: String
+    var arranging = false
     @AppStorage("showMeetings", store: .desk) private var showMeetings = true
 
     var body: some View {
@@ -109,6 +113,7 @@ private struct DeskPieceExtra: View {
                     if on, desk.running { desk.model.requestCalendar() }
                     if !on { desk.model.meetings = [] }
                 }
+                .disabled(arranging)
                 .padding(.leading, 16)
         case NowPlayingPlacement.widget:
             link("Shows only while something plays.", .nowPlaying)
@@ -149,21 +154,29 @@ struct NeedsDeskRow: View {
 }
 
 /// Desk's Arrange Desk… button (item 60). While arranging, the places and the order here wait:
-/// Done on the desktop writes the layout, so an edit here would be overwritten.
+/// Done on the desktop writes the layout, so an edit here would be overwritten. With nothing
+/// placed there is nothing to drag, so the button waits for a piece.
 private struct DeskArrangeRow: View {
     let deskOn: Bool
     let arranging: Bool
+    var placesNothing = false
 
     var body: some View {
         LabeledContent {
             Button(DeskArrangeCopy.settingsButton) { DeskController.shared.arrangeDesk() }
-                .disabled(!deskOn || arranging)
+                .disabled(!deskOn || arranging || placesNothing)
         } label: {
-            Text(arranging ? DeskArrangeCopy.settingsArranging
-                 : deskOn ? DeskArrangeCopy.settingsNote : DeskArrangeCopy.settingsDeskOff)
+            Text(note)
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private var note: String {
+        if arranging { return DeskArrangeCopy.settingsArranging }
+        if !deskOn { return DeskArrangeCopy.settingsDeskOff }
+        if placesNothing { return DeskArrangeCopy.settingsNothingPlaced }
+        return DeskArrangeCopy.settingsNote
     }
 }
 
