@@ -199,7 +199,8 @@ enum SettingsAnchor {
                                  "Update", "Remove", "enabledPlugins"]),
         SettingsEntry(title: "Mods and plugins", page: .mods, anchor: inventory,
                       synonyms: ["mods", "plugins", "Check", "risk", "Catalog", SettingsNames.byFolder, "seat", "marketplace", "skills", "agents",
-                                 "commands", "output styles", "MCP servers", "work", "personal", "label"]),
+                                 "commands", "output styles", "MCP servers", "work", "personal", "label",
+                                 "Let agents propose mods", "propose", "From Claude"]),
     ]
 
     private static let widgetAndHelp: [SettingsEntry] = [

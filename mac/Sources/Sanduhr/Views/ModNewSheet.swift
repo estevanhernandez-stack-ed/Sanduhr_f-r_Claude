@@ -77,7 +77,7 @@ extension ModsPageModel {
         sessionMods = rows
         self.kept = kept
         keptStates = states
-        // list_catalog's file follows what is kept and where it is on (slice G2).
+        // The catalog file agents read follows what is kept and where it is on (slice G2).
         ModProposalStore.shared.publishCatalog()
     }
 
@@ -432,7 +432,7 @@ struct NewModSheet: View {
     struct KeptConsent: Identifiable {
         let mod: KeptMod
         let folder: String
-        /// The propose_install request it answers, if any.
+        /// The install request from Claude it answers, if any.
         var request: String?
         var id: String { mod.id + "\n" + folder }
     }
@@ -652,15 +652,17 @@ struct NewModSheet: View {
     @ViewBuilder
     private var session: some View {
         @Bindable var proposals = proposals
+        // The same switch as the page's From Claude row (ModsFromClaudeRow), so the sheet works
+        // on its own; one store behind both.
         HStack {
-            Toggle("Let agents propose mods", isOn: $proposals.allowed)
+            Toggle(ModsFromClaudeRow.title, isOn: $proposals.allowed)
             Spacer()
             Button("Open Pack…") { Task { await model.choosePack(store: proposals) } }
                 .controlSize(.small)
                 .help("Opens a .sanduhrpack someone exported. Its mod waits here to be checked, tried and kept.")
         }
-            .help("Lets Claude send a mod it built to Sanduhr with the propose_mod tool. You review its files and what it can do, then keep it or dismiss it; nothing is turned on anywhere by a proposal.")
-        Text("Off, Sanduhr's MCP server refuses propose_mod, propose_install and list_catalog. On, Claude can see your kept mods and where they're on, send a mod for you to review, or ask to turn a kept one on in a folder; each waits here for you.")
+            .help("Lets Claude send a mod it built to Sanduhr. You review its files and what it can do, then keep it or dismiss it; nothing is turned on anywhere by a proposal.")
+        Text(ModsFromClaudeRow.caption)
             .font(.caption).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         Text("A mod Claude makes in a session lives in that session's folder, and Claude Code deletes it after a while. Keep copies it, unchanged, into Sanduhr's own folder and checks what it can do. None of its code runs until you try it or turn it on in a folder, and each asks first.")
