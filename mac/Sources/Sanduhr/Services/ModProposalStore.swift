@@ -83,11 +83,18 @@ final class ModProposalStore {
         var catalog: URL { support.appendingPathComponent(ModProposal.catalogFile) }
         var installRequest: URL { support.appendingPathComponent(ModProposal.installRequestFile) }
         var installResult: URL { support.appendingPathComponent(ModProposal.installResultFile) }
+        var configRequest: URL { support.appendingPathComponent(ConfigProposal.requestFile) }
+        var configResult: URL { support.appendingPathComponent(ConfigProposal.resultFile) }
+        var configRecords: URL { kept.dir.appendingPathComponent("config-proposals.json") }
+        var proposedConfig: URL { kept.dir.appendingPathComponent(".proposed-config", isDirectory: true) }
+        func stagedConfig(_ id: String) -> URL { proposedConfig.appendingPathComponent(id + ".json") }
         func staged(_ id: String) -> URL { proposed.appendingPathComponent(id, isDirectory: true) }
     }
 
     private(set) var records: [ModProposalRecord] = []
     private(set) var installs: [ModInstallRecord] = []
+    /// `propose_config`'s proposals (item 76, slice K).
+    private(set) var configs: [ConfigProposalRecord] = []
     var allowed: Bool {
         didSet {
             guard allowed != oldValue else { return }
@@ -112,6 +119,7 @@ final class ModProposalStore {
     var pendingFromClaude: [ModProposalRecord] { pending.filter { !$0.fromFile } }
     var pendingFromFiles: [ModProposalRecord] { pending.filter(\.fromFile) }
     var pendingInstalls: [ModInstallRecord] { installs.filter(\.isPending) }
+    var pendingConfigs: [ConfigProposalRecord] { configs.filter(\.isPending) }
 
     init(paths: Paths = .standard, defaults: UserDefaults = .standard, now: @escaping () -> Date = Date.init,
          folders: @escaping () -> [String] = {
@@ -126,6 +134,7 @@ final class ModProposalStore {
         allowed = defaults.bool(forKey: Self.switchKey)
         records = Self.load(paths.records)
         installs = Self.load(paths.installRecords)
+        configs = Self.load(paths.configRecords)
     }
 
     /// Writes the switch for the server and watches for requests.
@@ -141,6 +150,65 @@ final class ModProposalStore {
     func check() {
         if let data = HandoffFiles.take(paths.request, maxBytes: ModProposal.maxRequestBytes) { receive(data) }
         if let data = HandoffFiles.take(paths.installRequest, maxBytes: 4096) { receiveInstall(data) }
+        if let data = HandoffFiles.take(paths.configRequest, maxBytes: ModProposal.maxRequestBytes) { receiveConfig(data) }
+    }
+
+    // MARK: Config proposals (item 76, slice K)
+
+    func receiveConfig(_ data: Data) {
+        switch ConfigProposal.decode(data, now: now()) {
+        case .discard:
+            return
+        case .refused(let id, let reasons):
+            answerConfig(id, status: "rejected", reason: "invalid_config", reasons: reasons, remedy: "Fix what reasons names and call again.")
+        case .proposal(let p):
+            guard allowed else {
+                answerConfig(p.id, status: "rejected", reason: "switched_off",
+                             remedy: "The user hasn't let agents propose mods. Tell them it is in Sanduhr, Mods & Config, New Mod, From Claude: Let agents propose mods.")
+                return
+            }
+            guard let folder = namedFolders().first(where: { $0.name == p.folder }) else {
+                answerConfig(p.id, status: "rejected", reason: "unknown_folder", remedy: "Sanduhr knows no Claude Code folder named '\(p.folder)'.")
+                return
+            }
+            do {
+                try FileManager.default.createDirectory(at: paths.proposedConfig, withIntermediateDirectories: true)
+                HandoffFiles.writeOwnerOnly(p.json, to: paths.stagedConfig(p.id))
+            }
+            catch {
+                answerConfig(p.id, status: "error", reason: "stage_failed", remedy: "Sanduhr couldn't save the proposal for review.")
+                return
+            }
+            configs.append(ConfigProposalRecord(id: p.id, summary: p.summary, folderName: p.folder, folder: AccountData.normalized(folder.path),
+                                                files: p.files.count, settings: p.settings.count, servers: p.servers.count,
+                                                requestedAt: p.requestedAt, status: .pendingReview))
+            save()
+            answerConfig(p.id, status: "pending_review", folder: p.folder,
+                         remedy: "The user reviews it in Sanduhr, Mods & Config, By Seat. Call get_mod_status with request_id for the decision.")
+        }
+    }
+
+    /// The staged proposal, read again and checked again, as a pack for the Open sheet.
+    func configPack(_ r: ConfigProposalRecord) -> (pack: ModPackReader.Unpacked, sha256: String)? {
+        guard let data = FileManager.default.contents(atPath: paths.stagedConfig(r.id).path),
+              case .proposal(let p) = ConfigProposal.decode(data, now: r.requestedAt) else { return nil }
+        return (p.pack, ConfigImport.sha(data))
+    }
+
+    /// The user imported some of it (approved) or dismissed it.
+    func decideConfig(_ id: String, approved: Bool) {
+        guard let i = configs.firstIndex(where: { $0.id == id && $0.isPending }) else { return }
+        configs[i].status = approved ? .approved : .dismissed
+        configs[i].decidedAt = now()
+        try? FileManager.default.removeItem(at: paths.stagedConfig(id))
+        save()
+    }
+
+    private func answerConfig(_ id: String, status: String, folder: String? = nil, reason: String? = nil,
+                              reasons: [String] = [], remedy: String? = nil) {
+        HandoffFiles.writeOwnerOnly(ConfigProposal.resultJSON(id: id, status: status, folder: folder, reason: reason,
+                                                              reasons: reasons, remedy: remedy, now: now()),
+                                    to: paths.configResult)
     }
 
     // MARK: The catalog and install requests (slice G2)
@@ -407,11 +475,15 @@ final class ModProposalStore {
         let decidedInstalls = installs.filter { !$0.isPending }.sorted { ($0.decidedAt ?? .distantPast) > ($1.decidedAt ?? .distantPast) }
         let keepInstalls = Set(decidedInstalls.prefix(Self.keepDecided).map(\.id))
         installs = installs.filter { $0.isPending || keepInstalls.contains($0.id) }
+        let decidedConfigs = configs.filter { !$0.isPending }.sorted { ($0.decidedAt ?? .distantPast) > ($1.decidedAt ?? .distantPast) }
+        let keepConfigs = Set(decidedConfigs.prefix(Self.keepDecided).map(\.id))
+        configs = configs.filter { $0.isPending || keepConfigs.contains($0.id) }
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         if let data = try? encoder.encode(records) { HandoffFiles.writeOwnerOnly(data, to: paths.records) }
         if let data = try? encoder.encode(installs) { HandoffFiles.writeOwnerOnly(data, to: paths.installRecords) }
+        if let data = try? encoder.encode(configs) { HandoffFiles.writeOwnerOnly(data, to: paths.configRecords) }
         // A pack the user opened is theirs: the server's index lists Claude's proposals only.
         var index: [[String: Any]] = records.filter { !$0.fromFile }.map { r in
             var o: [String: Any] = ["id": r.id, "kind": "mod", "name": r.name, "status": r.status.rawValue]
@@ -421,6 +493,11 @@ final class ModProposalStore {
         }
         index += installs.map { r in
             var o: [String: Any] = ["id": r.id, "kind": "install", "name": r.name, "folder": r.folderName, "status": r.status.rawValue]
+            if let d = r.decidedAt { o["decided_at"] = HandoffFiles.stamp(d) }
+            return o
+        }
+        index += configs.map { r in
+            var o: [String: Any] = ["id": r.id, "kind": "config", "name": r.folderName, "folder": r.folderName, "status": r.status.rawValue]
             if let d = r.decidedAt { o["decided_at"] = HandoffFiles.stamp(d) }
             return o
         }

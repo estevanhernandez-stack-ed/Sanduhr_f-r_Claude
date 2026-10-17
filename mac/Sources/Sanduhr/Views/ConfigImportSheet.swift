@@ -22,6 +22,8 @@ struct ConfigImportState: Identifiable {
     var working = false
     /// A line per plugin or server `claude` didn't put in.
     var cliFailures: [String] = []
+    /// Opened from Claude's `propose_config` (slice K): its record, decided by the import.
+    var proposalID: String?
 
     var label: String { pack.manifest["label"] as? String ?? "Config" }
 
@@ -84,6 +86,19 @@ extension ModsPageModel {
         }
     }
 
+    /// Opens Claude's config proposal (slice K) in the Open sheet, into the folder it names.
+    func reviewConfigProposal(_ r: ConfigProposalRecord) {
+        guard let (pack, sha) = ModProposalStore.shared.configPack(r) else {
+            configImportNote = "Sanduhr can't read that proposal any more. Dismiss it, and ask Claude again."
+            return
+        }
+        var state = ConfigImportState(pack: pack, packSHA256: sha, fileName: "Claude's proposal: " + r.summary, seat: r.folder)
+        state.proposalID = r.id
+        state.cli = cliState(for: r.folder)
+        state.plan()
+        configImport = state
+    }
+
     /// Asks for a pack to open into `seat`.
     func chooseConfigPack(seat: String) async {
         let panel = NSOpenPanel()
@@ -135,6 +150,7 @@ extension ModsPageModel {
         }
         state.staged = staged
         state.working = false
+        if let id = state.proposalID, !record.steps.isEmpty { ModProposalStore.shared.decideConfig(id, approved: true) }
         imports = ConfigImport.Log.standard.list()
         if state.done?.steps.contains(where: \.throughCLI) == true { Task { await load(linked: lastLinked) } }
         return state
@@ -194,6 +210,8 @@ struct ConfigImportSheet: View {
     @State var state: ConfigImportState
     let close: () -> Void
     @State private var confirming = false
+    /// A proposal from Claude that sets hooks: the confirm asks for "hooks" typed out.
+    @State private var typingName = false
     @State private var undone: ModsPageModel.UndoOutcome?
     @State private var undoing = false
 
@@ -245,6 +263,18 @@ struct ConfigImportSheet: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(confirmMessage)
+        }
+        .sheet(isPresented: $typingName) {
+            TypedNameConfirm(title: "Bring \(chosenCount) \(chosenCount == 1 ? "item" : "items") into \(model.display(state.seat))?",
+                             verb: "set Claude's hooks", name: "hooks",
+                             message: confirmMessage + " Hooks run commands of their own whenever Claude Code reaches them.",
+                             actions: [.init(title: "Import") {
+                                 typingName = false
+                                 state.working = true
+                                 let given = state
+                                 Task { state = await model.finishConfigImport(given) }
+                             }],
+                             cancel: { typingName = false })
         }
     }
 
@@ -308,6 +338,11 @@ struct ConfigImportSheet: View {
                 Text("\(title) (\(list.count))").font(.callout)
             }
         }
+    }
+
+    /// Claude proposed it and a chosen row sets hooks.
+    private var needsTypedName: Bool {
+        state.proposalID != nil && state.rows.contains { $0.kind == .setting && $0.name == "hooks" && state.chosen.contains($0.id) }
     }
 
     private var confirmMessage: String {
@@ -426,7 +461,7 @@ struct ConfigImportSheet: View {
                 ProgressView().controlSize(.small)
                 Text(cliCount > 0 ? "Installing with claude…" : "Importing…").font(.caption).foregroundStyle(.secondary)
             }
-            Button("Import…") { confirming = true }
+            Button("Import…") { if needsTypedName { typingName = true } else { confirming = true } }
                 .keyboardShortcut(.defaultAction)
                 .disabled(!state.hasSeat || chosenCount == 0 || state.working)
         }

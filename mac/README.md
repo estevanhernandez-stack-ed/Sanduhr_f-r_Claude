@@ -615,7 +615,9 @@ and result shapes: `get_usage`, `get_local_burn_by_project`, `get_model_usage`,
 the watcher tools, `propose_now_playing_looks` (Now playing, below), and `propose_mod`,
 `list_catalog`, `propose_install` with `get_mod_status` (Mod Studio: a mod's files for you to
 review, your kept mods, a request to turn one on in a folder; only while **Let agents propose
-mods** is on).
+mods** is on), and `propose_config` under the same switch (agents, skills, commands, output
+styles, settings keys and MCP servers for one Claude Code folder, opened on By Seat as an import
+you review).
 `publish_usage` is dropped on the Mac. What it may read comes from
 `mcp-access.json`, which the app writes:
 
