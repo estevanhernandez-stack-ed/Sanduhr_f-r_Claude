@@ -38,7 +38,7 @@ struct SeatSettingsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Caption("Computed by Sanduhr for the seat as a whole: managed settings, then this seat's settings.json. Each project's .claude/settings.local.json and .claude/settings.json can override a key inside that project; they're counted here, never named. Objects merge key by key and lists combine, the strict keys take the strictest value, and values where they're ignored are left out. A --settings flag or shell variables of a running session can change this; Sanduhr can't see them.")
+            Caption("Computed by Sanduhr for the folder as a whole: managed settings, then this folder's settings.json. Each project's .claude/settings.local.json and .claude/settings.json can override a key inside that project; they're counted here, never named. Objects merge key by key and lists combine, the strict keys take the strictest value, and values where they're ignored are left out. A --settings flag or shell variables of a running session can change this; Sanduhr can't see them.")
             if let why = part.unreadable {
                 Caption(ModsPageModel.unreadableText(why), color: Color.hex("f87171"))
             }
@@ -94,7 +94,7 @@ struct SeatInstructionsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if part.nodes.isEmpty { Caption("No managed CLAUDE.md, no CLAUDE.md in the seat and no rules.") }
+            if part.nodes.isEmpty { Caption("No managed CLAUDE.md, no CLAUDE.md in the folder and no rules.") }
             ForEach(part.nodes) { InstructionNodeRow(node: $0, title: SeatInstructionTitles.title($0, in: part.nodes, hideNames: hideNames)) }
             if let leak = part.leak { Caption(leak, color: .orange) }
             if !part.excludes.isEmpty {
@@ -132,7 +132,7 @@ struct SeatInstructionsSection: View {
 enum SeatInstructionTitles {
     static func title(_ node: SeatReport.InstructionNode, in nodes: [SeatReport.InstructionNode], hideNames: Bool) -> String {
         guard hideNames, node.kind == .imported else { return node.title }
-        if node.outsideSeat { return "An import outside the seat" }
+        if node.outsideSeat { return "An import outside the folder" }
         let n = nodes.filter { $0.kind == .imported && !$0.outsideSeat && $0.id <= node.id }.count
         return "Import \(n)"
     }
@@ -161,7 +161,7 @@ private struct InstructionNodeRow: View {
         case .seat, .imported: break
         }
         if node.truncated { parts.append("over 1 MB, counted from its first megabyte") }
-        if node.outsideSeat { parts.append("outside the seat") }
+        if node.outsideSeat { parts.append("outside the folder") }
         return parts.joined(separator: " · ")
     }
 }
@@ -215,7 +215,7 @@ private struct ExtensionRowView: View {
 
     private var scope: String {
         switch row.scope {
-        case .seat: return "seat"
+        case .seat: return "folder"
         case .synced: return "from claude.ai, overwritten on the next sync"
         case .project:
             guard !hideNames, let p = row.project else { return "a project" }
@@ -375,17 +375,17 @@ struct SeatRepoSection: View {
         VStack(alignment: .leading, spacing: 4) {
             Caption(part.model.title + (part.branch.map { ", branch \($0)" } ?? "") + ".")
             if part.model == .plain {
-                Caption("Unsynced seat: Sanduhr offers no conversion. The seat's own onboarding (kill switch first, fetch, review drift, dry run, enable) is the route.")
+                Caption("Unsynced folder: Sanduhr offers no conversion. The folder's own onboarding (kill switch first, fetch, review drift, dry run, enable) is the route.")
             }
             switch part.remoteMatches {
-            case .some(true): Caption("Its origin matches the seat identity file.")
-            case .some(false): Caption("Its origin doesn't match the seat identity file (.seat/seat.json).", color: Color.hex("f87171"))
+            case .some(true): Caption("Its origin matches the folder's identity file.")
+            case .some(false): Caption("Its origin doesn't match the folder's identity file (.seat/seat.json).", color: Color.hex("f87171"))
             case .none: EmptyView()
             }
             if part.killSwitch { Caption("Sync is switched off (.seat/disabled).", color: .orange) }
             SeatSyncView(sync: part.sync, hideNames: hideNames)
             if !part.buckets.isEmpty {
-                SubHeading("The never-list, from the seat's .gitignore")
+                SubHeading("The never-list, from the folder's .gitignore")
                 ForEach(SeatReport.Bucket.allCases, id: \.self) { b in
                     if let list = part.buckets[b], !list.isEmpty {
                         // A work seat's patterns can name its projects: counted only.
@@ -435,7 +435,7 @@ struct SeatDriftSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Caption("Read-only. Across the wall (a work seat and any other), names and \"differs\" only, never values.")
+            Caption("Read-only. Across the wall (a folder marked work and any other), names and \"differs\" only, never values.")
             ForEach(model.shownDrift(report, demo: demo), id: \.other) { d in
                 DriftBlock(drift: d, otherLabel: model.label(of: d.other),
                            values: SeatWall.showsValues(between: seat, and: other(d.other)))
@@ -483,9 +483,9 @@ private struct SeatRoutesView: View {
         if !routes.isEmpty {
             SubHeading("Routing (.vscode/settings.json)")
             let crossing = routes.filter { seat.isWork && !model.isWork($0.target) }
-            Caption("\(routes.count) project\(routes.count == 1 ? "" : "s") name a seat: \(routes.filter { $0.target == seat.path }.count) this one.")
+            Caption("\(routes.count) project\(routes.count == 1 ? "" : "s") name a folder: \(routes.filter { $0.target == seat.path }.count) this one.")
             if !crossing.isEmpty {
-                Caption("\(crossing.count) of this work seat's projects route to a seat that isn't marked work.", color: Color.hex("f87171"))
+                Caption("\(crossing.count) of this folder's projects route to a folder not marked work.", color: Color.hex("f87171"))
             }
             if !seat.isWork {
                 // A project routed into a work seat is work's: counted, never named; in demo
@@ -495,7 +495,7 @@ private struct SeatRoutesView: View {
                     Caption("\((r.project as NSString).lastPathComponent) → \(model.label(of: r.target))")
                 }
                 if !toWork.isEmpty, !demo {
-                    Caption("\(toWork.count) project\(toWork.count == 1 ? "" : "s") route\(toWork.count == 1 ? "s" : "") to a work seat.")
+                    Caption("\(toWork.count) project\(toWork.count == 1 ? "" : "s") route\(toWork.count == 1 ? "s" : "") to a folder marked work.")
                 }
             }
         }

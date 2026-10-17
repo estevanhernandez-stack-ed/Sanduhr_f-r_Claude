@@ -10,7 +10,7 @@ struct ModsCompareView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Two seats side by side: what each has that the other doesn't, what both have in a different state, and what is the same. Names and states only. Settings values are on By Seat, under Drift.")
+            Text("Two folders side by side: what each has that the other doesn't, what both have in a different state, and what is the same. Names and states only. Settings values are on By Folder, under Drift.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -30,7 +30,7 @@ struct ModsCompareView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                Text(demo ? "Compare needs two seats that aren't work seats while demo mode is on." : "Compare needs two seats. Add Folder… lists another one.")
+                Text(demo ? "Compare needs two folders not marked work while demo mode is on." : "Compare needs two folders. Add Folder… lists another one.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -39,7 +39,7 @@ struct ModsCompareView: View {
 
     /// What a later slice will offer, and the wall's direction rule, in words.
     private func footnote(_ a: Seat, _ b: Seat) -> String {
-        let rule = "Installing or turning things on in another seat comes in a later slice, through Claude Code's own CLI. A plugin from a marketplace can go into any seat by name; your own skills, agents and commands are copied only out of a personal seat, never out of a work one."
+        let rule = "Installing or turning things on in another folder comes in a later slice, through Claude Code's own CLI. A plugin from a marketplace can go into any folder by name; your own skills, agents and commands are copied only out of a folder marked personal, never out of one marked work."
         return SeatWall.allowsCopy(from: a, to: b) || SeatWall.allowsCopy(from: b, to: a) ? rule : rule + " Neither of these two is marked personal."
     }
 }
@@ -52,7 +52,7 @@ private struct CompareSeatPickers: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            picker("First seat", selection: Binding(get: { a.path }, set: { model.pickCompare($0, first: true, current: (a, b)) }))
+            picker("First folder", selection: Binding(get: { a.path }, set: { model.pickCompare($0, first: true, current: (a, b)) }))
             Button {
                 model.compareA = b.path
                 model.compareB = a.path
@@ -60,9 +60,9 @@ private struct CompareSeatPickers: View {
                 Image(systemName: "arrow.left.arrow.right")
             }
             .buttonStyle(.borderless)
-            .help("Swap the two seats")
-            .accessibilityLabel("Swap the two seats")
-            picker("Second seat", selection: Binding(get: { b.path }, set: { model.pickCompare($0, first: false, current: (a, b)) }))
+            .help("Swap the two folders")
+            .accessibilityLabel("Swap the two folders")
+            picker("Second folder", selection: Binding(get: { b.path }, set: { model.pickCompare($0, first: false, current: (a, b)) }))
         }
         .controlSize(.small)
     }

@@ -25,6 +25,9 @@ final class DeskController: NSObject, NSMenuDelegate {
     private var lastWatchedPointer: NSPoint?
     private(set) var wingsWindow: NSWindow?
     private var wingsTimer: Timer?
+    /// The click layer (DeskClickLayer): stands in for the Desk window's click areas while the
+    /// Desk is under the desktop icons, nil otherwise and while arranging.
+    private(set) var clickWindow: NSWindow?
     let model = DeskModel()
     /// Keeps the corners clear of the Dock (item 56).
     let dock = DockFollower()
@@ -207,6 +210,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         running = false
         window?.close(); window = nil
         wingsWindow?.close(); wingsWindow = nil
+        clickWindow?.close(); clickWindow = nil
         wingsTimer?.invalidate(); wingsTimer = nil
         mouseMonitors.forEach { NSEvent.removeMonitor($0) }
         mouseMonitors = []
@@ -261,6 +265,62 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     @objc private func screensChanged() { if running { buildWindow() } }
 
+    /// "Keep the Desk under desktop icons" flipped, Arrange begun or ended, the window rebuilt:
+    /// the Desk window goes to its layer, and the click layer (DeskClickLayer) comes up or goes
+    /// away. Under the icons the Desk window itself never takes the mouse, so a plate left taking
+    /// it is let go; the click layer takes it from there. Arrange mode brings the Desk window up
+    /// to the click layer's level, so the whole frame takes the mouse as it always has.
+    func applyLayer() {
+        guard let w = window else { return }
+        let under = DeskLayer.isOn(in: UserDefaults.desk)
+        let layerActive = DeskClickLayer.active(underIcons: under, arranging: model.arrange.active)
+        w.level = DeskLayer.level(underIcons: under && !model.arrange.active)
+        if layerActive {
+            if !w.ignoresMouseEvents { w.ignoresMouseEvents = true }
+            if clickWindow == nil, let screen = w.screen ?? NSScreen.main { buildClickWindow(on: screen) }
+        } else {
+            clickWindow?.close(); clickWindow = nil
+        }
+        updateMouseThrough()
+    }
+
+    /// The click layer: a transparent window the Desk's size at the Desk's old level, holding
+    /// only the plates over the click areas (DeskClickLayerView). Click-through until the pointer
+    /// is over a plate, exactly as the Desk window is (updateMouseThrough).
+    private func buildClickWindow(on screen: NSScreen) {
+        clickWindow?.close()
+        let w = NSWindow(contentRect: screen.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        w.isReleasedWhenClosed = false
+        w.level = DeskClickLayer.level
+        w.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        w.isOpaque = false
+        w.backgroundColor = .clear
+        w.hasShadow = false
+        w.ignoresMouseEvents = true
+        let view = DeskClickLayerView(frame: NSRect(origin: .zero, size: screen.frame.size))
+        view.areas = DeskClickLayer.areas(in: model.elements())
+        w.contentView = view
+        w.setFrame(screen.frame, display: true)
+        w.orderFront(nil)
+        clickWindow = w
+    }
+
+    /// The plates follow the frames (onHitAreasChange, every mouse-through check).
+    private func syncClickAreas() {
+        guard let view = clickWindow?.contentView as? DeskClickLayerView else { return }
+        view.areas = DeskClickLayer.areas(in: model.elements())
+    }
+
+    /// The window a Desk menu pops in and a click is judged against: the click layer while it
+    /// stands in for the Desk window, else the Desk window. Both are the screen's size, so
+    /// `pointerInWindow()` reads the same either way.
+    private var clickHost: NSWindow? { clickWindow ?? window }
+
+    /// True for an event from the Desk window or the click layer (or none: a global monitor's).
+    private func isDeskEvent(_ event: NSEvent) -> Bool {
+        event.window == nil || event.window === window || event.window === clickWindow
+    }
+
     /// One transparent, click-through window covering the main screen, above the desktop
     /// icons and below every app window.
     private func buildWindow() {
@@ -274,10 +334,11 @@ final class DeskController: NSObject, NSMenuDelegate {
         w.isReleasedWhenClosed = false
         // Arrange mode carries over a rebuild (a display change): the window can still take the key.
         w.takesKey = model.arrange.active
-        // Just below normal windows, not in the desktop layer: on newer macOS a click on the
-        // desktop layer counts as clicking the wallpaper, which sweeps the windows away
-        // instead of reaching the meeting row.
-        w.level = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
+        // Just below normal windows by default, not in the desktop layer: on newer macOS a click
+        // on the desktop layer counts as clicking the wallpaper, which sweeps the windows away
+        // instead of reaching the meeting row. Under the icons when the user chose that
+        // (DeskLayer): then the click layer (DeskClickLayer) takes the clicks at this level.
+        w.level = DeskLayer.level(underIcons: DeskLayer.isOn(in: UserDefaults.desk) && !model.arrange.active)
         w.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         w.isOpaque = false
         w.backgroundColor = .clear
@@ -291,6 +352,10 @@ final class DeskController: NSObject, NSMenuDelegate {
         w.setFrame(screen.frame, display: true)
         w.orderFront(nil)
         window = w
+        clickWindow?.close(); clickWindow = nil
+        if DeskClickLayer.active(underIcons: DeskLayer.isOn(in: UserDefaults.desk), arranging: model.arrange.active) {
+            buildClickWindow(on: screen)
+        }
         // The bar's panel follows the Desk to its new screen.
         if model.arrange.active { arrangeBar.place(on: screen) }
         NotificationCenter.default.addObserver(
@@ -390,8 +455,9 @@ final class DeskController: NSObject, NSMenuDelegate {
             mouseMonitors.append(g)
         }
         if let l = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown], handler: { [weak self] event in
-            // Same process as the widget and its settings: only clicks on the desk layer count.
-            guard let self, event.window == nil || event.window === self.window else { return event }
+            // Same process as the widget and its settings: only clicks on the desk layer (or
+            // its click layer) count.
+            guard let self, self.isDeskEvent(event) else { return event }
             // Arrange mode: the click is the pieces' and the bar's (SwiftUI's gestures), never a join.
             if self.model.arrange.active { return event }
             // Control-click is a two-finger click.
@@ -404,7 +470,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         // pointer is over the meters and the hit plate behind them (DeskPointerMenu) gives every
         // point there a drawn pixel, so the click reaches Desk and the desktop never sees it.
         if let l = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown], handler: { [weak self] event in
-            guard let self, event.window == nil || event.window === self.window else { return event }
+            guard let self, self.isDeskEvent(event) else { return event }
             if self.model.arrange.active { return event }
             return self.limitMenuUnderPointer(event) ? nil : event
         }) {
@@ -423,7 +489,7 @@ final class DeskController: NSObject, NSMenuDelegate {
         guard DeskHitTest.hasMenu(elementUnderPointer()), !Self.appWindowCoversPointer() else { return }
         updateMouseThrough()
         DispatchQueue.main.asyncAfter(deadline: .now() + DeskPointerMenu.fallbackDelay) { [weak self] in
-            guard let self, let w = self.window, let view = w.contentView else { return }
+            guard let self, let w = self.clickHost, let view = w.contentView else { return }
             let hit = self.elementUnderPointer()
             guard DeskPointerMenu.fallbackOpens(overMeters: DeskHitTest.hasMenu(hit),
                                                 appWindowCovers: Self.appWindowCoversPointer(),
@@ -447,7 +513,14 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// The Desk element under the pointer (DeskHitTest), nil where Desk lets the mouse through.
     private func elementUnderPointer() -> DeskElement? {
         guard let point = pointerInWindow() else { return nil }
-        return DeskHitTest.element(at: point, in: model.elements())
+        return DeskHitTest.element(at: point, in: clickableElements())
+    }
+
+    /// The elements that take a click right now: all of them, or the click layer's small pieces
+    /// while it stands in for the Desk window under the icons (DeskClickLayer.elements).
+    private func clickableElements() -> [DeskElement] {
+        let all = model.elements()
+        return clickWindow == nil ? all : DeskClickLayer.elements(in: all)
     }
 
     /// A two-finger click on the meters opens the limit menu for the row under the pointer
@@ -455,7 +528,7 @@ final class DeskController: NSObject, NSMenuDelegate {
     /// On now playing (the Desk line or the strip under the camera), its menu instead.
     private func limitMenuUnderPointer(_ event: NSEvent) -> Bool {
         let hit = elementUnderPointer()
-        guard let view = window?.contentView, DeskHitTest.hasMenu(hit) else { return false }
+        guard let view = clickHost?.contentView, DeskHitTest.hasMenu(hit) else { return false }
         NSMenu.popUpContextMenu(menu(for: hit), with: event, for: view)
         return true
     }
@@ -515,7 +588,7 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     /// Pops `menu` at the pointer in the Desk window.
     private func popUpAtPointer(_ menu: NSMenu) {
-        guard let w = window, let view = w.contentView else { return }
+        guard let w = clickHost, let view = w.contentView else { return }
         menu.popUp(positioning: nil, at: view.convert(w.mouseLocationOutsideOfEventStream, from: nil), in: view)
     }
 
@@ -627,14 +700,20 @@ final class DeskController: NSObject, NSMenuDelegate {
         // Arrange mode (item 60) takes the whole frame; otherwise only the click areas, as before.
         let arranging = model.arrange.active
         let wanted = DeskArrange.takesMouse(arranging: arranging,
-                                            overElement: DeskHitTest.element(at: point, in: model.elements()) != nil)
+                                            overElement: DeskHitTest.element(at: point, in: clickableElements()) != nil)
         // Outside Arrange mode, a button held down (a file dragged from the desktop) keeps the
         // window as it was, so a drag that started elsewhere crosses the plates to the Finder
         // (DeskPointerDrag); the button coming up runs this again.
+        // Under the desktop icons (DeskLayer) the Desk window can't be clicked: Finder's icon
+        // window covers it. The click layer (DeskClickLayer) takes the mouse in its place, over
+        // the same areas, and the Desk window keeps ignoring it.
+        syncClickAreas()
+        let taker = clickWindow ?? w
         let over = arranging ? wanted
             : DeskPointerDrag.takesMouse(wanted: wanted, buttonDown: NSEvent.pressedMouseButtons != 0,
-                                         takingNow: !w.ignoresMouseEvents)
-        if w.ignoresMouseEvents == over { w.ignoresMouseEvents = !over }
+                                         takingNow: !taker.ignoresMouseEvents)
+        if taker.ignoresMouseEvents == over { taker.ignoresMouseEvents = !over }
+        if taker !== w, !w.ignoresMouseEvents { w.ignoresMouseEvents = true }
         let blocks = [model.metersFrame, model.accountFrame, model.noteFrame, model.meetingsFrame,
                       model.nowPlayingFrame, model.stripFrame, model.stripNextFrame,
                       model.watchersFrame, model.stripWatcherFrame, model.stripAVFrame]
@@ -706,6 +785,8 @@ final class DeskController: NSObject, NSMenuDelegate {
         guard running, !model.arrange.active, let w = window as? DeskWindow else { return }
         model.arrange.begin()
         w.takesKey = true
+        // Under the icons (DeskLayer) the window comes up for the edit, and the click layer rests.
+        applyLayer()
         // Arrange runs on the main thread (menus, Settings' button, the debug hooks).
         arrangeStash = MainActor.assumeIsolated {
             let stash = DeskArrangeStash()
@@ -742,6 +823,8 @@ final class DeskController: NSObject, NSMenuDelegate {
             arrangeStash = nil
             MainActor.assumeIsolated { stash.restore() }
         }
+        // Back under the icons, with the click layer, when that is the choice (DeskLayer).
+        applyLayer()
         updateMouseThrough()
     }
 

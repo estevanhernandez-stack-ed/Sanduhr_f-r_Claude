@@ -55,6 +55,8 @@ extension ModsPageModel {
     /// (the 2026-10-15 check: a double-clicked pack went into the first personal folder); a mod
     /// pack goes to New Mod as before.
     func openAnyPack(_ url: URL, store: ModProposalStore, seat: String? = nil) async {
+        // A new open: the last one's refusal goes.
+        importNotes.setNote(nil, for: nil)
         let read = await Task.detached(priority: .userInitiated) { () -> Result<(ModPackReader.Unpacked, String), ModPackReader.Refusal> in
             do {
                 let pack = try ModPackReader.read(url)
@@ -71,27 +73,33 @@ extension ModsPageModel {
             state.cli = cliState(for: seat ?? "")
             state.plan()
             tab = .bySeat
-            if let seat { selectedSeat = seat }
+            if let seat {
+                selectedSeat = seat
+                importNotes.setNote(nil, for: seat)
+            }
             configImport = state
         case .success((let pack, _)) where pack.kind == "mod":
             newModWay = .fromClaude
             newModOpen = true
             await openPack(url, store: store)
         case .success:
-            configImportNote = "Sanduhr can't open \(url.lastPathComponent): it isn't a kind of pack this Sanduhr opens."
+            // Said where it can be seen (polish 2026-10-17, #21): on By Seat, above the picker.
+            tab = .bySeat
+            importNotes.setNote("Sanduhr can't open \(url.lastPathComponent): it isn't a kind of pack this Sanduhr opens.", for: nil)
         case .failure(let r):
             newModWay = .fromClaude
             newModOpen = true
-            keptNote = "Sanduhr can't open \(url.lastPathComponent): " + r.reasons.joined(separator: " ")
+            keptNote = .failed("Sanduhr can't open \(url.lastPathComponent): " + r.reasons.joined(separator: " "))
         }
     }
 
     /// Opens Claude's config proposal (slice K) in the Open sheet, into the folder it names.
     func reviewConfigProposal(_ r: ConfigProposalRecord) {
         guard let (pack, sha) = ModProposalStore.shared.configPack(r) else {
-            configImportNote = "Sanduhr can't read that proposal any more. Dismiss it, and ask Claude again."
+            importNotes.setNote("Sanduhr can't read that proposal any more. Dismiss it, and ask Claude again.", for: importNoteFolder(r.folder))
             return
         }
+        importNotes.setNote(nil, for: r.folder)
         var state = ConfigImportState(pack: pack, packSHA256: sha, fileName: "Claude's proposal: " + r.summary, seat: r.folder)
         state.proposalID = r.id
         state.cli = cliState(for: r.folder)
@@ -497,7 +505,7 @@ struct ConfigImportSheet: View {
                         let outcome = await model.undoImport(record)
                         undone = outcome
                         // Kept on By Seat after the sheet closes.
-                        model.configImportNote = outcome.note
+                        model.importNotes.setNote(outcome.note, for: model.importNoteFolder(state.seat))
                         undoing = false
                     }
                 }

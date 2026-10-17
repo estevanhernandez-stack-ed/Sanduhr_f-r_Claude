@@ -412,6 +412,30 @@ struct DeskArrangeClickTests {
     func copy() {
         #expect(DeskArrangeCopy.menuItem == "Arrange Desk…")
         #expect(DeskArrangeCopy.settingsButton == "Arrange Desk…")
+        #expect(DeskArrangeCopy.settingsNothingPlaced == "Place a piece first.")
+        #expect(DeskArrangeCopy.hide == "Hide")
+        #expect(DeskArrangeCopy.show == "Show")
+        #expect(DeskArrangeCopy.hiddenStrip == "Hidden:")
+    }
+
+    @Test("Hide and Show edit the working layout only: Cancel leaves the saved string, Done writes it")
+    func hideAndShow() {
+        let d = CountingDefaults()
+        d.values["layout"] = "message:tl clock:tr:1.2 meters:bl"
+        let mode = DeskArrangeMode(store: d)
+        mode.begin()
+        mode.edit { $0.hide("clock") }
+        #expect(mode.working?.string == "message:tl meters:bl")
+        #expect(mode.working?.hidden == ["clock", "claude", "nowPlaying", "watchers", "meetings"])
+        mode.cancel()
+        #expect(d.values["layout"] as? String == "message:tl clock:tr:1.2 meters:bl")
+        #expect(d.writes.isEmpty)
+        mode.begin()
+        mode.edit { $0.hide("clock") }
+        mode.edit { $0.show("meetings") }
+        #expect(mode.done())
+        #expect(d.values["layout"] as? String == "message:tl meters:bl meetings:bl")
+        #expect(d.writes == ["layout"])
     }
 }
 

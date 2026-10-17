@@ -1,12 +1,38 @@
 import SwiftUI
 
+/// Which of Mods & Config's controls apply (polish 2026-10-17, #14 to #16), from what the page
+/// read: a fresh profile with one folder and the stock mod sees Search, the count and the cards
+/// alone. Nothing is taken away; a control appears when the catalog grows past
+/// `toolbarCardThreshold` cards or `pickerFolderThreshold` folders.
+struct ModsControls: Equatable, Sendable {
+    static let toolbarCardThreshold = 10
+    static let pickerFolderThreshold = 2
+
+    /// The filter row (Kind, Show), the sort and Expand All / Collapse All.
+    let toolbar: Bool
+    /// The Folder filter and By Folder's chip picker.
+    let picker: Bool
+    /// The Compare segment of the tab bar.
+    let compare: Bool
+
+    /// `cards` is the whole catalog, before any filter; `narrowed` keeps the toolbar while a
+    /// filter is set, so a filter chosen before the folders changed can always be cleared.
+    init(cards: Int, folders: Int, narrowed: Bool = false) {
+        picker = folders >= Self.pickerFolderThreshold
+        compare = picker
+        toolbar = cards > Self.toolbarCardThreshold || picker || narrowed
+    }
+}
+
 /// Mods & Config's tabs (item 71, slice 1): Catalog | By Seat, remembered while the window lives.
+/// Compare joins with two folders; the smoke hook can still show it before then.
 struct ModsTabBar: View {
     @Bindable var model: ModsPageModel
+    let demo: Bool
 
     var body: some View {
         Picker("Show", selection: $model.tab) {
-            ForEach(ModsTab.allCases, id: \.self) { Text($0.title).tag($0) }
+            ForEach(model.tabs(demo: demo), id: \.self) { Text($0.title).tag($0) }
         }
         .pickerStyle(.segmented)
         .labelsHidden()
@@ -32,7 +58,7 @@ struct SeatMarkBadge: View {
         switch mark {
         case .work: "Work"
         case .personal: "Personal"
-        case .unmarked: "Unmarked"
+        case .unmarked: "Not marked"
         }
     }
 
@@ -58,7 +84,7 @@ struct ModsCatalogView: View {
         let cards = model.shownCards(demo: demo)
         let searching = !model.filter.search.trimmingCharacters(in: .whitespaces).isEmpty
         VStack(alignment: .leading, spacing: 10) {
-            Text("Everything your Claude Code folders hold or a marketplace they added lists, one line each, with a dot for every folder (seat) that has it. Click a line for its card, and a chip on the card to open that seat. Read from files only: nothing is fetched, run or changed.")
+            Text("Everything your Claude Code folders hold or a marketplace they added lists, one line each, with a dot for every folder that has it. Click a line for its card, and a chip on the card to open that folder on By Folder. The cards are read from files: nothing is fetched, run or changed until you use a button.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -82,7 +108,8 @@ struct ModsCatalogView: View {
                 .padding(8)
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.1)))
             }
-            CatalogFilterBar(model: model, demo: demo)
+            let controls = model.controls(demo: demo)
+            CatalogFilterBar(model: model, demo: demo, controls: controls)
             HStack {
                 Text(countLine(shown: cards.count))
                     .font(.caption)
@@ -94,21 +121,7 @@ struct ModsCatalogView: View {
                 }
                     .controlSize(.small)
                     .help("A prompt for Claude to build a mod in a session. Copies it to the clipboard; installs nothing.")
-                Button("Expand All") { model.expandAll(demo: demo) }
-                    .buttonStyle(.link)
-                    .font(.caption)
-                    .disabled(cards.isEmpty)
-                Button("Collapse All") { model.collapseAll() }
-                    .buttonStyle(.link)
-                    .font(.caption)
-                    .disabled(model.openCards.isEmpty)
-                Picker("Sort plugins", selection: $model.sortByLoad) {
-                    Text("Plugins by name").tag(false)
-                    Text("Plugins by session load").tag(true)
-                }
-                .labelsHidden()
-                .controlSize(.small)
-                .frame(maxWidth: 200)
+                if controls.toolbar { toolbar(cards: cards) }
             }
             if model.loaded && cards.isEmpty {
                 Text("Nothing matches these filters.").font(.caption).foregroundStyle(.secondary)
@@ -118,6 +131,24 @@ struct ModsCatalogView: View {
             }
         }
         .sheet(isPresented: $model.newModOpen) { NewModSheet(model: model, demo: demo, close: { model.newModOpen = false }) }
+    }
+
+    /// Expand All, Collapse All and the sort, in New Mod…'s style; shown when they apply.
+    @ViewBuilder
+    private func toolbar(cards: [CatalogCard]) -> some View {
+        Button("Expand All") { model.expandAll(demo: demo) }
+            .controlSize(.small)
+            .disabled(cards.isEmpty)
+        Button("Collapse All") { model.collapseAll() }
+            .controlSize(.small)
+            .disabled(model.openCards.isEmpty)
+        Picker("Sort plugins", selection: $model.sortByLoad) {
+            Text("Plugins by name").tag(false)
+            Text("Plugins by session load").tag(true)
+        }
+        .labelsHidden()
+        .controlSize(.small)
+        .frame(maxWidth: 200)
     }
 
     private func countLine(shown: Int) -> String {
@@ -298,12 +329,10 @@ private struct CatalogLine: View {
                     Text(on).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Button("Folders…") { model.openStudio(.folders) }
-                    .buttonStyle(.link)
-                    .font(.caption)
+                    .controlSize(.small)
                     .help("Switch it on or off, update or remove it, per Claude Code folder.")
                 Button("Studio…") { model.openStudio() }
-                    .buttonStyle(.link)
-                    .font(.caption)
+                    .controlSize(.small)
                     .help("Preview the band with demo numbers and style it.")
             }
         }
@@ -385,26 +414,34 @@ private struct AvailableRow: View {
 private struct CatalogFilterBar: View {
     @Bindable var model: ModsPageModel
     let demo: Bool
+    /// Search always; Kind and Show with the toolbar, Folder with two or more folders.
+    let controls: ModsControls
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Picker("Kind", selection: $model.filter.kind) {
-                    Text("All kinds").tag(CatalogKind?.none)
-                    ForEach(CatalogKind.allCases, id: \.self) { Text($0.title).tag(CatalogKind?.some($0)) }
+            if controls.toolbar {
+                HStack(spacing: 8) {
+                    Picker("Kind", selection: $model.filter.kind) {
+                        Text("All kinds").tag(CatalogKind?.none)
+                        ForEach(CatalogKind.allCases, id: \.self) { Text($0.title).tag(CatalogKind?.some($0)) }
+                    }
+                    .frame(maxWidth: 200)
+                    if controls.picker {
+                        Picker("Folder", selection: $model.filter.seat) {
+                            Text("All folders").tag(String?.none)
+                            ForEach(model.filterSeats(demo: demo)) { Text($0.label).tag(String?.some($0.path)) }
+                        }
+                        .frame(maxWidth: 200)
+                    }
                 }
-                .frame(maxWidth: 200)
-                Picker("Seat", selection: $model.filter.seat) {
-                    Text("All seats").tag(String?.none)
-                    ForEach(model.filterSeats(demo: demo)) { Text($0.label).tag(String?.some($0.path)) }
-                }
-                .frame(maxWidth: 200)
             }
             HStack(spacing: 8) {
-                Picker("Show", selection: $model.filter.show) {
-                    ForEach(CatalogFilter.Show.allCases, id: \.self) { Text($0.title).tag($0) }
+                if controls.toolbar {
+                    Picker("Show", selection: $model.filter.show) {
+                        ForEach(CatalogFilter.Show.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .frame(maxWidth: 240)
                 }
-                .frame(maxWidth: 240)
                 TextField("Search name, description or marketplace", text: $model.filter.search)
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 280)
@@ -470,11 +507,9 @@ private struct CatalogCardView: View {
                         .font(.caption)
                         .foregroundStyle(Color.hex("a78bfa"))
                     Button("Folders…") { model.openStudio(.folders) }
-                        .buttonStyle(.link)
-                        .font(.caption)
+                        .controlSize(.small)
                     Button("Studio…") { model.openStudio() }
-                        .buttonStyle(.link)
-                        .font(.caption)
+                        .controlSize(.small)
                 }
                 WatchersAbovePromptLine()
             }
@@ -556,7 +591,8 @@ private struct CatalogCardHeader: View {
             }
             CatalogBadge(text: card.kind == .plugin && card.isMod ? "Mod" : card.kind.badge, color: .secondary)
             if card.isDuplicate { CatalogBadge(text: "Duplicate", color: .orange) }
-            if card.isAvailable { CatalogBadge(text: "Available", color: Color.hex("4ade80")) }
+            // Sanduhr's own mod says Not installed in its chips line; Available is a marketplace listing's word.
+            if card.isAvailable && !card.isSanduhrs { CatalogBadge(text: "Available", color: Color.hex("4ade80")) }
         }
     }
 }
@@ -582,7 +618,7 @@ private struct CatalogChips: View {
 
     var body: some View {
         if card.isAvailable {
-            Text(card.isSanduhrs ? "Installed in no folder yet." : "Listed by a marketplace, installed in no folder.")
+            Text(card.isSanduhrs ? "Not installed." : "Listed by a marketplace, installed in no folder.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } else {
@@ -590,7 +626,7 @@ private struct CatalogChips: View {
                 ForEach(card.chips) { chip in
                     Button { model.open(chip, card: card) } label: { CatalogChipLabel(chip: chip) }
                         .buttonStyle(.plain)
-                        .help("Open \(chip.label) on By Seat")
+                        .help("Open \(chip.label) on By Folder")
                         .accessibilityLabel("\(chip.label), \(SeatMarkBadge(mark: chip.mark).title), \(chip.state.title)")
                 }
             }
@@ -652,10 +688,10 @@ struct SeatLabelControls: View {
             if seat.markSource == .account {
                 SeatMarkBadge(mark: seat.mark)
             } else {
-                Text("side not set").font(.caption).foregroundStyle(.secondary)
+                Text("not marked").font(.caption).foregroundStyle(.secondary)
             }
             Button("Edit on Accounts…") { SettingsWindowController.shared.showAccount(account) }
-                .help("This folder is linked to \(account). Its name and Work or Personal side are set on Accounts.")
+                .help("This folder is linked to \(account). Its name and whether it is marked work or personal are set on Accounts.")
         }
         .controlSize(.small)
         .accessibilityElement(children: .combine)
@@ -670,13 +706,12 @@ struct SeatLabelControls: View {
                 .onSubmit { save() }
                 .onChange(of: editing) { if !editing { save() } }
                 .help("Your name for this folder. Sanduhr never takes one from the folder's files.")
-            Picker("Side", selection: Binding(get: { seat.mark }, set: { model.setMark($0, for: seat.path) })) {
-                Text("Unmarked").tag(SeatMark.unmarked)
+            Picker("Work or personal", selection: Binding(get: { seat.mark }, set: { model.setMark($0, for: seat.path) })) {
+                Text("Not marked").tag(SeatMark.unmarked)
                 Text("Work").tag(SeatMark.work)
                 Text("Personal").tag(SeatMark.personal)
             }
-            .labelsHidden()
-            .frame(maxWidth: 120)
+            .fixedSize()
         }
         .controlSize(.small)
         .onAppear { draft = seat.labelChosen ? seat.label : "" }

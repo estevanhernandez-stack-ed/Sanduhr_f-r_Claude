@@ -169,6 +169,10 @@ enum DeskArrangeCopy {
     static let barKeys = "Return or Done keeps the new layout. Escape or Cancel puts it back."
     static let settingsArranging = "Arranging on the desktop. Finish there with Done or Cancel."
     static let settingsDeskOff = "Turn on Desk to arrange it on the desktop."
+    static let settingsNothingPlaced = "Place a piece first."
+    static let hide = "Hide"
+    static let show = "Show"
+    static let hiddenStrip = "Hidden:"
 }
 
 /// One Arrange mode edit: the layout string as it was saved, kept verbatim so Cancel leaves it

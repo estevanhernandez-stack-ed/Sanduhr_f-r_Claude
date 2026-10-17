@@ -490,6 +490,10 @@ struct DeskFirstRunTests {
         #expect(s.defaults.bool(forKey: DeskController.enabledKey))
         #expect(DeskLayout.parse(s.defaults.string(forKey: "layout") ?? "")["meters"] != nil)
         #expect(s.defaults.object(forKey: "showMeetings") as? Bool == false)
+        // Meetings is off, so it is not placed either: the Desk page's Order list and place
+        // picker would show a piece that never draws.
+        #expect(DeskLayout.parse(s.defaults.string(forKey: "layout") ?? "")["meetings"] == nil)
+        #expect(DeskLayout.parse(DeskFirstRun.layout).keys.sorted() == ["clock", "message", "meters"])
         #expect(s.defaults.bool(forKey: DeskController.notchKey) == false)
         #expect(WidgetVisibility.saved(in: widget) == .whileDeskOff)
         #expect(widget.object(forKey: DeskFirstRun.tuckKey) == nil)

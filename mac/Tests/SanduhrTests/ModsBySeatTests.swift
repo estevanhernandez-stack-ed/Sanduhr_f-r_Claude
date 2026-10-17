@@ -113,7 +113,7 @@ struct ModsBySeatTests {
                                        "statusLine": ["command": h.at("gone/statusline.sh") + " --x"]]
         let lints = SettingsPrecedence.lints(settings: settings, configKeys: ["hooks", "projects"], seat: h.at(".claude-l"), isDefault: false)
         #expect(lints.contains { $0.hasPrefix("1 Write(path) allow rule never match") })
-        #expect(lints.contains { $0.contains("settings.local.json in the seat folder") })
+        #expect(lints.contains { $0.contains("settings.local.json in the folder itself") })
         #expect(lints.contains { $0.contains("Windows paths in hooks") })
         #expect(lints.contains { $0.contains("hooks in .claude.json is ignored") })
         #expect(lints.contains { $0.contains("written on another machine") })
@@ -137,7 +137,7 @@ struct ModsBySeatTests {
         #expect(p.contains("gone: on in settings, not installed on this Mac."))
         #expect(p.contains("missing: its folder isn't on this Mac."))
         #expect(p.contains("a: on from 2 marketplaces (one, two)."))
-        #expect(p.contains("Marketplace two isn't added in this seat (no source declared)."))
+        #expect(p.contains("Marketplace two isn't added in this folder (no source declared)."))
         #expect(p.contains("Marketplace dir is a folder that isn't on this Mac."))
         #expect(p.contains { $0.hasPrefix("a: the inline folder hides the marketplace plugin") })
         #expect(!p.contains { $0.contains("synced-one") })
@@ -437,7 +437,7 @@ struct ModsBySeatTests {
          "additionalDirectories":["~/made-up-client"]}}
         """#)], seat: "/Users/someone/.claude-w", home: "/Users/someone")
         let allow = Self.row(rows, "permissions.allow")
-        #expect(allow?.workValue == .text(#"["Read(‹path outside the seat›)","Read(/Users/someone/.claude-w/agents/**)","Bash(ls)"]"#))
+        #expect(allow?.workValue == .text(#"["Read(‹path outside the folder›)","Read(/Users/someone/.claude-w/agents/**)","Bash(ls)"]"#))
         if case .text(let t)? = allow?.value { #expect(t.contains("made-up-client")) }
         #expect(allow?.shown(work: false) == allow?.value)
         if case .text(let t)? = Self.row(rows, "permissions.additionalDirectories")?.shown(work: true) {
@@ -448,7 +448,7 @@ struct ModsBySeatTests {
         let hooks = SeatExtensionsCheck.hooks(settings: Self.obj(#"{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"/Users/someone/made-up-client/bin/x.sh --y"}]}]}}"#),
                                               scan: scan, seat: "/Users/someone/.claude-w", home: "/Users/someone")
         #expect(hooks.first?.command.contains("made-up-client") == true)
-        #expect(hooks.first?.workCommand == "‹path outside the seat› --y")
+        #expect(hooks.first?.workCommand == "‹path outside the folder› --y")
     }
 
     @Test func aWorkSeatsImportsAreNumberedNotNamed() {
@@ -457,7 +457,7 @@ struct ModsBySeatTests {
                      SeatReport.InstructionNode(id: 2, kind: .imported, title: "~/made-up-client/notes.md", depth: 1, outsideSeat: true),
                      SeatReport.InstructionNode(id: 3, kind: .imported, title: "~/.claude-w/docs/b.md", depth: 2)]
         #expect(nodes.map { SeatInstructionTitles.title($0, in: nodes, hideNames: true) }
-                == ["~/.claude-w/CLAUDE.md", "Import 1", "An import outside the seat", "Import 2"])
+                == ["~/.claude-w/CLAUDE.md", "Import 1", "An import outside the folder", "Import 2"])
         #expect(SeatInstructionTitles.title(nodes[2], in: nodes, hideNames: false) == "~/made-up-client/notes.md")
     }
 
@@ -509,9 +509,9 @@ struct ModsBySeatTests {
         r.history.cleanupDays = 60
         #expect(SeatSectionID.history.summary(r, others: 0).warns == false)
         #expect(SeatSectionID.housekeeping.summary(r, others: 0).text == "Nothing left over.")
-        #expect(SeatSectionID.drift.summary(r, others: 0).text == "No other seat to compare.")
+        #expect(SeatSectionID.drift.summary(r, others: 0).text == "No other folder to compare.")
         #expect(SeatSectionID.extensions.summary(r, others: 1).text == "0 agents, 0 skills, 0 commands, 0 output styles, 0 plugins, 0 hooks.")
-        #expect(SeatSectionID.seat.summary(r, others: 1).text == "Plain folder (unsynced seat).")
+        #expect(SeatSectionID.seat.summary(r, others: 1).text == "Plain folder (unsynced).")
         #expect(ModsPageModel.claudeVersion("/no/such/versions/2.1.296") == "2.1.296")
         #expect(ModsPageModel.claudeVersion("/usr/local/bin/claude") == nil)
 

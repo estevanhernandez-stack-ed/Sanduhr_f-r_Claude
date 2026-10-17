@@ -21,7 +21,8 @@ struct DeskLayoutSection: View {
                 Toggle(SettingsNames.deskSwitch, isOn: $deskOn)
                     .onChange(of: deskOn) { _, _ in DeskController.shared.apply() }
                     .settingsAnchor(SettingsAnchor.desk)
-                DeskArrangeRow(deskOn: deskOn, arranging: arranging)
+                DeskArrangeRow(deskOn: deskOn, arranging: arranging,
+                               placesNothing: DeskArrangement(layout).placesNothing)
                     .settingsAnchor(SettingsAnchor.arrange)
             }
             Section("Where each piece sits") {
@@ -29,10 +30,12 @@ struct DeskLayoutSection: View {
                     DeskPlaceRow(widget: w.key, name: w.name, layout: $layout)
                         .disabled(arranging)
                         .modifier(FirstPieceAnchor(widget: w.key))
-                    DeskPieceExtra(widget: w.key)
+                    DeskPieceExtra(widget: w.key, arranging: arranging)
                 }
                 Text(DeskLayout.placesCaption)
                     .font(.caption).foregroundStyle(.secondary)
+                Link("Learn more", destination: AboutLinks.deskGuide)
+                    .font(.caption)
             }
             Section("Order") {
                 // One row, so the section's anchor marks the whole list.
@@ -44,7 +47,8 @@ struct DeskLayoutSection: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             DeskClicksSection()
-            AdvancedSection(page: .deskLayout) { DeskMarginsRows() }
+            // The margins move every piece, so they wait while arranging as the places and the order do.
+            AdvancedSection(page: .deskLayout) { DeskMarginsRows().disabled(arranging) }
         }
         .formStyle(.grouped)
     }
@@ -66,11 +70,17 @@ private struct FirstPieceAnchor: ViewModifier {
 /// Desk, Clicks (moved from Desk Look in slice 2: it is behavior, not look).
 private struct DeskClicksSection: View {
     @AppStorage(DeskPieceClicks.key, store: .desk) private var piecesTakeClicks = DeskPieceClicks.defaultOn
+    @AppStorage(DeskLayer.key, store: .desk) private var underIcons = DeskLayer.defaultOn
 
     var body: some View {
         Section("Clicks") {
+            Toggle(DeskLayer.title, isOn: $underIcons)
+                .onChange(of: underIcons) { _, _ in DeskController.shared.applyLayer() }
+            Text(DeskLayer.caption)
+                .font(.caption).foregroundStyle(.secondary)
             Toggle(DeskPieceClicks.title, isOn: $piecesTakeClicks)
                 .settingsAnchor(SettingsAnchor.clicks)
+                .disabled(underIcons)
             Text(DeskPieceClicks.caption)
                 .font(.caption).foregroundStyle(.secondary)
         }
@@ -95,9 +105,11 @@ private struct DeskMarginsRows: View {
 }
 
 /// What a piece's row carries under it on the Desk page: Meetings has Read today's meetings (was
-/// General), Now playing and Watchers link to their own pages.
+/// General), Now playing and Watchers link to their own pages. Read today's meetings takes the
+/// meetings off the Desk, so it waits while arranging as the places do.
 private struct DeskPieceExtra: View {
     let widget: String
+    var arranging = false
     @AppStorage("showMeetings", store: .desk) private var showMeetings = true
 
     var body: some View {
@@ -109,6 +121,7 @@ private struct DeskPieceExtra: View {
                     if on, desk.running { desk.model.requestCalendar() }
                     if !on { desk.model.meetings = [] }
                 }
+                .disabled(arranging)
                 .padding(.leading, 16)
         case NowPlayingPlacement.widget:
             link("Shows only while something plays.", .nowPlaying)
@@ -149,21 +162,29 @@ struct NeedsDeskRow: View {
 }
 
 /// Desk's Arrange Desk… button (item 60). While arranging, the places and the order here wait:
-/// Done on the desktop writes the layout, so an edit here would be overwritten.
+/// Done on the desktop writes the layout, so an edit here would be overwritten. With nothing
+/// placed there is nothing to drag, so the button waits for a piece.
 private struct DeskArrangeRow: View {
     let deskOn: Bool
     let arranging: Bool
+    var placesNothing = false
 
     var body: some View {
         LabeledContent {
             Button(DeskArrangeCopy.settingsButton) { DeskController.shared.arrangeDesk() }
-                .disabled(!deskOn || arranging)
+                .disabled(!deskOn || arranging || placesNothing)
         } label: {
-            Text(arranging ? DeskArrangeCopy.settingsArranging
-                 : deskOn ? DeskArrangeCopy.settingsNote : DeskArrangeCopy.settingsDeskOff)
+            Text(note)
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private var note: String {
+        if arranging { return DeskArrangeCopy.settingsArranging }
+        if !deskOn { return DeskArrangeCopy.settingsDeskOff }
+        if placesNothing { return DeskArrangeCopy.settingsNothingPlaced }
+        return DeskArrangeCopy.settingsNote
     }
 }
 
@@ -287,7 +308,8 @@ enum DeskLayout {
     static let standard = "message:tl clock:bl claude:bl meetings:bl"
 
     /// Desk, Where each piece sits: what the places are, under the rows.
-    static let placesCaption = "Eight places: the four corners, the top and bottom centers, and the middle of each side. Top center sits below the notch. Size scales a piece from 60% to 160%; the message starts from its own size in Desk Look. Hidden takes a piece off the desktop."
+    /// Two sentences (polish-ux 14); the notch and Desk Look details are in the setup guide.
+    static let placesCaption = "Eight places: the four corners, the top and bottom centers, and the middle of each side. Size scales a piece from 60% to 160%; Hidden takes it off the desktop."
 
     static let widgets: [(key: String, name: String)] = [
         ("message", "Message"), ("clock", "Clock and date"), ("claude", SettingsNames.claudeMetersLine),
@@ -330,6 +352,7 @@ struct DeskLookSection: View {
     @AppStorage(DeskMessageLook.glowKey, store: .desk) private var messageGlow = true
     @AppStorage("inkColor", store: .desk) private var inkColor = "ffffff"
     @AppStorage("inkShadow", store: .desk) private var inkShadow = true
+    @AppStorage("plate", store: .desk) private var plate = DeskPlate.defaultOn
     @State private var families: [String] = []
 
     /// The Desk font as drawn (EsteFont Pro until one is picked, or when the picked one is gone);
@@ -372,7 +395,12 @@ struct DeskLookSection: View {
                     .settingsAnchor(SettingsAnchor.colors)
                 Toggle("Glow around the message", isOn: $messageGlow)
                 ColorRow(title: "Clock, date, meetings, Claude", value: $inkColor, showsHex: false)
-                Toggle("Drop shadow under the clock text", isOn: $inkShadow)
+                Toggle(DeskInkShadow.title, isOn: $inkShadow)
+                Text(DeskInkShadow.caption)
+                    .font(.caption).foregroundStyle(.secondary)
+                Toggle(DeskPlate.title, isOn: $plate)
+                Text(DeskPlate.caption)
+                    .font(.caption).foregroundStyle(.secondary)
                 Text("Pick a preset; Advanced, below, takes your own hex colors. Notch text color is on Notch; how the clock and the message take clicks is on Desk.")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -420,19 +448,51 @@ struct ColorRow: View {
     }
 }
 
-/// A hex field and its swatch: one hex color, or several with commas for a gradient.
+/// A hex field and its swatch: one hex color, or several with commas for a gradient. The field
+/// commits on Return and on losing focus (DeskHex): a valid value is saved, a bad one is not,
+/// the text stays for fixing and a red caption says what is wrong until it is valid or a preset
+/// resets the field.
 struct HexRow: View {
     let title: String?
     @Binding var value: String
+    @State private var text: String
+    @State private var problem: String?
+    @FocusState private var editing: Bool
+
+    init(title: String?, value: Binding<String>) {
+        self.title = title
+        _value = value
+        _text = State(initialValue: value.wrappedValue)
+    }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            field
+            if let problem {
+                Text(problem).font(.caption).foregroundStyle(.red)
+            }
+        }
+        .onChange(of: value) { text = value; problem = nil }
+        .onChange(of: text) { if problem != nil { problem = DeskHex.problem(text) } }
+        .onChange(of: editing) { if !editing { commit() } }
+    }
+
+    private var field: some View {
         HStack {
             if let title { Text(title) }
-            TextField("hex", text: $value)
+            TextField("hex", text: $text)
                 .font(.system(.body, design: .monospaced))
                 .accessibilityLabel(title.map { "\($0) hex" } ?? "Hex")
+                .focused($editing)
+                .onSubmit { commit() }
             Swatch(value: value).frame(width: 90, height: 18)
         }
+    }
+
+    private func commit() {
+        let result = DeskHex.commit(text, saved: value)
+        problem = result.problem
+        if result.value != value { value = result.value }
     }
 }
 
@@ -556,7 +616,8 @@ struct DeskMessageSection: View {
 
     var body: some View {
         // Slice 3 (F13): Add Line, List | Text, Save and Revert sit in a bar that never scrolls
-        // away; the rotation, the lines and Ask Claude scroll under it.
+        // away; the rotation, the lines and Ask Claude scroll under it in a grouped Form, so the
+        // margins and sections match the other Desk pages (polish-ux 14).
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 8) {
                 if let proposal = handoff.pending {
@@ -572,21 +633,7 @@ struct DeskMessageSection: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 10)
             Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    MessageRotationGroup(changed: refreshDesk)
-                        .settingsAnchor(SettingsAnchor.rotation)
-                    if editor.mode == .list {
-                        MessageListEditor(editor: editor, pinChanged: refreshDesk)
-                    } else {
-                        MessageTextEditorPane(editor: editor, pinChanged: refreshDesk)
-                    }
-                    Divider()
-                    MessageAskClaude()
-                        .settingsAnchor(SettingsAnchor.askClaude)
-                }
-                .padding(20)
-            }
+            form
         }
         .onAppear { editor.loadIfNeeded() }
         .onChange(of: rotate) { _, _ in refreshDesk() }
@@ -601,6 +648,29 @@ struct DeskMessageSection: View {
                                         close: { reviewing = false })
             }
         }
+    }
+
+    /// Rotation, the lines (one row each way, so the list keeps its own drag and drop, as the
+    /// Desk page's Order list does) and Ask Claude, each its own section.
+    private var form: some View {
+        Form {
+            Section {
+                MessageRotationGroup(changed: refreshDesk)
+                    .settingsAnchor(SettingsAnchor.rotation)
+            }
+            Section {
+                if editor.mode == .list {
+                    MessageListEditor(editor: editor, pinChanged: refreshDesk)
+                } else {
+                    MessageTextEditorPane(editor: editor, pinChanged: refreshDesk)
+                }
+            }
+            Section {
+                MessageAskClaude()
+                    .settingsAnchor(SettingsAnchor.askClaude)
+            }
+        }
+        .formStyle(.grouped)
     }
 
     /// The Desk picks today's line again.
@@ -732,7 +802,7 @@ struct DeskNotchSection: View {
                 Toggle(SettingsNames.notchSwitch, isOn: $enabled)
                     .settingsAnchor(SettingsAnchor.notch)
                 NeedsDeskRow()
-                Text("Widens the notch into one black island while the Desk is on. Click it to open these settings. Screens without a notch are left alone.")
+                Text("\(NeedsDeskRow.text) Widens the notch into one black island; click it to open these settings. Screens without a notch are left alone.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             NotchTextSection()
@@ -748,7 +818,7 @@ struct DeskNotchSection: View {
                     Slider(value: $lightBrightness, in: CameraLightLayout.brightnessRange)
                     Text("\(Int((lightBrightness * 100).rounded()))%")
                         .font(.system(.body, design: .monospaced))
-                        .frame(width: 48, alignment: .trailing)
+                        .frame(width: sliderValueWidth, alignment: .trailing)
                 }
                 slider("Reach below the menu bar", $lightSize, CameraLightLayout.sizeRange)
                 Text("While any app uses a camera, a soft white light around the notch lights your face, above every app. It ends when the camera stops, with or without Desk or the island. Tools, Camera Fill Light shows it by hand. Screens without a notch get it at the top center.")
@@ -888,9 +958,11 @@ private struct AVIndicatorSection: View {
                 ForEach(AVPlace.allCases) { Text($0.label).tag($0) }
             }
             .disabled(dot == .never && !mic)
-            Text("Indicators only: Sanduhr sees that a camera or the microphone is in use, never which app or anything captured, and never mutes or changes a device. No permission is asked and nothing is saved. In a wing or under the camera they show while one is in use, and that place shows its own text the rest of the time; a place whose text is off shows them beside the camera instead. With the island off, or on a screen without a notch, they show in a small tab at the top. Click one for what is in use. Needs the Desk. With Reduce Motion the dot holds still and they come and go without a fade.")
+            Text("Indicators only: Sanduhr sees that a camera or the mic is in use, never which app or what it captures, and never mutes or changes a device. Without the island they show in a small tab at the top.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            Link("Learn more", destination: AboutLinks.notchGuide)
+                .font(.caption)
         }
     }
 }
@@ -954,12 +1026,15 @@ private struct NotchGlowSection: View {
         Toggle("Not while a terminal is in front", isOn: $skipTerminal)
             .disabled(!claudeWaiting && !claudeDone)
         HStack(alignment: .firstTextBaseline) {
-            Text("The two Claude Code rows need the \(SettingsNames.claudeCodeGlowHook) in a Claude Code folder, installed in Claude Code. Claude Code tells Sanduhr only that it waits or finished, nothing about the conversation. At most one glow of each kind every 20 seconds. With a terminal or an editor that runs Claude Code in front (Terminal, iTerm2, Ghostty, Warp, WezTerm, Alacritty, kitty, VS Code, Cursor, Zed), you are already looking, so it doesn't glow. Screens without a notch glow at the top center.")
+            Text("The two Claude Code rows need the \(SettingsNames.claudeCodeGlowHook) in a Claude Code folder, installed in Claude Code. Claude Code tells Sanduhr only that it waits or finished, nothing about the conversation.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
             SettingsLinkButton(.integrations, anchor: SettingsAnchor.folders)
         }
+        // The 20-second cap, the terminals it skips and the notchless top-center glow are in the guide.
+        Link("Learn more", destination: AboutLinks.claudeCodeGuide)
+            .font(.caption)
     }
 }
 
@@ -1116,12 +1191,15 @@ private struct ShortcutsSection: View {
 
 // MARK: - Shared
 
+/// The value column beside every Desk slider, the hand-built Brightness row included (polish-ux 14).
+private let sliderValueWidth: CGFloat = 40
+
 private func slider(_ title: String, _ value: Binding<Double>, _ range: ClosedRange<Double>) -> some View {
     HStack {
         Text(title)
         Slider(value: value, in: range, step: 1)
         Text("\(Int(value.wrappedValue))")
             .font(.system(.body, design: .monospaced))
-            .frame(width: 40, alignment: .trailing)
+            .frame(width: sliderValueWidth, alignment: .trailing)
     }
 }

@@ -104,6 +104,62 @@ struct DeskArrangementStringTests {
     }
 }
 
+/// Arrange mode's Hide and Show (polish round, item 12): the same writes as Settings' Hidden and
+/// its place picker, as pure functions on the layout string.
+@Suite("Desk hide and show")
+struct DeskArrangementHideShowTests {
+    @Test("hide takes the piece's word out, size and all; the rest keep their sizes")
+    func hide() {
+        var a = DeskArrangement("message:tl clock:tr:1.2 meters:bl:0.8 meetings:bl")
+        a.hide("clock")
+        #expect(a.string == "message:tl meters:bl:0.8 meetings:bl")
+        #expect(a.string == DeskLayout.placing("clock", in: "", layout: "message:tl clock:tr:1.2 meters:bl:0.8 meetings:bl"))
+        #expect(a.hidden == ["clock", "claude", "nowPlaying", "watchers"])
+        // Hiding a hidden piece changes nothing.
+        a.hide("watchers")
+        #expect(a.string == "message:tl meters:bl:0.8 meetings:bl")
+    }
+
+    @Test("show puts a hidden piece at its standard anchor at size 1, seated by Settings' order")
+    func show() {
+        var a = DeskArrangement("message:tl meters:bl:0.8 meetings:bl")
+        a.show("clock")
+        #expect(a.string == "message:tl clock:bl meters:bl:0.8 meetings:bl")
+        #expect(a.string == DeskLayout.placing("clock", in: "bl", layout: "message:tl meters:bl:0.8 meetings:bl"))
+        var b = DeskArrangement("clock:bl")
+        b.show("message")
+        #expect(b.string == "message:tl clock:bl")
+        var empty = DeskArrangement("")
+        empty.show("meters")
+        #expect(empty.string == "meters:bl")
+        // A placed piece stays where it is, at its size.
+        a.show("meters")
+        #expect(a.placement("meters") == DeskPlacement(widget: "meters", anchor: .bl, scale: 0.8))
+    }
+
+    @Test("hide then show round trips the layout, a moved or resized piece coming back standard")
+    func roundTrip() {
+        var a = DeskArrangement(DeskLayout.standard)
+        a.hide("clock")
+        a.show("clock")
+        #expect(a.string == DeskLayout.standard)
+        var b = DeskArrangement("message:tl clock:tr:1.2 meters:bl")
+        b.hide("clock")
+        b.show("clock")
+        #expect(b.string == "message:tl clock:bl meters:bl")
+        #expect(DeskArrangement(b.string) == b)
+    }
+
+    @Test("nothing placed: an empty string or one with only unknown words")
+    func placesNothing() {
+        #expect(DeskArrangement("").placesNothing)
+        #expect(DeskArrangement("weather:tr").placesNothing)
+        #expect(!DeskArrangement("clock:bl").placesNothing)
+        #expect(DeskArrangement("").hidden == DeskArrangement.known)
+        #expect(DeskArrangement(DeskLayout.standard).hidden == ["meters", "nowPlaying", "watchers"])
+    }
+}
+
 @Suite("Desk piece sizes, item 59")
 struct DeskArrangementScaleTests {
     @Test func sizesStayWithinBoundsAndSnapToSteps() {

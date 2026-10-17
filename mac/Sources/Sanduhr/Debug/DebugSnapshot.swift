@@ -78,6 +78,12 @@ struct DebugStateInput {
     var deskFramesProblem: String?
     /// "Clock and message take clicks" (DeskPieceClicks), Settings, Desk, Look.
     var deskPieceClicks = DeskPieceClicks.defaultOn
+    /// "Plate behind the text" (DeskPlate, desk suite key "plate"), Settings, Desk Look: off when
+    /// the key is absent, on for a new install.
+    var deskPlate = DeskPlate.defaultOn
+    /// "Keep the Desk under desktop icons" (DeskLayer, desk suite key "underIcons"), Settings,
+    /// Desk, Clicks: off when the key is absent.
+    var deskUnderIcons = DeskLayer.defaultOn
     /// The Dock as the Desk sees it (item 56): its side, auto-hide, and the inset applied now.
     var dock = DockDebug()
     var alerts = AlertSettings()
@@ -537,6 +543,8 @@ enum DebugState {
         pairs.append(("desk_frames_ok", .bool(s.deskFramesProblem == nil)))
         pairs.append(("desk_frames_problem", s.deskFramesProblem.map(YAMLNode.string) ?? .null))
         pairs.append(("desk_piece_clicks", .bool(s.deskPieceClicks)))
+        pairs.append(("desk_plate", .bool(s.deskPlate)))
+        pairs.append(("desk_under_icons", .bool(s.deskUnderIcons)))
         pairs.append(("dock", dockYAML(s.dock)))
         pairs.append(("alerts", alerts(s.alerts)))
         let fetched: YAMLNode = s.lastFetch.map { .string(ISO8601.stamp($0, fractional: false)) } ?? .null

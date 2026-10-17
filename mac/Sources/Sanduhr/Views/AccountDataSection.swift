@@ -223,7 +223,7 @@ struct AccountDataSection: View {
             }
             .pickerStyle(.segmented)
             .fixedSize()
-            Caption("Work: what its folder supplies hides while demo mode is on (watchers, and Mods & Config's entries), and comparisons show its settings by key name only. Personal: Mods & Config shows its folder as yours. Not set: the folder can be marked on Mods & Config, By Seat.")
+            Caption("Work: what its folder supplies hides while demo mode is on (watchers, and Mods & Config's entries), and comparisons show its settings by key name only. Personal: Mods & Config shows its folder as yours. Not set: the folder can be marked on Mods & Config, By Folder.")
         }
     }
 

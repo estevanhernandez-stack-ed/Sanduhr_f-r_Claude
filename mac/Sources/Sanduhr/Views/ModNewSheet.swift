@@ -32,6 +32,16 @@ struct MarketplacePublish: Identifiable, Equatable {
     var id: String { mod.id }
 }
 
+/// What From Claude's last action said (polish 2026-10-17, #9), and whether it is a failure:
+/// only a failure draws orange.
+struct KeptNote: Equatable, Sendable {
+    let text: String
+    let isFailure: Bool
+
+    static func done(_ text: String) -> KeptNote { KeptNote(text: text, isFailure: false) }
+    static func failed(_ text: String) -> KeptNote { KeptNote(text: text, isFailure: true) }
+}
+
 /// Slice F: finding mods made in sessions, keeping them, checking and trying the kept copies.
 extension ModsPageModel {
     /// Every folder's session mods, read again with what is kept. In demo mode no work folder's.
@@ -67,7 +77,7 @@ extension ModsPageModel {
         sessionMods = rows
         self.kept = kept
         keptStates = states
-        // list_catalog's file follows what is kept and where it is on (slice G2).
+        // The catalog file agents read follows what is kept and where it is on (slice G2).
         ModProposalStore.shared.publishCatalog()
     }
 
@@ -109,7 +119,7 @@ extension ModsPageModel {
                 return "Sanduhr couldn't change \(installer.configFile(.meters, folder: folder)): it was changed while writing, or isn't JSON Sanduhr can edit."
             }
         }.value
-        keptNote = failed
+        keptNote = failed.map(KeptNote.failed)
         await refreshKept()
         // The Catalog shows the mod on or off there without Read Again.
         await load(linked: lastLinked)
@@ -136,7 +146,7 @@ extension ModsPageModel {
             await refreshKept()
             await checkKept(mod)
         case .failure(let f):
-            keptNote = f.message
+            keptNote = .failed(f.message)
         }
     }
 
@@ -156,14 +166,14 @@ extension ModsPageModel {
     func forget(_ mod: KeptMod) async {
         let using = keptStates[mod.id]?.filter { $0.value == .on }.count ?? 0
         guard using == 0 else {
-            keptNote = "\(mod.name) is on in \(using) \(using == 1 ? "folder" : "folders"). Turn it off there first."
+            keptNote = .failed("\(mod.name) is on in \(using) \(using == 1 ? "folder" : "folders"). Turn it off there first.")
             return
         }
         let store = keptStore
         let failed = await Task.detached(priority: .userInitiated) { () -> KeptMods.Failure? in
             do { try store.forget(mod); return nil } catch { return (error as? KeptMods.Failure) ?? .writeFailed }
         }.value
-        keptNote = failed?.message
+        keptNote = failed.map { .failed($0.message) }
         keptChecks[mod.id] = nil
         await refreshKept()
     }
@@ -191,7 +201,7 @@ extension ModsPageModel {
             await refreshKept()
             if keptChecks[kept.id] == nil { await checkKept(kept) }
         } catch {
-            keptNote = (error as? KeptMods.Failure)?.message ?? KeptMods.Failure.writeFailed.message
+            keptNote = .failed((error as? KeptMods.Failure)?.message ?? KeptMods.Failure.writeFailed.message)
         }
     }
 
@@ -218,12 +228,14 @@ extension ModsPageModel {
             try keptStore.trySession(mod, claude: claude, in: folder)
             if let folder { UserDefaults.standard.set(folder.path, forKey: Self.tryFolderKey) }
         } catch {
-            keptNote = (error as? KeptMods.Failure)?.message ?? KeptMods.Failure.writeFailed.message
+            keptNote = .failed((error as? KeptMods.Failure)?.message ?? KeptMods.Failure.writeFailed.message)
         }
     }
 
-    /// Export (item 76, slice A): asks where, then writes the kept copy as a `.sanduhrpack`.
+    /// Export (item 76, slice A): asks where, then writes the kept copy as a `.sanduhrpack`, off
+    /// the main actor with `exportingKept` set meanwhile (polish 2026-10-17, #22).
     func exportKept(_ mod: KeptMod) async {
+        guard exportingKept == nil else { return }
         let panel = NSSavePanel()
         // No allowedContentTypes: until Sanduhr declares the type, the panel adds the extension
         // a second time. ModPack.destination puts it on when the name lacks it.
@@ -233,15 +245,20 @@ extension ModsPageModel {
         panel.prompt = "Export"
         guard panel.runModal() == .OK, let picked = panel.url else { return }
         let url = ModPack.destination(picked)
+        exportingKept = mod.id
+        defer { exportingKept = nil }
         // The pack says what Check found: check first when it hasn't run this session.
         if keptChecks[mod.id] == nil { await checkKept(mod) }
         var report: ModCheckReport?
         if case .report(let r)? = keptChecks[mod.id] { report = r }
+        let from = URL(fileURLWithPath: keptStore.path(mod))
         do {
-            try ModPack.write(mod, from: URL(fileURLWithPath: keptStore.path(mod)), to: url, check: report)
-            keptNote = "Exported \(mod.name) to \(url.lastPathComponent)."
+            try await Task.detached(priority: .userInitiated) {
+                try ModPack.write(mod, from: from, to: url, check: report)
+            }.value
+            keptNote = .done("Exported \(mod.name) to \(url.lastPathComponent).")
         } catch {
-            keptNote = (error as? ModPack.Failure)?.message ?? ModPack.Failure.writeFailed.message
+            keptNote = .failed((error as? ModPack.Failure)?.message ?? ModPack.Failure.writeFailed.message)
         }
     }
 
@@ -249,7 +266,7 @@ extension ModsPageModel {
     /// when `choose`), then plans publishing `mod` into it. The confirm shows the plan.
     func preparePublish(_ mod: KeptMod, choose: Bool = false) async {
         publishedCommands = nil
-        guard let gitPath = ModMarketplace.findGit() else { keptNote = ModMarketplace.Failure.noGit.message; return }
+        guard let gitPath = ModMarketplace.findGit() else { keptNote = .failed(ModMarketplace.Failure.noGit.message); return }
         var folder = UserDefaults.standard.string(forKey: ModMarketplace.folderKey).map { URL(fileURLWithPath: $0) }
         var isDir: ObjCBool = false
         if choose || folder.map({ !FileManager.default.fileExists(atPath: $0.path, isDirectory: &isDir) || !isDir.boolValue }) ?? true {
@@ -270,7 +287,7 @@ extension ModsPageModel {
             UserDefaults.standard.set(folder.path, forKey: ModMarketplace.folderKey)
             publishing = MarketplacePublish(mod: mod, folder: folder, gitPath: gitPath, plan: plan)
         case .failure(let error):
-            keptNote = (error as? ModMarketplace.Failure)?.message ?? ModMarketplace.Failure.notAClone.message
+            keptNote = .failed((error as? ModMarketplace.Failure)?.message ?? ModMarketplace.Failure.notAClone.message)
         }
     }
 
@@ -286,12 +303,12 @@ extension ModsPageModel {
         keptBusy.remove(mod.id)
         switch result {
         case .success(let outcome) where outcome.pushFailure == nil:
-            keptNote = "Published \(mod.name) to \(plan.repo.source) (\(plan.repo.branch), \(outcome.commit)). On another machine, add it with the commands below."
+            keptNote = .done("Published \(mod.name) to \(plan.repo.source) (\(plan.repo.branch), \(outcome.commit)). On another machine, add it with the commands below.")
             publishedCommands = plan.commands
         case .success(let outcome):
-            keptNote = "Committed \(mod.name) as \(outcome.commit) in \(request.folder.lastPathComponent), but the push didn't go through: \(outcome.pushFailure ?? ""). Push from Terminal with git push."
+            keptNote = .failed("Committed \(mod.name) as \(outcome.commit) in \(request.folder.lastPathComponent), but the push didn't go through: \(outcome.pushFailure ?? ""). Push from Terminal with git push.")
         case .failure(let error):
-            keptNote = (error as? ModMarketplace.Failure)?.message ?? ModMarketplace.Failure.writeFailed.message
+            keptNote = .failed((error as? ModMarketplace.Failure)?.message ?? ModMarketplace.Failure.writeFailed.message)
         }
     }
 
@@ -339,7 +356,7 @@ extension ModsPageModel {
 
     func tryProposal(_ r: ModProposalRecord, store: ModProposalStore, in folder: URL? = nil) {
         guard let claude, canTryProposal(r, store: store) else {
-            if !store.isStaged(r) { keptNote = KeptMods.Failure.gone.message }
+            if !store.isStaged(r) { keptNote = .failed(KeptMods.Failure.gone.message) }
             return
         }
         do {
@@ -347,7 +364,7 @@ extension ModsPageModel {
             keptNote = nil
             if let folder { UserDefaults.standard.set(folder.path, forKey: Self.tryFolderKey) }
         } catch {
-            keptNote = (error as? KeptMods.Failure)?.message ?? KeptMods.Failure.writeFailed.message
+            keptNote = .failed((error as? KeptMods.Failure)?.message ?? KeptMods.Failure.writeFailed.message)
         }
     }
 
@@ -370,11 +387,11 @@ extension ModsPageModel {
                 keptNote = nil
                 await checkProposal(r, store: store)
             case .alreadyKept(let mod):
-                keptNote = "\(mod.name)\(mod.version.map { " " + $0 } ?? "") is kept already, with the same files."
+                keptNote = .done("\(mod.name)\(mod.version.map { " " + $0 } ?? "") is kept already, with the same files.")
             }
         } catch {
             let reasons = (error as? ModPackReader.Refusal)?.reasons ?? ["Sanduhr can't read that file."]
-            keptNote = "Sanduhr can't open \(url.lastPathComponent): " + reasons.joined(separator: " ")
+            keptNote = .failed("Sanduhr can't open \(url.lastPathComponent): " + reasons.joined(separator: " "))
         }
     }
 
@@ -415,13 +432,14 @@ struct NewModSheet: View {
     @State private var trying: KeptMod?
     @State private var tryingProposal: ModProposalRecord?
     @State private var forgetting: KeptMod?
+    @State private var dismissing: ModProposalRecord?
     @State private var exporting: KeptMod?
     @State private var consent: KeptConsent?
 
     struct KeptConsent: Identifiable {
         let mod: KeptMod
         let folder: String
-        /// The propose_install request it answers, if any.
+        /// The install request from Claude it answers, if any.
         var request: String?
         var id: String { mod.id + "\n" + folder }
     }
@@ -443,6 +461,9 @@ struct NewModSheet: View {
         .padding(20)
         .frame(width: 600)
         .onAppear { way = model.newModWay }
+        // Each open starts clean. Cleared on close rather than on appear: a pack from Finder
+        // sets its refusal before the sheet is up, and that one must survive the open.
+        .onDisappear { model.keptNote = nil }
         .task { await model.refreshKept() }
         .alert(approveTitle, isPresented: Binding(get: { approving != nil && !needsTypedName }, set: { if !$0 { approving = nil } })) {
             Button("Keep It") { if let r = approving { Task { await model.approve(r, store: proposals) } } }
@@ -508,6 +529,14 @@ struct NewModSheet: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Deletes Sanduhr's copy. The session's own folder is left as it is, until Claude Code cleans it up.")
+        }
+        .confirmationDialog("Dismiss \(dismissing?.name ?? "the proposal")?", isPresented: Binding(get: { dismissing != nil }, set: { if !$0 { dismissing = nil } })) {
+            Button("Dismiss", role: .destructive) { if let r = dismissing { proposals.dismiss(r.id) } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(dismissing?.fromFile == true
+                 ? "Sanduhr's copy of the pack's files is deleted. The pack itself is left where it is."
+                 : "Its staged files are deleted. Ask Claude again to get it back.")
         }
         .alert(publishTitle, isPresented: Binding(get: { model.publishing != nil }, set: { if !$0 { model.publishing = nil } })) {
             let same = model.publishing?.plan.change == .same
@@ -630,22 +659,25 @@ struct NewModSheet: View {
     @ViewBuilder
     private var session: some View {
         @Bindable var proposals = proposals
+        // The same switch as the page's From Claude row (ModsFromClaudeRow), so the sheet works
+        // on its own; one store behind both.
         HStack {
-            Toggle("Let agents propose mods", isOn: $proposals.allowed)
+            Toggle(ModsFromClaudeRow.title, isOn: $proposals.allowed)
             Spacer()
             Button("Open Pack…") { Task { await model.choosePack(store: proposals) } }
                 .controlSize(.small)
                 .help("Opens a .sanduhrpack someone exported. Its mod waits here to be checked, tried and kept.")
         }
-            .help("Lets Claude send a mod it built to Sanduhr with the propose_mod tool. You review its files and what it can do, then keep it or dismiss it; nothing is turned on anywhere by a proposal.")
-        Text("Off, Sanduhr's MCP server refuses propose_mod, propose_install and list_catalog. On, Claude can see your kept mods and where they're on, send a mod for you to review, or ask to turn a kept one on in a folder; each waits here for you.")
+            .help("Lets Claude send a mod it built to Sanduhr. You review its files and what it can do, then keep it or dismiss it; nothing is turned on anywhere by a proposal.")
+        Text(ModsFromClaudeRow.caption)
             .font(.caption).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         Text("A mod Claude makes in a session lives in that session's folder, and Claude Code deletes it after a while. Keep copies it, unchanged, into Sanduhr's own folder and checks what it can do. None of its code runs until you try it or turn it on in a folder, and each asks first.")
             .font(.caption).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         if let note = model.keptNote {
-            Text(note).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+            Text(note.text).font(.caption).foregroundStyle(note.isFailure ? Color.orange : Color.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         if let commands = model.publishedCommands { publishedLine(commands) }
         ScrollView {
@@ -725,7 +757,10 @@ struct NewModSheet: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                if model.keptBusy.contains(mod.id) { ProgressView().controlSize(.small) }
+                if model.exportingKept == mod.id {
+                    ProgressView().controlSize(.small)
+                    Text("Writing the pack…").font(.caption).foregroundStyle(.secondary)
+                } else if model.keptBusy.contains(mod.id) { ProgressView().controlSize(.small) }
                 Button("Try in a Session…") { trying = mod }
                     .controlSize(.small)
                     .disabled(!model.canTry(mod))
@@ -738,6 +773,7 @@ struct NewModSheet: View {
                         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: model.keptStore.path(mod))])
                     }
                     Button("Export…") { exporting = mod }
+                        .disabled(model.exportingKept != nil)
                         .help("Writes a .sanduhrpack to share it with another Mac or person.")
                     Button("Publish to Marketplace…") { Task { await model.preparePublish(mod) } }
                         .help("Commits it to a git clone of your own marketplace repo and pushes, after you confirm. Any machine adds the repo once with claude plugin marketplace add.")
@@ -774,7 +810,7 @@ struct NewModSheet: View {
                 }
                 Spacer()
                 if model.keptBusy.contains(r.id) { ProgressView().controlSize(.small) }
-                Button("Dismiss") { proposals.dismiss(r.id) }
+                Button("Dismiss…") { dismissing = r }
                     .controlSize(.small)
                     .help(r.fromFile ? "Deletes Sanduhr's copy of the pack's files. The pack itself is left where it is."
                           : "Deletes the proposed files. Claude hears that you dismissed it.")

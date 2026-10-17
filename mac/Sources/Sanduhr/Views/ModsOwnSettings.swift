@@ -47,10 +47,13 @@ struct OwnModRow: Identifiable, Equatable, Sendable {
     /// Update has something to do here: an entry naming older scripts, or an older pinned version.
     var updateWaiting: Bool { state.listed && (status == .outdated || (updateAvailable && !missing)) }
 
-    /// "On in 2 of 3 folders, an update waiting in 1", nil without a folder (item 75, slice C).
+    /// "On in 2 of 3 folders, an update waiting in 1", "Not installed" while no folder lists it (the
+    /// Catalog's word, 2026-10-17), nil without a folder (item 75, slice C).
     static func onLine(_ rows: [OwnModRow]) -> String? {
         guard !rows.isEmpty else { return nil }
-        var text = "On in \(rows.filter(\.state.isOn).count) of \(rows.count) folder\(rows.count == 1 ? "" : "s")"
+        var text = rows.contains(where: \.state.listed)
+            ? "On in \(rows.filter(\.state.isOn).count) of \(rows.count) folder\(rows.count == 1 ? "" : "s")"
+            : "Not installed"
         let waiting = rows.filter(\.updateWaiting).count
         if waiting > 0 { text += ", an update waiting in \(waiting)" }
         return text
@@ -106,28 +109,21 @@ struct OwnModUpdateQuestion: Identifiable, Equatable {
 }
 
 extension View {
-    /// The meters mod's two questions, in the Studio's Folders tab: On in a folder without the
-    /// mod, and an update that can do more.
-    func ownModQuestions(_ model: ModsPageModel, linked: [String]) -> some View {
-        modifier(OwnModQuestions(model: model, linked: linked))
+    /// The meters mod's update question (an update that can do more), on the page's header and
+    /// in the Studio's Folders tab. On in a folder without the mod is the consent sheet's, not a
+    /// question here. `active` is false on the header beneath an open Studio, so it shows once.
+    func ownModQuestions(_ model: ModsPageModel, linked: [String], active: Bool = true) -> some View {
+        modifier(OwnModQuestions(model: model, linked: linked, active: active))
     }
 }
 
 private struct OwnModQuestions: ViewModifier {
     @Bindable var model: ModsPageModel
     let linked: [String]
+    let active: Bool
 
     func body(content: Content) -> some View {
         content
-            .confirmationDialog(onTitle, isPresented: onShown, titleVisibility: .visible) {
-                Button("Turn On") {
-                    if let folder = model.confirmOn { Task { await model.setOwn(on: true, folder: folder, linked: linked) } }
-                    model.confirmOn = nil
-                }
-                Button("Cancel", role: .cancel) { model.confirmOn = nil }
-            } message: {
-                Text("Sanduhr adds its mod's folder to env.CLAUDE_CODE_PLUGIN_DIRS in this folder's settings.json, pinned to the version this copy of Sanduhr carries. Off or Remove puts the file back exactly.")
-            }
             .alert(updateTitle, isPresented: updateShown, presenting: model.updateQuestion) { q in
                 Button("Update") { Task { await model.update(folder: q.folder, confirmed: true, linked: linked) } }
                 Button("Keep the Version in Use", role: .cancel) {}
@@ -136,18 +132,10 @@ private struct OwnModQuestions: ViewModifier {
             }
     }
 
-    private var onTitle: String {
-        "Turn on \(IntegrationScripts.modName) in \(model.confirmOn.map(model.display) ?? "this folder")?"
-    }
-
     private var updateTitle: String { "The new version of \(IntegrationScripts.modName) can do more" }
 
-    private var onShown: Binding<Bool> {
-        Binding(get: { model.confirmOn != nil }, set: { if !$0 { model.confirmOn = nil } })
-    }
-
     private var updateShown: Binding<Bool> {
-        Binding(get: { model.updateQuestion != nil }, set: { if !$0 { model.updateQuestion = nil } })
+        Binding(get: { active && model.updateQuestion != nil }, set: { if !$0 { model.updateQuestion = nil } })
     }
 }
 
@@ -171,10 +159,11 @@ enum MetersModStatus {
 
 /// Sanduhr's own mod, sanduhr-meters, at the top of Mods & Config (2026-10-08: the meters above
 /// the prompt are a mod, so their controls live with the mods; slice 2 had them on Claude Code).
-/// Since item 75 slice C its per-folder rows live in the Mod Studio's Folders tab; the page keeps
-/// where it is on, in one line, and the ways into the Studio.
+/// Item 75 slice C moved its per-folder rows into the Mod Studio's Folders tab; since 2026-10-17
+/// the page's header (MetersHeader) shows the same rows again, above More.
 /// One folder's meters mod: its state, Update, Remove and the switch, then where it stands and
-/// what the last action said (a project's override included). The Studio's Folders tab.
+/// what the last action said (a project's override included). The header and the Studio's
+/// Folders tab.
 struct MetersModRow: View {
     let row: OwnModRow
     var model: ModsPageModel
@@ -219,12 +208,14 @@ struct MetersModRow: View {
     }
 }
 
-/// Update (an entry naming older scripts, or a pinned version older than the app's) and Remove.
+/// Update (an entry naming older scripts, or a pinned version older than the app's) and Remove,
+/// which asks first: it rewrites that folder's settings.json.
 private struct MetersModButtons: View {
     let row: OwnModRow
     var model: ModsPageModel
     let linked: [String]
     let busy: Bool
+    @State private var removing = false
 
     var body: some View {
         if row.status == .outdated || row.updateWaiting {
@@ -240,8 +231,65 @@ private struct MetersModButtons: View {
             .disabled(busy)
         }
         if row.state.listed || row.state.hasReceipt {
-            Button("Remove") { Task { await model.remove(folder: row.folder, linked: linked) } }
+            Button("Remove…") { removing = true }
                 .disabled(busy || !row.state.readable)
+                .confirmationDialog("Remove the meters mod from \(model.display(row.folder))?", isPresented: $removing) {
+                    Button("Remove", role: .destructive) { Task { await model.remove(folder: row.folder, linked: linked) } }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Its entries come out of that folder's settings.json. The receipt keeps the undo.")
+                }
+        }
+    }
+}
+
+/// Meters above the prompt at the top of Mods & Config (2026-10-17): one row per Claude Code
+/// folder, the same folders the Studio's Folders tab lists (no work folder in demo mode), each
+/// with its state in words, Update and Remove where they apply, and the switch; the watchers'
+/// line; and the way into the Studio. On in a folder without the mod goes through the consent
+/// sheet and the install, as in the Studio.
+struct MetersHeader: View {
+    var model: ModsPageModel
+    let linked: [String]
+    let demo: Bool
+    @State private var consent: MetersConsent?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(SettingsNames.metersAbovePrompt).font(.headline)
+                Spacer()
+                Button("Studio…") { model.openStudio() }
+                    .controlSize(.small)
+                    .help("Preview the band with demo numbers, style it and set its layout.")
+            }
+            rows
+            WatchersAbovePromptLine()
+        }
+        .ownModQuestions(model, linked: linked, active: !model.studioOpen)
+        .sheet(item: $consent) { c in
+            MetersConsentSheet(folder: model.display(c.folder),
+                               file: model.display(model.installer.configFile(.meters, folder: c.folder)),
+                               install: {
+                                   consent = nil
+                                   Task { await model.install(folder: c.folder, updating: false, linked: linked) }
+                               },
+                               cancel: { consent = nil })
+        }
+    }
+
+    @ViewBuilder
+    private var rows: some View {
+        let rows = model.studioRows(demo: demo)
+        if !model.ownLoaded {
+            Text("Reading your Claude Code folders…").font(.caption).foregroundStyle(.secondary)
+        } else if rows.isEmpty {
+            Text("No Claude Code folder found (~/.claude or a ~/.claude-name folder).")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        ForEach(rows) { row in
+            MetersModRow(row: row, model: model, linked: linked, install: { consent = MetersConsent(folder: row.folder) })
+            if row.id != rows.last?.id { Divider() }
         }
     }
 }

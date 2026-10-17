@@ -403,6 +403,8 @@ enum DebugHooks {
         s.silencedLimits = LimitMenu.silenced(in: UserDefaults.desk)
         s.meetingsCount = desk.model.meetings.count
         s.deskPieceClicks = DeskPieceClicks.isOn(in: UserDefaults.desk)
+        s.deskPlate = DeskPlate.isOn(in: UserDefaults.desk)
+        s.deskUnderIcons = DeskLayer.isOn(in: UserDefaults.desk)
         if desk.running, let size = desk.windowSize {
             s.deskFrames = desk.model.elements()
             s.deskFramesProblem = DeskFrameCheck.problem(s.deskFrames, window: size)

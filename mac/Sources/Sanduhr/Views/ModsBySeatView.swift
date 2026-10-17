@@ -9,12 +9,12 @@ enum SeatSectionID: String, CaseIterable, Sendable {
         switch self {
         case .settings: "Settings"
         case .instructions: "Instructions"
-        case .extensions: "Extensions"
+        case .extensions: "Mods and plugins"
         case .mcp: "MCP servers"
         case .history: "History"
         case .housekeeping: "Housekeeping"
-        case .seat: "Seat"
-        case .drift: "Drift between seats"
+        case .seat: "Folder"
+        case .drift: "Drift between folders"
         }
     }
 
@@ -84,14 +84,14 @@ enum SeatSummary {
         var parts: [String] = [r.model.title]
         if r.killSwitch { parts.append("sync switched off") }
         if case .unknownSchema = r.sync { parts.append("state.json in an unknown schema") }
-        if r.remoteMatches == false { parts.append("its origin doesn't match the seat file") }
+        if r.remoteMatches == false { parts.append("its origin doesn't match its identity file") }
         return (parts.joined(separator: ", ") + ".", r.remoteMatches == false)
     }
 
     static func drift(_ d: [SeatReport.Drift], others: Int) -> (text: String, warns: Bool) {
-        if others == 0 { return ("No other seat to compare.", false) }
+        if others == 0 { return ("No other folder to compare.", false) }
         let n: Int = d.reduce(0) { $0 + $1.count }
-        return (n == 0 ? "Same as the other seats." : plural(n, "difference") + " with " + plural(others, "other seat") + ".", false)
+        return (n == 0 ? "Same as the other folders." : plural(n, "difference") + " with " + plural(others, "other folder") + ".", false)
     }
 }
 
@@ -104,10 +104,16 @@ struct ModsBySeatView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // A note with no folder to sit under: a pack from Finder that isn't one Sanduhr
+            // opens, or an undo into a folder not listed.
+            if let note = model.importNotes.note(for: nil) {
+                Text(note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             if !model.loaded {
                 Text("Reading your Claude Code folders…").font(.caption).foregroundStyle(.secondary)
             } else if let seat = model.shownSeat(demo: demo) {
-                SeatPicker(model: model, demo: demo)
+                // One folder: its header says what it is; the picker comes with a second.
+                if model.controls(demo: demo).picker { SeatPicker(model: model, demo: demo) }
                 OtherFolderImports(model: model)
                 SeatHeader(seat: seat, model: model, linked: linked)
                     .id(ModsPageModel.seatAnchor(seat.path))
@@ -128,23 +134,33 @@ struct ModsBySeatView: View {
     }
 }
 
-/// One import not undone yet, with its Undo Import. `folder` names the folder when it isn't
-/// the seat shown around it.
+/// One import not undone yet, with its Undo Import, which asks first and spins while it runs.
+/// `folder` names the folder when it isn't the seat shown around it.
 private struct ImportRecordRow: View {
     let record: ConfigImport.Record
     var model: ModsPageModel
     let folder: String?
+    @State private var undoing = false
+
+    private var running: Bool { model.undoingImports.contains(record.id) }
 
     var body: some View {
         HStack(spacing: 8) {
             Text("Imported \(record.label)" + (folder.map { " into \($0)" } ?? "") + " \(record.at.formatted(date: .abbreviated, time: .shortened)), \(record.steps.filter { $0.kind != .folder && $0.kind != .settingsFile && $0.kind != .envObject && $0.kind != .marketplace }.count) items")
                 .font(.caption).foregroundStyle(.secondary)
-            Button("Undo Import") {
-                Task { model.configImportNote = await model.undoImport(record).note }
-            }
-            .disabled(model.undoingImports.contains(record.id))
+            if running { ProgressView().controlSize(.small) }
+            Button("Undo Import…") { undoing = true }
+                .disabled(running)
                 .controlSize(.small)
                 .help("Takes back what that import wrote. A file or setting changed since is left, and named.")
+                .confirmationDialog("Undo the import into \(folder ?? model.display(record.seat))?", isPresented: $undoing) {
+                    Button("Undo Import", role: .destructive) {
+                        Task { model.importNotes.setNote(await model.undoImport(record).note, for: model.importNoteFolder(record.seat)) }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("The files and settings it wrote are taken back; anything changed since is left and named.")
+                }
         }
     }
 }
@@ -214,7 +230,7 @@ private struct SeatPickerChip: View {
     var body: some View {
         HStack(spacing: 5) {
             if running {
-                Circle().fill(Color.hex("4ade80")).frame(width: 7, height: 7).help("Claude Code is running in this seat.")
+                Circle().fill(Color.hex("4ade80")).frame(width: 7, height: 7).help("Claude Code is running in this folder.")
             }
             Text(seat.label).font(.callout.weight(selected ? .semibold : .regular))
             SeatMarkBadge(mark: seat.mark)
@@ -233,6 +249,7 @@ private struct SeatHeader: View {
     let seat: Seat
     var model: ModsPageModel
     let linked: [String]
+    @State private var forgetting = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -246,9 +263,15 @@ private struct SeatHeader: View {
                     .controlSize(.small)
                     .help("Opens a .sanduhrpack into this folder. You choose what to bring over; only what the folder lacks can be.")
                 if model.addedFolders.contains(seat.path) {
-                    Button("Forget Folder") { Task { await model.forgetFolder(seat.path, linked: linked) } }
+                    Button("Forget Folder…") { forgetting = true }
                         .controlSize(.small)
                         .help("Stop listing this folder here. Nothing in the folder changes.")
+                        .confirmationDialog("Forget \(model.display(seat.path))?", isPresented: $forgetting) {
+                            Button("Forget", role: .destructive) { Task { await model.forgetFolder(seat.path, linked: linked) } }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("Sanduhr stops listing it. Nothing in the folder changes.")
+                        }
                 }
             }
             Text(facts).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -258,10 +281,10 @@ private struct SeatHeader: View {
             ForEach(model.imports.filter { $0.seat == AccountData.normalized(seat.path) }) { record in
                 ImportRecordRow(record: record, model: model, folder: nil)
             }
-            if let note = model.configImportNote, !note.isEmpty {
+            if let note = model.importNotes.note(for: seat.path) {
                 Text(note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
-            if let note = model.configExportNote {
+            if let note = model.exportNotes.note(for: seat.path) {
                 Text(note).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             if let note = model.configNotes[seat.path] {

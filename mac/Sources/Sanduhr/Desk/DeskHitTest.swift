@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import CoreGraphics
 
@@ -321,14 +322,47 @@ enum DeskPointerWatch {
 /// claude line draw the faint hit plate (DeskPointerMenu) and become click areas, so a two-finger
 /// click there opens Sanduhr's menu instead of the Finder's. The price is the desktop icons right
 /// beneath them, which the window covers while the pointer is there. Off, all three let every
-/// click through, exactly as before.
+/// click through, exactly as before. An absent key reads on, so a Desk from before the switch
+/// keeps its clicks; DeskFirstRun writes it off for a new install.
+/// Where the Desk window sits (Settings, Desk, Clicks's "Keep the Desk under desktop icons"):
+/// just below normal windows, as it always has, or in the desktop layer under Finder's icons,
+/// so files on the desktop sit on top of the Desk's text instead of under it. Under the icons
+/// the Desk window itself takes no clicks: Finder's icon window covers the whole screen above
+/// it, and on recent macOS a click there counts as clicking the wallpaper. The click layer
+/// (DeskClickLayer) stays at the old level with the small pieces' click areas, so those keep
+/// working; the big pieces' menus wait until the Desk is back above the icons.
+enum DeskLayer {
+    /// Desk suite key (com.626labs.sanduhr.desk).
+    static let key = "underIcons"
+    static let defaultOn = false
+
+    static let title = "Keep the Desk under desktop icons"
+    static let caption = "Files on the desktop sit on top of the Desk's text. Meeting rows, watchers, now playing and the account name still take their clicks, a file over one of them included. The clock, the message and the meters let every click through to the files, so their menus wait until this is off."
+
+    static func isOn(in store: DefaultsStore) -> Bool {
+        store.object(forKey: key) as? Bool ?? defaultOn
+    }
+
+    static func set(_ on: Bool, in store: DefaultsStore) {
+        store.set(on, forKey: key)
+    }
+
+    /// The window level for the choice: one above the desktop (under Finder's icons, which sit
+    /// twenty above it) when under the icons, else one below normal windows.
+    static func level(underIcons: Bool) -> NSWindow.Level {
+        underIcons
+            ? NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)) + 1)
+            : NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
+    }
+}
+
 enum DeskPieceClicks {
     /// Desk suite key (com.626labs.sanduhr.desk).
     static let key = "piecesTakeClicks"
     static let defaultOn = true
 
     static let title = "Clock and message take clicks"
-    static let caption = "On: two-finger click them for Sanduhr's menu. Desktop icons right beneath them can't be clicked there while it's on."
+    static let caption = "Desktop icons under the clock or message can't be clicked while this is on. On: two-finger click them for Sanduhr's menu."
 
     static func isOn(in store: DefaultsStore) -> Bool {
         store.object(forKey: key) as? Bool ?? defaultOn

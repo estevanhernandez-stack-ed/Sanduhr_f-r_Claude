@@ -274,6 +274,9 @@ struct CatalogFilter: Equatable, Sendable {
     var seat: String?
     var show: Show = .all
     var search = ""
+
+    /// A filter other than the search is set (the toolbar stays while one is, so it can be cleared).
+    var narrows: Bool { kind != nil || seat != nil || show != .all }
 }
 
 /// Builds the Catalog from every seat's scan (item 71, slice 1): one card per extension, a chip
@@ -581,8 +584,8 @@ enum ConfigCatalog {
             let (seat, scan) = pair
             guard !scan.unreadableFiles.isEmpty || scan.partial, !(demo && seat.isWork) else { return nil }
             return scan.unreadableFiles.isEmpty
-                ? "\(seat.label): a folder walk stopped at its limit, so what's listed may be partial. See By Seat."
-                : "\(seat.label): some files couldn't be read. See By Seat."
+                ? "\(seat.label): a folder walk stopped at its limit, so what's listed may be partial. See By Folder."
+                : "\(seat.label): some files couldn't be read. See By Folder."
         }
     }
 

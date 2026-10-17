@@ -61,6 +61,9 @@ final class NowPlayingController {
     private(set) var checking = false
     /// The last self-test failed (Settings says the system now playing isn't available).
     private(set) var adapterFailed = false
+    /// macOS is not letting Sanduhr ask Music or Spotify (Automation declined or reset); set by
+    /// the last ask that was denied, cleared by the next that was not. Settings shows a row.
+    private(set) var automationDenied = false
     /// Apps seen playing since launch (bundle ids), for Settings' app list. Memory only.
     private(set) var seenApps: [String] = []
     /// Running: placed somewhere and Desk running.
@@ -348,14 +351,19 @@ final class NowPlayingController {
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
             p.arguments = ["-e", NowPlayingFallback.script(for: app)]
-            let out = Pipe()
+            let out = Pipe(), errors = Pipe()
             p.standardOutput = out
-            p.standardError = FileHandle.nullDevice
-            p.terminationHandler = { [weak self] _ in
+            // Read only for the denial verdict (AutomationDenial); never logged or shown.
+            p.standardError = errors
+            p.terminationHandler = { [weak self] process in
                 let data = out.fileHandleForReading.readDataToEndOfFile()
                 let text = String(decoding: data, as: UTF8.self)
+                let denied = AutomationDenial.detect(
+                    exitCode: process.terminationStatus,
+                    stderr: String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self))
                 DispatchQueue.main.async {
                     guard let self, gen == self.generation, self.source == .fallback else { return }
+                    if self.automationDenied != denied { self.automationDenied = denied }
                     let info = NowPlayingFallback.info(fromScript: text, app: app, now: Date())
                     // A quiet app does not clear what the notifications already showed.
                     if info.state != .none { self.fallbackTrack(info, from: app) }

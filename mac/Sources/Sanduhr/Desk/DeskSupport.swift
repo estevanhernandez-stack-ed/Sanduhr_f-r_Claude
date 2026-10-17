@@ -66,8 +66,10 @@ enum DeskFirstRun {
     /// Widget defaults, written by 2.2.x: set on a fresh install until the first successful fetch
     /// hid the widget. WidgetVisibility replaces it; a pending one is adopted as `whileDeskOff`.
     static let tuckKey = "tuckAfterFirstFetch"
-    /// The standard layout with the Claude line swapped for the meters.
-    static let layout = "message:tl clock:bl meters:bl meetings:bl"
+    /// The standard layout with the Claude line swapped for the meters, and no meetings piece:
+    /// showMeetings starts off, so a placed one would sit in the Desk page's Order list and place
+    /// picker without ever drawing. Meetings joins the layout when the user places it.
+    static let layout = "message:tl clock:bl meters:bl"
 
     /// Widget settings any earlier version writes. windowFrame is saved on the first move or
     /// resize; the others as soon as the setting is touched. Sparkle's SULastCheckTime and
@@ -105,6 +107,13 @@ enum DeskFirstRun {
         d.set(layout, forKey: "layout")
         d.set(false, forKey: "showMeetings")
         d.set(false, forKey: DeskController.notchKey)
+        // The plate behind each piece (DeskPlate): on for a new install, whose desktop may be
+        // full of files; an absent key is off, so a Desk from before it looks as it did.
+        d.set(true, forKey: "plate")
+        // Clock and message take clicks (DeskPieceClicks): off for a new install, whose desktop
+        // icons under the clock or message would stop taking clicks; an absent key is on, so an
+        // existing Desk keeps the clicks it had.
+        d.set(false, forKey: DeskPieceClicks.key)
         w.set(WidgetVisibility.whileDeskOff.rawValue, forKey: WidgetVisibility.key)
         return .fresh
     }

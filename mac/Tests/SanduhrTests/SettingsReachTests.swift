@@ -58,6 +58,8 @@ struct SettingsSearchTests {
         #expect(SettingsSearch.hits("prompt").contains { $0.entry.page == .mods && $0.entry.anchor == SettingsAnchor.metersMod })
         #expect(SettingsSearch.hits("mod").contains { $0.entry.page == .mods && $0.entry.anchor == SettingsAnchor.metersMod })
         #expect(first("sanduhr-meters")?.anchor == SettingsAnchor.metersMod)
+        // The agents switch sits under More on Mods & Config (polish 2026-10-17, #20).
+        #expect(SettingsSearch.hits("propose").contains { $0.entry.page == .mods && $0.entry.anchor == SettingsAnchor.inventory })
         #expect(first("Option+S")?.anchor == SettingsAnchor.shortcuts)
         #expect(first("hex")?.page == .deskLook && first("hex")?.advanced == true)
         #expect(first("Add Line")?.page == .message)

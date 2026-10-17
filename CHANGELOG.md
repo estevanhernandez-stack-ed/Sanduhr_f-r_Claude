@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased (mac)
+## v2.27.0-mac — 2026-10-17
+
+- **The Desk can sit under your files.** Settings, Desk, Clicks gains **Keep the Desk under desktop icons**: the Desk window moves below the Finder's desktop icons, so files on the desktop sit on top of its text and can be selected, opened and dragged wherever they are. Meeting rows, watchers, now playing and the account name keep their clicks through a transparent click layer at the Desk's old level; the clock's, message's and meters' menus wait until the option is off. Off by default.
+
+- **A plate behind every Desk piece.** Desk Look's **Plate behind the text** draws a soft dark plate behind each piece, for a desktop with files under it. On for a new install, untouched for an existing one.
+
+- **Arrange Desk hides and shows pieces.** Each piece has Hide while arranging, and a Hidden strip brings one back; Done writes the layout once, Cancel drops it. Margins and the meetings switch wait while arranging.
+
+- **Mods & Config for a first-timer.** The page opens on **Meters above the prompt**, one row per folder with its state and switch, and keeps the rest under **More: mods and config**, which opens by itself once there is a kept mod, a waiting request or a second folder. Filters, sort and the folder pickers appear with two folders or more than ten cards. One word per concept: folder, mod and plugin, On / Off / Not installed. Remove, Dismiss, Undo Import and Forget Folder ask first; export and import notes belong to their folder and clear; the Catalog intro says nothing changes until a button is used.
+
+- **Smaller fixes.** Desk Look's hex fields validate on commit and keep the last good value; a denied Automation permission shows on the Now Playing page with a way to System Settings; the Notch page leads with "Needs the Desk."; three long captions became two sentences with a Learn more link; the Message page is a grouped form; "Clock and message take clicks" starts off for a new install.
+
+## v2.26.1-mac — 2026-10-17
 
 - **Settings read the way Claude Code reads them.** Export Config and the mod inventory now refuse a `settings.json` or `.claude.json` with a trailing comma, as By Seat already showed it; a well-formed file reads exactly as before.
 

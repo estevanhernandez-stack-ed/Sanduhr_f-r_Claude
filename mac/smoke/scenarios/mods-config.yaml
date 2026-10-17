@@ -1,10 +1,13 @@
-# Item 71, slice 1: Mods & Config opens on Catalog | By Seat. The Catalog lists every extension
+# Item 71, slice 1: Mods & Config opens on Catalog | By Folder. The Catalog lists every extension
 # any Claude Code folder holds or any marketplace it added lists, one card each with a chip per
-# seat; By Seat shows each seat. state.yaml's `mods_config` carries the tab and counts only, never
+# folder; By Folder shows each folder (the page says "folder" since 2026-10-17; the hook and the
+# state keys still say `seat`). state.yaml's `mods_config` carries the tab and counts only, never
 # a name, label, path or value. Read only: the run switches tabs and demo mode (in memory) and nothing else; no seat
 # file changes (the tests prove the scan writes nothing; by hand, docs/mac-smoke-test.md,
-# sections 49 and 50).
-name: Mods & Config Catalog and By Seat
+# sections 49 and 50). Controls appear when they apply (2026-10-17): on a one-folder Mac there
+# is no filter row, sort, Expand All, chip picker or Compare segment, so this run expects none
+# of them; Search, the count line and the tab bar are always there.
+name: Mods & Config Catalog and By Folder
 steps:
   # Demo mode first, so the snaps show no work seat, its sources or its descriptions.
   - do: demo
@@ -21,13 +24,20 @@ steps:
   - expect:
       window: settings
       contains: { text: "/in the catalog|shown\\./" }
+  # One word per concept (2026-10-17): the tab and the filter say folder, never seat.
+  - expect:
+      window: settings
+      contains: { text: By Folder }
+  - expect:
+      window: settings
+      missing: { text: "/By Seat|All seats/" }
   - snap: mods-catalog
   - do: mods-config
     arg: seat
   - expect_state: { mods_config.tab: seat }
   - snap: mods-by-seat
-  # By Seat (slice 1b): the picker on the first seat, its eight sections' counts in
-  # `mods_config.by_seat`, numbers and flags only. Opening a seat reads files, changes none.
+  # By Folder (slice 1b): the picker on the first folder, its eight sections' counts in
+  # `mods_config.by_seat`, numbers and flags only. Opening a folder reads files, changes none.
   - do: mods-config
     arg: seat 1
   - expect_state:
@@ -38,7 +48,10 @@ steps:
       mods_config.by_seat.0.history_warning: '/^(true|false)$/'
   - expect:
       window: settings
-      contains: { text: Drift between seats }
+      contains: { text: Drift between folders }
+  - expect:
+      window: settings
+      missing: { text: "/Drift between seats|Extensions/" }
   - snap: mods-by-seat-1
   - do: mods-config
     arg: catalog

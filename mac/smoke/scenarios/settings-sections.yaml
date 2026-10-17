@@ -126,9 +126,10 @@ steps:
   - snap: preview-integrations
   - do: settings
     arg: mods
-  # Mods & Config (raw value mods; item 64): Sanduhr's own mod, Meters above the prompt, is at the
-  # top with its switch per folder (its one home since 2026-10-08); every other mod only reads.
-  # Its summary card counts real mods, never the Sample label. The page opening changes nothing.
+  # Mods & Config (raw value mods; item 64): Sanduhr's own mod, Meters above the prompt, is the
+  # header at the top with its switch per folder (its one home since 2026-10-08; above More: mods
+  # and config since 2026-10-17); every other mod only reads. Its summary card, under More, counts
+  # real mods, never the Sample label. The page opening changes nothing.
   - expect_state: { settings_section: mods, settings_preview: mods, mods_page.open: true }
   - expect:
       window: settings
@@ -139,9 +140,11 @@ steps:
   - expect:
       window: settings
       contains: { text: Meters above the prompt }
+  # More may be open or folded (a kept mod, a waiting request or two folders open it; a choice
+  # once made stays): its label is on screen either way, the Catalog is not pinned.
   - expect:
       window: settings
-      contains: { text: "/sanduhr-meters, Sanduhr.s own mod/" }
+      contains: { text: "More: mods and config" }
   - snap: preview-mods
   - do: settings
     arg: widgetLook

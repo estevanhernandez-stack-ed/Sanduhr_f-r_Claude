@@ -34,8 +34,8 @@ Fresh-install and migration checks stay manual.
 - [ ] After the first successful fetch the widget hides by itself (Desk is on, and a new install's
   Widget, Show the widget is "Hidden while Desk is on") and the meters fill in. The menu bar
   hourglass shows the percent; left-click brings the widget back.
-- [ ] `defaults read com.626labs.sanduhr.desk` shows `deskEnabled = 1`, `layout = "message:tl clock:bl meters:bl meetings:bl"`,
-  `showMeetings = 0`, `notch = 0` and `migrated = 1`. `defaults read com.626labs.sanduhr` shows
+- [ ] `defaults read com.626labs.sanduhr.desk` shows `deskEnabled = 1`, `layout = "message:tl clock:bl meters:bl"`,
+  `showMeetings = 0`, `piecesTakeClicks = 0`, `notch = 0` and `migrated = 1`. `defaults read com.626labs.sanduhr` shows
   `deskFirstRunDone = 1`, `panelHidden = 1`, `widgetVisibility = whileDeskOff` and no `tuckAfterFirstFetch`.
 - [ ] Show the widget, quit and relaunch: the widget is hidden again (Desk is on); Desk is unchanged.
   Desk, turn the Desk switch off: the widget shows; on: it hides.
@@ -110,6 +110,8 @@ Fresh-install and migration checks stay manual.
 - [ ] Strip under the notch draws when Notch, "Extra height below" is above 0; its text appears with "Text under the camera too".
 - [ ] Notch, Text: set Right wing to Message: the right wing shows today's message within 15 seconds, growing to fit. Set Left wing to Nothing: a plain black wing. "Under the camera" to Time: the strip shows the time. Put all three back to their first choices (Next meeting, or the time; Claude meters; Next meeting, or the Claude meters).
 - [ ] Click the island: Sanduhr Settings opens.
+- [ ] Captions (polish-ux 13): the caption under the island switch starts "Needs the Desk." (with the Desk off, the Needs the Desk. row and its Desk Settings… button sit above it). Camera and mic ends in a two-sentence caption and a **Learn more** link that opens the setup guide at "4. Use the notch" in the browser. With the island off, Glow and Camera and mic stay usable (see item 27 and §24 step 9); only Text is disabled.
+- [ ] Captions and spacing (polish-ux 14): Notch glow's Claude Code caption is two sentences (the hook, and that Claude Code says only waiting or finished) with a **Learn more** link that opens the setup guide at "7. Connect Claude Code"; Desk, Where each piece sits ends in a two-sentence caption with a **Learn more** link to "3. Put things on your desktop". Camera fill light's Brightness value column is as wide as Reach below the menu bar's (the percent sits flush with the number under it). Message's rotation, lines and Ask Claude sit in grouped sections with the same margins as Desk Look, under the bar that never scrolls away; the list still scrolls, and dragging a row onto another still reorders it.
 - [ ] Quit and relaunch: the notch is still on (the switch saved). Turn it off: wings and strip go, Desk layer stays.
 - [ ] Full-screen an app: wings stay above it. Switch Spaces: wings stay.
 - [ ] External display as main: no island drawn.
@@ -694,7 +696,8 @@ S=~/Library/Application\ Support/Sanduhr/integrations
 - [ ] `/config`: the mod's Meters (both, session, weekly), Style (compact, full) and Label rows;
   full shows a line per meter with `on pace` or `N% ahead` and `resets Mon 9:00 AM`; a short
   terminal folds it to one line; the label shows first.
-- [ ] Remove: `diff /tmp/st-meters.json ~/.claude-smoketest/settings.json` is empty and the
+- [ ] Remove asks "Remove the meters mod from ~/.claude-smoketest?" (Cancel writes nothing);
+  Remove: `diff /tmp/st-meters.json ~/.claude-smoketest/settings.json` is empty and the
   `.sanduhr-backup` is gone. Install again, add `:/tmp/mine` after Sanduhr's entry by hand,
   Remove: the list reads `/tmp/other-mod:/tmp/mine`.
 - [ ] `state.yaml` shows `meters_installed` with the count and no path. Clean up: Remove, then
@@ -1338,9 +1341,11 @@ never your real settings, and remove it afterwards. Copy `mac/integrations/mods/
 to `~/modtest/meters` and give `~/.claude-modtest/settings.json`
 `{"env": {"CLAUDE_CODE_PLUGIN_DIRS": "~/modtest/meters:~/modtest/gone"}}`.
 
-1. Settings, Mods & Config (under Claude Code, cube symbol) opens with a summary card: mods, plugins, on,
-   folders, and missing when one is; "Sanduhr's own mod switches here; other mods are read-only." No Sample
-   label. VoiceOver reads it as one sentence with the counts.
+1. Settings, Mods & Config (under Claude Code, cube symbol) opens with **Meters above the prompt** (section
+   37), then **More: mods and config**, open here (two folders). First inside it is the summary card: mods,
+   plugins, on, folders, and missing when one is; "Sanduhr's own mod switches per folder in Meters above the
+   prompt, at the top of the page; other mods are read-only." No Sample label. VoiceOver reads it as one
+   sentence with the counts.
 2. One box per Claude Code folder, its path on top. `~/.claude-modtest` lists **sanduhr-meters**
    (0.2.0, Mod, On, its description, "Plugin folder list (CLAUDE_CODE_PLUGIN_DIRS)" and the path),
    "Draws: band above the prompt, toasts", "Its code reads or writes files." in orange, and a
@@ -1454,13 +1459,15 @@ and remove them afterwards. Give `~/.claude-modtest/settings.json` `{"model": "o
 `shasum`. Settings, Mods & Config: turn on **Meters above the prompt** for `~/.claude-modtest`
 (Install in the sheet).
 
-1. Settings, Mods & Config: **Meters above the prompt** sits at the top, above Mods and plugins,
-   with a row per folder: its path, On/Off/Not installed, Update and Remove when they apply, and a
-   switch. Its intro says how Off differs from Remove. `~/.claude-modtest` is on: "Version …,
-   through Sanduhr's current folder: it follows Sanduhr's updates." Under the rows, "Show watchers
-   above the prompt: off. …" with **Watchers Settings…**. The sanduhr-meters row in the inventory
-   below says "Sanduhr's own mod. It switches per folder at the top of this page, Meters above the
-   prompt." Settings, Claude Code has no switch for it: each folder box ends "Meters above the
+1. Settings, Mods & Config: **Meters above the prompt** is the first thing under the title, above
+   **More: mods and config**, with a row per folder: its path, On/Off/Not installed, Update and
+   Remove when they apply, and a switch; then **Studio…**. `~/.claude-modtest` is on: "Version …,
+   through Sanduhr's current folder: it follows Sanduhr's updates." Under the rows, "Watcher rows
+   above the prompt: off. …" with **Watchers Settings…**. More is folded on a fresh profile with one
+   folder; it starts open with a kept mod, a waiting proposal or install request, or two or more
+   folders, and once opened or closed by hand it stays so across launches. Inside it, the
+   sanduhr-meters line in the Catalog says where it is on, with **Folders…** and **Studio…**.
+   Settings, Claude Code has no switch for it: each folder box ends "Meters above the
    prompt: on" (off, not installed) with **Mods & Config Settings…**, which opens Mods & Config
    scrolled to the mod (`smoke/smoke do settings "mods meters"` does the same).
 2. Switch it off: the row reads "… Off: enabledPlugins sets sanduhr-meters@inline to false here."
@@ -1482,8 +1489,9 @@ and remove them afterwards. Give `~/.claude-modtest/settings.json` `{"model": "o
    `~/.claude-modtest2` row shows "Update to <version>". If the new mod calls something the old
    didn't, Update asks "The new version of sanduhr-meters can do more" listing the new calls;
    "Keep the Version in Use" leaves settings.json alone; Update moves the entry to the new stamp.
-7. Remove on both rows: each settings.json is back to its first `shasum` (`~/.claude-modtest2`'s
-   is gone again), and the row reads Not installed.
+7. Remove on both rows: each asks "Remove the meters mod from <folder>?" with a red Remove
+   (Cancel writes nothing); confirmed, each settings.json is back to its first `shasum`
+   (`~/.claude-modtest2`'s is gone again), and the row reads Not installed.
 8. Claude Code, Statusline, Install over an existing statusline in a folder that loads a mod
    with a status entry: under "From your mods", "See It in Mods & Config" closes the sheet and
    opens Settings, Mods & Config.
@@ -1585,8 +1593,18 @@ the end.
     the account name, now playing and the watchers, which work as before. Started from a menu with
     Settings closed, Settings stays closed.
 13. **Reduce Motion.** With Reduce Motion on, a drop moves the piece without the snap.
-14. **VoiceOver.** While arranging, each piece offers Move Up, Move Down, Bigger and Smaller, and the
-    bar reads as "Arrange Desk" with Cancel and Done.
+14. **VoiceOver.** While arranging, each piece offers Move Up, Move Down, Bigger, Smaller and Hide,
+    and the bar reads as "Arrange Desk" with Cancel and Done.
+14a. **Hide and Show.** Each piece's name tag has a small × (Hide): click the clock's and the clock
+    goes; a strip at the bottom of the screen, above the Dock, reads "Hidden:" with the clock and
+    every piece the layout leaves out, each with a **Show** button. Show puts the clock back at
+    Bottom left at 100% (the message comes back at Top left), exactly where Settings' place picker
+    would. Cancel puts hidden pieces back and shown ones away; Done writes the string without the
+    hidden piece's word (its size part included) and with the shown one's.
+14b. **The Desk page waits.** While arranging, Settings, Desk's Margins under Advanced and the
+    Meetings row's "Read today's meetings" are off, as Where each piece sits and Order are. With
+    every piece Hidden in Settings, the Order list reads "Nothing is placed on the Desk." and
+    **Arrange Desk…** is off with "Place a piece first." beside it; placing one piece turns it on.
 15. `smoke/smoke run scenarios/desk-arrange.yaml` passes: it opens Settings, Desk, Layout first;
     while arranging `desk_arrange.click_through` is `whole`, `desk_arrange.bar_visible` is true and
     `settings_open` is false; after, `drawn`, false and true again. The smoke's edit (the clock to
@@ -1645,9 +1663,10 @@ Standard layout (message top left; clock, claude line and meters bottom left), D
 showing today. Put a desktop icon (a scratch file) right under the clock first, and another on the
 desktop well away from every piece.
 
-1. Settings, Desk Look ends with **Clicks**: **Clock and message take clicks**, on, captioned "On:
-   two-finger click them for Sanduhr's menu. Desktop icons right beneath them can't be clicked
-   there while it's on." `smoke/smoke state` shows `desk_piece_clicks: true` and `desk_frames`
+1. Settings, Desk Look ends with **Clicks**: **Clock and message take clicks**, on (an existing
+   profile; a new install starts off), captioned "Desktop icons under the clock or message can't
+   be clicked while this is on. On: two-finger click them for Sanduhr's menu." `smoke/smoke state`
+   shows `desk_piece_clicks: true` and `desk_frames`
    lists `clock`, `message` and `claude_line` with non-empty frames; `desk_frames_ok: true`.
 2. Close Settings. Two-finger click (or Control-click) the time, the date, the gap between the
    hour and the minutes, and the space between two words of the message: each time Sanduhr's menu
@@ -1976,50 +1995,60 @@ On a Mac with two or more Claude Code folders. Nothing here changes a folder: be
 note the modification times of each folder's `settings.json` and `.claude.json` (`stat -f '%m %N'`),
 and compare them at the end.
 
-1. Settings, **Mods & Config**: Meters above the prompt at the top, then the **Catalog | By Seat**
-   tabs on Catalog. Switch to By Seat, open another page and come back: still By Seat. Close and
-   reopen Settings: Catalog again.
+1. Settings, **Mods & Config**: Meters above the prompt at the top, then **More: mods and config**
+   (open, with two folders) holding the summary card and the **Catalog | By Folder | Compare**
+   tabs on Catalog (never "By Seat": the page says folder, one word per concept, 2026-10-17).
+   Switch to By Folder, open another page and come back: still By Folder. Close and
+   reopen Settings: Catalog again. Controls appear when they apply (2026-10-17): with one
+   folder and ten or fewer cards the Catalog shows Search, the count and New Mod… only, no
+   Kind, Folder or Show filter, no sort, no Expand All / Collapse All, and no Compare segment;
+   with `claude` off the PATH, its note sits inside More under the tabs, never at the page top.
+   `smoke/smoke do mods-config compare` still lands on Compare, which says it needs two folders.
 2. The Catalog's first card is sanduhr-meters (Mod, From Sanduhr), with a chip for each folder
-   it is installed in, or "Installed in no folder yet.". Below it, one card per plugin, skill,
+   it is installed in, or "Not installed." and no Available badge (the Studio's word). Below it, one card per plugin, skill,
    agent, command, output style and MCP server, each with a chip per folder that has it: the
-   folder's label, a Work, Personal or Unmarked badge, and On, Off, Declared, not installed, In N
+   folder's label, a Work, Personal or Not marked badge, and On, Off, Declared, not installed, In N
    projects or Its session only. A chip never names a project.
 3. A plugin enabled from two marketplaces in any folder is one card with both "Marketplace …"
    sources and an orange **Duplicate** badge, and "On twice in <label>". A plugin a marketplace
    lists that no folder installed has no chips and a green **Available** badge.
-4. Filters: Kind, Agents shows only agents; Seat, one folder shows only cards with its chip;
+4. Filters (shown with two folders, or more than ten cards): Kind, Agents shows only agents;
+   Folder (All folders, with two folders), one folder shows only cards with its chip;
    Available only and Needs a look narrow the list; search for a marketplace's name finds its
-   plugins. The count line says "N of M shown.".
-5. On By Seat, pick a folder and give it a **Label** in its header (press Return) and mark it **Work**: back on the Catalog
+   plugins. The count line says "N of M shown.". Expand All, Collapse All, Folders… and
+   Studio… are small bordered buttons like New Mod…, not links.
+5. On By Folder, pick a folder and give it a **Label** in its header (press Return) and, in the
+   **Work or personal** picker beside it (its label shows), mark it **Work**: back on the Catalog
    its chips carry the new label and an orange Work badge. A folder whose linked account is
    marked work shows "Work from its account" and no picker. Nothing in the folder changes.
-6. Click a chip: By Seat opens on that folder with Extensions (or MCP servers) open and the item lit.
+6. Click a chip: By Folder opens on that folder with Mods and plugins (or MCP servers) open and the item lit.
 7. Mark a folder Work, then `smoke/smoke do demo on` (debug hooks on): cards only that folder
    holds, and plugins only its marketplaces list, disappear from the Catalog; shared cards lose its
-   chip and any source, description or version only it supplied; the Seat filter and By Seat no
+   chip and any source, description or version only it supplied; the Folder filter and By Folder no
    longer offer it. `demo off` brings them back. A folder with an unreadable file is named above the
-   filters ("some files couldn't be read. See By Seat.").
-8. Break a scratch folder's `settings.json` (add a `//` comment): Read Again. On By Seat its Settings
+   filters ("some files couldn't be read. See By Folder.").
+8. Break a scratch folder's `settings.json` (add a `//` comment): Read Again. On By Folder its Settings
    summary says "settings.json is unreadable: it isn't valid JSON (a comment around line …, column …)",
    never that it loads nothing.
 9. `smoke/smoke run smoke/scenarios/mods-config.yaml` (from `mac/`) passes; `smoke/smoke state`
    shows `mods_config` with `tab`, `seats`, `cards`, `available`, `needs_look`, `duplicates`,
    `work_only` and `shown`, numbers only. Compare the modification times from the start: unchanged.
 
-## 50. Mods & Config: By Seat (item 71, slice 1b)
+## 50. Mods & Config: By Folder (item 71, slice 1b)
 
 On a Mac with two or more Claude Code folders, one marked Work and one Personal (section 49, step
 5). Note each folder's modification times first (`stat -f '%m %N'` on `settings.json`,
 `.claude.json` and `history.jsonl`) and compare at the end: nothing may change.
 
-1. By Seat: a chip per folder with its label and badge; start `claude` in a terminal with
+1. By Folder: a chip per folder with its label and badge (the picker shows with two or more
+   folders; with one, its header alone says what it is); start `claude` in a terminal with
    `CLAUDE_CONFIG_DIR` set to one folder, Read Again: that chip shows a green dot. Quit it, Read
    Again: the dot goes.
 2. The header names the folder (`~/…`), its account or "No account linked", the install model
    (Git clone, Copy-installed or Plain folder), the Claude Code version on PATH for a native
    install, and "Claude Code's default folder" for `~/.claude`.
-3. Eight sections, each collapsed to one line: Settings, Instructions, Extensions, MCP servers,
-   History, Housekeeping, Seat, Drift between seats. Open and close one, switch tabs and back: it
+3. Eight sections, each collapsed to one line: Settings, Instructions, Mods and plugins, MCP servers,
+   History, Housekeeping, Folder, Drift between folders. Open and close one, switch tabs and back: it
    stays as left.
 4. Settings: "Computed by Sanduhr" at the top; each key with its value, "From User (~/…/settings.json)"
    or Managed, "honored: …", "this machine only" for keys in `.seat/local-keys.json`, and "also set
@@ -2028,14 +2057,14 @@ On a Mac with two or more Claude Code folders, one marked Work and one Personal 
 5. Instructions: the seat's CLAUDE.md with its `@` imports indented, line and byte counts; an
    import that doesn't exist says "doesn't resolve". On a non-default seat with `~/.claude/CLAUDE.md`
    present and no exclude, the leak warning shows.
-6. Extensions: agents, skills, commands and output styles; plugins with enabled, installed and
+6. Mods and plugins: agents, skills, commands and output styles; plugins with enabled, installed and
    declared marks; a plugin enabled from two marketplaces is listed under the checks; hooks
    read-only; then the Mods list with Check, as before.
 7. MCP servers: each server with its scope, transport, host or command (secrets masked), env and
    header names only, and the recommended route.
 8. History: without `cleanupPeriodDays`, orange "Transcripts older than 30 days are deleted at the
    next start"; with it, "Kept N days".
-9. Housekeeping lists any `*.sanduhr-backup` first; Seat shows the branch for a git clone, "Sync
+9. Housekeeping lists any `*.sanduhr-backup` first; Folder shows the branch for a git clone, "Sync
    is switched off" when `.seat/disabled` exists, and the never-list buckets from `.gitignore`.
 10. Drift on the Personal seat against the Work one: key names and "differs" only, no values;
     between two Personal seats the values show (masked). A work seat's sections never name its

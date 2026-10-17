@@ -172,6 +172,28 @@ struct DeskArrangement: Equatable {
         pieces.insert(moved, at: at)
     }
 
+    /// Takes `widget` off the Desk: the write Settings makes when a piece's place is set to
+    /// Hidden (`place` at nil), so its word goes, size and all, and the rest keep theirs.
+    mutating func hide(_ widget: String) {
+        place(widget, at: nil)
+    }
+
+    /// Puts a hidden `widget` back at its standard anchor at size 1: the write Settings makes
+    /// when a place is picked for a hidden piece (`place`, which also seats it by Settings'
+    /// order). A placed piece stays where it is.
+    mutating func show(_ widget: String) {
+        guard placement(widget) == nil else { return }
+        place(widget, at: Self.defaultAnchor(widget))
+    }
+
+    /// The known widgets not in the layout, in Settings' order (Arrange mode's Hidden strip).
+    var hidden: [String] {
+        Self.known.filter { placement($0) == nil }
+    }
+
+    /// Nothing is placed: Settings' Order list is empty and Arrange Desk… has nothing to drag.
+    var placesNothing: Bool { pieces.isEmpty }
+
     /// Sets a placed piece's size (snapped and kept within range). A hidden piece has none.
     mutating func setScale(_ widget: String, _ scale: Double) {
         guard let i = pieces.firstIndex(where: { $0.widget == widget }) else { return }
