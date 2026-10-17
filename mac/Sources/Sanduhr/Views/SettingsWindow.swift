@@ -130,9 +130,10 @@ final class SettingsWindowController {
     /// with no anchor or the window closed.
     var anchorVisible: Bool? { isOpen ? navigation.anchorVisible : nil }
     /// The page's preview is folded to its strip (state.yaml `settings_preview_folded`), nil for a
-    /// page without a preview or the window closed.
+    /// page without a preview or the window closed. Mods & Config's card sits under More on the
+    /// page (2026-10-17), with no strip to fold.
     var previewFolded: Bool? {
-        guard isOpen, SettingsPreviewKind.of(navigation.selection) != nil else { return nil }
+        guard isOpen, navigation.selection != .mods, SettingsPreviewKind.of(navigation.selection) != nil else { return nil }
         return navigation.previewFolds && !navigation.openPreviews.contains(navigation.selection)
     }
 
@@ -388,8 +389,8 @@ struct SettingsRoot: View {
         case .credentials: AccountsSettings(vm: vm, navigation: navigation).settingsViewport()
         case .usage: UsageSettings(vm: vm, navigation: navigation, theme: vm.theme.palette).settingsViewport()
         case .integrations: IntegrationsSettings(vm: vm, navigation: navigation).settingsViewport()
-        case .mods:
-            ModsSettings(vm: vm, model: navigation.modsPage).withPreview(.mods) { ModsSummaryCard(model: navigation.modsPage) }
+        // Mods & Config draws its summary card itself, under More (2026-10-17).
+        case .mods: ModsSettings(vm: vm, model: navigation.modsPage).settingsViewport()
         case .widgetLook:
             WidgetSettings(vm: vm, section: .widgetLook).id(navigation.selection)
                 .withPreview(.widgetLook) { WidgetPreview(vm: vm) }

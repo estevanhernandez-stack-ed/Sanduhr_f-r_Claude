@@ -18,18 +18,23 @@ final class ModsPageModel {
     private(set) var checks: [String: ModCheckOutcome] = [:]
     private(set) var checking: Set<String> = []
 
-    /// Sanduhr's own mod in each folder, the app's version of it, and what the last action said.
-    private(set) var own: [OwnModRow] = []
+    /// Sanduhr's own mod in each folder (set by `load`; tests seed it), the app's version of it,
+    /// and what the last action said.
+    var own: [OwnModRow] = []
     private(set) var appMod: AppModVersion?
     private(set) var ownNotes: [String: OwnModNote] = [:]
     private(set) var ownBusy: Set<String> = []
-    /// A folder whose list has no entry, waiting for On's confirmation.
-    var confirmOn: String?
     /// An update that can do more than the version in use, waiting for an answer.
     var updateQuestion: OwnModUpdateQuestion?
 
     let home = NSHomeDirectory()
     var installer = IntegrationInstaller.standard
+
+    /// `moreStore` keeps the More disclosure's choice (`moreExpandedKey`); tests give one in memory.
+    init(moreStore: DefaultsStore = UserDefaults.standard) {
+        self.moreStore = moreStore
+        moreChoice = moreStore.object(forKey: Self.moreExpandedKey) as? Bool
+    }
 
     var counts: ModCounts { ModCounts(inventory) }
 
@@ -101,6 +106,7 @@ final class ModsPageModel {
         defer { loading = false }
         let home = self.home
         let installer = self.installer
+        let keptStore = self.keptStore
         let added = SeatPreferences.added(in: store)
         let first = await Task.detached(priority: .userInitiated) { () -> ModsPageRead in
             let env = ProcessInfo.processInfo.environment
@@ -123,10 +129,13 @@ final class ModsPageModel {
                                                                    installed: installed))
             read.version = ModsPageModel.claudeVersion(claude)
             read.environmentSeat = env["CLAUDE_CONFIG_DIR"].flatMap { $0.isEmpty ? nil : ClaudeProcesses.seat(configDir: $0, home: home) }
+            // What is kept decides whether More starts open; New Mod reads it again with its states.
+            read.kept = keptStore.list()
             return read
         }.value
         claude = first.claude
         own = first.own
+        kept = first.kept
         appMod = first.app
         configNotes = first.notes
         addedFolders = added.map(AccountData.normalized)
@@ -177,10 +186,12 @@ final class ModsPageModel {
         applyPendingSeat()
     }
 
-    /// The Settings window closed: Mods & Config reopens on its Catalog, nothing focused.
+    /// The Settings window closed: Mods & Config reopens on its Catalog, nothing focused, and
+    /// More as the user left it (a link's opening of it was for the one window).
     func windowClosed() {
         tab = .catalog
         focus = nil
+        moreOpenedByLink = false
     }
 
     /// Seats with files Sanduhr couldn't read, for the Catalog's note.
@@ -275,6 +286,38 @@ final class ModsPageModel {
     func studioOnLine(demo: Bool) -> String? {
         guard ownLoaded else { return nil }
         return OwnModRow.onLine(studioRows(demo: demo))
+    }
+
+    // MARK: More: mods and config (2026-10-17)
+
+    /// The More disclosure's remembered choice: true or false once the user opened or closed it.
+    static let moreExpandedKey = "modsMoreExpanded"
+    private let moreStore: DefaultsStore
+    /// The choice as kept, nil until the user makes one.
+    private var moreChoice: Bool?
+    /// A link or search into More (the Mods and plugins anchor) opens it for this window only.
+    var moreOpenedByLink = false
+
+    /// More starts open when there is something in it for this user: a kept mod, a proposal or
+    /// install request waiting, or more than one folder. One folder and nothing waiting is the
+    /// first-timer's case, and the header stands alone.
+    nonisolated static func moreStartsOpen(kept: Int, waiting: Int, folders: Int) -> Bool {
+        kept > 0 || waiting > 0 || folders > 1
+    }
+
+    /// Whether More is open: a link's opening, else the kept choice, else the default from what
+    /// the page has read. `waiting` is ModProposalStore's pending proposals and install requests.
+    func moreExpanded(demo: Bool, waiting: Int) -> Bool {
+        if moreOpenedByLink { return true }
+        if let moreChoice { return moreChoice }
+        return Self.moreStartsOpen(kept: kept.count, waiting: waiting, folders: studioRows(demo: demo).count)
+    }
+
+    /// The user opened or closed More: kept for next time.
+    func setMoreExpanded(_ open: Bool) {
+        moreOpenedByLink = false
+        moreChoice = open
+        moreStore.set(open, forKey: Self.moreExpandedKey)
     }
 
     /// The folder of the mod this copy of Sanduhr carries, nil in a build without it.
@@ -514,15 +557,8 @@ final class ModsPageModel {
 
     // MARK: Sanduhr's own mod (slice 2)
 
-    /// The switch: On in a folder whose list has no entry asks first (it adds one).
-    func requestSwitch(_ row: OwnModRow, on: Bool, linked: [String]) {
-        if on && !row.state.listed {
-            confirmOn = row.folder
-            return
-        }
-        Task { await setOwn(on: on, folder: row.folder, linked: linked) }
-    }
-
+    /// Off, or On in a folder whose list has the entry. On in a folder without one goes through
+    /// the consent sheet and `install` (MetersModRow).
     func setOwn(on: Bool, folder: String, linked: [String]) async {
         await act(folder, linked: linked) { installer, home in
             try installer.switchOwnMod(on: on, folder: folder)
@@ -641,6 +677,8 @@ struct ModsPageRead: Sendable {
     var unreadableProcesses = 0
     var version: String?
     var environmentSeat: String?
+    /// The mods Sanduhr kept, for More's first state (2026-10-17).
+    var kept: [KeptMod] = []
 }
 
 /// Mods & Config's tabs (item 71, slice 1; Compare in slice 1d).
@@ -707,9 +745,9 @@ enum ModSketch {
 
 /// Settings, Mods & Config (item 64; raw value `mods`): Sanduhr's own mod first, Meters above the
 /// prompt, with its switch, Update and Remove per folder (its one home since 2026-10-08; slice 2
-/// had it on Claude Code), then every mod and plugin each Claude Code folder loads, what each
-/// draws and can reach, and Check (Claude Code's own validator) for a risk card. Other mods are
-/// read-only.
+/// had it on Claude Code; a header above More since 2026-10-17), then, under More: mods and
+/// config, every mod and plugin each Claude Code folder loads, what each draws and can reach,
+/// and Check (Claude Code's own validator) for a risk card. Other mods are read-only.
 struct ModsSettings: View {
     var vm: UsageViewModel
     var model: ModsPageModel
@@ -723,11 +761,11 @@ struct ModsSettings: View {
         Task { for url in urls { await model.openAnyPack(url, store: .shared) } }
     }
 
-    private func openMetersIfAsked() {
-        guard navigation?.anchor == SettingsAnchor.metersMod else { return }
-        navigation?.anchor = nil
-        model.tab = .catalog
-        model.openStudio(.folders)
+    /// A link or search into More (the Mods and plugins anchor) opens it, so the window's scroll
+    /// finds the tab bar. The meters anchor is the header at the top, which needs nothing opened.
+    private func openMoreIfAsked() {
+        guard navigation?.anchor == SettingsAnchor.inventory else { return }
+        model.moreOpenedByLink = true
     }
 
     private var linked: [String] { vm.realAccountLabels.compactMap { vm.dataChoices(for: $0).folder } }
@@ -742,10 +780,16 @@ struct ModsSettings: View {
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    // Catalog | By Seat (item 71, slice 1), right above what each shows.
-                    ModsTabBar(model: model)
-                        .settingsAnchor(SettingsAnchor.inventory)
-                    tabContent
+                    // Sanduhr's own mod first (2026-10-17): the switch per folder, under the title.
+                    MetersHeader(model: model, linked: linked, demo: vm.demo)
+                        .settingsAnchor(SettingsAnchor.metersMod)
+                    ModsMore(model: model, demo: vm.demo) {
+                        ModsSummaryCard(model: model)
+                        // Catalog | By Seat (item 71, slice 1), right above what each shows.
+                        ModsTabBar(model: model)
+                            .settingsAnchor(SettingsAnchor.inventory)
+                        tabContent
+                    }
                     ModsFolderActions(model: model, linked: linked)
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -758,14 +802,14 @@ struct ModsSettings: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task { await model.load(linked: linked) }
-        // The meters mod lives in the Catalog with the other mods (2026-10-14, the owner): links and
-        // search that name it open the Studio's Folders tab, where it switches per folder.
-        .onAppear { openMetersIfAsked(); openPacksIfAny() }
+        // Links and search that name the meters mod land on the header (2026-10-17; from
+        // 2026-10-14 they opened the Studio's Folders tab).
+        .onAppear { openMoreIfAsked(); openPacksIfAny() }
         .onChange(of: PackInbox.shared.urls) { openPacksIfAny() }
         .sheet(item: Binding(get: { model.configImport }, set: { model.configImport = $0 })) { state in
             ConfigImportSheet(model: model, demo: vm.demo, state: state, close: { model.configImport = nil })
         }
-        .onChange(of: navigation?.scrollRequest) { openMetersIfAsked() }
+        .onChange(of: navigation?.scrollRequest) { openMoreIfAsked() }
         .sheet(isPresented: Binding(get: { model.studioOpen }, set: { model.studioOpen = $0 })) {
             ModStudioSheet(model: .live(), mods: model, linked: linked, demo: vm.demo, tab: model.studioTab,
                            close: { model.studioOpen = false })
@@ -782,6 +826,35 @@ struct ModsSettings: View {
         case .compare:
             ModsCompareView(model: model, demo: vm.demo)
         }
+    }
+}
+
+/// More: mods and config (2026-10-17): the summary card, the tabs and what they show, under one
+/// disclosure so a first-timer sees the header alone. It starts open when the user has a kept
+/// mod, a waiting proposal or install request, or more than one folder; opened or closed by
+/// hand, it stays so (ModsPageModel.moreExpandedKey).
+private struct ModsMore<Content: View>: View {
+    var model: ModsPageModel
+    let demo: Bool
+    @ViewBuilder let content: () -> Content
+
+    /// Computed: a generic type can't hold a static stored property.
+    static var title: String { "More: mods and config" }
+
+    var body: some View {
+        let proposals = ModProposalStore.shared
+        let waiting = proposals.pendingFromClaude.count + proposals.pendingInstalls.count
+        DisclosureGroup(isExpanded: expanded(waiting: waiting)) {
+            VStack(alignment: .leading, spacing: 14) { content() }
+                .padding(.top, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Text(Self.title).font(.headline)
+        }
+    }
+
+    private func expanded(waiting: Int) -> Binding<Bool> {
+        Binding(get: { model.moreExpanded(demo: demo, waiting: waiting) }, set: { model.setMoreExpanded($0) })
     }
 }
 
@@ -814,7 +887,7 @@ struct ModsIntro: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Mods and plugins").font(.subheadline.weight(.semibold))
-            Text("Everything each Claude Code folder loads: mods (plugins with a hooks module that draw in Claude Code) and plain plugins, from the plugin folders its settings list, its installed plugins, its skills folder and the mods a session made. Sanduhr finds them by reading files: no mod runs. Other mods are read-only here: Sanduhr's own switches per folder above, and switching other mods comes later. Check asks Claude Code's own validator, which reads a mod without running it, what the mod hooks and calls.")
+            Text("Everything each Claude Code folder loads: mods (plugins with a hooks module that draw in Claude Code) and plain plugins, from the plugin folders its settings list, its installed plugins, its skills folder and the mods a session made. Sanduhr finds them by reading files: no mod runs. Other mods are read-only here: Sanduhr's own switches per folder in Meters above the prompt, at the top of the page, and switching other mods comes later. Check asks Claude Code's own validator, which reads a mod without running it, what the mod hooks and calls.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1084,7 +1157,7 @@ private struct ModReportView: View {
 }
 
 /// The page's summary card (item 68's pattern): the counts across folders, on the preview
-/// wallpaper.
+/// wallpaper. Since 2026-10-17 it sits first under More, on the page, not above it.
 struct ModsSummaryCard: View {
     var model: ModsPageModel
 
@@ -1099,7 +1172,7 @@ struct ModsSummaryCard: View {
                 } else {
                     Text("Reading your Claude Code folders…").foregroundStyle(.white.opacity(0.8))
                 }
-                Text("Sanduhr's own mod switches here, per folder; other mods are read-only.")
+                Text("Sanduhr's own mod switches per folder in Meters above the prompt, at the top of the page; other mods are read-only.")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.7))
             }
