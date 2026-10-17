@@ -128,23 +128,33 @@ struct ModsBySeatView: View {
     }
 }
 
-/// One import not undone yet, with its Undo Import. `folder` names the folder when it isn't
-/// the seat shown around it.
+/// One import not undone yet, with its Undo Import, which asks first and spins while it runs.
+/// `folder` names the folder when it isn't the seat shown around it.
 private struct ImportRecordRow: View {
     let record: ConfigImport.Record
     var model: ModsPageModel
     let folder: String?
+    @State private var undoing = false
+
+    private var running: Bool { model.undoingImports.contains(record.id) }
 
     var body: some View {
         HStack(spacing: 8) {
             Text("Imported \(record.label)" + (folder.map { " into \($0)" } ?? "") + " \(record.at.formatted(date: .abbreviated, time: .shortened)), \(record.steps.filter { $0.kind != .folder && $0.kind != .settingsFile && $0.kind != .envObject && $0.kind != .marketplace }.count) items")
                 .font(.caption).foregroundStyle(.secondary)
-            Button("Undo Import") {
-                Task { model.configImportNote = await model.undoImport(record).note }
-            }
-            .disabled(model.undoingImports.contains(record.id))
+            if running { ProgressView().controlSize(.small) }
+            Button("Undo Import…") { undoing = true }
+                .disabled(running)
                 .controlSize(.small)
                 .help("Takes back what that import wrote. A file or setting changed since is left, and named.")
+                .confirmationDialog("Undo the import into \(folder ?? model.display(record.seat))?", isPresented: $undoing) {
+                    Button("Undo Import", role: .destructive) {
+                        Task { model.configImportNote = await model.undoImport(record).note }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("The files and settings it wrote are taken back; anything changed since is left and named.")
+                }
         }
     }
 }
@@ -233,6 +243,7 @@ private struct SeatHeader: View {
     let seat: Seat
     var model: ModsPageModel
     let linked: [String]
+    @State private var forgetting = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -246,9 +257,15 @@ private struct SeatHeader: View {
                     .controlSize(.small)
                     .help("Opens a .sanduhrpack into this folder. You choose what to bring over; only what the folder lacks can be.")
                 if model.addedFolders.contains(seat.path) {
-                    Button("Forget Folder") { Task { await model.forgetFolder(seat.path, linked: linked) } }
+                    Button("Forget Folder…") { forgetting = true }
                         .controlSize(.small)
                         .help("Stop listing this folder here. Nothing in the folder changes.")
+                        .confirmationDialog("Forget \(model.display(seat.path))?", isPresented: $forgetting) {
+                            Button("Forget", role: .destructive) { Task { await model.forgetFolder(seat.path, linked: linked) } }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("Sanduhr stops listing it. Nothing in the folder changes.")
+                        }
                 }
             }
             Text(facts).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)

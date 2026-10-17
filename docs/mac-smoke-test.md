@@ -694,7 +694,8 @@ S=~/Library/Application\ Support/Sanduhr/integrations
 - [ ] `/config`: the mod's Meters (both, session, weekly), Style (compact, full) and Label rows;
   full shows a line per meter with `on pace` or `N% ahead` and `resets Mon 9:00 AM`; a short
   terminal folds it to one line; the label shows first.
-- [ ] Remove: `diff /tmp/st-meters.json ~/.claude-smoketest/settings.json` is empty and the
+- [ ] Remove asks "Remove the meters mod from ~/.claude-smoketest?" (Cancel writes nothing);
+  Remove: `diff /tmp/st-meters.json ~/.claude-smoketest/settings.json` is empty and the
   `.sanduhr-backup` is gone. Install again, add `:/tmp/mine` after Sanduhr's entry by hand,
   Remove: the list reads `/tmp/other-mod:/tmp/mine`.
 - [ ] `state.yaml` shows `meters_installed` with the count and no path. Clean up: Remove, then
@@ -1486,8 +1487,9 @@ and remove them afterwards. Give `~/.claude-modtest/settings.json` `{"model": "o
    `~/.claude-modtest2` row shows "Update to <version>". If the new mod calls something the old
    didn't, Update asks "The new version of sanduhr-meters can do more" listing the new calls;
    "Keep the Version in Use" leaves settings.json alone; Update moves the entry to the new stamp.
-7. Remove on both rows: each settings.json is back to its first `shasum` (`~/.claude-modtest2`'s
-   is gone again), and the row reads Not installed.
+7. Remove on both rows: each asks "Remove the meters mod from <folder>?" with a red Remove
+   (Cancel writes nothing); confirmed, each settings.json is back to its first `shasum`
+   (`~/.claude-modtest2`'s is gone again), and the row reads Not installed.
 8. Claude Code, Statusline, Install over an existing statusline in a folder that loads a mod
    with a status entry: under "From your mods", "See It in Mods & Config" closes the sheet and
    opens Settings, Mods & Config.

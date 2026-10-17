@@ -205,12 +205,14 @@ struct MetersModRow: View {
     }
 }
 
-/// Update (an entry naming older scripts, or a pinned version older than the app's) and Remove.
+/// Update (an entry naming older scripts, or a pinned version older than the app's) and Remove,
+/// which asks first: it rewrites that folder's settings.json.
 private struct MetersModButtons: View {
     let row: OwnModRow
     var model: ModsPageModel
     let linked: [String]
     let busy: Bool
+    @State private var removing = false
 
     var body: some View {
         if row.status == .outdated || row.updateWaiting {
@@ -226,8 +228,14 @@ private struct MetersModButtons: View {
             .disabled(busy)
         }
         if row.state.listed || row.state.hasReceipt {
-            Button("Remove") { Task { await model.remove(folder: row.folder, linked: linked) } }
+            Button("Remove…") { removing = true }
                 .disabled(busy || !row.state.readable)
+                .confirmationDialog("Remove the meters mod from \(model.display(row.folder))?", isPresented: $removing) {
+                    Button("Remove", role: .destructive) { Task { await model.remove(folder: row.folder, linked: linked) } }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Its entries come out of that folder's settings.json. The receipt keeps the undo.")
+                }
         }
     }
 }
